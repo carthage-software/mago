@@ -12,7 +12,6 @@ use mago_syntax_core::start_of_binary_number;
 use mago_syntax_core::start_of_float_number;
 use mago_syntax_core::start_of_hexadecimal_number;
 use mago_syntax_core::start_of_identifier;
-use mago_syntax_core::start_of_number;
 use mago_syntax_core::start_of_octal_number;
 use mago_syntax_core::start_of_octal_or_float_number;
 use mago_syntax_core::utils::read_digits_of_base;
@@ -27,32 +26,32 @@ pub struct TypeLexer<'arena> {
 }
 
 impl<'arena> TypeLexer<'arena> {
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn new(input: Input<'arena>) -> TypeLexer<'arena> {
         TypeLexer { input }
     }
 
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn has_reached_eof(&self) -> bool {
         self.input.has_reached_eof()
     }
 
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn current_position(&self) -> Position {
         self.input.current_position()
     }
 
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn slice_in_range(&self, from: u32, to: u32) -> &'arena str {
         let bytes_slice = self.input.slice_in_range(from, to);
         bytes_slice.utf8_chunks().next().map_or("", |chunk| chunk.valid())
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn advance(&mut self) -> Option<Result<TypeToken<'arena>, SyntaxError>> {
         if self.input.has_reached_eof() {
             return None;
@@ -65,42 +64,58 @@ impl<'arena> TypeLexer<'arena> {
             return Some(Ok(self.token(TypeTokenKind::Whitespace, whitespaces, start, end)));
         }
 
-        let (kind, length) = match self.input.read(3) {
-            [b'*', ..] => (TypeTokenKind::Asterisk, 1),
-            [b'.', b'.', b'.'] => (TypeTokenKind::Ellipsis, 3),
-            [b':', b':', ..] => (TypeTokenKind::ColonColon, 2),
-            [b'/', b'/', ..] => self.read_single_line_comment(),
-            [b'.', start_of_number!(), ..] => self.read_decimal(),
-            [start_of_number!(), ..] => self.read_number(),
-            [quote @ (b'\'' | b'"'), ..] => self.read_literal_string(*quote),
-            [b'\\', start_of_identifier!(), ..] => self.read_fully_qualified_identifier(),
-            [start_of_identifier!(), ..] => self.read_identifier_or_keyword(),
-            [b'$', start_of_identifier!(), ..] => self.read_variable(),
-            [b':', ..] => (TypeTokenKind::Colon, 1),
-            [b'=', ..] => (TypeTokenKind::Equals, 1),
-            [b'?', ..] => (TypeTokenKind::Question, 1),
-            [b'!', ..] => (TypeTokenKind::Exclamation, 1),
-            [b'&', ..] => (TypeTokenKind::Ampersand, 1),
-            [b'|', ..] => (TypeTokenKind::Pipe, 1),
-            [b'>', ..] => (TypeTokenKind::GreaterThan, 1),
-            [b'<', ..] => (TypeTokenKind::LessThan, 1),
-            [b'(', ..] => (TypeTokenKind::LeftParenthesis, 1),
-            [b')', ..] => (TypeTokenKind::RightParenthesis, 1),
-            [b'[', ..] => (TypeTokenKind::LeftBracket, 1),
-            [b']', ..] => (TypeTokenKind::RightBracket, 1),
-            [b'{', ..] => (TypeTokenKind::LeftBrace, 1),
-            [b'}', ..] => (TypeTokenKind::RightBrace, 1),
-            [b',', ..] => (TypeTokenKind::Comma, 1),
-            [b'+', ..] => (TypeTokenKind::Plus, 1),
-            [b'-', ..] => (TypeTokenKind::Minus, 1),
-            [unknown_byte, ..] => {
-                return Some(Err(SyntaxError::UnrecognizedToken(
-                    self.file_id(),
-                    *unknown_byte,
-                    self.input.current_position(),
-                )));
+        let remaining = self.input.read_remaining();
+        // SAFETY: has_reached_eof() was checked at the top; remaining is non-empty.
+        let first = unsafe { *remaining.get_unchecked(0) };
+        let second = remaining.get(1).copied();
+
+        let (kind, length) = match first {
+            b'*' => (TypeTokenKind::Asterisk, 1),
+            b':' => {
+                if second == Some(b':') {
+                    (TypeTokenKind::ColonColon, 2)
+                } else {
+                    (TypeTokenKind::Colon, 1)
+                }
             }
-            [] => unreachable!(),
+            b'=' => (TypeTokenKind::Equals, 1),
+            b'?' => (TypeTokenKind::Question, 1),
+            b'!' => (TypeTokenKind::Exclamation, 1),
+            b'&' => (TypeTokenKind::Ampersand, 1),
+            b'|' => (TypeTokenKind::Pipe, 1),
+            b'>' => (TypeTokenKind::GreaterThan, 1),
+            b'<' => (TypeTokenKind::LessThan, 1),
+            b'(' => (TypeTokenKind::LeftParenthesis, 1),
+            b')' => (TypeTokenKind::RightParenthesis, 1),
+            b'[' => (TypeTokenKind::LeftBracket, 1),
+            b']' => (TypeTokenKind::RightBracket, 1),
+            b'{' => (TypeTokenKind::LeftBrace, 1),
+            b'}' => (TypeTokenKind::RightBrace, 1),
+            b',' => (TypeTokenKind::Comma, 1),
+            b'+' => (TypeTokenKind::Plus, 1),
+            b'-' => (TypeTokenKind::Minus, 1),
+            b'.' => match remaining.get(..3) {
+                Some([b'.', b'.', b'.']) => (TypeTokenKind::Ellipsis, 3),
+                _ if matches!(second, Some(b'0'..=b'9')) => self.read_decimal(),
+                _ => {
+                    return Some(Err(SyntaxError::UnrecognizedToken(
+                        self.file_id(),
+                        first,
+                        self.input.current_position(),
+                    )));
+                }
+            },
+            b'/' if second == Some(b'/') => self.read_single_line_comment(),
+            b'\'' | b'"' => self.read_literal_string(first),
+            b'\\' if second.is_some_and(|b| b.is_ascii_alphabetic() || b == b'_' || b >= 0x80) => {
+                self.read_fully_qualified_identifier()
+            }
+            b'$' if second.is_some_and(|b| b.is_ascii_alphabetic() || b == b'_' || b >= 0x80) => self.read_variable(),
+            b'0'..=b'9' => self.read_number(),
+            b if b.is_ascii_alphabetic() || b == b'_' || b >= 0x80 => self.read_identifier_or_keyword(),
+            _ => {
+                return Some(Err(SyntaxError::UnrecognizedToken(self.file_id(), first, self.input.current_position())));
+            }
         };
 
         let buffer = self.input.consume(length);
@@ -109,7 +124,7 @@ impl<'arena> TypeLexer<'arena> {
         Some(Ok(self.token(kind, buffer, start, end)))
     }
 
-    #[inline]
+    #[inline(always)]
     fn read_variable(&self) -> (TypeTokenKind, usize) {
         let mut length = 2;
         while let [part_of_identifier!(), ..] = self.input.peek(length, 1) {
@@ -118,7 +133,7 @@ impl<'arena> TypeLexer<'arena> {
         (TypeTokenKind::Variable, length)
     }
 
-    #[inline]
+    #[inline(always)]
     fn read_single_line_comment(&self) -> (TypeTokenKind, usize) {
         let mut length = 2;
         loop {
@@ -130,7 +145,7 @@ impl<'arena> TypeLexer<'arena> {
         (TypeTokenKind::SingleLineComment, length)
     }
 
-    #[inline]
+    #[inline(always)]
     fn read_decimal(&self) -> (TypeTokenKind, usize) {
         let mut length = read_digits_of_base(&self.input, 2, 10);
         if let float_exponent!() = self.input.peek(length, 1) {
@@ -143,7 +158,7 @@ impl<'arena> TypeLexer<'arena> {
         (TypeTokenKind::LiteralFloat, length)
     }
 
-    #[inline]
+    #[inline(always)]
     fn read_number(&self) -> (TypeTokenKind, usize) {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         enum NumberKind {
@@ -200,7 +215,7 @@ impl<'arena> TypeLexer<'arena> {
         (TypeTokenKind::LiteralFloat, length)
     }
 
-    #[inline]
+    #[inline(always)]
     fn read_literal_string(&self, quote: u8) -> (TypeTokenKind, usize) {
         let total = self.input.len();
         let start = self.input.current_offset();
@@ -232,7 +247,7 @@ impl<'arena> TypeLexer<'arena> {
         if partial { (TypeTokenKind::PartialLiteralString, length) } else { (TypeTokenKind::LiteralString, length) }
     }
 
-    #[inline]
+    #[inline(always)]
     fn read_fully_qualified_identifier(&self) -> (TypeTokenKind, usize) {
         let mut length = 2;
         let mut last_was_slash = false;
@@ -261,7 +276,7 @@ impl<'arena> TypeLexer<'arena> {
 
     /// Read an identifier or keyword (including compound keywords with hyphens).
     /// This is the hot path - optimized for common case (simple identifiers).
-    #[inline]
+    #[inline(always)]
     fn read_identifier_or_keyword(&self) -> (TypeTokenKind, usize) {
         let remaining = self.input.read_remaining();
         let total = remaining.len();
@@ -337,7 +352,7 @@ impl<'arena> TypeLexer<'arena> {
     }
 
     /// Continue reading a qualified identifier (with backslashes).
-    #[inline]
+    #[inline(always)]
     fn finish_qualified_identifier(&self, start_len: usize) -> (TypeTokenKind, usize) {
         let mut length = start_len;
         let mut slashes = 0;
@@ -374,7 +389,7 @@ impl<'arena> TypeLexer<'arena> {
         if slashes > 0 { (TypeTokenKind::QualifiedIdentifier, length) } else { (TypeTokenKind::Identifier, length) }
     }
 
-    #[inline]
+    #[inline(always)]
     fn token(&self, kind: TypeTokenKind, value: &'arena [u8], start: Position, _end: Position) -> TypeToken<'arena> {
         // SAFETY: `Input` is constructed from a `&str` so the underlying bytes
         // are valid UTF-8. Token boundaries are either ASCII stop bytes or end
@@ -385,7 +400,7 @@ impl<'arena> TypeLexer<'arena> {
 }
 
 impl HasFileId for TypeLexer<'_> {
-    #[inline]
+    #[inline(always)]
     fn file_id(&self) -> FileId {
         self.input.file_id()
     }

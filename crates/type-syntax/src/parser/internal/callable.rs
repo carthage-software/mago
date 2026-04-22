@@ -18,7 +18,7 @@ pub fn parse_callable_type_specifications<'arena>(
 ) -> Result<CallableTypeSpecification<'arena>, ParseError> {
     Ok(CallableTypeSpecification {
         parameters: CallableTypeParameters {
-            left_parenthesis: stream.eat(TypeTokenKind::LeftParenthesis)?.span_for(stream.file_id()),
+            left_parenthesis: stream.eat_span(TypeTokenKind::LeftParenthesis)?,
             entries: {
                 let mut entries = stream.new_bvec::<CallableTypeParameter<'arena>>();
 
@@ -27,13 +27,9 @@ pub fn parse_callable_type_specifications<'arena>(
                         parameter_type: {
                             if stream.is_at(TypeTokenKind::Ellipsis)? { None } else { Some(parse_type(stream)?) }
                         },
-                        equals: if stream.is_at(TypeTokenKind::Equals)? {
-                            Some(stream.consume()?.span_for(stream.file_id()))
-                        } else {
-                            None
-                        },
+                        equals: if stream.is_at(TypeTokenKind::Equals)? { Some(stream.consume_span()?) } else { None },
                         ellipsis: if stream.is_at(TypeTokenKind::Ellipsis)? {
-                            Some(stream.consume()?.span_for(stream.file_id()))
+                            Some(stream.consume_span()?)
                         } else {
                             None
                         },
@@ -42,11 +38,7 @@ pub fn parse_callable_type_specifications<'arena>(
                         } else {
                             None
                         },
-                        comma: if stream.is_at(TypeTokenKind::Comma)? {
-                            Some(stream.consume()?.span_for(stream.file_id()))
-                        } else {
-                            None
-                        },
+                        comma: if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume_span()?) } else { None },
                     };
 
                     if entry.comma.is_none() {
@@ -59,10 +51,10 @@ pub fn parse_callable_type_specifications<'arena>(
 
                 mago_syntax_core::ast::Sequence::new(entries)
             },
-            right_parenthesis: stream.eat(TypeTokenKind::RightParenthesis)?.span_for(stream.file_id()),
+            right_parenthesis: stream.eat_span(TypeTokenKind::RightParenthesis)?,
         },
         return_type: if stream.is_at(TypeTokenKind::Colon)? {
-            let colon = stream.consume()?.span_for(stream.file_id());
+            let colon = stream.consume_span()?;
             let ret = parse_type_with_precedence(stream, TypePrecedence::Callable)?;
             Some(CallableTypeReturnType { colon, return_type: stream.alloc(ret) })
         } else {

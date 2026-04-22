@@ -6,7 +6,6 @@ use mago_syntax_core::utils::parse_literal_integer;
 use crate::ast::ArrayType;
 use crate::ast::AssociativeArrayType;
 use crate::ast::Identifier;
-use crate::ast::Keyword;
 use crate::ast::ListType;
 use crate::ast::NonEmptyArrayType;
 use crate::ast::NonEmptyListType;
@@ -82,7 +81,7 @@ pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
     let next = stream.peek()?;
     let (keyword, kind) = match next.kind {
         TypeTokenKind::Array => {
-            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
+            let keyword = stream.consume_keyword()?;
             if !stream.is_at(TypeTokenKind::LeftBrace)? {
                 return Ok(Type::Array(ArrayType { keyword, parameters: parse_generic_parameters_or_none(stream)? }));
             }
@@ -90,7 +89,7 @@ pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
             (keyword, ShapeTypeKind::Array)
         }
         TypeTokenKind::NonEmptyArray => {
-            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
+            let keyword = stream.consume_keyword()?;
             if !stream.is_at(TypeTokenKind::LeftBrace)? {
                 return Ok(Type::NonEmptyArray(NonEmptyArrayType {
                     keyword,
@@ -101,7 +100,7 @@ pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
             (keyword, ShapeTypeKind::NonEmptyArray)
         }
         TypeTokenKind::AssociativeArray => {
-            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
+            let keyword = stream.consume_keyword()?;
             if !stream.is_at(TypeTokenKind::LeftBrace)? {
                 return Ok(Type::AssociativeArray(AssociativeArrayType {
                     keyword,
@@ -112,7 +111,7 @@ pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
             (keyword, ShapeTypeKind::AssociativeArray)
         }
         TypeTokenKind::List => {
-            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
+            let keyword = stream.consume_keyword()?;
             if !stream.is_at(TypeTokenKind::LeftBrace)? {
                 return Ok(Type::List(ListType { keyword, parameters: parse_generic_parameters_or_none(stream)? }));
             }
@@ -120,7 +119,7 @@ pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
             (keyword, ShapeTypeKind::List)
         }
         TypeTokenKind::NonEmptyList => {
-            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
+            let keyword = stream.consume_keyword()?;
             if !stream.is_at(TypeTokenKind::LeftBrace)? {
                 return Ok(Type::NonEmptyList(NonEmptyListType {
                     keyword,
@@ -148,7 +147,7 @@ pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
     Ok(Type::Shape(ShapeType {
         kind,
         keyword,
-        left_brace: stream.eat(TypeTokenKind::LeftBrace)?.span_for(stream.file_id()),
+        left_brace: stream.eat_span(TypeTokenKind::LeftBrace)?,
         fields: {
             let mut fields = stream.new_bvec::<ShapeField<'arena>>();
             while !stream.is_at(TypeTokenKind::RightBrace)? && !stream.is_at(TypeTokenKind::Ellipsis)? {
@@ -156,23 +155,16 @@ pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
 
                 let key = if has_key {
                     let shape_key = parse_shape_field_key(stream)?;
-                    let question_mark = if stream.is_at(TypeTokenKind::Question)? {
-                        Some(stream.consume()?.span_for(stream.file_id()))
-                    } else {
-                        None
-                    };
-                    let colon = stream.eat(TypeTokenKind::Colon)?.span_for(stream.file_id());
+                    let question_mark =
+                        if stream.is_at(TypeTokenKind::Question)? { Some(stream.consume_span()?) } else { None };
+                    let colon = stream.eat_span(TypeTokenKind::Colon)?;
                     Some(ShapeFieldKey { key: shape_key, question_mark, colon })
                 } else {
                     None
                 };
                 let value_ty = parse_type(stream)?;
                 let value = stream.alloc(value_ty);
-                let comma = if stream.is_at(TypeTokenKind::Comma)? {
-                    Some(stream.consume()?.span_for(stream.file_id()))
-                } else {
-                    None
-                };
+                let comma = if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume_span()?) } else { None };
                 let field = ShapeField { key, value, comma };
 
                 if field.comma.is_none() {
@@ -188,19 +180,15 @@ pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
         additional_fields: {
             if stream.is_at(TypeTokenKind::Ellipsis)? {
                 Some(ShapeAdditionalFields {
-                    ellipsis: stream.consume()?.span_for(stream.file_id()),
+                    ellipsis: stream.consume_span()?,
                     parameters: parse_generic_parameters_or_none(stream)?,
-                    comma: if stream.is_at(TypeTokenKind::Comma)? {
-                        Some(stream.consume()?.span_for(stream.file_id()))
-                    } else {
-                        None
-                    },
+                    comma: if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume_span()?) } else { None },
                 })
             } else {
                 None
             }
         },
-        right_brace: stream.eat(TypeTokenKind::RightBrace)?.span_for(stream.file_id()),
+        right_brace: stream.eat_span(TypeTokenKind::RightBrace)?,
     }))
 }
 
@@ -284,7 +272,7 @@ pub fn parse_shape_field_key<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
     {
         let class_token = stream.consume()?;
         let class_name = Identifier::from_token(class_token, stream.file_id());
-        let double_colon = stream.eat(TypeTokenKind::ColonColon)?.span_for(stream.file_id());
+        let double_colon = stream.eat_span(TypeTokenKind::ColonColon)?;
         let constant_token = eat_member_identifier(stream)?;
         let constant_name = Identifier::from_token(constant_token, stream.file_id());
         let span = class_name.span.join(constant_name.span);

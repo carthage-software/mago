@@ -1,5 +1,3 @@
-use mago_database::file::HasFileId;
-
 use crate::ast::GenericParameterEntry;
 use crate::ast::GenericParameters;
 use crate::ast::SingleGenericParameter;
@@ -12,10 +10,10 @@ use crate::token::TypeTokenKind;
 pub fn parse_single_generic_parameter<'arena>(
     stream: &mut TypeTokenStream<'arena>,
 ) -> Result<SingleGenericParameter<'arena>, ParseError> {
-    let less_than = stream.eat(TypeTokenKind::LessThan)?.span_for(stream.file_id());
+    let less_than = stream.eat_span(TypeTokenKind::LessThan)?;
     let inner = parse_type(stream)?;
     let entry = stream.alloc(GenericParameterEntry { inner, comma: None });
-    let greater_than = stream.eat(TypeTokenKind::GreaterThan)?.span_for(stream.file_id());
+    let greater_than = stream.eat_span(TypeTokenKind::GreaterThan)?;
     Ok(SingleGenericParameter { less_than, entry, greater_than })
 }
 
@@ -23,17 +21,13 @@ pub fn parse_single_generic_parameter<'arena>(
 pub fn parse_generic_parameters<'arena>(
     stream: &mut TypeTokenStream<'arena>,
 ) -> Result<GenericParameters<'arena>, ParseError> {
-    let less_than = stream.eat(TypeTokenKind::LessThan)?.span_for(stream.file_id());
+    let less_than = stream.eat_span(TypeTokenKind::LessThan)?;
     let mut entries = stream.new_bvec::<GenericParameterEntry<'arena>>();
 
     loop {
         let entry = GenericParameterEntry {
             inner: parse_type(stream)?,
-            comma: if stream.is_at(TypeTokenKind::Comma)? {
-                Some(stream.consume()?.span_for(stream.file_id()))
-            } else {
-                None
-            },
+            comma: if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume_span()?) } else { None },
         };
 
         if entry.comma.is_none() {
@@ -47,7 +41,7 @@ pub fn parse_generic_parameters<'arena>(
         }
     }
 
-    let greater_than = stream.eat(TypeTokenKind::GreaterThan)?.span_for(stream.file_id());
+    let greater_than = stream.eat_span(TypeTokenKind::GreaterThan)?;
 
     Ok(GenericParameters { less_than, entries: mago_syntax_core::ast::Sequence::new(entries), greater_than })
 }

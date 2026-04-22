@@ -1,6 +1,3 @@
-use mago_database::file::HasFileId;
-
-use crate::ast::Keyword;
 use crate::ast::ShapeField;
 use crate::ast::ShapeFieldKey;
 use crate::ast::Type;
@@ -14,7 +11,7 @@ use crate::token::TypeTokenKind;
 
 #[inline]
 pub fn parse_object_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Type<'arena>, ParseError> {
-    let keyword = Keyword::from_token(stream.eat(TypeTokenKind::Object)?, stream.file_id());
+    let keyword = stream.eat_keyword(TypeTokenKind::Object)?;
     if !stream.is_at(TypeTokenKind::LeftBrace)? {
         return Ok(Type::Object(ObjectType { keyword, properties: None }));
     }
@@ -22,7 +19,7 @@ pub fn parse_object_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result
     Ok(Type::Object(ObjectType {
         keyword,
         properties: Some(ObjectProperties {
-            left_brace: stream.eat(TypeTokenKind::LeftBrace)?.span_for(stream.file_id()),
+            left_brace: stream.eat_span(TypeTokenKind::LeftBrace)?,
             fields: {
                 let mut fields = stream.new_bvec::<ShapeField<'arena>>();
                 while !stream.is_at(TypeTokenKind::RightBrace)? && !stream.is_at(TypeTokenKind::Ellipsis)? {
@@ -30,23 +27,16 @@ pub fn parse_object_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result
 
                     let key = if has_key {
                         let shape_key = parse_shape_field_key(stream)?;
-                        let question_mark = if stream.is_at(TypeTokenKind::Question)? {
-                            Some(stream.consume()?.span_for(stream.file_id()))
-                        } else {
-                            None
-                        };
-                        let colon = stream.eat(TypeTokenKind::Colon)?.span_for(stream.file_id());
+                        let question_mark =
+                            if stream.is_at(TypeTokenKind::Question)? { Some(stream.consume_span()?) } else { None };
+                        let colon = stream.eat_span(TypeTokenKind::Colon)?;
                         Some(ShapeFieldKey { key: shape_key, question_mark, colon })
                     } else {
                         None
                     };
                     let value_ty = parse_type(stream)?;
                     let value = stream.alloc(value_ty);
-                    let comma = if stream.is_at(TypeTokenKind::Comma)? {
-                        Some(stream.consume()?.span_for(stream.file_id()))
-                    } else {
-                        None
-                    };
+                    let comma = if stream.is_at(TypeTokenKind::Comma)? { Some(stream.consume_span()?) } else { None };
                     let field = ShapeField { key, value, comma };
 
                     if field.comma.is_none() {
@@ -59,12 +49,8 @@ pub fn parse_object_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result
 
                 mago_syntax_core::ast::Sequence::new(fields)
             },
-            ellipsis: if stream.is_at(TypeTokenKind::Ellipsis)? {
-                Some(stream.consume()?.span_for(stream.file_id()))
-            } else {
-                None
-            },
-            right_brace: stream.eat(TypeTokenKind::RightBrace)?.span_for(stream.file_id()),
+            ellipsis: if stream.is_at(TypeTokenKind::Ellipsis)? { Some(stream.consume_span()?) } else { None },
+            right_brace: stream.eat_span(TypeTokenKind::RightBrace)?,
         }),
     }))
 }

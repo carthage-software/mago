@@ -23,7 +23,6 @@ use crate::ast::InterfaceStringType;
 use crate::ast::IntersectionType;
 use crate::ast::IterableType;
 use crate::ast::KeyOfType;
-use crate::ast::Keyword;
 use crate::ast::LiteralFloatType;
 use crate::ast::LiteralIntOrFloatType;
 use crate::ast::LiteralIntType;
@@ -114,6 +113,7 @@ pub(crate) fn eat_member_identifier<'arena>(
 /// (e.g. `,`, `)`, `>`, `}`, `]`, `:`, `;`, `=`, EOF). Used to detect a trailing `|` in a
 /// union, so that `int|string|` or `array{0: int|string|}` parses leniently rather than
 /// erroring on the empty right-hand operand.
+#[inline]
 fn is_at_union_closing_token<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<bool, ParseError> {
     Ok(match stream.lookahead(0)?.map(|t| t.kind) {
         None => true,
@@ -151,7 +151,7 @@ pub fn parse_type_with_precedence<'arena>(
         inner = match stream.lookahead(0)?.map(|t| t.kind) {
             // Union types: T|U (and `T|` with a trailing pipe).
             Some(TypeTokenKind::Pipe) if !is_inner_nullable && min_precedence <= TypePrecedence::Union => {
-                let pipe = stream.consume()?.span_for(stream.file_id());
+                let pipe = stream.consume_span()?;
 
                 if is_at_union_closing_token(stream)? {
                     return Ok(Type::TrailingPipe(TrailingPipeType { inner: stream.alloc(inner), pipe }));
@@ -174,7 +174,7 @@ pub fn parse_type_with_precedence<'arena>(
             // Intersection types: T&U
             Some(TypeTokenKind::Ampersand) if !is_inner_nullable && min_precedence <= TypePrecedence::Intersection => {
                 let left = stream.alloc(inner);
-                let ampersand = stream.consume()?.span_for(stream.file_id());
+                let ampersand = stream.consume_span()?;
                 let rhs = parse_type_with_precedence(stream, TypePrecedence::Intersection)?;
                 let right = stream.alloc(rhs);
                 Type::Intersection(IntersectionType { left, ampersand, right })
@@ -182,35 +182,31 @@ pub fn parse_type_with_precedence<'arena>(
             // Conditional types: T is U ? V : W
             Some(TypeTokenKind::Is) if !is_inner_nullable && min_precedence <= TypePrecedence::Conditional => {
                 let subject = stream.alloc(inner);
-                let is = Keyword::from_token(stream.consume()?, stream.file_id());
-                let not = if stream.is_at(TypeTokenKind::Not)? {
-                    Some(Keyword::from_token(stream.consume()?, stream.file_id()))
-                } else {
-                    None
-                };
+                let is = stream.consume_keyword()?;
+                let not = if stream.is_at(TypeTokenKind::Not)? { Some(stream.consume_keyword()?) } else { None };
                 let target_ty = parse_type_with_precedence(stream, TypePrecedence::Conditional)?;
                 let target = stream.alloc(target_ty);
-                let question_mark = stream.eat(TypeTokenKind::Question)?.span_for(stream.file_id());
+                let question_mark = stream.eat_span(TypeTokenKind::Question)?;
                 let then_ty = parse_type_with_precedence(stream, TypePrecedence::Conditional)?;
                 let then = stream.alloc(then_ty);
-                let colon = stream.eat(TypeTokenKind::Colon)?.span_for(stream.file_id());
+                let colon = stream.eat_span(TypeTokenKind::Colon)?;
                 let otherwise_ty = parse_type_with_precedence(stream, TypePrecedence::Conditional)?;
                 let otherwise = stream.alloc(otherwise_ty);
                 Type::Conditional(ConditionalType { subject, is, not, target, question_mark, then, colon, otherwise })
             }
             // Postfix operations: T[], T[K]
             Some(TypeTokenKind::LeftBracket) if min_precedence <= TypePrecedence::Postfix => {
-                let left_bracket = stream.consume()?.span_for(stream.file_id());
+                let left_bracket = stream.consume_span()?;
 
                 if stream.is_at(TypeTokenKind::RightBracket)? {
                     let inner_ref = stream.alloc(inner);
-                    let right_bracket = stream.consume()?.span_for(stream.file_id());
+                    let right_bracket = stream.consume_span()?;
                     Type::Slice(SliceType { inner: inner_ref, left_bracket, right_bracket })
                 } else {
                     let target = stream.alloc(inner);
                     let index_ty = parse_type(stream)?;
                     let index = stream.alloc(index_ty);
-                    let right_bracket = stream.eat(TypeTokenKind::RightBracket)?.span_for(stream.file_id());
+                    let right_bracket = stream.eat_span(TypeTokenKind::RightBracket)?;
                     Type::IndexAccess(IndexAccessType { target, left_bracket, index, right_bracket })
                 }
             }
@@ -228,15 +224,15 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
     let inner = match next.kind {
         TypeTokenKind::Variable => Type::Variable(VariableType::from_token(stream.consume()?, stream.file_id())),
         TypeTokenKind::Question => {
-            let question_mark = stream.consume()?.span_for(stream.file_id());
+            let question_mark = stream.consume_span()?;
             let inner_ty = parse_type(stream)?;
             Type::Nullable(NullableType { question_mark, inner: stream.alloc(inner_ty) })
         }
         TypeTokenKind::LeftParenthesis => {
-            let left_parenthesis = stream.consume()?.span_for(stream.file_id());
+            let left_parenthesis = stream.consume_span()?;
             let inner_ty = parse_type(stream)?;
             let inner = stream.alloc(inner_ty);
-            let right_parenthesis = stream.eat(TypeTokenKind::RightParenthesis)?.span_for(stream.file_id());
+            let right_parenthesis = stream.eat_span(TypeTokenKind::RightParenthesis)?;
             Type::Parenthesized(ParenthesizedType { left_parenthesis, inner, right_parenthesis })
         }
         TypeTokenKind::Asterisk => {
@@ -252,31 +248,27 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                 Type::Wildcard(WildcardType { span: asterisk_span, kind: WildcardKind::Asterisk })
             }
         }
-        TypeTokenKind::Mixed => Type::Mixed(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::NonEmptyMixed => Type::NonEmptyMixed(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::Null => Type::Null(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::Void => Type::Void(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::Never => Type::Never(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::Resource => Type::Resource(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::ClosedResource => Type::ClosedResource(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::OpenResource => Type::OpenResource(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::True => Type::True(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::False => Type::False(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::Bool | TypeTokenKind::Boolean => {
-            Type::Bool(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
-        TypeTokenKind::Float | TypeTokenKind::Real | TypeTokenKind::Double => {
-            Type::Float(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
+        TypeTokenKind::Mixed => Type::Mixed(stream.consume_keyword()?),
+        TypeTokenKind::NonEmptyMixed => Type::NonEmptyMixed(stream.consume_keyword()?),
+        TypeTokenKind::Null => Type::Null(stream.consume_keyword()?),
+        TypeTokenKind::Void => Type::Void(stream.consume_keyword()?),
+        TypeTokenKind::Never => Type::Never(stream.consume_keyword()?),
+        TypeTokenKind::Resource => Type::Resource(stream.consume_keyword()?),
+        TypeTokenKind::ClosedResource => Type::ClosedResource(stream.consume_keyword()?),
+        TypeTokenKind::OpenResource => Type::OpenResource(stream.consume_keyword()?),
+        TypeTokenKind::True => Type::True(stream.consume_keyword()?),
+        TypeTokenKind::False => Type::False(stream.consume_keyword()?),
+        TypeTokenKind::Bool | TypeTokenKind::Boolean => Type::Bool(stream.consume_keyword()?),
+        TypeTokenKind::Float | TypeTokenKind::Real | TypeTokenKind::Double => Type::Float(stream.consume_keyword()?),
         TypeTokenKind::Int | TypeTokenKind::Integer => {
-            let keyword = Keyword::from_token(stream.consume()?, stream.file_id());
+            let keyword = stream.consume_keyword()?;
 
             if stream.is_at(TypeTokenKind::LessThan)? {
                 Type::IntRange(IntRangeType {
                     keyword,
-                    less_than: stream.consume()?.span_for(stream.file_id()),
+                    less_than: stream.consume_span()?,
                     min: if stream.is_at(TypeTokenKind::Minus)? {
-                        let minus = stream.consume()?.span_for(stream.file_id());
+                        let minus = stream.consume_span()?;
                         let token = stream.eat(TypeTokenKind::LiteralInteger)?;
                         let value = parse_literal_integer(token.value).unwrap_or_else(|| {
                             unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
@@ -298,13 +290,13 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                             raw: token.value,
                         })
                     } else if stream.is_at(TypeTokenKind::Int)? || stream.is_at(TypeTokenKind::Integer)? {
-                        IntOrKeyword::Keyword(Keyword::from_token(stream.consume()?, stream.file_id()))
+                        IntOrKeyword::Keyword(stream.consume_keyword()?)
                     } else {
-                        IntOrKeyword::Keyword(Keyword::from_token(stream.eat(TypeTokenKind::Min)?, stream.file_id()))
+                        IntOrKeyword::Keyword(stream.eat_keyword(TypeTokenKind::Min)?)
                     },
-                    comma: stream.eat(TypeTokenKind::Comma)?.span_for(stream.file_id()),
+                    comma: stream.eat_span(TypeTokenKind::Comma)?,
                     max: if stream.is_at(TypeTokenKind::Minus)? {
-                        let minus = stream.consume()?.span_for(stream.file_id());
+                        let minus = stream.consume_span()?;
                         let token = stream.eat(TypeTokenKind::LiteralInteger)?;
                         let value = parse_literal_integer(token.value).unwrap_or_else(|| {
                             unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
@@ -326,109 +318,89 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                             raw: token.value,
                         })
                     } else if stream.is_at(TypeTokenKind::Int)? || stream.is_at(TypeTokenKind::Integer)? {
-                        IntOrKeyword::Keyword(Keyword::from_token(stream.consume()?, stream.file_id()))
+                        IntOrKeyword::Keyword(stream.consume_keyword()?)
                     } else {
-                        IntOrKeyword::Keyword(Keyword::from_token(stream.eat(TypeTokenKind::Max)?, stream.file_id()))
+                        IntOrKeyword::Keyword(stream.eat_keyword(TypeTokenKind::Max)?)
                     },
-                    greater_than: stream.eat(TypeTokenKind::GreaterThan)?.span_for(stream.file_id()),
+                    greater_than: stream.eat_span(TypeTokenKind::GreaterThan)?,
                 })
             } else {
                 Type::Int(keyword)
             }
         }
-        TypeTokenKind::PositiveInt => Type::PositiveInt(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::NegativeInt => Type::NegativeInt(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::NonPositiveInt => Type::NonPositiveInt(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::NonNegativeInt => Type::NonNegativeInt(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::NonZeroInt => Type::NonZeroInt(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::String => Type::String(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::CallableString => Type::CallableString(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::LowercaseCallableString => {
-            Type::LowercaseCallableString(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
-        TypeTokenKind::UppercaseCallableString => {
-            Type::UppercaseCallableString(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
-        TypeTokenKind::NumericString => Type::NumericString(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::NonEmptyString => Type::NonEmptyString(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::NonEmptyLowercaseString => {
-            Type::NonEmptyLowercaseString(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
-        TypeTokenKind::LowercaseString => {
-            Type::LowercaseString(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
-        TypeTokenKind::NonEmptyUppercaseString => {
-            Type::NonEmptyUppercaseString(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
-        TypeTokenKind::UppercaseString => {
-            Type::UppercaseString(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
-        TypeTokenKind::TruthyString => Type::TruthyString(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::NonFalsyString => Type::NonFalsyString(Keyword::from_token(stream.consume()?, stream.file_id())),
+        TypeTokenKind::PositiveInt => Type::PositiveInt(stream.consume_keyword()?),
+        TypeTokenKind::NegativeInt => Type::NegativeInt(stream.consume_keyword()?),
+        TypeTokenKind::NonPositiveInt => Type::NonPositiveInt(stream.consume_keyword()?),
+        TypeTokenKind::NonNegativeInt => Type::NonNegativeInt(stream.consume_keyword()?),
+        TypeTokenKind::NonZeroInt => Type::NonZeroInt(stream.consume_keyword()?),
+        TypeTokenKind::String => Type::String(stream.consume_keyword()?),
+        TypeTokenKind::CallableString => Type::CallableString(stream.consume_keyword()?),
+        TypeTokenKind::LowercaseCallableString => Type::LowercaseCallableString(stream.consume_keyword()?),
+        TypeTokenKind::UppercaseCallableString => Type::UppercaseCallableString(stream.consume_keyword()?),
+        TypeTokenKind::NumericString => Type::NumericString(stream.consume_keyword()?),
+        TypeTokenKind::NonEmptyString => Type::NonEmptyString(stream.consume_keyword()?),
+        TypeTokenKind::NonEmptyLowercaseString => Type::NonEmptyLowercaseString(stream.consume_keyword()?),
+        TypeTokenKind::LowercaseString => Type::LowercaseString(stream.consume_keyword()?),
+        TypeTokenKind::NonEmptyUppercaseString => Type::NonEmptyUppercaseString(stream.consume_keyword()?),
+        TypeTokenKind::UppercaseString => Type::UppercaseString(stream.consume_keyword()?),
+        TypeTokenKind::TruthyString => Type::TruthyString(stream.consume_keyword()?),
+        TypeTokenKind::NonFalsyString => Type::NonFalsyString(stream.consume_keyword()?),
         TypeTokenKind::Object => parse_object_type(stream)?,
         TypeTokenKind::NoReturn | TypeTokenKind::NeverReturn | TypeTokenKind::NeverReturns | TypeTokenKind::Nothing => {
-            Type::Never(Keyword::from_token(stream.consume()?, stream.file_id()))
+            Type::Never(stream.consume_keyword()?)
         }
         TypeTokenKind::KeyOf => Type::KeyOf(KeyOfType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter(stream)?,
         }),
         TypeTokenKind::ValueOf => Type::ValueOf(ValueOfType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter(stream)?,
         }),
         TypeTokenKind::IntMask => Type::IntMask(IntMaskType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameters: parse_generic_parameters(stream)?,
         }),
         TypeTokenKind::IntMaskOf => Type::IntMaskOf(IntMaskOfType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter(stream)?,
         }),
         TypeTokenKind::New => Type::New(NewType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter(stream)?,
         }),
         TypeTokenKind::TemplateType => Type::TemplateType(TemplateTypeType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameters: parse_generic_parameters(stream)?,
         }),
-        TypeTokenKind::Scalar => Type::Scalar(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::Numeric => Type::Numeric(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::ArrayKey => Type::ArrayKey(Keyword::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::StringableObject => {
-            Type::StringableObject(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
-        TypeTokenKind::UnspecifiedLiteralInt => {
-            Type::UnspecifiedLiteralInt(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
-        TypeTokenKind::UnspecifiedLiteralString => {
-            Type::UnspecifiedLiteralString(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
-        TypeTokenKind::UnspecifiedLiteralFloat => {
-            Type::UnspecifiedLiteralFloat(Keyword::from_token(stream.consume()?, stream.file_id()))
-        }
+        TypeTokenKind::Scalar => Type::Scalar(stream.consume_keyword()?),
+        TypeTokenKind::Numeric => Type::Numeric(stream.consume_keyword()?),
+        TypeTokenKind::ArrayKey => Type::ArrayKey(stream.consume_keyword()?),
+        TypeTokenKind::StringableObject => Type::StringableObject(stream.consume_keyword()?),
+        TypeTokenKind::UnspecifiedLiteralInt => Type::UnspecifiedLiteralInt(stream.consume_keyword()?),
+        TypeTokenKind::UnspecifiedLiteralString => Type::UnspecifiedLiteralString(stream.consume_keyword()?),
+        TypeTokenKind::UnspecifiedLiteralFloat => Type::UnspecifiedLiteralFloat(stream.consume_keyword()?),
         TypeTokenKind::NonEmptyUnspecifiedLiteralString => {
-            Type::NonEmptyUnspecifiedLiteralString(Keyword::from_token(stream.consume()?, stream.file_id()))
+            Type::NonEmptyUnspecifiedLiteralString(stream.consume_keyword()?)
         }
         TypeTokenKind::PropertiesOf => Type::PropertiesOf(PropertiesOfType {
             filter: PropertiesOfFilter::All,
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter(stream)?,
         }),
         TypeTokenKind::PublicPropertiesOf => Type::PropertiesOf(PropertiesOfType {
             filter: PropertiesOfFilter::Public,
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter(stream)?,
         }),
         TypeTokenKind::PrivatePropertiesOf => Type::PropertiesOf(PropertiesOfType {
             filter: PropertiesOfFilter::Private,
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter(stream)?,
         }),
         TypeTokenKind::ProtectedPropertiesOf => Type::PropertiesOf(PropertiesOfType {
             filter: PropertiesOfFilter::Protected,
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter(stream)?,
         }),
         TypeTokenKind::Array
@@ -437,7 +409,7 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
         | TypeTokenKind::List
         | TypeTokenKind::NonEmptyList => parse_array_like_type(stream)?,
         TypeTokenKind::Iterable => Type::Iterable(IterableType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameters: parse_generic_parameters_or_none(stream)?,
         }),
         TypeTokenKind::LiteralFloat => {
@@ -466,52 +438,50 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
 
             Type::LiteralString(LiteralStringType { span: token.span_for(stream.file_id()), value, raw: token.value })
         }
-        TypeTokenKind::Minus => Type::Negated(NegatedType {
-            minus: stream.consume()?.span_for(stream.file_id()),
-            number: parse_literal_number_type(stream)?,
-        }),
-        TypeTokenKind::Plus => Type::Posited(PositedType {
-            plus: stream.consume()?.span_for(stream.file_id()),
-            number: parse_literal_number_type(stream)?,
-        }),
+        TypeTokenKind::Minus => {
+            Type::Negated(NegatedType { minus: stream.consume_span()?, number: parse_literal_number_type(stream)? })
+        }
+        TypeTokenKind::Plus => {
+            Type::Posited(PositedType { plus: stream.consume_span()?, number: parse_literal_number_type(stream)? })
+        }
         TypeTokenKind::EnumString => Type::EnumString(EnumStringType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter_or_none(stream)?,
         }),
         TypeTokenKind::TraitString => Type::TraitString(TraitStringType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter_or_none(stream)?,
         }),
         TypeTokenKind::ClassString => Type::ClassString(ClassStringType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter_or_none(stream)?,
         }),
         TypeTokenKind::InterfaceString => Type::InterfaceString(InterfaceStringType {
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             parameter: parse_single_generic_parameter_or_none(stream)?,
         }),
         TypeTokenKind::Callable => Type::Callable(CallableType {
             kind: CallableTypeKind::Callable,
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             specification: parse_optional_callable_type_specifications(stream)?,
         }),
         TypeTokenKind::PureCallable => Type::Callable(CallableType {
             kind: CallableTypeKind::PureCallable,
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             specification: parse_optional_callable_type_specifications(stream)?,
         }),
         TypeTokenKind::PureClosure => Type::Callable(CallableType {
             kind: CallableTypeKind::PureClosure,
-            keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+            keyword: stream.consume_keyword()?,
             specification: parse_optional_callable_type_specifications(stream)?,
         }),
         TypeTokenKind::QualifiedIdentifier => {
             let identifier = Identifier::from_token(stream.consume()?, stream.file_id());
             if stream.is_at(TypeTokenKind::ColonColon)? {
-                let double_colon = stream.consume()?.span_for(stream.file_id());
+                let double_colon = stream.consume_span()?;
 
                 if stream.is_at(TypeTokenKind::Asterisk)? {
-                    let asterisk = stream.consume()?.span_for(stream.file_id());
+                    let asterisk = stream.consume_span()?;
 
                     Type::MemberReference(MemberReferenceType {
                         class: identifier,
@@ -532,10 +502,7 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                         class: identifier,
                         double_colon,
                         member: if stream.is_at(TypeTokenKind::Asterisk)? {
-                            MemberReferenceSelector::StartsWith(
-                                identifier,
-                                stream.consume()?.span_for(stream.file_id()),
-                            )
+                            MemberReferenceSelector::StartsWith(identifier, stream.consume_span()?)
                         } else {
                             MemberReferenceSelector::Identifier(identifier)
                         },
@@ -556,16 +523,16 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
             {
                 Type::Callable(CallableType {
                     kind: CallableTypeKind::Closure,
-                    keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+                    keyword: stream.consume_keyword()?,
                     specification: Some(parse_callable_type_specifications(stream)?),
                 })
             } else {
                 let identifier = Identifier::from_token(stream.consume()?, stream.file_id());
                 if stream.is_at(TypeTokenKind::ColonColon)? {
-                    let double_colon = stream.consume()?.span_for(stream.file_id());
+                    let double_colon = stream.consume_span()?;
 
                     if stream.is_at(TypeTokenKind::Asterisk)? {
-                        let asterisk = stream.consume()?.span_for(stream.file_id());
+                        let asterisk = stream.consume_span()?;
 
                         Type::MemberReference(MemberReferenceType {
                             class: identifier,
@@ -587,17 +554,14 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                             class: identifier,
                             double_colon,
                             member: if stream.is_at(TypeTokenKind::Asterisk)? {
-                                MemberReferenceSelector::StartsWith(
-                                    member_identifier,
-                                    stream.consume()?.span_for(stream.file_id()),
-                                )
+                                MemberReferenceSelector::StartsWith(member_identifier, stream.consume_span()?)
                             } else {
                                 MemberReferenceSelector::Identifier(member_identifier)
                             },
                         })
                     }
                 } else if stream.is_at(TypeTokenKind::Asterisk)? {
-                    let asterisk_span = stream.consume()?.span_for(stream.file_id());
+                    let asterisk_span = stream.consume_span()?;
                     Type::GlobalWildcardReference(GlobalWildcardType {
                         selector: GlobalWildcardSelector::StartsWith(identifier, asterisk_span),
                     })
@@ -612,20 +576,20 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
             {
                 Type::Callable(CallableType {
                     kind: CallableTypeKind::Closure,
-                    keyword: Keyword::from_token(stream.consume()?, stream.file_id()),
+                    keyword: stream.consume_keyword()?,
                     specification: Some(parse_callable_type_specifications(stream)?),
                 })
             } else {
                 let identifier = Identifier::from_token(stream.consume()?, stream.file_id());
 
                 if stream.is_at(TypeTokenKind::ColonColon)? {
-                    let double_colon = stream.consume()?.span_for(stream.file_id());
+                    let double_colon = stream.consume_span()?;
 
                     Type::MemberReference(MemberReferenceType {
                         class: identifier,
                         double_colon,
                         member: if stream.is_at(TypeTokenKind::Asterisk)? {
-                            let asterisk = stream.consume()?.span_for(stream.file_id());
+                            let asterisk = stream.consume_span()?;
 
                             if is_at_member_identifier(stream)? {
                                 MemberReferenceSelector::EndsWith(
@@ -639,10 +603,7 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                             let identifier = Identifier::from_token(eat_member_identifier(stream)?, stream.file_id());
 
                             if stream.is_at(TypeTokenKind::Asterisk)? {
-                                MemberReferenceSelector::StartsWith(
-                                    identifier,
-                                    stream.consume()?.span_for(stream.file_id()),
-                                )
+                                MemberReferenceSelector::StartsWith(identifier, stream.consume_span()?)
                             } else {
                                 MemberReferenceSelector::Identifier(identifier)
                             }
@@ -654,7 +615,7 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
             }
         }
         TypeTokenKind::Exclamation => {
-            let exclamation = stream.consume()?.span_for(stream.file_id());
+            let exclamation = stream.consume_span()?;
             let next = stream.peek()?;
 
             // Parse the class identifier (can be fully qualified, qualified, or local)
@@ -678,12 +639,12 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
             };
 
             // Parse `::`
-            let double_colon = stream.eat(TypeTokenKind::ColonColon)?.span_for(stream.file_id());
+            let double_colon = stream.eat_span(TypeTokenKind::ColonColon)?;
 
             // Parse the alias name (can be identifier or keyword without `-`)
             let next = stream.peek()?;
             let alias = if next.kind.is_keyword() && !next.value.contains('-') {
-                AliasName::Keyword(Keyword::from_token(stream.consume()?, stream.file_id()))
+                AliasName::Keyword(stream.consume_keyword()?)
             } else if next.kind == TypeTokenKind::Identifier {
                 AliasName::Identifier(Identifier::from_token(stream.consume()?, stream.file_id()))
             } else {
