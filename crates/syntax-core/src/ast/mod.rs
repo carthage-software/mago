@@ -95,6 +95,24 @@ impl<'arena, T: HasSpan> Sequence<'arena, T> {
     }
 }
 
+impl<'arena, T> std::ops::Index<usize> for Sequence<'arena, T> {
+    type Output = T;
+
+    #[inline]
+    fn index(&self, index: usize) -> &T {
+        &self.nodes[index]
+    }
+}
+
+impl<'arena, T, Tok> std::ops::Index<usize> for TokenSeparatedSequence<'arena, T, Tok> {
+    type Output = T;
+
+    #[inline]
+    fn index(&self, index: usize) -> &T {
+        &self.nodes[index]
+    }
+}
+
 impl<'arena, T> IntoIterator for Sequence<'arena, T> {
     type Item = T;
     type IntoIter = IntoIter<'arena, Self::Item>;
