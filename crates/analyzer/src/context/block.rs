@@ -13,8 +13,6 @@ use mago_codex::assertion::Assertion;
 use mago_codex::context::ScopeContext;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
-use mago_codex::ttype::atomic::TAtomic;
-use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
@@ -138,24 +136,7 @@ impl BreakContext {
 impl ReferenceConstraint {
     pub fn new(constraint_span: Span, source: ReferenceConstraintSource, constraint_type: Option<Rc<TUnion>>) -> Self {
         let constraint_type = constraint_type.map(|mut constraint_type| {
-            if constraint_type.has_literal_string()
-                || constraint_type.has_literal_int()
-                || constraint_type.has_literal_float()
-            {
-                let union = Rc::make_mut(&mut constraint_type);
-
-                if union.has_literal_string() {
-                    union.types.to_mut().push(TAtomic::Scalar(TScalar::string()));
-                }
-
-                if union.has_literal_int() {
-                    union.types.to_mut().push(TAtomic::Scalar(TScalar::int()));
-                }
-
-                if union.has_literal_float() {
-                    union.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
-                }
-            }
+            Rc::make_mut(&mut constraint_type).widen_literals();
 
             constraint_type
         });

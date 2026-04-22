@@ -19,8 +19,6 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
-use mago_codex::ttype::atomic::scalar::float::TFloat;
-use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
@@ -323,8 +321,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                 continue;
             }
 
-            widen_by_reference_out_type(&mut new_type);
-
+            new_type.widen_literals();
             new_type.set_by_reference(true);
 
             let new_type = Rc::new(new_type);
@@ -385,31 +382,6 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
     }
 
     Ok(())
-}
-
-/// Replaces literal string/int/float atoms in `ty` with their general form. Used on the
-/// computed out-type of a by-reference argument, where a literal binding (often coming from
-/// template inference over a literal input) would be misleading: the callee may freely mutate
-/// the value to any other instance of the same type.
-fn widen_by_reference_out_type(ty: &mut TUnion) {
-    for atomic in ty.types.to_mut() {
-        match atomic {
-            TAtomic::Scalar(TScalar::String(string)) => {
-                *string = string.without_literal();
-            }
-            TAtomic::Scalar(TScalar::Integer(integer))
-                if matches!(integer, TInteger::Literal(_) | TInteger::UnspecifiedLiteral) =>
-            {
-                *integer = TInteger::Unspecified;
-            }
-            TAtomic::Scalar(TScalar::Float(float))
-                if matches!(float, TFloat::Literal(_) | TFloat::UnspecifiedLiteral) =>
-            {
-                *float = TFloat::Float;
-            }
-            _ => {}
-        }
-    }
 }
 
 /// Records a by-reference mutation in the enclosing loop scope so the multi-pass
