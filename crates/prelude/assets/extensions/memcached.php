@@ -2,9 +2,7 @@
 
 class Memcached
 {
-    public const int OPT_SERIALIZER = -1003; // taken from the PHP website, because memcached-api.php doesn't have it. WTF?
-
-    // taken from php-memcached / memcached-api.php
+    public const int OPT_SERIALIZER = -1003;
 
     public const int OPT_HASH = 2;
     public const int HASH_DEFAULT = 0;
@@ -48,9 +46,6 @@ class Memcached
     public const int OPT_RANDOMIZE_REPLICA_READS = 30;
     public const int OPT_REMOVE_FAILED_SERVERS = 35;
 
-    /**
-     * Supported serializers
-     */
     /** @var bool */
     public const bool HAVE_JSON = false;
     /** @var bool */
@@ -60,47 +55,29 @@ class Memcached
     /** @var bool */
     public const bool HAVE_ENCODING = false;
 
-    /**
-     * Feature support
-     */
     /** @var bool */
     public const bool HAVE_SESSION = false;
     /** @var bool */
     public const bool HAVE_SASL = false;
 
-    /**
-     * Class options.
-     */
     public const int OPT_COMPRESSION = -1001;
     public const int OPT_COMPRESSION_TYPE = -1004;
     public const int OPT_PREFIX_KEY = -1002;
 
-    /**
-     * Serializer constants
-     */
     public const int SERIALIZER_PHP = 1;
     public const int SERIALIZER_IGBINARY = 2;
     public const int SERIALIZER_JSON = 3;
     public const int SERIALIZER_JSON_ARRAY = 4;
     public const int SERIALIZER_MSGPACK = 5;
 
-    /**
-     * Compression types
-     */
     public const int COMPRESSION_FASTLZ = 2;
     public const int COMPRESSION_ZLIB = 1;
     public const int COMPRESSION_ZSTD = 3;
 
-    /**
-     * Flags for get and getMulti operations.
-     */
-    public const int GET_PRESERVE_ORDER = 1; // Whether to preserve key order in the result
-    public const int GET_EXTENDED = 2; // Whether to fetch CAS token as well (use "gets").
+    public const int GET_PRESERVE_ORDER = 1;
+    public const int GET_EXTENDED = 2;
 
-    /**
-     * Return values
-     */
-    public const bool GET_ERROR_RETURN_VALUE = false; // return value from simple errors. aha.
+    public const bool GET_ERROR_RETURN_VALUE = false;
     public const int RES_PAYLOAD_FAILURE = -1001;
     public const int RES_SUCCESS = 0;
     public const int RES_FAILURE = 1;
@@ -140,7 +117,6 @@ class Memcached
     public const int RES_AUTH_FAILURE = 41;
     public const int RES_AUTH_CONTINUE = 42;
 
-    /** Server callbacks, if compiled with --memcached-protocol */
     public const int ON_CONNECT = 0;
     public const int ON_ADD = 1;
     public const int ON_APPEND = 2;
@@ -157,7 +133,6 @@ class Memcached
     public const int ON_STAT = 13;
     public const int ON_VERSION = 14;
 
-    /** Constants used when compiled with --memcached-protocol */
     public const int RESPONSE_SUCCESS = 0;
     public const int RESPONSE_KEY_ENOENT = 1;
     public const int RESPONSE_KEY_EEXISTS = 2;
@@ -175,7 +150,6 @@ class Memcached
     public const int RESPONSE_EBUSY = 133;
     public const int RESPONSE_ETMPFAIL = 134;
 
-    /* Methods */
     public function __construct(
         ?string $persistent_id = null,
         ?callable $callback = null,
@@ -188,9 +162,7 @@ class Memcached
 
     public function addServer(string $host, int $port, int $weight = 0): bool {}
 
-    /**
-     * @param array<array{0:string,1:int,2?:int}>  $servers
-     */
+    /** @param array<array{0:string,1:int,2?:int}> $servers */
     public function addServers(array $servers): bool {}
 
     public function append(string $key, string $value): ?bool {}
@@ -240,35 +212,25 @@ class Memcached
      */
     public function deleteMultiByKey(string $server_key, array $keys, int $time = 0): array {}
 
-    /**
-     * @return false|array{key:string, value: mixed, cas?: int}
-     */
+    /** @return false|array{key:string, value: mixed, cas?: int} */
     public function fetch(): array|false {}
 
-    /**
-     * @return false|list<array{key:string, value: mixed, cas?: int}>
-     */
+    /** @return false|list<array{key:string, value: mixed, cas?: int}> */
     public function fetchAll(): array|false {}
 
     public function flush(int $delay = 0): bool {}
 
     public function get(string $key, ?callable $cache_cb = null, int $get_flags = 0): mixed {}
 
-    /**
-     * @return false|string[]
-     */
+    /** @return false|string[] */
     public function getAllKeys(): array|false {}
 
     public function getByKey(string $server_key, string $key, ?callable $cache_cb = null, int $get_flags = 0): mixed {}
 
-    /**
-     * @param string[] $keys
-     */
+    /** @param string[] $keys */
     public function getDelayed(array $keys, bool $with_cas = false, ?callable $value_cb = null): bool {}
 
-    /**
-     * @param string[] $keys
-     */
+    /** @param string[] $keys */
     public function getDelayedByKey(
         string $server_key,
         array $keys,
