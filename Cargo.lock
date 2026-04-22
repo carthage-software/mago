@@ -1687,6 +1687,7 @@ dependencies = [
  "mago-database",
  "mago-span",
  "memchr",
+ "serde",
 ]
 
 [[package]]
@@ -1720,6 +1721,7 @@ dependencies = [
 name = "mago-type-syntax"
 version = "1.24.0"
 dependencies = [
+ "bumpalo",
  "criterion",
  "mago-database",
  "mago-span",

@@ -2,6 +2,7 @@
 
 use bumpalo::Bump;
 
+use mago_span::Position;
 use mago_span::Span;
 use mago_syntax_core::input::Input;
 
@@ -38,6 +39,36 @@ pub fn parse_str<'arena>(arena: &'arena Bump, span: Span, input: &'arena str) ->
     let input = Input::anchored_at(span.file_id, input.as_bytes(), span.start);
     let lexer = TypeLexer::new(input);
     parser::construct(arena, lexer)
+}
+
+/// Parses the **longest valid type prefix** of `input` and reports the
+/// absolute position just past the consumed bytes.
+///
+/// Unlike [`parse_str`], this does not require the entire input to be a
+/// single type. It is the handoff point for embedding callers (e.g. the
+/// phpdoc-syntax parser): they parse one type, fast-forward their own
+/// scanner to the returned position, and keep going with their own
+/// tokens from there.
+///
+/// # Arguments
+///
+/// * `arena` - The arena that will own every AST node.
+/// * `span` - The absolute span covering `input` within its source file.
+/// * `input` - The slice to parse; only the prefix that forms a complete
+///   type expression is consumed.
+///
+/// # Errors
+///
+/// Returns a [`ParseError`] if the prefix does not start with a valid
+/// type.
+pub fn parse_prefix<'arena>(
+    arena: &'arena Bump,
+    span: Span,
+    input: &'arena str,
+) -> Result<(Type<'arena>, Position), ParseError> {
+    let input_obj = Input::anchored_at(span.file_id, input.as_bytes(), span.start);
+    let lexer = TypeLexer::new(input_obj);
+    parser::construct_prefix(arena, lexer)
 }
 
 #[cfg(test)]
