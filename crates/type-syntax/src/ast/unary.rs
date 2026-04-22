@@ -6,15 +6,15 @@ use mago_span::Span;
 use crate::ast::LiteralIntOrFloatType;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct NegatedType<'input> {
+pub struct NegatedType<'arena> {
     pub minus: Span,
-    pub number: LiteralIntOrFloatType<'input>,
+    pub number: LiteralIntOrFloatType<'arena>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct PositedType<'input> {
+pub struct PositedType<'arena> {
     pub plus: Span,
-    pub number: LiteralIntOrFloatType<'input>,
+    pub number: LiteralIntOrFloatType<'arena>,
 }
 
 impl HasSpan for NegatedType<'_> {

@@ -8,15 +8,15 @@ use crate::ast::generics::SingleGenericParameter;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct IntMaskType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameters: GenericParameters<'input>,
+pub struct IntMaskType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameters: GenericParameters<'arena>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct IntMaskOfType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameter: SingleGenericParameter<'input>,
+pub struct IntMaskOfType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameter: SingleGenericParameter<'arena>,
 }
 
 impl HasSpan for IntMaskType<'_> {

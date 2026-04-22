@@ -7,27 +7,27 @@ use crate::ast::generics::SingleGenericParameter;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ClassStringType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameter: Option<SingleGenericParameter<'input>>,
+pub struct ClassStringType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameter: Option<SingleGenericParameter<'arena>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct InterfaceStringType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameter: Option<SingleGenericParameter<'input>>,
+pub struct InterfaceStringType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameter: Option<SingleGenericParameter<'arena>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct EnumStringType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameter: Option<SingleGenericParameter<'input>>,
+pub struct EnumStringType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameter: Option<SingleGenericParameter<'arena>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct TraitStringType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameter: Option<SingleGenericParameter<'input>>,
+pub struct TraitStringType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameter: Option<SingleGenericParameter<'arena>>,
 }
 
 impl HasSpan for ClassStringType<'_> {

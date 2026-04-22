@@ -8,9 +8,9 @@ use crate::ast::keyword::Keyword;
 
 /// The `new<X>` utility type.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct NewType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameter: SingleGenericParameter<'input>,
+pub struct NewType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameter: SingleGenericParameter<'arena>,
 }
 
 impl HasSpan for NewType<'_> {

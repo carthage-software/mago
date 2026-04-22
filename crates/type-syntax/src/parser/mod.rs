@@ -1,3 +1,5 @@
+use bumpalo::Bump;
+
 use mago_database::file::HasFileId;
 
 use crate::ast::Type;
@@ -7,13 +9,13 @@ use crate::parser::internal::stream::TypeTokenStream;
 
 mod internal;
 
-/// Constructs a type AST from a lexer.
+/// Constructs a type AST from a lexer, allocating nodes in the given arena.
 ///
 /// # Errors
 ///
 /// Returns a [`ParseError`] if the type syntax is invalid.
-pub fn construct(lexer: TypeLexer<'_>) -> Result<Type<'_>, ParseError> {
-    let mut stream = TypeTokenStream::new(lexer);
+pub fn construct<'arena>(arena: &'arena Bump, lexer: TypeLexer<'arena>) -> Result<Type<'arena>, ParseError> {
+    let mut stream = TypeTokenStream::new(arena, lexer);
 
     let ty = internal::parse_type(&mut stream)?;
 

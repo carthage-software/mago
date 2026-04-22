@@ -7,35 +7,35 @@ use crate::ast::generics::GenericParameters;
 use crate::ast::identifier::Identifier;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ReferenceType<'input> {
-    pub identifier: Identifier<'input>,
-    pub parameters: Option<GenericParameters<'input>>,
+pub struct ReferenceType<'arena> {
+    pub identifier: Identifier<'arena>,
+    pub parameters: Option<GenericParameters<'arena>>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub enum MemberReferenceSelector<'input> {
+pub enum MemberReferenceSelector<'arena> {
     Wildcard(Span),
-    Identifier(Identifier<'input>),
-    StartsWith(Identifier<'input>, Span),
-    EndsWith(Span, Identifier<'input>),
+    Identifier(Identifier<'arena>),
+    StartsWith(Identifier<'arena>, Span),
+    EndsWith(Span, Identifier<'arena>),
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct MemberReferenceType<'input> {
-    pub class: Identifier<'input>,
+pub struct MemberReferenceType<'arena> {
+    pub class: Identifier<'arena>,
     pub double_colon: Span,
-    pub member: MemberReferenceSelector<'input>,
+    pub member: MemberReferenceSelector<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct GlobalWildcardType<'input> {
-    pub selector: GlobalWildcardSelector<'input>,
+pub struct GlobalWildcardType<'arena> {
+    pub selector: GlobalWildcardSelector<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub enum GlobalWildcardSelector<'input> {
-    StartsWith(Identifier<'input>, Span),
-    EndsWith(Span, Identifier<'input>),
+pub enum GlobalWildcardSelector<'arena> {
+    StartsWith(Identifier<'arena>, Span),
+    EndsWith(Span, Identifier<'arena>),
 }
 
 impl HasSpan for ReferenceType<'_> {

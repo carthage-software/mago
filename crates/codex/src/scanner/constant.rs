@@ -1,3 +1,4 @@
+use bumpalo::Bump;
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_constant_name_atom;
 use mago_docblock::error::ParseError;
@@ -47,7 +48,7 @@ pub fn scan_constant<'arena>(
             metadata.attributes.clone_from(&attributes);
             metadata.inferred_type = infer(context, scope, item.value, None);
 
-            process_constant_docblock(&mut metadata, &docblock, None, type_context, scope);
+            process_constant_docblock(context.arena, &mut metadata, &docblock, None, type_context, scope);
 
             if metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
                 metadata.flags |= MetadataFlags::DEPRECATED;
@@ -96,13 +97,14 @@ pub fn scan_defined_constant<'arena>(
     let mut metadata = ConstantMetadata::new(name, define.span(), flags);
     metadata.inferred_type = infer(context, scope, arguments[1].value(), None);
 
-    process_constant_docblock(&mut metadata, &docblock, None, type_context, scope);
+    process_constant_docblock(context.arena, &mut metadata, &docblock, None, type_context, scope);
 
     Some(metadata)
 }
 
 #[inline]
 fn process_constant_docblock(
+    arena: &Bump,
     metadata: &mut ConstantMetadata,
     docblock: &Result<Option<ConstantDocblockComment>, ParseError>,
     classname: Option<Atom>,
@@ -143,7 +145,7 @@ fn process_constant_docblock(
     }
 
     if let Some(type_string) = &docblock.type_string {
-        match get_type_metadata_from_type_string(type_string, classname, type_context, scope) {
+        match get_type_metadata_from_type_string(arena, type_string, classname, type_context, scope) {
             Ok(type_metadata) => {
                 metadata.type_metadata = Some(type_metadata);
             }

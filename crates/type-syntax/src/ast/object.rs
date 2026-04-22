@@ -2,20 +2,21 @@ use serde::Serialize;
 
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax_core::ast::Sequence;
 
 use crate::ast::Keyword;
 use crate::ast::ShapeField;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ObjectType<'input> {
-    pub keyword: Keyword<'input>,
-    pub properties: Option<ObjectProperties<'input>>,
+pub struct ObjectType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub properties: Option<ObjectProperties<'arena>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ObjectProperties<'input> {
+pub struct ObjectProperties<'arena> {
     pub left_brace: Span,
-    pub fields: Vec<ShapeField<'input>>,
+    pub fields: Sequence<'arena, ShapeField<'arena>>,
     pub ellipsis: Option<Span>,
     pub right_brace: Span,
 }

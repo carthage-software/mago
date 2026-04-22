@@ -1,5 +1,7 @@
 #![doc = include_str!("./../README.md")]
 
+use bumpalo::Bump;
+
 use mago_span::Span;
 use mago_syntax_core::input::Input;
 
@@ -13,32 +15,35 @@ pub mod lexer;
 pub mod parser;
 pub mod token;
 
-/// Parses a string representation of a `PHPDoc` type into an Abstract Syntax Tree (AST).
+/// Parses a string representation of a PHPDoc type into an arena-allocated
+/// Abstract Syntax Tree.
 ///
-/// This is the main entry point for the type parser. It takes the type string
-/// and its original `Span` (representing its location within the source file)
-/// and returns the parsed `Type` AST or a `ParseError`.
+/// All AST nodes are allocated in the caller-supplied [`bumpalo::Bump`], so
+/// no per-node heap allocation happens during parsing. The resulting
+/// [`Type`] borrows from `input` (for textual slices) and from `arena`
+/// (for nested sub-trees) for the duration of `'arena`.
 ///
 /// # Arguments
 ///
-/// * `span` - The original `Span` of the `input` string slice within its source file.
-///   This is crucial for ensuring all AST nodes have correct, absolute positioning.
-/// * `input` - The `&str` containing the type string to parse (e.g., `"int|string"`, `"array<int, MyClass>"`).
+/// * `arena` - The arena that will own every AST node.
+/// * `span` - The original `Span` of the `input` string slice within its
+///   source file; used to anchor every produced span.
+/// * `input` - The type string to parse (e.g. `"int|string"`,
+///   `"array<int, MyClass>"`).
 ///
 /// # Errors
 ///
 /// Returns a [`ParseError`] if any lexing or parsing error occurs.
-pub fn parse_str(span: Span, input: &str) -> Result<Type<'_>, ParseError> {
-    // Create an Input anchored at the type string's original starting position.
+pub fn parse_str<'arena>(arena: &'arena Bump, span: Span, input: &'arena str) -> Result<Type<'arena>, ParseError> {
     let input = Input::anchored_at(span.file_id, input.as_bytes(), span.start);
-    // Create the type-specific lexer.
     let lexer = TypeLexer::new(input);
-    // Construct the type AST using the lexer.
-    parser::construct(lexer)
+    parser::construct(arena, lexer)
 }
 
 #[cfg(test)]
 mod tests {
+    use bumpalo::Bump;
+
     use mago_database::file::FileId;
     use mago_span::HasSpan;
     use mago_span::Position;
@@ -48,8 +53,16 @@ mod tests {
 
     use super::*;
 
-    fn do_parse(input: &str) -> Result<Type<'_>, ParseError> {
-        parse_str(Span::new(FileId::zero(), Position::new(0), Position::new(input.len() as u32)), input)
+    /// Test helper: parses `input` against a fresh leaked arena so the
+    /// resulting `Type<'static>` can be freely inspected without plumbing
+    /// lifetimes through every test. The arena is intentionally leaked;
+    /// tests run once and exit, so the cost is bounded and the ergonomics
+    /// match the pre-arena API.
+    fn do_parse(input: &str) -> Result<Type<'static>, ParseError> {
+        let arena: &'static Bump = Box::leak(Box::new(Bump::new()));
+        let owned: &'static str = arena.alloc_str(input);
+        let span = Span::new(FileId::zero(), Position::new(0), Position::new(owned.len() as u32));
+        parse_str(arena, span, owned)
     }
 
     #[test]
@@ -125,8 +138,8 @@ mod tests {
         match do_parse("int|string") {
             Ok(ty) => match ty {
                 Type::Union(u) => {
-                    assert!(matches!(*u.left, Type::Int(_)));
-                    assert!(matches!(*u.right, Type::String(_)));
+                    assert!(matches!(u.left, Type::Int(_)));
+                    assert!(matches!(u.right, Type::String(_)));
                 }
                 _ => panic!("Expected Type::Union"),
             },
@@ -141,8 +154,8 @@ mod tests {
         match do_parse("$a|$b") {
             Ok(ty) => match ty {
                 Type::Union(u) => {
-                    assert!(matches!(*u.left, Type::Variable(_)));
-                    assert!(matches!(*u.right, Type::Variable(_)));
+                    assert!(matches!(u.left, Type::Variable(_)));
+                    assert!(matches!(u.right, Type::Variable(_)));
                 }
                 _ => panic!("Expected Type::Union"),
             },
@@ -158,7 +171,7 @@ mod tests {
         assert!(result.is_ok());
         match result.unwrap() {
             Type::Nullable(n) => {
-                assert!(matches!(*n.inner, Type::String(_)));
+                assert!(matches!(n.inner, Type::String(_)));
             }
             _ => panic!("Expected Type::Nullable"),
         }
@@ -252,7 +265,7 @@ mod tests {
 
         let field = &shape.fields[0];
         assert!(matches!(field.key.as_ref().map(|k| &k.key), Some(ShapeKey::String { value: "name", .. })));
-        assert!(matches!(field.value.as_ref(), Type::String(_)));
+        assert!(matches!(field.value, Type::String(_)));
     }
 
     #[test]
@@ -262,10 +275,10 @@ mod tests {
                 assert_eq!(shape.fields.len(), 2);
                 let first_field = &shape.fields[0];
                 assert!(matches!(first_field.key.as_ref().map(|k| &k.key), Some(ShapeKey::Integer { value: 0, .. })));
-                assert!(matches!(first_field.value.as_ref(), Type::String(_)));
+                assert!(matches!(first_field.value, Type::String(_)));
                 let second_field = &shape.fields[1];
                 assert!(matches!(second_field.key.as_ref().map(|k| &k.key), Some(ShapeKey::Integer { value: 1, .. })));
-                assert!(matches!(second_field.value.as_ref(), Type::Bool(_)));
+                assert!(matches!(second_field.value, Type::Bool(_)));
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
         }
@@ -361,7 +374,7 @@ mod tests {
             Ok(Type::Shape(shape)) => {
                 assert_eq!(shape.fields.len(), 1);
                 assert!(shape.fields[0].key.is_none(), "expected a keyless (positional) field");
-                match &*shape.fields[0].value {
+                match shape.fields[0].value {
                     Type::Array(_) => {}
                     v => panic!("expected value to be a generic array type, got {v:?}"),
                 }
@@ -383,7 +396,7 @@ mod tests {
                     ShapeKey::String { value, .. } => assert_eq!(*value, "foo"),
                     other => panic!("expected identifier key, got {other:?}"),
                 }
-                match &*shape.fields[0].value {
+                match shape.fields[0].value {
                     Type::Array(_) => {}
                     v => panic!("expected value to be a generic array type, got {v:?}"),
                 }
@@ -409,7 +422,7 @@ mod tests {
             Ok(Type::Shape(shape)) => {
                 assert_eq!(shape.fields.len(), 1, "expected a single keyless field");
                 assert!(shape.fields[0].key.is_none(), "value is a union, not a keyed field");
-                match &*shape.fields[0].value {
+                match shape.fields[0].value {
                     Type::Union(_) => {}
                     v => panic!("expected a union value type, got {v:?}"),
                 }
@@ -545,16 +558,16 @@ mod tests {
     fn test_parse_intersection() {
         match do_parse("Countable&Traversable") {
             Ok(Type::Intersection(i)) => {
-                assert!(matches!(*i.left, Type::Reference(_)));
-                assert!(matches!(*i.right, Type::Reference(_)));
+                assert!(matches!(i.left, Type::Reference(_)));
+                assert!(matches!(i.right, Type::Reference(_)));
 
-                if let Type::Reference(r) = *i.left {
+                if let Type::Reference(r) = i.left {
                     assert_eq!(r.identifier.value, "Countable");
                 } else {
                     panic!();
                 }
 
-                if let Type::Reference(r) = *i.right {
+                if let Type::Reference(r) = i.right {
                     assert_eq!(r.identifier.value, "Traversable");
                 } else {
                     panic!();
@@ -602,7 +615,7 @@ mod tests {
         }
 
         match do_parse("Action::DELETE|Action::NEW") {
-            Ok(Type::Union(u)) => match (&*u.left, &*u.right) {
+            Ok(Type::Union(u)) => match (&u.left, &u.right) {
                 (Type::MemberReference(lhs), Type::MemberReference(rhs)) => {
                     assert_eq!(lhs.member.to_string(), "DELETE");
                     assert_eq!(rhs.member.to_string(), "NEW");
@@ -763,10 +776,10 @@ mod tests {
     fn test_parse_negated_union() {
         match do_parse("-1|-2.0|string") {
             Ok(Type::Union(n)) => {
-                assert!(matches!(*n.left, Type::Negated(_)));
-                assert!(matches!(*n.right, Type::Union(_)));
+                assert!(matches!(n.left, Type::Negated(_)));
+                assert!(matches!(n.right, Type::Union(_)));
 
-                if let Type::Negated(neg) = *n.left {
+                if let Type::Negated(neg) = n.left {
                     assert!(matches!(neg.number, LiteralIntOrFloatType::Int(_)));
                     if let LiteralIntOrFloatType::Int(lit) = neg.number {
                         assert_eq!(lit.value, 1);
@@ -777,11 +790,11 @@ mod tests {
                     panic!("Expected left side to be Type::Negated");
                 }
 
-                if let Type::Union(inner_union) = *n.right {
-                    assert!(matches!(*inner_union.left, Type::Negated(_)));
-                    assert!(matches!(*inner_union.right, Type::String(_)));
+                if let Type::Union(inner_union) = n.right {
+                    assert!(matches!(inner_union.left, Type::Negated(_)));
+                    assert!(matches!(inner_union.right, Type::String(_)));
 
-                    if let Type::Negated(neg) = *inner_union.left {
+                    if let Type::Negated(neg) = inner_union.left {
                         assert!(matches!(neg.number, LiteralIntOrFloatType::Float(_)));
                         if let LiteralIntOrFloatType::Float(lit) = neg.number {
                             assert_eq!(lit.value, 2.0);
@@ -792,7 +805,7 @@ mod tests {
                         panic!("Expected left side of inner union to be Type::Negated");
                     }
 
-                    if let Type::String(s) = *inner_union.right {
+                    if let Type::String(s) = inner_union.right {
                         assert_eq!(s.value, "string");
                     } else {
                         panic!("Expected right side of inner union to be Type::String");
@@ -839,7 +852,7 @@ mod tests {
                 let spec = c.specification.expect("Expected callable specification");
                 assert!(spec.parameters.entries.is_empty());
                 assert!(spec.return_type.is_some());
-                assert!(matches!(*spec.return_type.unwrap().return_type, Type::Void(_)));
+                assert!(matches!(spec.return_type.unwrap().return_type, Type::Void(_)));
             }
             res => panic!("Expected Ok(Type::Callable), got {res:?}"),
         }
@@ -854,7 +867,7 @@ mod tests {
                 assert_eq!(spec.parameters.entries.len(), 1);
                 assert!(matches!(spec.parameters.entries[0].parameter_type, Some(Type::Bool(_))));
                 assert!(spec.return_type.is_some());
-                assert!(matches!(*spec.return_type.unwrap().return_type, Type::Int(_)));
+                assert!(matches!(spec.return_type.unwrap().return_type, Type::Int(_)));
             }
             res => panic!("Expected Ok(Type::Callable), got {res:?}"),
         }
@@ -870,7 +883,7 @@ mod tests {
                 assert_eq!(spec.parameters.entries.len(), 1);
                 assert!(matches!(spec.parameters.entries[0].parameter_type, Some(Type::String(_))));
                 assert!(spec.return_type.is_some());
-                assert!(matches!(*spec.return_type.unwrap().return_type, Type::Bool(_)));
+                assert!(matches!(spec.return_type.unwrap().return_type, Type::Bool(_)));
             }
             res => panic!("Expected Ok(Type::Callable) for Closure, got {res:?}"),
         }
@@ -900,11 +913,11 @@ mod tests {
                 assert!(third_param.ellipsis.is_some());
                 assert!(third_param.equals.is_none());
 
-                if let Type::Parenthesized(p) = *spec.return_type.unwrap().return_type {
-                    assert!(matches!(*p.inner, Type::Union(_)));
-                    if let Type::Union(u) = *p.inner {
-                        assert!(matches!(u.left.as_ref(), Type::Parenthesized(_)));
-                        assert!(matches!(u.right.as_ref(), Type::Null(_)));
+                if let Type::Parenthesized(p) = spec.return_type.unwrap().return_type {
+                    assert!(matches!(p.inner, Type::Union(_)));
+                    if let Type::Union(u) = p.inner {
+                        assert!(matches!(u.left, Type::Parenthesized(_)));
+                        assert!(matches!(u.right, Type::Null(_)));
                     }
                 } else {
                     panic!("Expected Type::CallableReturnType");
@@ -918,43 +931,43 @@ mod tests {
     fn test_parse_conditional_type() {
         match do_parse("int is not string ? array : int") {
             Ok(Type::Conditional(c)) => {
-                assert!(matches!(*c.subject, Type::Int(_)));
+                assert!(matches!(c.subject, Type::Int(_)));
                 assert!(c.not.is_some());
-                assert!(matches!(*c.target, Type::String(_)));
-                assert!(matches!(*c.then, Type::Array(_)));
-                assert!(matches!(*c.otherwise, Type::Int(_)));
+                assert!(matches!(c.target, Type::String(_)));
+                assert!(matches!(c.then, Type::Array(_)));
+                assert!(matches!(c.otherwise, Type::Int(_)));
             }
             res => panic!("Expected Ok(Type::Conditional), got {res:?}"),
         }
 
         match do_parse("$input is string ? array : int") {
             Ok(Type::Conditional(c)) => {
-                assert!(matches!(*c.subject, Type::Variable(_)));
+                assert!(matches!(c.subject, Type::Variable(_)));
                 assert!(c.not.is_none());
-                assert!(matches!(*c.target, Type::String(_)));
-                assert!(matches!(*c.then, Type::Array(_)));
-                assert!(matches!(*c.otherwise, Type::Int(_)));
+                assert!(matches!(c.target, Type::String(_)));
+                assert!(matches!(c.then, Type::Array(_)));
+                assert!(matches!(c.otherwise, Type::Int(_)));
             }
             res => panic!("Expected Ok(Type::Conditional), got {res:?}"),
         }
 
         match do_parse("int is string ? array : (int is not $bar ? string : $baz)") {
             Ok(Type::Conditional(c)) => {
-                assert!(matches!(*c.subject, Type::Int(_)));
+                assert!(matches!(c.subject, Type::Int(_)));
                 assert!(c.not.is_none());
-                assert!(matches!(*c.target, Type::String(_)));
-                assert!(matches!(*c.then, Type::Array(_)));
+                assert!(matches!(c.target, Type::String(_)));
+                assert!(matches!(c.then, Type::Array(_)));
 
-                let Type::Parenthesized(p) = *c.otherwise else {
+                let Type::Parenthesized(p) = c.otherwise else {
                     panic!("Expected Type::Parenthesized");
                 };
 
-                if let Type::Conditional(inner_conditional) = *p.inner {
-                    assert!(matches!(*inner_conditional.subject, Type::Int(_)));
+                if let Type::Conditional(inner_conditional) = p.inner {
+                    assert!(matches!(inner_conditional.subject, Type::Int(_)));
                     assert!(inner_conditional.not.is_some());
-                    assert!(matches!(*inner_conditional.target, Type::Variable(_)));
-                    assert!(matches!(*inner_conditional.then, Type::String(_)));
-                    assert!(matches!(*inner_conditional.otherwise, Type::Variable(_)));
+                    assert!(matches!(inner_conditional.target, Type::Variable(_)));
+                    assert!(matches!(inner_conditional.then, Type::String(_)));
+                    assert!(matches!(inner_conditional.otherwise, Type::Variable(_)));
                 } else {
                     panic!("Expected Type::Conditional");
                 }
@@ -995,11 +1008,11 @@ mod tests {
     fn test_indexed_access() {
         match do_parse("MyArray[MyKey]") {
             Ok(Type::IndexAccess(i)) => {
-                match *i.target {
+                match i.target {
                     Type::Reference(r) => assert_eq!(r.identifier.value, "MyArray"),
                     _ => panic!("Expected Type::Reference"),
                 }
-                match *i.index {
+                match i.index {
                     Type::Reference(r) => assert_eq!(r.identifier.value, "MyKey"),
                     _ => panic!("Expected Type::Reference"),
                 }
@@ -1012,7 +1025,7 @@ mod tests {
     fn test_slice_type() {
         match do_parse("string[]") {
             Ok(Type::Slice(s)) => {
-                assert!(matches!(*s.inner, Type::String(_)));
+                assert!(matches!(s.inner, Type::String(_)));
             }
             res => panic!("Expected Ok(Type::Slice), got {res:?}"),
         }
@@ -1022,11 +1035,11 @@ mod tests {
     fn test_slice_of_slice_of_slice_type() {
         match do_parse("string[][][]") {
             Ok(Type::Slice(s)) => {
-                assert!(matches!(*s.inner, Type::Slice(_)));
-                if let Type::Slice(inner_slice) = *s.inner {
-                    assert!(matches!(*inner_slice.inner, Type::Slice(_)));
-                    if let Type::Slice(inner_inner_slice) = *inner_slice.inner {
-                        assert!(matches!(*inner_inner_slice.inner, Type::String(_)));
+                assert!(matches!(s.inner, Type::Slice(_)));
+                if let Type::Slice(inner_slice) = s.inner {
+                    assert!(matches!(inner_slice.inner, Type::Slice(_)));
+                    if let Type::Slice(inner_inner_slice) = inner_slice.inner {
+                        assert!(matches!(inner_inner_slice.inner, Type::String(_)));
                     } else {
                         panic!("Expected inner slice to be a Slice");
                     }
@@ -1178,10 +1191,10 @@ mod tests {
         // Nullable applies only to the rightmost element of an intersection before parens
         match do_parse("Countable&?Traversable") {
             Ok(Type::Intersection(i)) => {
-                assert!(matches!(*i.left, Type::Reference(r) if r.identifier.value == "Countable"));
-                assert!(matches!(*i.right, Type::Nullable(_)));
-                if let Type::Nullable(n) = *i.right {
-                    assert!(matches!(*n.inner, Type::Reference(r) if r.identifier.value == "Traversable"));
+                assert!(matches!(i.left, Type::Reference(r) if r.identifier.value == "Countable"));
+                assert!(matches!(i.right, Type::Nullable(_)));
+                if let Type::Nullable(n) = i.right {
+                    assert!(matches!(n.inner, Type::Reference(r) if r.identifier.value == "Traversable"));
                 } else {
                     panic!();
                 }
@@ -1194,9 +1207,9 @@ mod tests {
     fn test_parenthesized_nullable() {
         match do_parse("?(Countable&Traversable)") {
             Ok(Type::Nullable(n)) => {
-                assert!(matches!(*n.inner, Type::Parenthesized(_)));
-                if let Type::Parenthesized(p) = *n.inner {
-                    assert!(matches!(*p.inner, Type::Intersection(_)));
+                assert!(matches!(n.inner, Type::Parenthesized(_)));
+                if let Type::Parenthesized(p) = n.inner {
+                    assert!(matches!(p.inner, Type::Intersection(_)));
                 } else {
                     panic!()
                 }
@@ -1209,8 +1222,8 @@ mod tests {
     fn test_positive_negative_int() {
         match do_parse("positive-int|negative-int") {
             Ok(Type::Union(u)) => {
-                assert!(matches!(*u.left, Type::PositiveInt(_)));
-                assert!(matches!(*u.right, Type::NegativeInt(_)));
+                assert!(matches!(u.left, Type::PositiveInt(_)));
+                assert!(matches!(u.right, Type::NegativeInt(_)));
             }
             res => panic!("Expected Ok(Type::Union), got {res:?}"),
         }
@@ -1301,8 +1314,8 @@ mod tests {
     fn test_parse_string_or_lowercase_string_union() {
         match do_parse("string|lowercase-string") {
             Ok(Type::Union(u)) => {
-                assert!(matches!(*u.left, Type::String(_)));
-                assert!(matches!(*u.right, Type::LowercaseString(_)));
+                assert!(matches!(u.left, Type::String(_)));
+                assert!(matches!(u.right, Type::LowercaseString(_)));
             }
             res => panic!("Expected Ok(Type::Union), got {res:?}"),
         }
@@ -1321,7 +1334,7 @@ mod tests {
                     first_field.key.as_ref().map(|k| &k.key),
                     Some(ShapeKey::String { value: "salt", .. })
                 ));
-                assert!(matches!(first_field.value.as_ref(), Type::Int(_)));
+                assert!(matches!(first_field.value, Type::Int(_)));
 
                 let second_field = &shape.fields[1];
                 assert!(second_field.is_optional());
@@ -1329,7 +1342,7 @@ mod tests {
                     second_field.key.as_ref().map(|k| &k.key),
                     Some(ShapeKey::String { value: "cost", .. })
                 ));
-                assert!(matches!(second_field.value.as_ref(), Type::Int(_)));
+                assert!(matches!(second_field.value, Type::Int(_)));
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
         }
@@ -1795,8 +1808,8 @@ mod tests {
                 assert_eq!(params.entries.len(), 1);
                 match &params.entries[0].inner {
                     Type::Union(u) => {
-                        assert!(matches!(*u.left, Type::Reference(_)));
-                        assert!(matches!(*u.right, Type::MemberReference(_)));
+                        assert!(matches!(u.left, Type::Reference(_)));
+                        assert!(matches!(u.right, Type::MemberReference(_)));
                     }
                     other => panic!("Expected inner Union, got {other:?}"),
                 }
@@ -1820,7 +1833,7 @@ mod tests {
     #[test]
     fn test_parse_trailing_pipe() {
         match do_parse("int|string|") {
-            Ok(Type::TrailingPipe(trailing)) => assert!(matches!(*trailing.inner, Type::Union(_))),
+            Ok(Type::TrailingPipe(trailing)) => assert!(matches!(trailing.inner, Type::Union(_))),
             other => panic!("Expected Type::TrailingPipe, got: {other:?}"),
         }
     }
@@ -1828,7 +1841,7 @@ mod tests {
     #[test]
     fn test_parse_trailing_pipe_single() {
         match do_parse("int|") {
-            Ok(Type::TrailingPipe(trailing)) => assert!(matches!(*trailing.inner, Type::Int(_))),
+            Ok(Type::TrailingPipe(trailing)) => assert!(matches!(trailing.inner, Type::Int(_))),
             other => panic!("Expected Type::TrailingPipe, got: {other:?}"),
         }
     }
@@ -1838,7 +1851,7 @@ mod tests {
         match do_parse("array{0: int|string|}") {
             Ok(Type::Shape(shape)) => {
                 assert_eq!(shape.fields.len(), 1);
-                assert!(matches!(shape.fields[0].value.as_ref(), Type::TrailingPipe(_)));
+                assert!(matches!(shape.fields[0].value, Type::TrailingPipe(_)));
             }
             other => panic!("Expected Type::Shape, got: {other:?}"),
         }
@@ -1854,7 +1867,7 @@ mod tests {
                 match &params.entries[0].inner {
                     Type::Shape(shape) => {
                         assert_eq!(shape.fields.len(), 1);
-                        assert!(matches!(shape.fields[0].value.as_ref(), Type::TrailingPipe(_)));
+                        assert!(matches!(shape.fields[0].value, Type::TrailingPipe(_)));
                     }
                     other => panic!("Expected Type::Shape, got {other:?}"),
                 }

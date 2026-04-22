@@ -42,7 +42,7 @@ const SHAPE_KEY_SCAN_LIMIT: usize = 48;
 /// from exceeding the stream buffer's lookahead capacity; hitting the
 /// cap conservatively returns `false` (treat the field as keyless).
 #[inline]
-pub fn scan_for_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Result<bool, ParseError> {
+pub fn scan_for_shape_field_key<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<bool, ParseError> {
     let mut depth_angle: u32 = 0;
 
     for i in 0..SHAPE_KEY_SCAN_LIMIT {
@@ -78,7 +78,7 @@ pub fn scan_for_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) ->
 }
 
 #[inline]
-pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
+pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Type<'arena>, ParseError> {
     let next = stream.peek()?;
     let (keyword, kind) = match next.kind {
         TypeTokenKind::Array => {
@@ -150,31 +150,30 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
         keyword,
         left_brace: stream.eat(TypeTokenKind::LeftBrace)?.span_for(stream.file_id()),
         fields: {
-            let mut fields = Vec::new();
+            let mut fields = stream.new_bvec::<ShapeField<'arena>>();
             while !stream.is_at(TypeTokenKind::RightBrace)? && !stream.is_at(TypeTokenKind::Ellipsis)? {
                 let has_key = scan_for_shape_field_key(stream)?;
 
-                let field = ShapeField {
-                    key: if has_key {
-                        Some(ShapeFieldKey {
-                            key: parse_shape_field_key(stream)?,
-                            question_mark: if stream.is_at(TypeTokenKind::Question)? {
-                                Some(stream.consume()?.span_for(stream.file_id()))
-                            } else {
-                                None
-                            },
-                            colon: stream.eat(TypeTokenKind::Colon)?.span_for(stream.file_id()),
-                        })
-                    } else {
-                        None
-                    },
-                    value: Box::new(parse_type(stream)?),
-                    comma: if stream.is_at(TypeTokenKind::Comma)? {
+                let key = if has_key {
+                    let shape_key = parse_shape_field_key(stream)?;
+                    let question_mark = if stream.is_at(TypeTokenKind::Question)? {
                         Some(stream.consume()?.span_for(stream.file_id()))
                     } else {
                         None
-                    },
+                    };
+                    let colon = stream.eat(TypeTokenKind::Colon)?.span_for(stream.file_id());
+                    Some(ShapeFieldKey { key: shape_key, question_mark, colon })
+                } else {
+                    None
                 };
+                let value_ty = parse_type(stream)?;
+                let value = stream.alloc(value_ty);
+                let comma = if stream.is_at(TypeTokenKind::Comma)? {
+                    Some(stream.consume()?.span_for(stream.file_id()))
+                } else {
+                    None
+                };
+                let field = ShapeField { key, value, comma };
 
                 if field.comma.is_none() {
                     fields.push(field);
@@ -184,7 +183,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
                 fields.push(field);
             }
 
-            fields
+            mago_syntax_core::ast::Sequence::new(fields)
         },
         additional_fields: {
             if stream.is_at(TypeTokenKind::Ellipsis)? {
@@ -205,7 +204,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
     }))
 }
 
-pub fn parse_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Result<ShapeKey<'input>, ParseError> {
+pub fn parse_shape_field_key<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<ShapeKey<'arena>, ParseError> {
     if stream.is_at(TypeTokenKind::LiteralString)? {
         let token = stream.consume()?;
         let value = &token.value[1..token.value.len() - 1];

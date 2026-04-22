@@ -3,6 +3,7 @@ use strum::Display;
 
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax_core::ast::Sequence;
 
 use crate::ast::Type;
 use crate::ast::VariableType;
@@ -18,38 +19,38 @@ pub enum CallableTypeKind {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct CallableType<'input> {
+pub struct CallableType<'arena> {
     pub kind: CallableTypeKind,
-    pub keyword: Keyword<'input>,
-    pub specification: Option<CallableTypeSpecification<'input>>,
+    pub keyword: Keyword<'arena>,
+    pub specification: Option<CallableTypeSpecification<'arena>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct CallableTypeSpecification<'input> {
-    pub parameters: CallableTypeParameters<'input>,
-    pub return_type: Option<CallableTypeReturnType<'input>>,
+pub struct CallableTypeSpecification<'arena> {
+    pub parameters: CallableTypeParameters<'arena>,
+    pub return_type: Option<CallableTypeReturnType<'arena>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct CallableTypeParameters<'input> {
+pub struct CallableTypeParameters<'arena> {
     pub left_parenthesis: Span,
-    pub entries: Vec<CallableTypeParameter<'input>>,
+    pub entries: Sequence<'arena, CallableTypeParameter<'arena>>,
     pub right_parenthesis: Span,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct CallableTypeParameter<'input> {
-    pub parameter_type: Option<Type<'input>>,
+pub struct CallableTypeParameter<'arena> {
+    pub parameter_type: Option<Type<'arena>>,
     pub equals: Option<Span>,
     pub ellipsis: Option<Span>,
-    pub variable: Option<VariableType<'input>>,
+    pub variable: Option<VariableType<'arena>>,
     pub comma: Option<Span>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct CallableTypeReturnType<'input> {
+pub struct CallableTypeReturnType<'arena> {
     pub colon: Span,
-    pub return_type: Box<Type<'input>>,
+    pub return_type: &'arena Type<'arena>,
 }
 
 impl CallableTypeKind {

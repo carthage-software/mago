@@ -8,9 +8,9 @@ use crate::ast::keyword::Keyword;
 
 /// The `template-type<Object, ClassName, TemplateName>` utility type.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct TemplateTypeType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameters: GenericParameters<'input>,
+pub struct TemplateTypeType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameters: GenericParameters<'arena>,
 }
 
 impl HasSpan for TemplateTypeType<'_> {

@@ -6,8 +6,8 @@ use mago_span::Span;
 use crate::ast::Type;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct SliceType<'input> {
-    pub inner: Box<Type<'input>>,
+pub struct SliceType<'arena> {
+    pub inner: &'arena Type<'arena>,
     pub left_bracket: Span,
     pub right_bracket: Span,
 }

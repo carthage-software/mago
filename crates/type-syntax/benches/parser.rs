@@ -1,5 +1,6 @@
 use std::hint::black_box;
 
+use bumpalo::Bump;
 use criterion::Criterion;
 use criterion::Throughput;
 use criterion::criterion_group;
@@ -19,7 +20,6 @@ fn benchmark_type_lexer(c: &mut Criterion) {
     let mut group = c.benchmark_group("type-lexer");
     let file_id = FileId::new("bench.php");
 
-    // Large file lexing
     group.throughput(Throughput::Bytes(LARGE_TYPES.len() as u64));
     group.bench_function("large", |b| {
         b.iter(|| {
@@ -46,6 +46,7 @@ fn benchmark_type_parser(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(content.len() as u64));
         group.bench_function(name, |b| {
             b.iter(|| {
+                let arena = Bump::new();
                 let mut success_count = 0usize;
                 for line in content.lines() {
                     let line = line.trim();
@@ -53,7 +54,7 @@ fn benchmark_type_parser(c: &mut Criterion) {
                         continue;
                     }
                     let span = Span::new(file_id, Position::new(0), Position::new(line.len() as u32));
-                    if parse_str(span, black_box(line)).is_ok() {
+                    if parse_str(&arena, span, black_box(line)).is_ok() {
                         success_count += 1;
                     }
                 }
@@ -74,8 +75,10 @@ fn benchmark_single_complex_type(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(complex_type.len() as u64));
     group.bench_function("nested_array_shape", |b| {
         b.iter(|| {
+            let arena = Bump::new();
             let span = Span::new(file_id, Position::new(0), Position::new(complex_type.len() as u32));
-            black_box(parse_str(span, black_box(complex_type)))
+            let ok = parse_str(&arena, span, black_box(complex_type)).is_ok();
+            black_box(ok)
         })
     });
 
@@ -84,8 +87,10 @@ fn benchmark_single_complex_type(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(closure_type.len() as u64));
     group.bench_function("complex_closure", |b| {
         b.iter(|| {
+            let arena = Bump::new();
             let span = Span::new(file_id, Position::new(0), Position::new(closure_type.len() as u32));
-            black_box(parse_str(span, black_box(closure_type)))
+            let ok = parse_str(&arena, span, black_box(closure_type)).is_ok();
+            black_box(ok)
         })
     });
 

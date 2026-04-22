@@ -13,14 +13,14 @@ use crate::token::TypePrecedence;
 use crate::token::TypeTokenKind;
 
 #[inline]
-pub fn parse_callable_type_specifications<'input>(
-    stream: &mut TypeTokenStream<'input>,
-) -> Result<CallableTypeSpecification<'input>, ParseError> {
+pub fn parse_callable_type_specifications<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
+) -> Result<CallableTypeSpecification<'arena>, ParseError> {
     Ok(CallableTypeSpecification {
         parameters: CallableTypeParameters {
             left_parenthesis: stream.eat(TypeTokenKind::LeftParenthesis)?.span_for(stream.file_id()),
             entries: {
-                let mut entries = Vec::new();
+                let mut entries = stream.new_bvec::<CallableTypeParameter<'arena>>();
 
                 while !stream.is_at(TypeTokenKind::RightParenthesis)? {
                     let entry = CallableTypeParameter {
@@ -57,15 +57,14 @@ pub fn parse_callable_type_specifications<'input>(
                     entries.push(entry);
                 }
 
-                entries
+                mago_syntax_core::ast::Sequence::new(entries)
             },
             right_parenthesis: stream.eat(TypeTokenKind::RightParenthesis)?.span_for(stream.file_id()),
         },
         return_type: if stream.is_at(TypeTokenKind::Colon)? {
-            Some(CallableTypeReturnType {
-                colon: stream.consume()?.span_for(stream.file_id()),
-                return_type: Box::new(parse_type_with_precedence(stream, TypePrecedence::Callable)?),
-            })
+            let colon = stream.consume()?.span_for(stream.file_id());
+            let ret = parse_type_with_precedence(stream, TypePrecedence::Callable)?;
+            Some(CallableTypeReturnType { colon, return_type: stream.alloc(ret) })
         } else {
             None
         },
@@ -73,9 +72,9 @@ pub fn parse_callable_type_specifications<'input>(
 }
 
 #[inline]
-pub fn parse_optional_callable_type_specifications<'input>(
-    stream: &mut TypeTokenStream<'input>,
-) -> Result<Option<CallableTypeSpecification<'input>>, ParseError> {
+pub fn parse_optional_callable_type_specifications<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
+) -> Result<Option<CallableTypeSpecification<'arena>>, ParseError> {
     if stream.is_at(TypeTokenKind::LeftParenthesis)? {
         let specifications = parse_callable_type_specifications(stream)?;
         Ok(Some(specifications))

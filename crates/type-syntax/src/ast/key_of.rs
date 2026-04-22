@@ -7,9 +7,9 @@ use crate::ast::generics::SingleGenericParameter;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct KeyOfType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameter: SingleGenericParameter<'input>,
+pub struct KeyOfType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameter: SingleGenericParameter<'arena>,
 }
 
 impl HasSpan for KeyOfType<'_> {

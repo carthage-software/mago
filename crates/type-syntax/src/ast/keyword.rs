@@ -7,9 +7,9 @@ use mago_span::Span;
 use crate::token::TypeToken;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct Keyword<'input> {
+pub struct Keyword<'arena> {
     pub span: Span,
-    pub value: &'input str,
+    pub value: &'arena str,
 }
 
 impl HasSpan for Keyword<'_> {
@@ -18,10 +18,10 @@ impl HasSpan for Keyword<'_> {
     }
 }
 
-impl<'input> Keyword<'input> {
+impl<'arena> Keyword<'arena> {
     /// Creates a Keyword from a TypeToken and file_id.
     #[inline]
-    pub fn from_token(token: TypeToken<'input>, file_id: FileId) -> Self {
+    pub fn from_token(token: TypeToken<'arena>, file_id: FileId) -> Self {
         debug_assert!(
             token.kind.is_keyword()
                 || (token.kind.is_identifier() && token.value.to_ascii_lowercase().ends_with("closure")),

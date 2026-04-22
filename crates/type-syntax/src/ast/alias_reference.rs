@@ -7,17 +7,17 @@ use crate::ast::identifier::Identifier;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub enum AliasName<'input> {
-    Identifier(Identifier<'input>),
-    Keyword(Keyword<'input>),
+pub enum AliasName<'arena> {
+    Identifier(Identifier<'arena>),
+    Keyword(Keyword<'arena>),
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct AliasReferenceType<'input> {
+pub struct AliasReferenceType<'arena> {
     pub exclamation: Span,
-    pub class: Identifier<'input>,
+    pub class: Identifier<'arena>,
     pub double_colon: Span,
-    pub alias: AliasName<'input>,
+    pub alias: AliasName<'arena>,
 }
 
 impl HasSpan for AliasName<'_> {

@@ -7,15 +7,15 @@ use crate::ast::Type;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ConditionalType<'input> {
-    pub subject: Box<Type<'input>>,
-    pub is: Keyword<'input>,
-    pub not: Option<Keyword<'input>>,
-    pub target: Box<Type<'input>>,
+pub struct ConditionalType<'arena> {
+    pub subject: &'arena Type<'arena>,
+    pub is: Keyword<'arena>,
+    pub not: Option<Keyword<'arena>>,
+    pub target: &'arena Type<'arena>,
     pub question_mark: Span,
-    pub then: Box<Type<'input>>,
+    pub then: &'arena Type<'arena>,
     pub colon: Span,
-    pub otherwise: Box<Type<'input>>,
+    pub otherwise: &'arena Type<'arena>,
 }
 
 impl ConditionalType<'_> {

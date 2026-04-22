@@ -8,9 +8,9 @@ use crate::token::TypeToken;
 use crate::token::TypeTokenKind;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct VariableType<'input> {
+pub struct VariableType<'arena> {
     pub span: Span,
-    pub value: &'input str,
+    pub value: &'arena str,
 }
 
 impl HasSpan for VariableType<'_> {
@@ -19,10 +19,10 @@ impl HasSpan for VariableType<'_> {
     }
 }
 
-impl<'input> VariableType<'input> {
+impl<'arena> VariableType<'arena> {
     /// Creates a VariableType from a TypeToken and file_id.
     #[inline]
-    pub fn from_token(token: TypeToken<'input>, file_id: FileId) -> Self {
+    pub fn from_token(token: TypeToken<'arena>, file_id: FileId) -> Self {
         debug_assert_eq!(token.kind, TypeTokenKind::Variable);
 
         VariableType { span: token.span_for(file_id), value: token.value }

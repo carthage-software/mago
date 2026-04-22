@@ -8,19 +8,19 @@ use crate::ast::literal::LiteralIntType;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[serde(tag = "type", content = "value")]
-pub enum IntOrKeyword<'input> {
-    NegativeInt { minus: Span, int: LiteralIntType<'input> },
-    Int(LiteralIntType<'input>),
-    Keyword(Keyword<'input>),
+pub enum IntOrKeyword<'arena> {
+    NegativeInt { minus: Span, int: LiteralIntType<'arena> },
+    Int(LiteralIntType<'arena>),
+    Keyword(Keyword<'arena>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct IntRangeType<'input> {
-    pub keyword: Keyword<'input>,
+pub struct IntRangeType<'arena> {
+    pub keyword: Keyword<'arena>,
     pub less_than: Span,
-    pub min: IntOrKeyword<'input>,
+    pub min: IntOrKeyword<'arena>,
     pub comma: Span,
-    pub max: IntOrKeyword<'input>,
+    pub max: IntOrKeyword<'arena>,
     pub greater_than: Span,
 }
 

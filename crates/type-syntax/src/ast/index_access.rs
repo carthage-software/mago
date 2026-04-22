@@ -6,10 +6,10 @@ use mago_span::Span;
 use crate::ast::Type;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct IndexAccessType<'input> {
-    pub target: Box<Type<'input>>,
+pub struct IndexAccessType<'arena> {
+    pub target: &'arena Type<'arena>,
     pub left_bracket: Span,
-    pub index: Box<Type<'input>>,
+    pub index: &'arena Type<'arena>,
     pub right_bracket: Span,
 }
 

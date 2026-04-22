@@ -22,14 +22,14 @@ use crate::token::TypeToken;
 use crate::token::TypeTokenKind;
 
 #[derive(Debug)]
-pub struct TypeLexer<'input> {
-    input: Input<'input>,
+pub struct TypeLexer<'arena> {
+    input: Input<'arena>,
 }
 
-impl<'input> TypeLexer<'input> {
+impl<'arena> TypeLexer<'arena> {
     #[inline]
     #[must_use]
-    pub fn new(input: Input<'input>) -> TypeLexer<'input> {
+    pub fn new(input: Input<'arena>) -> TypeLexer<'arena> {
         TypeLexer { input }
     }
 
@@ -47,13 +47,13 @@ impl<'input> TypeLexer<'input> {
 
     #[inline]
     #[must_use]
-    pub fn slice_in_range(&self, from: u32, to: u32) -> &'input str {
+    pub fn slice_in_range(&self, from: u32, to: u32) -> &'arena str {
         let bytes_slice = self.input.slice_in_range(from, to);
         bytes_slice.utf8_chunks().next().map_or("", |chunk| chunk.valid())
     }
 
     #[inline]
-    pub fn advance(&mut self) -> Option<Result<TypeToken<'input>, SyntaxError>> {
+    pub fn advance(&mut self) -> Option<Result<TypeToken<'arena>, SyntaxError>> {
         if self.input.has_reached_eof() {
             return None;
         }
@@ -375,7 +375,7 @@ impl<'input> TypeLexer<'input> {
     }
 
     #[inline]
-    fn token(&self, kind: TypeTokenKind, value: &'input [u8], start: Position, _end: Position) -> TypeToken<'input> {
+    fn token(&self, kind: TypeTokenKind, value: &'arena [u8], start: Position, _end: Position) -> TypeToken<'arena> {
         // SAFETY: `Input` is constructed from a `&str` so the underlying bytes
         // are valid UTF-8. Token boundaries are either ASCII stop bytes or end
         // of input, which land on UTF-8 char boundaries.

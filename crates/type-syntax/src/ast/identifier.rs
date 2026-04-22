@@ -7,9 +7,9 @@ use mago_span::Span;
 use crate::token::TypeToken;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct Identifier<'input> {
+pub struct Identifier<'arena> {
     pub span: Span,
-    pub value: &'input str,
+    pub value: &'arena str,
 }
 
 impl HasSpan for Identifier<'_> {
@@ -18,10 +18,10 @@ impl HasSpan for Identifier<'_> {
     }
 }
 
-impl<'input> Identifier<'input> {
+impl<'arena> Identifier<'arena> {
     /// Creates an Identifier from a TypeToken and file_id.
     #[inline]
-    pub fn from_token(token: TypeToken<'input>, file_id: FileId) -> Self {
+    pub fn from_token(token: TypeToken<'arena>, file_id: FileId) -> Self {
         Identifier { span: token.span_for(file_id), value: token.value }
     }
 }

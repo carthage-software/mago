@@ -1,3 +1,4 @@
+use bumpalo::Bump;
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_docblock::tag::TypeString;
@@ -55,12 +56,13 @@ pub fn get_type_metadata_from_hint<'arena>(
 
 #[inline]
 pub fn get_type_metadata_from_type_string(
+    arena: &Bump,
     ttype: &TypeString,
     classname: Option<Atom>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
 ) -> Result<TypeMetadata, TypeError> {
-    builder::get_type_from_string(&ttype.value, ttype.span, scope, type_context, classname).map(|type_union| {
+    builder::get_type_from_string(arena, &ttype.value, ttype.span, scope, type_context, classname).map(|type_union| {
         let mut type_metadata = TypeMetadata::new(type_union, ttype.span);
         type_metadata.from_docblock = true;
         type_metadata

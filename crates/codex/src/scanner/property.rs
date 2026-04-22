@@ -1,3 +1,4 @@
+use bumpalo::Bump;
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
@@ -116,6 +117,7 @@ pub fn scan_promoted_property<'arena>(
     match PropertyDocblockComment::create(context, parameter) {
         Ok(Some(docblock)) => {
             update_property_metadata_from_docblock(
+                context.arena,
                 &mut property_metadata,
                 &docblock,
                 classname,
@@ -238,6 +240,7 @@ pub fn scan_properties<'arena>(
 
                 if let Some(docblock) = docblock.as_ref() {
                     update_property_metadata_from_docblock(
+                        context.arena,
                         &mut metadata,
                         docblock,
                         classname,
@@ -293,6 +296,7 @@ pub fn scan_properties<'arena>(
 
             if let Some(docblock) = docblock.as_ref() {
                 update_property_metadata_from_docblock(
+                    context.arena,
                     &mut metadata,
                     docblock,
                     classname,
@@ -372,7 +376,7 @@ fn scan_property_hook<'arena>(
                     && let Some(type_string) = &param_tag.type_string
                 {
                     let type_context = TypeResolutionContext::new();
-                    match get_type_metadata_from_type_string(type_string, None, &type_context, scope) {
+                    match get_type_metadata_from_type_string(context.arena, type_string, None, &type_context, scope) {
                         Ok(docblock_type) => {
                             let native_type = param.type_declaration_metadata.as_ref();
                             let merged = merge_type_preserving_nullability(docblock_type, native_type);
@@ -397,7 +401,8 @@ fn scan_property_hook<'arena>(
                 && is_get
             {
                 let type_context = TypeResolutionContext::new();
-                match get_type_metadata_from_type_string(return_type_string, None, &type_context, scope) {
+                match get_type_metadata_from_type_string(context.arena, return_type_string, None, &type_context, scope)
+                {
                     Ok(docblock_type) => {
                         return_type_metadata = Some(docblock_type);
                     }
@@ -505,6 +510,7 @@ pub fn scan_property_item<'arena>(
 }
 
 fn update_property_metadata_from_docblock(
+    arena: &Bump,
     property_metadata: &mut PropertyMetadata,
     docblock: &PropertyDocblockComment,
     classname: Atom,
@@ -529,7 +535,7 @@ fn update_property_metadata_from_docblock(
     }
 
     if let Some(type_string) = &docblock.type_string {
-        match get_type_metadata_from_type_string(type_string, Some(classname), type_context, scope) {
+        match get_type_metadata_from_type_string(arena, type_string, Some(classname), type_context, scope) {
             Ok(property_type_metadata) => {
                 let real_type = property_metadata.type_declaration_metadata.as_ref();
                 let property_type_metadata = merge_type_preserving_nullability(property_type_metadata, real_type);

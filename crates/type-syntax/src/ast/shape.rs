@@ -3,6 +3,7 @@ use strum::Display;
 
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax_core::ast::Sequence;
 
 use crate::ast::Type;
 use crate::ast::generics::GenericParameters;
@@ -20,19 +21,19 @@ pub enum ShapeTypeKind {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ShapeType<'input> {
+pub struct ShapeType<'arena> {
     pub kind: ShapeTypeKind,
-    pub keyword: Keyword<'input>,
+    pub keyword: Keyword<'arena>,
     pub left_brace: Span,
-    pub fields: Vec<ShapeField<'input>>,
-    pub additional_fields: Option<ShapeAdditionalFields<'input>>,
+    pub fields: Sequence<'arena, ShapeField<'arena>>,
+    pub additional_fields: Option<ShapeAdditionalFields<'arena>>,
     pub right_brace: Span,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub enum ShapeKey<'input> {
+pub enum ShapeKey<'arena> {
     String {
-        value: &'input str,
+        value: &'arena str,
         span: Span,
     },
     Integer {
@@ -40,31 +41,31 @@ pub enum ShapeKey<'input> {
         span: Span,
     },
     ClassLikeConstant {
-        class_name: Identifier<'input>,
+        class_name: Identifier<'arena>,
         double_colon: Span,
-        constant_name: Identifier<'input>,
+        constant_name: Identifier<'arena>,
         span: Span,
     },
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ShapeFieldKey<'input> {
-    pub key: ShapeKey<'input>,
+pub struct ShapeFieldKey<'arena> {
+    pub key: ShapeKey<'arena>,
     pub question_mark: Option<Span>,
     pub colon: Span,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ShapeField<'input> {
-    pub key: Option<ShapeFieldKey<'input>>,
-    pub value: Box<Type<'input>>,
+pub struct ShapeField<'arena> {
+    pub key: Option<ShapeFieldKey<'arena>>,
+    pub value: &'arena Type<'arena>,
     pub comma: Option<Span>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ShapeAdditionalFields<'input> {
+pub struct ShapeAdditionalFields<'arena> {
     pub ellipsis: Span,
-    pub parameters: Option<GenericParameters<'input>>,
+    pub parameters: Option<GenericParameters<'arena>>,
     pub comma: Option<Span>,
 }
 

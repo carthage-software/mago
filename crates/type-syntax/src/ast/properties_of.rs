@@ -17,10 +17,10 @@ pub enum PropertiesOfFilter {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct PropertiesOfType<'input> {
+pub struct PropertiesOfType<'arena> {
     pub filter: PropertiesOfFilter,
-    pub keyword: Keyword<'input>,
-    pub parameter: SingleGenericParameter<'input>,
+    pub keyword: Keyword<'arena>,
+    pub parameter: SingleGenericParameter<'arena>,
 }
 
 impl HasSpan for PropertiesOfType<'_> {

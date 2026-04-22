@@ -70,7 +70,7 @@ pub mod stream;
 
 /// Parses a complete type expression, including unions, intersections, and conditionals.
 #[inline]
-pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
+pub fn parse_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Type<'arena>, ParseError> {
     parse_type_with_precedence(stream, TypePrecedence::Lowest)
 }
 
@@ -78,14 +78,14 @@ pub fn parse_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'
 ///
 /// Accepts plain `Identifier` tokens, the `new` keyword when it is *not* followed by `<`, and
 /// any single-word reserved keyword whose source text has no hyphen.
-pub(crate) fn is_at_member_identifier<'input>(stream: &mut TypeTokenStream<'input>) -> Result<bool, ParseError> {
+pub(crate) fn is_at_member_identifier<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<bool, ParseError> {
     is_at_member_identifier_at(stream, 0)
 }
 
 /// Like [`is_at_member_identifier`] but peeks `offset` tokens ahead instead of at the current
 /// position. `offset == 0` is equivalent to [`is_at_member_identifier`].
-pub(crate) fn is_at_member_identifier_at<'input>(
-    stream: &mut TypeTokenStream<'input>,
+pub(crate) fn is_at_member_identifier_at<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
     offset: usize,
 ) -> Result<bool, ParseError> {
     let Some(token) = stream.lookahead(offset)? else {
@@ -104,9 +104,9 @@ pub(crate) fn is_at_member_identifier_at<'input>(
 /// keyword when it is not followed by `<`, or any non-hyphenated reserved keyword. Errors
 /// with `UnexpectedToken` expecting `Identifier` otherwise, so the diagnostic matches the
 /// traditional call site.
-pub(crate) fn eat_member_identifier<'input>(
-    stream: &mut TypeTokenStream<'input>,
-) -> Result<TypeToken<'input>, ParseError> {
+pub(crate) fn eat_member_identifier<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
+) -> Result<TypeToken<'arena>, ParseError> {
     if is_at_member_identifier(stream)? { stream.consume() } else { stream.eat(TypeTokenKind::Identifier) }
 }
 
@@ -114,7 +114,7 @@ pub(crate) fn eat_member_identifier<'input>(
 /// (e.g. `,`, `)`, `>`, `}`, `]`, `:`, `;`, `=`, EOF). Used to detect a trailing `|` in a
 /// union, so that `int|string|` or `array{0: int|string|}` parses leniently rather than
 /// erroring on the empty right-hand operand.
-fn is_at_union_closing_token<'input>(stream: &mut TypeTokenStream<'input>) -> Result<bool, ParseError> {
+fn is_at_union_closing_token<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<bool, ParseError> {
     Ok(match stream.lookahead(0)?.map(|t| t.kind) {
         None => true,
         Some(kind) => matches!(
@@ -139,10 +139,10 @@ fn is_at_union_closing_token<'input>(stream: &mut TypeTokenStream<'input>) -> Re
 /// For example, `Closure(): int|string` with:
 /// - `Lowest` precedence: parses as `Union(Closure(): int, string)` (correct PHPStan/Psalm behavior)
 /// - `Callable` precedence: parses only `int`, leaving `|string` for the parent to handle
-pub fn parse_type_with_precedence<'input>(
-    stream: &mut TypeTokenStream<'input>,
+pub fn parse_type_with_precedence<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
     min_precedence: TypePrecedence,
-) -> Result<Type<'input>, ParseError> {
+) -> Result<Type<'arena>, ParseError> {
     let mut inner = parse_primary_type(stream)?;
 
     loop {
@@ -154,61 +154,64 @@ pub fn parse_type_with_precedence<'input>(
                 let pipe = stream.consume()?.span_for(stream.file_id());
 
                 if is_at_union_closing_token(stream)? {
-                    return Ok(Type::TrailingPipe(TrailingPipeType { inner: Box::new(inner), pipe }));
+                    return Ok(Type::TrailingPipe(TrailingPipeType { inner: stream.alloc(inner), pipe }));
                 }
 
                 let right = parse_type_with_precedence(stream, TypePrecedence::Union)?;
                 if let Type::TrailingPipe(trailing) = right {
                     return Ok(Type::TrailingPipe(TrailingPipeType {
-                        inner: Box::new(Type::Union(UnionType { left: Box::new(inner), pipe, right: trailing.inner })),
+                        inner: stream.alloc(Type::Union(UnionType {
+                            left: stream.alloc(inner),
+                            pipe,
+                            right: trailing.inner,
+                        })),
                         pipe: trailing.pipe,
                     }));
                 }
 
-                Type::Union(UnionType { left: Box::new(inner), pipe, right: Box::new(right) })
+                Type::Union(UnionType { left: stream.alloc(inner), pipe, right: stream.alloc(right) })
             }
             // Intersection types: T&U
             Some(TypeTokenKind::Ampersand) if !is_inner_nullable && min_precedence <= TypePrecedence::Intersection => {
-                Type::Intersection(IntersectionType {
-                    left: Box::new(inner),
-                    ampersand: stream.consume()?.span_for(stream.file_id()),
-                    right: Box::new(parse_type_with_precedence(stream, TypePrecedence::Intersection)?),
-                })
+                let left = stream.alloc(inner);
+                let ampersand = stream.consume()?.span_for(stream.file_id());
+                let rhs = parse_type_with_precedence(stream, TypePrecedence::Intersection)?;
+                let right = stream.alloc(rhs);
+                Type::Intersection(IntersectionType { left, ampersand, right })
             }
             // Conditional types: T is U ? V : W
             Some(TypeTokenKind::Is) if !is_inner_nullable && min_precedence <= TypePrecedence::Conditional => {
-                Type::Conditional(ConditionalType {
-                    subject: Box::new(inner),
-                    is: Keyword::from_token(stream.consume()?, stream.file_id()),
-                    not: if stream.is_at(TypeTokenKind::Not)? {
-                        Some(Keyword::from_token(stream.consume()?, stream.file_id()))
-                    } else {
-                        None
-                    },
-                    target: Box::new(parse_type_with_precedence(stream, TypePrecedence::Conditional)?),
-                    question_mark: stream.eat(TypeTokenKind::Question)?.span_for(stream.file_id()),
-                    then: Box::new(parse_type_with_precedence(stream, TypePrecedence::Conditional)?),
-                    colon: stream.eat(TypeTokenKind::Colon)?.span_for(stream.file_id()),
-                    otherwise: Box::new(parse_type_with_precedence(stream, TypePrecedence::Conditional)?),
-                })
+                let subject = stream.alloc(inner);
+                let is = Keyword::from_token(stream.consume()?, stream.file_id());
+                let not = if stream.is_at(TypeTokenKind::Not)? {
+                    Some(Keyword::from_token(stream.consume()?, stream.file_id()))
+                } else {
+                    None
+                };
+                let target_ty = parse_type_with_precedence(stream, TypePrecedence::Conditional)?;
+                let target = stream.alloc(target_ty);
+                let question_mark = stream.eat(TypeTokenKind::Question)?.span_for(stream.file_id());
+                let then_ty = parse_type_with_precedence(stream, TypePrecedence::Conditional)?;
+                let then = stream.alloc(then_ty);
+                let colon = stream.eat(TypeTokenKind::Colon)?.span_for(stream.file_id());
+                let otherwise_ty = parse_type_with_precedence(stream, TypePrecedence::Conditional)?;
+                let otherwise = stream.alloc(otherwise_ty);
+                Type::Conditional(ConditionalType { subject, is, not, target, question_mark, then, colon, otherwise })
             }
             // Postfix operations: T[], T[K]
             Some(TypeTokenKind::LeftBracket) if min_precedence <= TypePrecedence::Postfix => {
                 let left_bracket = stream.consume()?.span_for(stream.file_id());
 
                 if stream.is_at(TypeTokenKind::RightBracket)? {
-                    Type::Slice(SliceType {
-                        inner: Box::new(inner),
-                        left_bracket,
-                        right_bracket: stream.consume()?.span_for(stream.file_id()),
-                    })
+                    let inner_ref = stream.alloc(inner);
+                    let right_bracket = stream.consume()?.span_for(stream.file_id());
+                    Type::Slice(SliceType { inner: inner_ref, left_bracket, right_bracket })
                 } else {
-                    Type::IndexAccess(IndexAccessType {
-                        target: Box::new(inner),
-                        left_bracket,
-                        index: Box::new(parse_type(stream)?),
-                        right_bracket: stream.eat(TypeTokenKind::RightBracket)?.span_for(stream.file_id()),
-                    })
+                    let target = stream.alloc(inner);
+                    let index_ty = parse_type(stream)?;
+                    let index = stream.alloc(index_ty);
+                    let right_bracket = stream.eat(TypeTokenKind::RightBracket)?.span_for(stream.file_id());
+                    Type::IndexAccess(IndexAccessType { target, left_bracket, index, right_bracket })
                 }
             }
             _ => {
@@ -220,19 +223,22 @@ pub fn parse_type_with_precedence<'input>(
 
 /// Parses a primary (atomic) type without consuming any infix operators.
 #[inline]
-fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
+fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Type<'arena>, ParseError> {
     let next = stream.peek()?;
     let inner = match next.kind {
         TypeTokenKind::Variable => Type::Variable(VariableType::from_token(stream.consume()?, stream.file_id())),
-        TypeTokenKind::Question => Type::Nullable(NullableType {
-            question_mark: stream.consume()?.span_for(stream.file_id()),
-            inner: Box::new(parse_type(stream)?),
-        }),
-        TypeTokenKind::LeftParenthesis => Type::Parenthesized(ParenthesizedType {
-            left_parenthesis: stream.consume()?.span_for(stream.file_id()),
-            inner: Box::new(parse_type(stream)?),
-            right_parenthesis: stream.eat(TypeTokenKind::RightParenthesis)?.span_for(stream.file_id()),
-        }),
+        TypeTokenKind::Question => {
+            let question_mark = stream.consume()?.span_for(stream.file_id());
+            let inner_ty = parse_type(stream)?;
+            Type::Nullable(NullableType { question_mark, inner: stream.alloc(inner_ty) })
+        }
+        TypeTokenKind::LeftParenthesis => {
+            let left_parenthesis = stream.consume()?.span_for(stream.file_id());
+            let inner_ty = parse_type(stream)?;
+            let inner = stream.alloc(inner_ty);
+            let right_parenthesis = stream.eat(TypeTokenKind::RightParenthesis)?.span_for(stream.file_id());
+            Type::Parenthesized(ParenthesizedType { left_parenthesis, inner, right_parenthesis })
+        }
         TypeTokenKind::Asterisk => {
             let token = stream.consume()?;
             let asterisk_span = token.span_for(stream.file_id());
@@ -704,9 +710,9 @@ fn parse_primary_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Ty
     Ok(inner)
 }
 
-pub fn parse_literal_number_type<'input>(
-    stream: &mut TypeTokenStream<'input>,
-) -> Result<LiteralIntOrFloatType<'input>, ParseError> {
+pub fn parse_literal_number_type<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
+) -> Result<LiteralIntOrFloatType<'arena>, ParseError> {
     let next = stream.peek()?;
 
     match next.kind {

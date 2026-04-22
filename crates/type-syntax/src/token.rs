@@ -140,17 +140,17 @@ pub enum TypeTokenKind {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-pub struct TypeToken<'input> {
+pub struct TypeToken<'arena> {
     pub kind: TypeTokenKind,
     pub start: Position,
-    pub value: &'input str,
+    pub value: &'arena str,
 }
 
-impl<'input> TypeToken<'input> {
+impl<'arena> TypeToken<'arena> {
     /// Creates a new TypeToken.
     #[inline]
     #[must_use]
-    pub const fn new(kind: TypeTokenKind, value: &'input str, start: Position) -> Self {
+    pub const fn new(kind: TypeTokenKind, value: &'arena str, start: Position) -> Self {
         Self { kind, start, value }
     }
 

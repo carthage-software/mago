@@ -9,22 +9,22 @@ use crate::parser::internal::stream::TypeTokenStream;
 use crate::token::TypeTokenKind;
 
 #[inline]
-pub fn parse_single_generic_parameter<'input>(
-    stream: &mut TypeTokenStream<'input>,
-) -> Result<SingleGenericParameter<'input>, ParseError> {
-    Ok(SingleGenericParameter {
-        less_than: stream.eat(TypeTokenKind::LessThan)?.span_for(stream.file_id()),
-        entry: Box::new(GenericParameterEntry { inner: parse_type(stream)?, comma: None }),
-        greater_than: stream.eat(TypeTokenKind::GreaterThan)?.span_for(stream.file_id()),
-    })
+pub fn parse_single_generic_parameter<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
+) -> Result<SingleGenericParameter<'arena>, ParseError> {
+    let less_than = stream.eat(TypeTokenKind::LessThan)?.span_for(stream.file_id());
+    let inner = parse_type(stream)?;
+    let entry = stream.alloc(GenericParameterEntry { inner, comma: None });
+    let greater_than = stream.eat(TypeTokenKind::GreaterThan)?.span_for(stream.file_id());
+    Ok(SingleGenericParameter { less_than, entry, greater_than })
 }
 
 #[inline]
-pub fn parse_generic_parameters<'input>(
-    stream: &mut TypeTokenStream<'input>,
-) -> Result<GenericParameters<'input>, ParseError> {
+pub fn parse_generic_parameters<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
+) -> Result<GenericParameters<'arena>, ParseError> {
     let less_than = stream.eat(TypeTokenKind::LessThan)?.span_for(stream.file_id());
-    let mut entries = Vec::new();
+    let mut entries = stream.new_bvec::<GenericParameterEntry<'arena>>();
 
     loop {
         let entry = GenericParameterEntry {
@@ -49,13 +49,13 @@ pub fn parse_generic_parameters<'input>(
 
     let greater_than = stream.eat(TypeTokenKind::GreaterThan)?.span_for(stream.file_id());
 
-    Ok(GenericParameters { less_than, entries, greater_than })
+    Ok(GenericParameters { less_than, entries: mago_syntax_core::ast::Sequence::new(entries), greater_than })
 }
 
 #[inline]
-pub fn parse_single_generic_parameter_or_none<'input>(
-    stream: &mut TypeTokenStream<'input>,
-) -> Result<Option<SingleGenericParameter<'input>>, ParseError> {
+pub fn parse_single_generic_parameter_or_none<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
+) -> Result<Option<SingleGenericParameter<'arena>>, ParseError> {
     if stream.is_at(TypeTokenKind::LessThan)? {
         let single_generic_parameter = parse_single_generic_parameter(stream)?;
         Ok(Some(single_generic_parameter))
@@ -65,9 +65,9 @@ pub fn parse_single_generic_parameter_or_none<'input>(
 }
 
 #[inline]
-pub fn parse_generic_parameters_or_none<'input>(
-    stream: &mut TypeTokenStream<'input>,
-) -> Result<Option<GenericParameters<'input>>, ParseError> {
+pub fn parse_generic_parameters_or_none<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
+) -> Result<Option<GenericParameters<'arena>>, ParseError> {
     if stream.is_at(TypeTokenKind::LessThan)? {
         let generic_parameters = parse_generic_parameters(stream)?;
         Ok(Some(generic_parameters))

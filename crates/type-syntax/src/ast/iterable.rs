@@ -7,9 +7,9 @@ use crate::ast::generics::GenericParameters;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct IterableType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameters: Option<GenericParameters<'input>>,
+pub struct IterableType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameters: Option<GenericParameters<'arena>>,
 }
 
 impl HasSpan for IterableType<'_> {

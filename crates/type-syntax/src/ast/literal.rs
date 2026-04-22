@@ -5,30 +5,30 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct LiteralIntType<'input> {
+pub struct LiteralIntType<'arena> {
     pub span: Span,
     pub value: u64,
-    pub raw: &'input str,
+    pub raw: &'arena str,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct LiteralFloatType<'input> {
+pub struct LiteralFloatType<'arena> {
     pub span: Span,
     pub value: OrderedFloat<f64>,
-    pub raw: &'input str,
+    pub raw: &'arena str,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub enum LiteralIntOrFloatType<'input> {
-    Int(LiteralIntType<'input>),
-    Float(LiteralFloatType<'input>),
+pub enum LiteralIntOrFloatType<'arena> {
+    Int(LiteralIntType<'arena>),
+    Float(LiteralFloatType<'arena>),
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct LiteralStringType<'input> {
+pub struct LiteralStringType<'arena> {
     pub span: Span,
-    pub value: &'input str, // unquoted
-    pub raw: &'input str,
+    pub value: &'arena str, // unquoted
+    pub raw: &'arena str,
 }
 
 impl HasSpan for LiteralFloatType<'_> {

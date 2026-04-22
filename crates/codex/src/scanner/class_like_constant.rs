@@ -104,7 +104,8 @@ pub fn scan_class_like_constants<'arena>(
                 }
 
                 if let Some(type_string) = &docblock.type_string {
-                    match get_type_metadata_from_type_string(type_string, classname, type_context, scope) {
+                    match get_type_metadata_from_type_string(context.arena, type_string, classname, type_context, scope)
+                    {
                         Ok(type_metadata) => {
                             let real_type = meta.type_declaration.as_ref();
                             let type_metadata = merge_type_preserving_nullability(type_metadata, real_type);

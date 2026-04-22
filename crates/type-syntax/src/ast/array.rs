@@ -7,33 +7,33 @@ use crate::ast::generics::GenericParameters;
 use crate::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ArrayType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameters: Option<GenericParameters<'input>>,
+pub struct ArrayType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameters: Option<GenericParameters<'arena>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct NonEmptyArrayType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameters: Option<GenericParameters<'input>>,
+pub struct NonEmptyArrayType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameters: Option<GenericParameters<'arena>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct AssociativeArrayType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameters: Option<GenericParameters<'input>>,
+pub struct AssociativeArrayType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameters: Option<GenericParameters<'arena>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct ListType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameters: Option<GenericParameters<'input>>,
+pub struct ListType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameters: Option<GenericParameters<'arena>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct NonEmptyListType<'input> {
-    pub keyword: Keyword<'input>,
-    pub parameters: Option<GenericParameters<'input>>,
+pub struct NonEmptyListType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameters: Option<GenericParameters<'arena>>,
 }
 
 impl HasSpan for ArrayType<'_> {

@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use bumpalo::Bump;
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
@@ -147,14 +148,15 @@ use crate::ttype::wrap_atomic;
 /// - An unsupported type construct is encountered
 /// - Type references cannot be resolved (e.g., `self` outside a class context)
 /// - Invalid type combinations are used (e.g., incompatible intersection types)
-pub fn get_type_from_string(
-    type_string: &str,
+pub fn get_type_from_string<'arena>(
+    arena: &'arena Bump,
+    type_string: &'arena str,
     span: Span,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
     classname: Option<Atom>,
 ) -> Result<TUnion, TypeError> {
-    let ast = mago_type_syntax::parse_str(span, type_string)?;
+    let ast = mago_type_syntax::parse_str(arena, span, type_string)?;
 
     get_union_from_type_ast(&ast, scope, type_context, classname)
 }
@@ -177,18 +179,18 @@ pub fn get_union_from_type_ast(
 ) -> Result<TUnion, TypeError> {
     Ok(match ttype {
         Type::Parenthesized(parenthesized_type) => {
-            get_union_from_type_ast(&parenthesized_type.inner, scope, type_context, classname)?
+            get_union_from_type_ast(parenthesized_type.inner, scope, type_context, classname)?
         }
-        Type::Nullable(nullable_type) => match nullable_type.inner.as_ref() {
+        Type::Nullable(nullable_type) => match nullable_type.inner {
             Type::Null(_) => get_null(),
             Type::String(_) => get_nullable_string(),
             Type::Int(_) => get_nullable_int(),
             Type::Float(_) => get_nullable_float(),
             Type::Object(_) => get_nullable_object(),
             Type::Scalar(_) => get_nullable_scalar(),
-            _ => get_union_from_type_ast(&nullable_type.inner, scope, type_context, classname)?.as_nullable(),
+            _ => get_union_from_type_ast(nullable_type.inner, scope, type_context, classname)?.as_nullable(),
         },
-        Type::Union(UnionType { left, right, .. }) if matches!(left.as_ref(), Type::Null(_)) => match right.as_ref() {
+        Type::Union(UnionType { left, right, .. }) if matches!(**left, Type::Null(_)) => match **right {
             Type::Null(_) => get_null(),
             Type::String(_) => get_nullable_string(),
             Type::Int(_) => get_nullable_int(),
@@ -197,7 +199,7 @@ pub fn get_union_from_type_ast(
             Type::Scalar(_) => get_nullable_scalar(),
             _ => get_union_from_type_ast(right, scope, type_context, classname)?.as_nullable(),
         },
-        Type::Union(UnionType { left, right, .. }) if matches!(right.as_ref(), Type::Null(_)) => match left.as_ref() {
+        Type::Union(UnionType { left, right, .. }) if matches!(**right, Type::Null(_)) => match **left {
             Type::Null(_) => get_null(),
             Type::String(_) => get_nullable_string(),
             Type::Int(_) => get_nullable_int(),
@@ -207,16 +209,16 @@ pub fn get_union_from_type_ast(
             _ => get_union_from_type_ast(left, scope, type_context, classname)?.as_nullable(),
         },
         Type::Union(union_type) => {
-            let left = get_union_from_type_ast(&union_type.left, scope, type_context, classname)?;
-            let right = get_union_from_type_ast(&union_type.right, scope, type_context, classname)?;
+            let left = get_union_from_type_ast(union_type.left, scope, type_context, classname)?;
+            let right = get_union_from_type_ast(union_type.right, scope, type_context, classname)?;
 
             let combined_types: Vec<TAtomic> = left.types.iter().chain(right.types.iter()).cloned().collect();
 
             TUnion::from_vec(combined_types)
         }
         Type::Intersection(intersection) => {
-            if matches!(intersection.left.as_ref(), Type::NonEmptyString(_)) {
-                match intersection.right.as_ref() {
+            if matches!(intersection.left, Type::NonEmptyString(_)) {
+                match intersection.right {
                     Type::String(_) => return Ok(get_non_empty_string()),
                     Type::NonEmptyString(_) => return Ok(get_non_empty_string()),
                     Type::LowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
@@ -227,8 +229,8 @@ pub fn get_union_from_type_ast(
                 }
             }
 
-            if matches!(intersection.right.as_ref(), Type::NonEmptyString(_)) {
-                match intersection.left.as_ref() {
+            if matches!(intersection.right, Type::NonEmptyString(_)) {
+                match intersection.left {
                     Type::String(_) => return Ok(get_non_empty_string()),
                     Type::NonEmptyString(_) => return Ok(get_non_empty_string()),
                     Type::LowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
@@ -239,8 +241,8 @@ pub fn get_union_from_type_ast(
                 }
             }
 
-            let left = get_union_from_type_ast(&intersection.left, scope, type_context, classname)?;
-            let right = get_union_from_type_ast(&intersection.right, scope, type_context, classname)?;
+            let left = get_union_from_type_ast(intersection.left, scope, type_context, classname)?;
+            let right = get_union_from_type_ast(intersection.right, scope, type_context, classname)?;
 
             let left_str = left.get_id();
             let right_str = right.get_id();
@@ -282,14 +284,9 @@ pub fn get_union_from_type_ast(
 
             TUnion::from_vec(intersection_types)
         }
-        Type::Slice(slice) => wrap_atomic(get_array_type_from_ast(
-            None,
-            Some(slice.inner.as_ref()),
-            false,
-            scope,
-            type_context,
-            classname,
-        )?),
+        Type::Slice(slice) => {
+            wrap_atomic(get_array_type_from_ast(None, Some(slice.inner), false, scope, type_context, classname)?)
+        }
         Type::Array(ArrayType { parameters, .. }) | Type::AssociativeArray(AssociativeArrayType { parameters, .. }) => {
             let (key, value) = match parameters {
                 Some(parameters) => {
@@ -532,7 +529,7 @@ pub fn get_union_from_type_ast(
         Type::NonPositiveInt(_) => get_non_positive_int(),
         Type::NonNegativeInt(_) => get_non_negative_int(),
         Type::NonZeroInt(_) => get_non_zero_int(),
-        Type::TrailingPipe(trailing) => get_union_from_type_ast(&trailing.inner, scope, type_context, classname)?,
+        Type::TrailingPipe(trailing) => get_union_from_type_ast(trailing.inner, scope, type_context, classname)?,
         Type::IntRange(range) => {
             let min = match range.min {
                 IntOrKeyword::NegativeInt { int, .. } => Some(-(int.value as i64)),
@@ -559,10 +556,10 @@ pub fn get_union_from_type_ast(
             TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::Integer(TInteger::from_bounds(min, max)))))
         }
         Type::Conditional(conditional) => TUnion::from_single(Cow::Owned(TAtomic::Conditional(TConditional::new(
-            Arc::new(get_union_from_type_ast(&conditional.subject, scope, type_context, classname)?),
-            Arc::new(get_union_from_type_ast(&conditional.target, scope, type_context, classname)?),
-            Arc::new(get_union_from_type_ast(&conditional.then, scope, type_context, classname)?),
-            Arc::new(get_union_from_type_ast(&conditional.otherwise, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(conditional.subject, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(conditional.target, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(conditional.then, scope, type_context, classname)?),
+            Arc::new(get_union_from_type_ast(conditional.otherwise, scope, type_context, classname)?),
             conditional.is_negated(),
         )))),
         Type::Variable(variable_type) => {
@@ -646,8 +643,8 @@ pub fn get_union_from_type_ast(
         }
         Type::IndexAccess(index_access_type) => {
             TUnion::from_atomic(TAtomic::Derived(TDerived::IndexAccess(TIndexAccess::new(
-                get_union_from_type_ast(&index_access_type.target, scope, type_context, classname)?,
-                get_union_from_type_ast(&index_access_type.index, scope, type_context, classname)?,
+                get_union_from_type_ast(index_access_type.target, scope, type_context, classname)?,
+                get_union_from_type_ast(index_access_type.index, scope, type_context, classname)?,
             ))))
         }
         _ => {
@@ -683,7 +680,7 @@ fn get_object_from_ast(
             }
         };
 
-        let property_type = get_union_from_type_ast(&property.value, scope, type_context, classname)?;
+        let property_type = get_union_from_type_ast(property.value, scope, type_context, classname)?;
 
         known_properties.insert(key, (property_is_optional, property_type));
     }
@@ -767,7 +764,7 @@ fn get_shape_from_ast(
                     offset
                 };
 
-                let mut field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
+                let mut field_value_type = get_union_from_type_ast(field.value, scope, type_context, classname)?;
                 if field_is_optional {
                     field_value_type.set_possibly_undefined(true, None);
                 }
@@ -847,7 +844,7 @@ fn get_shape_from_ast(
                     array_key
                 };
 
-                let mut field_value_type = get_union_from_type_ast(&field.value, scope, type_context, classname)?;
+                let mut field_value_type = get_union_from_type_ast(field.value, scope, type_context, classname)?;
                 if field_is_optional {
                     field_value_type.set_possibly_undefined(true, None);
                 }
@@ -891,7 +888,7 @@ fn get_callable_from_ast(
         }
 
         if let Some(ret) = specification.return_type.as_ref() {
-            return_type = Some(get_union_from_type_ast(&ret.return_type, scope, type_context, classname)?);
+            return_type = Some(get_union_from_type_ast(ret.return_type, scope, type_context, classname)?);
         }
     } else {
         // `callable` without a specification should be treated the same as

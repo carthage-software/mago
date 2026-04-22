@@ -468,6 +468,7 @@ fn scan_class_like<'arena>(
             let template_name = atom(&template.name);
             let template_as_type = if let Some(type_string) = &template.type_string {
                 match builder::get_type_from_string(
+                    context.arena,
                     &type_string.value,
                     type_string.span,
                     scope,
@@ -544,7 +545,13 @@ fn scan_class_like<'arena>(
 
         for type_alias in &docblock.type_aliases {
             let alias_name = atom(&type_alias.name);
-            match get_type_metadata_from_type_string(&type_alias.type_string, Some(name), &type_context, scope) {
+            match get_type_metadata_from_type_string(
+                context.arena,
+                &type_alias.type_string,
+                Some(name),
+                &type_context,
+                scope,
+            ) {
                 Ok(type_metadata) => {
                     class_like_metadata.type_aliases.insert(alias_name, type_metadata);
                 }
@@ -564,6 +571,7 @@ fn scan_class_like<'arena>(
 
         for extended_type in docblock.template_extends {
             let extended_union = match builder::get_type_from_string(
+                context.arena,
                 &extended_type.value,
                 extended_type.span,
                 scope,
@@ -654,6 +662,7 @@ fn scan_class_like<'arena>(
 
         for implemented_type in docblock.template_implements {
             let implemented_union = match builder::get_type_from_string(
+                context.arena,
                 &implemented_type.value,
                 implemented_type.span,
                 scope,
@@ -738,6 +747,7 @@ fn scan_class_like<'arena>(
 
         for require_extend in docblock.require_extends {
             let required_union = match builder::get_type_from_string(
+                context.arena,
                 &require_extend.value,
                 require_extend.span,
                 scope,
@@ -820,6 +830,7 @@ fn scan_class_like<'arena>(
 
         for require_implements in docblock.require_implements {
             let required_union = match builder::get_type_from_string(
+                context.arena,
                 &require_implements.value,
                 require_implements.span,
                 scope,
@@ -901,7 +912,14 @@ fn scan_class_like<'arena>(
         }
 
         if let Some(inheritors) = docblock.inheritors {
-            match builder::get_type_from_string(&inheritors.value, inheritors.span, scope, &type_context, Some(name)) {
+            match builder::get_type_from_string(
+                context.arena,
+                &inheritors.value,
+                inheritors.span,
+                scope,
+                &type_context,
+                Some(name),
+            ) {
                 Ok(inheritors_union) => {
                     for inheritor in inheritors_union.types.as_ref() {
                         match inheritor {
@@ -939,7 +957,14 @@ fn scan_class_like<'arena>(
         }
 
         for mixin in &docblock.mixins {
-            match builder::get_type_from_string(&mixin.value, mixin.span, scope, &type_context, Some(name)) {
+            match builder::get_type_from_string(
+                context.arena,
+                &mixin.value,
+                mixin.span,
+                scope,
+                &type_context,
+                Some(name),
+            ) {
                 Ok(mixin_type) => {
                     class_like_metadata.mixins.push(mixin_type);
                 }
@@ -997,7 +1022,8 @@ fn scan_class_like<'arena>(
 
                 if let Some(type_hint) = &argument.type_hint {
                     function_parameter_metadata.set_type_declaration_metadata(
-                        get_type_metadata_from_type_string(type_hint, Some(name), &type_context, scope).ok(),
+                        get_type_metadata_from_type_string(context.arena, type_hint, Some(name), &type_context, scope)
+                            .ok(),
                     );
                 }
 
@@ -1016,8 +1042,14 @@ fn scan_class_like<'arena>(
                 function_like_metadata.parameters.push(function_parameter_metadata);
             }
 
-            function_like_metadata.return_type_metadata =
-                get_type_metadata_from_type_string(&method_tag.type_string, Some(name), &type_context, scope).ok();
+            function_like_metadata.return_type_metadata = get_type_metadata_from_type_string(
+                context.arena,
+                &method_tag.type_string,
+                Some(name),
+                &type_context,
+                scope,
+            )
+            .ok();
 
             codebase.function_likes.insert(method_id, function_like_metadata);
         }
@@ -1025,7 +1057,7 @@ fn scan_class_like<'arena>(
         for property in &docblock.properties {
             let property_name = atom(&property.variable.name);
             let type_metadata = if let Some(type_string) = &property.type_string {
-                match get_type_metadata_from_type_string(type_string, Some(name), &type_context, scope) {
+                match get_type_metadata_from_type_string(context.arena, type_string, Some(name), &type_context, scope) {
                     Ok(type_metadata) => Some(type_metadata),
                     Err(typing_error) => {
                         class_like_metadata.issues.push(
@@ -1235,6 +1267,7 @@ fn scan_class_like<'arena>(
 
                 for template_use in docblock.template_use {
                     let template_use_type = match builder::get_type_from_string(
+                        context.arena,
                         &template_use.value,
                         template_use.span,
                         scope,

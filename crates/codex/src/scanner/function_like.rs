@@ -1,3 +1,4 @@
+use bumpalo::Bump;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::ascii_lowercase_atom;
@@ -383,7 +384,14 @@ fn scan_function_like_docblock(
     for template in &docblock.templates {
         let template_name = atom(&template.name);
         let template_as_type = if let Some(type_string) = &template.type_string {
-            match builder::get_type_from_string(&type_string.value, type_string.span, scope, &type_context, classname) {
+            match builder::get_type_from_string(
+                context.arena,
+                &type_string.value,
+                type_string.span,
+                scope,
+                &type_context,
+                classname,
+            ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
                     metadata.issues.push(
@@ -455,7 +463,7 @@ fn scan_function_like_docblock(
             );
         }
 
-        match get_type_metadata_from_type_string(param_type_string, classname, &type_context, scope) {
+        match get_type_metadata_from_type_string(context.arena, param_type_string, classname, &type_context, scope) {
             Ok(mut provided_type) => {
                 let resulting_type = if !is_variadic
                     && parameter_metadata.flags.is_variadic()
@@ -523,7 +531,8 @@ fn scan_function_like_docblock(
             continue;
         }
 
-        match get_type_metadata_from_type_string(&param_out.type_string, classname, &type_context, scope) {
+        match get_type_metadata_from_type_string(context.arena, &param_out.type_string, classname, &type_context, scope)
+        {
             Ok(parameter_out_type) => {
                 parameter_metadata.out_type = Some(parameter_out_type);
             }
@@ -542,7 +551,13 @@ fn scan_function_like_docblock(
     }
 
     if let Some(return_type) = docblock.return_type.as_ref() {
-        match get_type_metadata_from_type_string(&return_type.type_string, classname, &type_context, scope) {
+        match get_type_metadata_from_type_string(
+            context.arena,
+            &return_type.type_string,
+            classname,
+            &type_context,
+            scope,
+        ) {
             Ok(return_type_signature) => {
                 let real_return_type = metadata.return_type_declaration_metadata.as_ref();
                 let return_type_signature = merge_type_preserving_nullability(return_type_signature, real_return_type);
@@ -594,7 +609,8 @@ fn scan_function_like_docblock(
             continue;
         }
 
-        match get_type_metadata_from_type_string(&where_tag.type_string, classname, &type_context, scope) {
+        match get_type_metadata_from_type_string(context.arena, &where_tag.type_string, classname, &type_context, scope)
+        {
             Ok(constraint_type) => {
                 let template_name = atom(&where_tag.name);
 
@@ -611,7 +627,7 @@ fn scan_function_like_docblock(
     }
 
     for thrown in docblock.throws {
-        match get_type_metadata_from_type_string(&thrown.type_string, classname, &type_context, scope) {
+        match get_type_metadata_from_type_string(context.arena, &thrown.type_string, classname, &type_context, scope) {
             Ok(thrown_type) => {
                 metadata.thrown_types.push(thrown_type);
             }
@@ -632,7 +648,8 @@ fn scan_function_like_docblock(
     for assertion_tag in docblock.assertions {
         let assertion_param_name = atom(&assertion_tag.variable.name);
 
-        let assertions = parse_assertion_string(assertion_tag.type_string, classname, &type_context, scope, metadata);
+        let assertions =
+            parse_assertion_string(context.arena, assertion_tag.type_string, classname, &type_context, scope, metadata);
 
         for assertion in assertions {
             metadata.assertions.entry(assertion_param_name).or_default().push(assertion);
@@ -642,7 +659,8 @@ fn scan_function_like_docblock(
     for assertion_tag in docblock.if_true_assertions {
         let assertion_param_name = atom(&assertion_tag.variable.name);
 
-        let assertions = parse_assertion_string(assertion_tag.type_string, classname, &type_context, scope, metadata);
+        let assertions =
+            parse_assertion_string(context.arena, assertion_tag.type_string, classname, &type_context, scope, metadata);
 
         for assertion in assertions {
             metadata.if_true_assertions.entry(assertion_param_name).or_default().push(assertion);
@@ -652,7 +670,8 @@ fn scan_function_like_docblock(
     for assertion_tag in docblock.if_false_assertions {
         let assertion_param_name = atom(&assertion_tag.variable.name);
 
-        let assertions = parse_assertion_string(assertion_tag.type_string, classname, &type_context, scope, metadata);
+        let assertions =
+            parse_assertion_string(context.arena, assertion_tag.type_string, classname, &type_context, scope, metadata);
 
         for assertion in assertions {
             metadata.if_false_assertions.entry(assertion_param_name).or_default().push(assertion);
@@ -675,6 +694,7 @@ fn scan_function_like_docblock(
 }
 
 fn parse_assertion_string(
+    arena: &Bump,
     mut type_string: TypeString,
     classname: Option<Atom>,
     type_context: &TypeResolutionContext,
@@ -720,7 +740,7 @@ fn parse_assertion_string(
         type_string.span = type_string.span.from_start(type_string.span.start + 1);
     }
 
-    match get_type_metadata_from_type_string(&type_string, classname, type_context, scope) {
+    match get_type_metadata_from_type_string(arena, &type_string, classname, type_context, scope) {
         Ok(type_metadata) => match (is_equal, is_negation) {
             (true, true) => {
                 for atomic in type_metadata.type_union.types.into_owned() {

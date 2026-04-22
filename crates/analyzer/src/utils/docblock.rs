@@ -191,6 +191,7 @@ pub fn get_docblock_variables<'ctx>(
             let type_string = var_tag.type_string;
 
             match get_type_from_string(
+                context.arena,
                 &type_string.value,
                 type_string.span,
                 &context.scope,
