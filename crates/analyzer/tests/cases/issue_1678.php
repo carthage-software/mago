@@ -10,6 +10,7 @@ declare(strict_types=1);
 function event_run(mixed &$out = ''): int
 {
     if (mt_rand(0, 10) === 0) {
+        /** @mago-expect analysis:mixed-operand */
         $out .= 'text';
     }
 

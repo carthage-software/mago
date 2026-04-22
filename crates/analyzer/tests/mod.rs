@@ -322,6 +322,7 @@ test_case!(class_string_union_constraint);
 test_case!(float_string_concat);
 test_case!(array_key_concat);
 test_case!(string_concat_combination_threshold);
+test_case!(template_concat_operand);
 test_case!(iterator_type_inference);
 test_case!(unused_template_parameter);
 test_case!(unused_function_template_parameter);
