@@ -263,23 +263,34 @@ impl<'input> TypeLexer<'input> {
     /// This is the hot path - optimized for common case (simple identifiers).
     #[inline]
     fn read_identifier_or_keyword(&self) -> (TypeTokenKind, usize) {
+        let remaining = self.input.read_remaining();
+        let total = remaining.len();
         let mut length = 1;
         let mut next_is_hyphen = false;
         let mut next_is_backslash = false;
 
-        loop {
-            match self.input.peek(length, 2) {
-                [part_of_identifier!(), ..] => length += 1,
-                [b'-', start_of_identifier!() | part_of_identifier!(), ..] => {
-                    next_is_hyphen = true;
-                    break;
-                }
-                [b'\\', start_of_identifier!(), ..] => {
-                    next_is_backslash = true;
-                    break;
-                }
-                _ => break,
+        // Scan identifier bytes greedily. Break on `-` or `\\` if the next
+        // byte after them could extend the identifier (hyphen-joined keyword
+        // or namespace separator).
+        while length < total {
+            // SAFETY: length < total guarantees the index is in bounds.
+            let b = unsafe { *remaining.get_unchecked(length) };
+            if mago_syntax_core::utils::is_part_of_identifier(&b) {
+                length += 1;
+                continue;
             }
+            if b == b'-' && length + 1 < total {
+                let b2 = unsafe { *remaining.get_unchecked(length + 1) };
+                if mago_syntax_core::utils::is_part_of_identifier(&b2) {
+                    next_is_hyphen = true;
+                }
+            } else if b == b'\\' && length + 1 < total {
+                let b2 = unsafe { *remaining.get_unchecked(length + 1) };
+                if mago_syntax_core::utils::is_start_of_identifier(&b2) {
+                    next_is_backslash = true;
+                }
+            }
+            break;
         }
 
         if next_is_backslash {
@@ -287,7 +298,8 @@ impl<'input> TypeLexer<'input> {
         }
 
         if !next_is_hyphen {
-            let bytes = self.input.read(length);
+            // SAFETY: length <= total (identifier was scanned in bounds).
+            let bytes = unsafe { remaining.get_unchecked(..length) };
             if let Some(kind) = keyword::lookup_keyword(bytes) {
                 return (kind, length);
             }
@@ -295,20 +307,28 @@ impl<'input> TypeLexer<'input> {
         }
 
         let base_len = length;
-        loop {
-            match self.input.peek(length, 2) {
-                [part_of_identifier!(), ..] => length += 1,
-                [b'-', start_of_identifier!() | part_of_identifier!(), ..] => length += 1,
-                _ => break,
+        while length < total {
+            let b = unsafe { *remaining.get_unchecked(length) };
+            if mago_syntax_core::utils::is_part_of_identifier(&b) {
+                length += 1;
+                continue;
             }
+            if b == b'-' && length + 1 < total {
+                let b2 = unsafe { *remaining.get_unchecked(length + 1) };
+                if mago_syntax_core::utils::is_part_of_identifier(&b2) {
+                    length += 1;
+                    continue;
+                }
+            }
+            break;
         }
 
-        let bytes = self.input.read(length);
+        let bytes = unsafe { remaining.get_unchecked(..length) };
         if let Some(kind) = keyword::lookup_keyword(bytes) {
             return (kind, length);
         }
 
-        let base_bytes = self.input.read(base_len);
+        let base_bytes = unsafe { remaining.get_unchecked(..base_len) };
         if let Some(kind) = keyword::lookup_keyword(base_bytes) {
             return (kind, base_len);
         }
@@ -356,8 +376,10 @@ impl<'input> TypeLexer<'input> {
 
     #[inline]
     fn token(&self, kind: TypeTokenKind, value: &'input [u8], start: Position, _end: Position) -> TypeToken<'input> {
-        let value_str = value.utf8_chunks().next().map_or("", |chunk| chunk.valid());
-        debug_assert_eq!(value_str.len(), value.len());
+        // SAFETY: `Input` is constructed from a `&str` so the underlying bytes
+        // are valid UTF-8. Token boundaries are either ASCII stop bytes or end
+        // of input, which land on UTF-8 char boundaries.
+        let value_str = unsafe { std::str::from_utf8_unchecked(value) };
         TypeToken { kind, start, value: value_str }
     }
 }

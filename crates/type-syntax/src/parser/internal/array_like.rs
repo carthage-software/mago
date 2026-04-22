@@ -25,6 +25,58 @@ use crate::parser::internal::parse_type;
 use crate::parser::internal::stream::TypeTokenStream;
 use crate::token::TypeTokenKind;
 
+/// Hard upper bound on the lookahead depth used when scanning for a
+/// shape field's key. Must be less than the stream's lookahead capacity.
+const SHAPE_KEY_SCAN_LIMIT: usize = 48;
+
+/// Look ahead from the current stream position to determine whether the
+/// next shape field starts with a `key:` / `key?:` prefix.
+///
+/// The scan tracks `<>` depth so that commas inside a generic parameter
+/// list are not mistaken for the field terminator (e.g. the `,` in
+/// `foo: array<int, string>`). `(`, `[`, and `{` remain hard terminators:
+/// a `(` inside a field value signals a callable type (whose own `:` for
+/// the return type must not be confused with a shape-key colon), a `[`
+/// signals slice/array-access syntax, and a `{` would start a new shape.
+/// A hard cap of [`SHAPE_KEY_SCAN_LIMIT`] prevents a pathological input
+/// from exceeding the stream buffer's lookahead capacity; hitting the
+/// cap conservatively returns `false` (treat the field as keyless).
+#[inline]
+pub fn scan_for_shape_field_key<'input>(stream: &mut TypeTokenStream<'input>) -> Result<bool, ParseError> {
+    let mut depth_angle: u32 = 0;
+
+    for i in 0..SHAPE_KEY_SCAN_LIMIT {
+        let Some(token) = stream.lookahead(i)? else {
+            return Ok(false);
+        };
+        match token.kind {
+            TypeTokenKind::Colon if depth_angle == 0 => return Ok(true),
+            TypeTokenKind::Question
+                if depth_angle == 0 && stream.lookahead(i + 1)?.is_some_and(|t| t.kind == TypeTokenKind::Colon) =>
+            {
+                return Ok(true);
+            }
+            TypeTokenKind::Comma
+            | TypeTokenKind::RightBrace
+            | TypeTokenKind::LeftBrace
+            | TypeTokenKind::LeftParenthesis
+            | TypeTokenKind::RightParenthesis
+            | TypeTokenKind::LeftBracket
+            | TypeTokenKind::RightBracket
+            | TypeTokenKind::Ellipsis
+                if depth_angle == 0 =>
+            {
+                return Ok(false);
+            }
+            TypeTokenKind::LessThan => depth_angle += 1,
+            TypeTokenKind::GreaterThan if depth_angle > 0 => depth_angle -= 1,
+            _ => {}
+        }
+    }
+
+    Ok(false)
+}
+
 #[inline]
 pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Result<Type<'input>, ParseError> {
     let next = stream.peek()?;
@@ -100,48 +152,7 @@ pub fn parse_array_like_type<'input>(stream: &mut TypeTokenStream<'input>) -> Re
         fields: {
             let mut fields = Vec::new();
             while !stream.is_at(TypeTokenKind::RightBrace)? && !stream.is_at(TypeTokenKind::Ellipsis)? {
-                let has_key = {
-                    let mut found_key = false;
-                    // Scan ahead to determine if a key is present before the value type.
-                    for i in 0.. {
-                        let Some(token) = stream.lookahead(i)? else {
-                            // Reached the end of the stream, so no key was found.
-                            break;
-                        };
-
-                        match token.kind {
-                            // If we find a colon, we know a key is present.
-                            TypeTokenKind::Colon => {
-                                found_key = true;
-                                break;
-                            }
-                            // If we find a question mark, it could indicate a key,
-                            // if the following token is a colon.
-                            TypeTokenKind::Question
-                                if stream.lookahead(i + 1)?.is_some_and(|t| t.kind == TypeTokenKind::Colon) =>
-                            {
-                                found_key = true;
-                                break;
-                            }
-                            // If we find any of these tokens, what came before must have
-                            // been a full value type, not a key.
-                            TypeTokenKind::Comma
-                            | TypeTokenKind::RightBrace
-                            | TypeTokenKind::LeftBrace
-                            | TypeTokenKind::LeftParenthesis
-                            | TypeTokenKind::RightParenthesis
-                            | TypeTokenKind::LeftBracket
-                            | TypeTokenKind::RightBracket
-                            | TypeTokenKind::Ellipsis => {
-                                break;
-                            }
-                            // Any other token is part of a potential key, so keep scanning.
-                            _ => {}
-                        }
-                    }
-
-                    found_key
-                };
+                let has_key = scan_for_shape_field_key(stream)?;
 
                 let field = ShapeField {
                     key: if has_key {

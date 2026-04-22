@@ -1,9 +1,9 @@
-use std::collections::VecDeque;
 use std::fmt::Debug;
 
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_span::Position;
+use mago_syntax_core::parser::LookaheadBuf;
 
 use crate::error::ParseError;
 use crate::error::SyntaxError;
@@ -16,7 +16,7 @@ use crate::token::TypeTokenKind;
 #[derive(Debug)]
 pub struct TypeTokenStream<'input> {
     pub(crate) lexer: TypeLexer<'input>,
-    buffer: VecDeque<TypeToken<'input>>,
+    buffer: LookaheadBuf<TypeToken<'input>, 64>,
     position: Position,
 }
 
@@ -25,9 +25,7 @@ impl<'input> TypeTokenStream<'input> {
     #[inline]
     pub fn new(lexer: TypeLexer<'input>) -> TypeTokenStream<'input> {
         let position = lexer.current_position();
-
-        // Pre-allocate buffer - typical lookahead is 1-2 tokens
-        TypeTokenStream { lexer, buffer: VecDeque::with_capacity(4), position }
+        TypeTokenStream { lexer, buffer: LookaheadBuf::new(), position }
     }
 
     /// Returns the current position of the stream within the source file.
@@ -114,7 +112,7 @@ impl<'input> TypeTokenStream<'input> {
     #[inline]
     pub fn peek_kind(&mut self) -> Result<Option<TypeTokenKind>, ParseError> {
         match self.fill_buffer(1) {
-            Ok(true) => Ok(self.buffer.front().map(|t| t.kind)),
+            Ok(true) => Ok(self.buffer.get(0).map(|t| t.kind)),
             Ok(false) => Ok(None),
             Err(e) => Err(e.into()),
         }
@@ -157,9 +155,8 @@ impl<'input> TypeTokenStream<'input> {
     /// - `Err(ParseError)`: If the underlying lexer produced an error.
     #[inline]
     pub fn lookahead(&mut self, n: usize) -> Result<Option<TypeToken<'input>>, ParseError> {
-        // Ensure the buffer has at least n+1 tokens (or propagate EOF/error).
         match self.fill_buffer(n + 1) {
-            Ok(true) => Ok(self.buffer.get(n).copied()),
+            Ok(true) => Ok(self.buffer.get(n)),
             Ok(false) => Ok(None),
             Err(error) => Err(error.into()),
         }

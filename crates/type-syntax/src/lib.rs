@@ -353,6 +353,101 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_shape_keyless_entry_with_commas_inside_generics() {
+        // Regression: the shape-field-key scan used to bail on any top-level
+        // comma without tracking bracket depth. A `,` inside `<...>` must
+        // be skipped over, not mistaken for the field terminator.
+        match do_parse("array{array<int, string>}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                assert!(shape.fields[0].key.is_none(), "expected a keyless (positional) field");
+                match &*shape.fields[0].value {
+                    Type::Array(_) => {}
+                    v => panic!("expected value to be a generic array type, got {v:?}"),
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_shape_keyed_entry_with_commas_inside_value_generics() {
+        // `foo: array<int, string>` must be recognized as a keyed field.
+        // The scan has to see the `:` at top level despite the `,` nested
+        // inside `<...>` in the value.
+        match do_parse("array{foo: array<int, string>}") {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1);
+                let key = shape.fields[0].key.as_ref().expect("expected a keyed field");
+                match &key.key {
+                    ShapeKey::String { value, .. } => assert_eq!(*value, "foo"),
+                    other => panic!("expected identifier key, got {other:?}"),
+                }
+                match &*shape.fields[0].value {
+                    Type::Array(_) => {}
+                    v => panic!("expected value to be a generic array type, got {v:?}"),
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_shape_with_large_union_value_does_not_overflow() {
+        // Regression: a single keyless field whose value is a long union
+        // containing nested generics used to scan past the stream's
+        // lookahead capacity (16 slots previously, now 64) looking for a
+        // phantom `:`. With bracket-depth tracking and the
+        // SHAPE_KEY_SCAN_LIMIT cap the scan stays bounded.
+        let input = "array{\
+            int | string | float | bool | null | \
+            array<int, string> | array<string, int> | \
+            callable(int, string): bool | \
+            list<int> | iterable<string, mixed>\
+        }";
+        match do_parse(input) {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 1, "expected a single keyless field");
+                assert!(shape.fields[0].key.is_none(), "value is a union, not a keyed field");
+                match &*shape.fields[0].value {
+                    Type::Union(_) => {}
+                    v => panic!("expected a union value type, got {v:?}"),
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_shape_many_fields_with_nested_generics() {
+        // Stress test: many fields, each with a value containing top-level
+        // commas inside `<>`. Previously the scan would overflow the fixed
+        // lookahead buffer on some fields because it couldn't distinguish
+        // `,` inside a generic from the field separator.
+        let input = "array{\
+            a: list<int, string>, \
+            b: array<int, string>, \
+            c: iterable<int, string>, \
+            d: callable(int, string): void, \
+            e: array<string, array<int, string>>, \
+            f: string\
+        }";
+        match do_parse(input) {
+            Ok(Type::Shape(shape)) => {
+                assert_eq!(shape.fields.len(), 6);
+                for (i, expected_key) in ["a", "b", "c", "d", "e", "f"].iter().enumerate() {
+                    let key = shape.fields[i].key.as_ref().expect("expected a keyed field");
+                    match &key.key {
+                        ShapeKey::String { value, .. } => assert_eq!(value, expected_key),
+                        other => panic!("field {i}: expected identifier key, got {other:?}"),
+                    }
+                }
+            }
+            res => panic!("Expected Ok(Type::Shape), got {res:?}"),
+        }
+    }
+
+    #[test]
     fn test_parse_unsealed_shape_with_fallback() {
         match do_parse(
             "array{
