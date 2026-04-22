@@ -9,7 +9,7 @@
 //! no deferred-error slot: the parser sees a lex failure the moment it
 //! reaches for a token that cannot be produced.
 
-use std::collections::VecDeque;
+use mago_syntax_core::parser::LookaheadBuf;
 use std::fmt::Debug;
 
 use bumpalo::Bump;
@@ -36,7 +36,7 @@ pub struct TokenStream<'arena> {
     arena: &'arena Bump,
     lexer: TwigLexer<'arena>,
     /// Non-trivia lookahead buffer pulled on demand from the lexer.
-    buffer: VecDeque<TwigToken<'arena>>,
+    buffer: LookaheadBuf<TwigToken<'arena>, 8>,
     /// Trivia collected as the lexer is drained.
     trivia: BVec<'arena, Trivia<'arena>>,
     /// End position of the most recently consumed significant token.
@@ -44,18 +44,10 @@ pub struct TokenStream<'arena> {
 }
 
 impl<'arena> TokenStream<'arena> {
-    const BUFFER_INITIAL_CAPACITY: usize = 8;
-
     #[inline]
     pub fn new(arena: &'arena Bump, lexer: TwigLexer<'arena>) -> Self {
         let position = lexer.current_position();
-        Self {
-            arena,
-            lexer,
-            buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
-            trivia: BVec::new_in(arena),
-            position,
-        }
+        Self { arena, lexer, buffer: LookaheadBuf::new(), trivia: BVec::new_in(arena), position }
     }
 
     #[inline]
@@ -225,7 +217,7 @@ impl<'arena> TokenStream<'arena> {
     #[inline]
     pub fn lookahead(&mut self, n: usize) -> Result<Option<TwigToken<'arena>>, ParseError> {
         match self.fill_buffer(n + 1) {
-            Ok(Some(_)) => Ok(self.buffer.get(n).copied()),
+            Ok(Some(_)) => Ok(self.buffer.get(n)),
             Ok(None) => Ok(None),
             Err(error) => Err(error.into()),
         }

@@ -275,6 +275,13 @@ pub struct TwigToken<'input> {
     pub value: &'input str,
 }
 
+impl mago_span::HasPosition for TwigToken<'_> {
+    #[inline]
+    fn position(&self) -> Position {
+        self.start
+    }
+}
+
 impl<'input> TwigToken<'input> {
     #[inline]
     #[must_use]

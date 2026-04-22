@@ -52,9 +52,19 @@ impl HasSpan for Trivia<'_> {
     }
 }
 
-impl<'arena> Sequence<'arena, Trivia<'arena>> {
-    /// Iterate only over the comment trivia in this sequence.
-    pub fn comments(&self) -> impl Iterator<Item = &Trivia<'arena>> {
+/// Iteration helpers over a trivia [`Sequence`].
+pub trait TriviaSequenceExt<'arena> {
+    fn comments<'a>(&'a self) -> impl Iterator<Item = &'a Trivia<'arena>>
+    where
+        'arena: 'a;
+}
+
+impl<'arena> TriviaSequenceExt<'arena> for Sequence<'arena, Trivia<'arena>> {
+    #[inline]
+    fn comments<'a>(&'a self) -> impl Iterator<Item = &'a Trivia<'arena>>
+    where
+        'arena: 'a,
+    {
         self.iter().filter(|t| t.kind.is_comment())
     }
 }
