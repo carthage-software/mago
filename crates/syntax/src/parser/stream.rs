@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::fmt::Debug;
 
 use bumpalo::Bump;
@@ -8,6 +7,7 @@ use bumpalo::collections::Vec;
 use mago_database::file::HasFileId;
 use mago_span::Position;
 use mago_span::Span;
+use mago_syntax_core::parser::LookaheadBuf;
 
 use crate::ast::sequence::Sequence;
 use crate::ast::trivia::Trivia;
@@ -22,25 +22,16 @@ use crate::token::TokenKind;
 pub struct TokenStream<'input, 'arena> {
     arena: &'arena Bump,
     lexer: Lexer<'input>,
-    buffer: VecDeque<Token<'input>>,
+    buffer: LookaheadBuf<Token<'input>, 16>,
     trivia: Vec<'arena, Token<'input>>,
     position: Position,
 }
 
 impl<'input, 'arena> TokenStream<'input, 'arena> {
-    /// Initial capacity for the token lookahead buffer.
-    const BUFFER_INITIAL_CAPACITY: usize = 8;
-
     pub fn new(arena: &'arena Bump, lexer: Lexer<'input>) -> TokenStream<'input, 'arena> {
         let position = lexer.current_position();
 
-        TokenStream {
-            arena,
-            lexer,
-            buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
-            trivia: Vec::new_in(arena),
-            position,
-        }
+        TokenStream { arena, lexer, buffer: LookaheadBuf::new(), trivia: Vec::new_in(arena), position }
     }
 
     /// Returns the current position of the stream within the source file.
@@ -143,7 +134,7 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     #[inline]
     pub fn lookahead(&mut self, n: usize) -> Result<Option<Token<'input>>, ParseError> {
         match self.fill_buffer(n + 1) {
-            Ok(Some(_)) => Ok(self.buffer.get(n).copied()),
+            Ok(Some(_)) => Ok(self.buffer.get(n)),
             Ok(None) => Ok(None),
             Err(error) => Err(error.into()),
         }

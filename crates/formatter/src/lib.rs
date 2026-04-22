@@ -11,6 +11,7 @@ use bumpalo::Bump;
 use mago_database::file::File;
 use mago_php_version::PHPVersion;
 use mago_syntax::ast::Program;
+use mago_syntax::ast::TriviaSequenceExt;
 use mago_syntax::error::ParseError;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::settings::ParserSettings;

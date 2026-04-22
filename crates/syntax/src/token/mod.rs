@@ -2,6 +2,7 @@ use serde::Serialize;
 use strum::Display;
 
 use mago_database::file::FileId;
+use mago_span::HasPosition;
 use mago_span::Position;
 use mago_span::Span;
 
@@ -272,6 +273,13 @@ pub struct Token<'a> {
     pub kind: TokenKind,
     pub start: Position,
     pub value: &'a str,
+}
+
+impl HasPosition for Token<'_> {
+    #[inline]
+    fn position(&self) -> Position {
+        self.start
+    }
 }
 
 impl Precedence {

@@ -21,6 +21,7 @@ use mago_syntax::ast::Hint;
 use mago_syntax::ast::Implements;
 use mago_syntax::ast::Interface;
 use mago_syntax::ast::Modifier;
+use mago_syntax::ast::ModifierSequenceExt;
 use mago_syntax::ast::Sequence;
 use mago_syntax::ast::Trait;
 use mago_syntax::ast::TraitUseAdaptation;

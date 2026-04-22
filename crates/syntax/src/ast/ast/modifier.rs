@@ -150,57 +150,79 @@ impl HasSpan for Modifier<'_> {
     }
 }
 
-impl<'arena> Sequence<'arena, Modifier<'arena>> {
-    /// Returns the first abstract modifier in the sequence, if any.
-    #[must_use]
-    pub fn get_static(&self) -> Option<&Modifier<'arena>> {
+/// Accessors layered over a modifier [`Sequence`] so that callers can
+/// query visibility, staticness, etc. without pattern-matching every
+/// variant. Imported automatically by `use crate::ast::*`.
+pub trait ModifierSequenceExt<'arena> {
+    fn get_static(&self) -> Option<&Modifier<'arena>>;
+    fn contains_static(&self) -> bool;
+    fn get_final(&self) -> Option<&Modifier<'arena>>;
+    fn contains_final(&self) -> bool;
+    fn get_abstract(&self) -> Option<&Modifier<'arena>>;
+    fn contains_abstract(&self) -> bool;
+    fn get_readonly(&self) -> Option<&Modifier<'arena>>;
+    fn contains_readonly(&self) -> bool;
+    fn get_first_visibility(&self) -> Option<&Modifier<'arena>>;
+    fn get_first_read_visibility(&self) -> Option<&Modifier<'arena>>;
+    fn get_first_write_visibility(&self) -> Option<&Modifier<'arena>>;
+    fn contains_visibility(&self) -> bool;
+    fn get_public(&self) -> Option<&Modifier<'arena>>;
+    fn contains_public(&self) -> bool;
+    fn get_protected(&self) -> Option<&Modifier<'arena>>;
+    fn contains_protected(&self) -> bool;
+    fn get_private(&self) -> Option<&Modifier<'arena>>;
+    fn contains_private(&self) -> bool;
+    fn get_private_set(&self) -> Option<&Modifier<'arena>>;
+    fn contains_private_set(&self) -> bool;
+    fn get_protected_set(&self) -> Option<&Modifier<'arena>>;
+    fn contains_protected_set(&self) -> bool;
+    fn get_public_set(&self) -> Option<&Modifier<'arena>>;
+    fn contains_public_set(&self) -> bool;
+}
+
+impl<'arena> ModifierSequenceExt<'arena> for Sequence<'arena, Modifier<'arena>> {
+    #[inline]
+    fn get_static(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Static(..)))
     }
 
-    /// Returns `true` if the sequence contains a static modifier.
-    #[must_use]
-    pub fn contains_static(&self) -> bool {
+    #[inline]
+    fn contains_static(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Static(..)))
     }
 
-    /// Return the first final modifier in the sequence, if any.
-    #[must_use]
-    pub fn get_final(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_final(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Final(_)))
     }
 
-    /// Returns `true` if the sequence contains a final modifier.
-    #[must_use]
-    pub fn contains_final(&self) -> bool {
+    #[inline]
+    fn contains_final(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Final(..)))
     }
 
-    /// Returns the first abstract modifier in the sequence, if any.
-    #[must_use]
-    pub fn get_abstract(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_abstract(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Abstract(..)))
     }
 
-    /// Returns `true` if the sequence contains an abstract modifier.
-    #[must_use]
-    pub fn contains_abstract(&self) -> bool {
+    #[inline]
+    fn contains_abstract(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Abstract(..)))
     }
 
-    /// Returns the first abstract modifier in the sequence, if any.
-    #[must_use]
-    pub fn get_readonly(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_readonly(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Readonly(..)))
     }
 
-    /// Returns `true` if the sequence contains a readonly modifier.
-    #[must_use]
-    pub fn contains_readonly(&self) -> bool {
+    #[inline]
+    fn contains_readonly(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Readonly(..)))
     }
 
-    #[must_use]
-    pub fn get_first_visibility(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_first_visibility(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| {
             matches!(
                 modifier,
@@ -214,84 +236,81 @@ impl<'arena> Sequence<'arena, Modifier<'arena>> {
         })
     }
 
-    #[must_use]
-    pub fn get_first_read_visibility(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_first_read_visibility(&self) -> Option<&Modifier<'arena>> {
         self.iter()
             .find(|modifier| matches!(modifier, Modifier::Public(..) | Modifier::Protected(..) | Modifier::Private(..)))
     }
 
-    #[must_use]
-    pub fn get_first_write_visibility(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_first_write_visibility(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| {
             matches!(modifier, Modifier::PrivateSet(..) | Modifier::ProtectedSet(..) | Modifier::PublicSet(..))
         })
     }
 
-    /// Returns `true` if the sequence contains a visibility modifier for reading or writing.
-    pub fn contains_visibility(&self) -> bool {
+    #[inline]
+    fn contains_visibility(&self) -> bool {
         self.iter().any(Modifier::is_visibility)
     }
 
-    #[must_use]
-    pub fn get_public(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_public(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Public(..)))
     }
 
-    /// Returns `true` if the sequence contains a public visibility modifier.
-    #[must_use]
-    pub fn contains_public(&self) -> bool {
+    #[inline]
+    fn contains_public(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Public(..)))
     }
 
-    #[must_use]
-    pub fn get_protected(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_protected(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Protected(..)))
     }
 
-    /// Returns `true` if the sequence contains a protected visibility modifier.
-    #[must_use]
-    pub fn contains_protected(&self) -> bool {
+    #[inline]
+    fn contains_protected(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Protected(..)))
     }
 
-    #[must_use]
-    pub fn get_private(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_private(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::Private(..)))
     }
 
-    /// Returns `true` if the sequence contains a private visibility modifier.
-    #[must_use]
-    pub fn contains_private(&self) -> bool {
+    #[inline]
+    fn contains_private(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::Private(..)))
     }
 
-    #[must_use]
-    pub fn get_private_set(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_private_set(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::PrivateSet(..)))
     }
 
-    #[must_use]
-    pub fn contains_private_set(&self) -> bool {
+    #[inline]
+    fn contains_private_set(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::PrivateSet(..)))
     }
 
-    #[must_use]
-    pub fn get_protected_set(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_protected_set(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::ProtectedSet(..)))
     }
 
-    #[must_use]
-    pub fn contains_protected_set(&self) -> bool {
+    #[inline]
+    fn contains_protected_set(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::ProtectedSet(..)))
     }
 
-    #[must_use]
-    pub fn get_public_set(&self) -> Option<&Modifier<'arena>> {
+    #[inline]
+    fn get_public_set(&self) -> Option<&Modifier<'arena>> {
         self.iter().find(|modifier| matches!(modifier, Modifier::PublicSet(..)))
     }
 
-    #[must_use]
-    pub fn contains_public_set(&self) -> bool {
+    #[inline]
+    fn contains_public_set(&self) -> bool {
         self.iter().any(|modifier| matches!(modifier, Modifier::PublicSet(..)))
     }
 }

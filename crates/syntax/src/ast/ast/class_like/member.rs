@@ -126,29 +126,40 @@ impl ClassLikeConstantSelector<'_> {
     }
 }
 
-impl<'arena> Sequence<'arena, ClassLikeMember<'arena>> {
-    #[must_use]
-    pub fn contains_trait_uses(&self) -> bool {
+/// Accessors over a class-like member [`Sequence`]. Lives as a trait
+/// because [`Sequence`] is defined in [`mago_syntax_core`]; `use`-import
+/// it to get the methods in scope.
+pub trait ClassLikeMemberSequenceExt<'arena> {
+    fn contains_trait_uses(&self) -> bool;
+    fn contains_constants(&self) -> bool;
+    fn contains_properties(&self) -> bool;
+    fn contains_enum_cases(&self) -> bool;
+    fn contains_methods(&self) -> bool;
+}
+
+impl<'arena> ClassLikeMemberSequenceExt<'arena> for Sequence<'arena, ClassLikeMember<'arena>> {
+    #[inline]
+    fn contains_trait_uses(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::TraitUse(_)))
     }
 
-    #[must_use]
-    pub fn contains_constants(&self) -> bool {
+    #[inline]
+    fn contains_constants(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::Constant(_)))
     }
 
-    #[must_use]
-    pub fn contains_properties(&self) -> bool {
+    #[inline]
+    fn contains_properties(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::Property(_)))
     }
 
-    #[must_use]
-    pub fn contains_enum_cases(&self) -> bool {
+    #[inline]
+    fn contains_enum_cases(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::EnumCase(_)))
     }
 
-    #[must_use]
-    pub fn contains_methods(&self) -> bool {
+    #[inline]
+    fn contains_methods(&self) -> bool {
         self.iter().any(|member| matches!(member, ClassLikeMember::Method(_)))
     }
 }

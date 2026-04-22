@@ -8,6 +8,7 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::ast::Modifier;
+use mago_syntax::ast::ModifierSequenceExt;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 

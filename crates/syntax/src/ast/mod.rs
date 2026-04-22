@@ -13,8 +13,11 @@ use mago_span::Span;
 pub use crate::ast::ast::*;
 pub use crate::ast::node::*;
 pub use crate::ast::sequence::Sequence;
+pub use crate::ast::sequence::TokenSeparatedSequence;
+pub use crate::ast::sequence::TokenSeparatedSequenceExt;
 pub use crate::ast::trivia::Trivia;
 pub use crate::ast::trivia::TriviaKind;
+pub use crate::ast::trivia::TriviaSequenceExt;
 use crate::error::ParseError;
 
 pub mod ast;

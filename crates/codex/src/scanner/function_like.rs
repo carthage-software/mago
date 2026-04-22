@@ -13,6 +13,7 @@ use mago_syntax::ast::Closure;
 use mago_syntax::ast::Function;
 use mago_syntax::ast::Method;
 use mago_syntax::ast::MethodBody;
+use mago_syntax::ast::ModifierSequenceExt;
 use mago_syntax::utils;
 
 use crate::assertion::Assertion;

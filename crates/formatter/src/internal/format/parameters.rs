@@ -5,6 +5,7 @@ use mago_span::HasSpan;
 use mago_syntax::ast::FunctionLikeParameter;
 use mago_syntax::ast::FunctionLikeParameterList;
 use mago_syntax::ast::Modifier;
+use mago_syntax::ast::ModifierSequenceExt;
 use mago_syntax::ast::Sequence;
 
 use crate::document::BreakMode;

@@ -10,6 +10,7 @@ use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::ModifierSequenceExt;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 

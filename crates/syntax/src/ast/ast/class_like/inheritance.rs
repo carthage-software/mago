@@ -6,6 +6,7 @@ use mago_span::Span;
 use crate::ast::ast::identifier::Identifier;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::sequence::TokenSeparatedSequence;
+use crate::ast::sequence::TokenSeparatedSequenceExt;
 
 /// Represents `implements` keyword with one or more types.
 ///

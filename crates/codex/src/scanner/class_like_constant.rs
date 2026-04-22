@@ -5,6 +5,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::ClassLikeConstant;
+use mago_syntax::ast::ModifierSequenceExt;
 
 use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;

@@ -1,155 +1,39 @@
-use std::slice::Iter;
-
-use bumpalo::Bump;
-use bumpalo::collections::Vec;
-use bumpalo::collections::vec::IntoIter;
-use bumpalo::vec;
-use serde::Serialize;
+//! PHP-specific view over the shared sequence primitives.
+//!
+//! Every syntax crate uses the same two container types, defined in
+//! [`mago_syntax_core::ast`]. PHP fixes the [`TokenSeparatedSequence`]
+//! separator to its own [`Token<'arena>`] via a type alias so that the
+//! rest of the PHP AST can continue to write
+//! `TokenSeparatedSequence<'arena, T>` (one generic) and pick up PHP
+//! extension methods through [`TokenSeparatedSequenceExt`].
 
 use mago_database::file::FileId;
 use mago_span::HasSpan;
 use mago_span::Position;
 use mago_span::Span;
+use mago_syntax_core::ast::TokenSeparatedSequence as CoreTokenSeparatedSequence;
 
 use crate::token::Token;
 
-/// Represents a sequence of nodes.
-///
-/// An example of this is modifiers in a method declaration.
-///
-/// i.e. `public` and `static` in `public static function foo() {}`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-#[repr(transparent)]
-pub struct Sequence<'arena, T> {
-    pub nodes: Vec<'arena, T>,
+pub use mago_syntax_core::ast::Sequence;
+
+/// A comma-/semicolon-separated sequence of PHP AST nodes.
+pub type TokenSeparatedSequence<'arena, T> = CoreTokenSeparatedSequence<'arena, T, Token<'arena>>;
+
+/// PHP-specific helpers on a [`TokenSeparatedSequence`]. Supplies the
+/// span-reconstruction methods that need to combine a file id with a
+/// token's start and value length.
+pub trait TokenSeparatedSequenceExt<'arena, T: HasSpan> {
+    fn first_span(&self, file_id: FileId) -> Option<Span>;
+    fn last_span(&self, file_id: FileId) -> Option<Span>;
+    fn span(&self, file_id: FileId, from: Position) -> Span;
 }
 
-/// Represents a sequence of nodes separated by a token.
-///
-/// An example of this is arguments in a function call, where the tokens are commas.
-///
-/// i.e. `1`, `2` and `3` in `foo(1, 2, 3)`.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct TokenSeparatedSequence<'arena, T> {
-    pub nodes: Vec<'arena, T>,
-    pub tokens: Vec<'arena, Token<'arena>>,
-}
-
-impl<'arena, T: HasSpan> Sequence<'arena, T> {
+impl<'arena, T: HasSpan> TokenSeparatedSequenceExt<'arena, T> for TokenSeparatedSequence<'arena, T> {
     #[inline]
-    #[must_use]
-    pub const fn new(inner: Vec<'arena, T>) -> Self {
-        Self { nodes: inner }
-    }
-
-    #[inline]
-    pub fn empty(arena: &'arena Bump) -> Self {
-        Self { nodes: vec![in arena] }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.nodes.len()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn get(&self, index: usize) -> Option<&T> {
-        self.nodes.get(index)
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn first(&self) -> Option<&T> {
-        self.nodes.first()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn first_span(&self) -> Option<Span> {
-        self.nodes.first().map(HasSpan::span)
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn last(&self) -> Option<&T> {
-        self.nodes.last()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn last_span(&self) -> Option<Span> {
-        self.nodes.last().map(HasSpan::span)
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn span(&self, file_id: FileId, from: Position) -> Span {
-        self.last_span().map_or(Span::new(file_id, from, from), |span| Span::new(file_id, from, span.end))
-    }
-
-    #[inline]
-    pub fn iter(&self) -> Iter<'_, T> {
-        self.nodes.iter()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn as_slice(&self) -> &[T] {
-        self.nodes.as_slice()
-    }
-}
-
-impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
-    #[inline]
-    #[must_use]
-    pub const fn new(inner: Vec<'arena, T>, tokens: Vec<'arena, Token>) -> Self {
-        Self { nodes: inner, tokens }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn empty(arena: &'arena Bump) -> Self {
-        Self { nodes: vec![in arena], tokens: vec![in arena] }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.nodes.len()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.nodes.is_empty()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn get(&self, index: usize) -> Option<&T> {
-        self.nodes.get(index)
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn first(&self) -> Option<&T> {
-        self.nodes.first()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn first_span(&self, file_id: FileId) -> Option<Span> {
+    fn first_span(&self, file_id: FileId) -> Option<Span> {
         match (self.tokens.first(), self.nodes.first()) {
             (Some(token), Some(node)) => {
-                // check if the token comes before the node
                 let token_end = token.start.offset + token.value.len() as u32;
                 if token_end <= node.span().start.offset { Some(token.span_for(file_id)) } else { Some(node.span()) }
             }
@@ -160,17 +44,9 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
-    #[must_use]
-    pub fn last(&self) -> Option<&T> {
-        self.nodes.last()
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn last_span(&self, file_id: FileId) -> Option<Span> {
+    fn last_span(&self, file_id: FileId) -> Option<Span> {
         match (self.tokens.last(), self.nodes.last()) {
             (Some(token), Some(node)) => {
-                // check if the token comes after the node
                 if token.start.offset >= node.span().end.offset {
                     Some(token.span_for(file_id))
                 } else {
@@ -184,86 +60,10 @@ impl<'arena, T: HasSpan> TokenSeparatedSequence<'arena, T> {
     }
 
     #[inline]
-    #[must_use]
-    pub fn span(&self, file_id: FileId, from: Position) -> Span {
+    fn span(&self, file_id: FileId, from: Position) -> Span {
         match (self.first_span(file_id), self.last_span(file_id)) {
             (Some(first), Some(last)) => Span::new(file_id, first.start, last.end),
             _ => Span::new(file_id, from, from),
         }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn has_trailing_token(&self) -> bool {
-        self.tokens
-            .last()
-            .is_some_and(|token| token.start.offset >= self.nodes.last().map_or(0, |node| node.span().end.offset))
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn get_trailing_token(&self) -> Option<&Token<'arena>> {
-        self.tokens
-            .last()
-            .filter(|token| token.start.offset >= self.nodes.last().map_or(0, |node| node.span().end.offset))
-    }
-
-    #[inline]
-    pub fn iter(&self) -> Iter<'_, T> {
-        self.nodes.iter()
-    }
-
-    /// Returns an iterator over the sequence, where each item includes
-    /// the index of the element, the element and the token following it.
-    /// The token is `None` only for the last element if it has no trailing token.
-    #[inline]
-    pub fn iter_with_tokens(&self) -> impl Iterator<Item = (usize, &T, Option<&Token<'arena>>)> {
-        self.nodes.iter().enumerate().map(move |(i, item)| {
-            let token = self.tokens.get(i);
-
-            (i, item, token)
-        })
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn as_slice(&self) -> &[T] {
-        self.nodes.as_slice()
-    }
-}
-
-impl<'arena, T: HasSpan> IntoIterator for Sequence<'arena, T> {
-    type Item = T;
-    type IntoIter = IntoIter<'arena, Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.nodes.into_iter()
-    }
-}
-
-impl<'a, T: HasSpan> IntoIterator for &'a Sequence<'_, T> {
-    type Item = &'a T;
-    type IntoIter = Iter<'a, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-impl<'arena, T: HasSpan> IntoIterator for TokenSeparatedSequence<'arena, T> {
-    type Item = T;
-    type IntoIter = IntoIter<'arena, Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.nodes.into_iter()
-    }
-}
-
-impl<'a, T: HasSpan> IntoIterator for &'a TokenSeparatedSequence<'_, T> {
-    type Item = &'a T;
-    type IntoIter = Iter<'a, T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
     }
 }

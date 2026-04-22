@@ -11,6 +11,7 @@ use crate::ast::ast::identifier::LocalIdentifier;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::ast::terminator::Terminator;
 use crate::ast::sequence::TokenSeparatedSequence;
+use crate::ast::sequence::TokenSeparatedSequenceExt;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Use<'arena> {

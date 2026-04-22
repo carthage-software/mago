@@ -4,6 +4,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Modifier;
+use mago_syntax::ast::ModifierSequenceExt;
 use mago_syntax::ast::Property;
 use mago_syntax::ast::PropertyHookBody;
 use mago_syntax::ast::PropertyItem;

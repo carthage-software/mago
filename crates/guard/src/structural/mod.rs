@@ -4,6 +4,7 @@ use mago_syntax::ast::Constant;
 use mago_syntax::ast::Enum;
 use mago_syntax::ast::Function;
 use mago_syntax::ast::Interface;
+use mago_syntax::ast::ModifierSequenceExt;
 use mago_syntax::ast::Namespace;
 use mago_syntax::ast::Trait;
 use mago_syntax::walker::MutWalker;

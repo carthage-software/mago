@@ -17,6 +17,7 @@ use mago_syntax::ast::Instantiation;
 use mago_syntax::ast::Keyword;
 use mago_syntax::ast::Literal;
 use mago_syntax::ast::Modifier;
+use mago_syntax::ast::ModifierSequenceExt;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::Sequence;
 use mago_syntax::ast::Statement;

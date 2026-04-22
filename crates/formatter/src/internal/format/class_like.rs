@@ -10,6 +10,7 @@ use mago_syntax::ast::ClassLikeMember;
 use mago_syntax::ast::EnumCaseItem;
 use mago_syntax::ast::Method;
 use mago_syntax::ast::Modifier;
+use mago_syntax::ast::ModifierSequenceExt;
 use mago_syntax::ast::PlainProperty;
 use mago_syntax::ast::Property;
 use mago_syntax::ast::PropertyItem;
