@@ -40,12 +40,21 @@ jobs:
       - name: Setup Mago
         uses: nhedger/setup-mago@v1
 
-      - name: Run Mago
-        run: |
-          mago format --dry-run
-          mago lint
-          mago analyze
+      - name: Check formatting
+        run: mago format --check
+
+      - name: Lint
+        if: success() || failure()
+        run: mago lint
+
+      - name: Analyze
+        if: success() || failure()
+        run: mago analyze
 ```
+
+:::tip
+Splitting `format`, `lint`, and `analyze` into separate steps (and using `if: success() || failure()` on the later ones) lets a single run surface findings from all three tools even when an earlier one fails. A combined `run:` block short-circuits on the first failure, hiding findings from the later tools. `success() || failure()` runs the step as long as the job was not cancelled, unlike `always()` which would also run it after a failure in job setup. Use `mago format --check` (not `--dry-run`) so the step actually fails CI when code is not formatted — `--dry-run` only prints a diff and always exits `0`.
+:::
 
 :::tip
 Mago automatically detects GitHub Actions via the `GITHUB_ACTIONS` environment variable and defaults to `--reporting-format=github`, producing native PR annotations. No extra configuration needed.
@@ -76,13 +85,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Check Formatting
+      - name: Check formatting
         run: mago fmt --check
 
       - name: Lint
+        if: success() || failure()
         run: mago lint
 
       - name: Analyze
+        if: success() || failure()
         run: mago analyze
 ```
 
