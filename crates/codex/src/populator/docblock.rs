@@ -43,7 +43,9 @@ fn should_inherit_docblock_type(
     has_explicit_inheritdoc: bool,
     codebase: &CodebaseMetadata,
 ) -> bool {
-    if child_docblock.is_some() {
+    // Allow re-inheritance when the existing child type was itself inherited (not user-written).
+    // Inherited types are marked `inferred: true`; user-written docblock types are `inferred: false`.
+    if child_docblock.is_some_and(|m| !m.inferred) {
         return false;
     }
 
@@ -487,7 +489,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
                 type_union
             };
 
-            Some(TypeMetadata { type_union: narrowed_type, span, from_docblock, inferred: false })
+            Some(TypeMetadata { type_union: narrowed_type, span, from_docblock, inferred: true })
         } else {
             None
         };
@@ -505,7 +507,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
                 && let Some(child_param) = child_method.parameters.get_mut(i)
                 && let Some((type_union, span, from_docblock)) = substituted_param
             {
-                child_param.type_metadata = Some(TypeMetadata { type_union, span, from_docblock, inferred: false });
+                child_param.type_metadata = Some(TypeMetadata { type_union, span, from_docblock, inferred: true });
             }
         }
 
