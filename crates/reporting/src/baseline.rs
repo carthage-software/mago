@@ -27,7 +27,20 @@ use serde::Serialize;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 
+use crate::Annotation;
+use crate::Issue;
 use crate::IssueCollection;
+
+/// The annotation a baseline uses to identify an issue's location.
+///
+/// Prefers a primary annotation, falls back to the first annotation. This
+/// keeps the baseline resilient to rules that forget to mark any
+/// annotation as primary — those issues still get baselined/filtered
+/// instead of leaking through as unbaselined on every re-run.
+#[inline]
+fn baseline_annotation(issue: &Issue) -> Option<&Annotation> {
+    issue.annotations.iter().find(|a| a.is_primary()).or_else(|| issue.annotations.first())
+}
 
 /// The variant of baseline format to use.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, JsonSchema)]
@@ -146,19 +159,19 @@ impl StrictBaseline {
         let mut entries: BTreeMap<Cow<'static, str>, StrictBaselineEntry> = BTreeMap::new();
 
         for issue in issues.iter() {
-            let Some(primary_annotation) = issue.annotations.iter().find(|a| a.is_primary()) else {
+            let Some(annotation) = baseline_annotation(issue) else {
                 continue;
             };
 
-            let Ok(file) = read_database.get(&primary_annotation.span.file_id) else {
+            let Ok(file) = read_database.get(&annotation.span.file_id) else {
                 continue;
             };
 
             let normalized_path = normalize_path(&file.name);
             let entry = entries.entry(Cow::Owned(normalized_path)).or_default();
 
-            let start_line = file.line_number(primary_annotation.span.start.offset);
-            let end_line = file.line_number(primary_annotation.span.end.offset);
+            let start_line = file.line_number(annotation.span.start.offset);
+            let end_line = file.line_number(annotation.span.end.offset);
 
             let baseline_issue = StrictBaselineIssue {
                 code: issue.code.as_ref().unwrap_or(&String::from("unknown")).clone(),
@@ -188,12 +201,12 @@ impl StrictBaseline {
         let mut filtered_issues = Vec::new();
 
         for issue in issues {
-            let Some(primary_annotation) = issue.annotations.iter().find(|a| a.is_primary()) else {
+            let Some(annotation) = baseline_annotation(&issue) else {
                 filtered_issues.push(issue);
                 continue;
             };
 
-            let Ok(file) = read_database.get(&primary_annotation.span.file_id) else {
+            let Ok(file) = read_database.get(&annotation.span.file_id) else {
                 filtered_issues.push(issue);
                 continue;
             };
@@ -204,8 +217,8 @@ impl StrictBaseline {
                 continue;
             };
 
-            let start_line = file.line_number(primary_annotation.span.start.offset);
-            let end_line = file.line_number(primary_annotation.span.end.offset);
+            let start_line = file.line_number(annotation.span.start.offset);
+            let end_line = file.line_number(annotation.span.end.offset);
 
             let baseline_issue = StrictBaselineIssue {
                 code: issue.code.as_ref().unwrap_or(&String::from("unknown")).clone(),
@@ -302,11 +315,11 @@ impl LooseBaseline {
         let mut issue_counts: HashMap<(String, String, String), u32> = HashMap::default();
 
         for issue in issues.iter() {
-            let Some(primary_annotation) = issue.annotations.iter().find(|a| a.is_primary()) else {
+            let Some(annotation) = baseline_annotation(issue) else {
                 continue;
             };
 
-            let Ok(file) = read_database.get(&primary_annotation.span.file_id) else {
+            let Ok(file) = read_database.get(&annotation.span.file_id) else {
                 continue;
             };
 
@@ -340,12 +353,12 @@ impl LooseBaseline {
         let mut filtered_issues = Vec::new();
 
         for issue in issues {
-            let Some(primary_annotation) = issue.annotations.iter().find(|a| a.is_primary()) else {
+            let Some(annotation) = baseline_annotation(&issue) else {
                 filtered_issues.push(issue);
                 continue;
             };
 
-            let Ok(file) = read_database.get(&primary_annotation.span.file_id) else {
+            let Ok(file) = read_database.get(&annotation.span.file_id) else {
                 filtered_issues.push(issue);
                 continue;
             };
