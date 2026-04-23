@@ -15,6 +15,9 @@ jobs:
     permissions:
       contents: read
 
+    env:
+      MAGO_LOG: trace
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
