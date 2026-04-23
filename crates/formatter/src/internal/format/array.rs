@@ -29,7 +29,6 @@ use crate::internal::format::misc::get_document_width;
 use crate::internal::format::misc::is_expandable_expression;
 use crate::internal::format::misc::is_string_word_type;
 use crate::internal::utils::get_expression_width;
-use crate::internal::utils::string_width;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ArrayLike<'arena> {
@@ -271,28 +270,30 @@ fn inline_single_element<'arena>(
 
     match elements[0] {
         ArrayElement::KeyValue(element) => {
-            if (element.key.is_literal() || is_string_word_type(element.key))
-                && is_expandable_expression(element.value, true)
+            if !((element.key.is_literal() || is_string_word_type(element.key))
+                && is_expandable_expression(element.value, true))
             {
-                let line_start =
-                    f.file.get_line_start_offset(f.file.line_number(array_like.span().start.offset)).unwrap_or(0)
-                        as usize;
-                let current_column = string_width(&f.source_text[line_start..array_like.span().start.offset as usize]);
-
-                if has_nested_array_like_value(element.value) {
-                    return None;
-                }
-
-                let element = element.format(f);
-
-                if current_column + get_document_width(&element) > f.settings.print_width {
-                    return None;
-                }
-
-                Some(element)
-            } else {
-                None
+                return None;
             }
+
+            if has_nested_array_like_value(element.value) {
+                return None;
+            }
+
+            if !value_has_internal_break_point(element.value) {
+                return None;
+            }
+
+            let key = element.key.format(f);
+            let value = element.value.format(f);
+            Some(Document::Group(Group::new(vec![
+                in f.arena;
+                key,
+                Document::space(),
+                Document::String("=>"),
+                Document::space(),
+                value,
+            ])))
         }
         ArrayElement::Value(element) => {
             if is_expandable_expression(element.value, true) {
@@ -310,6 +311,31 @@ fn inline_single_element<'arena>(
         }
         ArrayElement::Missing(_) => None,
     }
+}
+
+#[inline]
+fn value_has_internal_break_point<'arena>(expression: &'arena Expression<'arena>) -> bool {
+    match expression {
+        Expression::Parenthesized(inner) => value_has_internal_break_point(inner.expression),
+        Expression::UnaryPrefix(op) => value_has_internal_break_point(op.operand),
+        Expression::Throw(throw) => value_has_internal_break_point(throw.exception),
+        Expression::Array(_) | Expression::LegacyArray(_) | Expression::List(_) => true,
+        Expression::Closure(_) | Expression::AnonymousClass(_) | Expression::Match(_) => true,
+        Expression::PartialApplication(_) => true,
+        Expression::Call(call) => argument_list_is_substantial(call.get_argument_list()),
+        Expression::Instantiation(instantiation) => {
+            instantiation.argument_list.as_ref().is_some_and(argument_list_is_substantial)
+        }
+        _ => false,
+    }
+}
+
+#[inline]
+fn argument_list_is_substantial<'arena>(argument_list: &'arena mago_syntax::ast::ArgumentList<'arena>) -> bool {
+    if argument_list.arguments.len() >= 2 {
+        return true;
+    }
+    argument_list.arguments.first().is_some_and(|arg| value_has_internal_break_point(arg.value()))
 }
 
 #[inline]

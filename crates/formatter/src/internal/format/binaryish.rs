@@ -162,7 +162,23 @@ pub(super) fn print_binaryish_expression<'arena>(
         );
     }
 
-    let parts = print_binaryish_expression_parts(f, left, operator, original_right, is_inside_parenthesis, false);
+    let is_nested_same_precedence_subchain = matches!(
+        grandparent,
+        Some(Node::Binary(parent_binary))
+            if should_flatten(
+                &operator,
+                &BinaryishOperator::Binary(&parent_binary.operator),
+            ) && (operator.is_logical() || operator.is_comparison())
+    );
+
+    let parts = print_binaryish_expression_parts(
+        f,
+        left,
+        operator,
+        original_right,
+        is_inside_parenthesis,
+        is_nested_same_precedence_subchain,
+    );
 
     if is_inside_parenthesis {
         let lhs_is_binary = left.is_binary();
@@ -182,17 +198,17 @@ pub(super) fn print_binaryish_expression<'arena>(
         ]));
     }
 
-    let should_not_indent = if let Some(Node::Binary(parent_binary)) = grandparent {
-        (parent_binary.operator.is_comparison() && operator.is_comparison())
-            || (parent_binary.operator.is_logical() && operator.is_logical())
-    } else {
-        matches!(grandparent, Some(Node::Return(_) | Node::Throw(_)))
-            || matches!(grandparent, Some(Node::ArrowFunction(func)) if func.arrow.is_before(&operator.span()))
-            || matches!(grandparent, Some(Node::For(r#for)) if r#for.body.span().is_after(&operator.span()))
-            || (matches!(grandparent, Some(Node::Conditional(_)))
-                && !matches!(f.great_grandparent_node(), Some(Node::Return(_) | Node::Throw(_)))
-                && !is_at_call_like_expression(f))
-    };
+    let should_not_indent = matches!(
+        grandparent,
+        Some(Node::Binary(parent_binary))
+            if (parent_binary.operator.is_comparison() && operator.is_comparison())
+                || (parent_binary.operator.is_logical() && operator.is_logical())
+    ) || matches!(grandparent, Some(Node::Return(_) | Node::Throw(_)))
+        || matches!(grandparent, Some(Node::ArrowFunction(func)) if func.arrow.is_before(&operator.span()))
+        || matches!(grandparent, Some(Node::For(r#for)) if r#for.body.span().is_after(&operator.span()))
+        || (matches!(grandparent, Some(Node::Conditional(_)))
+            && !matches!(f.great_grandparent_node(), Some(Node::Return(_) | Node::Throw(_)))
+            && !is_at_call_like_expression(f));
 
     let should_indent_if_inlining =
         matches!(grandparent, Some(Node::Assignment(_) | Node::PropertyItem(_) | Node::ConstantItem(_)));
@@ -208,6 +224,10 @@ pub(super) fn print_binaryish_expression<'arena>(
     let should_inline_logical_or_coalesce_rhs = should_inline_binary_rhs_expression(f, right, &operator);
 
     if should_not_indent {
+        if is_nested_same_precedence_subchain {
+            return Document::Array(parts);
+        }
+
         return Document::Group(Group::new(parts));
     }
 
@@ -277,7 +297,17 @@ fn print_binaryish_expression_parts<'arena>(
         || has_own_line_comment_in_left_chain(f, left)
         || (is_original_right_parenthesized && has_placed_leading_comment_in_leftmost(f, original_right));
 
-    let mut should_inline_this_level = !should_break && should_inline_binary_rhs_expression(f, right, &operator);
+    let rhs_is_parenthesized_lassoc_subchain = match right {
+        Expression::Binary(binary) => {
+            should_flatten(&operator, &BinaryishOperator::Binary(&binary.operator))
+                && (operator.is_logical() || operator.is_comparison())
+        }
+        _ => false,
+    };
+
+    let mut should_inline_this_level = !should_break
+        && !rhs_is_parenthesized_lassoc_subchain
+        && should_inline_binary_rhs_expression(f, right, &operator);
     should_inline_this_level = should_inline_this_level || f.is_in_inlined_binary_chain;
 
     let old_inlined_chain_state = f.is_in_inlined_binary_chain;
@@ -373,7 +403,7 @@ fn print_binaryish_expression_parts<'arena>(
         Document::Line(if has_space_around { Line::default() } else { Line::soft() })
     });
 
-    right_document.push(if should_inline_this_level {
+    right_document.push(if should_inline_this_level && !rhs_is_parenthesized_lassoc_subchain {
         Document::Group(Group::new(vec![in f.arena; right.format(f)]))
     } else {
         right.format(f)

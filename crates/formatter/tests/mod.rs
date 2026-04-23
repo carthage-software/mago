@@ -411,6 +411,18 @@ test_case!(member_access_chain_keeps_breaks_with_comments);
 test_case!(issue_1562);
 test_case!(bare_cr_line_endings);
 
+// Idempotency regressions found by the corpus smoke test.
+test_case!(idempotency_keyed_array_value_call);
+test_case!(idempotency_keyed_array_value_nested_array);
+test_case!(idempotency_arrow_fn_returns_keyed_array_with_call);
+test_case!(idempotency_mixed_breaking_logical_chain);
+
+// Full-file idempotency fixtures sourced from the corpus. When a corpus
+// file stops being idempotent, copy it here so the formatter test suite
+// captures the regression directly and we can iterate without touching
+// the corpus tree.
+test_case!(idempotency_corpus_numeric_comparator);
+
 #[test]
 fn test_all_test_cases_are_ran() {
     let test_case_file = include_str!("mod.rs");

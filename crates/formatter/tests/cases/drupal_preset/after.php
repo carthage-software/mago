@@ -1303,8 +1303,9 @@ $form['frontend'] = [
   ])
   ->execute();
 
-static::setMessage(t('The combined export file could not be created: @message.', ['@message' =>
-  $e->getMessage()]), 'error');
+static::setMessage(t('The combined export file could not be created: @message.', [
+  '@message' => $e->getMessage(),
+]), 'error');
 
 $form['account']['notify_message'] = [
   '#type' => 'container',
