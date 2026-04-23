@@ -151,6 +151,23 @@ impl<'arena> FormatterState<'_, 'arena> {
         false
     }
 
+    /// Returns true if any line comment (not block comment) lies strictly inside the span.
+    #[must_use]
+    #[inline]
+    pub fn has_inner_line_comment_in_range(&self, start: u32, end: u32) -> bool {
+        for comment in self.remaining_comments() {
+            if comment.start > end {
+                break;
+            }
+
+            if comment.start >= start && comment.end <= end && !comment.is_block {
+                return true;
+            }
+        }
+
+        false
+    }
+
     #[must_use]
     pub(crate) fn print_trailing_comments_for_node(&mut self, node: Node<'_, '_>) -> Option<Document<'arena>> {
         self.print_trailing_comments(node.span())
@@ -215,8 +232,14 @@ impl<'arena> FormatterState<'_, 'arena> {
                     self.print_preserved_trailing_comment(&mut parts, comment);
                     previous_comment = Some(comment);
                 } else {
-                    previous_comment =
-                        Some(self.print_trailing_comment(&mut parts, comment, previous_comment, range.end_offset()));
+                    let is_placed_trailing = self.placed_comments.is_placed_trailing(self.next_comment_index);
+                    previous_comment = Some(self.print_trailing_comment(
+                        &mut parts,
+                        comment,
+                        previous_comment,
+                        range.end_offset(),
+                        is_placed_trailing,
+                    ));
                 }
                 self.placed_comments.mark_consumed(self.next_comment_index);
                 self.next_comment_index += 1;
@@ -275,6 +298,7 @@ impl<'arena> FormatterState<'_, 'arena> {
         comment: Comment,
         previous: Option<Comment>,
         token_end_offset: u32,
+        is_placed_trailing: bool,
     ) -> Comment {
         let printed = self.print_comment(comment);
 
@@ -299,7 +323,7 @@ impl<'arena> FormatterState<'_, 'arena> {
 
         if !comment.is_block || previous.is_some_and(|c| c.has_line_suffix) {
             parts.push(Document::LineSuffix(vec![in self.arena; Document::Space(Space::soft()), printed]));
-
+            let _ = is_placed_trailing;
             return comment.with_line_suffix(true);
         }
 
@@ -575,8 +599,14 @@ impl<'arena> FormatterState<'_, 'arena> {
                 after.end_offset() == comment.start || self.is_insignificant(after.end_offset(), comment.start);
 
             if is_between && gap_is_ok {
-                previous_comment =
-                    Some(self.print_trailing_comment(&mut parts, comment, previous_comment, after.end_offset()));
+                let is_placed_trailing = self.placed_comments.is_placed_trailing(self.next_comment_index);
+                previous_comment = Some(self.print_trailing_comment(
+                    &mut parts,
+                    comment,
+                    previous_comment,
+                    after.end_offset(),
+                    is_placed_trailing,
+                ));
                 self.placed_comments.mark_consumed(self.next_comment_index);
                 self.next_comment_index += 1;
             } else {
@@ -585,6 +615,76 @@ impl<'arena> FormatterState<'_, 'arena> {
         }
 
         if parts.is_empty() { None } else { Some(Document::Array(parts)) }
+    }
+
+    /// Collect inline block comments between two spans. Returns `None` if no comments
+    /// are present OR if any comment is not a block comment (line comments force a break).
+    #[must_use]
+    pub(crate) fn collect_inline_block_comments_between(
+        &mut self,
+        after: Span,
+        before: Span,
+    ) -> Option<Document<'arena>> {
+        let mut collected: std::vec::Vec<usize> = std::vec::Vec::new();
+
+        let is_ws = |b: u8| matches!(b, b' ' | b'\t' | b'\n' | b'\r');
+        let mut gap_end = after.end_offset() as usize;
+
+        for (offset, trivia) in self.all_comments[self.next_comment_index..].iter().enumerate() {
+            let index = self.next_comment_index + offset;
+            let comment = Comment::from_trivia(self.file, trivia);
+
+            if comment.start < after.end_offset() {
+                continue;
+            }
+
+            if comment.end > before.start_offset() {
+                break;
+            }
+
+            let pre_gap = &self.source_text[gap_end..(comment.start as usize)];
+            if !pre_gap.bytes().all(is_ws) {
+                return None;
+            }
+
+            if self.placed_comments.is_consumed(index) {
+                gap_end = comment.end as usize;
+                continue;
+            }
+
+            if !comment.is_block {
+                return None;
+            }
+
+            collected.push(index);
+            gap_end = comment.end as usize;
+        }
+
+        let tail = &self.source_text[gap_end..(before.start_offset() as usize)];
+        if !tail.bytes().all(is_ws) {
+            return None;
+        }
+
+        if collected.is_empty() {
+            return None;
+        }
+
+        let mut parts = vec![in self.arena];
+        for index in &collected {
+            self.placed_comments.mark_consumed(*index);
+            let trivia = &self.all_comments[*index];
+            let comment = Comment::from_trivia(self.file, trivia);
+            parts.push(self.print_comment(comment));
+            parts.push(Document::Space(Space::soft()));
+        }
+
+        if let Some(last) = collected.last().copied()
+            && self.next_comment_index <= last
+        {
+            self.next_comment_index = last + 1;
+        }
+
+        Some(Document::Array(parts))
     }
 
     #[must_use]

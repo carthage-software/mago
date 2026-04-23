@@ -109,6 +109,14 @@ pub(super) fn print_argument_list<'arena>(
         }
     }
 
+    if !force_break && let Some(argument) = argument_list.arguments.first() {
+        let argument_expr = argument.value();
+        let leading_bound = deepest_leading_token_offset(argument_expr);
+        if f.has_inner_line_comment_in_range(argument_list.left_parenthesis.end_offset(), leading_bound) {
+            force_break = true;
+        }
+    }
+
     let mut contents = vec![in f.arena; clone_in_arena(f.arena, &left_parenthesis)];
 
     // First, run all the decision functions with unformatted arguments
@@ -753,5 +761,25 @@ fn is_hopefully_short_call_argument(mut node: &Expression) -> bool {
             is_simple_call_argument(operation.lhs, 1) && is_simple_call_argument(operation.rhs, 1)
         }
         _ => is_simple_call_argument(node, 2),
+    }
+}
+
+/// Peel through wrappers to find the offset of the argument's first meaningful
+/// token. A line comment anchored before this offset will be visible at the
+/// top of the argument's flat layout and needs to force a break.
+fn deepest_leading_token_offset(expr: &Expression<'_>) -> u32 {
+    let mut current = expr;
+    loop {
+        match current {
+            Expression::Parenthesized(p) => current = p.expression,
+            Expression::Call(Call::Function(call)) => {
+                if let Expression::Parenthesized(p) = call.function {
+                    current = p.expression;
+                } else {
+                    return current.start_offset();
+                }
+            }
+            _ => return current.start_offset(),
+        }
     }
 }

@@ -62,6 +62,7 @@ use mago_syntax::ast::MissingArrayElement;
 use mago_syntax::ast::NamedArgument;
 use mago_syntax::ast::NamedPlaceholderArgument;
 use mago_syntax::ast::NestedVariable;
+use mago_syntax::ast::Node;
 use mago_syntax::ast::NullSafePropertyAccess;
 use mago_syntax::ast::PartialApplication;
 use mago_syntax::ast::PartialArgument;
@@ -1253,38 +1254,68 @@ impl<'arena> Format<'arena> for Conditional<'arena> {
 
                     let conditional_id = f.next_id();
                     let then_id = f.next_id();
+                    let condition_id = f.next_id();
+                    let condition_doc = self.condition.format(f);
+                    let question_doc = format_token_with_only_leading_comments(f, self.question_mark, "? ");
+                    let then_doc = then.format(f);
+                    let colon_transition = if inline_colon {
+                        if preserve_break {
+                            Document::space()
+                        } else {
+                            Document::IfBreak(
+                                IfBreak::new(f.arena, Document::space(), {
+                                    Document::IfBreak(
+                                        IfBreak::new(f.arena, Document::Line(Line::hard()), Document::space())
+                                            .with_id(conditional_id),
+                                    )
+                                })
+                                .with_id(then_id),
+                            )
+                        }
+                    } else {
+                        Document::Line(Line::default())
+                    };
+                    let colon_doc = format_token_with_only_leading_comments(f, self.colon, ": ");
+                    let else_doc = self.r#else.format(f);
+
+                    let branches = Document::Indent(vec![
+                        in f.arena;
+                        Document::Line(Line::default()),
+                        question_doc,
+                        Document::Group(Group::new(vec![in f.arena; then_doc]).with_id(then_id)),
+                        colon_transition,
+                        colon_doc,
+                        else_doc,
+                    ]);
+
+                    let has_outer_indent_context = f.grandparent_node().is_some_and(|n| {
+                        matches!(
+                            n,
+                            Node::Assignment(_)
+                                | Node::PropertyItem(_)
+                                | Node::ConstantItem(_)
+                                | Node::Binary(_)
+                                | Node::KeyValueArrayElement(_)
+                                | Node::ValueArrayElement(_)
+                                | Node::VariadicArrayElement(_)
+                                | Node::PositionalArgument(_)
+                                | Node::NamedArgument(_)
+                                | Node::Return(_)
+                                | Node::Throw(_)
+                                | Node::Yield(_)
+                        )
+                    });
+                    let tail = if has_outer_indent_context {
+                        branches
+                    } else {
+                        Document::IndentIfBreak(IndentIfBreak::new(condition_id, vec![in f.arena; branches]))
+                    };
 
                     Document::Group(
                         Group::new(vec![
                             in f.arena;
-                            self.condition.format(f),
-                            Document::Indent(vec![
-                                in f.arena;
-                                Document::Line(Line::default()),
-                                format_token_with_only_leading_comments(f, self.question_mark, "? "),
-                                Document::Group(Group::new(vec![in f.arena; then.format(f)]).with_id(then_id)),
-                                {
-                                    if inline_colon {
-                                        if preserve_break {
-                                            Document::space()
-                                        } else {
-                                            Document::IfBreak(
-                                                IfBreak::new(f.arena, Document::space(), {
-                                                    Document::IfBreak(
-                                                        IfBreak::new(f.arena, Document::Line(Line::hard()), Document::space())
-                                                            .with_id(conditional_id),
-                                                    )
-                                                })
-                                                .with_id(then_id),
-                                            )
-                                        }
-                                    } else {
-                                        Document::Line(Line::default())
-                                    }
-                                },
-                                format_token_with_only_leading_comments(f, self.colon, ": "),
-                                self.r#else.format(f),
-                            ]),
+                            Document::Group(Group::new(vec![in f.arena; condition_doc]).with_id(condition_id)),
+                            tail,
                         ])
                         .with_break_mode(if preserve_break { BreakMode::Preserve } else { BreakMode::Auto })
                         .with_id(conditional_id),
@@ -1747,6 +1778,10 @@ impl<'arena> Format<'arena> for StaticMethodPartialApplication<'arena> {
 impl<'arena> Format<'arena> for AnonymousClass<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, AnonymousClass, {
+            let new_doc = self.new.format(f);
+            let signature_start = self.modifiers.first().map(|m| m.span()).unwrap_or_else(|| self.class.span());
+            let inline_doc = f.collect_inline_block_comments_between(self.new.span(), signature_start);
+
             let mut signature = print_modifiers(f, &self.modifiers);
             if !signature.is_empty() {
                 signature.push(Document::space());
@@ -1775,7 +1810,7 @@ impl<'arena> Format<'arena> for AnonymousClass<'arena> {
             if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
                 Document::Group(Group::new(vec![
                     in f.arena;
-                    self.new.format(f),
+                    new_doc,
                     Document::Indent(vec![
                         in f.arena;
                         Document::Line(Line::hard()),
@@ -1786,13 +1821,13 @@ impl<'arena> Format<'arena> for AnonymousClass<'arena> {
                     ]),
                 ]))
             } else {
-                Document::Group(Group::new(vec![
-                    in f.arena;
-                    self.new.format(f),
-                    Document::space(),
-                    signature,
-                    body,
-                ]))
+                let mut parts = vec![in f.arena; new_doc, Document::space()];
+                if let Some(doc) = inline_doc {
+                    parts.push(doc);
+                }
+                parts.push(signature);
+                parts.push(body);
+                Document::Group(Group::new(parts))
             }
         })
     }

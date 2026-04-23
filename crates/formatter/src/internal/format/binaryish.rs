@@ -208,7 +208,24 @@ pub(super) fn print_binaryish_expression<'arena>(
         || matches!(grandparent, Some(Node::For(r#for)) if r#for.body.span().is_after(&operator.span()))
         || (matches!(grandparent, Some(Node::Conditional(_)))
             && !matches!(f.great_grandparent_node(), Some(Node::Return(_) | Node::Throw(_)))
-            && !is_at_call_like_expression(f));
+            && !is_at_call_like_expression(f)
+            && f.nth_parent_kind(4).is_some_and(|n| {
+                matches!(
+                    n,
+                    Node::Assignment(_)
+                        | Node::PropertyItem(_)
+                        | Node::ConstantItem(_)
+                        | Node::Binary(_)
+                        | Node::KeyValueArrayElement(_)
+                        | Node::ValueArrayElement(_)
+                        | Node::VariadicArrayElement(_)
+                        | Node::PositionalArgument(_)
+                        | Node::NamedArgument(_)
+                        | Node::Return(_)
+                        | Node::Throw(_)
+                        | Node::Yield(_)
+                )
+            }));
 
     let should_indent_if_inlining =
         matches!(grandparent, Some(Node::Assignment(_) | Node::PropertyItem(_) | Node::ConstantItem(_)));
@@ -273,6 +290,11 @@ pub(super) fn print_binaryish_expression<'arena>(
         return Document::Group(Group::new(head_parts));
     }
 
+    if same_precedence_sub_expression && should_inline_logical_or_coalesce_rhs {
+        head_parts.extend(tail_parts);
+        return Document::Group(Group::new(head_parts));
+    }
+
     let group_id = f.next_id();
 
     head_parts.push(Document::IndentIfBreak(IndentIfBreak::new(group_id, tail_parts)));
@@ -293,6 +315,7 @@ fn print_binaryish_expression_parts<'arena>(
     let right = unwrap_parenthesized(right);
     let is_original_right_parenthesized = !std::ptr::eq(original_right, right);
     let should_break = f.has_placed_trailing_line_comment(left.span())
+        || f.has_placed_trailing_line_comment(right.span())
         || f.has_placed_leading_own_line_comment(right.span())
         || has_own_line_comment_in_left_chain(f, left)
         || (is_original_right_parenthesized && has_placed_leading_comment_in_leftmost(f, original_right));
@@ -427,6 +450,9 @@ fn print_binaryish_expression_parts<'arena>(
         })));
     } else {
         parts.extend(right_document);
+        if is_nested && should_break {
+            parts.push(Document::BreakParent);
+        }
     }
 
     parts

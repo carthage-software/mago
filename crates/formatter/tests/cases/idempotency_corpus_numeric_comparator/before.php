@@ -1,12 +1,4 @@
-<?php
-
-/**
- * Verbatim copy of `sebastian/comparator`'s `NumericComparator.php` used as a formatter idempotency
- * regression fixture. Upstream: https://github.com/sebastianbergmann/comparator
- * Licensed BSD-3-Clause; bundled here only as a format-target input.
- */
-
-declare(strict_types=1);
+<?php declare(strict_types=1);
 /*
  * This file is part of sebastian/comparator.
  *

@@ -92,6 +92,10 @@ impl Comments {
         self.placed.get(index).copied().flatten() == Some(Placement::Leading)
     }
 
+    pub fn is_placed_trailing(&self, index: usize) -> bool {
+        self.placed.get(index).copied().flatten() == Some(Placement::Trailing)
+    }
+
     fn mark_placed(&mut self, index: usize, placement: Placement) {
         if let Some(v) = self.placed.get_mut(index) {
             *v = Some(placement);
@@ -168,6 +172,8 @@ fn collect_node_comments<'ast, 'arena>(
         return;
     }
 
+    let can_reattribute = !is_binary_like(node);
+    let mut prev_child: Option<Node<'ast, 'arena>> = None;
     for child in children.iter() {
         let child = unwrap_parenthesized_node(*child);
         let child_start = child.span().start.offset;
@@ -179,12 +185,20 @@ fn collect_node_comments<'ast, 'arena>(
                 break;
             }
 
-            let decorated = make_decorated(source_text, all_comments, *cursor, node);
+            let enclosing = if can_reattribute
+                && let Some(prev) = prev_child.filter(|p| comment_start >= p.span().end.offset && is_binary_like(*p))
+            {
+                prev
+            } else {
+                node
+            };
+            let decorated = make_decorated(source_text, all_comments, *cursor, enclosing);
             place_and_insert(decorated, comments);
             *cursor += 1;
         }
 
         collect_node_comments(source_text, child, all_comments, comments, cursor);
+        prev_child = Some(child);
     }
 
     while *cursor < total {
@@ -194,9 +208,30 @@ fn collect_node_comments<'ast, 'arena>(
             break;
         }
 
-        let decorated = make_decorated(source_text, all_comments, *cursor, node);
+        let enclosing = if can_reattribute
+            && let Some(prev) = prev_child.filter(|p| comment_start >= p.span().end.offset && is_binary_like(*p))
+        {
+            prev
+        } else {
+            node
+        };
+
+        let decorated = make_decorated(source_text, all_comments, *cursor, enclosing);
         place_and_insert(decorated, comments);
         *cursor += 1;
+    }
+}
+
+fn is_binary_like(node: Node<'_, '_>) -> bool {
+    match node {
+        Node::Binary(_) | Node::Conditional(_) => true,
+        Node::Expression(expression) => {
+            matches!(unwrap_parenthesized(expression), Expression::Binary(_) | Expression::Conditional(_))
+        }
+        Node::Parenthesized(paren) => {
+            matches!(unwrap_parenthesized(paren.expression), Expression::Binary(_) | Expression::Conditional(_))
+        }
+        _ => false,
     }
 }
 
@@ -242,6 +277,16 @@ fn unwrap_parenthesized_node<'ast, 'arena>(node: Node<'ast, 'arena>) -> Node<'as
 }
 
 fn place_comment<'ast, 'arena>(comment: DecoratedComment<'ast, 'arena>) -> CommentPlacement<'ast, 'arena> {
+    let enclosing = match comment.enclosing {
+        Node::Expression(expr) => match unwrap_parenthesized(expr) {
+            Expression::Binary(binary) => Node::Binary(binary),
+            Expression::Conditional(cond) => Node::Conditional(cond),
+            _ => comment.enclosing,
+        },
+        other => other,
+    };
+
+    let comment = DecoratedComment { enclosing, ..comment };
     match comment.enclosing {
         Node::Binary(_) => place_binary(comment),
         Node::Conditional(_) => place_conditional(comment),

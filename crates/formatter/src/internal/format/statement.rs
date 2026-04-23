@@ -173,7 +173,9 @@ fn print_statement_slice<'ctx, 'arena>(
             if let Some(line_start_offset) = f.file.get_line_start_offset(line) {
                 let c = &f.source_text[line_start_offset as usize..offset as usize];
                 let ws = c.chars().take_while(|c| c.is_whitespace()).collect::<String>();
-                if !ws.is_empty() {
+                let should_apply_align =
+                    !ws.is_empty() && (matches!(stmt, Statement::OpeningTag(_)) || c.len() == ws.len());
+                if should_apply_align {
                     if matches!(stmt, Statement::OpeningTag(_)) {
                         let mut j = i + 1;
                         let mut stmts_to_format = vec![in f.arena];
