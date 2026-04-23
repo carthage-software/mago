@@ -2,7 +2,7 @@ use crate::token::TypeTokenKind;
 
 /// Fast keyword lookup using two-level dispatch.
 /// Returns the TypeTokenKind if the bytes match a keyword (case-insensitive).
-#[inline(always)]
+#[inline]
 pub fn lookup_keyword(bytes: &[u8]) -> Option<TypeTokenKind> {
     match bytes.len() {
         2 => lookup_len2(bytes),
@@ -30,7 +30,7 @@ pub fn lookup_keyword(bytes: &[u8]) -> Option<TypeTokenKind> {
     }
 }
 
-#[inline(always)]
+#[inline]
 fn eq(a: &[u8], b: &[u8]) -> bool {
     a.eq_ignore_ascii_case(b)
 }

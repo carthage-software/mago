@@ -26,32 +26,32 @@ pub struct TypeLexer<'arena> {
 }
 
 impl<'arena> TypeLexer<'arena> {
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn new(input: Input<'arena>) -> TypeLexer<'arena> {
         TypeLexer { input }
     }
 
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn has_reached_eof(&self) -> bool {
         self.input.has_reached_eof()
     }
 
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn current_position(&self) -> Position {
         self.input.current_position()
     }
 
-    #[inline(always)]
+    #[inline]
     #[must_use]
     pub fn slice_in_range(&self, from: u32, to: u32) -> &'arena str {
         let bytes_slice = self.input.slice_in_range(from, to);
         bytes_slice.utf8_chunks().next().map_or("", |chunk| chunk.valid())
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn advance(&mut self) -> Option<Result<TypeToken<'arena>, SyntaxError>> {
         if self.input.has_reached_eof() {
             return None;
@@ -124,7 +124,7 @@ impl<'arena> TypeLexer<'arena> {
         Some(Ok(self.token(kind, buffer, start, end)))
     }
 
-    #[inline(always)]
+    #[inline]
     fn read_variable(&self) -> (TypeTokenKind, usize) {
         let mut length = 2;
         while let [part_of_identifier!(), ..] = self.input.peek(length, 1) {
@@ -133,7 +133,7 @@ impl<'arena> TypeLexer<'arena> {
         (TypeTokenKind::Variable, length)
     }
 
-    #[inline(always)]
+    #[inline]
     fn read_single_line_comment(&self) -> (TypeTokenKind, usize) {
         let mut length = 2;
         loop {
@@ -145,7 +145,7 @@ impl<'arena> TypeLexer<'arena> {
         (TypeTokenKind::SingleLineComment, length)
     }
 
-    #[inline(always)]
+    #[inline]
     fn read_decimal(&self) -> (TypeTokenKind, usize) {
         let mut length = read_digits_of_base(&self.input, 2, 10);
         if let float_exponent!() = self.input.peek(length, 1) {
@@ -158,7 +158,7 @@ impl<'arena> TypeLexer<'arena> {
         (TypeTokenKind::LiteralFloat, length)
     }
 
-    #[inline(always)]
+    #[inline]
     fn read_number(&self) -> (TypeTokenKind, usize) {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         enum NumberKind {
@@ -215,7 +215,7 @@ impl<'arena> TypeLexer<'arena> {
         (TypeTokenKind::LiteralFloat, length)
     }
 
-    #[inline(always)]
+    #[inline]
     fn read_literal_string(&self, quote: u8) -> (TypeTokenKind, usize) {
         let total = self.input.len();
         let start = self.input.current_offset();
@@ -247,7 +247,7 @@ impl<'arena> TypeLexer<'arena> {
         if partial { (TypeTokenKind::PartialLiteralString, length) } else { (TypeTokenKind::LiteralString, length) }
     }
 
-    #[inline(always)]
+    #[inline]
     fn read_fully_qualified_identifier(&self) -> (TypeTokenKind, usize) {
         let mut length = 2;
         let mut last_was_slash = false;
@@ -276,7 +276,7 @@ impl<'arena> TypeLexer<'arena> {
 
     /// Read an identifier or keyword (including compound keywords with hyphens).
     /// This is the hot path - optimized for common case (simple identifiers).
-    #[inline(always)]
+    #[inline]
     fn read_identifier_or_keyword(&self) -> (TypeTokenKind, usize) {
         let remaining = self.input.read_remaining();
         let total = remaining.len();
@@ -352,7 +352,7 @@ impl<'arena> TypeLexer<'arena> {
     }
 
     /// Continue reading a qualified identifier (with backslashes).
-    #[inline(always)]
+    #[inline]
     fn finish_qualified_identifier(&self, start_len: usize) -> (TypeTokenKind, usize) {
         let mut length = start_len;
         let mut slashes = 0;
@@ -389,7 +389,7 @@ impl<'arena> TypeLexer<'arena> {
         if slashes > 0 { (TypeTokenKind::QualifiedIdentifier, length) } else { (TypeTokenKind::Identifier, length) }
     }
 
-    #[inline(always)]
+    #[inline]
     fn token(&self, kind: TypeTokenKind, value: &'arena [u8], start: Position, _end: Position) -> TypeToken<'arena> {
         // SAFETY: `Input` is constructed from a `&str` so the underlying bytes
         // are valid UTF-8. Token boundaries are either ASCII stop bytes or end
@@ -400,7 +400,7 @@ impl<'arena> TypeLexer<'arena> {
 }
 
 impl HasFileId for TypeLexer<'_> {
-    #[inline(always)]
+    #[inline]
     fn file_id(&self) -> FileId {
         self.input.file_id()
     }
