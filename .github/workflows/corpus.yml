@@ -1,0 +1,81 @@
+name: Corpus Smoke Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  corpus:
+    name: Analyze, lint, and format the corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Mago
+        run: cargo build --release --locked
+
+      - name: Install PHP and Composer
+        uses: shivammathur/setup-php@master
+        with:
+          php-version: "8.4"
+          tools: "composer:v2"
+
+      - name: Install corpus dependencies
+        working-directory: corpus
+        run: composer install --no-interaction --prefer-dist --ignore-platform-reqs
+
+      - name: Analyze corpus (generate baseline)
+        working-directory: corpus
+        run: |
+          ${{ github.workspace }}/target/release/mago analyze \
+            --baseline analysis-baseline.toml \
+            --generate-baseline \
+            --reporting-format=count
+
+      - name: Analyze corpus (verify baseline is stable)
+        working-directory: corpus
+        run: |
+          ${{ github.workspace }}/target/release/mago analyze \
+            --baseline analysis-baseline.toml \
+            --fail-on-out-of-sync-baseline \
+            --minimum-fail-level=note
+
+      - name: Lint corpus (generate baseline)
+        working-directory: corpus
+        run: |
+          ${{ github.workspace }}/target/release/mago lint --pedantic \
+            --baseline lint-baseline.toml \
+            --generate-baseline \
+            --reporting-format=count
+
+      - name: Lint corpus (verify baseline is stable)
+        working-directory: corpus
+        run: |
+          ${{ github.workspace }}/target/release/mago lint --pedantic \
+            --baseline lint-baseline.toml \
+            --fail-on-out-of-sync-baseline \
+            --minimum-fail-level=note
+
+      - name: Format corpus
+        working-directory: corpus
+        run: ${{ github.workspace }}/target/release/mago fmt
+
+      - name: Format corpus (verify idempotent)
+        working-directory: corpus
+        run: ${{ github.workspace }}/target/release/mago fmt --check
