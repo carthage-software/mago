@@ -648,15 +648,21 @@ impl Configuration {
         self.source.normalize()?;
 
         if let Some(b) = self.analyzer.baseline.take() {
-            self.analyzer.baseline = Some(if b.is_relative() { self.source.workspace.join(&b) } else { b });
+            let resolved = if b.is_relative() { self.source.workspace.join(&b) } else { b };
+            tracing::debug!("Analyzer baseline configuration from {}.", resolved.display());
+            self.analyzer.baseline = Some(resolved);
         }
 
         if let Some(b) = self.linter.baseline.take() {
-            self.linter.baseline = Some(if b.is_relative() { self.source.workspace.join(&b) } else { b });
+            let resolved = if b.is_relative() { self.source.workspace.join(&b) } else { b };
+            tracing::debug!("Linter baseline configuration from {}.", resolved.display());
+            self.linter.baseline = Some(resolved);
         }
 
         if let Some(b) = self.guard.baseline.take() {
-            self.guard.baseline = Some(if b.is_relative() { self.source.workspace.join(&b) } else { b });
+            let resolved = if b.is_relative() { self.source.workspace.join(&b) } else { b };
+            tracing::debug!("Guard baseline configuration from {}.", resolved.display());
+            self.guard.baseline = Some(resolved);
         }
 
         Ok(())
