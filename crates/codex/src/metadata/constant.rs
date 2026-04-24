@@ -45,6 +45,17 @@ impl ConstantMetadata {
     pub fn take_issues(&mut self) -> Vec<Issue> {
         std::mem::take(&mut self.issues)
     }
+
+    /// Applies a patch to this entry in place, refining type information.
+    ///
+    /// Mirrors [`FunctionLikeMetadata::apply_patch`](crate::metadata::function_like::FunctionLikeMetadata::apply_patch):
+    /// the patch may refine the constant's docblock type, but span, file, name, and the
+    /// inferred runtime value belong to whichever non-patch source originally declared it.
+    pub fn apply_patch(&mut self, patch: ConstantMetadata) {
+        if patch.type_metadata.is_some() {
+            self.type_metadata = patch.type_metadata;
+        }
+    }
 }
 
 impl HasSpan for ConstantMetadata {

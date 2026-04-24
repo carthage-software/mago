@@ -213,12 +213,12 @@ where
         let source_count = source_files.len();
 
         let mut compile_parallel_duration = Duration::ZERO;
-        let partial_codebases: Vec<CodebaseMetadata> = measure!(
+        let partial_codebases: Vec<(CodebaseMetadata, bool)> = measure!(
             trace_enabled,
             compile_parallel_duration,
             source_files
                 .into_par_iter()
-                .map_init(Bump::new, |arena, file| -> Result<CodebaseMetadata, OrchestratorError> {
+                .map_init(Bump::new, |arena, file| -> Result<(CodebaseMetadata, bool), OrchestratorError> {
                     let program = parse_file_with_settings(arena, &file, parser_settings);
                     if program.has_errors() {
                         tracing::warn!(
@@ -233,15 +233,15 @@ where
 
                     let file_signature = signature_builder::build_file_signature(&file, program, &resolved_names);
 
-                    let mut metadata = scan_program(arena, &file, program, &resolved_names);
-                    metadata.set_file_signature(file.id, file_signature);
+                    let mut codebase = scan_program(arena, &file, program, &resolved_names);
+                    codebase.set_file_signature(file.id, file_signature);
 
                     arena.reset();
                     if let Some(compiling_bar) = &compiling_bar {
                         compiling_bar.inc(1);
                     }
 
-                    Ok(metadata)
+                    Ok((codebase, file.file_type.is_patch()))
                 })
                 .collect::<Result<Vec<_>, _>>()?
         );
@@ -249,8 +249,12 @@ where
         let mut merged_codex = self.codebase;
         let mut merge_duration = Duration::ZERO;
         measure!(trace_enabled, merge_duration, {
-            for partial in partial_codebases {
-                merged_codex.extend(partial);
+            for codebase in partial_codebases.iter().filter_map(|(codebase, is_patch)| (!is_patch).then_some(codebase))
+            {
+                merged_codex.extend_ref(codebase);
+            }
+            for codebase in partial_codebases.iter().filter_map(|(codebase, is_patch)| is_patch.then_some(codebase)) {
+                merged_codex.apply_patches_ref(codebase);
             }
         });
 

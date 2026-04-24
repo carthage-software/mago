@@ -113,8 +113,7 @@ impl AnalysisService {
         let semantics_checker = SemanticsChecker::new(self.settings.version);
         issues.extend(semantics_checker.check(file, program, &resolved_names));
 
-        let user_codebase = scan_program(&arena, file, program, &resolved_names);
-        self.codebase.extend(user_codebase);
+        self.codebase.extend(scan_program(&arena, file, program, &resolved_names));
 
         populate_codebase(&mut self.codebase, &mut self.symbol_references, AtomSet::default(), HashSet::default());
 

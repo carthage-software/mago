@@ -35,6 +35,53 @@ macro_rules! test_case {
     };
 }
 
+/// Loads `cases/<name>.patch.php` and attaches it as a `FileType::Patch` aux file. Optionally
+/// loads `cases/<name>.vendor.php` (with the `vendor` flag) and/or `cases/<name>.php` as the
+/// user file (with the `user` flag). Without `user` the analyzer is given an empty `<?php`
+/// program — useful for tests that only assert on patch diagnostics. With `user` the
+/// fixture also exercises user-side analysis against the merged codebase, which is how we
+/// verify post-merge codebase shape (e.g. that an orphan patch method really is absent).
+macro_rules! patch_test_case {
+    ($test_name:ident) => {
+        #[test]
+        fn $test_name() {
+            let patch = include_str!(concat!("cases/", stringify!($test_name), ".patch.php"));
+            $crate::framework::TestCase::new(stringify!($test_name), "<?php\n").with_patch(patch).run();
+        }
+    };
+    ($test_name:ident, vendor) => {
+        #[test]
+        fn $test_name() {
+            let vendor = include_str!(concat!("cases/", stringify!($test_name), ".vendor.php"));
+            let patch = include_str!(concat!("cases/", stringify!($test_name), ".patch.php"));
+            $crate::framework::TestCase::new(stringify!($test_name), "<?php\n")
+                .with_vendor(vendor)
+                .with_patch(patch)
+                .run();
+        }
+    };
+    ($test_name:ident, user) => {
+        #[test]
+        fn $test_name() {
+            let user_content = include_str!(concat!("cases/", stringify!($test_name), ".php"));
+            let patch = include_str!(concat!("cases/", stringify!($test_name), ".patch.php"));
+            $crate::framework::TestCase::new(stringify!($test_name), user_content).with_patch(patch).run();
+        }
+    };
+    ($test_name:ident, vendor, user) => {
+        #[test]
+        fn $test_name() {
+            let user_content = include_str!(concat!("cases/", stringify!($test_name), ".php"));
+            let vendor = include_str!(concat!("cases/", stringify!($test_name), ".vendor.php"));
+            let patch = include_str!(concat!("cases/", stringify!($test_name), ".patch.php"));
+            $crate::framework::TestCase::new(stringify!($test_name), user_content)
+                .with_vendor(vendor)
+                .with_patch(patch)
+                .run();
+        }
+    };
+}
+
 test_case!(accessing_undefined_class_constant);
 test_case!(argument_count);
 test_case!(array_append_no_overflow_when_max_below_php_int_max);
@@ -2474,6 +2521,52 @@ test_case!(issue_1781, {
     s
 });
 
+// Patch diagnostic tests — each fixture is a `.patch.php` (and optional `.vendor.php`)
+// pair scanned against an empty user program; expectations live as `@mago-expect` pragmas
+// in the patch.
+patch_test_case!(patch_orphan_class);
+patch_test_case!(patch_method_merged_after_vendor, vendor);
+patch_test_case!(patch_new_method_ignored, vendor, user);
+patch_test_case!(patch_new_property_ignored, vendor);
+patch_test_case!(patch_property_visibility_mismatch, vendor);
+patch_test_case!(patch_property_flag_mismatch, vendor);
+patch_test_case!(patch_new_constant_ignored, vendor);
+patch_test_case!(patch_constant_visibility_mismatch, vendor);
+patch_test_case!(patch_enum_cases_ignored, vendor);
+patch_test_case!(patch_kind_mismatch, vendor);
+patch_test_case!(patch_parent_class_mismatch, vendor);
+patch_test_case!(patch_parent_class_match_ok, vendor);
+patch_test_case!(patch_omitted_parent_class_ok, vendor);
+patch_test_case!(patch_interface_mismatch, vendor);
+patch_test_case!(patch_interface_omitted_ok, vendor);
+patch_test_case!(patch_declared_traits_error, vendor);
+patch_test_case!(patch_trait_require_extends_omitted_ok, vendor);
+patch_test_case!(patch_trait_require_extends_mismatch, vendor);
+patch_test_case!(patch_trait_require_implements_omitted_ok, vendor);
+patch_test_case!(patch_trait_require_implements_mismatch, vendor);
+patch_test_case!(patch_interface_extends_omitted_ok, vendor);
+patch_test_case!(patch_interface_extends_mismatch, vendor);
+patch_test_case!(patch_readonly_class_mismatch, vendor);
+patch_test_case!(patch_new_pseudo_method_ok, vendor);
+patch_test_case!(patch_method_parameter_type_ok, vendor);
+patch_test_case!(patch_method_parameter_count_mismatch, vendor);
+patch_test_case!(patch_method_visibility_mismatch, vendor);
+patch_test_case!(patch_method_abstract_mismatch, vendor);
+patch_test_case!(patch_method_static_mismatch, vendor);
+patch_test_case!(patch_method_final_added_ok, vendor);
+patch_test_case!(patch_method_final_removed_error, vendor);
+patch_test_case!(patch_new_pseudo_property_ok, vendor);
+patch_test_case!(patch_property_type_ok, vendor);
+patch_test_case!(patch_property_static_mismatch, vendor);
+patch_test_case!(patch_property_hooks_mismatch, vendor);
+patch_test_case!(patch_property_final_added_ok, vendor);
+patch_test_case!(patch_property_final_removed_error, vendor);
+patch_test_case!(patch_constant_type_ok, vendor);
+patch_test_case!(patch_constant_final_added_ok, vendor);
+patch_test_case!(patch_constant_final_removed_error, vendor);
+patch_test_case!(patch_template_parameters_ok, vendor);
+patch_test_case!(patch_type_alias_ok, vendor);
+
 #[test]
 fn test_all_test_cases_are_ran() {
     let test_case_file = include_str!("mod.rs");
@@ -2486,6 +2579,19 @@ fn test_all_test_cases_are_ran() {
         }
 
         let file_name = path.file_stem().unwrap().to_str().unwrap();
+        // Patch fixtures: `<name>.patch.php` is paired with a
+        // `patch_test_case!(<name>)` registration; the optional `<name>.vendor.php` sidecar
+        // is loaded transitively. `file_stem()` strips only the trailing `.php`, leaving
+        // `<name>.patch` / `<name>.vendor` here.
+        if let Some(patch_name) = file_name.strip_suffix(".patch") {
+            let has_test = test_case_file.contains(&format!("patch_test_case!({patch_name})"))
+                || test_case_file.contains(&format!("patch_test_case!({patch_name},"));
+            assert!(has_test, "Patch fixture '{file_name}.php' was not found as a patch_test_case");
+            continue;
+        }
+        if file_name.ends_with(".vendor") {
+            continue;
+        }
         let has_test = test_case_file.contains(&format!("test_case!({file_name})"))
             || test_case_file.contains(&format!("test_case!({file_name},"));
         assert!(has_test, "File '{file_name}' was not found as a test case");

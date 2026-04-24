@@ -60,6 +60,14 @@ pub struct OrchestratorConfiguration<'cfg> {
     /// Supports both directory paths and glob patterns (same as `paths`).
     pub includes: Vec<String>,
 
+    /// Paths or glob patterns for patch files that override type information for vendored code.
+    ///
+    /// Patches are plain PHP files that redefine vendor (or built-in) classes, interfaces,
+    /// functions, or constants with corrected PHPDoc / type declarations. Like includes,
+    /// patches are not analyzed, linted, or formatted themselves, but their metadata takes
+    /// precedence over both vendored and built-in definitions during analysis.
+    pub patches: Vec<String>,
+
     /// Glob patterns or paths to exclude from file scanning.
     ///
     /// These patterns are used to filter out files and directories that should not be

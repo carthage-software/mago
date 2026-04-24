@@ -106,6 +106,7 @@ pub struct DatabaseConfiguration<'config> {
     /// Paths or glob patterns for included files.
     /// Can be directory paths (e.g., "vendor") or glob patterns (e.g., "vendor/**/*.php")
     pub includes: Vec<Cow<'config, str>>,
+    pub patches: Vec<Cow<'config, str>>,
     pub excludes: Vec<Exclusion<'config>>,
     pub extensions: Vec<Cow<'config, str>>,
     /// Settings for glob pattern matching behavior.
@@ -180,6 +181,7 @@ impl<'config> DatabaseConfiguration<'config> {
             workspace: Cow::Borrowed(workspace),
             paths,
             includes,
+            patches: Vec::new(),
             excludes,
             extensions,
             glob: GlobSettings::default(),
@@ -193,6 +195,7 @@ impl<'config> DatabaseConfiguration<'config> {
             workspace: Cow::Owned(self.workspace.into_owned()),
             paths: self.paths.into_iter().map(|s| Cow::Owned(s.into_owned())).collect(),
             includes: self.includes.into_iter().map(|s| Cow::Owned(s.into_owned())).collect(),
+            patches: self.patches.into_iter().map(|s| Cow::Owned(s.into_owned())).collect(),
             excludes: self
                 .excludes
                 .into_iter()

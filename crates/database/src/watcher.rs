@@ -62,13 +62,24 @@ pub struct DatabaseWatcher<'config> {
     watcher: Option<RecommendedWatcher>,
     watched_paths: Vec<PathBuf>,
     receiver: Option<Receiver<Vec<ChangedFile>>>,
+    host_base_paths: Vec<PathBuf>,
+    patch_base_paths: Vec<PathBuf>,
+    include_base_paths: Vec<PathBuf>,
 }
 
 impl<'config> DatabaseWatcher<'config> {
     #[inline]
     #[must_use]
     pub fn new(database: Database<'config>) -> Self {
-        Self { database, watcher: None, watched_paths: Vec::new(), receiver: None }
+        Self {
+            database,
+            watcher: None,
+            watched_paths: Vec::new(),
+            receiver: None,
+            host_base_paths: Vec::new(),
+            patch_base_paths: Vec::new(),
+            include_base_paths: Vec::new(),
+        }
     }
 
     /// Starts watching for file changes in the configured directories.
@@ -129,17 +140,28 @@ impl<'config> DatabaseWatcher<'config> {
         // receive change events for files under that directory).
         let mut unique_watch_paths = HashSet::new();
 
+        let mut host_base_paths = Vec::new();
         for path in &config.paths {
             let watch_path = Self::extract_watch_path(path.as_ref());
             let absolute_path = if watch_path.is_absolute() { watch_path } else { config.workspace.join(watch_path) };
 
+            host_base_paths.push(absolute_path.clone());
             unique_watch_paths.insert(absolute_path);
         }
 
+        let mut include_base_paths = Vec::new();
         for path in &config.includes {
             let watch_path = Self::extract_watch_path(path.as_ref());
             let absolute_path = if watch_path.is_absolute() { watch_path } else { config.workspace.join(watch_path) };
+            include_base_paths.push(absolute_path.clone());
+            unique_watch_paths.insert(absolute_path);
+        }
 
+        let mut patch_base_paths = Vec::new();
+        for path in &config.patches {
+            let watch_path = Self::extract_watch_path(path.as_ref());
+            let absolute_path = if watch_path.is_absolute() { watch_path } else { config.workspace.join(watch_path) };
+            patch_base_paths.push(absolute_path.clone());
             unique_watch_paths.insert(absolute_path);
         }
 
@@ -181,6 +203,9 @@ impl<'config> DatabaseWatcher<'config> {
         self.watcher = Some(watcher);
         self.watched_paths = watched_paths;
         self.receiver = Some(rx);
+        self.host_base_paths = host_base_paths;
+        self.patch_base_paths = patch_base_paths;
+        self.include_base_paths = include_base_paths;
 
         Ok(())
     }
@@ -196,6 +221,9 @@ impl<'config> DatabaseWatcher<'config> {
         }
         self.watched_paths.clear();
         self.receiver = None;
+        self.host_base_paths.clear();
+        self.patch_base_paths.clear();
+        self.include_base_paths.clear();
     }
 
     /// Checks if the watcher is currently active.
@@ -345,7 +373,34 @@ impl<'config> DatabaseWatcher<'config> {
 
                     let Ok(file) = self.database.get(&changed_file.id) else {
                         if changed_file.path.exists() {
-                            match File::read(&workspace, &changed_file.path, FileType::Host) {
+                            let host_spec = self
+                                .host_base_paths
+                                .iter()
+                                .filter(|b| changed_file.path.starts_with(b.as_path()))
+                                .map(|b| b.components().count())
+                                .max();
+                            let patch_spec = self
+                                .patch_base_paths
+                                .iter()
+                                .filter(|b| changed_file.path.starts_with(b.as_path()))
+                                .map(|b| b.components().count())
+                                .max();
+                            let include_spec = self
+                                .include_base_paths
+                                .iter()
+                                .filter(|b| changed_file.path.starts_with(b.as_path()))
+                                .map(|b| b.components().count())
+                                .max();
+                            // Mirror loader priority: host beats patch unless patch is strictly
+                            // more specific; patch beats vendored; default to host.
+                            let new_file_type = match (host_spec, patch_spec, include_spec) {
+                                (Some(h), Some(p), _) if p > h => FileType::Patch,
+                                (Some(_), _, _) => FileType::Host,
+                                (None, Some(_), _) => FileType::Patch,
+                                (None, None, Some(_)) => FileType::Vendored,
+                                (None, None, None) => FileType::Host,
+                            };
+                            match File::read(&workspace, &changed_file.path, new_file_type) {
                                 Ok(file) => {
                                     self.database.add(file);
                                     tracing::debug!("Added new file to database: {}", changed_file.path.display());

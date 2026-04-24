@@ -231,6 +231,7 @@ fn load_workspace_database(
     };
 
     let includes: Vec<Cow<'static, str>> = source.includes.iter().cloned().map(Cow::<'static, str>::Owned).collect();
+    let patches: Vec<Cow<'static, str>> = source.patches.iter().cloned().map(Cow::<'static, str>::Owned).collect();
     let extensions: Vec<Cow<'static, str>> = if source.extensions.is_empty() {
         vec![Cow::Borrowed("php")]
     } else {
@@ -257,6 +258,7 @@ fn load_workspace_database(
 
     let db_configuration = DatabaseConfiguration {
         workspace,
+        patches,
         paths,
         includes,
         excludes,

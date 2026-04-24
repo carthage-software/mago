@@ -1,3 +1,4 @@
+use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 use serde::Deserialize;
@@ -6,11 +7,13 @@ use serde::Serialize;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
+use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
 
 use crate::flags::attribute::AttributeFlags;
 use crate::identifier::method::MethodIdentifier;
+use crate::issue::ScanningIssueKind;
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::enum_case::EnumCaseMetadata;
@@ -466,6 +469,301 @@ impl ClassLikeMetadata {
         self.shrink_to_fit();
     }
 
+    /// Applies a patch to this class, refining member definitions while preserving everything else.
+    ///
+    /// Type annotations on existing members (methods via `CodebaseMetadata::extend()`,
+    /// properties, constants, `@template` declarations, pseudo-methods, and type aliases)
+    /// can be refined by a patch. Structural information (hierarchy, override chains,
+    /// initialization state, enum cases) is never altered.
+    ///
+    /// Patches are not required to re-declare hierarchy. If a patch does declare a parent
+    /// class, implemented interfaces, `@require-extends`, or `@require-implements`, those
+    /// declarations must match the original exactly — a mismatch is a hard error indicating
+    /// the patch targets a different class. `use` trait declarations are never valid in a
+    /// patch and are always reported as an error.
+    ///
+    /// Diagnostics about the patch itself (mismatches, attempts to introduce new members)
+    /// are returned to the caller rather than pushed onto `self.issues`. The patched class
+    /// is vendor/built-in metadata; its `issues` list is reserved for diagnostics about
+    /// that definition. Patch diagnostics belong to the patch and the caller routes them to
+    /// the codebase-level patch-diagnostics collection.
+    #[must_use = "patch diagnostics must be routed to CodebaseMetadata::patch_diagnostics"]
+    pub fn apply_patch(&mut self, patch: ClassLikeMetadata, inherited_methods: &AtomSet) -> Vec<Issue> {
+        // Patches redeclare the same class by name, so their member identifiers
+        // already carry the correct class name and merge cleanly.
+        debug_assert_eq!(self.name, patch.name, "patch class name must match the patched class");
+
+        let mut diagnostics: Vec<Issue> = Vec::new();
+
+        if self.kind != patch.kind {
+            diagnostics.push(
+                Issue::error(format!(
+                    "Patch declares `{}` as a {} but the original symbol is a {}; patch members are ignored.",
+                    patch.original_name,
+                    patch.kind.as_str(),
+                    self.kind.as_str(),
+                ))
+                .with_code(ScanningIssueKind::PatchKindMismatch)
+                .with_annotation(Annotation::primary(patch.span)),
+            );
+            return diagnostics;
+        }
+
+        // `readonly class` is a structural modifier — a patch cannot add or remove it.
+        if patch.flags.contains(MetadataFlags::READONLY) != self.flags.contains(MetadataFlags::READONLY) {
+            diagnostics.push(
+                Issue::error(format!(
+                    "Patch declares `{}` as a {} class but the original is {}; patch members are ignored.",
+                    patch.original_name,
+                    if patch.flags.contains(MetadataFlags::READONLY) { "readonly" } else { "non-readonly" },
+                    if self.flags.contains(MetadataFlags::READONLY) { "readonly" } else { "non-readonly" },
+                ))
+                .with_code(ScanningIssueKind::PatchKindMismatch)
+                .with_annotation(Annotation::primary(patch.span)),
+            );
+            return diagnostics;
+        }
+
+        if !patch.used_traits.is_empty() {
+            diagnostics.push(
+                Issue::error(format!(
+                    "Patch for `{}` declares `use` traits; patches refine member type information only and must not declare trait usage.",
+                    patch.original_name,
+                ))
+                .with_code(ScanningIssueKind::PatchDeclaresTrait)
+                .with_annotation(Annotation::primary(patch.span)),
+            );
+            return diagnostics;
+        }
+
+        // Hierarchy declarations must match the original exactly if declared; a mismatch
+        // means the patch is describing a different class.
+        let hierarchy_mismatch = (patch.direct_parent_class.is_some()
+            && patch.direct_parent_class != self.direct_parent_class)
+            || (!patch.direct_parent_interfaces.is_empty()
+                && patch.direct_parent_interfaces != self.direct_parent_interfaces)
+            || (!patch.require_extends.is_empty() && patch.require_extends != self.require_extends)
+            || (!patch.require_implements.is_empty() && patch.require_implements != self.require_implements);
+
+        if hierarchy_mismatch {
+            diagnostics.push(
+                Issue::error(format!(
+                    "Patch for `{}` declares hierarchy that does not match the original; patch members are ignored.",
+                    patch.original_name,
+                ))
+                .with_code(ScanningIssueKind::PatchHierarchyMismatch)
+                .with_annotation(Annotation::primary(patch.span)),
+            );
+            return diagnostics;
+        }
+
+        // Template types
+        //
+        // Patches can add @template declarations to un-annotated vendor code or refine existing
+        // constraints. Existing templates are overridden by name; new names are appended.
+        // template_variance is keyed by position in the template_types IndexMap and must be
+        // rebuilt after the merge. template_readonly is name-keyed so it can be extended
+        // directly without rebuilding.
+        if !patch.template_types.is_empty() {
+            // Collect name → variance for the current (original) state.
+            let mut name_to_variance: HashMap<Atom, Variance> = self
+                .template_types
+                .iter()
+                .enumerate()
+                .map(|(i, (name, _))| (*name, self.template_variance.get(i).copied().unwrap_or(Variance::Invariant)))
+                .collect();
+
+            // Patch overrides existing entries and contributes new ones.
+            name_to_variance.extend(
+                patch.template_types.iter().enumerate().map(|(i, (name, _))| {
+                    (*name, patch.template_variance.get(i).copied().unwrap_or(Variance::Invariant))
+                }),
+            );
+
+            // Extend the IndexMap: existing names get updated definitions, new ones are appended.
+            self.template_types.extend(patch.template_types);
+
+            // Rebuild position-indexed variance vec to match the merged IndexMap order.
+            // template_readonly is name-keyed so it doesn't need rebuilding — just extend it.
+            self.template_variance = self
+                .template_types
+                .keys()
+                .map(|name| name_to_variance.get(name).copied().unwrap_or(Variance::Invariant))
+                .collect();
+            self.template_readonly.extend(patch.template_readonly);
+        }
+
+        // Methods
+        //
+        // Real-method type info is patched in place by `FunctionLikeMetadata::apply_patch`,
+        // called from `CodebaseMetadata::extend` when a patch function-like meets an Occupied
+        // slot. Pseudo-methods (@method annotations) are purely class-level and always update
+        // structural maps. For real methods: if already declared in the original, the type info
+        // flows through function_likes and no structural change is needed here. If not declared
+        // in the original (e.g. the method is inherited), the patch is introducing an override
+        // for this class — add it to the structural maps so the populator sees it as a declared
+        // override. If the method exists nowhere in the inheritance chain, it is a new method
+        // — warn and ignore.
+        for method_name in &patch.methods {
+            if patch.pseudo_methods.contains(method_name) || patch.static_pseudo_methods.contains(method_name) {
+                continue;
+            }
+            if inherited_methods.contains(method_name) {
+                if self.methods.insert(*method_name) {
+                    if let Some(id) = patch.inheritable_method_ids.get(method_name) {
+                        self.inheritable_method_ids.insert(*method_name, *id);
+                    }
+                }
+            } else if !self.methods.contains(method_name) {
+                diagnostics.push(
+                    Issue::warning(format!(
+                        "Patch for `{}` declares method `{}` which does not exist in the original \
+                         or any of its ancestors; patches cannot introduce new methods.",
+                        patch.original_name, method_name,
+                    ))
+                    .with_code(ScanningIssueKind::PatchIntroducesNewMethod)
+                    .with_annotation(Annotation::primary(patch.span)),
+                );
+            }
+        }
+
+        for name in patch.pseudo_methods.iter().chain(patch.static_pseudo_methods.iter()) {
+            if let Some(id) = patch.declaring_method_ids.get(name) {
+                self.declaring_method_ids.insert(*name, *id);
+            }
+            if let Some(id) = patch.appearing_method_ids.get(name) {
+                self.appearing_method_ids.insert(*name, *id);
+            }
+            if let Some(id) = patch.inheritable_method_ids.get(name) {
+                self.inheritable_method_ids.insert(*name, *id);
+            }
+        }
+
+        self.pseudo_methods.extend(patch.pseudo_methods);
+        self.static_pseudo_methods.extend(patch.static_pseudo_methods);
+
+        // Properties
+        //
+        // Patches can refine type annotations on existing properties. New properties are
+        // rejected because they would assert a property exists at runtime when it does not.
+        // Exception: magic properties (@property/@property-read/@property-write) are pure
+        // type annotations for __get/__set magic and carry no runtime existence claim.
+        // Initialization state and override chains are structural and must not be touched.
+        for (name, prop_metadata) in patch.properties {
+            if let Some(slot) = self.properties.get_mut(&name) {
+                // Patches can only refine type annotations. Structural attributes
+                // (visibility, modifiers, hooks) must match the original exactly;
+                // if they differ the patch is wrong and we should say so rather than
+                // silently discarding the mismatch.
+                let visibility_mismatch = prop_metadata.read_visibility != slot.read_visibility
+                    || prop_metadata.write_visibility != slot.write_visibility;
+                // READONLY, STATIC, ABSTRACT: any mismatch is structural.
+                // FINAL: only an error when removed (vendor has it, patch doesn't);
+                //        adding final via a patch is allowed.
+                let structural_flag_mismatch =
+                    [MetadataFlags::READONLY, MetadataFlags::STATIC, MetadataFlags::ABSTRACT]
+                        .iter()
+                        .any(|&f| prop_metadata.flags.contains(f) != slot.flags.contains(f))
+                        || (slot.flags.contains(MetadataFlags::FINAL)
+                            && !prop_metadata.flags.contains(MetadataFlags::FINAL));
+                let has_hooks = !prop_metadata.hooks.is_empty();
+
+                if visibility_mismatch || structural_flag_mismatch || has_hooks {
+                    diagnostics.push(
+                        Issue::warning(format!(
+                            "Patch for `{}::{}` declares structural attributes (visibility, modifiers, \
+                             or hooks) that differ from the original; only type annotations are applied.",
+                            patch.original_name, name,
+                        ))
+                        .with_code(ScanningIssueKind::PatchPropertyStructuralMismatch)
+                        .with_annotation(Annotation::primary(prop_metadata.span.unwrap_or(patch.span))),
+                    );
+                }
+
+                slot.type_declaration_metadata = prop_metadata.type_declaration_metadata;
+                slot.type_metadata = prop_metadata.type_metadata;
+            } else if prop_metadata.flags.is_magic_property() {
+                self.add_property(name, prop_metadata);
+            } else {
+                diagnostics.push(
+                    Issue::warning(format!(
+                        "Patch declares property `{}::{}` which does not exist in the original; \
+                         patches cannot introduce new properties.",
+                        patch.original_name, name,
+                    ))
+                    .with_code(ScanningIssueKind::PatchIntroducesNewProperty)
+                    .with_annotation(Annotation::primary(patch.span)),
+                );
+            }
+        }
+
+        // Constants
+        //
+        // Same rule as properties: only existing constants can have their type annotations
+        // refined; new constants are rejected.
+        for (name, const_metadata) in patch.constants {
+            if let Some(slot) = self.constants.get_mut(&name) {
+                let visibility_mismatch = const_metadata.visibility != slot.visibility;
+                // ABSTRACT: any mismatch is structural.
+                // FINAL: only an error when removed (vendor has it, patch doesn't);
+                //        adding final via a patch is allowed.
+                let structural_flag_mismatch = const_metadata.flags.contains(MetadataFlags::ABSTRACT)
+                    != slot.flags.contains(MetadataFlags::ABSTRACT)
+                    || (slot.flags.contains(MetadataFlags::FINAL)
+                        && !const_metadata.flags.contains(MetadataFlags::FINAL));
+
+                if visibility_mismatch || structural_flag_mismatch {
+                    diagnostics.push(
+                        Issue::warning(format!(
+                            "Patch for `{}::{}` declares structural attributes (visibility or modifiers) \
+                             that differ from the original; only type annotations are applied.",
+                            patch.original_name, name,
+                        ))
+                        .with_code(ScanningIssueKind::PatchConstantStructuralMismatch)
+                        .with_annotation(Annotation::primary(const_metadata.span)),
+                    );
+                }
+
+                slot.type_declaration = const_metadata.type_declaration;
+                slot.type_metadata = const_metadata.type_metadata;
+            } else {
+                diagnostics.push(
+                    Issue::warning(format!(
+                        "Patch declares constant `{}::{}` which does not exist in the original; \
+                         patches cannot introduce new constants.",
+                        patch.original_name, name,
+                    ))
+                    .with_code(ScanningIssueKind::PatchIntroducesNewConstant)
+                    .with_annotation(Annotation::primary(patch.span)),
+                );
+            }
+        }
+
+        // Enum cases are structural (they define the valid runtime values of an enum)
+        // and cannot be modified by a patch.
+        if !patch.enum_cases.is_empty() {
+            diagnostics.push(
+                Issue::warning(format!(
+                    "Patch for `{}` declares enum case(s); enum cases are structural and cannot be \
+                     refined — patch enum cases are ignored.",
+                    patch.original_name,
+                ))
+                .with_code(ScanningIssueKind::PatchEnumCasesIgnored)
+                .with_annotation(Annotation::primary(patch.span)),
+            );
+        }
+
+        // Type aliases
+        self.type_aliases.extend(patch.type_aliases);
+
+        // Scan-time issues on the patch itself (malformed docblocks, bad type
+        // annotations, etc.) are not validation errors about the application — they
+        // are diagnostics about the patch source and belong in the same bucket.
+        diagnostics.extend(patch.issues);
+
+        diagnostics
+    }
+
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.properties.shrink_to_fit();
@@ -482,5 +780,370 @@ impl ClassLikeMetadata {
         self.constants.shrink_to_fit();
         self.enum_cases.shrink_to_fit();
         self.type_aliases.shrink_to_fit();
+    }
+}
+
+#[must_use]
+pub fn method_exists_in_ancestors(
+    class_meta: &ClassLikeMetadata,
+    method_name: &Atom,
+    class_likes: &AtomMap<ClassLikeMetadata>,
+) -> bool {
+    let mut visited = AtomSet::default();
+    method_exists_in_ancestors_inner(class_meta, method_name, class_likes, &mut visited)
+}
+
+fn method_exists_in_ancestors_inner(
+    class_meta: &ClassLikeMetadata,
+    method_name: &Atom,
+    class_likes: &AtomMap<ClassLikeMetadata>,
+    visited: &mut AtomSet,
+) -> bool {
+    if !visited.insert(class_meta.name) {
+        return false;
+    }
+    if let Some(parent_name) = class_meta.direct_parent_class
+        && let Some(parent_meta) = class_likes.get(&parent_name)
+        && (parent_meta.methods.contains(method_name)
+            || method_exists_in_ancestors_inner(parent_meta, method_name, class_likes, visited))
+    {
+        return true;
+    }
+    for interface_name in &class_meta.direct_parent_interfaces {
+        if let Some(interface_meta) = class_likes.get(interface_name)
+            && (interface_meta.methods.contains(method_name)
+                || method_exists_in_ancestors_inner(interface_meta, method_name, class_likes, visited))
+        {
+            return true;
+        }
+    }
+    for trait_name in &class_meta.used_traits {
+        if let Some(trait_meta) = class_likes.get(trait_name)
+            && (trait_meta.methods.contains(method_name)
+                || method_exists_in_ancestors_inner(trait_meta, method_name, class_likes, visited))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use std::iter::once;
+
+    use mago_atom::AtomSet;
+    use mago_atom::atom;
+    use mago_span::Span;
+
+    use crate::identifier::method::MethodIdentifier;
+    use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
+    use crate::metadata::flags::MetadataFlags;
+    use crate::metadata::property::PropertyMetadata;
+    use crate::metadata::ttype::TypeMetadata;
+    use crate::misc::GenericParent;
+    use crate::misc::VariableIdentifier;
+    use crate::ttype;
+    use crate::ttype::template::GenericTemplate;
+    use crate::ttype::template::variance::Variance;
+    use crate::visibility::Visibility;
+
+    use super::ClassLikeMetadata;
+
+    fn make(name: &str) -> ClassLikeMetadata {
+        let a = atom(name);
+        ClassLikeMetadata::new(a, a, Span::dummy(0, 10), None, MetadataFlags::empty())
+    }
+
+    #[test]
+    fn apply_patch_overrides_methods_and_preserves_rest() {
+        let class_name = atom("VendorClass");
+        let mut vendored = make("VendorClass");
+        let method_foo = atom("foo");
+        let method_bar = atom("bar");
+
+        vendored.methods.insert(method_foo);
+        vendored.methods.insert(method_bar);
+        vendored.declaring_method_ids.insert(method_foo, MethodIdentifier::new(class_name, method_foo));
+        vendored.declaring_method_ids.insert(method_bar, MethodIdentifier::new(class_name, method_bar));
+
+        let mut patch = make("VendorClass");
+        patch.methods.insert(method_bar);
+        patch.declaring_method_ids.insert(method_bar, MethodIdentifier::new(class_name, method_bar));
+
+        let issues = vendored.apply_patch(patch, &AtomSet::default());
+
+        assert!(vendored.methods.contains(&method_foo));
+        assert!(vendored.declaring_method_ids.contains_key(&method_foo));
+
+        assert!(vendored.methods.contains(&method_bar));
+        assert!(vendored.declaring_method_ids.contains_key(&method_bar));
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_overrides_properties_and_preserves_rest() {
+        let mut vendored = make("VendorClass");
+        let prop_foo = atom("$foo");
+        let prop_bar = atom("$bar");
+
+        vendored
+            .properties
+            .insert(prop_foo, PropertyMetadata::new(VariableIdentifier(prop_foo), MetadataFlags::empty()));
+        vendored
+            .properties
+            .insert(prop_bar, PropertyMetadata::new(VariableIdentifier(prop_bar), MetadataFlags::empty()));
+        vendored.declaring_property_ids.insert(prop_foo, prop_foo);
+        vendored.declaring_property_ids.insert(prop_bar, prop_bar);
+
+        let mut patch = make("VendorClass");
+        let patch_bar = atom("$bar");
+        let mut patch_bar_meta = PropertyMetadata::new(VariableIdentifier(patch_bar), MetadataFlags::PATCH);
+        patch_bar_meta.type_metadata = Some(TypeMetadata::new(ttype::get_string(), Span::dummy(0, 5)));
+        patch.properties.insert(patch_bar, patch_bar_meta);
+        patch.declaring_property_ids.insert(patch_bar, patch_bar);
+
+        let issues = vendored.apply_patch(patch, &AtomSet::default());
+
+        // $foo is untouched
+        assert!(vendored.properties.contains_key(&prop_foo));
+        assert!(vendored.properties[&prop_foo].type_metadata.is_none());
+
+        // $bar gets the type annotation but keeps its original flags (not is_patch)
+        assert!(vendored.properties.contains_key(&prop_bar));
+        assert!(!vendored.properties[&prop_bar].flags.is_patch());
+        assert_eq!(
+            vendored.properties[&prop_bar].type_metadata.as_ref().map(|md| md.type_union.clone()),
+            Some(ttype::get_string())
+        );
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_overrides_constants_and_preserves_rest() {
+        let mut vendored = make("VendorClass");
+        let foo_const = atom("FOO");
+        let bar_const = atom("BAR");
+
+        vendored.constants.insert(
+            foo_const,
+            ClassLikeConstantMetadata::new(foo_const, Span::dummy(0, 5), Visibility::Public, MetadataFlags::empty()),
+        );
+        vendored.constants.insert(
+            bar_const,
+            ClassLikeConstantMetadata::new(bar_const, Span::dummy(0, 5), Visibility::Public, MetadataFlags::empty()),
+        );
+
+        let mut patch = make("VendorClass");
+        let mut patch_bar_meta =
+            ClassLikeConstantMetadata::new(bar_const, Span::dummy(0, 5), Visibility::Public, MetadataFlags::PATCH);
+        patch_bar_meta.type_metadata = Some(TypeMetadata::new(ttype::get_string(), Span::dummy(0, 5)));
+        patch.constants.insert(bar_const, patch_bar_meta);
+
+        let issues = vendored.apply_patch(patch, &AtomSet::default());
+
+        // FOO is untouched
+        assert!(vendored.constants.contains_key(&foo_const));
+        assert!(vendored.constants[&foo_const].type_metadata.is_none());
+
+        // BAR gets the type annotation but keeps its original flags (not is_patch)
+        assert!(vendored.constants.contains_key(&bar_const));
+        assert!(!vendored.constants[&bar_const].flags.is_patch());
+        assert_eq!(
+            vendored.constants[&bar_const].type_metadata.as_ref().map(|md| md.type_union.clone()),
+            Some(ttype::get_string())
+        );
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_overrides_type_aliases_and_preserves_rest() {
+        let mut vendored = make("VendorClass");
+        let foo_alias = atom("FooAlias");
+        let bar_alias = atom("BarAlias");
+
+        vendored.type_aliases.insert(foo_alias, TypeMetadata::new(ttype::get_int(), Span::dummy(0, 5)));
+        vendored.type_aliases.insert(bar_alias, TypeMetadata::new(ttype::get_int(), Span::dummy(0, 5)));
+
+        let mut patch = make("VendorClass");
+        patch.type_aliases.insert(bar_alias, TypeMetadata::new(ttype::get_string(), Span::dummy(0, 5)));
+
+        let issues = vendored.apply_patch(patch, &AtomSet::default());
+
+        assert!(vendored.type_aliases.contains_key(&foo_alias));
+        assert_eq!(vendored.type_aliases[&foo_alias].type_union, ttype::get_int());
+
+        assert!(vendored.type_aliases.contains_key(&bar_alias));
+        assert_eq!(vendored.type_aliases[&bar_alias].type_union, ttype::get_string());
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_adds_override_for_inherited_real_method() {
+        let class_name = atom("VendorClass");
+        let mut vendored = make("VendorClass");
+        let method_existing = atom("existing");
+        vendored.methods.insert(method_existing);
+        vendored.declaring_method_ids.insert(method_existing, MethodIdentifier::new(class_name, method_existing));
+
+        let mut patch = make("VendorClass");
+        let method_override = atom("inherited_method");
+        patch.methods.insert(method_override);
+        patch.declaring_method_ids.insert(method_override, MethodIdentifier::new(class_name, method_override));
+        patch.inheritable_method_ids.insert(method_override, MethodIdentifier::new(class_name, method_override));
+
+        let inherited: AtomSet = once(method_override).collect();
+        let issues = vendored.apply_patch(patch, &inherited);
+
+        // The override is added to the real method set and to inheritable_method_ids.
+        // declaring_method_ids and appearing_method_ids are filled in later by the populator
+        // from self.methods, so apply_patch does not seed them here.
+        assert!(vendored.methods.contains(&method_override));
+        assert!(vendored.inheritable_method_ids.contains_key(&method_override));
+
+        // No warning: patch overrides of inherited methods are expected and intentional.
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_adds_pseudo_methods() {
+        let class_name = atom("VendorClass");
+        let mut vendored = make("VendorClass");
+
+        let mut patch = make("VendorClass");
+        let pseudo = atom("magicMethod");
+        patch.pseudo_methods.insert(pseudo);
+        patch.declaring_method_ids.insert(pseudo, MethodIdentifier::new(class_name, pseudo));
+        patch.appearing_method_ids.insert(pseudo, MethodIdentifier::new(class_name, pseudo));
+        patch.inheritable_method_ids.insert(pseudo, MethodIdentifier::new(class_name, pseudo));
+
+        let issues = vendored.apply_patch(patch, &AtomSet::default());
+
+        // Pseudo-method added to the right sets and ID maps.
+        assert!(vendored.pseudo_methods.contains(&pseudo));
+        assert!(vendored.declaring_method_ids.contains_key(&pseudo));
+        assert!(vendored.appearing_method_ids.contains_key(&pseudo));
+        assert!(vendored.inheritable_method_ids.contains_key(&pseudo));
+
+        // Must not appear as a real method.
+        assert!(!vendored.methods.contains(&pseudo));
+
+        // No issues.
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_accepts_new_magic_property() {
+        let mut vendored = make("VendorClass");
+
+        let mut patch = make("VendorClass");
+        let prop_magic = atom("$magic");
+        patch.properties.insert(
+            prop_magic,
+            PropertyMetadata::new(VariableIdentifier(prop_magic), MetadataFlags::PATCH | MetadataFlags::MAGIC_PROPERTY),
+        );
+
+        let issues = vendored.apply_patch(patch, &AtomSet::default());
+
+        assert!(vendored.properties.contains_key(&prop_magic));
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_does_not_touch_initialized_or_override_maps() {
+        let mut vendored = make("VendorClass");
+        let prop = atom("$x");
+        vendored.properties.insert(prop, PropertyMetadata::new(VariableIdentifier(prop), MetadataFlags::empty()));
+        vendored.initialized_properties.insert(prop);
+        vendored.overridden_property_ids.insert(prop, once(atom("ParentClass")).collect());
+
+        let mut patch = make("VendorClass");
+        patch.properties.insert(prop, PropertyMetadata::new(VariableIdentifier(prop), MetadataFlags::PATCH));
+        // patch has no initialized_properties entry and no overridden_property_ids
+
+        let issues = vendored.apply_patch(patch, &AtomSet::default());
+
+        // initialized_properties must not be cleared by the patch
+        assert!(vendored.initialized_properties.contains(&prop));
+        // overridden_property_ids must not be cleared by the patch
+        assert!(vendored.overridden_property_ids.contains_key(&prop));
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_adds_template_types() {
+        let class_name = atom("VendorClass");
+        let mut vendored = make("VendorClass");
+
+        let mut patch = make("VendorClass");
+        let t = atom("T");
+        patch.template_types.insert(t, GenericTemplate::new(GenericParent::ClassLike(class_name), ttype::get_mixed()));
+        patch.template_variance.push(Variance::Covariant);
+        patch.template_readonly.insert(t);
+
+        let issues = vendored.apply_patch(patch, &AtomSet::default());
+
+        assert!(vendored.template_types.contains_key(&t));
+        assert_eq!(vendored.template_variance.first().copied(), Some(Variance::Covariant));
+        assert!(vendored.template_readonly.contains(&t));
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_refines_existing_template_and_appends_new() {
+        let class_name = atom("VendorClass");
+        let mut vendored = make("VendorClass");
+        let t = atom("T");
+        let u = atom("U");
+
+        // Original has T (invariant, constraint = mixed) and U (covariant).
+        vendored
+            .template_types
+            .insert(t, GenericTemplate::new(GenericParent::ClassLike(class_name), ttype::get_mixed()));
+        vendored
+            .template_types
+            .insert(u, GenericTemplate::new(GenericParent::ClassLike(class_name), ttype::get_mixed()));
+        vendored.template_variance = vec![Variance::Invariant, Variance::Covariant];
+
+        // Patch refines T (now contravariant) and adds V (invariant).
+        let mut patch = make("VendorClass");
+        let v = atom("V");
+        patch.template_types.insert(t, GenericTemplate::new(GenericParent::ClassLike(class_name), ttype::get_int()));
+        patch.template_types.insert(v, GenericTemplate::new(GenericParent::ClassLike(class_name), ttype::get_string()));
+        patch.template_variance = vec![Variance::Contravariant, Variance::Invariant];
+
+        let issues = vendored.apply_patch(patch, &AtomSet::default());
+
+        // T refined, U preserved, V appended → order T=0, U=1, V=2
+        assert_eq!(vendored.template_types.keys().copied().collect::<Vec<_>>(), [t, u, v]);
+        assert_eq!(vendored.template_variance, [Variance::Contravariant, Variance::Covariant, Variance::Invariant]);
+
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_preserves_original_only_readonly_template() {
+        // Original: T is readonly. Patch adds U but does not re-declare T.
+        // T must remain readonly after the patch — the patch can add readonly
+        // entries but must not strip existing ones by omitting them.
+        let class_name = atom("VendorClass");
+        let mut vendored = make("VendorClass");
+        let t = atom("T");
+        vendored
+            .template_types
+            .insert(t, GenericTemplate::new(GenericParent::ClassLike(class_name), ttype::get_mixed()));
+        vendored.template_variance.push(Variance::Invariant);
+        vendored.template_readonly.insert(t);
+
+        let mut patch = make("VendorClass");
+        let u = atom("U");
+        patch.template_types.insert(u, GenericTemplate::new(GenericParent::ClassLike(class_name), ttype::get_mixed()));
+        patch.template_variance.push(Variance::Invariant);
+
+        let issues = vendored.apply_patch(patch, &AtomSet::default());
+
+        assert!(vendored.template_readonly.contains(&t), "T should remain readonly after patch");
+        assert!(!vendored.template_readonly.contains(&u), "U was not declared readonly by the patch");
+        assert!(issues.is_empty());
     }
 }
