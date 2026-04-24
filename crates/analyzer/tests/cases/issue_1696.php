@@ -42,10 +42,6 @@ function reassign_if_else_early_return(mixed $param): string
     }
 
     if ($is_ok) {
-        // Tracking a branch-discriminator boolean across if/else bodies is not supported, so we don't
-        // know that $param is a string here.
-        //
-        // @mago-expect analysis:mixed-return-statement
         return $param;
     }
 

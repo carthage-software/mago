@@ -189,6 +189,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         }
 
         if_scope.reasonable_clauses.clone_from(&if_block_context.clauses);
+        let saved_if_clauses = if_clauses.clone();
         if_scope.negated_clauses = negate_or_synthesize(
             if_clauses,
             self.condition,
@@ -240,6 +241,24 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             self,
         )?;
 
+        let if_body_assigned_ids = if_scope.assigned_variable_ids.clone().unwrap_or_default();
+        let mut if_body_redefined_snapshot: AtomMap<Rc<TUnion>> = AtomMap::default();
+        if let Some(redefined) = &if_scope.redefined_variables {
+            for (k, v) in redefined {
+                if if_body_assigned_ids.contains_key(k) {
+                    if_body_redefined_snapshot.insert(*k, v.clone());
+                }
+            }
+        }
+
+        if let Some(new_vars) = &if_scope.new_variables {
+            for (k, v) in new_vars {
+                if if_body_assigned_ids.contains_key(k) {
+                    if_body_redefined_snapshot.insert(*k, v.clone());
+                }
+            }
+        }
+
         let mut else_block_context = if let Some(post_leaving_if_context) = if_scope.post_leaving_if_context.take() {
             post_leaving_if_context
         } else {
@@ -267,6 +286,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             self.body.else_statements(),
             self.span(),
         )?;
+
+        synthesize_branch_discriminator_clauses(
+            block_context,
+            &if_body_redefined_snapshot,
+            &else_block_context,
+            &else_block_context.assigned_variable_ids,
+            &saved_if_clauses,
+            &if_scope.negated_clauses,
+            self.condition.span(),
+            &context.settings.algebra_thresholds(),
+            context.settings.formula_size_threshold,
+        );
 
         let has_returned = !if_scope.final_actions.contains(ControlAction::None);
 
@@ -1389,6 +1420,91 @@ fn get_definitely_evaluated_ored_expressions<'ast, 'arena>(
     }
 
     vec![expression]
+}
+
+fn synthesize_branch_discriminator_clauses<'ctx>(
+    outer_block_context: &mut BlockContext<'ctx>,
+    if_body_redefined: &AtomMap<Rc<TUnion>>,
+    else_block_context: &BlockContext<'ctx>,
+    else_assigned_ids: &AtomMap<u32>,
+    if_clauses: &[mago_algebra::clause::Clause],
+    negated_clauses: &[mago_algebra::clause::Clause],
+    condition_span: Span,
+    algebra_thresholds: &mago_algebra::AlgebraThresholds,
+    formula_size_threshold: u16,
+) {
+    if if_body_redefined.is_empty() {
+        return;
+    }
+
+    if if_clauses.is_empty() && negated_clauses.is_empty() {
+        return;
+    }
+
+    for (variable_id, if_type) in if_body_redefined {
+        if !else_assigned_ids.contains_key(variable_id) {
+            continue;
+        }
+
+        let Some(else_type) = else_block_context.locals.get(variable_id) else {
+            continue;
+        };
+
+        let if_truthy = if_type.is_always_truthy();
+        let if_falsy = if_type.is_always_falsy();
+        let else_truthy = else_type.is_always_truthy();
+        let else_falsy = else_type.is_always_falsy();
+
+        let (truthy_side_clauses, falsy_side_clauses) = if if_truthy && else_falsy {
+            (if_clauses, negated_clauses)
+        } else if if_falsy && else_truthy {
+            (negated_clauses, if_clauses)
+        } else {
+            continue;
+        };
+
+        if truthy_side_clauses.is_empty() && falsy_side_clauses.is_empty() {
+            continue;
+        }
+
+        if !truthy_side_clauses.is_empty() {
+            let mut possibilities = IndexMap::default();
+            possibilities.insert(*variable_id, IndexMap::from([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
+
+            let head = vec![mago_algebra::clause::Clause::new(
+                possibilities,
+                condition_span,
+                condition_span,
+                None,
+                None,
+                None,
+            )];
+
+            let combined = disjoin_clauses(head, truthy_side_clauses.to_vec(), condition_span, algebra_thresholds);
+            if combined.len() <= usize::from(formula_size_threshold) {
+                outer_block_context.clauses.extend(combined.into_iter().map(Rc::new));
+            }
+        }
+
+        if !falsy_side_clauses.is_empty() {
+            let mut possibilities = IndexMap::default();
+            possibilities.insert(*variable_id, IndexMap::from([(Assertion::Truthy.to_hash(), Assertion::Truthy)]));
+
+            let head = vec![mago_algebra::clause::Clause::new(
+                possibilities,
+                condition_span,
+                condition_span,
+                None,
+                None,
+                None,
+            )];
+
+            let combined = disjoin_clauses(head, falsy_side_clauses.to_vec(), condition_span, algebra_thresholds);
+            if combined.len() <= usize::from(formula_size_threshold) {
+                outer_block_context.clauses.extend(combined.into_iter().map(Rc::new));
+            }
+        }
+    }
 }
 
 #[cfg(test)]
