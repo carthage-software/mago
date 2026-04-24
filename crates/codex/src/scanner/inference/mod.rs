@@ -303,7 +303,7 @@ pub(super) fn infer_with_constants<'arena>(
                 }
                 UnaryPrefixOperator::Negation(_) => {
                     Some(if let Some(operand_value) = operand_type.get_single_literal_int_value() {
-                        get_literal_int(operand_value.saturating_mul(-1))
+                        get_literal_int(operand_value.wrapping_neg())
                     } else if let Some(operand_value) = operand_type.get_single_literal_float_value() {
                         TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::Float(TFloat::literal(
                             -operand_value,
