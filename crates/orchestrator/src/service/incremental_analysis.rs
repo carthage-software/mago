@@ -1022,6 +1022,7 @@ mod tests {
             workspace: Cow::Owned(Path::new("/test").to_path_buf()),
             paths: vec![Cow::Borrowed(b"src")],
             includes: vec![],
+            patches: vec![],
             excludes: vec![],
             extensions: vec![Cow::Borrowed(b"php")],
             glob: mago_database::GlobSettings::default(),

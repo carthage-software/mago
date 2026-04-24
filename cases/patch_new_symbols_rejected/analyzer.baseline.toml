@@ -1,0 +1,51 @@
+variant = "strict"
+
+[[entries."patch.php".issues]]
+code = "patch-enum-cases-ignored"
+start_line = 11
+end_line = 14
+
+[[entries."patch.php".issues]]
+code = "patch-introduces-new-constant"
+start_line = 2
+end_line = 9
+
+[[entries."patch.php".issues]]
+code = "patch-introduces-new-method"
+start_line = 2
+end_line = 9
+
+[[entries."patch.php".issues]]
+code = "patch-introduces-new-property"
+start_line = 2
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "non-existent-class-constant"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "non-existent-class-constant"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "non-existent-method"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "non-existent-property"
+start_line = 11
+end_line = 11

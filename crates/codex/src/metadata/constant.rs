@@ -73,6 +73,13 @@ impl ConstantMetadata {
     pub fn is_available_in_version_range(&self, range: PHPVersionRange) -> bool {
         self.version_constraint.allows_version_range(range)
     }
+
+    /// Applies a patch to this entry in place, refining type information.
+    pub fn apply_patch(&mut self, patch: &ConstantMetadata) {
+        if patch.type_metadata.is_some() {
+            self.type_metadata.clone_from(&patch.type_metadata);
+        }
+    }
 }
 
 impl HasSpan for ConstantMetadata {

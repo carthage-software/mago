@@ -147,12 +147,21 @@ impl<'config> DatabaseLoader<'config> {
             &path_excludes,
         )?;
 
+        let patch_files_with_spec = self.load_paths(
+            &self.configuration.patches,
+            FileType::Patch,
+            &extensions_set,
+            &glob_excludes,
+            &dir_prune_globs,
+            &path_excludes,
+        )?;
+
         let mut all_files: HashMap<FileId, File> = HashMap::default();
         // Per-file maximum specificity for each tier the file matched. `None` in a slot means
         // the file did not match any configured pattern in that tier; otherwise it carries the
         // best specificity score that tier could offer, scored by `calculate_pattern_specificity`.
-        let mut file_specificities: HashMap<FileId, (Option<usize>, Option<usize>)> = HashMap::default();
-        let bump_spec = |slot: &mut Option<usize>, s: usize| *slot = Some(slot.map_or(s, |e| e.max(s)));
+        type TierSpecs = (Option<usize>, Option<usize>, Option<usize>);
+        let mut tier_specs: HashMap<FileId, TierSpecs> = HashMap::default();
 
         // Process host files (from paths)
         for file_with_spec in host_files_with_spec {
@@ -160,7 +169,7 @@ impl<'config> DatabaseLoader<'config> {
             let specificity = file_with_spec.specificity;
 
             all_files.insert(file_id, file_with_spec.file);
-            bump_spec(&mut file_specificities.entry(file_id).or_insert((None, None)).0, specificity);
+            bump_spec(&mut tier_specs.entry(file_id).or_insert((None, None, None)).0, specificity);
         }
 
         // When stdin override is set, ensure that the file is in the database
@@ -195,7 +204,7 @@ impl<'config> DatabaseLoader<'config> {
                 if let Entry::Vacant(e) = all_files.entry(file_id) {
                     e.insert(file);
 
-                    bump_spec(&mut file_specificities.entry(file_id).or_insert((None, None)).0, usize::MAX);
+                    bump_spec(&mut tier_specs.entry(file_id).or_insert((None, None, None)).0, usize::MAX);
                 }
             }
         }
@@ -205,14 +214,21 @@ impl<'config> DatabaseLoader<'config> {
             let vendored_specificity = file_with_spec.specificity;
 
             all_files.entry(file_id).or_insert(file_with_spec.file);
-            bump_spec(&mut file_specificities.entry(file_id).or_insert((None, None)).1, vendored_specificity);
+            bump_spec(&mut tier_specs.entry(file_id).or_insert((None, None, None)).1, vendored_specificity);
         }
 
-        db.reserve(file_specificities.len() + self.memory_sources.len());
+        for file_with_spec in patch_files_with_spec {
+            let file_id = file_with_spec.file.id;
+            let specificity = file_with_spec.specificity;
+            all_files.entry(file_id).or_insert(file_with_spec.file);
+            bump_spec(&mut tier_specs.entry(file_id).or_insert((None, None, None)).2, specificity);
+        }
 
-        for (file_id, specificities) in file_specificities {
+        db.reserve(tier_specs.len() + self.memory_sources.len());
+
+        for (file_id, (host_spec, vendored_spec, patch_spec)) in tier_specs {
             if let Some(mut file) = all_files.remove(&file_id) {
-                file.file_type = resolve_file_type(specificities);
+                file.file_type = resolve_file_type(host_spec, vendored_spec, patch_spec);
                 db.add(file);
             }
         }
@@ -454,7 +470,43 @@ impl<'config> DatabaseLoader<'config> {
     }
 }
 
-/// Calculates how specific a pattern is for a given file path.
+fn bump_spec(slot: &mut Option<usize>, s: usize) {
+    *slot = Some(slot.map_or(s, |e| e.max(s)));
+}
+
+/// Picks the final [`FileType`] for a file that matched configured base paths in one or
+/// more tiers.
+///
+/// Each argument carries the maximum specificity of any matching base path in that tier, or
+/// `None` if no base path in that tier matched. Vendored wins over Host at equal-or-more
+/// specificity; Host wins only when strictly more specific. Patch beats Vendored
+/// unconditionally; Patch beats Host only when strictly more specific. When nothing matches
+/// the result is `Host`.
+pub(crate) fn resolve_file_type(
+    host_spec: Option<usize>,
+    vendored_spec: Option<usize>,
+    patch_spec: Option<usize>,
+) -> FileType {
+    let mut decision: Option<(FileType, usize)> = host_spec.map(|s| (FileType::Host, s));
+
+    if let Some(v) = vendored_spec {
+        decision = match decision {
+            Some((FileType::Host, h)) if v < h => decision,
+            _ => Some((FileType::Vendored, v)),
+        };
+    }
+
+    if let Some(p) = patch_spec {
+        decision = match decision {
+            Some((FileType::Host | FileType::Patch, e)) if p <= e => decision,
+            _ => Some((FileType::Patch, p)),
+        };
+    }
+
+    decision.map(|(ft, _)| ft).unwrap_or(FileType::Host)
+}
+
+/// Calculates how specific a configured base path or glob pattern is for conflict resolution.
 ///
 /// Examples:
 ///
@@ -487,86 +539,63 @@ pub(crate) fn calculate_pattern_specificity(pattern: &[u8]) -> usize {
     }
 }
 
-/// Picks the final [`FileType`] for a file that matched configured base paths in one or
-/// more tiers.
-///
-/// `host_specificity` and `vendored_specificity` are the maximum specificity scores of any
-/// matching base path in each tier, or `None` if no base path in that tier matched.
-/// Vendored wins over Host at equal-or-more specificity; Host wins only when strictly more
-/// specific. When nothing matches the result is `Host`.
-pub(crate) fn resolve_file_type((host_specificity, vendored_specificity): (Option<usize>, Option<usize>)) -> FileType {
-    match (host_specificity, vendored_specificity) {
-        (Some(h), Some(v)) if v < h => FileType::Host,
-        (_, Some(_)) => FileType::Vendored,
-        (Some(_), None) => FileType::Host,
-        (None, None) => FileType::Host,
-    }
-}
-
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
-mod tests {
+mod resolution_tests {
     use super::*;
-    use crate::DatabaseReader;
-    use crate::GlobSettings;
-    use std::borrow::Cow;
-    use tempfile::TempDir;
-
-    fn create_test_config(temp_dir: &TempDir, paths: Vec<&str>, includes: Vec<&str>) -> DatabaseConfiguration<'static> {
-        // Normalize path separators to platform-specific separators
-        let normalize = |s: &str| s.replace('/', std::path::MAIN_SEPARATOR_STR);
-
-        DatabaseConfiguration {
-            workspace: Cow::Owned(temp_dir.path().to_path_buf()),
-            paths: paths.into_iter().map(|s| Cow::Owned(normalize(s).into_bytes())).collect(),
-            includes: includes.into_iter().map(|s| Cow::Owned(normalize(s).into_bytes())).collect(),
-            excludes: vec![],
-            extensions: vec![Cow::Borrowed(b"php")],
-            glob: GlobSettings::default(),
-        }
-    }
-
-    /// Returns the file's logical name as a lossy UTF-8 string for assertion matching.
-    fn name_str(name: &[u8]) -> std::borrow::Cow<'_, str> {
-        String::from_utf8_lossy(name)
-    }
-
-    fn create_test_file(temp_dir: &TempDir, relative_path: &str, content: &str) {
-        let file_path = temp_dir.path().join(relative_path);
-        if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent).unwrap();
-        }
-        std::fs::write(file_path, content).unwrap();
-    }
 
     #[test]
     fn defaults_to_host_when_nothing_matches() {
-        assert_eq!(resolve_file_type((None, None)), FileType::Host);
+        assert_eq!(resolve_file_type(None, None, None), FileType::Host);
     }
 
     #[test]
     fn host_only_match_yields_host() {
-        assert_eq!(resolve_file_type((Some(100), None)), FileType::Host);
+        assert_eq!(resolve_file_type(Some(100), None, None), FileType::Host);
     }
 
     #[test]
     fn vendored_only_match_yields_vendored() {
-        assert_eq!(resolve_file_type((None, Some(100))), FileType::Vendored);
+        assert_eq!(resolve_file_type(None, Some(100), None), FileType::Vendored);
+    }
+
+    #[test]
+    fn patch_only_match_yields_patch() {
+        assert_eq!(resolve_file_type(None, None, Some(100)), FileType::Patch);
     }
 
     #[test]
     fn vendored_beats_host_at_equal_specificity() {
-        assert_eq!(resolve_file_type((Some(100), Some(100))), FileType::Vendored);
+        assert_eq!(resolve_file_type(Some(100), Some(100), None), FileType::Vendored);
     }
 
     #[test]
     fn vendored_beats_host_when_more_specific() {
-        assert_eq!(resolve_file_type((Some(100), Some(2000))), FileType::Vendored);
+        assert_eq!(resolve_file_type(Some(100), Some(2000), None), FileType::Vendored);
     }
 
     #[test]
     fn host_beats_vendored_only_when_strictly_more_specific() {
-        assert_eq!(resolve_file_type((Some(2000), Some(100))), FileType::Host);
+        assert_eq!(resolve_file_type(Some(2000), Some(100), None), FileType::Host);
+    }
+
+    #[test]
+    fn patch_beats_vendored_unconditionally() {
+        assert_eq!(resolve_file_type(None, Some(2000), Some(100)), FileType::Patch);
+    }
+
+    #[test]
+    fn host_beats_patch_at_equal_specificity() {
+        assert_eq!(resolve_file_type(Some(100), None, Some(100)), FileType::Host);
+    }
+
+    #[test]
+    fn patch_beats_host_when_strictly_more_specific() {
+        assert_eq!(resolve_file_type(Some(100), None, Some(2000)), FileType::Patch);
+    }
+
+    #[test]
+    fn patch_beats_host_that_won_over_vendored() {
+        assert_eq!(resolve_file_type(Some(100), Some(2000), Some(50)), FileType::Patch);
     }
 
     #[test]
@@ -588,6 +617,54 @@ mod tests {
     fn extensionless_phpish_pattern_treated_as_file() {
         assert_eq!(calculate_pattern_specificity(b"src/foo.PHP"), calculate_pattern_specificity(b"src/foo.php"),);
     }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use crate::DatabaseReader;
+    use crate::GlobSettings;
+    use std::borrow::Cow;
+    use tempfile::TempDir;
+
+    fn create_test_config(temp_dir: &TempDir, paths: Vec<&str>, includes: Vec<&str>) -> DatabaseConfiguration<'static> {
+        create_test_config_with_patches(temp_dir, paths, includes, vec![])
+    }
+
+    fn create_test_config_with_patches(
+        temp_dir: &TempDir,
+        paths: Vec<&str>,
+        includes: Vec<&str>,
+        patches: Vec<&str>,
+    ) -> DatabaseConfiguration<'static> {
+        // Normalize path separators to platform-specific separators
+        let normalize = |s: &str| s.replace('/', std::path::MAIN_SEPARATOR_STR);
+
+        DatabaseConfiguration {
+            workspace: Cow::Owned(temp_dir.path().to_path_buf()),
+            paths: paths.into_iter().map(|s| Cow::Owned(normalize(s).into_bytes())).collect(),
+            includes: includes.into_iter().map(|s| Cow::Owned(normalize(s).into_bytes())).collect(),
+            patches: patches.into_iter().map(|s| Cow::Owned(normalize(s).into_bytes())).collect(),
+            excludes: vec![],
+            extensions: vec![Cow::Borrowed(b"php")],
+            glob: GlobSettings::default(),
+        }
+    }
+
+    /// Returns the file's logical name as a lossy UTF-8 string for assertion matching.
+    fn name_str(name: &[u8]) -> std::borrow::Cow<'_, str> {
+        String::from_utf8_lossy(name)
+    }
+
+    fn create_test_file(temp_dir: &TempDir, relative_path: &str, content: &str) {
+        let file_path = temp_dir.path().join(relative_path);
+        if let Some(parent) = file_path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(file_path, content).unwrap();
+    }
+
     #[test]
     fn test_exact_file_vs_directory() {
         let temp_dir = TempDir::new().unwrap();
@@ -904,5 +981,52 @@ mod tests {
         let names: Vec<String> = db.files().map(|f| name_str(&f.name).into_owned()).collect();
         assert!(names.iter().any(|n| n.ends_with("bin/run.php")), "run.php should be loaded, got {names:?}");
         assert!(!names.iter().any(|n| n.ends_with("bin/console")), "extensionless console should be skipped");
+    }
+
+    #[test]
+    fn test_patch_beats_vendored_at_equal_specificity() {
+        // A file covered by both patches and includes at the same directory-level specificity
+        // should be classified as Patch, not Vendored.
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "lib/Foo.php", "<?php");
+
+        let config = create_test_config_with_patches(&temp_dir, vec![], vec!["lib/"], vec!["lib/"]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let file = db.files().find(|f| String::from_utf8_lossy(&f.name).contains("Foo.php")).unwrap();
+        assert_eq!(file.file_type, FileType::Patch, "patch should beat vendored at equal specificity");
+    }
+
+    #[test]
+    fn test_host_beats_patch_at_equal_specificity() {
+        // When a file is covered by both paths and patches at the same directory-level specificity,
+        // the host (paths) classification wins.  Patches only override host when strictly more specific.
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "src/Foo.php", "<?php");
+
+        let config = create_test_config_with_patches(&temp_dir, vec!["src/"], vec![], vec!["src/"]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let file = db.files().find(|f| String::from_utf8_lossy(&f.name).contains("Foo.php")).unwrap();
+        assert_eq!(file.file_type, FileType::Host, "host should beat patch at equal specificity");
+    }
+
+    #[test]
+    fn test_patch_beats_host_when_strictly_more_specific() {
+        // An exact-file patch pattern has higher specificity than a directory paths pattern,
+        // so the patch wins and the file is treated as Patch rather than Host.
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "src/Foo.php", "<?php");
+        create_test_file(&temp_dir, "src/Bar.php", "<?php");
+
+        // Patch covers only Foo.php exactly; paths covers the whole directory.
+        let config = create_test_config_with_patches(&temp_dir, vec!["src/"], vec![], vec!["src/Foo.php"]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let foo = db.files().find(|f| String::from_utf8_lossy(&f.name).contains("Foo.php")).unwrap();
+        assert_eq!(foo.file_type, FileType::Patch, "exact-file patch should beat directory-level host pattern");
+
+        let bar = db.files().find(|f| String::from_utf8_lossy(&f.name).contains("Bar.php")).unwrap();
+        assert_eq!(bar.file_type, FileType::Host, "file not covered by patch should remain Host");
     }
 }

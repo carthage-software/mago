@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."patch2.php".issues]]
+code = "patch-duplicate-target"
+start_line = 2
+end_line = 5
+
+[[entries."patch2.php".issues]]
+code = "patch-duplicate-target"
+start_line = 7
+end_line = 7
+
+[[entries."patch2.php".issues]]
+code = "patch-duplicate-target"
+start_line = 9
+end_line = 9

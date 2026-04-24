@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."patch.php".issues]]
+code = "patch-function-parameter-mismatch"
+start_line = 4
+end_line = 4

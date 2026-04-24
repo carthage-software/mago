@@ -65,12 +65,13 @@ pub struct DatabaseWatcher<'config> {
     watcher: Option<RecommendedWatcher>,
     watched_paths: Vec<PathBuf>,
     receiver: Option<Receiver<Vec<ChangedFile>>>,
-    /// Configured host base paths paired with their loader-style specificity score.
+    /// Configured base paths paired with their loader-style specificity score.
     ///
     /// Carrying the score (computed via [`calculate_pattern_specificity`] over the original
     /// pattern, before stripping any glob suffix) is what lets the watcher and the loader
     /// agree on which [`FileType`] a newly-added file should get.
     host_base_paths: Vec<(PathBuf, usize)>,
+    patch_base_paths: Vec<(PathBuf, usize)>,
     include_base_paths: Vec<(PathBuf, usize)>,
 }
 
@@ -84,6 +85,7 @@ impl<'config> DatabaseWatcher<'config> {
             watched_paths: Vec::new(),
             receiver: None,
             host_base_paths: Vec::new(),
+            patch_base_paths: Vec::new(),
             include_base_paths: Vec::new(),
         }
     }
@@ -169,6 +171,16 @@ impl<'config> DatabaseWatcher<'config> {
             unique_watch_paths.insert(absolute_path);
         }
 
+        let mut patch_base_paths = Vec::new();
+        for path in &config.patches {
+            let specificity = calculate_pattern_specificity(path.as_ref());
+            let watch_path = Self::extract_watch_path(path.as_ref());
+            let absolute_path = if watch_path.is_absolute() { watch_path } else { config.workspace.join(watch_path) };
+            let canonical = absolute_path.canonicalize().unwrap_or_else(|_| absolute_path.clone());
+            patch_base_paths.push((canonical, specificity));
+            unique_watch_paths.insert(absolute_path);
+        }
+
         let explicit_watch_paths: Vec<PathBuf> = unique_watch_paths
             .iter()
             .filter(|wp| glob_excludes.is_match(wp.as_path()) || path_excludes.contains(wp.as_path()))
@@ -208,6 +220,7 @@ impl<'config> DatabaseWatcher<'config> {
         self.watched_paths = watched_paths;
         self.receiver = Some(rx);
         self.host_base_paths = host_base_paths;
+        self.patch_base_paths = patch_base_paths;
         self.include_base_paths = include_base_paths;
 
         Ok(())
@@ -225,6 +238,7 @@ impl<'config> DatabaseWatcher<'config> {
         self.watched_paths.clear();
         self.receiver = None;
         self.host_base_paths.clear();
+        self.patch_base_paths.clear();
         self.include_base_paths.clear();
     }
 
@@ -395,6 +409,7 @@ impl<'config> DatabaseWatcher<'config> {
                             let new_file_type = classify_added_file(
                                 &changed_file.path,
                                 &self.host_base_paths,
+                                &self.patch_base_paths,
                                 &self.include_base_paths,
                             );
                             match File::read(&workspace, &changed_file.path, new_file_type) {
@@ -529,13 +544,18 @@ impl Drop for DatabaseWatcher<'_> {
 /// [`resolve_file_type`] for the actual conflict resolution. The watcher and the loader
 /// therefore reach the same `FileType` for the same file under the same configuration —
 /// see the helper's docs for the priority rules.
-fn classify_added_file(path: &Path, host_bases: &[(PathBuf, usize)], include_bases: &[(PathBuf, usize)]) -> FileType {
+fn classify_added_file(
+    path: &Path,
+    host_bases: &[(PathBuf, usize)],
+    patch_bases: &[(PathBuf, usize)],
+    include_bases: &[(PathBuf, usize)],
+) -> FileType {
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let max_spec = |bases: &[(PathBuf, usize)]| {
         bases.iter().filter(|(b, _)| canonical.starts_with(b.as_path())).map(|(_, s)| *s).max()
     };
 
-    resolve_file_type((max_spec(host_bases), max_spec(include_bases)))
+    resolve_file_type(max_spec(host_bases), max_spec(include_bases), max_spec(patch_bases))
 }
 
 #[cfg(test)]
@@ -548,7 +568,8 @@ mod classify_added_file_tests {
 
     #[test]
     fn defaults_to_host_when_no_base_matches() {
-        let ft = classify_added_file(Path::new("/ws/orphan/foo.php"), &bases(&["/ws/src"]), &bases(&["/ws/stubs"]));
+        let ft =
+            classify_added_file(Path::new("/ws/orphan/foo.php"), &bases(&["/ws/src"]), &[], &bases(&["/ws/stubs"]));
         assert_eq!(ft, FileType::Host);
     }
 
@@ -557,13 +578,13 @@ mod classify_added_file_tests {
         // Regression test: prior to this fix the watcher hardcoded `FileType::Host` for
         // every newly-discovered file, so a fresh PHP file dropped into an `includes`
         // directory at runtime was wrongly added as source and linted as such.
-        let ft = classify_added_file(Path::new("/ws/stubs/foo.php"), &bases(&["/ws/src"]), &bases(&["/ws/stubs"]));
+        let ft = classify_added_file(Path::new("/ws/stubs/foo.php"), &bases(&["/ws/src"]), &[], &bases(&["/ws/stubs"]));
         assert_eq!(ft, FileType::Vendored);
     }
 
     #[test]
     fn host_when_only_host_matches() {
-        let ft = classify_added_file(Path::new("/ws/src/foo.php"), &bases(&["/ws/src"]), &bases(&["/ws/stubs"]));
+        let ft = classify_added_file(Path::new("/ws/src/foo.php"), &bases(&["/ws/src"]), &[], &bases(&["/ws/stubs"]));
         assert_eq!(ft, FileType::Host);
     }
 
@@ -572,7 +593,8 @@ mod classify_added_file_tests {
         // The same directory configured under both `paths` and `includes`: vendored wins,
         // matching the loader's "vendored beats host at equal specificity" rule. Catches
         // the divergence the original watcher hit (it was awarding the file to host).
-        let ft = classify_added_file(Path::new("/ws/shared/foo.php"), &bases(&["/ws/shared"]), &bases(&["/ws/shared"]));
+        let ft =
+            classify_added_file(Path::new("/ws/shared/foo.php"), &bases(&["/ws/shared"]), &[], &bases(&["/ws/shared"]));
         assert_eq!(ft, FileType::Vendored);
     }
 
@@ -583,6 +605,7 @@ mod classify_added_file_tests {
         let ft = classify_added_file(
             Path::new("/ws/src/vendor/stub.php"),
             &bases(&["/ws/src"]),
+            &[],
             &bases(&["/ws/src/vendor"]),
         );
         assert_eq!(ft, FileType::Vendored);
@@ -594,7 +617,51 @@ mod classify_added_file_tests {
         // treated `src/` and `src/foo.php` as equally specific (both 2 components) and
         // gave the file to vendored; the loader-aligned specificity score (file × 1000
         // beats dir × 100) instead keeps it on host.
-        let ft = classify_added_file(Path::new("/ws/src/foo.php"), &bases(&["/ws/src/foo.php"]), &bases(&["/ws/src"]));
+        let ft =
+            classify_added_file(Path::new("/ws/src/foo.php"), &bases(&["/ws/src/foo.php"]), &[], &bases(&["/ws/src"]));
         assert_eq!(ft, FileType::Host);
+    }
+
+    #[test]
+    fn patch_when_only_patch_matches() {
+        let ft = classify_added_file(
+            Path::new("/ws/patches/foo.php"),
+            &bases(&["/ws/src"]),
+            &bases(&["/ws/patches"]),
+            &bases(&["/ws/stubs"]),
+        );
+        assert_eq!(ft, FileType::Patch);
+    }
+
+    #[test]
+    fn patch_wins_over_host_when_strictly_more_specific() {
+        let ft = classify_added_file(
+            Path::new("/ws/src/patches/foo.php"),
+            &bases(&["/ws/src"]),
+            &bases(&["/ws/src/patches"]),
+            &[],
+        );
+        assert_eq!(ft, FileType::Patch);
+    }
+
+    #[test]
+    fn host_wins_over_patch_at_equal_specificity() {
+        // Tie between host and patch goes to host — same precedence the loader applies.
+        let ft =
+            classify_added_file(Path::new("/ws/shared/foo.php"), &bases(&["/ws/shared"]), &bases(&["/ws/shared"]), &[]);
+        assert_eq!(ft, FileType::Host);
+    }
+
+    #[test]
+    fn patch_wins_over_include_when_both_match_without_host() {
+        // No host match; patch and include both match. Patch beats vendored — matches the
+        // loader's USER_DEFINED > PATCH > BUILT_IN > VENDORED tier order.
+        let ft = classify_added_file(
+            Path::new("/ws/overlap/foo.php"),
+            &[],
+            &bases(&["/ws/overlap"]),
+            &bases(&["/ws/overlap"]),
+        );
+        assert_eq!(ft, FileType::Patch);
     }
 }
