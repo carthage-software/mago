@@ -21,6 +21,7 @@ function sitemap_create_late(): ?string
         }
     }
 
+    // @mago-expect analysis:redundant-condition
     if (!$param['active']) {
         return null;
     }

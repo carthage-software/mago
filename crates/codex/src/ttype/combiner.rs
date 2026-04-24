@@ -719,6 +719,7 @@ fn scrape_type_properties(
                             let known_items = widen_known_items_with_params(
                                 known_items,
                                 &combination.keyed_array_parameters,
+                                &combination.keyed_array_entries,
                                 codebase,
                                 options,
                             );
@@ -736,6 +737,16 @@ fn scrape_type_properties(
                             let mut frozen_entries = std::mem::take(&mut combination.keyed_array_entries);
                             if let Some((ref key_param, ref value_param)) = parameters {
                                 for (key, (_, entry_type)) in frozen_entries.iter_mut() {
+                                    // If the incoming unsealed array also declares this key as a
+                                    // known item, the caller is saying this key is exactly the
+                                    // declared type - the generic value_param catch-all covers
+                                    // *other* keys only. Widening here would turn e.g.
+                                    // `array{count: int, id: int}` + `array{count: int, ...<string, mixed>}`
+                                    // into `array{count: mixed, id: mixed}`, which is a false loss.
+                                    if known_items.as_ref().is_some_and(|ki| ki.contains_key(key)) {
+                                        continue;
+                                    }
+
                                     let key_type = TUnion::from_atomic(key.to_atomic());
 
                                     if union_comparator::can_expression_types_be_identical(
@@ -1231,6 +1242,7 @@ fn scrape_type_properties(
 fn widen_known_items_with_params(
     known_items: Option<BTreeMap<ArrayKey, (bool, TUnion)>>,
     params: &Option<(TUnion, TUnion)>,
+    other_known_items: &BTreeMap<ArrayKey, (bool, TUnion)>,
     codebase: &CodebaseMetadata,
     options: CombinerOptions,
 ) -> Option<BTreeMap<ArrayKey, (bool, TUnion)>> {
@@ -1274,6 +1286,10 @@ fn widen_known_items_with_params(
 
         for (key, (_, entry_type)) in items.iter_mut() {
             if entry_type == value_param {
+                continue;
+            }
+
+            if other_known_items.contains_key(key) {
                 continue;
             }
 
