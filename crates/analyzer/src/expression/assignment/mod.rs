@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
 use mago_atom::Atom;
+use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
@@ -944,6 +945,16 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
 
     let right_clauses =
         BlockContext::filter_clauses(context, variable_id, right_clauses.into_iter().map(Rc::new).collect(), None);
+
+    let mut covered_variable_ids: AtomSet = AtomSet::default();
+    covered_variable_ids.insert(variable_id);
+    for clause in &right_clauses {
+        for var in clause.possibilities.keys() {
+            covered_variable_ids.insert(*var);
+        }
+    }
+
+    block_context.parent_conflicting_clause_variables.retain(|var| !covered_variable_ids.contains(var));
 
     let mut possibilities = IndexMap::default();
     possibilities.insert(variable_id, IndexMap::from([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
