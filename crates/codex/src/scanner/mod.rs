@@ -109,7 +109,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
     }
 
     pub fn get_docblock(&self, node: impl HasSpan) -> Option<&'arena Trivia<'arena>> {
-        get_docblock_for_node(self.program, self.file, node)
+        get_docblock_for_node(self.program, node)
     }
 }
 

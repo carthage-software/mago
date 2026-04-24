@@ -141,9 +141,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
     pub fn get_parsed_docblocks(&mut self) -> Vec<Element<'arena>> {
         let mut elements = vec![];
         let mut start = self.statement_span.start.offset;
-        while let Some(trivia) =
-            comments::docblock::get_docblock_before_position(self.source_file, self.comments, start)
-        {
+        while let Some(trivia) = comments::docblock::get_docblock_before_position(self.comments, start) {
             match mago_docblock::parse_trivia(self.arena, trivia) {
                 Ok(document) => elements.extend(document.elements),
                 Err(error) => {

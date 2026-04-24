@@ -1,4 +1,3 @@
-use mago_database::file::File;
 use mago_span::HasSpan;
 
 use crate::ast::Program;
@@ -14,7 +13,6 @@ use crate::ast::TriviaKind;
 /// # Arguments
 ///
 /// * `program` - The program containing the trivia.
-/// * `file` - The file from which the trivia is derived.
 /// * `node` - The node for which to find the preceding docblock comment.
 ///
 /// # Returns
@@ -24,10 +22,9 @@ use crate::ast::TriviaKind;
 #[inline]
 pub fn get_docblock_for_node<'arena>(
     program: &'arena Program<'arena>,
-    file: &File,
     node: impl HasSpan,
 ) -> Option<&'arena Trivia<'arena>> {
-    get_docblock_before_position(file, program.trivia.as_slice(), node.span().start.offset)
+    get_docblock_before_position(program.trivia.as_slice(), node.span().start.offset)
 }
 
 /// Retrieves the docblock comment that appears before a specific position in the source code.
@@ -38,7 +35,6 @@ pub fn get_docblock_for_node<'arena>(
 ///
 /// # Arguments
 ///
-/// * `file` - The file from which the trivia is derived.
 /// * `trivias` - A slice of trivia associated with the source code.
 /// * `node_start_offset` - The start offset of the node for which to find the preceding docblock comment.
 ///
@@ -46,7 +42,6 @@ pub fn get_docblock_for_node<'arena>(
 ///
 /// An `Option` containing a reference to the `Trivia` representing the docblock comment if found,
 pub fn get_docblock_before_position<'arena>(
-    file: &File,
     trivias: &'arena [Trivia<'arena>],
     node_start_offset: u32,
 ) -> Option<&'arena Trivia<'arena>> {
@@ -58,18 +53,16 @@ pub fn get_docblock_before_position<'arena>(
     // Track the earliest position we've "covered" by trivia.
     // Start from node_start_offset and work backwards.
     // As we iterate, we verify that each trivia connects to the next (no code gaps).
+    // Since the parser captures all whitespace as WhiteSpace trivia, any gap not covered
+    // by a trivia node is actual code, so we just check for contiguity.
     let mut covered_from = node_start_offset;
 
     for i in (0..candidate_partition_idx).rev() {
         let trivia = &trivias[i];
         let trivia_end = trivia.span.end_offset();
 
-        // Check if there's a gap between this trivia and our covered region.
-        // If there's non-whitespace content in the gap, there's actual code between them.
-        let gap_slice = file.contents.as_bytes().get(trivia_end as usize..covered_from as usize).unwrap_or(&[]);
-
-        if !gap_slice.iter().all(u8::is_ascii_whitespace) {
-            // There's actual code in the gap. No docblock applies.
+        if trivia_end != covered_from {
+            // Gap between this trivia and our covered region contains code.
             return None;
         }
 
@@ -89,4 +82,40 @@ pub fn get_docblock_before_position<'arena>(
 
     // Iterated through all preceding trivia without finding a suitable docblock.
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use bumpalo::Bump;
+    use mago_database::file::FileId;
+    use mago_span::HasSpan;
+
+    use crate::parser::parse_file_content;
+
+    use super::get_docblock_before_position;
+
+    #[test]
+    fn whitespace_between_docblock_and_class_is_trivia() {
+        // The parser emits WhiteSpace trivia for all whitespace, so there is no
+        // code gap between the docblock's end offset and the class's start offset.
+        // This verifies the assumption that strict trivia contiguity == no code gap.
+        let arena = Bump::new();
+        let program = parse_file_content(&arena, FileId::zero(), "<?php\n\n/** @return int */\n\nclass Foo {}");
+        // statements[0] is the <?php opening tag; statements[1] is the class.
+        let class_start = program.statements.iter().nth(1).unwrap().span().start.offset;
+        let docblock = get_docblock_before_position(program.trivia.as_slice(), class_start);
+        assert!(docblock.is_some(), "expected docblock to be found across whitespace");
+        assert!(docblock.unwrap().value.contains("@return int"));
+    }
+
+    #[test]
+    fn code_between_docblock_and_function_blocks_attribution() {
+        let arena = Bump::new();
+        let program =
+            parse_file_content(&arena, FileId::zero(), "<?php\n/** @return int */\necho 1;\nfunction foo() {}");
+        // statements: [0]=OpeningTag, [1]=Echo, [2]=Function
+        let func_start = program.statements.iter().nth(2).unwrap().span().start.offset;
+        let docblock = get_docblock_before_position(program.trivia.as_slice(), func_start);
+        assert!(docblock.is_none(), "expected no docblock when code intervenes");
+    }
 }

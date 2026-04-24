@@ -215,7 +215,7 @@ impl MissingDocsRule {
         node: &'a impl HasSpan,
         subject: &'static str,
     ) {
-        let trivia = get_docblock_for_node(program, ctx.source_file, node);
+        let trivia = get_docblock_for_node(program, node);
 
         if trivia.is_none_or(|t| !t.kind.is_docblock()) {
             ctx.collector.report(
