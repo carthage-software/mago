@@ -1,3 +1,4 @@
+use mago_database::file::FileType;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -323,6 +324,16 @@ impl MetadataFlags {
     #[must_use]
     pub const fn is_polyfill(self) -> bool {
         self.contains(Self::POLYFILL)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn origin_flags(file_type: FileType) -> Self {
+        match file_type {
+            FileType::Host => Self::USER_DEFINED,
+            FileType::Builtin => Self::BUILTIN,
+            FileType::Vendored => Self::empty(),
+        }
     }
 }
 

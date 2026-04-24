@@ -31,12 +31,7 @@ pub fn scan_constant<'arena>(
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
     let docblock = ConstantDocblockComment::create(context, constant);
 
-    let mut flags = MetadataFlags::empty();
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    let flags = MetadataFlags::origin_flags(context.file.file_type);
 
     constant
         .items
@@ -86,12 +81,7 @@ pub fn scan_defined_constant<'arena>(
     let docblock = ConstantDocblockComment::create(context, define);
 
     let name = ascii_lowercase_constant_name_atom(name_string.value?);
-    let mut flags = MetadataFlags::empty();
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    let flags = MetadataFlags::origin_flags(context.file.file_type);
 
     let mut metadata = ConstantMetadata::new(name, define.span(), flags);
     metadata.inferred_type = infer(context, scope, value_arg.value(), None);

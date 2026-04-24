@@ -61,12 +61,7 @@ pub fn scan_method<'arena>(
 ) -> FunctionLikeMetadata {
     let span = method.span();
 
-    let mut flags = MetadataFlags::empty();
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    let mut flags = MetadataFlags::origin_flags(context.file.file_type);
 
     if method.ampersand.is_some() {
         flags |= MetadataFlags::BY_REFERENCE;
@@ -151,12 +146,7 @@ pub fn scan_function<'arena>(
     type_resolution_context: TypeResolutionContext,
     constants: Option<&AtomMap<ConstantMetadata>>,
 ) -> FunctionLikeMetadata {
-    let mut flags = MetadataFlags::empty();
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    let mut flags = MetadataFlags::origin_flags(context.file.file_type);
 
     if utils::block_has_yield(&function.body) {
         flags |= MetadataFlags::HAS_YIELD;
@@ -217,12 +207,7 @@ pub fn scan_closure<'arena>(
 ) -> FunctionLikeMetadata {
     let span = closure.span();
 
-    let mut flags = MetadataFlags::empty();
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    let mut flags = MetadataFlags::origin_flags(context.file.file_type);
 
     if utils::block_has_yield(&closure.body) {
         flags |= MetadataFlags::HAS_YIELD;
@@ -269,12 +254,7 @@ pub fn scan_arrow_function<'arena>(
 ) -> FunctionLikeMetadata {
     let span = arrow_function.span();
 
-    let mut flags = MetadataFlags::empty();
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    let mut flags = MetadataFlags::origin_flags(context.file.file_type);
 
     if utils::expression_has_yield(arrow_function.expression) {
         flags |= MetadataFlags::HAS_YIELD;

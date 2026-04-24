@@ -44,11 +44,7 @@ pub fn scan_promoted_property<'arena>(
     let name_span = parameter_metadata.get_name_span();
 
     let mut flags = MetadataFlags::PROMOTED_PROPERTY;
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    flags |= MetadataFlags::origin_flags(context.file.file_type);
 
     if parameter_metadata.flags.has_default() {
         flags |= MetadataFlags::HAS_DEFAULT;
@@ -174,12 +170,7 @@ pub fn scan_properties<'arena>(
         }
     };
 
-    let mut flags = MetadataFlags::empty();
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    let mut flags = MetadataFlags::origin_flags(context.file.file_type);
 
     match property {
         Property::Plain(plain_property) => plain_property

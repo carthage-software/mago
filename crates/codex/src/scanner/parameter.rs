@@ -33,12 +33,7 @@ pub fn scan_function_like_parameter_with_constants<'arena>(
     scope: &NamespaceScope,
     constants: Option<&AtomMap<ConstantMetadata>>,
 ) -> FunctionLikeParameterMetadata {
-    let mut flags = MetadataFlags::empty();
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    let mut flags = MetadataFlags::origin_flags(context.file.file_type);
 
     if parameter.ellipsis.is_some() {
         flags |= MetadataFlags::VARIADIC;
