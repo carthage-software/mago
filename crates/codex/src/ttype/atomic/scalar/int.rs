@@ -863,12 +863,12 @@ impl TInteger {
             }
         }
 
-        if all_literals && !has_unspecified_literal && !has_from && !has_to {
-            return types.into_iter().map(|t| TAtomic::Scalar(TScalar::Integer(t))).collect();
-        }
-
         if has_unspecified {
             return vec![TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified))];
+        }
+
+        if all_literals && !has_unspecified_literal && !has_from && !has_to {
+            return types.into_iter().map(|t| TAtomic::Scalar(TScalar::Integer(t))).collect();
         }
 
         if has_from && has_to && max_to.saturating_add(1) >= min_from {

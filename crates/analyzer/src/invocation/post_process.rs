@@ -300,6 +300,11 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
         );
 
         if let Some(argument) = argument {
+            let declared_had_templates = parameter_ref
+                .get_out_type()
+                .or_else(|| parameter_ref.get_type())
+                .is_some_and(|declared| declared.has_template_types());
+
             let mut new_type = parameter_ref
                 .get_out_type()
                 .or_else(|| parameter_ref.get_type())
@@ -321,7 +326,10 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
                 continue;
             }
 
-            new_type.widen_literals();
+            if declared_had_templates {
+                new_type.widen_literals();
+            }
+
             new_type.set_by_reference(true);
 
             let new_type = Rc::new(new_type);
