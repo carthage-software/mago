@@ -5,6 +5,7 @@ use serde::Serialize;
 
 use mago_atom::Atom;
 use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use mago_reporting::Issue;
 use mago_span::Span;
 
@@ -133,6 +134,12 @@ pub struct FunctionLikeMetadata {
     /// function/method returns `false`. From `@psalm-assert-if-false`, etc.
     pub if_false_assertions: BTreeMap<Atom, Vec<Assertion>>,
 
+    /// Names of variables this function/method imports from the global scope via a
+    /// `global $x;` statement anywhere in its body. Used by the invocation post-processor
+    /// to invalidate caller-side narrowings of those globals on every call, since the
+    /// callee can reassign them behind the caller's back.
+    pub globals_accessed: AtomSet,
+
     /// Tracks whether this function/method has a docblock comment.
     /// Used to determine if docblock inheritance should occur implicitly.
     pub has_docblock: bool,
@@ -195,6 +202,7 @@ impl FunctionLikeMetadata {
             assertions: BTreeMap::new(),
             if_true_assertions: BTreeMap::new(),
             if_false_assertions: BTreeMap::new(),
+            globals_accessed: AtomSet::default(),
             has_docblock: false,
             issues: vec![],
         }

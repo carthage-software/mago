@@ -534,6 +534,66 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         });
     }
 
+    // Superglobal array entries (`$_SESSION['x']`, `$_GET['y']`, ...) are reachable from
+    // every function body, so any non-pure call can mutate them whether or not it was
+    // passed any arguments. Reset each superglobal variable in locals back to its
+    // declared type (wiping the caller's narrowed known-items), and drop any clauses
+    // or separately-keyed index entries that refer to them.
+    let superglobal_vars_to_reset: Vec<Atom> =
+        block_context.locals.keys().copied().filter(|var_id| is_superglobal_name(var_id.as_str())).collect();
+
+    for var_id in &superglobal_vars_to_reset {
+        if let Some(declared) = crate::common::global::get_global_variable_type(var_id.as_str()) {
+            block_context.locals.insert(*var_id, declared);
+        } else {
+            block_context.locals.remove(var_id);
+        }
+    }
+
+    let superglobal_index_keys_to_remove: Vec<_> =
+        block_context.locals.keys().copied().filter(|var_id| is_superglobal_index_key(*var_id)).collect();
+
+    for key in &superglobal_index_keys_to_remove {
+        block_context.locals.remove(key);
+    }
+
+    let touches_superglobal = |var: Atom| {
+        let s = var.as_str();
+        is_superglobal_index_key(var) || is_superglobal_name(s)
+    };
+    block_context
+        .clauses
+        .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(touches_superglobal));
+    block_context
+        .reconciled_expression_clauses
+        .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(touches_superglobal));
+
+    // If the callee imports any variables via `global $x;` anywhere in its body, it can
+    // reassign them in the caller's global scope. Widen any literal narrowings we were
+    // holding for those specific variables so later checks don't assume stale values.
+    if let Some(metadata) = metadata
+        && !metadata.globals_accessed.is_empty()
+    {
+        let mut touched_globals: foldhash::HashSet<Atom> = foldhash::HashSet::default();
+        for name in &metadata.globals_accessed {
+            if let Some(existing) = block_context.locals.get(name).cloned() {
+                let mut widened = (*existing).clone();
+                widened.widen_literals();
+                block_context.locals.insert(*name, Rc::new(widened));
+                touched_globals.insert(*name);
+            }
+        }
+
+        if !touched_globals.is_empty() {
+            block_context.clauses.retain(|clause| {
+                clause.wedge || !clause.possibilities.keys().copied().any(|k| touched_globals.contains(&k))
+            });
+            block_context.reconciled_expression_clauses.retain(|clause| {
+                clause.wedge || !clause.possibilities.keys().copied().any(|k| touched_globals.contains(&k))
+            });
+        }
+    }
+
     // When an object is passed as an argument, properties on any object could be modified.
     let arguments = invocation.arguments_source.get_arguments();
 
@@ -577,6 +637,25 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
 fn is_property_or_index_key(var_id: Atom) -> bool {
     let s = var_id.as_str();
     s.contains("->") || (s.starts_with('$') && s.contains('['))
+}
+
+/// A variable ID like `$_SESSION['user_id']` - an index access rooted at a PHP
+/// superglobal. These are reachable from any function body, so a non-pure call
+/// might mutate them regardless of its arguments.
+fn is_superglobal_index_key(var_id: Atom) -> bool {
+    let s = var_id.as_str();
+    let Some(bracket_pos) = s.find('[') else {
+        return false;
+    };
+
+    is_superglobal_name(&s[..bracket_pos])
+}
+
+fn is_superglobal_name(name: &str) -> bool {
+    matches!(
+        name,
+        "$_SESSION" | "$_GET" | "$_POST" | "$_COOKIE" | "$_SERVER" | "$_ENV" | "$_FILES" | "$_REQUEST" | "$GLOBALS"
+    )
 }
 
 fn resolve_invocation_assertion<'ctx, 'arena>(

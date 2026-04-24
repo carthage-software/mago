@@ -1506,6 +1506,7 @@ fn create_enum_from_method(enum_name: &str, enum_method_span: Span, backing_type
         assertions: Default::default(),
         if_true_assertions: Default::default(),
         if_false_assertions: Default::default(),
+        globals_accessed: Default::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
     }
@@ -1562,6 +1563,7 @@ fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_
         assertions: Default::default(),
         if_true_assertions: Default::default(),
         if_false_assertions: Default::default(),
+        globals_accessed: Default::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
     }
@@ -1619,6 +1621,7 @@ fn create_enum_cases_method(enum_name: &str, enum_method_span: Span, has_cases: 
         assertions: Default::default(),
         if_true_assertions: Default::default(),
         if_false_assertions: Default::default(),
+        globals_accessed: Default::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
     }

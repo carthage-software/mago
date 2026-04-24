@@ -1,6 +1,7 @@
 use bumpalo::Bump;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
+use mago_atom::AtomSet;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_docblock::tag::TypeString;
@@ -10,11 +11,20 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::ArrowFunction;
+use mago_syntax::ast::Block;
 use mago_syntax::ast::Closure;
+use mago_syntax::ast::ForBody;
+use mago_syntax::ast::ForeachBody;
 use mago_syntax::ast::Function;
+use mago_syntax::ast::IfBody;
 use mago_syntax::ast::Method;
 use mago_syntax::ast::MethodBody;
 use mago_syntax::ast::ModifierSequenceExt;
+use mago_syntax::ast::Statement;
+use mago_syntax::ast::SwitchBody;
+use mago_syntax::ast::SwitchCase;
+use mago_syntax::ast::Variable;
+use mago_syntax::ast::WhileBody;
 use mago_syntax::utils;
 
 use crate::assertion::Assertion;
@@ -107,6 +117,8 @@ pub fn scan_method<'arena>(
         if utils::block_has_throws(block) {
             metadata.flags |= MetadataFlags::HAS_THROW;
         }
+
+        collect_globals_into(block, &mut metadata.globals_accessed);
     } else {
         method_metadata.is_abstract = true;
     }
@@ -161,6 +173,7 @@ pub fn scan_function<'arena>(
     let name = context.resolved_names.get(&function.name);
 
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Function, function.span(), flags);
+    collect_globals_into(&function.body, &mut metadata.globals_accessed);
 
     metadata.name = Some(ascii_lowercase_atom(name));
     metadata.original_name = Some(atom(name));
@@ -226,6 +239,7 @@ pub fn scan_closure<'arena>(
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Closure, span, flags).with_parameters(
         closure.parameter_list.parameters.iter().map(|p| scan_function_like_parameter(p, classname, context, scope)),
     );
+    collect_globals_into(&closure.body, &mut metadata.globals_accessed);
 
     metadata.attributes = scan_attribute_lists(&closure.attribute_lists, context);
     metadata.type_resolution_context =
@@ -775,4 +789,118 @@ fn parse_assertion_string(
     }
 
     assertions
+}
+
+/// Collects every variable imported via `global $x;` anywhere in `block`, without
+/// descending into nested function/closure/arrow-function definitions (those are
+/// separate scopes).
+pub fn collect_globals_into(block: &Block, globals: &mut AtomSet) {
+    for statement in &block.statements {
+        collect_globals_from_statement(statement, globals);
+    }
+}
+
+fn collect_globals_from_statement(statement: &Statement, globals: &mut AtomSet) {
+    match statement {
+        Statement::Global(global) => {
+            for variable in &global.variables {
+                if let Variable::Direct(direct) = variable {
+                    globals.insert(atom(direct.name));
+                }
+            }
+        }
+        Statement::Block(block) => collect_globals_into(block, globals),
+        Statement::Namespace(namespace) => {
+            for statement in namespace.statements() {
+                collect_globals_from_statement(statement, globals);
+            }
+        }
+        Statement::If(r#if) => match &r#if.body {
+            IfBody::Statement(body) => {
+                collect_globals_from_statement(body.statement, globals);
+                for else_if in &body.else_if_clauses {
+                    collect_globals_from_statement(else_if.statement, globals);
+                }
+                if let Some(else_clause) = &body.else_clause {
+                    collect_globals_from_statement(else_clause.statement, globals);
+                }
+            }
+            IfBody::ColonDelimited(body) => {
+                for statement in &body.statements {
+                    collect_globals_from_statement(statement, globals);
+                }
+                for else_if in &body.else_if_clauses {
+                    for statement in &else_if.statements {
+                        collect_globals_from_statement(statement, globals);
+                    }
+                }
+                if let Some(else_clause) = &body.else_clause {
+                    for statement in &else_clause.statements {
+                        collect_globals_from_statement(statement, globals);
+                    }
+                }
+            }
+        },
+        Statement::For(r#for) => match &r#for.body {
+            ForBody::Statement(statement) => collect_globals_from_statement(statement, globals),
+            ForBody::ColonDelimited(body) => {
+                for statement in &body.statements {
+                    collect_globals_from_statement(statement, globals);
+                }
+            }
+        },
+        Statement::Foreach(foreach) => match &foreach.body {
+            ForeachBody::Statement(statement) => collect_globals_from_statement(statement, globals),
+            ForeachBody::ColonDelimited(body) => {
+                for statement in &body.statements {
+                    collect_globals_from_statement(statement, globals);
+                }
+            }
+        },
+        Statement::While(r#while) => match &r#while.body {
+            WhileBody::Statement(statement) => collect_globals_from_statement(statement, globals),
+            WhileBody::ColonDelimited(body) => {
+                for statement in &body.statements {
+                    collect_globals_from_statement(statement, globals);
+                }
+            }
+        },
+        Statement::DoWhile(do_while) => collect_globals_from_statement(do_while.statement, globals),
+        Statement::Switch(switch) => {
+            let cases = match &switch.body {
+                SwitchBody::BraceDelimited(body) => &body.cases,
+                SwitchBody::ColonDelimited(body) => &body.cases,
+            };
+            for case in cases {
+                match case {
+                    SwitchCase::Expression(case) => {
+                        for statement in &case.statements {
+                            collect_globals_from_statement(statement, globals);
+                        }
+                    }
+                    SwitchCase::Default(case) => {
+                        for statement in &case.statements {
+                            collect_globals_from_statement(statement, globals);
+                        }
+                    }
+                }
+            }
+        }
+        Statement::Try(r#try) => {
+            for statement in &r#try.block.statements {
+                collect_globals_from_statement(statement, globals);
+            }
+            for catch in &r#try.catch_clauses {
+                for statement in &catch.block.statements {
+                    collect_globals_from_statement(statement, globals);
+                }
+            }
+            if let Some(finally) = &r#try.finally_clause {
+                for statement in &finally.block.statements {
+                    collect_globals_from_statement(statement, globals);
+                }
+            }
+        }
+        _ => {}
+    }
 }
