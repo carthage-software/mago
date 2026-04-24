@@ -14,7 +14,9 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_iterable_parameters;
@@ -455,9 +457,31 @@ fn update_array_assignment_child_type<'ctx>(
                             continue;
                         }
 
+                        let widened_known_items = keyed_array.get_known_items().map(|items| {
+                            let mut items = items.clone();
+                            for (item_key, (_, entry)) in items.iter_mut() {
+                                let item_key_type = TUnion::from_atomic(item_key.to_atomic());
+                                if union_comparator::can_expression_types_be_identical(
+                                    context.codebase,
+                                    &item_key_type,
+                                    &key_type,
+                                    false,
+                                    false,
+                                ) {
+                                    *entry = combine_union_types(
+                                        entry,
+                                        value_type,
+                                        context.codebase,
+                                        CombinerOptions::default(),
+                                    );
+                                }
+                            }
+                            items
+                        });
+
                         collection_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
                             parameters: Some((Arc::new((*key_type).clone()), Arc::new(value_type.clone()))),
-                            known_items: keyed_array.get_known_items().cloned(),
+                            known_items: widened_known_items,
                             non_empty: true,
                         })));
                     }
