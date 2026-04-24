@@ -47,14 +47,32 @@ pub(crate) fn is_contained_by(
         return false;
     }
 
-    for (i, input_parameters) in input_signature.get_parameters().iter().enumerate() {
+    let container_params = container_signature.get_parameters();
+    let input_params = input_signature.get_parameters();
+    let input_has_variadic = input_params.last().is_some_and(|p| p.is_variadic());
+    if !input_has_variadic && container_params.len() > input_params.len() {
+        let input_is_strict = match input_callable.as_ref() {
+            TCallable::Alias(identifier) => {
+                codebase.get_function_like(identifier).is_some_and(|m| m.flags.is_built_in())
+            }
+            TCallable::Signature(signature) => signature.source.as_ref().is_some_and(|identifier| {
+                codebase.get_function_like(identifier).is_some_and(|m| m.flags.is_built_in())
+            }),
+        };
+
+        if input_is_strict {
+            return false;
+        }
+    }
+
+    for (i, input_parameter) in input_params.iter().enumerate() {
         let container_parameter;
-        if let Some(inner) = container_signature.get_parameters().get(i) {
+        if let Some(inner) = container_params.get(i) {
             container_parameter = inner;
-        } else if let Some(last_parameter) = container_signature.get_parameters().last().filter(|p| p.is_variadic()) {
+        } else if let Some(last_parameter) = container_params.last().filter(|p| p.is_variadic()) {
             container_parameter = last_parameter;
         } else {
-            if input_parameters.has_default() {
+            if input_parameter.has_default() {
                 break;
             }
 
@@ -69,7 +87,7 @@ pub(crate) fn is_contained_by(
             continue;
         }
 
-        let Some(input_parameter_type) = input_parameters.get_type_signature() else {
+        let Some(input_parameter_type) = input_parameter.get_type_signature() else {
             continue;
         };
 
