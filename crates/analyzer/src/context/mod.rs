@@ -15,7 +15,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Identifier;
 use mago_syntax::ast::Trivia;
-use mago_syntax::comments;
+use mago_syntax::comments::docblock::PrecedingDocblocks;
 
 use crate::analysis_result::AnalysisResult;
 use crate::artifacts::AnalysisArtifacts;
@@ -140,8 +140,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
 
     pub fn get_parsed_docblocks(&mut self) -> Vec<Element<'arena>> {
         let mut elements = vec![];
-        let mut start = self.statement_span.start.offset;
-        while let Some(trivia) = comments::docblock::get_docblock_before_position(self.comments, start) {
+        for trivia in PrecedingDocblocks::new(self.comments, self.statement_span.start.offset) {
             match mago_docblock::parse_trivia(self.arena, trivia) {
                 Ok(document) => elements.extend(document.elements),
                 Err(error) => {
@@ -170,7 +169,6 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
                     self.collector.report_with_code(IssueCode::InvalidDocblock, issue);
                 }
             }
-            start = trivia.span.start.offset;
         }
 
         elements

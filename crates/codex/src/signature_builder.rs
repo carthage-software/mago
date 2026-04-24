@@ -18,6 +18,7 @@ use mago_syntax::ast::Program;
 use mago_syntax::ast::Property;
 use mago_syntax::ast::PropertyItem;
 use mago_syntax::ast::Trait;
+use mago_syntax::ast::Trivia;
 use mago_syntax::walker::MutWalker;
 
 use crate::signature::DefSignatureNode;
@@ -40,7 +41,7 @@ pub fn build_file_signature<'arena>(
     program: &'arena Program<'arena>,
     resolved_names: &'arena ResolvedNames<'arena>,
 ) -> FileSignature {
-    let mut builder = SignatureBuilder::new(file, resolved_names);
+    let mut builder = SignatureBuilder::new(file, resolved_names, &program.trivia.nodes);
     builder.walk_program(program, &mut ());
 
     let hash = program.fingerprint(resolved_names, &builder.fingerprint_options);
@@ -52,15 +53,15 @@ pub fn build_file_signature<'arena>(
 struct SignatureBuilder<'file, 'arena> {
     file: &'file File,
     resolved_names: &'arena ResolvedNames<'arena>,
-    fingerprint_options: FingerprintOptions<'static>,
-    sig_only_options: FingerprintOptions<'static>,
+    fingerprint_options: FingerprintOptions<'arena>,
+    sig_only_options: FingerprintOptions<'arena>,
     class_stack: Vec<DefSignatureNode>,
     ast_nodes: Vec<DefSignatureNode>,
 }
 
 impl<'file, 'arena> SignatureBuilder<'file, 'arena> {
-    fn new(file: &'file File, resolved_names: &'arena ResolvedNames<'arena>) -> Self {
-        let fingerprint_options = FingerprintOptions::default();
+    fn new(file: &'file File, resolved_names: &'arena ResolvedNames<'arena>, trivia: &'arena [Trivia<'arena>]) -> Self {
+        let fingerprint_options = FingerprintOptions::default().with_trivia_context(trivia);
         let sig_only_options = FingerprintOptions { signature_only: true, ..fingerprint_options };
 
         Self {

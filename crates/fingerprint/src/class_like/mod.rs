@@ -1,6 +1,7 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
+use mago_span::HasSpan;
 use mago_syntax::ast::AnonymousClass;
 use mago_syntax::ast::Class;
 use mago_syntax::ast::ClassLikeConstant;
@@ -29,6 +30,7 @@ use mago_syntax::ast::TraitUseAbsoluteMethodReference;
 use mago_syntax::ast::TraitUseAdaptation;
 use mago_syntax::ast::TraitUseMethodReference;
 use mago_syntax::ast::TraitUseSpecification;
+use mago_syntax::comments::docblock::PrecedingDocblocks;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -435,6 +437,13 @@ impl Fingerprintable for Method<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
+        if let Some(trivia) = options.trivia_context {
+            for t in PrecedingDocblocks::new(trivia, self.span().start.offset)
+                .important_only(options.important_comment_patterns)
+            {
+                t.value.hash(hasher);
+            }
+        }
         "method".hash(hasher);
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -479,6 +488,13 @@ impl Fingerprintable for Class<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
+        if let Some(trivia) = options.trivia_context {
+            for t in PrecedingDocblocks::new(trivia, self.span().start.offset)
+                .important_only(options.important_comment_patterns)
+            {
+                t.value.hash(hasher);
+            }
+        }
         "class".hash(hasher);
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -500,6 +516,13 @@ impl Fingerprintable for Interface<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
+        if let Some(trivia) = options.trivia_context {
+            for t in PrecedingDocblocks::new(trivia, self.span().start.offset)
+                .important_only(options.important_comment_patterns)
+            {
+                t.value.hash(hasher);
+            }
+        }
         "interface".hash(hasher);
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -519,6 +542,13 @@ impl Fingerprintable for Trait<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
+        if let Some(trivia) = options.trivia_context {
+            for t in PrecedingDocblocks::new(trivia, self.span().start.offset)
+                .important_only(options.important_comment_patterns)
+            {
+                t.value.hash(hasher);
+            }
+        }
         "trait".hash(hasher);
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -537,6 +567,13 @@ impl Fingerprintable for Enum<'_> {
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
     ) {
+        if let Some(trivia) = options.trivia_context {
+            for t in PrecedingDocblocks::new(trivia, self.span().start.offset)
+                .important_only(options.important_comment_patterns)
+            {
+                t.value.hash(hasher);
+            }
+        }
         "enum".hash(hasher);
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);

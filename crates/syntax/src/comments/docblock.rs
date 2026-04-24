@@ -4,6 +4,48 @@ use crate::ast::Program;
 use crate::ast::Trivia;
 use crate::ast::TriviaKind;
 
+/// An iterator that yields docblock trivia nodes preceding a position, walking
+/// backwards through stacked docblocks using the same gap-checking logic as
+/// `get_docblock_before_position`.
+///
+/// By default all docblocks are yielded. Call `important_only(patterns)` to
+/// restrict the iterator to docblocks whose text contains at least one of the
+/// given substrings, skipping non-matching entries rather than stopping.
+pub struct PrecedingDocblocks<'arena, 'pat> {
+    trivia: &'arena [Trivia<'arena>],
+    start: u32,
+    important_patterns: &'pat [&'pat str],
+}
+
+impl<'arena> PrecedingDocblocks<'arena, 'static> {
+    pub fn new(trivia: &'arena [Trivia<'arena>], start_offset: u32) -> Self {
+        Self { trivia, start: start_offset, important_patterns: &[] }
+    }
+}
+
+impl<'arena, 'pat> PrecedingDocblocks<'arena, 'pat> {
+    /// Restrict this iterator to docblocks whose text contains at least one of
+    /// `patterns`. Non-matching docblocks are skipped; the search continues
+    /// backward past them.
+    pub fn important_only<'new_pat>(self, patterns: &'new_pat [&'new_pat str]) -> PrecedingDocblocks<'arena, 'new_pat> {
+        PrecedingDocblocks { trivia: self.trivia, start: self.start, important_patterns: patterns }
+    }
+}
+
+impl<'arena, 'pat> Iterator for PrecedingDocblocks<'arena, 'pat> {
+    type Item = &'arena Trivia<'arena>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let trivia = get_docblock_before_position(self.trivia, self.start)?;
+            self.start = trivia.span.start_offset();
+            if self.important_patterns.is_empty() || self.important_patterns.iter().any(|p| trivia.value.contains(*p)) {
+                return Some(trivia);
+            }
+        }
+    }
+}
+
 /// Retrieves the docblock comment associated with a given node in the program.
 /// If the node is preceded by a docblock comment, it returns that comment.
 ///

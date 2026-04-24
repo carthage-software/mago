@@ -4,6 +4,7 @@ use std::hash::Hasher;
 use foldhash::fast::FixedState;
 
 use mago_names::ResolvedNames;
+use mago_syntax::ast::Trivia;
 
 pub mod access;
 pub mod argument;
@@ -102,6 +103,7 @@ pub struct FingerprintOptions<'a> {
     pub include_use_statements: bool,
     pub important_comment_patterns: &'a [&'a str],
     pub signature_only: bool,
+    pub trivia_context: Option<&'a [Trivia<'a>]>,
 }
 
 impl Default for FingerprintOptions<'_> {
@@ -110,6 +112,7 @@ impl Default for FingerprintOptions<'_> {
             include_use_statements: false,
             important_comment_patterns: DEFAULT_IMPORTANT_COMMENT_PATTERNS,
             signature_only: false,
+            trivia_context: None,
         }
     }
 }
@@ -122,7 +125,18 @@ impl<'a> FingerprintOptions<'a> {
 
     #[must_use]
     pub fn strict() -> Self {
-        Self { include_use_statements: true, important_comment_patterns: &[], signature_only: false }
+        Self {
+            include_use_statements: true,
+            important_comment_patterns: &[],
+            signature_only: false,
+            trivia_context: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_trivia_context(mut self, trivia: &'a [Trivia<'a>]) -> Self {
+        self.trivia_context = Some(trivia);
+        self
     }
 
     #[must_use]
