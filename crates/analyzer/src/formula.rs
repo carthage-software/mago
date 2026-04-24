@@ -13,11 +13,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Construct;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::ast::*;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::assertion::scrape_assertions;
@@ -328,13 +324,119 @@ pub fn get_formula(
         return if negated.len() > usize::from(formula_size_threshold) { None } else { Some(negated) };
     }
 
-    get_formula_from_assertions(
+    if let Expression::Conditional(conditional_expr) = expression
+        && let Some(then) = conditional_expr.then
+        && artifacts.get_expression_type(conditional_expr.r#else).is_some_and(|t| t.is_always_falsy())
+    {
+        return handle_binary_and_operation(
+            conditional_object_id,
+            conditional_expr.condition,
+            then,
+            assertion_context,
+            artifacts,
+            algebra_thresholds,
+            formula_size_threshold,
+        );
+    }
+
+    let mut formula = get_formula_from_assertions(
         conditional_object_id,
         creating_object_id,
         expression,
         scrape_assertions(expression, artifacts, assertion_context),
         formula_size_threshold,
-    )
+    )?;
+
+    add_nullsafe_base_clauses(expression, &mut formula, conditional_object_id, creating_object_id, assertion_context);
+
+    if formula.len() > usize::from(formula_size_threshold) { None } else { Some(formula) }
+}
+
+fn add_nullsafe_base_clauses(
+    expression: &Expression,
+    formula: &mut Vec<Clause>,
+    conditional_object_id: Span,
+    creating_object_id: Span,
+    assertion_context: AssertionContext<'_, '_>,
+) {
+    let mut current = Some(unwrap_expression(expression));
+    while let Some(expr) = current {
+        match expr {
+            Expression::Access(Access::NullSafeProperty(access)) => {
+                push_not_null_clause(
+                    access.object,
+                    formula,
+                    conditional_object_id,
+                    creating_object_id,
+                    assertion_context,
+                );
+                current = Some(unwrap_expression(access.object));
+            }
+            Expression::Access(Access::Property(access)) => {
+                current = Some(unwrap_expression(access.object));
+            }
+            Expression::Call(Call::NullSafeMethod(call)) => {
+                push_not_null_clause(
+                    call.object,
+                    formula,
+                    conditional_object_id,
+                    creating_object_id,
+                    assertion_context,
+                );
+                current = Some(unwrap_expression(call.object));
+            }
+            Expression::Call(Call::Method(call)) => {
+                current = Some(unwrap_expression(call.object));
+            }
+            _ => {
+                current = None;
+            }
+        }
+    }
+}
+
+fn push_not_null_clause(
+    base: &Expression,
+    formula: &mut Vec<Clause>,
+    conditional_object_id: Span,
+    creating_object_id: Span,
+    assertion_context: AssertionContext<'_, '_>,
+) {
+    let Some(base_id) = get_expression_id(
+        base,
+        assertion_context.this_class_name,
+        assertion_context.resolved_names,
+        Some(assertion_context.codebase),
+    ) else {
+        return;
+    };
+
+    let assertion = Assertion::IsNotType(TAtomic::Null);
+    let assertion_hash = assertion.to_hash();
+
+    if formula.iter().any(|clause| {
+        clause.possibilities.len() == 1
+            && clause
+                .possibilities
+                .get(&base_id)
+                .is_some_and(|types| types.len() == 1 && types.contains_key(&assertion_hash))
+    }) {
+        return;
+    }
+
+    let mut clause_map = IndexMap::new();
+    let mut type_map = IndexMap::new();
+    type_map.insert(assertion_hash, assertion);
+    clause_map.insert(base_id, type_map);
+
+    formula.push(Clause::new(
+        clause_map,
+        conditional_object_id,
+        creating_object_id,
+        Some(false),
+        Some(true),
+        Some(false),
+    ));
 }
 
 /// Creates a logical formula representing a disjunction of equality/identity comparisons.
