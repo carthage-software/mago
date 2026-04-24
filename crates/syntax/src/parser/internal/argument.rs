@@ -10,6 +10,7 @@ use crate::ast::ast::PositionalArgument;
 use crate::ast::ast::VariadicPlaceholderArgument;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use crate::token::TokenKind;
 
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_optional_argument_list(&mut self) -> Result<Option<ArgumentList<'arena>>, ParseError> {
@@ -58,7 +59,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         if current.kind == T!["..."] {
             let next = self.stream.lookahead(1)?;
             match next.map(|t| t.kind) {
-                Some(crate::token::TokenKind::Comma | crate::token::TokenKind::RightParenthesis) | None => {
+                Some(TokenKind::Comma | TokenKind::RightParenthesis) | None => {
                     return Ok(PartialArgument::VariadicPlaceholder(VariadicPlaceholderArgument {
                         span: self.stream.consume_span()?,
                     }));

@@ -6,6 +6,7 @@ use crate::ast::ast::MatchExpressionArm;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use crate::token::TokenKind;
 
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_match(&mut self) -> Result<Match<'arena>, ParseError> {
@@ -66,6 +67,11 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     fn parse_match_default_arm(&mut self) -> Result<MatchDefaultArm<'arena>, ParseError> {
         Ok(MatchDefaultArm {
             default: self.expect_keyword(T!["default"])?,
+            comma: if self.stream.is_at(TokenKind::Comma)? {
+                Some(self.stream.eat_span(TokenKind::Comma)?)
+            } else {
+                None
+            },
             arrow: self.stream.eat_span(T!["=>"])?,
             expression: self.arena.alloc(self.parse_expression()?),
         })

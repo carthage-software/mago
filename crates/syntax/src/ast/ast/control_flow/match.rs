@@ -41,6 +41,7 @@ pub struct MatchExpressionArm<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct MatchDefaultArm<'arena> {
     pub default: Keyword<'arena>,
+    pub comma: Option<Span>,
     pub arrow: Span,
     pub expression: &'arena Expression<'arena>,
 }

@@ -1295,4 +1295,12 @@ mod parser {
     smoke_test!(binary_prefix_nowdoc, "<?php echo b<<<'EOT'\nhello\nEOT;");
     smoke_test!(binary_prefix_escape_sequences, "<?php echo b\"hello\\nworld\";");
     smoke_test!(binary_prefix_single_quoted_escape, "<?php echo b'hello\\'world';");
+    smoke_test!(issue_1713_nullsafe_in_interpolated_string, "<?php \"$a?->b\";");
+    smoke_test!(issue_1713_property_in_interpolated_baseline, "<?php \"$a->b\";");
+    smoke_test!(issue_1713_exit_first_class_callable, "<?php exit(...);");
+    smoke_test!(issue_1713_die_first_class_callable, "<?php die(...);");
+    smoke_test!(issue_1713_die_partial_application, "<?php die(1, ?);");
+    smoke_test!(issue_1713_exit_partial_application_variadic, "<?php exit(1, ?, ...);");
+    smoke_test!(issue_1713_match_trailing_comma, "<?php $value = match (1) { 0, 1, => 'Foo', default, => 'Bar', };");
+    smoke_test!(issue_1713_yield_unary_minus, "<?php function gen() { yield * -1; }");
 }

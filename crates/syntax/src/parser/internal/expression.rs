@@ -40,6 +40,7 @@ use crate::parser::Parser;
 use crate::token::Associativity;
 use crate::token::GetPrecedence;
 use crate::token::Precedence;
+use crate::token::TokenKind;
 
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_expression(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {
@@ -62,6 +63,45 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         }
 
         self.parse_expression()
+    }
+
+    /// Returns `true` when `kind` could begin a value expression. Mirrors the
+    /// starter set accepted by [`Self::parse_lhs_expression`].
+    pub(crate) const fn is_at_start_of_expression(kind: TokenKind) -> bool {
+        if kind.is_literal() || kind.is_unary_prefix() || kind.is_magic_constant() || kind.is_construct() {
+            return true;
+        }
+
+        if matches!(
+            kind,
+            T!["#["
+                | "clone"
+                | "function"
+                | "fn"
+                | "static"
+                | "self"
+                | "parent"
+                | "list"
+                | "new"
+                | "throw"
+                | "yield"
+                | "match"
+                | "array"
+                | "["
+                | "("
+                | "\""
+                | "<<<"
+                | "`"]
+        ) {
+            return true;
+        }
+
+        if matches!(kind, T![Dollar | DollarLeftBrace | Variable]) {
+            return true;
+        }
+
+        matches!(kind, T![Identifier | QualifiedIdentifier | FullyQualifiedIdentifier])
+            || kind.is_soft_reserved_identifier()
     }
 
     /// Internal expression parsing that uses arena-allocated references to reduce stack usage.
@@ -148,16 +188,8 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         let next = self.stream.peek_kind(1)?;
 
         let is_call = precedence != Precedence::New && matches!(next, Some(T!["("]));
-        let is_call_or_access = is_call
-            || matches!(
-                next,
-                Some(
-                    crate::token::TokenKind::LeftBracket
-                        | crate::token::TokenKind::ColonColon
-                        | crate::token::TokenKind::MinusGreaterThan
-                        | crate::token::TokenKind::QuestionMinusGreaterThan
-                )
-            );
+        let is_call_or_access =
+            is_call || matches!(next, Some(T![LeftBracket | ColonColon | MinusGreaterThan | QuestionMinusGreaterThan]));
 
         if token.kind.is_literal() && (!token.kind.is_keyword() || !is_call_or_access) {
             return Ok(self.arena.alloc(Expression::Literal(self.parse_literal()?)));
@@ -186,7 +218,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             (T!["static"], _) => Expression::Static(self.expect_any_keyword()?),
             (T!["self"], _) if !is_call => Expression::Self_(self.expect_any_keyword()?),
             (T!["parent"], _) if !is_call => Expression::Parent(self.expect_any_keyword()?),
-            (kind, _) if kind.is_construct() => Expression::Construct(self.parse_construct()?),
+            (kind, _) if kind.is_construct() => self.parse_construct()?,
             (T!["list"], Some(T!["("])) => Expression::List(self.parse_list()?),
             (T!["new"], Some(T!["class" | "#["])) => Expression::AnonymousClass(self.parse_anonymous_class()?),
             (T!["new"], Some(T!["static"])) => Expression::Instantiation(self.parse_instantiation()?),
@@ -203,12 +235,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             (T!["match"], Some(T!["("])) => Expression::Match(self.parse_match()?),
             (T!["array"], Some(T!["("])) => Expression::LegacyArray(self.parse_legacy_array()?),
             (T!["["], _) => Expression::Array(self.parse_array()?),
-            (
-                crate::token::TokenKind::Dollar
-                | crate::token::TokenKind::DollarLeftBrace
-                | crate::token::TokenKind::Variable,
-                _,
-            ) => Expression::Variable(self.parse_variable()?),
+            (T![Dollar | DollarLeftBrace | Variable], _) => Expression::Variable(self.parse_variable()?),
             (kind, _) if kind.is_magic_constant() => Expression::MagicConstant(self.parse_magic_constant()?),
             (kind, ..)
                 if matches!(kind, T![Identifier | QualifiedIdentifier | FullyQualifiedIdentifier | "clone"])

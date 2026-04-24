@@ -334,8 +334,8 @@ impl<'input> Lexer<'input> {
                 }
 
                 if IDENT_START_TABLE[first_byte as usize] {
-                    // Check for binary string prefix: b/B followed by ', ", or <<<
-                    let is_binary_string_prefix = matches!(first_byte, b'b' | b'B')
+                    let is_binary_string_prefix = !self.interpolating
+                        && matches!(first_byte, b'b' | b'B')
                         && matches!(self.input.read(4), [_, b'\'' | b'"', ..] | [_, b'<', b'<', b'<']);
 
                     if !is_binary_string_prefix {

@@ -1,4 +1,9 @@
 use crate::T;
+use crate::ast::Expression;
+use crate::ast::FunctionPartialApplication;
+use crate::ast::Identifier;
+use crate::ast::LocalIdentifier;
+use crate::ast::PartialApplication;
 use crate::ast::ast::Construct;
 use crate::ast::ast::DieConstruct;
 use crate::ast::ast::EmptyConstruct;
@@ -15,10 +20,10 @@ use crate::parser::Parser;
 use crate::token::Precedence;
 
 impl<'input, 'arena> Parser<'input, 'arena> {
-    pub(crate) fn parse_construct(&mut self) -> Result<Construct<'arena>, ParseError> {
+    pub(crate) fn parse_construct(&mut self) -> Result<Expression<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
-        Ok(match token.kind {
+        Ok(Expression::Construct(match token.kind {
             T!["isset"] => {
                 let isset = self.expect_keyword(T!["isset"])?;
                 let result = self.parse_comma_separated_sequence(T!["("], T![")"], |p| p.parse_expression())?;
@@ -62,14 +67,58 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 include_once: self.expect_any_keyword()?,
                 value: self.arena.alloc(self.parse_expression()?),
             }),
-            T!["exit"] => Construct::Exit(ExitConstruct {
-                exit: self.expect_any_keyword()?,
-                arguments: self.parse_optional_argument_list()?,
-            }),
-            T!["die"] => Construct::Die(DieConstruct {
-                die: self.expect_any_keyword()?,
-                arguments: self.parse_optional_argument_list()?,
-            }),
+            T!["exit"] => {
+                let exit = self.expect_any_keyword()?;
+                if let Some(next) = self.stream.lookahead(0)?
+                    && matches!(next.kind, T!["("])
+                {
+                    let partial_args = self.parse_partial_argument_list()?;
+
+                    if partial_args.has_placeholders() {
+                        return Ok(Expression::PartialApplication(PartialApplication::Function(
+                            FunctionPartialApplication {
+                                function: self.arena.alloc(Expression::Identifier(Identifier::Local(
+                                    LocalIdentifier { span: exit.span, value: exit.value },
+                                ))),
+                                argument_list: partial_args,
+                            },
+                        )));
+                    } else {
+                        Construct::Exit(ExitConstruct {
+                            exit,
+                            arguments: Some(partial_args.into_argument_list(self.arena)),
+                        })
+                    }
+                } else {
+                    Construct::Exit(ExitConstruct { exit, arguments: None })
+                }
+            }
+            T!["die"] => {
+                let die = self.expect_any_keyword()?;
+                if let Some(next) = self.stream.lookahead(0)?
+                    && matches!(next.kind, T!["("])
+                {
+                    let partial_args = self.parse_partial_argument_list()?;
+
+                    if partial_args.has_placeholders() {
+                        return Ok(Expression::PartialApplication(PartialApplication::Function(
+                            FunctionPartialApplication {
+                                function: self.arena.alloc(Expression::Identifier(Identifier::Local(
+                                    LocalIdentifier { span: die.span, value: die.value },
+                                ))),
+                                argument_list: partial_args,
+                            },
+                        )));
+                    } else {
+                        Construct::Die(DieConstruct {
+                            die,
+                            arguments: Some(partial_args.into_argument_list(self.arena)),
+                        })
+                    }
+                } else {
+                    Construct::Die(DieConstruct { die, arguments: None })
+                }
+            }
             _ => {
                 return Err(self.stream.unexpected(
                     Some(token),
@@ -87,6 +136,6 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                     ],
                 ));
             }
-        })
+        }))
     }
 }
