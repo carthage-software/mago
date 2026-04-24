@@ -1328,11 +1328,12 @@ impl Rem for TInteger {
             (_, Literal(1 | -1)) => Literal(0),
             (Literal(l), From(f)) => {
                 if f > 0 {
-                    if l >= 0 {
-                        Range(0, (f - 1).min(l))
-                    } else {
-                        Range((f - 1).min(l.saturating_neg()).saturating_neg(), 0)
-                    }
+                    // `l % d` where `d ∈ [f, ∞)`: the divisor is unbounded above, so
+                    // for any `d > |l|` the remainder is exactly `l`. The range is
+                    // therefore bounded by `|l|`, not by `f - 1`. Using `(f - 1).min(l)`
+                    // as the upper bound collapses cases like `4 % positive-int` to
+                    // `Range(0, 0)` (since `f = 1`).
+                    if l >= 0 { Range(0, l) } else { Range(l, 0) }
                 } else {
                     Unspecified
                 }
@@ -1790,8 +1791,8 @@ mod tests {
         assert_eq!(TInteger::To(10) % TInteger::Literal(3), TInteger::Range(-2, 2));
         assert_eq!(TInteger::Range(5, 15) % TInteger::Literal(4), TInteger::Range(0, 3));
         assert_eq!(TInteger::From(10) % TInteger::Literal(-3), TInteger::Range(0, 2));
-        assert_eq!(TInteger::Literal(10) % TInteger::From(3), TInteger::Range(0, 2));
-        assert_eq!(TInteger::Literal(-5) % TInteger::From(3), TInteger::Range(-2, 0));
+        assert_eq!(TInteger::Literal(10) % TInteger::From(3), TInteger::Range(0, 10));
+        assert_eq!(TInteger::Literal(-5) % TInteger::From(3), TInteger::Range(-5, 0));
         assert_eq!(TInteger::Literal(22) % TInteger::Literal(5), TInteger::Literal(2));
         assert_eq!(TInteger::Literal(22) % TInteger::Literal(-5), TInteger::Literal(2));
         assert_eq!(TInteger::Literal(-22) % TInteger::Literal(5), TInteger::Literal(-2));

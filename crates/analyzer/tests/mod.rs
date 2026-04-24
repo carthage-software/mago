@@ -373,6 +373,7 @@ test_case!(issue_1682_php90, crate::framework::php_90_settings());
 test_case!(issue_1680, crate::framework::check_name_casing_settings());
 test_case!(issue_1678);
 test_case!(issue_1686);
+test_case!(issue_1701);
 test_case!(issue_1702);
 test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
