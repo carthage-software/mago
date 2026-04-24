@@ -190,6 +190,33 @@ impl IncrementalAnalysisService {
         self.file_states.len()
     }
 
+    /// Merges `new_file_scans` into `merged_codebase` and re-applies patches so member
+    /// updates survive the remove/re-add of changed vendor entries.
+    ///
+    /// The apply pass only runs when at least one patch file is present in `new_file_scans`.
+    /// In the incremental body-only path, that is true exactly when a vendor file changed
+    /// this round (the `any_vendor_changed` force-rescan adds every patch into
+    /// `changed_files`) or when a patch file's content itself changed (handled by a full
+    /// reanalyze). When neither happens, the merged codebase already has every patch's
+    /// contributions from a previous round; re-running the pass would only regenerate
+    /// validation diagnostics that already live in `file_states` and let them accumulate.
+    fn apply_scan_results(
+        &self,
+        merged_codebase: &mut CodebaseMetadata,
+        new_file_scans: &[(FileId, CodebaseMetadata)],
+    ) {
+        let mut has_patch_in_scans = false;
+        for (fid, codebase) in new_file_scans {
+            merged_codebase.extend_ref(codebase);
+            if !has_patch_in_scans && self.database.get(fid).is_ok_and(|f| f.file_type.is_patch()) {
+                has_patch_in_scans = true;
+            }
+        }
+        if has_patch_in_scans {
+            merged_codebase.apply_patches_pass();
+        }
+    }
+
     /// Distributes codebase-level issues into per-file caches based on their primary annotation's file ID.
     ///
     /// Issues that cannot be attributed to a tracked file (no primary annotation, zero file ID,
@@ -277,6 +304,9 @@ impl IncrementalAnalysisService {
                 let file_signature = signature_builder::build_file_signature(&file, program, &resolved_names);
                 let mut metadata = scan_program(arena, &file, program, &resolved_names, php_version);
                 metadata.set_file_signature(file.id, file_signature);
+                if file.file_type.is_patch() {
+                    metadata.convert_partial_to_patch();
+                }
 
                 arena.reset();
 
@@ -294,6 +324,7 @@ impl IncrementalAnalysisService {
                 (file_id, content_hash, clone_for_ownership)
             })
             .collect();
+        merged_codebase.apply_patches_pass();
 
         let mut symbol_references = (*self.base_symbol_references).clone();
         populate_codebase(&mut merged_codebase, &mut symbol_references, WordSet::default(), HashSet::default());
@@ -382,6 +413,23 @@ impl IncrementalAnalysisService {
         let deleted_count = self.file_states.keys().filter(|id| !current_file_ids.contains(id)).count();
         if deleted_count > 0 {
             tracing::debug!("{} file(s) deleted since last run", deleted_count);
+
+            // A deleted patch leaves its refinements already folded into the vendor / built-in
+            // baseline with nothing left to undo them: the apply pass only runs for patches present
+            // in the new scans, and the vendor file it targeted is untouched. Fall back to a full
+            // reanalyze so the affected baselines are rebuilt without the patch — the same policy the
+            // patch-content-change path below uses.
+            let patch_deleted = self
+                .codebase
+                .patch_class_likes
+                .values()
+                .map(|meta| meta.span.file_id)
+                .chain(self.codebase.patch_function_likes.values().map(|meta| meta.span.file_id))
+                .chain(self.codebase.patch_constants.values().map(|meta| meta.span.file_id))
+                .any(|file_id| !current_file_ids.contains(&file_id));
+            if patch_deleted {
+                return self.analyze();
+            }
         }
 
         if let Some(hint) = changed_hint {
@@ -450,6 +498,27 @@ impl IncrementalAnalysisService {
             return Ok(result);
         }
 
+        // When a vendor file changes, patch files that were unchanged by content must still be
+        // re-scanned so `apply_patches_pass` runs against the updated vendor state. This
+        // handles both class-method and free-function cases: a method (or function) removed from
+        // the vendor makes the corresponding patch entry an orphan, which `apply_patches_pass`
+        // already detects and reports.
+        let any_vendor_changed = changed_files.iter().any(|f| f.file_type == FileType::Vendored);
+        if any_vendor_changed {
+            let source_files_by_id: HashMap<FileId, &_> = source_files.iter().map(|f| (f.id, f)).collect();
+            let mut i = 0;
+            while i < unchanged_file_ids.len() {
+                if self.database.get(&unchanged_file_ids[i]).is_ok_and(|f| f.file_type.is_patch()) {
+                    let fid = unchanged_file_ids.swap_remove(i);
+                    if let Some(&file) = source_files_by_id.get(&fid) {
+                        changed_files.push(file);
+                    }
+                } else {
+                    i += 1;
+                }
+            }
+        }
+
         let parser_settings = self.parser_settings;
         let php_version = self.settings.version;
         let new_file_scans: Vec<(FileId, CodebaseMetadata)> = changed_files
@@ -472,12 +541,27 @@ impl IncrementalAnalysisService {
                     file.id,
                     signature_builder::build_file_signature(file, program, &resolved_names),
                 );
+                if file.file_type.is_patch() {
+                    metadata.convert_partial_to_patch();
+                }
 
                 arena.reset();
 
                 (file.id, metadata)
             })
             .collect();
+
+        // A patch whose content actually changed requires rebuilding the merged codebase from
+        // scratch. Patches that were force-rescanned due to a vendor change (same hash) go
+        // through the normal incremental path: `apply_patches_pass` re-applies them to the
+        // freshly-updated vendor entries and generates the correct diagnostics.
+        let any_patch_content_changed = new_file_scans.iter().any(|(fid, _)| {
+            self.database.get(fid).is_ok_and(|f| f.file_type.is_patch())
+                && self.file_states.get(fid).is_none_or(|s| s.content_hash != file_hashes[fid])
+        });
+        if any_patch_content_changed {
+            return self.analyze();
+        }
 
         let mut diff = {
             let mut diff = CodebaseDiff::new();
@@ -531,9 +615,7 @@ impl IncrementalAnalysisService {
                     merged_codebase.remove_entries_by_keys(&prev_state.entry_keys);
                 }
             }
-            for (_file_id, new_metadata) in &new_file_scans {
-                merged_codebase.extend_ref(new_metadata);
-            }
+            self.apply_scan_results(&mut merged_codebase, &new_file_scans);
 
             let files_to_skip: HashSet<FileId> = unchanged_file_ids.iter().copied().collect();
             let mut symbol_references = std::mem::take(&mut self.symbol_references);
@@ -644,9 +726,7 @@ impl IncrementalAnalysisService {
                 merged_codebase.remove_entries_by_keys(&prev_state.entry_keys);
             }
         }
-        for (_file_id, new_metadata) in &new_file_scans {
-            merged_codebase.extend_ref(new_metadata);
-        }
+        self.apply_scan_results(&mut merged_codebase, &new_file_scans);
 
         merged_codebase.safe_symbols.clear();
         merged_codebase.safe_symbol_members.clear();
@@ -3942,5 +4022,272 @@ mod tests {
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "body change in closure with typed param");
+    }
+
+    fn make_db_with_types(files: Vec<(&[u8], FileType, &[u8])>) -> Database<'static> {
+        let config = DatabaseConfiguration {
+            workspace: Cow::Owned(Path::new("/test").to_path_buf()),
+            paths: vec![Cow::Borrowed(b"src")],
+            includes: vec![],
+            patches: vec![],
+            excludes: vec![],
+            extensions: vec![Cow::Borrowed(b"php")],
+            glob: mago_database::GlobSettings::default(),
+        };
+        let mut db = Database::new(config);
+        for (name, file_type, contents) in files {
+            db.add(File::new(Cow::Owned(name.to_vec()), file_type, None, Cow::Owned(contents.to_vec())));
+        }
+        db
+    }
+
+    /// After a patch changes its declared return type, host classes that override
+    /// the patched method must be re-analyzed against the new type.
+    #[test]
+    fn test_watch_patch_return_type_change_propagates_to_host() {
+        let vendor = b"<?php\nclass VendorBase {\n    public function compute(): mixed {}\n}\n";
+        let patch_v1 = b"<?php\nclass VendorBase {\n    public function compute(): string {}\n}\n";
+        let host =
+            b"<?php\nclass MyImpl extends VendorBase {\n    public function compute(): string { return 'hello'; }\n}\n";
+
+        let mut db = make_db_with_types(vec![
+            (b"vendor/VendorBase.php", FileType::Vendored, vendor),
+            (b"patches/VendorBase.php", FileType::Patch, patch_v1),
+            (b"src/MyImpl.php", FileType::Host, host),
+        ]);
+
+        let mut service = make_watch_service(&db);
+        service.analyze().expect("Initial analysis failed.");
+        assert_matches_full(&service, &db, "initial - patches declare string return");
+
+        // Patch changes declared return type from string to int — child's string override is now incompatible.
+        let patch_v2 = "<?php\nclass VendorBase {\n    public function compute(): int {}\n}\n";
+        db.update(FileId::new(b"patches/VendorBase.php"), Cow::Owned(patch_v2.as_bytes().to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        {
+            let mut fresh = make_watch_service(&db);
+            let full = fresh.analyze().expect("Full analysis failed.");
+            assert!(!full.issues.is_empty(), "Expected at least one issue after patch changes return type to int");
+        }
+        assert_matches_full(&service, &db, "patch changed return type to int");
+
+        // Revert patch.
+        db.update(FileId::new(b"patches/VendorBase.php"), Cow::Owned(patch_v1.to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        assert_matches_full(&service, &db, "patch reverted to string");
+    }
+
+    /// Same scenario but the patch only changes its PHPDoc return annotation, not the PHP return
+    /// type hint. The file-signature differ would see no change (signature_hash unchanged), so the
+    /// patch-change fix must inject the patched symbols into diff.get_changed() to trigger cascade.
+    #[test]
+    fn test_watch_patch_phpdoc_only_change_propagates_to_host() {
+        let vendor = b"<?php\nclass VendorBase {\n    public function compute(): mixed {}\n}\n";
+        let patch_v1 =
+            b"<?php\nclass VendorBase {\n    /** @return string */\n    public function compute(): mixed {}\n}\n";
+        let host =
+            b"<?php\nclass MyImpl extends VendorBase {\n    public function compute(): string { return 'hello'; }\n}\n";
+
+        let mut db = make_db_with_types(vec![
+            (b"vendor/VendorBase.php", FileType::Vendored, vendor),
+            (b"patches/VendorBase.php", FileType::Patch, patch_v1),
+            (b"src/MyImpl.php", FileType::Host, host),
+        ]);
+
+        let mut service = make_watch_service(&db);
+        service.analyze().expect("Initial analysis failed.");
+        assert_matches_full(&service, &db, "initial - patch phpdoc says string");
+
+        // Change only the PHPDoc annotation — PHP return hint stays mixed.
+        let patch_v2 =
+            "<?php\nclass VendorBase {\n    /** @return int */\n    public function compute(): mixed {}\n}\n";
+        db.update(FileId::new(b"patches/VendorBase.php"), Cow::Owned(patch_v2.as_bytes().to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        {
+            let mut fresh = make_watch_service(&db);
+            let full = fresh.analyze().expect("Full analysis failed.");
+            assert!(!full.issues.is_empty(), "Expected at least one issue after patch PHPDoc changes to @return int");
+        }
+        assert_matches_full(&service, &db, "patch phpdoc changed to int");
+
+        // Revert.
+        db.update(FileId::new(b"patches/VendorBase.php"), Cow::Owned(patch_v1.to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        assert_matches_full(&service, &db, "patch phpdoc reverted to string");
+    }
+
+    /// Deleting a patch must revert the refinements it folded into the vendor baseline. The patch
+    /// changes `compute()`'s return type to `int`, which makes the host's `return $v->compute()`
+    /// (declared `string`) an error. Once the patch file is gone the vendor's `string` is restored
+    /// and the error must clear — a stale patched type would keep it.
+    #[test]
+    fn test_watch_patch_deleted_reverts_to_vendor() {
+        let vendor = b"<?php\nclass VendorBase {\n    public function compute(): string { return ''; }\n}\n";
+        let patch = b"<?php\nclass VendorBase {\n    public function compute(): int {}\n}\n";
+        let host = b"<?php\nclass MyImpl {\n    public function run(VendorBase $v): string {\n        return $v->compute();\n    }\n}\n";
+
+        let mut db = make_db_with_types(vec![
+            (b"vendor/VendorBase.php", FileType::Vendored, vendor),
+            (b"patches/VendorBase.php", FileType::Patch, patch),
+            (b"src/MyImpl.php", FileType::Host, host),
+        ]);
+
+        let mut service = make_watch_service(&db);
+        service.analyze().expect("Initial analysis failed.");
+        {
+            let mut fresh = make_watch_service(&db);
+            let full = fresh.analyze().expect("Full analysis failed.");
+            assert!(!full.issues.is_empty(), "Expected a return-type error while the patch makes compute() return int");
+        }
+        assert_matches_full(
+            &service,
+            &db,
+            "initial - patch makes compute() return int, host returning it as string is an error",
+        );
+
+        // Delete the patch — compute() reverts to the vendor's `string`, so the host is correct again.
+        db.delete(FileId::new(b"patches/VendorBase.php"));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        assert_matches_full(&service, &db, "patch deleted, return-type error must clear");
+    }
+
+    /// Mirrors the user's play directory: Base (vendor) → Child extends Base (vendor, no method)
+    /// → patch refines Child with @return bool → Borked extends Child returning 123 (host).
+    /// Changing the patch's @return bool to @return int must clear the type-mismatch error.
+    #[test]
+    fn test_watch_patch_application_on_intermediate_class() {
+        let vendor = b"<?php\nclass Base {\n    /** @return mixed */\n    public function does_it() { return 4; }\n}\nclass Child extends Base {\n}\n";
+        let patch_v1 =
+            b"<?php\nclass Child extends Base {\n    /** @return bool */\n    abstract public function does_it();\n}\n";
+        let host = b"<?php\nclass Borked extends Child {\n    public function does_it() { return 123; }\n}\n";
+
+        let mut db = make_db_with_types(vec![
+            (b"vendor/vendor.php", FileType::Vendored, vendor),
+            (b"patches/patches.php", FileType::Patch, patch_v1),
+            (b"src/Borked.php", FileType::Host, host),
+        ]);
+
+        let mut service = make_watch_service(&db);
+        service.analyze().expect("Initial analysis failed.");
+        assert_matches_full(&service, &db, "initial - patch says @return bool, 123 is an error");
+
+        // Patch changes @return bool to @return int — Borked returning 123 is now compatible.
+        let patch_v2 =
+            "<?php\nclass Child extends Base {\n    /** @return int */\n    abstract public function does_it();\n}\n";
+        db.update(FileId::new(b"patches/patches.php"), Cow::Owned(patch_v2.as_bytes().to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        assert_matches_full(&service, &db, "patch phpdoc changed to @return int, type-mismatch should clear");
+
+        // Revert.
+        db.update(FileId::new(b"patches/patches.php"), Cow::Owned(patch_v1.to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        assert_matches_full(&service, &db, "patch reverted to @return bool, error should return");
+    }
+
+    /// When a vendor file is updated to remove a method that a patch overrides, the patch
+    /// is now introducing a method that does not exist in the vendor and must be flagged.
+    #[test]
+    fn test_watch_vendor_removes_method_patch_becomes_new_method() {
+        let vendor_v1 = b"<?php\nclass VendorClass {\n    public function existing(): void {}\n    public function willDisappear(): void {}\n}\n";
+        let patch =
+            b"<?php\nclass VendorClass {\n    public function willDisappear(): string { return 'patched'; }\n}\n";
+
+        let mut db = make_db_with_types(vec![
+            (b"vendor/VendorClass.php", FileType::Vendored, vendor_v1),
+            (b"patches/VendorClass.php", FileType::Patch, patch),
+        ]);
+
+        let mut service = make_watch_service(&db);
+        service.analyze().expect("Initial analysis failed.");
+        assert_matches_full(&service, &db, "initial - patch overrides existing vendor method, no error");
+
+        // Vendor removes the method — patch now introduces a brand-new method and must be flagged.
+        let vendor_v2 = "<?php\nclass VendorClass {\n    public function existing(): void {}\n}\n";
+        db.update(FileId::new(b"vendor/VendorClass.php"), Cow::Owned(vendor_v2.as_bytes().to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        {
+            let mut fresh = make_watch_service(&db);
+            let full = fresh.analyze().expect("Full analysis failed.");
+            assert!(
+                !full.issues.is_empty(),
+                "Expected patch-introduces-new-method issue after vendor removes the method"
+            );
+        }
+        assert_matches_full(&service, &db, "vendor removed method, patch must be flagged");
+
+        // Revert vendor — patch is patching an existing method again, no error.
+        db.update(FileId::new(b"vendor/VendorClass.php"), Cow::Owned(vendor_v1.to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        assert_matches_full(&service, &db, "vendor reverted, patch-introduces-new-method clears");
+    }
+
+    /// Same as the class-method case but for a free function: vendor removes a function that
+    /// the patch targets, so the patch is now introducing a function that does not exist.
+    #[test]
+    fn test_watch_vendor_removes_function_patch_becomes_orphan() {
+        let vendor_v1 =
+            b"<?php\nfunction vendor_existing(): void {}\nfunction vendor_will_disappear(): string { return 'hi'; }\n";
+        let patch = b"<?php\n/** @return non-empty-string */\nfunction vendor_will_disappear(): string {}\n";
+
+        let mut db = make_db_with_types(vec![
+            (b"vendor/funcs.php", FileType::Vendored, vendor_v1),
+            (b"patches/funcs.php", FileType::Patch, patch),
+        ]);
+
+        let mut service = make_watch_service(&db);
+        service.analyze().expect("Initial analysis failed.");
+        assert_matches_full(&service, &db, "initial - patch overrides existing vendor function, no error");
+
+        // Vendor removes the function — patch is now an orphan and must be flagged.
+        let vendor_v2 = "<?php\nfunction vendor_existing(): void {}\n";
+        db.update(FileId::new(b"vendor/funcs.php"), Cow::Owned(vendor_v2.as_bytes().to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        {
+            let mut fresh = make_watch_service(&db);
+            let full = fresh.analyze().expect("Full analysis failed.");
+            assert!(!full.issues.is_empty(), "Expected orphan-patch-function issue after vendor removes the function");
+        }
+        assert_matches_full(&service, &db, "vendor removed function, patch must be flagged as orphan");
+
+        // Revert vendor — patch targets an existing function again, no error.
+        db.update(FileId::new(b"vendor/funcs.php"), Cow::Owned(vendor_v1.to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        assert_matches_full(&service, &db, "vendor reverted, orphan-patch-function clears");
+    }
+
+    /// A patch whose parameter names do not line up with the original would apply its refined
+    /// types to the wrong parameters by position. That can signal a wrong parameter order or a
+    /// patch drifting out of sync with the vendor, so the patch is skipped and the mismatch is
+    /// reported rather than misapplied silently.
+    #[test]
+    fn test_watch_patch_parameter_name_mismatch_is_rejected() {
+        let vendor = b"<?php\nfunction vendor_fn(string $a, int $b): void {}\n";
+        // The patch renames the first parameter, so position 1 no longer matches by name.
+        let patch =
+            b"<?php\n/** @param non-empty-string $renamed */\nfunction vendor_fn(string $renamed, int $b): void {}\n";
+
+        let db = make_db_with_types(vec![
+            (b"vendor/funcs.php", FileType::Vendored, vendor),
+            (b"patches/funcs.php", FileType::Patch, patch),
+        ]);
+
+        let mut service = make_watch_service(&db);
+        let result = service.analyze().expect("Initial analysis failed.");
+        assert!(
+            result.issues.iter().any(|i| i.code.as_deref() == Some("patch-function-parameter-name-mismatch")),
+            "Expected a parameter-name-mismatch diagnostic, got: {:?}",
+            result.issues.iter().map(|i| i.code.clone()).collect::<Vec<_>>()
+        );
     }
 }
