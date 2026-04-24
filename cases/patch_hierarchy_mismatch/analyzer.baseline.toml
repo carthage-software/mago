@@ -1,0 +1,36 @@
+variant = "strict"
+
+[[entries."patch.php".issues]]
+code = "patch-hierarchy-mismatch"
+start_line = 2
+end_line = 2
+
+[[entries."patch.php".issues]]
+code = "patch-hierarchy-mismatch"
+start_line = 4
+end_line = 4
+
+[[entries."patch.php".issues]]
+code = "patch-hierarchy-mismatch"
+start_line = 6
+end_line = 6
+
+[[entries."patch.php".issues]]
+code = "patch-hierarchy-mismatch"
+start_line = 9
+end_line = 9
+
+[[entries."patch.php".issues]]
+code = "patch-hierarchy-mismatch"
+start_line = 12
+end_line = 12
+
+[[entries."patch.php".issues]]
+code = "patch-hierarchy-mismatch"
+start_line = 26
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "non-existent-method"
+start_line = 6
+end_line = 6

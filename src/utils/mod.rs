@@ -105,6 +105,7 @@ pub(crate) fn create_orchestrator<'a>(
         excludes: configuration.source.excludes.iter().map(|p| p.as_ref()).collect(),
         extensions: configuration.source.extensions.iter().map(|e| e.as_ref()).collect(),
         includes: configuration.source.includes.clone(),
+        patches: configuration.source.patches.clone(),
         glob,
     };
 

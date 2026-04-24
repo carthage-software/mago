@@ -175,6 +175,7 @@ Mago distinguishes between your code, third-party code, and code to ignore entir
 
 - **`paths`** are your source files. Mago analyses, lints, and formats them.
 - **`includes`** are dependencies (typically `vendor`). Mago parses them so it can resolve symbols and types, but never analyses, lints, or rewrites them.
+- **`patches`** are PHP files that override type information for vendored or built-in code. Mago parses them and their type declarations and PHPDoc take precedence over `includes` and built-ins, but they are never analysed, linted, or formatted. Patches refine member type information only (method signatures, property types, constants, `@template` annotations). Hierarchy (`extends`, `implements`, `require-extends`, `require-implements`) does not need to be re-declared, but if it is it must match the original exactly — a mismatch is reported as an error and the patch's members are ignored. `use` trait declarations are never valid in a patch and are always an error.
 - **`excludes`** are paths or globs Mago ignores entirely. They apply to every tool.
 
 If a file matches both `paths` and `includes`, the more specific pattern wins. Exact file paths are most specific, then deeper directory paths, then shallow ones, then glob patterns. When patterns are equally specific, `includes` wins, which lets you explicitly mark a path as a dependency.
@@ -182,16 +183,18 @@ If a file matches both `paths` and `includes`, the more specific pattern wins. E
 ```toml
 [source]
 paths     = ["src", "tests"]
+patches   = ["patches"]
 includes  = ["vendor"]
 excludes  = ["cache/**", "build/**", "var/**"]
 extensions = ["php"]
 ```
 
-Glob patterns work in all three lists:
+Glob patterns work in all four lists:
 
 ```toml
 [source]
 paths    = ["src/**/*.php"]
+patches  = ["patches/**/*.php"]
 includes = ["vendor/symfony/**/*.php"]   # only Symfony from vendor
 excludes = [
   "**/*_generated.php",
@@ -206,6 +209,7 @@ excludes = [
 | :--- | :--- | :--- | :--- |
 | `paths` | string list | `[]` | Directories or globs for your source code. If empty, the entire workspace is scanned. |
 | `includes` | string list | `[]` | Directories or globs for third-party code Mago should parse but not modify. |
+| `patches` | string list | `[]` | Directories or globs for type patches. Their PHPDoc and type declarations override those from `includes` and built-ins. Not analysed, linted, or formatted. |
 | `excludes` | string list | `[]` | Globs or paths excluded from every tool. |
 | `extensions` | string list | `["php"]` | File extensions treated as PHP. |
 
@@ -257,7 +261,7 @@ prefer-static-closure = { exclude = ["tests/"] }
 no-global             = { exclude = ["**/*Test.php"] }
 ```
 
-> Use `mago list-files` to verify which files Mago will process. `mago list-files --command formatter` shows what the formatter will touch, `--command analyzer` shows the analyzer's view, and so on.
+> Use `mago list-files` to verify which files Mago will process. `mago list-files --command formatter` shows what the formatter will touch, `--command analyzer` shows the analyzer's view, and so on. This helps verify your `paths`, `includes`, `patches`, and `excludes` configuration is working as expected.
 
 ## `[parser]`
 

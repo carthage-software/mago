@@ -1,0 +1,51 @@
+variant = "strict"
+
+[[entries."patch.php".issues]]
+code = "patch-constant-structural-mismatch"
+start_line = 4
+end_line = 4
+
+[[entries."patch.php".issues]]
+code = "patch-constant-structural-mismatch"
+start_line = 5
+end_line = 5
+
+[[entries."patch.php".issues]]
+code = "patch-method-structural-mismatch"
+start_line = 9
+end_line = 9
+
+[[entries."patch.php".issues]]
+code = "patch-method-structural-mismatch"
+start_line = 10
+end_line = 10
+
+[[entries."patch.php".issues]]
+code = "patch-method-structural-mismatch"
+start_line = 11
+end_line = 11
+
+[[entries."patch.php".issues]]
+code = "patch-method-structural-mismatch"
+start_line = 12
+end_line = 12
+
+[[entries."patch.php".issues]]
+code = "patch-method-structural-mismatch"
+start_line = 13
+end_line = 13
+
+[[entries."patch.php".issues]]
+code = "patch-property-structural-mismatch"
+start_line = 2
+end_line = 27
+
+[[entries."patch.php".issues]]
+code = "patch-property-structural-mismatch"
+start_line = 19
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "invalid-method-access"
+start_line = 6
+end_line = 6
