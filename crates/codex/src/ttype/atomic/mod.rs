@@ -761,6 +761,7 @@ impl TAtomic {
             TAtomic::Scalar(scalar) => scalar.is_truthy(),
             TAtomic::Array(array) => array.is_truthy(),
             TAtomic::Mixed(mixed) => mixed.is_truthy(),
+            TAtomic::Resource(resource) => resource.closed.is_none_or(|closed| !closed),
             TAtomic::Object(_) | TAtomic::Callable(_) => true,
             _ => false,
         }
@@ -772,6 +773,7 @@ impl TAtomic {
             TAtomic::Scalar(scalar) if scalar.is_falsy() => true,
             TAtomic::Array(array) if array.is_falsy() => true,
             TAtomic::Mixed(mixed) if mixed.is_falsy() => true,
+            TAtomic::Resource(resource) => resource.closed.is_some_and(|closed| closed),
             TAtomic::Null | TAtomic::Void => true,
             _ => false,
         }
