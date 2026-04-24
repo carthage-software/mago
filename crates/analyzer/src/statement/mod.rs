@@ -214,6 +214,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
 
         context.statement_span = last_statement_span;
         block_context.conditionally_referenced_variable_ids = AtomSet::default();
+        block_context.parent_conflicting_clause_variables.clear();
 
         Ok(())
     }
