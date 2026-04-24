@@ -375,6 +375,7 @@ test_case!(issue_1678);
 test_case!(issue_1686);
 test_case!(issue_1701);
 test_case!(issue_1702);
+test_case!(issue_1703);
 test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
 test_case!(symbol_existence_assertions);

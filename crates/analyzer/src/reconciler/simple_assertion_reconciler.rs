@@ -1513,6 +1513,10 @@ fn reconcile_non_empty_countable(
                     known_items,
                 })));
             }
+            TAtomic::Mixed(_) => {
+                did_remove_type = true;
+                acceptable_types.push(atomic);
+            }
             _ => {
                 acceptable_types.push(atomic);
             }
