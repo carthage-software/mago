@@ -11,6 +11,8 @@
 use std::fmt::Write;
 
 use mago_atom::atom;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::get_truthy_string;
@@ -65,7 +67,7 @@ pub fn resolve_sprintf(
         return Some(get_literal_string(atom(&result)));
     }
 
-    let min_len = analyze_min_length(format_str);
+    let min_len = analyze_min_length(format_str, context, invocation);
     if min_len >= 2 {
         Some(get_truthy_string())
     } else if min_len >= 1 {
@@ -73,6 +75,42 @@ pub fn resolve_sprintf(
     } else {
         None
     }
+}
+
+fn argument_string_min_length(
+    context: &ProviderContext<'_, '_, '_>,
+    invocation: &InvocationInfo<'_, '_, '_>,
+    arg_index: usize,
+) -> usize {
+    let Some(arg) = invocation.get_argument(arg_index, &[]) else {
+        return 0;
+    };
+
+    let Some(arg_type) = context.get_expression_type(arg) else {
+        return 0;
+    };
+
+    if let Some(literal) = arg_type.get_single_literal_string_value() {
+        return literal.chars().count();
+    }
+
+    let mut min_len = usize::MAX;
+    for atomic in arg_type.types.as_ref() {
+        let atomic_min = match atomic {
+            TAtomic::Scalar(TScalar::String(string)) if string.is_non_empty || string.is_numeric => 1,
+            _ => 0,
+        };
+
+        if atomic_min < min_len {
+            min_len = atomic_min;
+        }
+
+        if min_len == 0 {
+            return 0;
+        }
+    }
+
+    if min_len == usize::MAX { 0 } else { min_len }
 }
 
 /// Parse flags from a format specifier. Advances `i` past all flag characters.
@@ -315,13 +353,16 @@ fn normalize_scientific_in_place(s: &mut String, start: usize) {
     }
 }
 
-/// Analyze a format string to determine the minimum number of characters the output
-/// will always contain, regardless of argument values.
-fn analyze_min_length(format_str: &str) -> usize {
+fn analyze_min_length(
+    format_str: &str,
+    context: &ProviderContext<'_, '_, '_>,
+    invocation: &InvocationInfo<'_, '_, '_>,
+) -> usize {
     let bytes = format_str.as_bytes();
     let len = bytes.len();
     let mut i = 0;
     let mut min_len: usize = 0;
+    let mut arg_index: usize = 1;
 
     while i < len {
         if bytes[i] != b'%' {
@@ -365,12 +406,7 @@ fn analyze_min_length(format_str: &str) -> usize {
         }
 
         let width = parse_number(bytes, &mut i);
-
-        // Skip precision.
-        if i < len && bytes[i] == b'.' {
-            i += 1;
-            parse_number(bytes, &mut i);
-        }
+        let precision = parse_precision(bytes, &mut i);
 
         if i >= len {
             return min_len;
@@ -380,11 +416,19 @@ fn analyze_min_length(format_str: &str) -> usize {
         i += 1;
 
         let specifier_min = match specifier {
-            b's' => 0,
+            b's' => {
+                let mut from_arg = argument_string_min_length(context, invocation, arg_index);
+                if let Some(prec) = precision {
+                    from_arg = from_arg.min(prec);
+                }
+
+                from_arg
+            }
             b'd' | b'u' | b'f' | b'F' | b'e' | b'E' | b'x' | b'X' | b'o' | b'b' | b'c' => 1,
             _ => 0,
         };
 
+        arg_index += 1;
         min_len += specifier_min.max(width);
     }
 
