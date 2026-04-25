@@ -64,7 +64,7 @@ ordered-float = { version = "5.0", default-features = false, features = ["serde"
 pretty_assertions = { version = "1.4.1" }
 codespan-reporting = { version = "0.13.1", features = ["serde", "serialization"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-serde_yml = "0.0.12"
+serde_norway = "0.9.42"
 toml = "1.0.3"
 regex = "1.11.0"
 cruet = "0.15.0"
@@ -145,7 +145,7 @@ tar = { workspace = true }
 flate2 = { workspace = true }
 zip = { workspace = true }
 tracing = { workspace = true }
-serde_yml = { workspace = true }
+serde_norway = { workspace = true }
 toml = { workspace = true }
 diffy = { workspace = true }
 tempfile = { workspace = true }

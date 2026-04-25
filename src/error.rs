@@ -111,11 +111,7 @@ pub enum Error {
     InvalidExtendsEntry { path: PathBuf, reason: String },
 
     /// An `extends` target path could not be resolved on disk.
-    ExtendsTargetNotFound {
-        entry: String,
-        resolved: PathBuf,
-        source: std::io::Error,
-    },
+    ExtendsTargetNotFound { entry: String, resolved: PathBuf, source: std::io::Error },
 
     /// Failed to deserialize TOML configuration.
     ///
@@ -320,11 +316,7 @@ impl std::fmt::Display for Error {
                 write!(f, "Invalid `extends` declaration in `{}`: {reason}", path.display())
             }
             Self::ExtendsTargetNotFound { entry, resolved, source } => {
-                write!(
-                    f,
-                    "Cannot resolve `extends` entry `{entry}` (looked at `{}`): {source}",
-                    resolved.display()
-                )
+                write!(f, "Cannot resolve `extends` entry `{entry}` (looked at `{}`): {source}", resolved.display())
             }
             Self::DeserializingToml(error) => write!(f, "Failed to deserialize TOML: {error}"),
             Self::SerializingToml(error) => write!(f, "Failed to serialize TOML: {error}"),

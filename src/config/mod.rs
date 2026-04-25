@@ -13,8 +13,8 @@
 //!   2. `$XDG_CONFIG_HOME`.
 //!   3. `~/.config`.
 //!   4. `~`.
-//!   The first match wins; workspace beats global. If nothing is found, built-in defaults
-//!   are used.
+//!      The first match wins; workspace beats global. If nothing is found, built-in defaults
+//!      are used.
 //! - Within a directory, format precedence is `toml > yaml > yml > json`.
 //!
 //! # `extends`
@@ -987,6 +987,46 @@ mod tests {
         assert_eq!(config.threads, 4);
         assert_eq!(config.php_version.to_string(), "8.2.0");
     }
+
+    /// A 5-deep chain mixing every supported format. Each layer contributes one distinct
+    /// piece of the final configuration so we can assert the whole stack merged correctly.
+    ///
+    /// Chain (innermost to outermost):
+    ///
+    ///   bottom.toml      -> stack-size = 16_777_216         (deepest base, within bounds)
+    ///   layer-yml.yml    extends bottom.toml,
+    ///                    threads = 7
+    ///   layer-json.json  extends layer-yml.yml,
+    ///                    php-version = "8.1.0"
+    ///   layer-yaml.yaml  extends layer-json.json,
+    ///                    allow-unsupported-php-version = true
+    ///   mago.toml        extends layer-yaml.yaml,
+    ///                    php-version = "8.3.0"  (overrides layer-json)
+    #[test]
+    fn test_extends_long_mixed_format_chain() {
+        let dir = temp_dir().join("extends-long-chain");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        write_file(&dir.join("bottom.toml"), "stack-size = 16777216\n");
+        write_file(&dir.join("layer-yml.yml"), "extends: \"bottom.toml\"\nthreads: 7\n");
+        write_file(
+            &dir.join("layer-json.json"),
+            "{\n  \"extends\": \"layer-yml.yml\",\n  \"php-version\": \"8.1.0\"\n}\n",
+        );
+        write_file(&dir.join("layer-yaml.yaml"), "extends: \"layer-json.json\"\nallow-unsupported-php-version: true\n");
+        write_file(&dir.join("mago.toml"), "extends = \"layer-yaml.yaml\"\nphp-version = \"8.3.0\"\n");
+
+        let config = load_isolated(&dir.join("mago.toml"));
+        // Deepest layer survives as long as no later layer overrides it.
+        assert_eq!(config.stack_size, 16_777_216);
+        // Set in layer-yml.yml, never overridden.
+        assert_eq!(config.threads, 7);
+        // Set in layer-json.json, then overridden by the outermost mago.toml.
+        assert_eq!(config.php_version.to_string(), "8.3.0");
+        // Set in layer-yaml.yaml.
+        assert!(config.allow_unsupported_php_version);
+    }
 }
 
 /// Auto-detect the editor URL template from environment hints.
@@ -1072,7 +1112,7 @@ impl ConfigFormat {
         match self {
             ConfigFormat::Toml => toml::from_str::<Value>(content)
                 .map_err(|e| Error::ParseConfigFile { path: path.to_path_buf(), source: Box::new(e) }),
-            ConfigFormat::Yaml => serde_yml::from_str::<Value>(content)
+            ConfigFormat::Yaml => serde_norway::from_str::<Value>(content)
                 .map_err(|e| Error::ParseConfigFile { path: path.to_path_buf(), source: Box::new(e) }),
             ConfigFormat::Json => serde_json::from_str::<Value>(content)
                 .map_err(|e| Error::ParseConfigFile { path: path.to_path_buf(), source: Box::new(e) }),
