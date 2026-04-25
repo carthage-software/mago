@@ -102,7 +102,20 @@ pub enum Error {
     UnsupportedConfigExtension(PathBuf),
 
     /// Failed to parse the value of an `MAGO_*` environment variable into the target type.
-    EnvVarParse { name: String, source: Box<dyn std::error::Error + Send + Sync> },
+    EnvVarParse { name: &'static str, source: Box<dyn std::error::Error + Send + Sync> },
+
+    /// Configuration file's `extends` chain cycles back on itself.
+    CircularExtends(PathBuf),
+
+    /// The `extends` field had an unsupported shape (must be a string or an array of strings).
+    InvalidExtendsEntry { path: PathBuf, reason: String },
+
+    /// An `extends` target path could not be resolved on disk.
+    ExtendsTargetNotFound {
+        entry: String,
+        resolved: PathBuf,
+        source: std::io::Error,
+    },
 
     /// Failed to deserialize TOML configuration.
     ///
@@ -300,6 +313,19 @@ impl std::fmt::Display for Error {
             Self::EnvVarParse { name, source } => {
                 write!(f, "Invalid value for environment variable `{name}`: {source}")
             }
+            Self::CircularExtends(path) => {
+                write!(f, "Configuration `extends` chain cycles back on `{}`", path.display())
+            }
+            Self::InvalidExtendsEntry { path, reason } => {
+                write!(f, "Invalid `extends` declaration in `{}`: {reason}", path.display())
+            }
+            Self::ExtendsTargetNotFound { entry, resolved, source } => {
+                write!(
+                    f,
+                    "Cannot resolve `extends` entry `{entry}` (looked at `{}`): {source}",
+                    resolved.display()
+                )
+            }
             Self::DeserializingToml(error) => write!(f, "Failed to deserialize TOML: {error}"),
             Self::SerializingToml(error) => write!(f, "Failed to serialize TOML: {error}"),
             Self::CanonicalizingPath(path, error) => write!(f, "Failed to canonicalize path `{path:?}`: {error}"),
@@ -374,6 +400,9 @@ impl std::error::Error for Error {
             Self::ParseConfigFile { source, .. } => Some(source.as_ref()),
             Self::UnsupportedConfigExtension(_) => None,
             Self::EnvVarParse { source, .. } => Some(source.as_ref()),
+            Self::CircularExtends(_) => None,
+            Self::InvalidExtendsEntry { .. } => None,
+            Self::ExtendsTargetNotFound { source, .. } => Some(source),
             Self::BuildingRuntime(error) => Some(error),
             Self::DeserializingToml(error) => Some(error),
             Self::SerializingToml(error) => Some(error),

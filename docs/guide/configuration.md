@@ -10,14 +10,87 @@ This page details the global configuration options and the `[source]` section. F
 
 ## Configuration File Discovery
 
-When no `--config` flag is provided, Mago searches for a configuration file (`mago.toml`, `mago.yaml`, or `mago.json`) in the following locations, in order:
+When no `--config` flag is provided, Mago searches for a configuration file in the following locations, in order:
 
-1. **Workspace directory** — the current working directory (or the path given by `--workspace`)
-2. **`$XDG_CONFIG_HOME`** — if the environment variable is set (e.g., `$XDG_CONFIG_HOME/mago.toml`)
-3. **`$HOME/.config`** — the default XDG config directory (e.g., `~/.config/mago.toml`)
-4. **`$HOME`** — the user's home directory (e.g., `~/mago.toml`)
+1. **Workspace directory**: the current working directory (or the path given by `--workspace`).
+2. **`$XDG_CONFIG_HOME`**: if the environment variable is set (e.g., `$XDG_CONFIG_HOME/mago.toml`).
+3. **`$HOME/.config`**: the default XDG config directory (e.g., `~/.config/mago.toml`).
+4. **`$HOME`**: the user's home directory (e.g., `~/mago.toml`).
+
+In each location, Mago looks for `mago.{toml,yaml,yml,json}` first, then falls back to `mago.dist.{toml,yaml,yml,json}`. Within a directory, the format precedence is `toml > yaml > yml > json`.
 
 The first file found wins. This allows you to have a global configuration in `~/.config/mago.toml` that applies when no project-level configuration exists.
+
+## Sharing configuration with `extends`
+
+:::info Available in Mago 1.25.0+
+This feature is not available in 1.24.x or earlier; the `extends` directive is silently ignored on those versions because they have no concept of it.
+:::
+
+Larger organizations and shared standards often want a single base config that several projects inherit. The `extends` directive lets one config layer on top of others without copy-pasting:
+
+```toml
+# Single parent
+extends = "vendor/some-org/mago-config/mago.toml"
+
+# Or a list, applied left-to-right; each later layer overrides earlier ones
+extends = [
+    "vendor/some-org/mago-config",            # directory: looks for mago.{toml,yaml,yml,json} inside
+    "configs/strict.json",                     # mixing formats is fine
+    "../shared/team-defaults.toml",
+]
+
+# This file's own keys override anything from the layers above
+php-version = "8.3"
+```
+
+### Resolution rules
+
+- **Absolute paths** are used as-is.
+- **Relative paths** are resolved against the directory of the file declaring the `extends`, **not** against the current working directory. Concretely: if you run `mago --config some/dir/config.toml` and `config.toml` says `extends = "base.toml"`, Mago looks for `some/dir/base.toml`, not `$(pwd)/base.toml`.
+- **File entries** must exist and have a recognised extension (`.toml`, `.yaml`, `.yml`, `.json`).
+- **Directory entries** are scanned for `mago.{toml,yaml,yml,json}` (in that precedence). If the directory has no recognised config file, the entry is skipped with a warning rather than failing the build.
+
+### Effective precedence
+
+Layers are merged later-wins, deepest-first:
+
+1. Built-in defaults.
+2. Each `extends` layer, recursively. A parent's own `extends` is fully resolved before its keys apply.
+3. The owning file's keys.
+4. `MAGO_*` environment variables for the [supported top-level scalars](/guide/environment-variables).
+5. CLI flags (`--php-version`, `--threads`, etc.).
+
+### Merge semantics
+
+For each top-level key:
+
+- **Tables / objects** are deep-merged recursively. A child can override a single key inside a nested table without redefining the whole table.
+- **Arrays** (e.g. `source.excludes`, `linter.rules.*.exclude`) are **concatenated**, parent first. If a base config excludes `vendor/`, you keep that exclude *and* add your own; you don't have to repeat it.
+- **Scalars** (strings, numbers, booleans) are overwritten by the child.
+
+```toml
+# base.toml
+threads = 4
+[source]
+excludes = ["vendor", "node_modules"]
+```
+
+```toml
+# project mago.toml
+extends = "base.toml"
+threads = 8                     # overrides base
+[source]
+excludes = ["build"]            # appended -> ["vendor", "node_modules", "build"]
+```
+
+### Cycle detection
+
+If `A extends B` and `B extends A`, Mago detects the cycle via canonical-path tracking and surfaces a clear error rather than recursing forever. Diamond inheritance (`A extends B`, `A extends C`, both extend `D`) processes `D` once and is fine.
+
+### Format mixing
+
+The chain can mix formats freely: a `mago.toml` extending a `mago.yaml` extending a `base.json` works exactly as you'd expect. Each layer is parsed by its own driver and merged at a generic value level before the final document is validated against the schema.
 
 ## Global Options
 
@@ -329,8 +402,8 @@ Hyperlinks are only rendered when output is sent to a terminal with colors enabl
 
 Clickable file paths are supported in the following reporting formats:
 
-- `rich` (default), `medium`, `short` — file paths in diagnostic headers
-- `emacs` — file paths at the start of each line
+- `rich` (default), `medium`, `short`: file paths in diagnostic headers
+- `emacs`: file paths at the start of each line
 
 Machine-readable formats (`json`, `github`, `gitlab`, `checkstyle`, `sarif`) are not affected.
 

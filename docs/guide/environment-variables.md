@@ -37,9 +37,9 @@ See [force-color.org](https://force-color.org/) for more information.
 
 Mago follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/latest/). When no configuration file is found in the workspace, Mago searches for a global configuration file in the following order:
 
-1. `$XDG_CONFIG_HOME/mago.toml` — if `XDG_CONFIG_HOME` is set
-2. `$HOME/.config/mago.toml` — the default XDG config directory
-3. `$HOME/mago.toml` — the user's home directory
+1. `$XDG_CONFIG_HOME/mago.toml` (if `XDG_CONFIG_HOME` is set)
+2. `$HOME/.config/mago.toml` (the default XDG config directory)
+3. `$HOME/mago.toml` (the user's home directory)
 
 Set this variable to change the first lookup directory:
 
@@ -47,25 +47,15 @@ Set this variable to change the first lookup directory:
 
 ## Reserved `MAGO_` prefix
 
-The `MAGO_` prefix is reserved for Mago configuration. Mago reads **all** environment variables starting with `MAGO_` and attempts to map them to configuration fields. If any `MAGO_`-prefixed environment variable does not correspond to a valid configuration field, Mago will fail with an "unknown field" error.
+The `MAGO_` prefix is reserved for Mago. Only the variables documented on this page are officially recognised; anything else prefixed `MAGO_` is reserved for internal use and may be silently ignored or repurposed in a future release.
 
-For example, setting `MAGO_LINT=1` or `MAGO_MY_CUSTOM_VAR=foo` in your environment will cause an error like:
-
-```
-ERROR Failed to build the configuration: unknown field `lint`, expected one of ...
-```
-
-If you encounter unexpected configuration errors, check your environment for any `MAGO_`-prefixed variables that are not listed below:
-
-```bash
-env | grep ^MAGO_
-```
-
-Remove or rename any variables that are not recognized by Mago.
+:::info Behaviour change in Mago 1.25.0
+Earlier versions auto-mapped any `MAGO_*` variable into the configuration tree (so `MAGO_LINT=1` would error out with "unknown field"). Mago 1.25.0 narrows this to the explicit list below; unknown `MAGO_*` variables no longer error and no longer override anything.
+:::
 
 ## Overriding Configuration
 
-The following environment variables can be used to override settings from the `mago.toml` file.
+The following top-level scalars can be overridden via environment variables. There is no env-var support for nested settings like individual rule levels. Use `mago.toml` (or an extended config; see [Sharing configuration with `extends`](/guide/configuration#sharing-configuration-with-extends)) for those.
 
 ### `MAGO_PHP_VERSION`
 
@@ -78,6 +68,12 @@ Overrides the `php_version` setting. This is useful for testing your code agains
 Overrides the `threads` setting, allowing you to control the number of parallel threads Mago uses for tasks like linting and formatting.
 
 - **Example**: `MAGO_THREADS=4 mago lint`
+
+### `MAGO_STACK_SIZE`
+
+Overrides the `stack-size` setting (per-thread stack size in bytes). Valid range is enforced by normalisation; out-of-range values are clamped.
+
+- **Example**: `MAGO_STACK_SIZE=8388608 mago lint`
 
 ### `MAGO_EDITOR_URL`
 
@@ -95,7 +91,7 @@ Overrides the `allow-unsupported-php-version` setting. Set to `true` to allow Ma
 
 ### `MAGO_NO_VERSION_CHECK`
 
-*Available in Mago 1.20.0+.* Has no effect on 1.19.x and earlier.
+_Available in Mago 1.20.0+._ Has no effect on 1.19.x and earlier.
 
 Overrides the `no-version-check` setting. Set to `true` to silence the warning emitted when the installed Mago binary drifts from the `version` pinned in `mago.toml`. Major-version drift is **always fatal** and is not affected by this variable; the whole point of a major pin is to stop runs across incompatible config schemas.
 
