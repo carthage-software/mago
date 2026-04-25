@@ -205,11 +205,15 @@ impl<'arena> TypeLexer<'arena> {
         }
 
         if let float_exponent!() = self.input.peek(length, 1) {
-            length += 1;
-            if let number_sign!() = self.input.peek(length, 1) {
-                length += 1;
+            let mut exp_length = length + 1;
+            if let number_sign!() = self.input.peek(exp_length, 1) {
+                exp_length += 1;
             }
-            length = read_digits_of_base(&self.input, length, 10);
+
+            let after_exp = read_digits_of_base(&self.input, exp_length, 10);
+            if after_exp > exp_length {
+                length = after_exp;
+            }
         }
 
         (TypeTokenKind::LiteralFloat, length)

@@ -165,6 +165,20 @@ mod tests {
     }
 
     #[test]
+    fn test_float_with_dangling_exponent_does_not_panic() {
+        match do_parse("3.") {
+            Ok(Type::LiteralFloat(LiteralFloatType { value, raw, .. })) => {
+                assert_eq!(*value, 3.0);
+                assert_eq!(raw, "3.");
+            }
+            other => panic!("expected `3.` to parse as LiteralFloat 3.0, got: {other:?}"),
+        }
+
+        let _ = do_parse("3.eint");
+        let _ = do_parse("3.e");
+    }
+
+    #[test]
     fn test_parse_simple_union() {
         match do_parse("int|string") {
             Ok(ty) => match ty {
