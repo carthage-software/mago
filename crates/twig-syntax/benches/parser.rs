@@ -45,10 +45,11 @@ fn bench_roundtrip(c: &mut Criterion) {
     for &(name, src) in FIXTURES {
         group.throughput(Throughput::Bytes(src.len() as u64));
         group.bench_function(name, |b| {
+            let mut out = String::with_capacity(src.len());
             b.iter(|| {
+                out.clear();
                 let input = Input::new(FileId::zero(), black_box(src).as_bytes());
                 let mut lexer = TwigLexer::new(input, LexerSettings::default());
-                let mut out = String::with_capacity(src.len());
                 while let Some(result) = lexer.advance() {
                     out.push_str(result.expect("lex ok").value);
                 }
@@ -65,8 +66,9 @@ fn bench_parser(c: &mut Criterion) {
     for &(name, src) in FIXTURES {
         group.throughput(Throughput::Bytes(src.len() as u64));
         group.bench_function(name, |b| {
+            let mut arena = Bump::new();
             b.iter(|| {
-                let arena = Bump::new();
+                arena.reset();
                 let tpl = parse_file_content(&arena, FileId::zero(), black_box(src));
                 assert!(!tpl.has_errors());
                 black_box(tpl.statements.len())
