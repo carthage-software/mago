@@ -25,3 +25,11 @@ mago-names = { workspace = true, optional = true }
 
 [features]
 build = ["bumpalo", "rust-embed", "mago-syntax", "mago-names"]
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "prelude"
+harness = false
+required-features = ["build"]

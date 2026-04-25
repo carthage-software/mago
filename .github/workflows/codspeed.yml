@@ -28,10 +28,10 @@ jobs:
           bins: cargo-codspeed
 
       - name: Build the benchmark target(s)
-        run: cargo codspeed build -p mago-syntax -p mago-codex -p mago-twig-syntax -p mago-type-syntax -p mago-analyzer
+        run: cargo codspeed build -p mago-syntax -p mago-codex -p mago-twig-syntax -p mago-type-syntax -p mago-analyzer -p mago-prelude --features mago-prelude/build
 
       - name: Run the benchmarks
         uses: CodSpeedHQ/action@v4
         with:
           mode: simulation
-          run: cargo codspeed run -p mago-syntax -p mago-codex -p mago-twig-syntax -p mago-type-syntax -p mago-analyzer
+          run: cargo codspeed run -p mago-syntax -p mago-codex -p mago-twig-syntax -p mago-type-syntax -p mago-analyzer -p mago-prelude
