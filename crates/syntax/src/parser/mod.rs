@@ -18,7 +18,7 @@ mod internal;
 pub mod stream;
 
 /// Maximum recursion depth for expression parsing.
-/// This prevents stack overflow on deeply nested expressions.
+/// This prevents stack overflow on deeply nested expressions and statements.
 const MAX_RECURSION_DEPTH: u16 = 512;
 
 #[derive(Debug, Default)]

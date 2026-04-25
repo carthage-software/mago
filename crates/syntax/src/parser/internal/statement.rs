@@ -1,3 +1,6 @@
+use mago_database::file::HasFileId;
+use mago_span::Span;
+
 use crate::T;
 use crate::ast::ast::AttributeList;
 use crate::ast::ast::Expression;
@@ -5,10 +8,29 @@ use crate::ast::ast::ExpressionStatement;
 use crate::ast::ast::Statement;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
+use crate::parser::MAX_RECURSION_DEPTH;
 use crate::parser::Parser;
 
 impl<'input, 'arena> Parser<'input, 'arena> {
     pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+        self.state.recursion_depth += 1;
+        if self.state.recursion_depth > MAX_RECURSION_DEPTH {
+            self.state.recursion_depth -= 1;
+            let file_id = self.stream.file_id();
+
+            return Err(ParseError::RecursionLimitExceeded(
+                self.stream.lookahead(0)?.map(|t| t.span_for(file_id)).unwrap_or_else(|| {
+                    Span::new(file_id, self.stream.current_position(), self.stream.current_position())
+                }),
+            ));
+        }
+
+        let result = self.parse_statement_inner();
+        self.state.recursion_depth -= 1;
+        result
+    }
+
+    fn parse_statement_inner(&mut self) -> Result<Statement<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
         Ok(match token.kind {
             T![InlineText | InlineShebang] => Statement::Inline(self.parse_inline()?),
