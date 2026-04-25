@@ -21,6 +21,6 @@ fuzz_target!(|data: &[u8]| {
     };
 
     let arena = Bump::new();
-    let file = File::ephemeral(Cow::Borrowed("fuzz.php"), Cow::Borrowed(src));
+    let file = File::ephemeral(Cow::Borrowed("fuzz.php"), Cow::Owned(src.to_string()));
     let _ = parse_file(&arena, &file);
 });
