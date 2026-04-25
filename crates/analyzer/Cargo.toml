@@ -36,3 +36,8 @@ diffy = { workspace = true }
 [dev-dependencies]
 mago-prelude = { workspace = true, features = ["build"] }
 indoc = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "cases"
+harness = false

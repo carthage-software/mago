@@ -1307,6 +1307,7 @@ name = "mago-analyzer"
 version = "1.24.0"
 dependencies = [
  "bumpalo",
+ "codspeed-criterion-compat",
  "diffy",
  "foldhash 0.2.0",
  "indexmap",
