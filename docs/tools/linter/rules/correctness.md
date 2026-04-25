@@ -16,8 +16,10 @@ This document details the rules available in the `Correctness` category.
 | Invalid Open Tag | [`invalid-open-tag`](#invalid-open-tag) |
 | No Assign In Argument | [`no-assign-in-argument`](#no-assign-in-argument) |
 | No Assign In Condition | [`no-assign-in-condition`](#no-assign-in-condition) |
+| No Dead Store | [`no-dead-store`](#no-dead-store) |
 | No Empty Catch Clause | [`no-empty-catch-clause`](#no-empty-catch-clause) |
 | No Only | [`no-only`](#no-only) |
+| No Redundant Variable | [`no-redundant-variable`](#no-redundant-variable) |
 | Strict Assertions | [`strict-assertions`](#strict-assertions) |
 | Strict Behavior | [`strict-behavior`](#strict-behavior) |
 | Strict Types | [`strict-types`](#strict-types) |
@@ -304,6 +306,58 @@ if ($x = 1) {
 ```
 
 
+## <a id="no-dead-store"></a>`no-dead-store`
+
+Flags assignments to a variable whose value is overwritten by a later
+assignment without being read in between. The earlier assignment is dead;
+its value never reaches anything observable.
+
+Detection is limited to linear (non-branching) flow. Writes inside conditional
+branches (if/else, loops, match arms, try paths, switch cases) don't pair up
+with writes in sibling branches, so this rule produces no false positives for
+code like `if ($cond) { $x = 1; } else { $x = 2; } return $x;`.
+
+Variables whose name starts with an underscore (`$_`, `$_foo`) are ignored.
+Variables declared via `global` or `static` are also ignored.
+
+The rule analyses one function-like scope at a time. It bails out of any scope
+that uses variable variables (`$$x`, `${expr}`) or calls `extract()`.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function f() {
+    $x = compute();
+    return $x;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function f() {
+    $x = 1; // dead - overwritten before being read
+    $x = compute();
+    return $x;
+}
+```
+
+
 ## <a id="no-empty-catch-clause"></a>`no-empty-catch-clause`
 
 Warns when a `catch` clause is empty.
@@ -396,6 +450,61 @@ test('example test', function () {
 it('does something', function () {
     expect(1)->toBe(1);
 })->only();
+```
+
+
+## <a id="no-redundant-variable"></a>`no-redundant-variable`
+
+Flags variables that are written or declared but whose value is never read.
+
+Detects fully-unused variables (assigned and never referenced) as well as
+variables whose only mention is on the write side — for example, an
+undefined name passed to a function as a potential by-reference output where
+the result is never observed by the caller.
+
+Variables whose name starts with an underscore (`$_`, `$_foo`) are treated as
+intentionally-discarded and are ignored. Variables declared via `global` or
+`static` are also ignored, since they are bindings to external scope.
+
+The rule analyses one function-like scope at a time. It bails out of any scope
+that uses variable variables (`$$x`, `${expr}`) or calls `extract()`, since
+those introduce names the linter cannot resolve.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function greet(string $name): string
+{
+    $greeting = "Hello, $name!";
+
+    return $greeting;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function greet(string $name): string
+{
+    $unused = compute_something();
+
+    return "Hello, $name!";
+}
 ```
 
 

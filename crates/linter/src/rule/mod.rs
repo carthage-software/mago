@@ -237,6 +237,8 @@ define_rules! {
     NoRedundantElse(no_redundant_else @ NoRedundantElseRule),
     NoRedundantBlock(no_redundant_block @ NoRedundantBlockRule),
     NoRedundantUse(no_redundant_use @ NoRedundantUseRule),
+    NoRedundantVariable(no_redundant_variable @ NoRedundantVariableRule),
+    NoDeadStore(no_dead_store @ NoDeadStoreRule),
     NoRedundantYieldFrom(no_redundant_yield_from @ NoRedundantYieldFromRule),
     NoSelfAssignment(no_self_assignment @ NoSelfAssignmentRule),
     NoProtectedInFinal(no_protected_in_final @ NoProtectedInFinalRule),

@@ -57,6 +57,7 @@ use crate::rule::NoAssignInConditionConfig;
 use crate::rule::NoBooleanFlagParameterConfig;
 use crate::rule::NoClosingTagConfig;
 use crate::rule::NoDbSchemaChangeConfig;
+use crate::rule::NoDeadStoreConfig;
 use crate::rule::NoDebugSymbolsConfig;
 use crate::rule::NoDirectDbQueryConfig;
 use crate::rule::NoElseClauseConfig;
@@ -106,6 +107,7 @@ use crate::rule::NoRedundantParenthesesConfig;
 use crate::rule::NoRedundantReadonlyConfig;
 use crate::rule::NoRedundantStringConcatConfig;
 use crate::rule::NoRedundantUseConfig;
+use crate::rule::NoRedundantVariableConfig;
 use crate::rule::NoRedundantWriteVisibilityConfig;
 use crate::rule::NoRedundantYieldFromConfig;
 use crate::rule::NoRequestAllConfig;
@@ -263,6 +265,8 @@ pub struct RulesSettings {
     pub no_redundant_else: RuleSettings<NoRedundantElseConfig>,
     pub no_redundant_block: RuleSettings<NoRedundantBlockConfig>,
     pub no_redundant_use: RuleSettings<NoRedundantUseConfig>,
+    pub no_redundant_variable: RuleSettings<NoRedundantVariableConfig>,
+    pub no_dead_store: RuleSettings<NoDeadStoreConfig>,
     pub no_redundant_yield_from: RuleSettings<NoRedundantYieldFromConfig>,
     pub no_self_assignment: RuleSettings<NoSelfAssignmentConfig>,
     pub no_protected_in_final: RuleSettings<NoProtectedInFinalConfig>,
