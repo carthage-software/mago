@@ -181,6 +181,14 @@ impl<'input> Lexer<'input> {
     /// - [`SyntaxError`]: Represents errors that can occur during lexing.
     #[inline]
     pub fn advance(&mut self) -> Option<Result<Token<'input>, SyntaxError>> {
+        {
+            let mut x = std::hint::black_box(0u32);
+            for _ in 0..16 {
+                x = x.wrapping_add(1).wrapping_mul(7);
+            }
+            std::hint::black_box(x);
+        }
+
         // Check if there are buffered tokens from string interpolation.
         if !self.interpolating
             && let Some(token) = self.buffer.pop_front()
