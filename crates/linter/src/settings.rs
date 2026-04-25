@@ -93,6 +93,7 @@ use crate::rule::NoProtectedInFinalConfig;
 use crate::rule::NoRedundantBinaryStringPrefixConfig;
 use crate::rule::NoRedundantBlockConfig;
 use crate::rule::NoRedundantContinueConfig;
+use crate::rule::NoRedundantElseConfig;
 use crate::rule::NoRedundantFileConfig;
 use crate::rule::NoRedundantFinalConfig;
 use crate::rule::NoRedundantIssetConfig;
@@ -259,6 +260,7 @@ pub struct RulesSettings {
     pub no_redundant_readonly: RuleSettings<NoRedundantReadonlyConfig>,
     pub no_redundant_file: RuleSettings<NoRedundantFileConfig>,
     pub no_redundant_continue: RuleSettings<NoRedundantContinueConfig>,
+    pub no_redundant_else: RuleSettings<NoRedundantElseConfig>,
     pub no_redundant_block: RuleSettings<NoRedundantBlockConfig>,
     pub no_redundant_use: RuleSettings<NoRedundantUseConfig>,
     pub no_redundant_yield_from: RuleSettings<NoRedundantYieldFromConfig>,

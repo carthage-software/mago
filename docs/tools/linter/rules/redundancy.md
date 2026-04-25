@@ -22,6 +22,7 @@ This document details the rules available in the `Redundancy` category.
 | No Redundant Binary String Prefix | [`no-redundant-binary-string-prefix`](#no-redundant-binary-string-prefix) |
 | No Redundant Block | [`no-redundant-block`](#no-redundant-block) |
 | No Redundant Continue | [`no-redundant-continue`](#no-redundant-continue) |
+| No Redundant Else | [`no-redundant-else`](#no-redundant-else) |
 | No Redundant File | [`no-redundant-file`](#no-redundant-file) |
 | No Redundant Final | [`no-redundant-final`](#no-redundant-final) |
 | No Redundant Isset | [`no-redundant-isset`](#no-redundant-isset) |
@@ -545,6 +546,55 @@ while (true) {
 while (true) {
     echo "Hello, world!";
     continue; // Redundant `continue` statement
+}
+```
+
+
+## <a id="no-redundant-else"></a>`no-redundant-else`
+
+Flags `if`/`else` statements where the `if` branch always terminates
+control flow (via `return`, `throw`, `exit`, `die`, `continue`, or `break`).
+
+When the `if` branch unconditionally terminates, the `else` branch becomes
+unnecessary nesting. Extracting the `else` body to follow the `if` flattens
+the control flow without changing semantics.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function process($user) {
+    if (!$user->isVerified()) {
+        return;
+    }
+
+    $user->login();
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function process($user) {
+    if (!$user->isVerified()) {
+        return;
+    } else {
+        $user->login();
+    }
 }
 ```
 

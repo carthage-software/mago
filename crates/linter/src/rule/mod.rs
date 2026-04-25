@@ -234,6 +234,7 @@ define_rules! {
     NoRedundantReadonly(no_redundant_readonly @ NoRedundantReadonlyRule),
     NoRedundantFile(no_redundant_file @ NoRedundantFileRule),
     NoRedundantContinue(no_redundant_continue @ NoRedundantContinueRule),
+    NoRedundantElse(no_redundant_else @ NoRedundantElseRule),
     NoRedundantBlock(no_redundant_block @ NoRedundantBlockRule),
     NoRedundantUse(no_redundant_use @ NoRedundantUseRule),
     NoRedundantYieldFrom(no_redundant_yield_from @ NoRedundantYieldFromRule),
