@@ -30,7 +30,10 @@
 //! - **User Interaction Errors**: Terminal interaction and dialoguer errors
 //! - **Version Errors**: PHP version validation and parsing errors
 
+use std::path::PathBuf;
+
 use dialoguer::Error as DialoguerError;
+use rayon::ThreadPoolBuildError;
 
 use mago_analyzer::error::AnalysisError;
 use mago_database::error::DatabaseError;
@@ -38,7 +41,6 @@ use mago_orchestrator::OrchestratorError;
 use mago_php_version::PHPVersion;
 use mago_php_version::error::ParsingError;
 use mago_reporting::error::ReportingError;
-use rayon::ThreadPoolBuildError;
 
 use crate::version_check::VersionPinParseError;
 
@@ -88,12 +90,19 @@ pub enum Error {
     /// system resource constraints or incompatible runtime configurations.
     BuildingRuntime(std::io::Error),
 
-    /// Failed to build or merge configuration from multiple sources.
-    ///
-    /// This error occurs when loading configuration from environment variables, TOML files,
-    /// or command-line arguments fails due to invalid settings, missing required fields,
-    /// or incompatible configuration values.
-    BuildingConfiguration(config::ConfigError),
+    /// Failed to read a configuration file from disk.
+    ReadConfigFile { path: PathBuf, source: std::io::Error },
+
+    /// Failed to parse a configuration file as TOML/YAML/JSON, or the parsed
+    /// document failed schema validation (`deny_unknown_fields`, type mismatches, …).
+    ParseConfigFile { path: PathBuf, source: Box<dyn std::error::Error + Send + Sync> },
+
+    /// Configuration file path has an unrecognised extension. We support `.toml`, `.yaml`,
+    /// `.yml`, and `.json`.
+    UnsupportedConfigExtension(PathBuf),
+
+    /// Failed to parse the value of an `MAGO_*` environment variable into the target type.
+    EnvVarParse { name: String, source: Box<dyn std::error::Error + Send + Sync> },
 
     /// Failed to deserialize TOML configuration.
     ///
@@ -116,7 +125,7 @@ pub enum Error {
     ///
     /// The first field contains the path that failed to canonicalize, and the second
     /// field contains the underlying I/O error.
-    CanonicalizingPath(std::path::PathBuf, std::io::Error),
+    CanonicalizingPath(PathBuf, std::io::Error),
 
     /// Failed to parse or serialize JSON data.
     ///
@@ -275,7 +284,22 @@ impl std::fmt::Display for Error {
             Self::Database(error) => write!(f, "Failed to load database: {error}"),
             Self::Reporting(error) => write!(f, "Failed to report results: {error}"),
             Self::BuildingRuntime(error) => write!(f, "Failed to build the runtime: {error}"),
-            Self::BuildingConfiguration(error) => write!(f, "Failed to build the configuration: {error}"),
+            Self::ReadConfigFile { path, source } => {
+                write!(f, "Failed to read configuration file `{}`: {source}", path.display())
+            }
+            Self::ParseConfigFile { path, source } => {
+                write!(f, "Failed to parse configuration file `{}`: {source}", path.display())
+            }
+            Self::UnsupportedConfigExtension(path) => {
+                write!(
+                    f,
+                    "Unsupported configuration file extension for `{}` (expected `.toml`, `.yaml`, `.yml`, or `.json`)",
+                    path.display()
+                )
+            }
+            Self::EnvVarParse { name, source } => {
+                write!(f, "Invalid value for environment variable `{name}`: {source}")
+            }
             Self::DeserializingToml(error) => write!(f, "Failed to deserialize TOML: {error}"),
             Self::SerializingToml(error) => write!(f, "Failed to serialize TOML: {error}"),
             Self::CanonicalizingPath(path, error) => write!(f, "Failed to canonicalize path `{path:?}`: {error}"),
@@ -346,7 +370,10 @@ impl std::error::Error for Error {
         match self {
             Self::Database(error) => Some(error),
             Self::Reporting(error) => Some(error),
-            Self::BuildingConfiguration(error) => Some(error),
+            Self::ReadConfigFile { source, .. } => Some(source),
+            Self::ParseConfigFile { source, .. } => Some(source.as_ref()),
+            Self::UnsupportedConfigExtension(_) => None,
+            Self::EnvVarParse { source, .. } => Some(source.as_ref()),
             Self::BuildingRuntime(error) => Some(error),
             Self::DeserializingToml(error) => Some(error),
             Self::SerializingToml(error) => Some(error),
@@ -386,16 +413,6 @@ impl From<DatabaseError> for Error {
 impl From<ReportingError> for Error {
     fn from(error: ReportingError) -> Self {
         Self::Reporting(error)
-    }
-}
-
-/// Converts configuration building errors into CLI errors.
-///
-/// This enables the `?` operator to automatically convert [`config::ConfigError`]
-/// into [`Error`] when propagating errors from configuration loading operations.
-impl From<config::ConfigError> for Error {
-    fn from(error: config::ConfigError) -> Self {
-        Self::BuildingConfiguration(error)
     }
 }
 

@@ -49,14 +49,8 @@ use std::fmt::Debug;
 use std::path::Path;
 use std::path::PathBuf;
 
-use config::Case;
-use config::Config;
-use config::Environment;
-use config::File;
-use config::FileFormat;
-use config::FileStoredFormat;
-use config::Value;
-use config::ValueKind;
+// Note: format detection + parsing is handled by `ConfigFormat` below; we no longer route
+// through the `config` crate, which added ~1.5ms of intermediate-Value-tree overhead.
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -243,18 +237,6 @@ pub struct Configuration {
     #[serde(default)]
     pub guard: GuardConfiguration,
 
-    /// Log filter for tracing output.
-    ///
-    /// This field exists solely to prevent errors when `MAGO_LOG` environment
-    /// variable is set. Due to `deny_unknown_fields`, without this field serde
-    /// would reject the configuration when `MAGO_LOG` is present in the environment.
-    ///
-    /// This is not a user-facing configuration option and is never serialized.
-    #[serde(default, skip_serializing)]
-    #[schemars(skip)]
-    #[allow(dead_code)]
-    log: Value,
-
     /// Editor URL template for OSC 8 terminal hyperlinks on file paths in diagnostics.
     ///
     /// When set, file paths in diagnostic output become clickable links in terminals
@@ -356,43 +338,45 @@ impl Configuration {
     ) -> Result<Configuration, Error> {
         let workspace_dir = workspace.clone().unwrap_or_else(|| CURRENT_DIR.to_path_buf());
 
-        let mut builder = Config::builder();
-
-        let resolved_config_file;
+        let resolved_config_file: Option<(PathBuf, ConfigFormat)>;
         let config_file_is_explicit;
         if let Some(file) = file {
             tracing::debug!("Sourcing configuration from {}.", file.display());
 
-            resolved_config_file = Some(file.to_path_buf());
+            resolved_config_file = Some((
+                file.to_path_buf(),
+                ConfigFormat::for_path(file).ok_or_else(|| Error::UnsupportedConfigExtension(file.to_path_buf()))?,
+            ));
+
             config_file_is_explicit = true;
-            builder = builder.add_source(File::from(file).required(true));
         } else {
-            let formats = [FileFormat::Toml, FileFormat::Yaml, FileFormat::Json];
-            // Check workspace first, then XDG, then ~/.config, then ~ (workspace has highest precedence)
             let fallback_roots = [
                 std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from),
                 home_dir().map(|h| h.join(".config")),
                 home_dir(),
             ];
 
-            if let Some((config_file, format)) = Self::find_config_files(&workspace_dir, &fallback_roots, &formats) {
+            resolved_config_file = Self::find_config_files(&workspace_dir, &fallback_roots);
+            if let Some((config_file, _)) = &resolved_config_file {
                 tracing::debug!("Sourcing configuration from {}.", config_file.display());
-                resolved_config_file = Some(config_file.clone());
-                builder = builder.add_source(File::from(config_file).format(format).required(false));
             } else {
                 tracing::debug!("No configuration file found, using defaults and environment variables.");
-                resolved_config_file = None;
             }
 
             config_file_is_explicit = false;
         }
 
-        let mut configuration: Configuration = builder
-            .add_source(Environment::with_prefix(ENVIRONMENT_PREFIX).convert_case(Case::Kebab))
-            .build()?
-            .try_deserialize::<Configuration>()?;
+        let mut configuration: Configuration = if let Some((path, format)) = &resolved_config_file {
+            let content =
+                std::fs::read_to_string(path).map_err(|e| Error::ReadConfigFile { path: path.clone(), source: e })?;
+            format.deserialize(&content, path)?
+        } else {
+            Configuration::from_workspace(workspace_dir.clone())
+        };
 
-        configuration.config_file = resolved_config_file;
+        configuration.apply_env_overrides()?;
+
+        configuration.config_file = resolved_config_file.as_ref().map(|(p, _)| p.clone());
         configuration.config_file_is_explicit = config_file_is_explicit;
 
         if allow_unsupported_php_version && !configuration.allow_unsupported_php_version {
@@ -464,19 +448,18 @@ impl Configuration {
     /// 4. The first match (by name and directory order) wins
     ///
     /// This prevents global configuration files from overriding project-local configuration.
-    fn find_config_files(
-        root_dir: &Path,
-        fallback_roots: &[Option<PathBuf>],
-        file_formats: &[FileFormat],
-    ) -> Option<(PathBuf, FileFormat)> {
+    fn find_config_files(root_dir: &Path, fallback_roots: &[Option<PathBuf>]) -> Option<(PathBuf, ConfigFormat)> {
         let config_files = [CONFIGURATION_FILE_NAME, CONFIGURATION_DIST_FILE_NAME];
 
         for name in config_files.iter() {
             let base = root_dir.join(name);
 
-            for format in file_formats.iter() {
-                if let Some(ext) = format.file_extensions().iter().find(|ext| base.with_added_extension(ext).exists()) {
-                    return Some((base.with_added_extension(ext), *format));
+            for format in ConfigFormat::ALL.iter() {
+                for ext in format.extensions() {
+                    let candidate = base.with_added_extension(ext);
+                    if candidate.exists() {
+                        return Some((candidate, *format));
+                    }
                 }
             }
         }
@@ -484,14 +467,70 @@ impl Configuration {
         for root in fallback_roots.iter().flatten() {
             let base = root.join(CONFIGURATION_FILE_NAME);
 
-            for format in file_formats.iter() {
-                if let Some(ext) = format.file_extensions().iter().find(|ext| base.with_added_extension(ext).exists()) {
-                    return Some((base.with_added_extension(ext), *format));
+            for format in ConfigFormat::ALL.iter() {
+                for ext in format.extensions() {
+                    let candidate = base.with_added_extension(ext);
+                    if candidate.exists() {
+                        return Some((candidate, *format));
+                    }
                 }
             }
         }
 
         None
+    }
+
+    /// Apply environment-variable overrides for the small set of documented top-level
+    /// scalar fields. We do **not** auto-map nested keys — anyone who needs to override
+    /// nested settings does so via the config file. The supported variables are:
+    ///
+    /// - `MAGO_PHP_VERSION` — overrides `php-version`
+    /// - `MAGO_THREADS` — overrides `threads`
+    /// - `MAGO_STACK_SIZE` — overrides `stack-size`
+    /// - `MAGO_ALLOW_UNSUPPORTED_PHP_VERSION` — overrides `allow-unsupported-php-version`
+    /// - `MAGO_NO_VERSION_CHECK` — overrides `no-version-check`
+    /// - `MAGO_EDITOR_URL` — overrides `editor-url`
+    fn apply_env_overrides(&mut self) -> Result<(), Error> {
+        if let Ok(v) = std::env::var(format!("{ENVIRONMENT_PREFIX}_PHP_VERSION")) {
+            self.php_version = v.parse().map_err(|e| Error::EnvVarParse {
+                name: format!("{ENVIRONMENT_PREFIX}_PHP_VERSION"),
+                source: Box::new(e),
+            })?;
+        }
+
+        if let Ok(v) = std::env::var(format!("{ENVIRONMENT_PREFIX}_THREADS")) {
+            self.threads = v.parse().map_err(|e| Error::EnvVarParse {
+                name: format!("{ENVIRONMENT_PREFIX}_THREADS"),
+                source: Box::new(e),
+            })?;
+        }
+
+        if let Ok(v) = std::env::var(format!("{ENVIRONMENT_PREFIX}_STACK_SIZE")) {
+            self.stack_size = v.parse().map_err(|e| Error::EnvVarParse {
+                name: format!("{ENVIRONMENT_PREFIX}_STACK_SIZE"),
+                source: Box::new(e),
+            })?;
+        }
+
+        if let Ok(v) = std::env::var(format!("{ENVIRONMENT_PREFIX}_ALLOW_UNSUPPORTED_PHP_VERSION")) {
+            self.allow_unsupported_php_version = parse_bool(&v).map_err(|e| Error::EnvVarParse {
+                name: format!("{ENVIRONMENT_PREFIX}_ALLOW_UNSUPPORTED_PHP_VERSION"),
+                source: Box::new(e),
+            })?;
+        }
+
+        if let Ok(v) = std::env::var(format!("{ENVIRONMENT_PREFIX}_NO_VERSION_CHECK")) {
+            self.no_version_check = parse_bool(&v).map_err(|e| Error::EnvVarParse {
+                name: format!("{ENVIRONMENT_PREFIX}_NO_VERSION_CHECK"),
+                source: Box::new(e),
+            })?;
+        }
+
+        if let Ok(v) = std::env::var(format!("{ENVIRONMENT_PREFIX}_EDITOR_URL")) {
+            self.editor_url = Some(v);
+        }
+
+        Ok(())
     }
 
     /// Creates a default configuration anchored to a specific workspace directory.
@@ -538,7 +577,6 @@ impl Configuration {
             formatter: FormatterConfiguration::default(),
             analyzer: AnalyzerConfiguration::default(),
             guard: GuardConfiguration::default(),
-            log: Value::new(None, ValueKind::Nil),
             editor_url: None,
             config_file: None,
             config_file_is_explicit: false,
@@ -767,7 +805,6 @@ mod tests {
         let xdg_config_home_path = temp_dir().join("xdg-config-home-3");
         let workspace_path = temp_dir().join("workspace-3");
 
-        // Clean up any existing directories from previous test runs
         let _ = std::fs::remove_dir_all(&home_path);
         let _ = std::fs::remove_dir_all(&xdg_config_home_path);
         let _ = std::fs::remove_dir_all(&workspace_path);
@@ -845,4 +882,73 @@ fn detect_editor_url() -> Option<String> {
     }
 
     None
+}
+
+/// Configuration file format. Order of variants is the precedence order used during
+/// auto-discovery within a directory: TOML wins over YAML wins over JSON.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConfigFormat {
+    Toml,
+    Yaml,
+    Json,
+}
+
+impl ConfigFormat {
+    pub(crate) const ALL: &'static [ConfigFormat] = &[ConfigFormat::Toml, ConfigFormat::Yaml, ConfigFormat::Json];
+
+    /// Extensions matched for this format, in preference order.
+    pub(crate) fn extensions(&self) -> &'static [&'static str] {
+        match self {
+            ConfigFormat::Toml => &["toml"],
+            ConfigFormat::Yaml => &["yaml", "yml"],
+            ConfigFormat::Json => &["json"],
+        }
+    }
+
+    /// Detect format from a file path's extension; returns `None` if unrecognised.
+    pub(crate) fn for_path(path: &Path) -> Option<ConfigFormat> {
+        let ext = path.extension().and_then(|e| e.to_str())?;
+        for f in Self::ALL {
+            if f.extensions().iter().any(|x| x.eq_ignore_ascii_case(ext)) {
+                return Some(*f);
+            }
+        }
+        None
+    }
+
+    /// Deserialize a Configuration from raw file content using the right serde driver.
+    /// `path` is included in error messages.
+    pub(crate) fn deserialize(&self, content: &str, path: &Path) -> Result<Configuration, Error> {
+        match self {
+            ConfigFormat::Toml => toml::from_str::<Configuration>(content)
+                .map_err(|e| Error::ParseConfigFile { path: path.to_path_buf(), source: Box::new(e) }),
+            ConfigFormat::Yaml => serde_yml::from_str::<Configuration>(content)
+                .map_err(|e| Error::ParseConfigFile { path: path.to_path_buf(), source: Box::new(e) }),
+            ConfigFormat::Json => serde_json::from_str::<Configuration>(content)
+                .map_err(|e| Error::ParseConfigFile { path: path.to_path_buf(), source: Box::new(e) }),
+        }
+    }
+}
+
+/// Parse a boolean from an env var. Accepts: 1/0, true/false, yes/no, on/off (any case).
+fn parse_bool(s: &str) -> Result<bool, std::io::Error> {
+    let trimmed = s.trim();
+    if trimmed == "1"
+        || trimmed.eq_ignore_ascii_case("true")
+        || trimmed.eq_ignore_ascii_case("yes")
+        || trimmed.eq_ignore_ascii_case("on")
+    {
+        return Ok(true);
+    }
+
+    if trimmed.is_empty()
+        || trimmed == "0"
+        || trimmed.eq_ignore_ascii_case("false")
+        || trimmed.eq_ignore_ascii_case("no")
+        || trimmed.eq_ignore_ascii_case("off")
+    {
+        return Ok(false);
+    }
+
+    Err(std::io::Error::new(std::io::ErrorKind::InvalidData, format!("invalid boolean: `{s}`")))
 }
