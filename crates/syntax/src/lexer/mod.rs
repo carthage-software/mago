@@ -1123,23 +1123,31 @@ impl<'input> Lexer<'input> {
         // For brace interpolation ({$...}), allow qualified identifiers with backslashes.
         self.brace_interpolating = brace;
 
-        loop {
-            let subsequent_token = self.advance()?.ok()?;
-            // Check if this token contains the end offset
-            let token_start = subsequent_token.start.offset;
-            let token_end = token_start + subsequent_token.value.len() as u32;
-            let is_final_token = token_start <= end_offset && end_offset <= token_end;
+        let pending_error = loop {
+            match self.advance() {
+                Some(Ok(token)) => {
+                    let token_start = token.start.offset;
+                    let token_end = token_start + token.value.len() as u32;
+                    let is_final_token = token_start <= end_offset && end_offset <= token_end;
 
-            self.buffer.push_back(subsequent_token);
+                    self.buffer.push_back(token);
 
-            if is_final_token {
-                break;
+                    if is_final_token {
+                        break None;
+                    }
+                }
+                Some(Err(error)) => break Some(error),
+                None => break None,
             }
-        }
+        };
 
         self.mode = post_interpolation_mode;
         self.interpolating = was_interpolating;
         self.brace_interpolating = was_brace_interpolating;
+
+        if let Some(error) = pending_error {
+            return Some(Err(error));
+        }
 
         self.advance()
     }

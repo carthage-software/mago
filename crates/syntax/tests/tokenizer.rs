@@ -1282,6 +1282,24 @@ fn test_b_identifier_not_followed_by_string() -> Result<(), SyntaxError> {
     })
 }
 
+#[test]
+fn test_unrecognized_byte_inside_bracket_interpolation_surfaces_error() {
+    let code: &[u8] = b"<?php\n\"$a[-0\x00x0]\";";
+    let input = Input::new(FileId::zero(), code);
+    let mut lexer = Lexer::new(input, LexerSettings::default());
+
+    let mut saw_error = false;
+    while let Some(result) = lexer.advance() {
+        if let Err(SyntaxError::UnrecognizedToken(_, byte, _)) = result {
+            assert_eq!(byte, 0, "expected the NUL byte to be reported as unrecognized");
+            saw_error = true;
+            break;
+        }
+    }
+
+    assert!(saw_error, "lexer should surface the unrecognized NUL byte instead of silently terminating");
+}
+
 fn test_lexer(code: &[u8], expected_kinds: &[TokenKind]) -> Result<(), SyntaxError> {
     test_lexer_with_settings(code, expected_kinds, LexerSettings::default())
 }
