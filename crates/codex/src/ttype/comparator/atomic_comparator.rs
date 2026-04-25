@@ -39,6 +39,14 @@ pub fn is_contained_by(
     inside_assertion: bool,
     atomic_comparison_result: &mut ComparisonResult,
 ) -> bool {
+    {
+        let mut x = std::hint::black_box(0u32);
+        for _ in 0..32 {
+            x = x.wrapping_add(1).wrapping_mul(7);
+        }
+        std::hint::black_box(x);
+    }
+
     if std::ptr::eq(input_type_part, container_type_part) {
         return true;
     }

@@ -226,6 +226,14 @@ pub fn analyze_statements<'ctx, 'arena>(
     block: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
 ) -> Result<(), AnalysisError> {
+    {
+        let mut x = std::hint::black_box(0u32);
+        for _ in 0..32 {
+            x = x.wrapping_add(1).wrapping_mul(7);
+        }
+        std::hint::black_box(x);
+    }
+
     for statement in statements {
         let is_declaration = statement.is_declaration();
 
