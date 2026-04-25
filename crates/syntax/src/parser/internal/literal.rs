@@ -23,9 +23,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             T![LiteralFloat] => Literal::Float(LiteralFloat {
                 span: token.span_for(self.stream.file_id()),
                 raw: token.value,
-                // Use 0.0 as fallback for malformed floats (e.g., "1.0e" without exponent)
-                // This enables fault-tolerant parsing without panicking.
-                value: OrderedFloat(parse_literal_float(token.value).unwrap_or(0.0)),
+                value: OrderedFloat(parse_literal_float(token.value).unwrap_or_else(|| {
+                    unreachable!("lexer generated invalid float `{}`; this should never happen.", token.value)
+                })),
             }),
             T![LiteralInteger] => Literal::Integer(LiteralInteger {
                 span: token.span_for(self.stream.file_id()),
