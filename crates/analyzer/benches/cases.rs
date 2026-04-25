@@ -1,4 +1,4 @@
-//! Per-test-case analyzer benchmarks.
+//! Per-category analyzer benchmarks driven by the `tests/cases/` corpus.
 
 use std::borrow::Cow;
 use std::path::Path;
@@ -26,9 +26,6 @@ use mago_names::resolver::NameResolver;
 use mago_prelude::Prelude;
 use mago_syntax::parser::parse_file;
 
-/// Built once for the entire bench run. Each iteration clones from this snapshot, mirroring
-/// what `tests/framework.rs::run_test_case_inner` does — and what a real-run cost-per-file
-/// looks like once the prelude is warm.
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
 
@@ -45,9 +42,6 @@ fn analyze_file(path: &Path, content: &str) {
     let arena = Bump::new();
     let program = parse_file(&arena, source_file);
     if program.has_errors() {
-        // The bench is meant to measure analyzer work on parseable files. A parse error here
-        // is a real signal that something in the case file (or the parser) is wrong; surface
-        // it loudly rather than silently skipping.
         panic!("Parse failed for {}: {:?}", path.display(), program.errors);
     }
 
@@ -75,38 +69,55 @@ fn analyze_file(path: &Path, content: &str) {
     }
 }
 
-fn discover_cases() -> Vec<(String, PathBuf)> {
+const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_"];
+
+fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases");
-    let mut entries: Vec<(String, PathBuf)> = std::fs::read_dir(&cases_dir)
-        .unwrap_or_else(|e| panic!("failed to read {}: {e}", cases_dir.display()))
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("php") {
-                return None;
-            }
-            let stem = path.file_stem()?.to_string_lossy().into_owned();
-            Some((stem, path))
-        })
-        .collect();
-    entries.sort_by(|a, b| a.0.cmp(&b.0));
-    entries
+    let mut buckets: Vec<(&'static str, Vec<(PathBuf, String)>)> =
+        BENCHMARKED_PREFIXES.iter().map(|p| (*p, Vec::new())).collect();
+
+    let entries =
+        std::fs::read_dir(&cases_dir).unwrap_or_else(|e| panic!("failed to read {}: {e}", cases_dir.display()));
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("php") {
+            continue;
+        }
+
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else { continue };
+        let Some(bucket) = buckets.iter_mut().find(|(p, _)| stem.starts_with(p)) else { continue };
+        let content =
+            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+        bucket.1.push((path, content));
+    }
+
+    for (_, files) in &mut buckets {
+        files.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+
+    buckets
 }
 
 fn bench_cases(c: &mut Criterion) {
-    // Force prelude + plugin registry to materialise before timing starts so the first
-    // case in the run doesn't pay the build cost.
     LazyLock::force(&PRELUDE);
     LazyLock::force(&PLUGIN_REGISTRY);
 
     let mut group = c.benchmark_group("analyzer_case");
-    for (name, path) in discover_cases() {
-        let content =
-            std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
-        group.bench_with_input(BenchmarkId::from_parameter(&name), &(path, content), |b, (p, c)| {
-            b.iter(|| analyze_file(p, c));
+    for (prefix, files) in discover_cases_by_prefix() {
+        if files.is_empty() {
+            continue;
+        }
+
+        let bench_name = prefix.trim_end_matches('_');
+        group.bench_with_input(BenchmarkId::from_parameter(bench_name), &files, |b, files| {
+            b.iter(|| {
+                for (p, c) in files {
+                    analyze_file(p, c);
+                }
+            });
         });
     }
+
     group.finish();
 }
 
