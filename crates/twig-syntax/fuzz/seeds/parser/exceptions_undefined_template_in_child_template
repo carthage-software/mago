@@ -1,0 +1,8 @@
+{% extends 'base.twig' %}
+
+{% block sidebar %}
+    {{ include('include.twig') }}
+{% endblock %}
+--TEMPLATE(base.twig)--
+{% block sidebar %}
+{% endblock %}

@@ -1,0 +1,3 @@
+{{ foo_path('bar') }}
+{{ bar_path('bar') }}
+{{ a_foo_b_bar('bar') }}

@@ -1,0 +1,14 @@
+{% import 'greeting.twig' as greeting %}
+
+{{ greeting.welcome('Fabien') }}
+
+--TEMPLATE(greeting.twig)--
+{% macro welcome(name) %}
+  {% deprecated 'The "welcome" macro is deprecated, use "hello" instead.' %}
+  {% import _self as self %}
+  {{ self.hello(name) }}
+{% endmacro %}
+
+{% macro hello(name) %}
+Hello {{ name }}
+{% endmacro %}

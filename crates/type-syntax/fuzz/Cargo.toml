@@ -1,0 +1,42 @@
+[package]
+name = "mago-type-syntax-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+authors = ["Seifeddine Gmati <azjezz@carthage.software>"]
+license = "MIT OR Apache-2.0"
+
+# Own workspace - the top-level mago workspace deliberately excludes this so
+# `libfuzzer-sys` (nightly-only) doesn't leak into normal builds.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+bumpalo = { version = "3", features = ["collections"] }
+
+mago-type-syntax = { path = ".." }
+mago-syntax-core = { path = "../../syntax-core" }
+mago-database = { path = "../../database" }
+mago-span = { path = "../../span" }
+
+[[bin]]
+name = "parser"
+path = "fuzz_targets/parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "lexer"
+path = "fuzz_targets/lexer.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
+opt-level = 3
+overflow-checks = true

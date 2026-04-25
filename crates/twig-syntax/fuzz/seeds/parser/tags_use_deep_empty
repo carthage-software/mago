@@ -1,0 +1,4 @@
+{% use "foo.twig" %}
+--TEMPLATE(foo.twig)--
+{% use "bar.twig" %}
+--TEMPLATE(bar.twig)--

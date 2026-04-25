@@ -1,0 +1,2 @@
+{{ 'foo'|magic_call_string }}
+{{ 'foo'|magic_call_array }}

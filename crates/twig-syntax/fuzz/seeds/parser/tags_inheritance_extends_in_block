@@ -1,0 +1,3 @@
+{% block foo %}
+    {% extends "foo.twig" %}
+{% endblock %}

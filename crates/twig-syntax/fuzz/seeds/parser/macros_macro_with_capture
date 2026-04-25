@@ -1,0 +1,7 @@
+{{ _self.some_macro() }}
+
+{% macro some_macro() %}
+    {% apply upper %}
+        {% if true %}foo{% endif %}
+    {% endapply %}
+{% endmacro %}

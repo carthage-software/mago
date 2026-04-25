@@ -1,0 +1,11 @@
+{% extends 'layout' %}
+{% block content -%}
+    {% apply title -%}
+        second
+    {% endapply %}
+{% endblock %}
+--TEMPLATE(layout)--
+{% apply title -%}
+    first
+{% endapply %}
+{% block content %}{% endblock %}

@@ -1,0 +1,6 @@
+{{ {foo: "bar", number: 3, "spéßi%l": "e%c0d@d", "spa ce": ""}|url_encode }}
+{{ {foo: "bar", number: 3, "spéßi%l": "e%c0d@d", "spa ce": ""}|url_encode|raw }}
+{{ {}|url_encode|default("default") }}
+{{ 'spéßi%le%c0d@dspa ce'|url_encode }}
+*{{ ''|url_encode }}*
+*{{ null|url_encode }}*

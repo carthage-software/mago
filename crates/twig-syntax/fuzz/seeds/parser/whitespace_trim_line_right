@@ -1,0 +1,13 @@
+**{% if true ~%}    	    
+foo{% endif %}**
+
+**{{ 'foo' ~}}    	    
+foo
+**
+
+**{# comment ~#}	    
+	foo
+**
+
+**{% verbatim ~%}	    
+    foo{% endverbatim %}**

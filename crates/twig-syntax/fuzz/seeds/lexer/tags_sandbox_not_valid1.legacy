@@ -1,0 +1,6 @@
+{%- sandbox %}
+    {%- include "foo.twig" %}
+    a
+{%- endsandbox %}
+--TEMPLATE(foo.twig)--
+foo

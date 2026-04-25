@@ -1,0 +1,5 @@
+{{ block('foo', 'included.twig') is defined ? 'ok' : 'ko' }}
+{{ block('foo', included_loaded) is defined ? 'ok' : 'ko' }}
+{{ block('foo', included_loaded_internal) is defined ? 'ok' : 'ko' }}
+--TEMPLATE(included.twig)--
+{% block foo %}FOO{% endblock %}

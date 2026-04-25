@@ -1,0 +1,11 @@
+{% block foo %}
+    {%- from _self import input as linput %}
+{% endblock %}
+
+{% block bar %}
+    {{- linput('username') }}
+{% endblock %}
+
+{% macro input(name) -%}
+    <input name="{{ name }}">
+{% endmacro %}

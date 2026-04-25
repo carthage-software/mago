@@ -1,0 +1,2 @@
+{% if false %}{% block foo %}FOO{% endblock %}{% endif %}
+{% if true %}{% block bar %}BAR{% endblock %}{% endif %}

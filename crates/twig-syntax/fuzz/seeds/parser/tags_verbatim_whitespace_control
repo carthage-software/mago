@@ -1,0 +1,35 @@
+1***
+
+{%- verbatim %}
+    {{ 'bla' }}
+{% endverbatim %}
+
+1***
+2***
+
+{%- verbatim -%}
+    {{ 'bla' }}
+{% endverbatim %}
+
+2***
+3***
+
+{%- verbatim -%}
+    {{ 'bla' }}
+{% endverbatim -%}
+
+3***
+4***
+
+{%- verbatim -%}
+    {{ 'bla' }}
+{%- endverbatim %}
+
+4***
+5***
+
+{%- verbatim -%}
+    {{ 'bla' }}
+{%- endverbatim -%}
+
+5***

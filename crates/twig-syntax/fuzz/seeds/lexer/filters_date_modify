@@ -1,0 +1,2 @@
+{{ date1|date_modify('-1day')|date('Y-m-d H:i:s') }}
+{{ date2|date_modify('-1day')|date('Y-m-d H:i:s') }}

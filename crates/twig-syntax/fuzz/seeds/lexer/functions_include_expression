@@ -1,0 +1,6 @@
+FOO
+{{ include(foo) }}
+
+BAR
+--TEMPLATE(foo.twig)--
+FOOBAR

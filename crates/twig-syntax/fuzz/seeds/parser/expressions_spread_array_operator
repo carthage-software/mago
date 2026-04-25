@@ -1,0 +1,4 @@
+{{ [1, 2, ...[3, 4]]|join(',') }}
+{{ [1, 2, ...moreNumbers]|join(',') }}
+{{ [1, 2, ...iterableNumbers]|join(',') }}
+{{ [1, 2, ...iterableNumbers, 0, ...moreNumbers]|join(',') }}

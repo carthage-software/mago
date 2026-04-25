@@ -1,0 +1,5 @@
+{% include "foo.twig" with {'foo': 'bar'} %}
+{% include "foo.twig" with vars1 %}
+{% include "foo.twig" with vars2 %}
+--TEMPLATE(foo.twig)--
+{{ foo }}

@@ -1,0 +1,11 @@
+{% import 'macros' as macro %}
+{{ macro.foo() }}
+--TEMPLATE(macros)--
+{% macro foo() %}
+    foo
+    {{- _self.bar() }}
+{% endmacro %}
+
+{% macro bar() -%}
+    bar
+{% endmacro %}

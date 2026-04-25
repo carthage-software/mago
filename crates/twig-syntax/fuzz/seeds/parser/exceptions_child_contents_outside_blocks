@@ -1,0 +1,10 @@
+{% extends 'base.twig' %}
+
+Content outside a block.
+
+{% block sidebar %}
+    Content inside a block.
+{% endblock %}
+--TEMPLATE(base.twig)--
+{% block sidebar %}
+{% endblock %}

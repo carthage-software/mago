@@ -1,0 +1,15 @@
+{% block foo %}
+     {% if foo %}
+
+
+
+
+         {% for i in fo %}
+
+
+
+         {% endfor %}
+
+
+
+{% endblock %}

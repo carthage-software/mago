@@ -1,0 +1,4 @@
+{{ "I like Twig.\nYou will like it too.\n\nEverybody like it!"|nl2br }}
+{{ text|nl2br }}
+*{{ ''|nl2br }}*
+*{{ null|nl2br }}*

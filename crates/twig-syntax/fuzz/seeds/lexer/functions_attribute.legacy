@@ -1,0 +1,10 @@
+{{ attribute(obj, method) }}
+{{ attribute(variable=obj, attribute=method) }}
+{{ attribute(variable: obj, attribute: method) }}
+{{ attribute(array, item) }}
+{{ attribute(obj, "bar", ["a", "b"]) }}
+{{ attribute(obj, "bar", arguments) }}
+{{ attribute(variable=obj, attribute="bar", arguments=arguments) }}
+{{ attribute(variable: obj, attribute: "bar", arguments: arguments) }}
+{{ attribute(obj, method) is defined ? 'ok' : 'ko' }}
+{{ attribute(obj, nonmethod) is defined ? 'ok' : 'ko' }}

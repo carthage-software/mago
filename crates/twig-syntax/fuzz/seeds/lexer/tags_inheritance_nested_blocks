@@ -1,0 +1,15 @@
+{% extends "foo.twig" %}
+
+{% block content %}
+    {% block subcontent %}
+        {% block subsubcontent %}
+            SUBSUBCONTENT
+        {% endblock %}
+    {% endblock %}
+{% endblock %}
+--TEMPLATE(foo.twig)--
+{% block content %}
+    {% block subcontent %}
+        SUBCONTENT
+    {% endblock %}
+{% endblock %}

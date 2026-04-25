@@ -1,0 +1,5 @@
+{% use 'foo.twig' %}
+--TEMPLATE(foo.twig)--
+{% block bar %}
+    {% do node.data 5 %}
+{% endblock %}

@@ -1,0 +1,18 @@
+{%- import _self as macros %}
+
+{% block foo %}
+    {%- import "macros" as macros %}
+    {{- macros.input('username') }}
+{% endblock %}
+
+{% block bar %}
+    {{- macros.input('username') }}
+{% endblock %}
+
+{% macro input(name) -%}
+    <input name="{{ name }}">
+{% endmacro %}
+--TEMPLATE(macros)--
+{% macro input(name) %}
+    <input name="{{ name }}" value="local">
+{% endmacro %}

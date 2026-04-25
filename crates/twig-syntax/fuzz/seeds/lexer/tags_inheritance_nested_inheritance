@@ -1,0 +1,9 @@
+{% extends "layout.twig" %}
+{% block inside %}INSIDE{% endblock inside %}
+--TEMPLATE(layout.twig)--
+{% extends "base.twig" %}
+{% block body %}
+    {% block inside '' %}
+{% endblock body %}
+--TEMPLATE(base.twig)--
+{% block body '' %}

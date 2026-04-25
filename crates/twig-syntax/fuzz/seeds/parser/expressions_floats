@@ -1,0 +1,5 @@
+{% set val2 = 0.0 %}
+
+{{ val is same as (0.0) ? 'Yes' : 'No' }}
+{{ val2 is same as (0.0) ? 'Yes' : 'No' }}
+{{ val is same as (val2) ? 'Yes' : 'No' }}

@@ -1,0 +1,2 @@
+{{ string|length }}
+{{ markup|length }}

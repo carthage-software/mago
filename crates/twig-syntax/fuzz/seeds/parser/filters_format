@@ -1,0 +1,3 @@
+{{ string|format(foo, 3) }}
+*{{ ""|format(foo, 3) }}*
+*{{ null|format(foo, 3) }}*

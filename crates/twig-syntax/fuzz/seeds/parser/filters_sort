@@ -1,0 +1,3 @@
+{{ array1|sort|join }}
+{{ array2|sort|join }}
+{{ traversable|sort|join }}

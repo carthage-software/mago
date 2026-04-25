@@ -1,0 +1,5 @@
+{% extends foo ? 'foo.twig' : 'bar.twig' %}
+--TEMPLATE(foo.twig)--
+FOO
+--TEMPLATE(bar.twig)--
+BAR

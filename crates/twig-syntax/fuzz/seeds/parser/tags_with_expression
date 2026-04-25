@@ -1,0 +1,3 @@
+{% with {foo: 'foo', bar: 'BAZ'} %}
+    {{ foo }}{{ bar }}
+{% endwith %}

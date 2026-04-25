@@ -1,0 +1,7 @@
+{% use 'foo.twig' %}
+
+{% block content %}
+    {{ parent() }}
+{% endblock %}
+--TEMPLATE(foo.twig)--
+{% block content %}BAR{% endblock %}

@@ -1,0 +1,9 @@
+{{ obj.(method) }}
+{{ array.(item) }}
+{{ obj.("bar")("a", "b") }}
+{{ obj.("bar")(param1: "a", param2: "b") }}
+{{ obj.("bar")(param2: "b", param1: "a") }}
+{{ obj.("bar")("a", param2: "b") }}
+{{ obj.("bar")(...arguments) }}
+{{ obj.(method) is defined ? 'ok' : 'ko' }}
+{{ obj.(nonmethod) is defined ? 'ok' : 'ko' }}

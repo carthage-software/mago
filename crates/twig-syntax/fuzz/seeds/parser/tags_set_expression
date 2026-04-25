@@ -1,0 +1,4 @@
+{% set foo, bar = 'foo' ~ 'bar', 'bar' ~ 'foo' %}
+
+{{ foo }}
+{{ bar }}

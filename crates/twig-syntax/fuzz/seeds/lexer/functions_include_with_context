@@ -1,0 +1,6 @@
+{{ include("foo.twig") }}
+{{- include("foo.twig", with_context = false) }}
+{{- include("foo.twig", {'foo1': 'bar'}) }}
+{{- include("foo.twig", {'foo1': 'bar'}, with_context = false) }}
+--TEMPLATE(foo.twig)--
+{% for k, v in _context %}{{ k }},{% endfor %}

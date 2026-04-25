@@ -1,0 +1,16 @@
+{{ ["foo", "bar"]|join(', ') }}
+{{ foo|join(', ') }}
+{{ bar|join(', ') }}
+
+{{ ["foo", "bar"]|join(', ', ' and ') }}
+{{ foo|join(', ', ' and ') }}
+{{ bar|join(', ', ' and ') }}
+{{ ["one", "two", "three"]|join(', ', ' and ') }}
+{{ ["a", "b", "c"]|join('','-') }}
+{{ ["a", "b", "c"]|join('-','-') }}
+{{ ["a", "b", "c"]|join('-','') }}
+{{ ["hello"]|join('|','-') }}
+
+{{ {"a": "w", "b": "x", "c": "y", "d": "z"}|join }}
+{{ {"a": "w", "b": "x", "c": "y", "d": "z"}|join(',') }}
+{{ {"a": "w", "b": "x", "c": "y", "d": "z"}|join(',','-') }}

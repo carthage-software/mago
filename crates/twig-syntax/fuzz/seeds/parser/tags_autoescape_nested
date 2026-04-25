@@ -1,0 +1,13 @@
+{{ var }}
+{% autoescape 'html' %}
+  {{ var }}
+  {% autoescape false %}
+    {{ var }}
+    {% autoescape 'html' %}
+      {{ var }}
+    {% endautoescape %}
+    {{ var }}
+  {% endautoescape %}
+  {{ var }}
+{% endautoescape %}
+{{ var }}

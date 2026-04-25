@@ -1,0 +1,5 @@
+{% include 'content.twig' %}
+--TEMPLATE(content.twig)--
+
+
+{{ random([]) }}

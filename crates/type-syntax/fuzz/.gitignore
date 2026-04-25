@@ -1,0 +1,9 @@
+target/
+artifacts/
+coverage/
+Cargo.lock
+
+# Working corpus - libFuzzer writes new mutations here. Committed seeds live
+# in `seeds/` instead. Keep the directory structure checked in via .gitkeep.
+corpus/*/*
+!corpus/*/.gitkeep

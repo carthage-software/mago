@@ -1,0 +1,15 @@
+{% extends "foo.twig" %}
+
+{% block content %}
+  {% block inside %}
+    INSIDE OVERRIDDEN
+  {% endblock %}
+
+  BEFORE
+  {{ parent() }}
+  AFTER
+{% endblock %}
+--TEMPLATE(foo.twig)--
+{% block content %}
+  BAR
+{% endblock %}

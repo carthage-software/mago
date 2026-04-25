@@ -1,0 +1,6 @@
+{% for item in items %}
+  * {{ loop.index }}/{{ loop.index0 }}
+  * {{ loop.revindex }}/{{ loop.revindex0 }}
+  * {{ loop.first }}/{{ loop.last }}/{{ loop.length }}
+
+{% endfor %}

@@ -1,0 +1,3 @@
+{% for c in enum_cases('Twig\\Tests\\NonExistentEnum') %}
+    {{~ c.name }}
+{% endfor %}

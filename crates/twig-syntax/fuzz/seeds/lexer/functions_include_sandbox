@@ -1,0 +1,6 @@
+{{ include("foo.twig", sandboxed = true) }}
+--TEMPLATE(foo.twig)--
+
+
+{{ 'foo'|e }}
+{{ 'foo'|e }}

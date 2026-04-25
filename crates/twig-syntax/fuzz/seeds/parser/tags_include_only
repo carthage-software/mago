@@ -1,0 +1,8 @@
+{% include "foo.twig" %}
+{% include "foo.twig" only %}
+{% include "foo.twig" with vars1 %}
+{% include "foo.twig" with vars1 only %}
+{% include "foo.twig" with vars2 %}
+{% include "foo.twig" with vars2 only %}
+--TEMPLATE(foo.twig)--
+{% for k, v in _context %}{{ k }},{% endfor %}

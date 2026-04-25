@@ -19,6 +19,7 @@ package.homepage = "https://mago.carthage.software"
 package.repository = "https://github.com/carthage-software/mago"
 package.rust-version = "1.95.0"
 members = ["crates/*"]
+exclude = ["crates/syntax/fuzz", "crates/twig-syntax/fuzz", "crates/type-syntax/fuzz"]
 
 [workspace.lints.clippy]
 large_enum_variant = { level = "allow" }

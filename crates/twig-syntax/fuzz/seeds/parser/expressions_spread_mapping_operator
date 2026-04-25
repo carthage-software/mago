@@ -1,0 +1,16 @@
+{% for key, value in { firstName: 'Ryan', lastName: 'Weaver', favoriteFood: 'popcorn', ...{favoriteFood: 'pizza', sport: 'running'} } %}
+    {{ key }}: {{ value }}
+{% endfor %}
+
+{% for key, value in { firstName: 'Ryan', ...morePersonalDetails} %}
+    {{ key }}: {{ value }}
+{% endfor %}
+
+{% for key, value in { firstName: 'Ryan', ...iterablePersonalDetails} %}
+    {{ key }}: {{ value }}
+{% endfor %}
+
+{# multiple spreads #}
+{% for key, value in { firstName: 'Ryan', ...iterablePersonalDetails, lastName: 'Weaver', ...morePersonalDetails} %}
+    {{ key }}: {{ value }}
+{% endfor %}

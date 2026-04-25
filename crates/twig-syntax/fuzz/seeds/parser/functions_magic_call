@@ -1,0 +1,2 @@
+{{ 'foo'|magic_call }}
+{{ 'foo'|magic_call_closure }}

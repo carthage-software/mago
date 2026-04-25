@@ -1,0 +1,6 @@
+{% autoescape 'html' %}
+{{ 'v:bind@click="foo"'|escape('html_attr_relaxed') }}
+{% endautoescape %}
+{% autoescape 'html_attr_relaxed' %}
+{{ 'v:bind@click="foo"' | escape('html_attr') }}
+{% endautoescape %}

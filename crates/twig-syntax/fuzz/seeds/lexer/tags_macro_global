@@ -1,0 +1,6 @@
+{% from 'forms.twig' import foo %}
+
+{{ foo('foo') }}
+{{ foo() }}
+--TEMPLATE(forms.twig)--
+{% macro foo(name) %}{{ name|default('foo') }}{{ global }}{% endmacro %}

@@ -1,0 +1,16 @@
+{% extends "base.twig" %}
+
+{% block element -%}
+    Element:
+    {{- parent() -}}
+{% endblock %}
+--TEMPLATE(base.twig)--
+{% block element -%}
+    <div>
+        {%- if item.children is defined %}
+            {%- for item in item.children %}
+                {{- block('element') -}}
+            {% endfor %}
+        {%- endif -%}
+    </div>
+{%- endblock %}

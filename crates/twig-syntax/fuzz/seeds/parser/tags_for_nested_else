@@ -1,0 +1,9 @@
+{% for item in items %}
+  {% for item in items1 %}
+    * {{ item }}
+  {% else %}
+    no {{ item }}
+  {% endfor %}
+{% else %}
+  no item1
+{% endfor %}

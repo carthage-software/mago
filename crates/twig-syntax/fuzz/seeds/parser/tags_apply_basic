@@ -1,0 +1,3 @@
+{% apply upper %}
+Some text with a {{ var }}
+{% endapply %}

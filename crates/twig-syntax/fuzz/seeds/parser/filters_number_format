@@ -1,0 +1,9 @@
+{{ 20|number_format }}
+{{ 20.25|number_format }}
+{{ 20.25|number_format(2) }}
+{{ 20.25|number_format(2, ',') }}
+{{ 1020.25|number_format(2, ',') }}
+{{ 1020.25|number_format(2, ',', '.') }}
+{{ '1020.25'|number_format(2, ',', '.') }}
+{{ ''|number_format(2, ',', '.') }}
+{{ null|number_format(2, ',', '.') }}

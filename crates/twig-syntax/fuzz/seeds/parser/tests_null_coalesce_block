@@ -1,0 +1,2 @@
+{% block foo %}OK{% endblock %}
+{{ block('foo') ?? 'KO' }}

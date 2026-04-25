@@ -1,0 +1,4 @@
+{% include "included.twig" ignore missing %}
+NOT DISPLAYED
+--TEMPLATE(included.twig)--
+{% include "DOES NOT EXIST" %}

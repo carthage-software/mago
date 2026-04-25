@@ -1,0 +1,9 @@
+{% set foo = 'foo' %}
+{% set bar = 'foo<br />' %}
+
+{{ foo }}
+{{ bar }}
+
+{% set foo, bar = 'foo', 'bar' %}
+
+{{ foo }}{{ bar }}

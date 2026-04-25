@@ -1,0 +1,12 @@
+{{ array|length }}
+{{ string|length }}
+{{ number|length }}
+{{ to_string_able|length }}
+{{ countable|length }}
+{{ iterator_aggregate|length }}
+{{ ""|length }}
+{{ null|length }}
+{{ magic|length }}
+{{ non_countable|length }}
+{{ simple_xml_element|length }}
+{{ iterator|length }}

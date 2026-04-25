@@ -1,0 +1,3 @@
+{% deprecated 'The "index.twig" template is deprecated, use "greeting.twig" instead.' package="foo/bar" %}
+
+Hello Fabien

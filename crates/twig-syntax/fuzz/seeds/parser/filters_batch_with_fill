@@ -1,0 +1,9 @@
+<table>
+{% for row in items|batch(3, 'fill') %}
+  <tr>
+  {% for column in row %}
+    <td>{{ column }}</td>
+  {% endfor %}
+  </tr>
+{% endfor %}
+</table>

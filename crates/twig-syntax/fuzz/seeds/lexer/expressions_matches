@@ -1,0 +1,7 @@
+{{ 'foo' matches '/o/' ? 'OK' : 'KO' }}
+{{ 'foo' matches '/o/'|lower ? 'OK' : 'KO' }}
+{{ 'foo' matches '/^fo/' ? 'OK' : 'KO' }}
+{{ 'foo' matches '/^' ~ 'fo/' ? 'OK' : 'KO' }}
+{{ 'foo' matches '/O/i' ? 'OK' : 'KO' }}
+{{ null matches '/o/' }}
+{{ markup matches '/test/' ? 'OK': 'KO' }}

@@ -1,0 +1,7 @@
+{% set foo = 'baz' %}
+{% apply upper %}
+    {% set foo = 'foo' %}
+    {% set bar = 'bar' %}
+{% endapply %}
+{{ 'foo' == foo ? 'OK ' ~ foo : 'KO' }}
+{{ 'bar' == bar ? 'OK ' ~ bar : 'KO' }}

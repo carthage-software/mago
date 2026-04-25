@@ -1,0 +1,4 @@
+{{ constant('DATE_W3C') == expect ? 'true' : 'false' }}
+{{ constant('ARRAY_AS_PROPS', object) }}
+{{ constant('class', object) }}
+{{ constant('ARRAY_AS_PROPS', object) ?? 'KO' }}

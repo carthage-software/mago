@@ -1,0 +1,5 @@
+{{ "Hello, <strong>World</strong>!"|striptags }}
+{{ text|striptags }}
+{{ text|striptags('<strong>')|raw }}
+*{{ ''|striptags }}*
+*{{ null|striptags }}*

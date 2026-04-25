@@ -1,0 +1,19 @@
+{% extends "parent.twig" %}
+
+{% block outer %}
+    outer wrap start
+    {{~ parent() }}
+    outer wrap end
+{% endblock %}
+
+{% block inner -%}
+    inner actual
+{% endblock %}
+--TEMPLATE(parent.twig)--
+{% block outer %}
+    outer start
+    {% block inner %}
+        inner default
+    {% endblock %}
+    outer end
+{% endblock %}

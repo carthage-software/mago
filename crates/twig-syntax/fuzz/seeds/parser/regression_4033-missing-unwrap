@@ -1,0 +1,11 @@
+{% extends 'parent' %}
+{%- block content -%}
+    {{ parent() }}
+    child
+{%- endblock -%}
+--TEMPLATE(parent)--
+{% extends ['unknowngrandparent', 'grandparent'] %}
+--TEMPLATE(grandparent)--
+{%- block content -%}
+    grandparent
+{%- endblock -%}

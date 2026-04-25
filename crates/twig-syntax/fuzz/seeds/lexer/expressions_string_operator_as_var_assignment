@@ -1,0 +1,7 @@
+{% for matches in [1, 2] %}
+    {{- matches }}
+{% endfor %}
+
+{% set matches = [1, 2] %}
+
+OK

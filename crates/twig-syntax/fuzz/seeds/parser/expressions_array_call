@@ -1,0 +1,4 @@
+{{ items.foo }}
+{{ items['foo'] }}
+{{ items[foo] }}
+{{ items[items[foo]] }}

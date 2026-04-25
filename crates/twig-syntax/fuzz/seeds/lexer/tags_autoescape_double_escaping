@@ -1,0 +1,3 @@
+{% autoescape 'html' %}
+{{ var|escape }}
+{% endautoescape %}

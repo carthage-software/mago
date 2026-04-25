@@ -1,0 +1,3 @@
+{% apply lower|title %}
+  {{ var }}
+{% endapply %}

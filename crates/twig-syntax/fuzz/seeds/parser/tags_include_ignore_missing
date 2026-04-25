@@ -1,0 +1,4 @@
+{% include ["foo.twig", "bar.twig"] ignore missing %}
+{% include "foo.twig" ignore missing %}
+{% include "foo.twig" ignore missing with {} %}
+{% include "foo.twig" ignore missing with {} only %}

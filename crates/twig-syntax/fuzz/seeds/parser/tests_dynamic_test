@@ -1,0 +1,4 @@
+{{ 'bar' is test_bar ? '1' :'0' }}
+{{ 'foo' is test_foo ? '1' :'0' }}
+{{ 'bar' is test_foo ? '1' :'0' }}
+{{ 'foo' is test_bar ? '1' :'0' }}

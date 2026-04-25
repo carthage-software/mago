@@ -1,0 +1,12 @@
+{{ date1|date }}
+{{ date1|date('d/m/Y') }}
+{{ date1|date('d/m/Y H:i:s', 'Asia/Hong_Kong') }}
+{{ date1|date('d/m/Y H:i:s', timezone1) }}
+{{ date1|date('d/m/Y H:i:s') }}
+{{ date1|date_modify('+1 hour')|date('d/m/Y H:i:s') }}
+
+{{ date2|date('d/m/Y H:i:s P', 'Europe/Paris') }}
+{{ date2|date('d/m/Y H:i:s P', 'Asia/Hong_Kong') }}
+{{ date2|date('d/m/Y H:i:s P', false) }}
+{{ date2|date('e', 'Europe/Paris') }}
+{{ date2|date('e', false) }}

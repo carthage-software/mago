@@ -1,0 +1,25 @@
+{% guard filter foobar %}
+    NEVER
+    {{ 'a'|foobar }}
+{% else -%}
+    The foobar filter doesn't exist
+{% endguard %}
+
+{% guard function constant -%}
+    The constant function does exist
+{% else %}
+    NEVER
+{% endguard %}
+
+{% guard test foobar %}
+    NEVER
+    {{ 'a'|foobar }}
+{% else -%}
+    The foobar test doesn't exist
+{% endguard %}
+
+{% guard test divisible by -%}
+    The divisible by function does exist
+{% else %}
+    NEVER
+{% endguard %}

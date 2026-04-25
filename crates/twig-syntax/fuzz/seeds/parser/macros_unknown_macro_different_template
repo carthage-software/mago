@@ -1,0 +1,4 @@
+{% import foo_template as macros %}
+{{ macros.foo() }}
+--TEMPLATE(foo.twig)--
+foo

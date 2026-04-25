@@ -1,0 +1,3 @@
+{{ "    <div>   <div>   foo   </div>   </div>"|spaceless }}
+*{{ ""|spaceless }}*
+*{{ null|spaceless }}*

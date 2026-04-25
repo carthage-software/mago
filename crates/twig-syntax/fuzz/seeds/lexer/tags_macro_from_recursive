@@ -1,0 +1,10 @@
+{% from _self import recursive_macro %}
+
+{{ recursive_macro(10) }}
+
+{% macro recursive_macro(n) %}
+    {% if n > 0 %}
+        {{- recursive_macro(n - 1) -}}
+    {% endif %}
+    {{- n }}
+{% endmacro %}

@@ -1,0 +1,5 @@
+{%- set tmp -%}
+  {%- block foo 'foo' -%}
+  {%- block bar 'bar' -%}
+{%- endset -%}
+{{ tmp }}

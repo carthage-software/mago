@@ -1,0 +1,9 @@
+{{ 8 is divisible by(2) ? 'OK' }}
+{{ 8 is divisible by 2 ? 'OK' }}
+{{ 8 is not divisible by(3) ? 'OK' }}
+{{ 8 is    divisible   by   (2) ? 'OK' }}
+{{ 8 is    divisible   by   2 ? 'OK' }}
+{{ 8 is not
+   divisible
+   by
+   (3) ? 'OK' }}

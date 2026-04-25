@@ -1,0 +1,19 @@
+{{ nope ?? nada ?? 'OK' -}} {# no deprecation as the operators have the same precedence #}
+
+{{ 1 + nope ?? nada ?? 2 }}
+{{ 1 + nope ??
+   3 + nada ?? 2 }}
+{{ 1 ~ 'notnull' ?? 'foo' ~ '_bar' }}
+{{
+  1 ~ 2 + 3
+  ??
+  1 ~
+  2 + 4
+}}
+{{ (
+  1 ~ 2 + 3
+  ??
+  1 ~
+  2 + 4
+  )
+}}

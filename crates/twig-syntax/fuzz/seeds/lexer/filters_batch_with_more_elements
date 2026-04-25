@@ -1,0 +1,7 @@
+{% for row in items|batch(3, 'fill') %}
+  <div class=row>
+  {% for key, column in row %}
+    <div class={{ key }}>{{ column }}</div>
+  {% endfor %}
+  </div>
+{% endfor %}

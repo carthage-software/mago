@@ -1,0 +1,3 @@
+{{ date1|date }}
+{{ date1|date('%d days %h hours') }}
+{{ date1|date('%d days %h hours', timezone1) }}

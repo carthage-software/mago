@@ -1,0 +1,5 @@
+{% extends 'base.twig' %}
+{% block bar %}BAR{% endblock %}
+--TEMPLATE(base.twig)--
+{% block foo %}{{ block() }}{% endblock %}
+{% block bar %}BAR_BASE{% endblock %}

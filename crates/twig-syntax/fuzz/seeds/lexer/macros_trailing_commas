@@ -1,0 +1,15 @@
+{% import _self as test %}
+
+{% macro test(a, b,) -%}
+    {{ a|default('a') }}<br />
+    {{- b|default('b') }}<br />
+{%- endmacro %}
+{% macro test2(a, b) -%}
+    {{ a|default('a') }}<br />
+    {{- b|default('b') }}<br />
+{%- endmacro %}
+
+{{ test.test(1, 2,) }}
+{{ test.test(3, 4) }}
+{{ test.test2(5, 6,) }}
+{{ test.test2(7, 8) }}

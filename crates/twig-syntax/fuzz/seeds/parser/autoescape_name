@@ -1,0 +1,10 @@
+{{ br -}}
+{{ include('index.js.twig') -}}
+{{ include('index.html.twig') -}}
+{{ include('index.txt.twig') -}}
+--TEMPLATE(index.js.twig)--
+{{ br -}}
+--TEMPLATE(index.html.twig)--
+{{ br -}}
+--TEMPLATE(index.txt.twig)--
+{{ br -}}

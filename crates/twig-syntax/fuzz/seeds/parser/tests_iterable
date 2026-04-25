@@ -1,0 +1,4 @@
+{{ foo is iterable ? 'ok' : 'ko' }}
+{{ traversable is iterable ? 'ok' : 'ko' }}
+{{ obj is iterable ? 'ok' : 'ko' }}
+{{ val is iterable ? 'ok' : 'ko' }}

@@ -1,0 +1,3 @@
+{{ date|date(format='d/m/Y H:i:s P', timezone='America/Chicago') }}
+{{ date|date(timezone='America/Chicago', format='d/m/Y H:i:s P') }}
+{{ date|date('d/m/Y H:i:s P', timezone='America/Chicago') }}

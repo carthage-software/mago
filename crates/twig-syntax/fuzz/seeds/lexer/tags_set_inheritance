@@ -1,0 +1,16 @@
+{% extends "layout.twig" %}
+
+{% set bar %}bar{% endset %}
+
+{% block var_from_child %}
+    {{- bar -}}
+{% endblock %}
+--TEMPLATE(layout.twig)--
+{% set foo %}foo{% endset %}
+
+{% block var_from_layout %}
+    {{- foo -}}
+{% endblock %}
+
+{% block var_from_child %}
+{% endblock %}

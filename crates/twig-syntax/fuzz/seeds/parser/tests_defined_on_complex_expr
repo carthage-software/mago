@@ -1,0 +1,1 @@
+{{ (1 + 2) is defined ? 'ok' : 'ko' }}

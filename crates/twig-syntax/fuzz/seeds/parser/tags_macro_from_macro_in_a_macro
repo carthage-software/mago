@@ -1,0 +1,11 @@
+{% from _self import another, foo %}
+
+{{ foo() }}
+
+{% macro foo() %}
+    {{ another() }}
+{% endmacro %}
+
+{% macro another() %}
+    OK
+{% endmacro %}

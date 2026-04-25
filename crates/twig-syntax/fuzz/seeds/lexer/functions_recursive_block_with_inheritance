@@ -1,0 +1,14 @@
+{% extends "ordered_menu.twig" %}
+{% block label %}"{{ parent() }}"{% endblock %}
+{% block list %}{% set class = 'b' %}{{ parent() }}{% endblock %}
+--TEMPLATE(ordered_menu.twig)--
+{% extends "menu.twig" %}
+{% block list %}{% set class = class|default('a') %}<ol class="{{ class }}">{{ block('children') }}</ol>{% endblock %}
+--TEMPLATE(menu.twig)--
+{% extends "base.twig" %}
+{% block list %}<ul>{{ block('children') }}</ul>{% endblock %}
+{% block children %}{% set currentItem = item %}{% for item in currentItem %}{{ block('item') }}{% endfor %}{% set item = currentItem %}{% endblock %}
+{% block item %}<li>{% if item is not iterable %}{{ block('label') }}{% else %}{{ block('list') }}{% endif %}</li>{% endblock %}
+{% block label %}{{ item }}{% endblock %}
+--TEMPLATE(base.twig)--
+{{ block('list') }}

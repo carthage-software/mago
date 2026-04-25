@@ -1,0 +1,4 @@
+{% use 'foo' with foobar as bar %}
+--TEMPLATE(foo)--
+{% block bar %}
+{% endblock %}

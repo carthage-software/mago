@@ -1,0 +1,6 @@
+{% for key, item in items %}
+* {{ key }} ({{ loop.length }}):
+{% for value in item %}
+  * {{ value }} ({{ loop.length }})
+{% endfor %}
+{% endfor %}

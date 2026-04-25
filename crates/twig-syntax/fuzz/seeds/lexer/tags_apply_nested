@@ -1,0 +1,7 @@
+{% apply lower|title %}
+  {{ var }}
+  {% apply upper %}
+    {{ var }}
+  {% endapply %}
+  {{ var }}
+{% endapply %}

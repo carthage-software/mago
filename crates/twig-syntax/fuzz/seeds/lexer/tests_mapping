@@ -1,0 +1,8 @@
+{{ empty is mapping ? 'ok' : 'ko' }}
+{{ sequence is mapping ? 'ok' : 'ko' }}
+{{ empty_array_obj is mapping ? 'ok' : 'ko' }}
+{{ sequence_array_obj is mapping ? 'ok' : 'ko' }}
+{{ mapping_array_obj is mapping ? 'ok' : 'ko' }}
+{{ obj is mapping ? 'ok' : 'ko' }}
+{{ mapping is mapping ? 'ok' : 'ko' }}
+{{ string is mapping ? 'ok' : 'ko' }}

@@ -1,0 +1,7 @@
+{{ [1, 2, 3, 4]|first }}
+{{ {a: 1, b: 2, c: 3, d: 4}|first }}
+{{ '1234'|first }}
+{{ arr|first }}
+{{ 'Ä€é'|first }}
+*{{ ''|first }}*
+*{{ null|first }}*

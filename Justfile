@@ -48,6 +48,30 @@ fix:
 test:
     cargo test --workspace --locked --all-targets
 
+# Fuzz the PHP lexer.
+fuzz-php-lexer:
+    cd crates/syntax/fuzz && cargo +nightly fuzz run lexer corpus/lexer seeds/lexer
+
+# Fuzz the PHP parser.
+fuzz-php-parser:
+    cd crates/syntax/fuzz && cargo +nightly fuzz run parser corpus/parser seeds/parser
+
+# Fuzz the Twig lexer.
+fuzz-twig-lexer:
+    cd crates/twig-syntax/fuzz && cargo +nightly fuzz run lexer corpus/lexer seeds/lexer
+
+# Fuzz the Twig parser.
+fuzz-twig-parser:
+    cd crates/twig-syntax/fuzz && cargo +nightly fuzz run parser corpus/parser seeds/parser
+
+# Fuzz the type lexer.
+fuzz-type-lexer:
+    cd crates/type-syntax/fuzz && cargo +nightly fuzz run lexer corpus/lexer seeds/lexer
+
+# Fuzz the type parser.
+fuzz-type-parser:
+    cd crates/type-syntax/fuzz && cargo +nightly fuzz run parser corpus/parser seeds/parser
+
 # Publishes all crates to crates.io in the correct order.
 publish:
     # Note: the order of publishing is important, as some crates depend on others.

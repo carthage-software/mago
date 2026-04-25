@@ -1,0 +1,3 @@
+{{ 1 is odd ? 'ok' : 'ko' }}
+{{ 2 is odd ? 'ko' : 'ok' }}
+{{ -1 is odd ? 'ok' : 'ko' }}

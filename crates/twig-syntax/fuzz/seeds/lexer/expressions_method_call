@@ -1,0 +1,13 @@
+{{ items.foo.foo }}
+{{ items.foo.getFoo() }}
+{{ items.foo.bar }}
+{{ items.foo['bar'] }}
+{{ items.foo.bar('a', 43) }}
+{{ items.foo.bar(param1: 'a', param2: 43) }}
+{{ items.foo.bar(param2: 43, param1: 'a') }}
+{{ items.foo.bar('a', param2: 43) }}
+{{ items.foo.bar(foo) }}
+{{ items.foo.self.foo() }}
+{{ items.foo.is }}
+{{ items.foo.in }}
+{{ items.foo.not }}

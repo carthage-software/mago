@@ -1,0 +1,9 @@
+{% extends "base.twig" %}
+
+{% block content %}
+    {{ parent() }}
+{% endblock %}
+--TEMPLATE(base.twig)--
+{% block content %}
+    {{ include("foo.twig") }}
+{% endblock %}

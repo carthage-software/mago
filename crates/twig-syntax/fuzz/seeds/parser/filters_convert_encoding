@@ -1,0 +1,3 @@
+{{ "愛していますか？"|convert_encoding('ISO-2022-JP', 'UTF-8')|convert_encoding('UTF-8', 'ISO-2022-JP') }}
+*{{ ""|convert_encoding('ISO-2022-JP', 'UTF-8')|convert_encoding('UTF-8', 'ISO-2022-JP') }}*
+*{{ null|convert_encoding('ISO-2022-JP', 'UTF-8')|convert_encoding('UTF-8', 'ISO-2022-JP') }}*

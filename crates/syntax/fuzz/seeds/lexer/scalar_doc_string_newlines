@@ -1,0 +1,11 @@
+<?php
+
+<<<'EOF'@@{ "\n\n" }@@EOF;
+<<<'EOF'@@{ "\n\n\n" }@@EOF;
+<<<'EOF'@@{ "\nFoo\n\n" }@@EOF;
+<<<EOF@@{ "\n\$var\n\n" }@@EOF;
+
+<<<'EOF'@@{ "\r\n\r\n" }@@EOF;
+<<<'EOF'@@{ "\r\n\r\n\r\n" }@@EOF;
+<<<'EOF'@@{ "\r\nFoo\r\n\r\n" }@@EOF;
+<<<EOF@@{ "\r\n\$var\r\n\r\n" }@@EOF;
