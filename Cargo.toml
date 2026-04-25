@@ -70,7 +70,7 @@ regex = "1.11.0"
 cruet = "0.15.0"
 indicatif = { version = "0.18.0" }
 paste = "1.0.15"
-criterion = "0.8.1"
+criterion = { package = "codspeed-criterion-compat", version = "4.5.0" }
 clap = { version = "4.5.20", features = ["cargo", "derive", "unicode", "wrap_help"] }
 clap_complete = "4.5.59"
 termtree = "1.0.0"
