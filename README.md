@@ -13,6 +13,7 @@
 [![CI Status](https://github.com/carthage-software/mago/actions/workflows/ci.yml/badge.svg)](https://github.com/carthage-software/mago/actions/workflows/ci.yml)
 [![CD Status](https://github.com/carthage-software/mago/actions/workflows/cd.yml/badge.svg)](https://github.com/carthage-software/mago/actions/workflows/cd.yml)
 [![CodeQL](https://github.com/carthage-software/mago/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/carthage-software/mago/actions/workflows/github-code-scanning/codeql)
+[![CodSpeed](https://img.shields.io/endpoint?url=https://codspeed.io/badge.json)](https://codspeed.io/carthage-software/mago?utm_source=badge)
 [![Crates.io](https://img.shields.io/crates/v/mago.svg)](https://crates.io/crates/mago)
 [![Latest Stable Version for PHP](https://poser.pugx.org/carthage-software/mago/v)](https://packagist.org/packages/carthage-software/mago)
 [![Total Composer Downloads](http://poser.pugx.org/carthage-software/mago/downloads)](https://packagist.org/packages/carthage-software/mago)
