@@ -1,2 +1,0 @@
-<?php
-global $$foo->bar;

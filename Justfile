@@ -48,13 +48,21 @@ fix:
 test:
     cargo test --workspace --locked --all-targets
 
-# Fuzz the PHP lexer.
+# Fuzz the PHP lexer. Seeds are drawn from the syntax/analyzer/formatter PHP fixtures.
 fuzz-php-lexer:
-    cd crates/syntax/fuzz && cargo +nightly fuzz run lexer corpus/lexer seeds/lexer
+    cd crates/syntax/fuzz && cargo +nightly fuzz run lexer \
+        corpus/lexer \
+        ../tests/fixtures \
+        ../../analyzer/tests/cases \
+        ../../formatter/tests/cases
 
-# Fuzz the PHP parser.
+# Fuzz the PHP parser. Seeds are drawn from the syntax/analyzer/formatter PHP fixtures.
 fuzz-php-parser:
-    cd crates/syntax/fuzz && cargo +nightly fuzz run parser corpus/parser seeds/parser
+    cd crates/syntax/fuzz && cargo +nightly fuzz run parser \
+        corpus/parser \
+        ../tests/fixtures \
+        ../../analyzer/tests/cases \
+        ../../formatter/tests/cases
 
 # Fuzz the Twig lexer.
 fuzz-twig-lexer:
