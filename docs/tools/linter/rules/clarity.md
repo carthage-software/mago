@@ -17,6 +17,7 @@ This document details the rules available in the `Clarity` category.
 | No Hash Emoji | [`no-hash-emoji`](#no-hash-emoji) |
 | No Isset | [`no-isset`](#no-isset) |
 | No Multi Assignments | [`no-multi-assignments`](#no-multi-assignments) |
+| No Negated Ternary | [`no-negated-ternary`](#no-negated-ternary) |
 | No Nested Ternary | [`no-nested-ternary`](#no-nested-ternary) |
 | No Short Bool Cast | [`no-short-bool-cast`](#no-short-bool-cast) |
 | No Shorthand Ternary | [`no-shorthand-ternary`](#no-shorthand-ternary) |
@@ -372,6 +373,44 @@ $a = $b;
 <?php
 
 $a = $b = 0;
+```
+
+
+## <a id="no-negated-ternary"></a>`no-negated-ternary`
+
+Flags ternary expressions whose condition is a logical negation
+(`!$foo ? a : b`).
+
+A negated condition adds a layer of indirection the reader has to
+undo to follow the branches. Removing the negation and swapping
+the `then` and `else` branches produces an equivalent expression
+that reads more directly.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$x = $foo ? 0 : 1;
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$x = !$foo ? 1 : 0;
 ```
 
 

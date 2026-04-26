@@ -84,6 +84,7 @@ use crate::rule::NoIteratorToArrayInForeachConfig;
 use crate::rule::NoLiteralNamespaceStringConfig;
 use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMultiAssignmentsConfig;
+use crate::rule::NoNegatedTernaryConfig;
 use crate::rule::NoNestedTernaryConfig;
 use crate::rule::NoNoopConfig;
 use crate::rule::NoNullPropertyInitConfig;
@@ -274,6 +275,7 @@ pub struct RulesSettings {
     pub no_noop: RuleSettings<NoNoopConfig>,
     pub no_only: RuleSettings<NoOnlyConfig>,
     pub no_multi_assignments: RuleSettings<NoMultiAssignmentsConfig>,
+    pub no_negated_ternary: RuleSettings<NoNegatedTernaryConfig>,
     pub no_nested_ternary: RuleSettings<NoNestedTernaryConfig>,
     pub no_hash_emoji: RuleSettings<NoHashEmojiConfig>,
     pub no_hash_comment: RuleSettings<NoHashCommentConfig>,

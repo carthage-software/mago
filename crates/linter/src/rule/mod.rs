@@ -245,6 +245,7 @@ define_rules! {
     NoPhpTagTerminator(no_php_tag_terminator @ NoPhpTagTerminatorRule),
     NoNoop(no_noop @ NoNoopRule),
     NoMultiAssignments(no_multi_assignments @ NoMultiAssignmentsRule),
+    NoNegatedTernary(no_negated_ternary @ NoNegatedTernaryRule),
     NoNestedTernary(no_nested_ternary @ NoNestedTernaryRule),
     NoHashEmoji(no_hash_emoji @ NoHashEmojiRule),
     NoHashComment(no_hash_comment @ NoHashCommentRule),
