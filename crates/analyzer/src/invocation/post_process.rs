@@ -327,7 +327,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
             }
 
             if declared_had_templates {
-                new_type.widen_scalars();
+                new_type.widen_literals();
             }
 
             new_type.set_by_reference(true);
