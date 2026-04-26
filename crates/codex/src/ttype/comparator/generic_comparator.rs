@@ -75,7 +75,7 @@ pub(crate) fn is_contained_by(
             false,
             &mut parameter_comparison_result,
         ) {
-            if let Some(Variance::Contravariant) = container_metadata.template_variance.get(&parameter_offset)
+            if let Some(Variance::Contravariant) = container_metadata.template_variance.get(parameter_offset)
                 && union_comparator::is_contained_by(
                     codebase,
                     container_type_parameter,

@@ -397,7 +397,7 @@ fn replace_atomic(
                     };
 
                     let is_covariant = if let Some(class_like_metadata) = codebase.get_class_like(&object_name) {
-                        matches!(class_like_metadata.template_variance.get(&offset), Some(Variance::Covariant))
+                        matches!(class_like_metadata.template_variance.get(offset), Some(Variance::Covariant))
                     } else {
                         false
                     };
