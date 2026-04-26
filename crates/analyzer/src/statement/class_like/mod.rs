@@ -1690,7 +1690,7 @@ fn check_template_parameters<'ctx>(
 
             if parent_metadata
                 .template_variance
-                .get(&i)
+                .get(i)
                 .is_some_and(mago_codex::ttype::template::variance::Variance::is_invariant)
             {
                 for extended_type_atomic in extended_type.types.as_ref() {
@@ -1708,7 +1708,7 @@ fn check_template_parameters<'ctx>(
 
                     if class_like_metadata
                         .template_variance
-                        .get(&local_offset)
+                        .get(local_offset)
                         .is_some_and(mago_codex::ttype::template::variance::Variance::is_covariant)
                     {
                         let child_template_name = generic_parameter.parameter_name;

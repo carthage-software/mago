@@ -464,7 +464,8 @@ fn scan_class_like<'arena>(
         class_like_metadata.has_sealed_methods = docblock.has_sealed_methods;
         class_like_metadata.has_sealed_properties = docblock.has_sealed_properties;
 
-        for (i, template) in docblock.templates.iter().enumerate() {
+        let mut template_variance = Vec::new();
+        for template in &docblock.templates {
             let template_name = atom(&template.name);
             let template_as_type = if let Some(type_string) = &template.type_string {
                 match builder::get_type_from_string(
@@ -511,8 +512,10 @@ fn scan_class_like<'arena>(
                 class_like_metadata.template_readonly.insert(template_name);
             }
 
-            class_like_metadata.add_template_variance_parameter(i, variance);
+            template_variance.push(variance);
         }
+
+        class_like_metadata.set_template_variance(template_variance);
 
         // Process imported type aliases first so they're available when building
         // type alias definitions AND when resolving @template-extends/@template-implements

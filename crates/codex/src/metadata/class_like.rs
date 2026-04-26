@@ -1,4 +1,3 @@
-use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 use serde::Deserialize;
@@ -54,7 +53,7 @@ pub struct ClassLikeMetadata {
     pub kind: SymbolKind,
     pub template_types: TemplateTypes,
     pub template_readonly: AtomSet,
-    pub template_variance: HashMap<usize, Variance>,
+    pub template_variance: Vec<Variance>,
     pub template_extended_offsets: AtomMap<Vec<TUnion>>,
     pub template_extended_parameters: AtomMap<IndexMap<Atom, TUnion, RandomState>>,
     pub template_type_extends_count: AtomMap<usize>,
@@ -132,7 +131,7 @@ impl ClassLikeMetadata {
             overridden_method_ids: AtomMap::default(),
             overridden_property_ids: AtomMap::default(),
             properties: AtomMap::default(),
-            template_variance: HashMap::default(),
+            template_variance: Vec::new(),
             template_type_extends_count: AtomMap::default(),
             template_extended_parameters: AtomMap::default(),
             template_extended_offsets: AtomMap::default(),
@@ -304,10 +303,10 @@ impl ClassLikeMetadata {
         self.template_types.insert(name, constraint);
     }
 
-    /// Adds or updates the variance for a specific parameter index. Returns the previous variance if one existed.
+    /// Set the variance for the template parameters
     #[inline]
-    pub fn add_template_variance_parameter(&mut self, index: usize, variance: Variance) -> Option<Variance> {
-        self.template_variance.insert(index, variance)
+    pub fn set_template_variance(&mut self, template_variance: Vec<Variance>) {
+        self.template_variance = template_variance;
     }
 
     /// Adds or replaces the offset types for a specific template parameter name.

@@ -1416,7 +1416,7 @@ fn get_combiner_key(name: Atom, type_params: &[TUnion], codebase: &CodebaseMetad
             estimated_len += 2; // ", "
         }
 
-        if covariants.get(&i) == Some(&Variance::Covariant) {
+        if covariants.get(i) == Some(&Variance::Covariant) {
             estimated_len += 1; // "*"
         } else {
             estimated_len += tunion.get_id().len();
@@ -1439,7 +1439,7 @@ fn get_combiner_key(name: Atom, type_params: &[TUnion], codebase: &CodebaseMetad
                 pos += 2;
             }
             let param_str =
-                if covariants.get(&i) == Some(&Variance::Covariant) { "*" } else { tunion.get_id().as_str() };
+                if covariants.get(i) == Some(&Variance::Covariant) { "*" } else { tunion.get_id().as_str() };
             buffer[pos..pos + param_str.len()].copy_from_slice(param_str.as_bytes());
             pos += param_str.len();
         }
@@ -1458,7 +1458,7 @@ fn get_combiner_key(name: Atom, type_params: &[TUnion], codebase: &CodebaseMetad
         if i > 0 {
             result.push_str(", ");
         }
-        if covariants.get(&i) == Some(&Variance::Covariant) {
+        if covariants.get(i) == Some(&Variance::Covariant) {
             result.push('*');
         } else {
             result.push_str(tunion.get_id().as_str());
