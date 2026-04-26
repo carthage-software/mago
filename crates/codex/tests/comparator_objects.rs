@@ -213,7 +213,11 @@ fn generic_object_invariant_in_param() {
     let cb = codebase_from_php(GENERICS);
     let a = t_generic_named("ArrayList", vec![u(t_lit_int(5))]);
     let b = t_generic_named("ArrayList", vec![u(t_int())]);
-    assert!(atomic_is_contained(&a, &b, &cb));
+    // `ArrayList<T>` declares `T` without a variance annotation, so T is
+    // invariant. `ArrayList<int(5)>` is a strict subtype of `ArrayList<int>`
+    // in the forward direction only, but invariance also requires the reverse
+    // (`int <: int(5)`), which doesn't hold - so containment is rejected.
+    assert!(!atomic_is_contained(&a, &b, &cb));
 }
 
 #[test]

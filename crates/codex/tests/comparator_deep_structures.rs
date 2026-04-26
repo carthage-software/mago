@@ -171,7 +171,7 @@ fn shape_in_unsealed_keyed_array() {
 
 #[test]
 fn deep_object_with_generic_param() {
-    let cb = codebase_from_php(r"<?php /** @template T */ class Box {}");
+    let cb = codebase_from_php(r"<?php /** @template-covariant T */ class Box {}");
     let lit = t_generic_named("Box", vec![ui(42)]);
     let general = t_generic_named("Box", vec![u(t_int())]);
     assert!(atomic_is_contained(&lit, &general, &cb));
@@ -179,7 +179,7 @@ fn deep_object_with_generic_param() {
 
 #[test]
 fn deep_nested_object_in_box() {
-    let cb = codebase_from_php(r"<?php /** @template T */ class Box {}");
+    let cb = codebase_from_php(r"<?php /** @template-covariant T */ class Box {}");
     let inner = t_generic_named("Box", vec![ui(1)]);
     let outer = t_generic_named("Box", vec![u(inner)]);
     let inner_general = t_generic_named("Box", vec![u(t_int())]);
@@ -228,7 +228,7 @@ fn shape_with_string_in_string_lit() {
 
 #[test]
 fn list_of_generic_objects() {
-    let cb = codebase_from_php(r"<?php /** @template T */ class Box {}");
+    let cb = codebase_from_php(r"<?php /** @template-covariant T */ class Box {}");
     let inner_lit = t_generic_named("Box", vec![ui(1)]);
     let inner_int = t_generic_named("Box", vec![u(t_int())]);
     let outer_lit = t_list(u(inner_lit), false);
