@@ -51,6 +51,9 @@ interface Pipeline
 
 class ExtractorImpl implements Extractor
 {
+    /**
+     * @return \Generator<Rows>
+     */
     #[\Override]
     public function extract(): \Generator
     {
@@ -68,6 +71,9 @@ class ExtractorImpl implements Extractor
 
 class PipelineImpl implements Pipeline
 {
+    /**
+     * @return \Generator<Rows>
+     */
     #[\Override]
     public function process(): \Generator
     {

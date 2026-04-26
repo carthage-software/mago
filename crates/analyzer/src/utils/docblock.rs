@@ -4,6 +4,7 @@ use mago_atom::Atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::reference::TReference;
 use mago_codex::ttype::builder::get_type_from_string;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -332,9 +333,13 @@ pub fn insert_variable_from_docblock<'ctx>(
             && !previous_type.is_generic_parameter()
             && !previous_type.contains_placeholder();
 
+        let could_share_object_runtime_instance =
+            unions_could_share_object_runtime_instance(&previous_type, &variable_type);
+
         let is_impossible = !is_redundant
             && !is_super
             && !is_sub
+            && !could_share_object_runtime_instance
             && !can_expression_types_be_identical(context.codebase, &previous_type, &variable_type, false, false);
 
         if is_impossible {
@@ -409,6 +414,7 @@ pub fn check_docblock_type_incompatibility(
     let is_impossible = !is_redundant
         && !is_super
         && !is_sub
+        && !unions_could_share_object_runtime_instance(inferred_type, docblock_type)
         && !can_expression_types_be_identical(context.codebase, inferred_type, docblock_type, false, true);
 
     if is_impossible {
@@ -498,4 +504,24 @@ pub fn check_docblock_type_incompatibility(
 
         context.collector.report_with_code(IssueCode::RedundantDocblockType, issue);
     }
+}
+
+fn unions_could_share_object_runtime_instance(inferred_type: &TUnion, docblock_type: &TUnion) -> bool {
+    for inferred_atomic in inferred_type.types.iter() {
+        let TAtomic::Object(TObject::Named(inferred_named)) = inferred_atomic else {
+            continue;
+        };
+
+        for docblock_atomic in docblock_type.types.iter() {
+            let TAtomic::Object(TObject::Named(docblock_named)) = docblock_atomic else {
+                continue;
+            };
+
+            if inferred_named.name.eq_ignore_ascii_case(&docblock_named.name) {
+                return true;
+            }
+        }
+    }
+
+    false
 }

@@ -136,7 +136,7 @@ impl BreakContext {
 impl ReferenceConstraint {
     pub fn new(constraint_span: Span, source: ReferenceConstraintSource, constraint_type: Option<Rc<TUnion>>) -> Self {
         let constraint_type = constraint_type.map(|mut constraint_type| {
-            Rc::make_mut(&mut constraint_type).widen_literals();
+            Rc::make_mut(&mut constraint_type).widen_scalars();
 
             constraint_type
         });

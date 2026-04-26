@@ -89,6 +89,7 @@ test_case!(reconcile_empty_string);
 test_case!(reconcile_non_empty_string);
 test_case!(reconcile_properties);
 test_case!(reconciling_generic_parameter);
+test_case!(invariant_generic_unsound);
 test_case!(recursive_templates);
 test_case!(resource_reconciliation);
 test_case!(scalar_types_reconciliation);

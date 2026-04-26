@@ -35,13 +35,12 @@ final class Test
         // lateBinding() should return Foo<int, string>, not Foo<array-key, mixed>
         $result = $data->lateBinding();
 
+        /** @mago-expect analysis:less-specific-argument */
         $this->acceptFoo($result);
     }
 
     /**
      * @param Foo<int, string> $_foo
      */
-    private function acceptFoo(Foo $_foo): void
-    {
-    }
+    private function acceptFoo(Foo $_foo): void {}
 }

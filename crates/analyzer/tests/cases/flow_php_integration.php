@@ -2,7 +2,7 @@
 
 namespace Flow\Types {
     /**
-     * @template T
+     * @template-covariant T
      */
     interface Type
     {

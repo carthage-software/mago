@@ -2,7 +2,7 @@
 
 namespace Psl\Type {
     /**
-     * @template T
+     * @template-covariant T
      */
     interface TypeInterface
     {

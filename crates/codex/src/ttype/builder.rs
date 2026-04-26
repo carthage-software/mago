@@ -968,22 +968,28 @@ fn get_reference_from_ast<'i>(
         || fq_reference_name_id.eq_ignore_ascii_case("IteratorAggregate")
         || fq_reference_name_id.eq_ignore_ascii_case("Traversable");
 
+    let mixed_default = || {
+        let mut union = get_mixed();
+        union.set_from_template_default(true);
+        union
+    };
+
     'iterator: {
         if !is_iterator {
             break 'iterator;
         }
 
         let Some(type_parameters) = &mut type_parameters else {
-            type_parameters = Some(vec![get_mixed(), get_mixed()]);
+            type_parameters = Some(vec![mixed_default(), mixed_default()]);
 
             break 'iterator;
         };
 
         if type_parameters.len() == 1 {
-            type_parameters.insert(0, get_mixed());
+            type_parameters.insert(0, mixed_default());
         } else if type_parameters.is_empty() {
-            type_parameters.push(get_mixed());
-            type_parameters.push(get_mixed());
+            type_parameters.push(mixed_default());
+            type_parameters.push(mixed_default());
         }
 
         if !is_generator {
@@ -991,7 +997,7 @@ fn get_reference_from_ast<'i>(
         }
 
         while type_parameters.len() < 4 {
-            type_parameters.push(get_mixed());
+            type_parameters.push(mixed_default());
         }
     }
 

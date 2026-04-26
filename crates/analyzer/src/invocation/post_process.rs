@@ -327,7 +327,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
             }
 
             if declared_had_templates {
-                new_type.widen_literals();
+                new_type.widen_scalars();
             }
 
             new_type.set_by_reference(true);
@@ -578,7 +578,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         for name in &metadata.globals_accessed {
             if let Some(existing) = block_context.locals.get(name).cloned() {
                 let mut widened = (*existing).clone();
-                widened.widen_literals();
+                widened.widen_scalars();
                 block_context.locals.insert(*name, Rc::new(widened));
                 touched_globals.insert(*name);
             }

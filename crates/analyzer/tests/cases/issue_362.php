@@ -85,6 +85,11 @@ function appendToCollection(ArrayCollection $collection, string $value): void
     $collection[] = $value;
 }
 
+// `@var` acts as a runtime widening cast: PHP doesn't enforce template
+// parameters at runtime, so the user's narrower `non-negative-int` slot is
+// honoured even though invariance prevents it from being a strict subtype of
+// the inferred `ArrayCollection<int, string>`. PHPStan/Psalm accept the same
+// idiom.
 /** @var ArrayCollection<non-negative-int, string> $collection */
 $collection = ArrayCollection::fromArray([
     0 => 'a',

@@ -66,7 +66,10 @@ pub(crate) fn is_contained_by(
 
         let mut parameter_comparison_result = ComparisonResult::new();
 
-        if !union_comparator::is_contained_by(
+        let variance =
+            container_metadata.template_variance.get(parameter_offset).copied().unwrap_or(Variance::Invariant);
+
+        let forward_ok = union_comparator::is_contained_by(
             codebase,
             &specialized_template_type,
             container_type_parameter,
@@ -74,8 +77,10 @@ pub(crate) fn is_contained_by(
             specialized_template_type.ignore_falsable_issues(),
             false,
             &mut parameter_comparison_result,
-        ) {
-            if let Some(Variance::Contravariant) = container_metadata.template_variance.get(parameter_offset)
+        );
+
+        if !forward_ok {
+            if matches!(variance, Variance::Contravariant)
                 && union_comparator::is_contained_by(
                     codebase,
                     container_type_parameter,
@@ -93,6 +98,32 @@ pub(crate) fn is_contained_by(
 
             if !parameter_comparison_result.type_coerced_from_as_mixed.unwrap_or(false) {
                 all_parameters_match = false;
+            }
+
+            continue;
+        }
+
+        if matches!(variance, Variance::Invariant)
+            && !specialized_template_type.from_template_default()
+            && !container_type_parameter.from_template_default()
+        {
+            let mut reverse_result = ComparisonResult::new();
+            let reverse_ok = union_comparator::is_contained_by(
+                codebase,
+                container_type_parameter,
+                &specialized_template_type,
+                false,
+                container_type_parameter.ignore_falsable_issues(),
+                inside_assertion,
+                &mut reverse_result,
+            );
+
+            if !reverse_ok {
+                update_failed_result_from_nested(atomic_comparison_result, &reverse_result);
+
+                if !reverse_result.type_coerced_from_as_mixed.unwrap_or(false) {
+                    all_parameters_match = false;
+                }
             }
         }
     }

@@ -186,12 +186,18 @@ fn get_union_from_identifier_hint<'arena>(
     let name = context.resolved_names.get(identifier);
 
     if name.eq_ignore_ascii_case("Generator") {
+        let mixed_default = || {
+            let mut union = get_mixed();
+            union.set_from_template_default(true);
+            union
+        };
+
         return wrap_atomic(TAtomic::Object(TObject::Named(
             TNamedObject::new(atom(name)).with_type_parameters(Some(vec![
-                get_mixed(),
-                get_mixed(),
-                get_mixed(),
-                get_mixed(),
+                mixed_default(),
+                mixed_default(),
+                mixed_default(),
+                mixed_default(),
             ])),
         )));
     }

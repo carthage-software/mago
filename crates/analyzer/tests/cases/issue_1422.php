@@ -19,7 +19,9 @@ class Box
 /** @param Box<array<string, mixed>> $box */
 function accept(Box $box): void {}
 
+/** @mago-expect analysis:invalid-argument */
 accept(new Box([]));
+/** @mago-expect analysis:invalid-argument */
 accept(new Box());
 
 /** @var Box<array<string, mixed>> */

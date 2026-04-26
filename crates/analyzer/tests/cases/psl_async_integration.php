@@ -2,7 +2,7 @@
 
 namespace Psl\Async {
     /**
-     * @template T
+     * @template-covariant T
      */
     final readonly class Awaitable
     {

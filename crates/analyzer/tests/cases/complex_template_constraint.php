@@ -52,6 +52,12 @@ function get_certificates_1(FormData $formData): array
     return $result;
 }
 
+// FormData's `T` is invariant because the public `$data` property is read/write.
+// Each `new FormData([...])` infers a more specific shape (required keys, literal
+// strings) than the function parameter. Strict invariance correctly rejects the
+// flow since the callee could otherwise overwrite `$data` with a value that
+// violates the original narrower shape. PHPStan reports the same.
+/** @mago-expect analysis:invalid-argument */
 $certificates = get_certificates_1(new FormData([
     'name' => 'John Doe',
     'age' => '30',
@@ -61,12 +67,14 @@ $certificates = get_certificates_1(new FormData([
     ],
 ]));
 
+/** @mago-expect analysis:invalid-argument */
 $certificates2 = get_certificates_1(new FormData([
     'name' => 'Jane Smith',
     'age' => '25',
     'certificates' => new UploadedFile('certificate3.pdf', 3072, 'application/pdf', '/tmp/certificate3.pdf', false),
 ]));
 
+/** @mago-expect analysis:invalid-argument */
 $certificates3 = get_certificates_1(new FormData([
     'name' => 'Alice Johnson',
     'age' => '28',

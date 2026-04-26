@@ -18,6 +18,7 @@ use mago_codex::ttype::get_object;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::standin_type_replacer::get_most_specific_type_from_bounds;
+use mago_codex::ttype::template::variance::Variance;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
@@ -350,8 +351,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         }
 
         let mut resolved_template_types = vec![];
-        for (template_name, _) in &metadata.template_types {
-            let template_type = if let Some(lower_bounds) =
+        for (offset, (template_name, _)) in metadata.template_types.iter().enumerate() {
+            let mut template_type = if let Some(lower_bounds) =
                 template_result.get_lower_bounds_for_class_like(*template_name, metadata.name)
             {
                 get_most_specific_type_from_bounds(lower_bounds, context.codebase)
@@ -386,6 +387,11 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             } else {
                 wrap_atomic(TAtomic::Placeholder)
             };
+
+            let variance = metadata.template_variance.get(offset).copied().unwrap_or(Variance::Invariant);
+            if matches!(variance, Variance::Invariant) {
+                template_type.widen_scalars();
+            }
 
             resolved_template_types.push(template_type);
         }

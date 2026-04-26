@@ -707,8 +707,15 @@ fn expand_or_fill_type_parameters(
         return;
     }
 
-    let defaults: Vec<TUnion> =
-        class_metadata.template_types.values().map(|template| template.constraint.clone()).collect();
+    let defaults: Vec<TUnion> = class_metadata
+        .template_types
+        .values()
+        .map(|template| {
+            let mut constraint = template.constraint.clone();
+            constraint.set_from_template_default(true);
+            constraint
+        })
+        .collect();
 
     named.type_parameters = Some(defaults);
 }

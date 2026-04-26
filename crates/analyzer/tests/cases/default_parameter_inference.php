@@ -18,8 +18,8 @@ function use_integer(int $x): void
 }
 
 /**
- * @template TKey of array-key
- * @template TValue
+ * @template-covariant TKey of array-key
+ * @template-covariant TValue
  */
 final class Collection
 {

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * @template T
+ * @template-covariant T
  * @psalm-inheritors None<T>|Some<T>
  */
 abstract class Option
@@ -15,7 +15,7 @@ abstract class Option
 }
 
 /**
- * @template T
+ * @template-covariant T
  * @extends Option<T>
  */
 final class None extends Option
@@ -30,7 +30,7 @@ final class None extends Option
 }
 
 /**
- * @template T
+ * @template-covariant T
  * @extends Option<T>
  */
 final class Some extends Option

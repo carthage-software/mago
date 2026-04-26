@@ -13,7 +13,7 @@ class stdClass
 }
 
 /**
- * @template K
+ * @template-covariant K
  * @template-covariant V
  *
  * @inheritors IteratorAggregate|Generator|Iterator|PDOStatement|DS\Collection|DOMNodeList|DatePeriod
@@ -21,7 +21,7 @@ class stdClass
 interface Traversable {}
 
 /**
- * @template K
+ * @template-covariant K
  * @template-covariant V
  *
  * @extends Traversable<K, V>
@@ -37,7 +37,7 @@ interface IteratorAggregate extends Traversable
 }
 
 /**
- * @template K
+ * @template-covariant K
  * @template-covariant V
  *
  * @extends Traversable<K, V>
