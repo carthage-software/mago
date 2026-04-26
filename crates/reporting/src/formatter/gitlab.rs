@@ -25,12 +25,19 @@ struct CodeQualityIssue<'a> {
 #[derive(Serialize)]
 struct Location {
     path: String,
-    lines: Lines,
+    positions: Positions,
 }
 
 #[derive(Serialize)]
-struct Lines {
-    begin: u32,
+struct Positions {
+    begin: Position,
+    end: Position,
+}
+
+#[derive(Serialize)]
+struct Position {
+    line: u32,
+    column: u32,
 }
 
 /// Formatter that outputs issues in GitLab Code Quality JSON format.
@@ -52,14 +59,25 @@ impl Formatter for GitlabFormatter {
                     Level::Error => "major",
                 };
 
-                let (path, line) = match issue.annotations.iter().find(|annotation| annotation.is_primary()) {
+                let (path, positions) = match issue.annotations.iter().find(|annotation| annotation.is_primary()) {
                     Some(annotation) => {
                         let file = database.get(&annotation.span.file_id()).unwrap();
-                        let line = file.line_number(annotation.span.start.offset) + 1;
+                        let begin = Position {
+                            line: file.line_number(annotation.span.start.offset) + 1,
+                            column: file.column_number(annotation.span.start.offset) + 1,
+                        };
 
-                        (file.name.to_string(), line)
+                        let end = Position {
+                            line: file.line_number(annotation.span.end.offset) + 1,
+                            column: file.column_number(annotation.span.end.offset) + 1,
+                        };
+
+                        (file.name.to_string(), Positions { begin, end })
                     }
-                    None => ("<unknown>".to_string(), 0),
+                    None => (
+                        "<unknown>".to_string(),
+                        Positions { begin: Position { line: 0, column: 0 }, end: Position { line: 0, column: 0 } },
+                    ),
                 };
 
                 let description = long_message(issue, true);
@@ -70,7 +88,8 @@ impl Formatter for GitlabFormatter {
                     let mut hasher = blake3::Hasher::new();
                     hasher.update(check_name.as_bytes());
                     hasher.update(path.as_bytes());
-                    hasher.update(line.to_le_bytes().as_slice());
+                    hasher.update(positions.begin.line.to_le_bytes().as_slice());
+                    hasher.update(positions.begin.column.to_le_bytes().as_slice());
                     hasher.update(description.as_bytes());
                     hasher.finalize().to_hex()[..32].to_string()
                 };
@@ -80,7 +99,7 @@ impl Formatter for GitlabFormatter {
                     check_name,
                     fingerprint,
                     severity,
-                    location: Location { path, lines: Lines { begin: line } },
+                    location: Location { path, positions },
                 }
             })
             .collect::<Vec<_>>();
