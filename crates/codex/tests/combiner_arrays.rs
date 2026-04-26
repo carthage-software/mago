@@ -160,7 +160,7 @@ fn keyed_sealed_different_keys_kept_separate() {
     let a = t_keyed_sealed(BTreeMap::from([(ak_str("a"), (false, ui(1)))]), false);
     let b = t_keyed_sealed(BTreeMap::from([(ak_str("b"), (false, ui(2)))]), false);
     let r = combine_default(vec![a, b]);
-    assert!(r.len() >= 1);
+    assert!(!r.is_empty());
 }
 
 #[test]
@@ -246,7 +246,7 @@ fn under_array_threshold_keeps_sealed_lists() {
     let inputs: Vec<TAtomic> =
         (0..16_i64).map(|i| t_sealed_list(BTreeMap::from([(0_usize, (false, ui(i)))]))).collect();
     let r = combine_default(inputs);
-    assert!(r.len() >= 1);
+    assert!(!r.is_empty());
 }
 
 #[test]

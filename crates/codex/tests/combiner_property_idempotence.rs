@@ -1,3 +1,5 @@
+#![allow(clippy::vec_init_then_push)]
+
 mod combiner_common;
 
 use combiner_common::*;

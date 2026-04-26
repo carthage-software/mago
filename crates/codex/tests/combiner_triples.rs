@@ -29,23 +29,19 @@ fn bool_triples() {
 fn int_lit_range_triples() {
     check("int,int(0),int(1)", vec![t_int(), t_lit_int(0), t_lit_int(1)], &["int"]);
     check("int(0),int,int(1)", vec![t_lit_int(0), t_int(), t_lit_int(1)], &["int"]);
-    check(
-        "int(0),int(1),int(2)",
-        vec![t_lit_int(0), t_lit_int(1), t_lit_int(2)],
-        &["int(0)", "int(1)", "int(2)"],
-    );
-    check(
-        "Range(0,5),int(6),int(7)",
-        vec![t_int_range(0, 5), t_lit_int(6), t_lit_int(7)],
-        &["int<0, 7>"],
-    );
+    check("int(0),int(1),int(2)", vec![t_lit_int(0), t_lit_int(1), t_lit_int(2)], &["int(0)", "int(1)", "int(2)"]);
+    check("Range(0,5),int(6),int(7)", vec![t_int_range(0, 5), t_lit_int(6), t_lit_int(7)], &["int<0, 7>"]);
     check(
         "Range(0,5),int(10),int(20)",
         vec![t_int_range(0, 5), t_lit_int(10), t_lit_int(20)],
         &["int(10)", "int(20)", "int<0, 5>"],
     );
     check("positive,int(0),int(-1)", vec![t_positive_int(), t_lit_int(0), t_lit_int(-1)], &["int<-1, max>"]);
-    check("From(5),To(0),int(2)", vec![t_int_from(5), t_int_to(0), t_lit_int(2)], &["int(2)", "int<5, max>", "non-positive-int"]);
+    check(
+        "From(5),To(0),int(2)",
+        vec![t_int_from(5), t_int_to(0), t_lit_int(2)],
+        &["int(2)", "int<5, max>", "non-positive-int"],
+    );
 }
 
 #[test]
@@ -56,11 +52,7 @@ fn string_triples() {
         vec![t_lit_string("a"), t_lit_string("b"), t_lit_string("c")],
         &["string('a')", "string('b')", "string('c')"],
     );
-    check(
-        "non-empty,'a','b'",
-        vec![t_non_empty_string(), t_lit_string("a"), t_lit_string("b")],
-        &["non-empty-string"],
-    );
+    check("non-empty,'a','b'", vec![t_non_empty_string(), t_lit_string("a"), t_lit_string("b")], &["non-empty-string"]);
     check(
         "non-empty,'a',''",
         vec![t_non_empty_string(), t_lit_string("a"), t_lit_string("")],
@@ -76,11 +68,7 @@ fn string_triples() {
         vec![t_lower_string(), t_lit_string("hi"), t_lit_string("HI")],
         &["lowercase-string", "string('HI')"],
     );
-    check(
-        "string,non-empty,'hi'",
-        vec![t_string(), t_non_empty_string(), t_lit_string("hi")],
-        &["string"],
-    );
+    check("string,non-empty,'hi'", vec![t_string(), t_non_empty_string(), t_lit_string("hi")], &["string"]);
 }
 
 #[test]
@@ -136,11 +124,7 @@ fn array_triples() {
         vec![t_list(u(t_int()), false), t_list(u(t_string()), false), t_int()],
         &["int", "list<int|string>"],
     );
-    check(
-        "array{},array{},array{}",
-        vec![t_empty_array(), t_empty_array(), t_empty_array()],
-        &["array{}"],
-    );
+    check("array{},array{},array{}", vec![t_empty_array(), t_empty_array(), t_empty_array()], &["array{}"]);
     check(
         "list,list,list",
         vec![t_list(u(t_int()), false), t_list(u(t_int()), false), t_list(u(t_int()), false)],
@@ -148,11 +132,7 @@ fn array_triples() {
     );
     check(
         "list,list_string,list_float",
-        vec![
-            t_list(u(t_int()), false),
-            t_list(u(t_string()), false),
-            t_list(u(t_float()), false),
-        ],
+        vec![t_list(u(t_int()), false), t_list(u(t_string()), false), t_list(u(t_float()), false)],
         &["list<float|int|string>"],
     );
 }
@@ -161,16 +141,8 @@ fn array_triples() {
 fn object_triples() {
     check("object,Foo,Bar", vec![t_object_any(), t_named("Foo"), t_named("Bar")], &["object"]);
     check("Foo,Bar,object", vec![t_named("Foo"), t_named("Bar"), t_object_any()], &["object"]);
-    check(
-        "Foo,Bar,Baz",
-        vec![t_named("Foo"), t_named("Bar"), t_named("Baz")],
-        &["Bar", "Baz", "Foo"],
-    );
-    check(
-        "Foo,Foo,Bar",
-        vec![t_named("Foo"), t_named("Foo"), t_named("Bar")],
-        &["Bar", "Foo"],
-    );
+    check("Foo,Bar,Baz", vec![t_named("Foo"), t_named("Bar"), t_named("Baz")], &["Bar", "Baz", "Foo"]);
+    check("Foo,Foo,Bar", vec![t_named("Foo"), t_named("Foo"), t_named("Bar")], &["Bar", "Foo"]);
     check(
         "E,E::A,E::B",
         vec![t_enum("E"), t_enum_case("E", "A"), t_enum_case("E", "B")],
@@ -193,31 +165,15 @@ fn scalar_subtype_triples() {
 
 #[test]
 fn resource_triples() {
-    check(
-        "open,closed,resource",
-        vec![t_open_resource(), t_closed_resource(), t_resource()],
-        &["resource"],
-    );
-    check(
-        "open,open,closed",
-        vec![t_open_resource(), t_open_resource(), t_closed_resource()],
-        &["resource"],
-    );
+    check("open,closed,resource", vec![t_open_resource(), t_closed_resource(), t_resource()], &["resource"]);
+    check("open,open,closed", vec![t_open_resource(), t_open_resource(), t_closed_resource()], &["resource"]);
     check(
         "closed,closed,closed",
         vec![t_closed_resource(), t_closed_resource(), t_closed_resource()],
         &["closed-resource"],
     );
-    check(
-        "open,open,open",
-        vec![t_open_resource(), t_open_resource(), t_open_resource()],
-        &["open-resource"],
-    );
-    check(
-        "open,int,closed",
-        vec![t_open_resource(), t_int(), t_closed_resource()],
-        &["int", "resource"],
-    );
+    check("open,open,open", vec![t_open_resource(), t_open_resource(), t_open_resource()], &["open-resource"]);
+    check("open,int,closed", vec![t_open_resource(), t_int(), t_closed_resource()], &["int", "resource"]);
 }
 
 #[test]
@@ -225,26 +181,14 @@ fn four_atoms() {
     check(
         "int,string,float,bool",
         vec![t_int(), t_string(), t_float(), t_bool()],
-        &["scalar"],  // generalisation triggered
+        &["scalar"], // generalisation triggered
     );
-    check(
-        "int,string,bool,null",
-        vec![t_int(), t_string(), t_bool(), null()],
-        &["bool", "int", "null", "string"],
-    );
+    check("int,string,bool,null", vec![t_int(), t_string(), t_bool(), null()], &["bool", "int", "null", "string"]);
     check(
         "Foo,Bar,Baz,Qux",
         vec![t_named("Foo"), t_named("Bar"), t_named("Baz"), t_named("Qux")],
         &["Bar", "Baz", "Foo", "Qux"],
     );
-    check(
-        "object,Foo,Bar,Baz",
-        vec![t_object_any(), t_named("Foo"), t_named("Bar"), t_named("Baz")],
-        &["object"],
-    );
-    check(
-        "true,false,bool,bool",
-        vec![t_true(), t_false(), t_bool(), t_bool()],
-        &["bool"],
-    );
+    check("object,Foo,Bar,Baz", vec![t_object_any(), t_named("Foo"), t_named("Bar"), t_named("Baz")], &["object"]);
+    check("true,false,bool,bool", vec![t_true(), t_false(), t_bool(), t_bool()], &["bool"]);
 }

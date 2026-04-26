@@ -1,3 +1,5 @@
+#![allow(clippy::approx_constant)]
+
 mod combiner_common;
 
 use combiner_common::*;

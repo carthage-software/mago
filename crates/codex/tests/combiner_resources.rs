@@ -91,7 +91,6 @@ fn many_closed_resources_collapse() {
 
 #[test]
 fn alternating_open_closed_collapses_to_resource() {
-    let inputs: Vec<_> =
-        (0..10).map(|i| if i % 2 == 0 { t_open_resource() } else { t_closed_resource() }).collect();
+    let inputs: Vec<_> = (0..10).map(|i| if i % 2 == 0 { t_open_resource() } else { t_closed_resource() }).collect();
     assert_combines_to(inputs, vec![t_resource()]);
 }

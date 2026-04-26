@@ -90,10 +90,7 @@ pub fn assert_multiset_eq(actual: &[TAtomic], expected: &[TAtomic]) {
     actual_keys.sort();
     expected_keys.sort();
 
-    assert_eq!(
-        actual_keys, expected_keys,
-        "\n  actual:   {actual:#?}\n  expected: {expected:#?}",
-    );
+    assert_eq!(actual_keys, expected_keys, "\n  actual:   {actual:#?}\n  expected: {expected:#?}",);
 }
 
 /// Stable string id for an atomic, used by `assert_multiset_eq`.
