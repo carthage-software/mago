@@ -5,6 +5,8 @@ use std::sync::Arc;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
+use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
@@ -295,33 +297,8 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
             if matches!(binary.operator, BinaryOperator::Addition(_))
                 && (left_atomic.is_array() || right_atomic.is_array())
             {
-                if left_atomic.is_array() && right_atomic.is_array() {
-                    // PHP array addition: $a + $b keeps all keys from $a and adds keys from $b that don't exist in $a
-                    // If either operand is non-empty, the result is non-empty
-                    // We use the combiner for merging types but fix the non_empty flag afterwards
-                    let mut combined = combiner::combine(
-                        vec![left_atomic.clone(), right_atomic.clone()],
-                        context.codebase,
-                        context.settings.combiner_options(),
-                    );
-
-                    // Fix the non_empty flag: if either operand is non-empty, result is non-empty
-                    if let (TAtomic::Array(left_array), TAtomic::Array(right_array)) = (&left_atomic, right_atomic) {
-                        let should_be_non_empty = left_array.is_non_empty() || right_array.is_non_empty();
-
-                        for atomic in &mut combined {
-                            if let TAtomic::Array(result_array) = atomic {
-                                match result_array {
-                                    TArray::Keyed(keyed) => {
-                                        keyed.non_empty = should_be_non_empty;
-                                    }
-                                    TArray::List(list) => {
-                                        list.non_empty = should_be_non_empty;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if let (TAtomic::Array(left_array), TAtomic::Array(right_array)) = (&left_atomic, &right_atomic) {
+                    let combined = compose_array_plus(left_array, right_array, context);
 
                     pair_result_atomics.extend(combined);
 
@@ -660,4 +637,131 @@ fn calculate_int_arithmetic(op: &BinaryOperator<'_>, left: TInteger, right: TInt
     };
 
     if result.is_unspecified() { None } else { Some(result) }
+}
+
+/// Compose two array shapes under PHP's `+` operator.
+fn compose_array_plus<'ctx, 'arena>(left: &TArray, right: &TArray, context: &Context<'ctx, 'arena>) -> Vec<TAtomic> {
+    if let (TArray::Keyed(left_keyed), TArray::Keyed(right_keyed)) = (left, right) {
+        let composed = compose_keyed_plus(left_keyed, right_keyed);
+        return vec![TAtomic::Array(TArray::Keyed(composed))];
+    }
+
+    let mut combined = combiner::combine(
+        vec![TAtomic::Array(left.clone()), TAtomic::Array(right.clone())],
+        context.codebase,
+        context.settings.combiner_options(),
+    );
+
+    let should_be_non_empty = left.is_non_empty() || right.is_non_empty();
+    for atomic in &mut combined {
+        if let TAtomic::Array(result_array) = atomic {
+            match result_array {
+                TArray::Keyed(keyed) => keyed.non_empty = should_be_non_empty,
+                TArray::List(list) => list.non_empty = should_be_non_empty,
+            }
+        }
+    }
+
+    combined
+}
+
+/// `+` composition for two keyed shapes.
+fn compose_keyed_plus(left: &TKeyedArray, right: &TKeyedArray) -> TKeyedArray {
+    use std::collections::BTreeMap;
+
+    let left_known = left.known_items.as_ref();
+    let right_known = right.known_items.as_ref();
+
+    let mut composed_known: BTreeMap<_, _> = BTreeMap::new();
+
+    if let Some(left_known) = left_known {
+        for (key, (left_optional, left_value)) in left_known {
+            if !*left_optional {
+                composed_known.insert(*key, (false, left_value.clone()));
+                continue;
+            }
+
+            if let Some(right_known) = right_known
+                && let Some((right_optional, right_value)) = right_known.get(key)
+            {
+                let merged_value = left_value.clone();
+                let merged_value = mago_codex::ttype::combine_optional_union_types(
+                    Some(&merged_value),
+                    Some(right_value),
+                    &Default::default(),
+                );
+                let new_optional = *left_optional && *right_optional;
+                composed_known.insert(*key, (new_optional, merged_value));
+                continue;
+            }
+
+            if let Some((right_key_type, right_value_type)) = right.parameters.as_ref() {
+                let key_could_match = key_could_be_in_param(key, right_key_type);
+                if key_could_match {
+                    let merged_value = mago_codex::ttype::combine_optional_union_types(
+                        Some(left_value),
+                        Some(right_value_type),
+                        &Default::default(),
+                    );
+                    composed_known.insert(*key, (false, merged_value));
+                    continue;
+                }
+            }
+
+            composed_known.insert(*key, (true, left_value.clone()));
+        }
+    }
+
+    if let Some(right_known) = right_known {
+        let left_has_catch_all_for_string_keys =
+            left.parameters.as_ref().is_some_and(|(k, _)| matches!(k.types.first(), Some(t) if !t.is_never()));
+
+        for (key, (right_optional, right_value)) in right_known {
+            if composed_known.contains_key(key) {
+                continue;
+            }
+
+            if left_has_catch_all_for_string_keys
+                && let Some((left_key_type, left_value_type)) = left.parameters.as_ref()
+                && key_could_be_in_param(key, left_key_type)
+            {
+                let merged_value = mago_codex::ttype::combine_optional_union_types(
+                    Some(left_value_type),
+                    Some(right_value),
+                    &Default::default(),
+                );
+
+                composed_known.insert(*key, (*right_optional, merged_value));
+            } else {
+                composed_known.insert(*key, (*right_optional, right_value.clone()));
+            }
+        }
+    }
+
+    let composed_parameters = match (left.parameters.as_ref(), right.parameters.as_ref()) {
+        (Some((lk, lv)), Some((rk, rv))) => {
+            let merged_k = mago_codex::ttype::combine_optional_union_types(Some(lk), Some(rk), &Default::default());
+            let merged_v = mago_codex::ttype::combine_optional_union_types(Some(lv), Some(rv), &Default::default());
+            Some((Arc::new(merged_k), Arc::new(merged_v)))
+        }
+        (Some(p), None) | (None, Some(p)) => Some(p.clone()),
+        (None, None) => None,
+    };
+
+    let non_empty =
+        left.is_non_empty() || right.is_non_empty() || composed_known.values().any(|(optional, _)| !*optional);
+
+    TKeyedArray {
+        known_items: Some(composed_known).filter(|m| !m.is_empty()),
+        parameters: composed_parameters,
+        non_empty,
+    }
+}
+
+fn key_could_be_in_param(key: &ArrayKey, param: &TUnion) -> bool {
+    match key {
+        ArrayKey::Integer(_) => param.has_int(),
+        ArrayKey::String(_) => param.has_string(),
+        ArrayKey::ClassLikeConstant { .. } => true,
+    }
 }
