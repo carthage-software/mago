@@ -3665,7 +3665,9 @@ function array_reduce(array $array, callable $callback, mixed $initial = null): 
  * @param array<K, V> $array
  * @param T $value
  *
- * @return ($length is int<1, max> ? non-empty-array<K, V|T> : array<K, V|T>)
+ * @return ($array is list<V>
+ *     ? ($length is int<1, max> ? non-empty-list<V|T> : list<V|T>)
+ *     : ($length is int<1, max> ? non-empty-array<K, V|T> : array<K, V|T>))
  *
  * @pure
  */
