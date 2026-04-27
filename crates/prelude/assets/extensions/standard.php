@@ -4271,7 +4271,7 @@ function key(object|array $array): string|int|null {}
 /**
  * @template T
  *
- * @param array<T>|T $value
+ * @param non-empty-array<T>|T $value
  * @param T ...$values
  *
  * @return T
@@ -4283,7 +4283,7 @@ function min(mixed $value, mixed ...$values): mixed {}
 /**
  * @template T
  *
- * @param array<T>|T $value
+ * @param non-empty-array<T>|T $value
  * @param T ...$values
  *
  * @return T
