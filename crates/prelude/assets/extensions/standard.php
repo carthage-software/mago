@@ -3845,6 +3845,7 @@ function array_map(?callable $callback, array $array, array ...$arrays): array {
  * @template V
  *
  * @param array<K, V> $array
+ * @param int<1, max> $length
  *
  * @return ($preserve_keys is true ? list<array<K, V>> : list<list<V>>)
  *
@@ -4318,6 +4319,7 @@ function array_search(mixed $needle, array $haystack, bool $strict = false): str
 /**
  * @template T
  *
+ * @param int<0, max> $count
  * @param T $value
  *
  * @return (
