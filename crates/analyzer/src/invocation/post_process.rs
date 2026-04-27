@@ -834,7 +834,7 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                         .collect::<Vec<_>>()
                         .join("|");
 
-                    if all_negated || always_redundant {
+                    if all_negated {
                         context.collector.report_with_code(
                             IssueCode::RedundantTypeComparison,
                             Issue::warning(format!(
@@ -845,9 +845,24 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                                     .with_message(format!("Argument `{assertion_variable}` has type `{asserted_type_id}`")),
                             )
                             .with_note(format!(
-                                "The assertion expects `{assertion_variable}` to not be `{expected_type_id}`, which is always true."
+                                "The negated assertion against `{expected_type_id}` always holds because `{assertion_variable}` is `{asserted_type_id}`."
                             ))
                             .with_help("Consider removing this assertion as it has no effect."),
+                        );
+                    } else if always_redundant {
+                        context.collector.report_with_code(
+                            IssueCode::RedundantTypeComparison,
+                            Issue::warning(format!(
+                                "Redundant type assertion: `{assertion_variable}` is already `{asserted_type_id}`."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(invocation.span)
+                                    .with_message(format!("Argument `{assertion_variable}` already has type `{asserted_type_id}`")),
+                            )
+                            .with_note(format!(
+                                "The assertion against `{expected_type_id}` always holds because `{assertion_variable}` is `{asserted_type_id}`."
+                            ))
+                            .with_help("Consider removing this assertion or replacing it with `default` if used in a `match` arm."),
                         );
                     } else {
                         context.collector.report_with_code(
