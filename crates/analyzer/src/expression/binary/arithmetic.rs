@@ -322,6 +322,13 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                     invalid_pair = true;
                 }
             } else if left_atomic.is_numeric() && right_atomic.is_numeric() {
+                if let Some(reason) = definite_arithmetic_runtime_error(&binary.operator, &right_atomic) {
+                    invalid_right_messages.push((reason, binary.rhs.span()));
+                    pair_result_atomics.push(TAtomic::Never);
+                    result_atomic_types.extend(pair_result_atomics);
+                    continue;
+                }
+
                 let numeric_results = determine_numeric_result(
                     &binary.operator,
                     &left_atomic,
@@ -763,5 +770,25 @@ fn key_could_be_in_param(key: &ArrayKey, param: &TUnion) -> bool {
         ArrayKey::Integer(_) => param.has_int(),
         ArrayKey::String(_) => param.has_string(),
         ArrayKey::ClassLikeConstant { .. } => true,
+    }
+}
+
+/// Detect arithmetic operations that are statically guaranteed to throw at
+/// runtime, where the failure does not surface as `Never` from
+/// [`determine_numeric_result`].
+fn definite_arithmetic_runtime_error(op: &BinaryOperator<'_>, right: &TAtomic) -> Option<String> {
+    match op {
+        BinaryOperator::Modulo(_) => {
+            let zero = matches!(right.get_literal_int_value(), Some(0))
+                || matches!(right.get_literal_float_value(), Some(0.0));
+
+            if zero { Some("Modulo by zero".to_string()) } else { None }
+        }
+        BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_) => {
+            let value = right.get_literal_int_value()?;
+
+            if value < 0 { Some(format!("Bit shift by a negative number (`{value}`)")) } else { None }
+        }
+        _ => None,
     }
 }

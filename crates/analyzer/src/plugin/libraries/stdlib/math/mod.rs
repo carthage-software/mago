@@ -1,8 +1,10 @@
 mod abs;
+mod intdiv;
 mod max;
 mod min;
 
 pub use abs::AbsProvider;
+pub use intdiv::IntdivHook;
 pub use max::MaxProvider;
 pub use min::MinProvider;
 
