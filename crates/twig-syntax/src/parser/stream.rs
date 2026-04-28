@@ -41,13 +41,16 @@ pub struct TokenStream<'arena> {
     trivia: BVec<'arena, Trivia<'arena>>,
     /// End position of the most recently consumed significant token.
     position: Position,
+    file_id: FileId,
 }
 
 impl<'arena> TokenStream<'arena> {
     #[inline]
     pub fn new(arena: &'arena Bump, lexer: TwigLexer<'arena>) -> Self {
         let position = lexer.current_position();
-        Self { arena, lexer, buffer: LookaheadBuf::new(), trivia: BVec::new_in(arena), position }
+        let file_id = lexer.file_id();
+
+        Self { arena, lexer, buffer: LookaheadBuf::new(), trivia: BVec::new_in(arena), position, file_id }
     }
 
     #[inline]
@@ -170,6 +173,16 @@ impl<'arena> TokenStream<'arena> {
     /// Consume iff the next token has the given kind.
     #[inline]
     pub fn eat(&mut self, kind: TwigTokenKind) -> Result<TwigToken<'arena>, ParseError> {
+        if let Some(token) = self.buffer.get(0) {
+            if token.kind == kind {
+                let _ = self.buffer.pop_front();
+                self.position = token.end();
+                return Ok(token);
+            }
+
+            return Err(self.unexpected(Some(token), &[kind]));
+        }
+
         match self.peek_kind(0)? {
             Some(k) if k == kind => self.consume(),
             Some(_) => {
@@ -210,12 +223,20 @@ impl<'arena> TokenStream<'arena> {
     /// Is the next token of the given kind?
     #[inline]
     pub fn is_at(&mut self, kind: TwigTokenKind) -> Result<bool, ParseError> {
+        if let Some(t) = self.buffer.get(0) {
+            return Ok(t.kind == kind);
+        }
+
         Ok(self.peek_kind(0)? == Some(kind))
     }
 
     /// Look at the Nth-ahead significant token (0 = next).
     #[inline]
     pub fn lookahead(&mut self, n: usize) -> Result<Option<TwigToken<'arena>>, ParseError> {
+        if n < self.buffer.len() {
+            return Ok(self.buffer.get(n));
+        }
+
         match self.fill_buffer(n + 1) {
             Ok(Some(_)) => Ok(self.buffer.get(n)),
             Ok(None) => Ok(None),
@@ -226,6 +247,10 @@ impl<'arena> TokenStream<'arena> {
     /// Kind of the Nth-ahead significant token (0 = next).
     #[inline]
     pub fn peek_kind(&mut self, n: usize) -> Result<Option<TwigTokenKind>, ParseError> {
+        if n < self.buffer.len() {
+            return Ok(self.buffer.get(n).map(|t| t.kind));
+        }
+
         match self.fill_buffer(n + 1) {
             Ok(Some(_)) => Ok(self.buffer.get(n).map(|t| t.kind)),
             Ok(None) => Ok(None),
@@ -374,8 +399,9 @@ impl<'arena> TokenStream<'arena> {
 }
 
 impl HasFileId for TokenStream<'_> {
+    #[inline]
     fn file_id(&self) -> FileId {
-        self.lexer.file_id()
+        self.file_id
     }
 }
 
