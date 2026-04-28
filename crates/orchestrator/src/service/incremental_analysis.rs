@@ -630,11 +630,11 @@ impl IncrementalAnalysisService {
         merged_codebase.safe_symbols.clear();
         merged_codebase.safe_symbol_members.clear();
 
-        if !merged_codebase.mark_safe_symbols(&diff, &self.symbol_references) {
+        let Some(global_scope_invalid) = merged_codebase.mark_safe_symbols(&diff, &self.symbol_references) else {
             tracing::warn!("Invalidation cascade too expensive (>5000 steps), falling back to full analysis");
 
             return self.analyze();
-        }
+        };
 
         // Ensure classes that depend on changed class_likes are not marked safe.
         // This handles cases where reference graph edges were lost (e.g., a parent
@@ -699,13 +699,22 @@ impl IncrementalAnalysisService {
         let mut files_to_skip: HashSet<FileId> = HashSet::default();
         for &file_id in &unchanged_file_ids {
             if let Some(sig) = merged_codebase.get_file_signature(&file_id) {
-                let all_safe = sig.ast_nodes.iter().all(|node| {
-                    let symbol_safe = node.name.is_empty() || merged_codebase.safe_symbols.contains(&node.name);
-                    let children_safe = node.children.iter().all(|child| {
-                        child.name.is_empty() || merged_codebase.safe_symbol_members.contains(&(node.name, child.name))
-                    });
-                    symbol_safe && children_safe
-                });
+                let all_safe = if sig.ast_nodes.is_empty() {
+                    // A file with no named top-level symbols contains only
+                    // global-scope code. Global-scope code is tracked under the
+                    // (empty, empty) pseudo-symbol in the reference graph, so
+                    // check whether that pseudo-symbol was invalidated.
+                    !global_scope_invalid
+                } else {
+                    sig.ast_nodes.iter().all(|node| {
+                        let symbol_safe = node.name.is_empty() || merged_codebase.safe_symbols.contains(&node.name);
+                        let children_safe = node.children.iter().all(|child| {
+                            child.name.is_empty()
+                                || merged_codebase.safe_symbol_members.contains(&(node.name, child.name))
+                        });
+                        symbol_safe && children_safe
+                    })
+                };
 
                 if all_safe {
                     files_to_skip.insert(file_id);

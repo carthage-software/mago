@@ -908,14 +908,11 @@ impl CodebaseMetadata {
     /// * `references` - Symbol reference graph from previous run
     ///
     /// # Returns
-    ///
-    /// `true` if safe symbols were successfully marked, or `false` if the cascade was too large to compute.
-    pub fn mark_safe_symbols(&mut self, diff: &CodebaseDiff, references: &SymbolReferences) -> bool {
-        // Get invalid symbols with propagation through reference graph
-        let Some((invalid_symbols, partially_invalid)) = references.get_invalid_symbols(diff) else {
-            // Propagation too expensive (>5000 steps)
-            return false;
-        };
+    /// Returns `Some(global_scope_invalid)` on success, where `global_scope_invalid`
+    /// is `true` when global-scope code (the `(empty, empty)` pseudo-symbol) references
+    /// something that changed. Returns `None` if the cascade was too large to compute.
+    pub fn mark_safe_symbols(&mut self, diff: &CodebaseDiff, references: &SymbolReferences) -> Option<bool> {
+        let (invalid_symbols, partially_invalid) = references.get_invalid_symbols(diff)?;
 
         // Mark all symbols in 'keep' set as safe (unless invalidated by cascade)
         for keep_symbol in diff.get_keep() {
@@ -932,7 +929,7 @@ impl CodebaseMetadata {
             }
         }
 
-        true
+        Some(invalid_symbols.contains(&(empty_atom(), empty_atom())))
     }
 
     /// Merges information from another `CodebaseMetadata` into this one.
