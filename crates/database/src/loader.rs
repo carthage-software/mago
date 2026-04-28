@@ -150,14 +150,38 @@ impl<'a> DatabaseLoader<'a> {
         }
 
         // When stdin override is set, ensure that the file is in the database
-        // (covers new/unsaved files, not on disk)
+        // (covers new/unsaved files, not on disk). Excluded paths are skipped
+        // so that editor integrations using `--stdin-input` honor the same
+        // exclude rules as a regular filesystem scan.
         if let Some((ref name, ref content)) = self.stdin_override {
-            let file = File::ephemeral(Cow::Owned(name.as_ref().to_string()), Cow::Owned(content.clone()));
-            let file_id = file.id;
-            if let Entry::Vacant(e) = all_files.entry(file_id) {
-                e.insert(file);
+            let virtual_path = self.configuration.workspace.join(name.as_ref());
+            let virtual_path_canonical = virtual_path.canonicalize().unwrap_or_else(|_| virtual_path.clone());
+            let virtual_path_str = virtual_path_canonical.to_string_lossy();
 
-                file_decisions.insert(file_id, (FileType::Host, usize::MAX));
+            let glob_excluded = !glob_excludes.is_empty()
+                && (glob_excludes.is_match(virtual_path_canonical.as_path()) || glob_excludes.is_match(name.as_ref()));
+
+            let path_excluded = path_excludes.iter().any(|excl| {
+                let canonical = if Path::new(excl.as_ref()).is_absolute() {
+                    excl.as_ref().to_path_buf()
+                } else {
+                    self.configuration.workspace.join(excl.as_ref())
+                };
+                let canonical = canonical.canonicalize().unwrap_or(canonical);
+                let canonical_str = canonical.to_string_lossy();
+
+                virtual_path_str.starts_with(canonical_str.as_ref())
+                    && matches!(virtual_path_str.as_bytes().get(canonical_str.len()), None | Some(&b'/' | &b'\\'))
+            });
+
+            if !glob_excluded && !path_excluded {
+                let file = File::ephemeral(Cow::Owned(name.as_ref().to_string()), Cow::Owned(content.clone()));
+                let file_id = file.id;
+                if let Entry::Vacant(e) = all_files.entry(file_id) {
+                    e.insert(file);
+
+                    file_decisions.insert(file_id, (FileType::Host, usize::MAX));
+                }
             }
         }
 

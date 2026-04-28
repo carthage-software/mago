@@ -26,10 +26,12 @@ Integrate Mago directly into the [Zed editor](https://zed.dev) for seamless, hig
           "format_on_save": "on",
 
           // Configure Mago as the external formatter.
+          // `--stdin-filepath` lets Mago apply `source.excludes` and `formatter.excludes`
+          // from your `mago.toml` to the current buffer, and produces better error messages.
           "formatter": {
             "external": {
               "command": "mago",
-              "arguments": ["format", "--stdin-input"]
+              "arguments": ["format", "--stdin-input", "--stdin-filepath", "{buffer_path}"]
             }
           }
         }

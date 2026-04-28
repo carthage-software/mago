@@ -64,6 +64,20 @@ cat src/Service.php | mago fmt --stdin-input
 This will read the code from `src/Service.php`, format it, and print the formatted code to standard
 output.
 
+### Honoring excludes for editor integrations
+
+When piping code from an editor, the formatter has no way to know which file the buffer represents,
+so it cannot consult `source.excludes` or `formatter.excludes` from your `mago.toml`. Pass the
+buffer's path via `--stdin-filepath` to opt into exclude-aware formatting:
+
+```bash
+cat src/Service.php | mago fmt --stdin-input --stdin-filepath src/Service.php
+```
+
+If the supplied path matches an exclude pattern, the input is written back to stdout unchanged
+(no-op). The path is also used in error messages so parse failures reference the real buffer
+instead of `<stdin>`. Both relative and absolute paths are accepted.
+
 ## Formatting staged files (pre-commit hooks)
 
 The `--staged` flag is designed for git pre-commit hooks. It formats only the files currently staged for commit and automatically re-stages them:

@@ -38,6 +38,7 @@
 
 use std::borrow::Cow;
 use std::io::Read;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -108,6 +109,21 @@ pub struct FormatCommand {
     #[arg(long, short = 'i', conflicts_with_all = ["dry_run", "check", "path", "staged"])]
     pub stdin_input: bool,
 
+    /// Logical filepath of the buffer being read from STDIN.
+    ///
+    /// When provided alongside `--stdin-input`, the formatter treats the
+    /// piped content as if it lived at this path. The path is used to:
+    ///
+    /// - Honor `source.excludes` and `formatter.excludes` from `mago.toml`.
+    ///   If the path matches an exclude pattern, the input is written back
+    ///   to STDOUT unchanged.
+    /// - Improve diagnostic messages by referencing the real filepath.
+    ///
+    /// Editor integrations should pass the buffer path here (for example,
+    /// Zed's `{buffer_path}` substitution).
+    #[arg(long, requires = "stdin_input", value_name = "PATH")]
+    pub stdin_filepath: Option<PathBuf>,
+
     /// Format files that are staged in git.
     ///
     /// This flag is designed for git pre-commit hooks. It will:
@@ -165,28 +181,7 @@ impl FormatCommand {
         }
 
         if self.stdin_input {
-            let file = Self::create_file_from_stdin()?;
-            let status = orchestrator.format_file(&file)?;
-
-            let exit_code = match status {
-                FileFormatStatus::Unchanged => {
-                    print!("{}", file.contents);
-
-                    ExitCode::SUCCESS
-                }
-                FileFormatStatus::Changed(new_content) => {
-                    print!("{new_content}");
-
-                    ExitCode::SUCCESS
-                }
-                FileFormatStatus::FailedToParse(parse_error) => {
-                    tracing::error!("Failed to parse input: {}", parse_error);
-
-                    ExitCode::from(EXIT_CODE_ERROR)
-                }
-            };
-
-            return Ok(exit_code);
+            return self.execute_stdin(orchestrator, &configuration);
         }
 
         let mut database = orchestrator.load_database(&configuration.source.workspace, false, None, None)?;
@@ -232,12 +227,50 @@ impl FormatCommand {
         Ok(exit_code)
     }
 
-    /// Creates an ephemeral file from standard input.
-    fn create_file_from_stdin() -> Result<File, Error> {
+    /// Executes the STDIN formatting flow.
+    ///
+    /// When `--stdin-filepath` is set, the buffer is registered with the database
+    /// loader using its real workspace-relative name. The loader honors `source`
+    /// and `formatter` exclude rules: if the path matches an exclude pattern,
+    /// the file isn't loaded and we pass the original input through unchanged.
+    ///
+    /// Without `--stdin-filepath`, the buffer is treated as an ad-hoc snippet
+    /// and formatted unconditionally.
+    fn execute_stdin(
+        self,
+        mut orchestrator: mago_orchestrator::Orchestrator<'_>,
+        configuration: &Configuration,
+    ) -> Result<ExitCode, Error> {
         let mut content = String::new();
         std::io::stdin().read_to_string(&mut content).map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
-        Ok(File::ephemeral(Cow::Borrowed("<stdin>"), Cow::Owned(content)))
+        let Some(filepath) = self.stdin_filepath.as_deref() else {
+            let file = File::ephemeral(Cow::Borrowed("<stdin>"), Cow::Owned(content));
+            return Ok(emit_stdin_result(orchestrator.format_file(&file)?, &file));
+        };
+
+        let logical_name = stdin_logical_name(filepath, &configuration.source.workspace);
+        orchestrator.set_source_paths([filepath.to_string_lossy().to_string()]);
+
+        let database = orchestrator.load_database(
+            &configuration.source.workspace,
+            false,
+            None,
+            Some((logical_name.clone(), content.clone())),
+        )?;
+
+        let file = match database.get_by_name(&logical_name) {
+            Ok(file) => file.clone(),
+            Err(_) => {
+                // File is excluded.
+                print!("{content}");
+                return Ok(ExitCode::SUCCESS);
+            }
+        };
+
+        let status = orchestrator.get_format_service(database.read_only()).format_file(&file)?;
+
+        Ok(emit_stdin_result(status, &file))
     }
 
     /// Executes formatting for staged files.
@@ -318,4 +351,45 @@ fn to_change_log(
     }
 
     Ok(change_log)
+}
+
+fn emit_stdin_result(status: FileFormatStatus, file: &File) -> ExitCode {
+    match status {
+        FileFormatStatus::Unchanged => {
+            print!("{}", file.contents);
+            ExitCode::SUCCESS
+        }
+        FileFormatStatus::Changed(new_content) => {
+            print!("{new_content}");
+            ExitCode::SUCCESS
+        }
+        FileFormatStatus::FailedToParse(parse_error) => {
+            tracing::error!("Failed to parse {}: {parse_error}", file.name);
+            ExitCode::from(EXIT_CODE_ERROR)
+        }
+    }
+}
+
+/// Computes a workspace-relative, forward-slash logical name for `filepath`.
+///
+/// Falls back to the path as given when it isn't a descendant of the workspace.
+fn stdin_logical_name(filepath: &Path, workspace: &Path) -> String {
+    let canonical_filepath = filepath.canonicalize();
+    let canonical_workspace = workspace.canonicalize();
+
+    let stripped: &Path = match (canonical_filepath.as_ref(), canonical_workspace.as_ref()) {
+        (Ok(fp), Ok(ws)) => fp.strip_prefix(ws).unwrap_or(fp),
+        _ => filepath.strip_prefix(workspace).unwrap_or(filepath),
+    };
+
+    #[cfg(windows)]
+    let mut name = stripped.to_string_lossy().replace('\\', "/");
+    #[cfg(not(windows))]
+    let mut name = stripped.to_string_lossy().into_owned();
+
+    while let Some(rest) = name.strip_prefix("./") {
+        name = rest.to_string();
+    }
+
+    name
 }
