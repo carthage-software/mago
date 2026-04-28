@@ -19,3 +19,10 @@ mago-atom = { workspace = true }
 foldhash = { workspace = true }
 itertools = { workspace = true }
 indexmap = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "algebra"
+harness = false

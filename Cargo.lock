@@ -1321,6 +1321,7 @@ dependencies = [
 name = "mago-algebra"
 version = "1.24.0"
 dependencies = [
+ "codspeed-criterion-compat",
  "foldhash 0.2.0",
  "indexmap",
  "itertools 0.14.0",
