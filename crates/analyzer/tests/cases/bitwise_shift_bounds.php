@@ -10,6 +10,7 @@ function take_0(int $v): void {}
 
 const SHIFT_OK = 1 << 3;
 const SHIFT_OVER = 1 << 65;
+/** @mago-expect analysis:invalid-operand */
 const SHIFT_NEG = 1 >> -1;
 
 take_8(SHIFT_OK);

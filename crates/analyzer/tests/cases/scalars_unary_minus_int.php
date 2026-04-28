@@ -1,0 +1,9 @@
+<?php
+
+declare(strict_types=1);
+
+function takesInt(int $n): int { return $n; }
+
+$x = 5;
+$y = -$x;
+takesInt($y);
