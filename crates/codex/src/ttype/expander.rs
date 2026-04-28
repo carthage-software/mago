@@ -545,11 +545,21 @@ fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &Ty
         return;
     };
 
+    let has_params = named.type_parameters.as_ref().is_some_and(|p| !p.is_empty());
+    let class_metadata = codebase.get_class_like(&named.name);
+    let has_required_intersections =
+        class_metadata.map(|m| !m.require_extends.is_empty() || !m.require_implements.is_empty()).unwrap_or(false);
+    let needs_default_params = !has_params && class_metadata.map(|m| !m.template_types.is_empty()).unwrap_or(false);
+
+    if !has_params && !has_required_intersections && !needs_default_params {
+        return;
+    }
+
     let Some(_guard) = ObjectParamsExpansionGuard::try_new(named.name) else {
         return;
     };
 
-    if let Some(class_metadata) = codebase.get_class_like(&named.name) {
+    if has_required_intersections && let Some(class_metadata) = class_metadata {
         for &required in class_metadata.require_extends.iter().chain(&class_metadata.require_implements) {
             named.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(required))));
         }
@@ -558,35 +568,82 @@ fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &Ty
     expand_or_fill_type_parameters(named, codebase, options);
 }
 
+/// Classifies a class-like name as one of the PHP "special" tokens that require
+/// resolution against the expansion options. The check is case-insensitive but
+/// avoids the (relatively expensive) `ascii_lowercase_atom` interning step on
+/// the common path where the input is not a special name at all.
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum SpecialClassName {
+    None,
+    SelfType,
+    Static,
+    Parent,
+    This,
+}
+
+#[inline]
+fn classify_special_class_name(name: &str) -> SpecialClassName {
+    match name.len() {
+        4 => {
+            if name.eq_ignore_ascii_case("self") {
+                SpecialClassName::SelfType
+            } else {
+                SpecialClassName::None
+            }
+        }
+        5 => {
+            if name == "$this" || name.eq_ignore_ascii_case("$this") {
+                SpecialClassName::This
+            } else {
+                SpecialClassName::None
+            }
+        }
+        6 => {
+            if name.eq_ignore_ascii_case("static") {
+                SpecialClassName::Static
+            } else if name.eq_ignore_ascii_case("parent") {
+                SpecialClassName::Parent
+            } else {
+                SpecialClassName::None
+            }
+        }
+        _ => SpecialClassName::None,
+    }
+}
+
 /// Resolves `static`, `$this`, `self`, and `parent` to their concrete class names.
 fn resolve_special_class_names(object: &mut TObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
-    if let TObject::Named(named) = object {
-        let name_lc = ascii_lowercase_atom(&named.name);
-        let needs_static_resolution = matches!(name_lc.as_str(), "static" | "$this") || named.is_this;
+    let TObject::Named(named) = object else {
+        return;
+    };
 
-        if needs_static_resolution
-            && let StaticClassType::Object(TObject::Enum(static_enum)) = &options.static_class_type
-        {
-            *object = TObject::Enum(static_enum.clone());
-            return;
-        }
+    let special = classify_special_class_name(named.name.as_str());
+    if matches!(special, SpecialClassName::None) && !named.is_static && !named.is_this {
+        return;
+    }
+
+    let needs_static_resolution = matches!(special, SpecialClassName::Static | SpecialClassName::This) || named.is_this;
+
+    if needs_static_resolution && let StaticClassType::Object(TObject::Enum(static_enum)) = &options.static_class_type {
+        *object = TObject::Enum(static_enum.clone());
+        return;
     }
 
     let TObject::Named(named) = object else {
         return;
     };
 
-    let name_lc = ascii_lowercase_atom(&named.name);
     let was_this = named.is_this;
-
-    match name_lc.as_str() {
-        "static" | "$this" => resolve_static_type(named, was_this, false, codebase, options),
-        "self" => {
+    match special {
+        SpecialClassName::Static | SpecialClassName::This => {
+            resolve_static_type(named, was_this, false, codebase, options)
+        }
+        SpecialClassName::SelfType => {
             if let Some(self_class) = options.self_class {
                 named.name = self_class;
             }
         }
-        "parent" => {
+        SpecialClassName::Parent => {
             if let Some(self_class) = options.self_class
                 && let Some(class_metadata) = codebase.get_class_like(&self_class)
                 && let Some(parent) = class_metadata.direct_parent_class
@@ -594,8 +651,8 @@ fn resolve_special_class_names(object: &mut TObject, codebase: &CodebaseMetadata
                 named.name = parent;
             }
         }
-        _ if named.is_static => resolve_static_type(named, was_this, true, codebase, options),
-        _ => {}
+        SpecialClassName::None if named.is_static => resolve_static_type(named, was_this, true, codebase, options),
+        SpecialClassName::None => {}
     }
 }
 
