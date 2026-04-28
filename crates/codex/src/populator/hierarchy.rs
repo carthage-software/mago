@@ -43,25 +43,21 @@ fn detect_circular_type_reference(
     type_metadata: &TypeMetadata,
     all_aliases: &mago_atom::AtomMap<TypeMetadata>,
     visiting: &mut AtomSet,
-    path: &mut Vec<String>,
-) -> Option<Vec<String>> {
-    // If we're already visiting this type, we found a cycle
+    path: &mut Vec<Atom>,
+) -> Option<Vec<Atom>> {
     if visiting.contains(&type_name) {
         let mut cycle_chain = path.clone();
-        cycle_chain.push(type_name.to_string());
+        cycle_chain.push(type_name);
         return Some(cycle_chain);
     }
 
-    // Mark as visiting
     visiting.insert(type_name);
-    path.push(type_name.to_string());
+    path.push(type_name);
 
-    // Walk through the type union looking for type alias references
     if let Some(cycle) = check_union_for_circular_refs(&type_metadata.type_union, all_aliases, visiting, path) {
         return Some(cycle);
     }
 
-    // Done visiting this type
     visiting.remove(&type_name);
     path.pop();
     None
@@ -72,8 +68,8 @@ fn check_union_for_circular_refs(
     type_union: &TUnion,
     all_aliases: &mago_atom::AtomMap<TypeMetadata>,
     visiting: &mut AtomSet,
-    path: &mut Vec<String>,
-) -> Option<Vec<String>> {
+    path: &mut Vec<Atom>,
+) -> Option<Vec<Atom>> {
     let nodes = type_union.get_all_child_nodes();
     for node in nodes {
         if let TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) = node {
@@ -201,14 +197,15 @@ pub fn populate_class_like_metadata_iterative(
         if let Some(cycle) =
             detect_circular_type_reference(*type_name, type_metadata, &metadata.type_aliases, &mut visiting, &mut path)
         {
+            let cycle_strs: Vec<&str> = cycle.iter().map(Atom::as_str).collect();
             metadata.issues.push(
-                Issue::error(format!("Circular type reference detected: {}", cycle.join(" → ")))
+                Issue::error(format!("Circular type reference detected: {}", cycle_strs.join(" → ")))
                     .with_code(crate::issue::ScanningIssueKind::CircularTypeImport)
                     .with_annotation(
                         Annotation::primary(type_metadata.span)
                             .with_message("This type is part of a circular reference chain"),
                     )
-                    .with_note(format!("The type reference chain creates a cycle: {}", cycle.join(" references ")))
+                    .with_note(format!("The type reference chain creates a cycle: {}", cycle_strs.join(" references ")))
                     .with_help("Reorganize your type definitions to avoid circular dependencies"),
             );
         }
