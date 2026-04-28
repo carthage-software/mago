@@ -116,12 +116,13 @@ fn read_variable<'ctx>(
     variable_name: &str,
     variable_span: Span,
 ) -> Rc<TUnion> {
-    let _ = block_context.has_variable(variable_name);
+    let variable_atom = atom(variable_name);
+    block_context.add_conditionally_referenced_variable_atom(variable_name, variable_atom);
 
-    let variable_type = match block_context.locals.get(&atom(variable_name)) {
+    let variable_type = match block_context.locals.get(&variable_atom) {
         Some(variable_type) => variable_type.clone(),
         None => {
-            if block_context.variables_possibly_in_scope.contains(&atom(variable_name)) {
+            if block_context.variables_possibly_in_scope.contains(&variable_atom) {
                 if !block_context.flags.inside_isset() {
                     context.collector.report_with_code(
                         IssueCode::PossiblyUndefinedVariable,
@@ -160,7 +161,6 @@ fn read_variable<'ctx>(
 
                 // This variable does not currently exist, but is being referenced.
                 // therefore, we need to analyze it as if it was being assigned `null`.
-                let variable_atom = atom(variable_name);
                 assignment::analyze_assignment_to_variable(
                     context,
                     block_context,

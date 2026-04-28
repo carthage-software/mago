@@ -22,6 +22,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Expression;
+use mago_syntax::comments::docblock::PrecedingDocblocks;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -60,6 +61,10 @@ pub fn populate_docblock_variables_excluding<'ctx>(
     override_existing: bool,
     exclude_variable: Option<Atom>,
 ) {
+    if PrecedingDocblocks::new(context.comments, context.statement_span.start.offset).next().is_none() {
+        return;
+    }
+
     for (name, variable_type, variable_type_span) in get_docblock_variables(context, block_context, artifacts, true) {
         // Check for undefined type references in ALL @var types, regardless of variable name.
         for type_ref in variable_type.get_all_child_nodes() {
