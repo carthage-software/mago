@@ -1149,10 +1149,10 @@ fn scrape_type_properties(
                 combination.literal_strings.insert(atom);
             }
         } else {
-            // When we have a constrained string type (like numeric-string) and literals,
-            // we need to decide whether to merge them or keep them separate.
-            // If the non-literal is numeric-string, keep non-numeric literals separate.
             let mut literals_to_keep = AtomSet::default();
+            if !combination.literal_strings.is_empty() {
+                string_scalar.is_callable = false;
+            }
 
             if string_scalar.is_truthy
                 || string_scalar.is_non_empty
@@ -1169,7 +1169,6 @@ fn scrape_type_properties(
                         string_scalar.is_truthy = false;
                     }
 
-                    // If the string is numeric but the literal is not, keep the literal separate
                     if string_scalar.is_numeric && !str_is_numeric(value) {
                         literals_to_keep.insert(*value);
                     } else {
