@@ -95,7 +95,12 @@ pub(crate) fn is_contained_by(
 
         let container_for_comparison =
             if container_parameter_type.accepts_null() && !input_parameter_type.accepts_null() {
-                TUnion::from_vec(container_parameter_type.get_non_nullable_types())
+                let non_nullable = container_parameter_type.get_non_nullable_types();
+                if non_nullable.is_empty() {
+                    return false;
+                }
+
+                TUnion::from_vec(non_nullable)
             } else {
                 container_parameter_type.clone()
             };

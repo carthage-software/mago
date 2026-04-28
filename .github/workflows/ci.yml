@@ -63,6 +63,10 @@ jobs:
       - name: cargo test
         run: cargo test --workspace --locked
 
+      - name: cargo test (property)
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        run: cargo test -p mago-codex --features property-tests --locked
+
       - name: cargo build
         if: matrix.rust == 'stable'
         run: cargo build --release --locked

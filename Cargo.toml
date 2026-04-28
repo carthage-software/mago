@@ -79,6 +79,7 @@ serde-wasm-bindgen = "0.6"
 diffy = "0.4.0"
 termcolor = "1.4.1"
 indoc = "2"
+proptest = "1.5"
 ureq = { version = "3", features = ["rustls", "json"] }
 self-replace = "1"
 semver = "1"
