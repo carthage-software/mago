@@ -1212,14 +1212,21 @@ fn scrape_type_properties(
     }
 
     if let TAtomic::Scalar(TScalar::Float(float_scalar)) = &atomic {
-        if combination.value_types.contains_key(&*ATOM_FLOAT) {
+        if let Some(stored) = combination.value_types.get(&*ATOM_FLOAT) {
+            if matches!(stored, TAtomic::Scalar(TScalar::Float(TFloat::Float))) {
+                return;
+            }
+
+            if matches!(float_scalar, TFloat::Float) {
+                combination.literal_floats.clear();
+                combination.value_types.insert(*ATOM_FLOAT, atomic);
+            }
+
             return;
         }
 
         if let TFloat::Literal(literal_value) = float_scalar {
-            // Check if adding this float would exceed the threshold (using string threshold for floats)
             if combination.literal_floats.len() >= options.string_combination_threshold as usize {
-                // Exceeded threshold - generalize to base float type
                 combination.literal_floats.clear();
                 combination.value_types.insert(*ATOM_FLOAT, TAtomic::Scalar(TScalar::float()));
                 return;

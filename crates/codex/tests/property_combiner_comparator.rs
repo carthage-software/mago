@@ -210,13 +210,8 @@ proptest! {
             a, ra, rra,
         );
     }
-}
-
-proptest! {
-    #![proptest_config(proptest_config())]
 
     #[test]
-    #[ignore = "combiner over-widens lists with float refinements and absorbs void in unions"]
     fn recanonicalise_is_widening(a in arb_union()) {
         let cb = empty_codebase();
         let ra = recanonicalise(&a);
@@ -225,7 +220,6 @@ proptest! {
     }
 
     #[test]
-    #[ignore = "depends on `recanonicalise_is_widening`"]
     fn subtype_preserved_through_canonical_container((a, b) in arb_subtype_pair()) {
         let cb = empty_codebase();
         prop_assume!(is_contained(&a, &b, &cb));
