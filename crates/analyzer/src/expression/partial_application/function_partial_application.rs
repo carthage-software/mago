@@ -47,12 +47,24 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
         let resulting_type = if self.argument_list.is_first_class_callable() {
             let callable_types: Vec<TAtomic> = callables
                 .into_iter()
-                .map(|mut callable| {
-                    if let TCallable::Signature(ref mut sig) = callable {
-                        sig.is_closure = true;
-                    }
+                .map(|callable| {
+                    let signature = match callable {
+                        TCallable::Signature(mut sig) => {
+                            sig.is_closure = true;
+                            sig
+                        }
+                        TCallable::Alias(id) => {
+                            match get_signature_of_function_like_identifier(&id, context.codebase) {
+                                Some(mut sig) => {
+                                    sig.is_closure = true;
+                                    sig
+                                }
+                                None => return TAtomic::Callable(TCallable::Alias(id)),
+                            }
+                        }
+                    };
 
-                    TAtomic::Callable(callable)
+                    TAtomic::Callable(TCallable::Signature(signature))
                 })
                 .collect();
 

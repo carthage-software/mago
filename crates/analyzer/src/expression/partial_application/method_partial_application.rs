@@ -56,7 +56,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                 if method_resolution.has_invalid_target { get_never() } else { get_mixed_closure() }
             } else {
                 TUnion::from_vec(
-                    identifiers.into_iter().map(|identifier| TAtomic::Callable(TCallable::Alias(identifier))).collect(),
+                    identifiers
+                        .into_iter()
+                        .map(|identifier| {
+                            match get_signature_of_function_like_identifier(&identifier, context.codebase) {
+                                Some(mut sig) => {
+                                    sig.is_closure = true;
+                                    TAtomic::Callable(TCallable::Signature(sig))
+                                }
+                                None => TAtomic::Callable(TCallable::Alias(identifier)),
+                            }
+                        })
+                        .collect(),
                 )
             }
         } else {

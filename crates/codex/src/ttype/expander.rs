@@ -809,7 +809,8 @@ pub fn get_signature_of_function_like_metadata(
         None
     };
 
-    let mut signature = TCallableSignature::new(function_like_metadata.flags.is_pure(), true)
+    let is_closure = matches!(function_like_identifier, FunctionLikeIdentifier::Closure(..));
+    let mut signature = TCallableSignature::new(function_like_metadata.flags.is_pure(), is_closure)
         .with_parameters(parameters)
         .with_return_type(return_type)
         .with_source(Some(*function_like_identifier));

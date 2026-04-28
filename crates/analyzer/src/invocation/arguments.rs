@@ -355,10 +355,19 @@ pub fn verify_argument_type<'arena>(
 
         context.collector.report_with_code(issue_kind, issue);
     } else if !union_comparison_result.type_coerced.unwrap_or(false) {
-        let types_can_be_identical =
-            can_expression_types_be_identical(context.codebase, input_type, parameter_type, false, false);
+        let parameter_requires_closure = parameter_type.types.iter().all(
+            |atomic| matches!(atomic, TAtomic::Callable(TCallable::Signature(signature)) if signature.is_closure()),
+        );
 
-        if types_can_be_identical && parameter_type.is_callable() {
+        let input_can_be_closure = input_type
+            .types
+            .iter()
+            .any(|atomic| matches!(atomic, TAtomic::Callable(TCallable::Signature(s)) if s.is_closure()));
+
+        let types_can_be_identical = !(parameter_requires_closure && !input_can_be_closure)
+            && can_expression_types_be_identical(context.codebase, input_type, parameter_type, false, false);
+
+        if types_can_be_identical && parameter_type.is_callable() && !parameter_requires_closure {
             let all_inputs_are_resolvable_aliases = input_type.types.iter().all(|atomic| {
                 if matches!(atomic, TAtomic::Callable(_)) {
                     false
