@@ -1534,6 +1534,7 @@ test_case!(strings_strlen_returns_non_negative);
 test_case!(strings_strlen_of_non_empty_is_positive);
 test_case!(strings_explode_returns_list_with_separator);
 test_case!(strings_implode_basic);
+test_case!(strings_implode_single_empty_element);
 test_case!(strings_str_contains_returns_bool);
 test_case!(strings_numeric_string_intval);
 test_case!(strings_is_string_narrows);
