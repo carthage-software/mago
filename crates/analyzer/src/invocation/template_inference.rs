@@ -521,6 +521,13 @@ fn infer_templates_from_input_and_container_types(
                     }
                 };
 
+                let has_callable_alternatives =
+                    generic_container_parts.iter().filter(|t| matches!(t, TAtomic::Callable(_))).count() > 1;
+
+                let mut sandboxed_violations: Vec<TemplateInferenceViolation> = Vec::new();
+                let arm_violations: &mut Vec<TemplateInferenceViolation> =
+                    if has_callable_alternatives { &mut sandboxed_violations } else { violations };
+
                 for input_atomic in residual_input_type.types.as_ref() {
                     let (input_signature, is_cast_from_non_callable) = match input_atomic {
                         TAtomic::Callable(TCallable::Signature(argument_signature)) => {
@@ -591,7 +598,7 @@ fn infer_templates_from_input_and_container_types(
                             &input_param_for_inference,
                             template_result,
                             InferenceOptions { infer_only_if_new: true, ..options },
-                            violations,
+                            arm_violations,
                         );
                     }
 
@@ -615,7 +622,7 @@ fn infer_templates_from_input_and_container_types(
                         &input_return_for_inference,
                         template_result,
                         InferenceOptions { infer_only_if_new: false, ..options },
-                        violations,
+                        arm_violations,
                     );
                 }
             }
