@@ -29,24 +29,24 @@ pub fn inherit_methods_from_parent(
     };
 
     for (method_name_lc, appearing_method_id) in &parent_metadata.appearing_method_ids {
-        let mut aliased_method_names = vec![*method_name_lc];
+        let mut process_name = |aliased_method_name: Atom| {
+            if metadata.has_appearing_method(aliased_method_name) {
+                return;
+            }
+
+            let implemented_method_id = MethodIdentifier::new(class_like_name, aliased_method_name);
+            let final_appearing_id = if parent_is_trait { implemented_method_id } else { *appearing_method_id };
+            metadata.appearing_method_ids.insert(aliased_method_name, final_appearing_id);
+        };
+
+        process_name(*method_name_lc);
 
         if let Some(ref reverse_map) = reverse_alias_map
             && let Some(aliases) = reverse_map.get(method_name_lc)
         {
-            aliased_method_names.extend(aliases.iter().copied());
-        }
-
-        for aliased_method_name in aliased_method_names {
-            if metadata.has_appearing_method(aliased_method_name) {
-                continue;
+            for alias in aliases.iter().copied() {
+                process_name(alias);
             }
-
-            let implemented_method_id = MethodIdentifier::new(class_like_name, aliased_method_name);
-
-            let final_appearing_id = if parent_is_trait { implemented_method_id } else { *appearing_method_id };
-
-            metadata.appearing_method_ids.insert(aliased_method_name, final_appearing_id);
         }
     }
 
@@ -74,15 +74,7 @@ pub fn inherit_methods_from_parent(
             }
         }
 
-        let mut aliased_method_names = vec![*method_name_lc];
-
-        if let Some(ref reverse_map) = reverse_alias_map
-            && let Some(aliases) = reverse_map.get(method_name_lc)
-        {
-            aliased_method_names.extend(aliases.iter().copied());
-        }
-
-        for aliased_method_name in aliased_method_names {
+        let process_name = |aliased_method_name: Atom, metadata: &mut ClassLikeMetadata| {
             if let Some(implementing_method_id) = metadata.declaring_method_ids.get(&aliased_method_name) {
                 let implementing_class = implementing_method_id.get_class_name();
                 let implementing_method_name = implementing_method_id.get_method_name();
@@ -94,21 +86,26 @@ pub fn inherit_methods_from_parent(
                         .get(&(implementing_class, implementing_method_name))
                         .is_some_and(|m| m.flags.is_magic_method());
 
-                if !is_existing_pseudo_from_trait {
-                    // Don't overwrite if:
-                    // 1. The child has a concrete (non-abstract) method, OR
-                    // 2. The child declared its own version (even if abstract) - this preserves
-                    //    interface method overrides where a child interface narrows the return type
-                    if !codebase.method_is_abstract(&implementing_class, &implementing_method_name)
-                        || *implementing_class == class_like_name
-                    {
-                        continue;
-                    }
+                if !is_existing_pseudo_from_trait
+                    && (!codebase.method_is_abstract(&implementing_class, &implementing_method_name)
+                        || *implementing_class == class_like_name)
+                {
+                    return;
                 }
             }
 
             metadata.declaring_method_ids.insert(aliased_method_name, *declaring_method_id);
             metadata.inheritable_method_ids.insert(aliased_method_name, *declaring_method_id);
+        };
+
+        process_name(*method_name_lc, metadata);
+
+        if let Some(ref reverse_map) = reverse_alias_map
+            && let Some(aliases) = reverse_map.get(method_name_lc)
+        {
+            for alias in aliases.iter().copied() {
+                process_name(alias, metadata);
+            }
         }
     }
 }
