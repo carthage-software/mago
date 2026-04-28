@@ -140,7 +140,8 @@ impl StringStyleRule {
 
         let has_literal = parts.iter().any(|p| matches!(p, ConcatPart::Literal { .. }));
         let has_interpolable = parts.iter().any(|p| matches!(p, ConcatPart::Interpolable { .. }));
-        if !has_literal || !has_interpolable {
+        let has_other = parts.iter().any(|p| matches!(p, ConcatPart::Other));
+        if !has_literal || !has_interpolable || has_other {
             return;
         }
 
@@ -402,6 +403,28 @@ mod tests {
             <?php
 
             echo "class: " . Foo::class;
+        "#}
+    }
+
+    test_lint_success! {
+        name = concat_with_static_access_and_variable,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo 'foo ' . SomeClass::class . $var;
+        "#}
+    }
+
+    test_lint_success! {
+        name = concat_with_function_call_and_variable,
+        rule = StringStyleRule,
+        settings = prefer_interpolation,
+        code = indoc! {r#"
+            <?php
+
+            echo 'foo ' . someFunction() . $var;
         "#}
     }
 
