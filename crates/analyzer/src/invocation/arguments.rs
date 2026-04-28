@@ -364,7 +364,7 @@ pub fn verify_argument_type<'arena>(
             .iter()
             .any(|atomic| matches!(atomic, TAtomic::Callable(TCallable::Signature(s)) if s.is_closure()));
 
-        let types_can_be_identical = !(parameter_requires_closure && !input_can_be_closure)
+        let types_can_be_identical = (!parameter_requires_closure || input_can_be_closure)
             && can_expression_types_be_identical(context.codebase, input_type, parameter_type, false, false);
 
         if types_can_be_identical && parameter_type.is_callable() && !parameter_requires_closure {
