@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
-use mago_atom::atom;
 use proptest::collection::vec;
 use proptest::prelude::*;
 use proptest::sample::select;
 
+use mago_atom::atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -124,7 +124,15 @@ fn arb_array_key() -> impl Strategy<Value = TAtomic> {
 }
 
 fn arb_leaf_atomic() -> impl Strategy<Value = TAtomic> {
-    prop_oneof![arb_primitive(), arb_bool(), arb_integer(), arb_float(), arb_string(), arb_named_object(), arb_array_key()]
+    prop_oneof![
+        arb_primitive(),
+        arb_bool(),
+        arb_integer(),
+        arb_float(),
+        arb_string(),
+        arb_named_object(),
+        arb_array_key()
+    ]
 }
 
 fn arb_atomic() -> impl Strategy<Value = TAtomic> {
@@ -145,9 +153,8 @@ fn arb_atomic() -> impl Strategy<Value = TAtomic> {
                     non_empty,
                 }))
             }),
-            (element_union.clone(), element_union.clone()).prop_map(|(k, v)| {
-                TAtomic::Iterable(TIterable::new(Arc::new(k), Arc::new(v)))
-            }),
+            (element_union.clone(), element_union.clone())
+                .prop_map(|(k, v)| { TAtomic::Iterable(TIterable::new(Arc::new(k), Arc::new(v))) }),
             (element_union.clone(), element_union).prop_map(|(p, r)| {
                 let signature = TCallableSignature::new(false, false)
                     .with_parameters(vec![TCallableParameter::new(Some(Arc::new(p)), false, false, false)])
@@ -176,6 +183,24 @@ fn arb_subtype_pair() -> impl Strategy<Value = (TUnion, TUnion)> {
 
         (a, b)
     })
+}
+
+fn arb_subtype_chain() -> impl Strategy<Value = (TUnion, TUnion, TUnion)> {
+    (vec(arb_atomic(), 1..=3), vec(arb_atomic(), 0..=2), vec(arb_atomic(), 0..=2)).prop_map(
+        |(a_atoms, mid_extras, top_extras)| {
+            let a = TUnion::from_vec(a_atoms.clone());
+
+            let mut b_atoms = a_atoms;
+            b_atoms.extend(mid_extras);
+            let b = TUnion::from_vec(b_atoms.clone());
+
+            let mut c_atoms = b_atoms;
+            c_atoms.extend(top_extras);
+            let c = TUnion::from_vec(c_atoms);
+
+            (a, b, c)
+        },
+    )
 }
 
 fn proptest_config() -> ProptestConfig {
@@ -229,6 +254,133 @@ proptest! {
             is_contained(&a, &rb, &cb),
             "a </: rb\n  a = {:?}\n  b = {:?}\n  rb = {:?}",
             a, b, rb,
+        );
+    }
+
+    #[test]
+    fn never_is_bottom(a in arb_union()) {
+        let cb = empty_codebase();
+        let never = TUnion::from_atomic(TAtomic::Never);
+        prop_assert!(is_contained(&never, &a, &cb), "never </: a\n  a = {:?}", a);
+    }
+
+    #[test]
+    fn mixed_is_top(a in arb_union()) {
+        let cb = empty_codebase();
+        let mixed = TUnion::from_atomic(TAtomic::Mixed(TMixed::new()));
+        prop_assert!(is_contained(&a, &mixed, &cb), "a </: mixed\n  a = {:?}", a);
+    }
+
+    #[test]
+    fn combine_widens_each_input(a in arb_atomic(), b in arb_atomic()) {
+        let cb = empty_codebase();
+        let ua = TUnion::from_atomic(a.clone());
+        let ub = TUnion::from_atomic(b.clone());
+        let combined = recanonicalise(&TUnion::from_vec(vec![a.clone(), b.clone()]));
+
+        prop_assert!(
+            is_contained(&ua, &combined, &cb),
+            "a </: combine(a, b)\n  a = {:?}\n  b = {:?}\n  combined = {:?}",
+            a, b, combined,
+        );
+        prop_assert!(
+            is_contained(&ub, &combined, &cb),
+            "b </: combine(a, b)\n  a = {:?}\n  b = {:?}\n  combined = {:?}",
+            a, b, combined,
+        );
+    }
+
+    #[test]
+    fn combine_is_commutative(a in arb_atomic(), b in arb_atomic()) {
+        let cb = empty_codebase();
+        let ab = recanonicalise(&TUnion::from_vec(vec![a.clone(), b.clone()]));
+        let ba = recanonicalise(&TUnion::from_vec(vec![b.clone(), a.clone()]));
+
+        prop_assert!(
+            is_contained(&ab, &ba, &cb),
+            "combine(a, b) </: combine(b, a)\n  a = {:?}\n  b = {:?}\n  ab = {:?}\n  ba = {:?}",
+            a, b, ab, ba,
+        );
+        prop_assert!(
+            is_contained(&ba, &ab, &cb),
+            "combine(b, a) </: combine(a, b)\n  a = {:?}\n  b = {:?}\n  ab = {:?}\n  ba = {:?}",
+            a, b, ab, ba,
+        );
+    }
+
+    #[test]
+    #[ignore = "combiner is not associative on chains of unsealed keyed arrays with overlapping value refinements"]
+    fn combine_is_associative(a in arb_atomic(), b in arb_atomic(), c in arb_atomic()) {
+        let cb = empty_codebase();
+        let ab = recanonicalise(&TUnion::from_vec(vec![a.clone(), b.clone()]));
+        let bc = recanonicalise(&TUnion::from_vec(vec![b.clone(), c.clone()]));
+
+        let mut left_atoms: Vec<TAtomic> = ab.types.as_ref().to_vec();
+        left_atoms.push(c.clone());
+        let left = recanonicalise(&TUnion::from_vec(left_atoms));
+
+        let mut right_atoms = vec![a.clone()];
+        right_atoms.extend(bc.types.as_ref().iter().cloned());
+        let right = recanonicalise(&TUnion::from_vec(right_atoms));
+
+        prop_assert!(
+            is_contained(&left, &right, &cb),
+            "(a + b) + c </: a + (b + c)\n  a = {:?}\n  b = {:?}\n  c = {:?}\n  left = {:?}\n  right = {:?}",
+            a, b, c, left, right,
+        );
+        prop_assert!(
+            is_contained(&right, &left, &cb),
+            "a + (b + c) </: (a + b) + c\n  a = {:?}\n  b = {:?}\n  c = {:?}\n  left = {:?}\n  right = {:?}",
+            a, b, c, left, right,
+        );
+    }
+
+    #[test]
+    fn combine_self_is_idempotent(a in arb_atomic()) {
+        let cb = empty_codebase();
+        let single = recanonicalise(&TUnion::from_atomic(a.clone()));
+        let double = recanonicalise(&TUnion::from_vec(vec![a.clone(), a.clone()]));
+
+        prop_assert!(
+            is_contained(&single, &double, &cb),
+            "[a] </: [a, a]\n  a = {:?}\n  single = {:?}\n  double = {:?}",
+            a, single, double,
+        );
+        prop_assert!(
+            is_contained(&double, &single, &cb),
+            "[a, a] </: [a]\n  a = {:?}\n  single = {:?}\n  double = {:?}",
+            a, single, double,
+        );
+    }
+
+    #[test]
+    fn combine_with_never_is_identity(a in arb_atomic()) {
+        let cb = empty_codebase();
+        let single = recanonicalise(&TUnion::from_atomic(a.clone()));
+        let with_never = recanonicalise(&TUnion::from_vec(vec![a.clone(), TAtomic::Never]));
+
+        prop_assert!(
+            is_contained(&single, &with_never, &cb),
+            "[a] </: [a, never]\n  a = {:?}\n  single = {:?}\n  with_never = {:?}",
+            a, single, with_never,
+        );
+        prop_assert!(
+            is_contained(&with_never, &single, &cb),
+            "[a, never] </: [a]\n  a = {:?}\n  single = {:?}\n  with_never = {:?}",
+            a, single, with_never,
+        );
+    }
+
+    #[test]
+    fn subtype_is_transitive((a, b, c) in arb_subtype_chain()) {
+        let cb = empty_codebase();
+        prop_assume!(is_contained(&a, &b, &cb));
+        prop_assume!(is_contained(&b, &c, &cb));
+
+        prop_assert!(
+            is_contained(&a, &c, &cb),
+            "transitivity broke\n  a = {:?}\n  b = {:?}\n  c = {:?}",
+            a, b, c,
         );
     }
 }
