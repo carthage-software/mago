@@ -497,30 +497,19 @@ fn analyze<'ctx, 'ast, 'arena>(
 
             let (parent_lb, parent_ub) = parent_int.get_bounds();
 
-            let lb_up = match (parent_lb, body_lb) {
-                (Some(p), Some(b)) => b >= p,
-                (None, Some(_)) => true,
-                (None, None) => true,
-                _ => false,
-            };
-            let ub_up = match (parent_ub, body_ub) {
+            let ub_grew = match (parent_ub, body_ub) {
                 (Some(p), Some(b)) => b > p,
+                (Some(_), None) => true,
                 _ => false,
             };
-
-            let lb_down = match (parent_lb, body_lb) {
+            let lb_shrunk = match (parent_lb, body_lb) {
                 (Some(p), Some(b)) => b < p,
-                _ => false,
-            };
-            let ub_down = match (parent_ub, body_ub) {
-                (Some(p), Some(b)) => b <= p,
-                (None, Some(_)) => true,
-                (None, None) => true,
+                (Some(_), None) => true,
                 _ => false,
             };
 
-            let new_ub = if lb_up && ub_up { None } else { body_ub };
-            let new_lb = if lb_down && ub_down { None } else { body_lb };
+            let new_ub = if ub_grew { None } else { body_ub };
+            let new_lb = if lb_shrunk { None } else { body_lb };
 
             if new_ub != body_ub || new_lb != body_lb {
                 *continue_type = Rc::new(TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(
