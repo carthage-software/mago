@@ -23,10 +23,10 @@ use crate::Prelude;
 struct PHPAssets;
 
 pub(crate) fn build_prelude_internal() -> Prelude {
-    let arena = Bump::new();
+    let mut arena = Bump::new();
     let database = get_prelude_database();
     let read_db = database.read_only();
-    let mut metadata = get_prelude_metadata(&arena, &read_db);
+    let mut metadata = get_prelude_metadata(&mut arena, &read_db);
     let mut symbol_references = SymbolReferences::default();
 
     populate_codebase(&mut metadata, &mut symbol_references, Default::default(), Default::default());
@@ -61,9 +61,11 @@ fn get_prelude_database() -> mago_database::Database<'static> {
     db
 }
 
-fn get_prelude_metadata(arena: &Bump, database: &ReadDatabase) -> CodebaseMetadata {
+fn get_prelude_metadata(arena: &mut Bump, database: &ReadDatabase) -> CodebaseMetadata {
     let mut metadata = CodebaseMetadata::default();
     for file in database.files() {
+        arena.reset();
+
         let file_metadata = scan_file_for_metadata(&file, arena);
 
         metadata.extend(file_metadata);
