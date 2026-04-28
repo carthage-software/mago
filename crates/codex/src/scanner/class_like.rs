@@ -464,6 +464,22 @@ fn scan_class_like<'arena>(
         class_like_metadata.has_sealed_methods = docblock.has_sealed_methods;
         class_like_metadata.has_sealed_properties = docblock.has_sealed_properties;
 
+        for imported_type_alias in &docblock.imported_type_aliases {
+            let fqcn = ascii_lowercase_atom(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
+            let type_name = atom(&imported_type_alias.name);
+            let alias = imported_type_alias.alias.as_deref().map_or(type_name, atom);
+
+            if fqcn == name {
+                continue;
+            }
+
+            type_context = type_context.with_imported_type_alias(alias, fqcn, type_name);
+        }
+
+        for type_alias in &docblock.type_aliases {
+            type_context = type_context.with_type_alias(atom(&type_alias.name));
+        }
+
         let mut template_variance = Vec::new();
         for template in &docblock.templates {
             let template_name = atom(&template.name);
@@ -517,8 +533,8 @@ fn scan_class_like<'arena>(
 
         class_like_metadata.set_template_variance(template_variance);
 
-        // Process imported type aliases first so they're available when building
-        // type alias definitions AND when resolving @template-extends/@template-implements
+        // Aliases were already registered in `type_context` above; here we
+        // record them on the class metadata and report any diagnostics.
         for imported_type_alias in docblock.imported_type_aliases {
             let fqcn = ascii_lowercase_atom(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
             let type_name = atom(&imported_type_alias.name);
@@ -539,11 +555,6 @@ fn scan_class_like<'arena>(
             }
 
             class_like_metadata.imported_type_aliases.insert(alias, (fqcn, type_name, imported_type_alias.span));
-            type_context = type_context.with_imported_type_alias(alias, fqcn, type_name);
-        }
-
-        for type_alias in &docblock.type_aliases {
-            type_context = type_context.with_type_alias(atom(&type_alias.name));
         }
 
         for type_alias in &docblock.type_aliases {
