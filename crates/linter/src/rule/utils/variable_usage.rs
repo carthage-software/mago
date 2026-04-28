@@ -1,6 +1,8 @@
-//! Shared variable-usage walker for the `no-redundant-variable` and `no-dead-store` rules.
+//! Shared variable-usage walker for the `no-redundant-variable`, `no-dead-store`,
+//! `no-unused-static`, `no-unused-global`, and `no-unused-closure-capture` rules.
 
 use foldhash::HashMap;
+use foldhash::HashSet;
 
 use mago_span::Span;
 use mago_syntax::ast::*;
@@ -177,6 +179,72 @@ impl<'arena> Recorder<'arena> for DeadStoreRecorder<'arena> {
     }
 }
 
+/// Collects every direct variable name referenced (read, written, unset, passed
+/// as a call argument, captured by a nested closure, etc.) within a body.
+///
+/// Unlike [`RedundantRecorder`] / [`DeadStoreRecorder`], this collector ignores
+/// `declare_external`. That makes `static $x;`, `global $x;`, parameters, and
+/// closure `use ($x)` captures invisible from the collector's point of view —
+/// only *other* references to those names show up in [`UsageCollector::referenced`].
+///
+/// The collector also bails (sets `bailed = true`) when the body contains
+/// variable variables (`$$x`, `${expr}`) or calls `extract()`, since those
+/// introduce names the linter cannot resolve.
+///
+/// Populate `interest` before walking with the names the caller cares about;
+/// `compact('foo')` matches against this set so any match resolves to a read
+/// without the collector having to fabricate `&'arena` strings on the fly.
+#[derive(Default)]
+pub struct UsageCollector<'arena> {
+    pub interest: HashSet<&'arena str>,
+    pub referenced: HashSet<&'arena str>,
+    pub bailed: bool,
+}
+
+impl<'arena> Recorder<'arena> for UsageCollector<'arena> {
+    fn declare_external(&mut self, _name: &'arena str) {}
+
+    fn record_write(&mut self, name: &'arena str, _span: Span) {
+        self.referenced.insert(name);
+    }
+
+    fn record_read(&mut self, name: &'arena str) {
+        self.referenced.insert(name);
+    }
+
+    fn record_read_then_write(&mut self, name: &'arena str, _span: Span) {
+        self.referenced.insert(name);
+    }
+
+    fn record_call_argument(&mut self, name: &'arena str, _span: Span) {
+        self.referenced.insert(name);
+    }
+
+    fn record_unset(&mut self, name: &'arena str) {
+        self.referenced.insert(name);
+    }
+
+    fn enter_arm(&mut self) {}
+
+    fn exit_arm(&mut self) {}
+
+    fn bail(&mut self) {
+        self.bailed = true;
+    }
+
+    fn is_bailed(&self) -> bool {
+        self.bailed
+    }
+
+    fn is_seen(&self, name: &str) -> bool {
+        self.interest.contains(name) || self.referenced.contains(name)
+    }
+
+    fn tracked_names(&self) -> Vec<&'arena str> {
+        self.interest.iter().copied().collect()
+    }
+}
+
 pub fn analyze<'arena, R: Recorder<'arena> + Default + Sync + Send>(
     parameter_list: &FunctionLikeParameterList<'arena>,
     body: &Block<'arena>,
@@ -194,6 +262,19 @@ pub fn analyze<'arena, R: Recorder<'arena> + Default + Sync + Send>(
         }
     }
 
+    walker.walk_block(body, &mut ());
+    walker.rec
+}
+
+/// Walks `body` with a [`UsageCollector`] pre-loaded with `interest` names so
+/// that `compact('name')` resolves to a read of `$name` for any name in the set.
+///
+/// Returns the collector after the walk; callers should check `bailed` first
+/// before consulting `referenced`.
+pub fn collect_used_names<'arena>(body: &Block<'arena>, interest: HashSet<&'arena str>) -> UsageCollector<'arena> {
+    let collector = UsageCollector { interest, referenced: HashSet::default(), bailed: false };
+    let mut walker: UsageWalker<'arena, UsageCollector<'arena>> =
+        UsageWalker { rec: collector, ctx: ExprCtx::Read, excluded: Vec::new() };
     walker.walk_block(body, &mut ());
     walker.rec
 }

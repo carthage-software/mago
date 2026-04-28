@@ -20,6 +20,9 @@ This document details the rules available in the `Correctness` category.
 | No Empty Catch Clause | [`no-empty-catch-clause`](#no-empty-catch-clause) |
 | No Only | [`no-only`](#no-only) |
 | No Redundant Variable | [`no-redundant-variable`](#no-redundant-variable) |
+| No Unused Closure Capture | [`no-unused-closure-capture`](#no-unused-closure-capture) |
+| No Unused Global | [`no-unused-global`](#no-unused-global) |
+| No Unused Static | [`no-unused-static`](#no-unused-static) |
 | Strict Assertions | [`strict-assertions`](#strict-assertions) |
 | Strict Behavior | [`strict-behavior`](#strict-behavior) |
 | Strict Types | [`strict-types`](#strict-types) |
@@ -504,6 +507,150 @@ function greet(string $name): string
     $unused = compute_something();
 
     return "Hello, $name!";
+}
+```
+
+
+## <a id="no-unused-closure-capture"></a>`no-unused-closure-capture`
+
+Flags variables in a closure's `use (...)` clause that are never read
+or written inside the closure body.
+
+Captures only earn their keep when the body refers to them. A capture
+that nothing observes is usually a leftover from a refactor or a typo
+in the captured name.
+
+Names beginning with an underscore (`$_`, `$_foo`) are treated as
+intentionally-discarded and are ignored. By-reference captures
+(`use (&$x)`) are also ignored — they are commonly used for their
+side-effect on the outer scope, even when the inner body doesn't
+otherwise touch the binding. The rule bails out of any closure body
+that uses variable variables (`$$x`, `${expr}`) or calls `extract()`.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$base = 10;
+$add = function (int $x) use ($base): int {
+    return $x + $base;
+};
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$base = 10;
+$add = function (int $x) use ($base): int {
+    return $x;
+};
+```
+
+
+## <a id="no-unused-global"></a>`no-unused-global`
+
+Flags `global $x;` declarations whose name is never read or written
+inside the surrounding function-like scope.
+
+A `global` statement only earns its keep when later code refers to the
+imported binding. If the name is never used, the statement is dead —
+usually a leftover from a refactor or a typo in the imported name.
+
+Names beginning with an underscore (`$_`, `$_foo`) are treated as
+intentionally-discarded and are ignored. The rule bails out of any
+scope that uses variable variables (`$$x`, `${expr}`) or calls
+`extract()`, since those introduce names the linter cannot resolve.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function bump(): void {
+    global $counter;
+    $counter++;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function f(): void {
+    global $forgotten;
+}
+```
+
+
+## <a id="no-unused-static"></a>`no-unused-static`
+
+Flags `static $x;` declarations whose name is never read or written
+inside the surrounding function-like scope.
+
+A `static` declaration only earns its keep when later code refers to
+the binding. If the name is never used after the declaration, the
+statement is dead — usually a leftover from a refactor.
+
+Names beginning with an underscore (`$_`, `$_foo`) are treated as
+intentionally-discarded and are ignored. The rule bails out of any
+scope that uses variable variables (`$$x`, `${expr}`) or calls
+`extract()`, since those introduce names the linter cannot resolve.
+
+
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"warning"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function next_id(): int {
+    static $counter = 0;
+    return ++$counter;
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function f(): void {
+    static $forgotten = 0;
 }
 ```
 
