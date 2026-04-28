@@ -1,11 +1,11 @@
+use foldhash::HashSet;
+
 use mago_atom::Atom;
 use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
-
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -577,6 +577,9 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
             }
         }
     }
+
+    let mut seen = HashSet::default();
+    ids.retain(|(_, method_id, _, _, _)| seen.insert(*method_id));
 
     ids
 }
