@@ -3,7 +3,6 @@ use std::hash::Hash;
 use foldhash::HashSet;
 use foldhash::HashSetExt;
 use indexmap::IndexMap;
-use itertools::Itertools;
 
 use mago_atom::Atom;
 use mago_atom::AtomSet;
@@ -123,7 +122,7 @@ pub fn saturate_clauses<'a>(
             return vec![];
         }
 
-        let mut removed_indices: HashSet<usize> = HashSet::default();
+        let mut removed_indices: Vec<bool> = vec![false; unique_clauses_len];
         let mut added_clauses: Vec<Clause> = Vec::new();
 
         // Pre-built index of every (var, possibility-hash) pair that appears
@@ -172,7 +171,7 @@ pub fn saturate_clauses<'a>(
 
                 // Simple O(N) scan - fast for typical small N
                 for (clause_b_idx, clause_b) in unique_clauses.iter().enumerate() {
-                    if clause_a_idx == clause_b_idx || removed_indices.contains(&clause_b_idx) {
+                    if clause_a_idx == clause_b_idx || removed_indices[clause_b_idx] {
                         continue;
                     }
 
@@ -192,7 +191,7 @@ pub fn saturate_clauses<'a>(
                     let mut clause_var_possibilities = matching_clause_possibilities.clone();
                     clause_var_possibilities.retain(|k, _| k != &negated_hash);
 
-                    removed_indices.insert(clause_b_idx);
+                    removed_indices[clause_b_idx] = true;
 
                     if clause_var_possibilities.is_empty() {
                         if let Some(updated_clause) = clause_b.remove_possibilities(clause_var) {
@@ -208,7 +207,7 @@ pub fn saturate_clauses<'a>(
                 let clause_a_size = clause_a.possibilities.len();
 
                 'inner: for (clause_b_idx, clause_b) in unique_clauses.iter().enumerate() {
-                    if clause_a_idx >= clause_b_idx || removed_indices.contains(&clause_b_idx) {
+                    if clause_a_idx >= clause_b_idx || removed_indices[clause_b_idx] {
                         continue;
                     }
 
@@ -255,7 +254,7 @@ pub fn saturate_clauses<'a>(
                     }
 
                     if let Some(key_to_remove) = opposing_key {
-                        removed_indices.insert(clause_a_idx);
+                        removed_indices[clause_a_idx] = true;
                         let maybe_new_clause = clause_a.remove_possibilities(key_to_remove);
 
                         if let Some(new_clause) = maybe_new_clause {
@@ -275,7 +274,7 @@ pub fn saturate_clauses<'a>(
         let mut combined_clauses: Vec<Clause> = Vec::with_capacity(unique_clauses_len);
 
         for (idx, clause) in unique_clauses.iter().enumerate() {
-            if !removed_indices.contains(&idx) && seen_hashes.insert(clause.hash) {
+            if !removed_indices[idx] && seen_hashes.insert(clause.hash) {
                 combined_clauses.push((*clause).clone());
             }
         }
@@ -420,7 +419,8 @@ pub fn saturate_clauses<'a>(
         simplified_clauses
     }
 
-    let unique_clauses = clauses.into_iter().unique().collect::<Vec<_>>();
+    let mut seen: HashSet<u32> = HashSet::default();
+    let unique_clauses: Vec<&Clause> = clauses.into_iter().filter(|c| seen.insert(c.hash)).collect();
 
     saturate_clauses_inner(unique_clauses, thresholds.saturation_complexity.into(), thresholds.consensus_limit.into())
 }
@@ -561,7 +561,7 @@ pub fn disjoin_clauses(
         return vec![];
     }
 
-    let mut clauses = vec![];
+    let mut clauses = Vec::with_capacity(left_clauses_len.saturating_mul(right_clauses_len));
     let mut has_wedge = false;
 
     // This is creating the cartesian product of two CNF formulas, which is correct for (F1 ∨ F2).
@@ -585,7 +585,14 @@ pub fn disjoin_clauses(
 
             let mut possibilities = left_clause.possibilities.clone();
             for (var, possible_types) in &right_clause.possibilities {
-                possibilities.entry(*var).or_default().extend(possible_types.iter().map(|(&k, v)| (k, v.clone())));
+                match possibilities.get_mut(var) {
+                    Some(existing) => {
+                        existing.extend(possible_types.iter().map(|(&k, v)| (k, v.clone())));
+                    }
+                    None => {
+                        possibilities.insert(*var, possible_types.clone());
+                    }
+                }
             }
 
             // If a combined clause contains `A` and `!A`, it's a tautology (always true)
@@ -687,13 +694,13 @@ fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Opt
     };
 
     if !clause.wedge {
-        let impossibilities = clause.get_impossibilities();
+        for (var, possibility_map) in &clause.possibilities {
+            for assertion in possibility_map.values() {
+                let impossible_type = assertion.get_negation();
+                let hash = impossible_type.to_hash();
 
-        for (var, impossible_types) in &impossibilities {
-            for impossible_type in impossible_types {
                 let mut seed_clause_possibilities = IndexMap::new();
-                seed_clause_possibilities
-                    .insert(*var, IndexMap::from([(impossible_type.to_hash(), impossible_type.clone())]));
+                seed_clause_possibilities.insert(*var, IndexMap::from([(hash, impossible_type)]));
 
                 let seed_clause =
                     Clause::new(seed_clause_possibilities, clause.condition_span, clause.span, None, None, None);
@@ -709,30 +716,40 @@ fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Opt
 
     let mut complexity_upper_bound = seed_clauses.len();
     for clause in &clauses {
-        let mut possibilities_count = 0;
-        let impossibilities = clause.get_impossibilities();
-        for impossible_types in impossibilities.values() {
-            possibilities_count += impossible_types.len();
-        }
+        let possibilities_count: usize = clause.possibilities.values().map(IndexMap::len).sum();
 
         complexity_upper_bound = complexity_upper_bound.saturating_mul(possibilities_count);
 
         if complexity_upper_bound > max_complexity {
-            // If the complexity is too high, bail out early
             return None;
         }
     }
 
     while let Some(clause) = clauses.pop() {
         let mut new_clauses = Vec::with_capacity(seed_clauses.len() * 4);
-        let clause_impossibilities = clause.get_impossibilities();
+
+        let clause_negations: Vec<(Atom, Vec<(u64, Assertion)>)> = clause
+            .possibilities
+            .iter()
+            .map(|(var, possibility_map)| {
+                let negs = possibility_map
+                    .values()
+                    .map(|a| {
+                        let neg = a.get_negation();
+                        let hash = neg.to_hash();
+                        (hash, neg)
+                    })
+                    .collect();
+
+                (*var, negs)
+            })
+            .collect();
 
         for grouped_clause in &seed_clauses {
-            for (var, impossible_types) in &clause_impossibilities {
-                'next: for impossible_type in impossible_types {
+            for (var, negations) in &clause_negations {
+                'next: for (impossible_hash, impossible_type) in negations {
                     complexity += 1;
                     if complexity > max_complexity {
-                        // Early bailout
                         return None;
                     }
 
@@ -749,7 +766,7 @@ fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Opt
                     new_clause_possibilities
                         .entry(*var)
                         .or_insert_with(IndexMap::new)
-                        .insert(impossible_type.to_hash(), impossible_type.clone());
+                        .insert(*impossible_hash, impossible_type.clone());
 
                     new_clauses.push(Clause::new(
                         new_clause_possibilities,

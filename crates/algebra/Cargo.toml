@@ -17,7 +17,6 @@ mago-codex = { workspace = true }
 mago-span = { workspace = true }
 mago-atom = { workspace = true }
 foldhash = { workspace = true }
-itertools = { workspace = true }
 indexmap = { workspace = true }
 
 [dev-dependencies]
