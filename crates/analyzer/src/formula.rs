@@ -68,7 +68,7 @@ pub fn get_formula(
     let expression = unwrap_expression(conditional);
 
     if let Expression::Binary(binary) = expression {
-        if let BinaryOperator::And(_) = binary.operator {
+        if matches!(binary.operator, BinaryOperator::And(_) | BinaryOperator::LowAnd(_)) {
             return handle_binary_and_operation(
                 conditional_object_id,
                 binary.lhs,
@@ -80,7 +80,7 @@ pub fn get_formula(
             );
         }
 
-        if let BinaryOperator::Or(_) = binary.operator {
+        if matches!(binary.operator, BinaryOperator::Or(_) | BinaryOperator::LowOr(_)) {
             return handle_binary_or_operation(
                 conditional_object_id,
                 binary.lhs,
@@ -270,7 +270,7 @@ pub fn get_formula(
         }
 
         if let Expression::Binary(binary_expression) = unwrap_expression(unary_prefix.operand) {
-            if let BinaryOperator::Or(_) = binary_expression.operator {
+            if matches!(binary_expression.operator, BinaryOperator::Or(_) | BinaryOperator::LowOr(_)) {
                 return handle_binary_and_operation(
                     conditional_object_id,
                     &Expression::UnaryPrefix(UnaryPrefix {
@@ -288,7 +288,7 @@ pub fn get_formula(
                 );
             }
 
-            if let BinaryOperator::And(_) = binary_expression.operator {
+            if matches!(binary_expression.operator, BinaryOperator::And(_) | BinaryOperator::LowAnd(_)) {
                 return handle_binary_or_operation(
                     conditional_object_id,
                     &Expression::UnaryPrefix(UnaryPrefix {
