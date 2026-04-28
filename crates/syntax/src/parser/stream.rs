@@ -4,6 +4,7 @@ use bumpalo::Bump;
 use bumpalo::collections::CollectIn;
 use bumpalo::collections::Vec;
 
+use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_span::Position;
 use mago_span::Span;
@@ -25,13 +26,22 @@ pub struct TokenStream<'input, 'arena> {
     buffer: LookaheadBuf<Token<'input>, 16>,
     trivia: Vec<'arena, Token<'input>>,
     position: Position,
+    file_id: FileId,
 }
 
 impl<'input, 'arena> TokenStream<'input, 'arena> {
     pub fn new(arena: &'arena Bump, lexer: Lexer<'input>) -> TokenStream<'input, 'arena> {
         let position = lexer.current_position();
+        let file_id_cached = lexer.file_id();
 
-        TokenStream { arena, lexer, buffer: LookaheadBuf::new(), trivia: Vec::new_in(arena), position }
+        TokenStream {
+            arena,
+            lexer,
+            buffer: LookaheadBuf::new(),
+            trivia: Vec::new_in(arena),
+            position,
+            file_id: file_id_cached,
+        }
     }
 
     /// Returns the current position of the stream within the source file.
@@ -65,13 +75,26 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     /// Returns the token if it matches, otherwise returns an error.
     #[inline]
     pub fn eat(&mut self, kind: TokenKind) -> Result<Token<'input>, ParseError> {
-        // Check kind first without copying full token
+        // Fast path: head already buffered. Avoids the Result<Option<...>>
+        // round trip from `peek_kind` plus a follow-up `lookahead` on the
+        // happy path.
+        if let Some(token) = self.buffer.get(0) {
+            if token.kind == kind {
+                let _ = self.buffer.pop_front();
+
+                self.position = Position::new(token.start.offset + token.value.len() as u32);
+                return Ok(token);
+            }
+
+            return Err(self.unexpected(Some(token), &[kind]));
+        }
+
+        // Slow path: buffer empty, fill it.
         let current_kind = self.peek_kind(0)?;
         match current_kind {
             Some(k) if k == kind => self.consume(),
             Some(_) => {
                 let token = self.lookahead(0)?.unwrap();
-
                 Err(self.unexpected(Some(token), &[kind]))
             }
             None => Err(self.unexpected(None, &[kind])),
@@ -125,6 +148,10 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     /// Returns `false` if at EOF.
     #[inline]
     pub fn is_at(&mut self, kind: TokenKind) -> Result<bool, ParseError> {
+        if let Some(token) = self.buffer.get(0) {
+            return Ok(token.kind == kind);
+        }
+
         Ok(self.peek_kind(0)? == Some(kind))
     }
 
@@ -133,6 +160,10 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     /// Returns `Ok(None)` if EOF is reached before the nth token.
     #[inline]
     pub fn lookahead(&mut self, n: usize) -> Result<Option<Token<'input>>, ParseError> {
+        if n < self.buffer.len() {
+            return Ok(self.buffer.get(n));
+        }
+
         match self.fill_buffer(n + 1) {
             Ok(Some(_)) => Ok(self.buffer.get(n)),
             Ok(None) => Ok(None),
@@ -146,6 +177,10 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     /// copying the full token when only the kind is needed.
     #[inline]
     pub fn peek_kind(&mut self, n: usize) -> Result<Option<TokenKind>, ParseError> {
+        if n < self.buffer.len() {
+            return Ok(self.buffer.get(n).map(|t| t.kind));
+        }
+
         match self.fill_buffer(n + 1) {
             Ok(Some(_)) => Ok(self.buffer.get(n).map(|t| t.kind)),
             Ok(None) => Ok(None),
@@ -228,7 +263,8 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
 }
 
 impl HasFileId for TokenStream<'_, '_> {
-    fn file_id(&self) -> mago_database::file::FileId {
-        self.lexer.file_id()
+    #[inline]
+    fn file_id(&self) -> FileId {
+        self.file_id
     }
 }
