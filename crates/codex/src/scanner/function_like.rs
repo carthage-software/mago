@@ -425,7 +425,36 @@ fn scan_function_like_docblock(
             get_mixed()
         };
 
-        let definition = GenericTemplate::new(GenericParent::FunctionLike(functionlike_id), template_as_type);
+        let template_default = if let Some(type_string) = &template.default {
+            match builder::get_type_from_string(
+                context.arena,
+                &type_string.value,
+                type_string.span,
+                scope,
+                &type_context,
+                classname,
+            ) {
+                Ok(tunion) => Some(tunion),
+                Err(typing_error) => {
+                    metadata.issues.push(
+                        Issue::error("Invalid `@template` default type string.")
+                            .with_code(ScanningIssueKind::InvalidTemplateTag)
+                            .with_annotation(
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                            )
+                            .with_note(typing_error.note())
+                            .with_help(typing_error.help()),
+                    );
+
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        let definition = GenericTemplate::new(GenericParent::FunctionLike(functionlike_id), template_as_type)
+            .with_default(template_default);
 
         metadata.add_template_type(template_name, definition.clone());
         type_context = type_context.with_template_definition(template_name, vec![definition]);

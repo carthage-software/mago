@@ -738,7 +738,9 @@ fn should_use_static_type_params(named: &TNamedObject, static_obj: &TNamedObject
     let templates = &class_metadata.template_types;
 
     current_params.len() == templates.len()
-        && current_params.iter().zip(templates.values()).all(|(current, template)| current == &template.constraint)
+        && current_params.iter().zip(templates.values()).all(|(current, template)| {
+            current == &template.constraint || template.default.as_ref().is_some_and(|default| current == default)
+        })
 }
 
 /// Expands existing type parameters or fills them with default template bounds.
@@ -747,34 +749,26 @@ fn expand_or_fill_type_parameters(
     codebase: &CodebaseMetadata,
     options: &TypeExpansionOptions,
 ) {
-    if let Some(params) = &mut named.type_parameters
-        && !params.is_empty()
-    {
+    if let Some(class_metadata) = codebase.get_class_like(&named.name) {
+        let template_count = class_metadata.template_types.len();
+        let supplied_count = named.type_parameters.as_ref().map_or(0, Vec::len);
+
+        if supplied_count < template_count {
+            let mut params = named.type_parameters.take().unwrap_or_default();
+            params.extend(class_metadata.template_types.values().skip(supplied_count).map(|template| {
+                let mut fallback = template.default.clone().unwrap_or_else(|| template.constraint.clone());
+                fallback.set_from_template_default(true);
+                fallback
+            }));
+            named.type_parameters = Some(params);
+        }
+    }
+
+    if let Some(params) = &mut named.type_parameters {
         for param in params.iter_mut() {
             expand_union(codebase, param, options);
         }
-        return;
     }
-
-    let Some(class_metadata) = codebase.get_class_like(&named.name) else {
-        return;
-    };
-
-    if class_metadata.template_types.is_empty() {
-        return;
-    }
-
-    let defaults: Vec<TUnion> = class_metadata
-        .template_types
-        .values()
-        .map(|template| {
-            let mut constraint = template.constraint.clone();
-            constraint.set_from_template_default(true);
-            constraint
-        })
-        .collect();
-
-    named.type_parameters = Some(defaults);
 }
 
 #[must_use]

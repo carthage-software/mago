@@ -22,11 +22,20 @@ pub fn extend_template_parameters(metadata: &mut ClassLikeMetadata, parent_metad
 
         if let Some(parent_offsets) = metadata.template_extended_offsets.get(&parent_name).cloned() {
             let parent_template_type_names = parent_metadata.get_template_type_names();
+            let supplied_count = parent_offsets.len();
 
             for (i, extended_type_arc) in parent_offsets.into_iter().enumerate() {
                 if let Some(mapped_name) = parent_template_type_names.get(i).copied() {
                     metadata.add_template_extended_parameter(parent_name, mapped_name, extended_type_arc);
                 }
+            }
+
+            for (parameter_name, template) in parent_metadata.template_types.iter().skip(supplied_count) {
+                let Some(default) = &template.default else {
+                    break;
+                };
+
+                metadata.add_template_extended_parameter(parent_name, *parameter_name, default.clone());
             }
 
             let current_child_extended_params = metadata.template_extended_parameters.clone();
@@ -39,7 +48,8 @@ pub fn extend_template_parameters(metadata: &mut ClassLikeMetadata, parent_metad
             }
         } else {
             for (parameter_name, template) in &parent_metadata.template_types {
-                metadata.add_template_extended_parameter(parent_name, *parameter_name, template.constraint.clone());
+                let value = template.default.clone().unwrap_or_else(|| template.constraint.clone());
+                metadata.add_template_extended_parameter(parent_name, *parameter_name, value);
             }
 
             metadata.extend_template_extended_parameters(parent_metadata.template_extended_parameters.clone());

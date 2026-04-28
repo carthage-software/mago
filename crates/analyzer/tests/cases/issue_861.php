@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * @template TParent of object|null = null
+ * @template TParent of object|null
  */
 final class ChildNode
 {

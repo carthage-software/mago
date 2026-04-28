@@ -1585,6 +1585,8 @@ fn check_template_parameters<'ctx>(
     inheritance: InheritanceKind,
 ) {
     let expected_parameters_count = parent_metadata.template_types.len();
+    let min_required_parameters_count =
+        parent_metadata.template_types.values().take_while(|t| t.default.is_none()).count();
 
     let class_name = class_like_metadata.original_name;
     let class_kind_str = class_like_metadata.kind.as_str();
@@ -1598,9 +1600,9 @@ fn check_template_parameters<'ctx>(
         InheritanceKind::Use(_) => ("uses", "@use"),
     };
 
-    if expected_parameters_count > actual_parameters_count {
+    if min_required_parameters_count > actual_parameters_count {
         let issue = Issue::error(format!(
-            "Too few template arguments for `{parent_name}`: expected {expected_parameters_count}, but found {actual_parameters_count}."
+            "Too few template arguments for `{parent_name}`: expected at least {min_required_parameters_count}, but found {actual_parameters_count}."
         ))
         .with_annotation(
             Annotation::primary(primary_annotation_span)

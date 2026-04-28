@@ -130,6 +130,8 @@ pub struct TemplateTag {
     pub modifier: Option<TemplateModifier>,
     /// The optional constraint type string following the modifier, with its span.
     pub type_string: Option<TypeString>,
+    /// The optional default type string after `=` (e.g., `T of int|string = string`).
+    pub default: Option<TypeString>,
     /// Whether the template was declared as covariant (`@template-covariant`).
     pub covariant: bool,
     /// Whether the template was declared as contravariant (`@template-contravariant`).
@@ -370,19 +372,22 @@ pub fn parse_template_tag(
 
     let mut modifier: Option<TemplateModifier> = None;
     let mut type_string_opt: Option<TypeString> = None;
+    let mut default_opt: Option<TypeString> = None;
 
-    // Track current position relative to the start of the *original* content string
-    // Start after the name part
     let mut current_offset_rel = trim_start_offset_rel + name_part.len();
 
-    // 2. Check for optional modifier
-    // Need to peek into the *original* content slice to find the next non-whitespace char
     let remaining_after_name = content.get(current_offset_rel..).unwrap_or("");
     let whitespace_len1 = remaining_after_name.find(|c: char| !c.is_whitespace()).unwrap_or(0);
     let after_whitespace1_offset_rel = current_offset_rel + whitespace_len1;
     let potential_modifier_slice = remaining_after_name.trim_start();
 
-    if !potential_modifier_slice.is_empty() {
+    if let Some(rest) = potential_modifier_slice.strip_prefix('=') {
+        // `@template T = DEFAULT` (no constraint).
+        let after_eq_offset_rel = after_whitespace1_offset_rel + 1;
+        if let Some((default_type, _)) = split_tag_content(rest, span.subspan(after_eq_offset_rel as u32, 0)) {
+            default_opt = Some(default_type);
+        }
+    } else if !potential_modifier_slice.is_empty() {
         let mut modifier_parts = potential_modifier_slice.split_whitespace().peekable();
         if let Some(potential_modifier_str) = modifier_parts.peek().copied() {
             let modifier_val = match potential_modifier_str.to_ascii_lowercase().as_str() {
@@ -397,18 +402,38 @@ pub fn parse_template_tag(
                 modifier_parts.next();
                 current_offset_rel = after_whitespace1_offset_rel + potential_modifier_str.len();
 
-                // 3. If modifier found, look for the type string part
                 let remaining_after_modifier = content.get(current_offset_rel..).unwrap_or("");
                 if let Some((type_string, _)) =
                     split_tag_content(remaining_after_modifier, span.subspan(current_offset_rel as u32, 0))
                 {
+                    let type_end_rel = (type_string.span.end.offset - span.start.offset) as usize;
                     type_string_opt = Some(type_string);
+
+                    let after_constraint = content.get(type_end_rel..).unwrap_or("");
+                    let trimmed = after_constraint.trim_start();
+                    if let Some(rest) = trimmed.strip_prefix('=') {
+                        let leading_ws = after_constraint.len() - trimmed.len();
+                        let after_eq_offset_rel = type_end_rel + leading_ws + 1;
+                        if let Some((default_type, _)) =
+                            split_tag_content(rest, span.subspan(after_eq_offset_rel as u32, 0))
+                        {
+                            default_opt = Some(default_type);
+                        }
+                    }
                 }
             }
         }
     }
 
-    Ok(TemplateTag { span, name, modifier, type_string: type_string_opt, covariant, contravariant })
+    Ok(TemplateTag {
+        span,
+        name,
+        modifier,
+        type_string: type_string_opt,
+        default: default_opt,
+        covariant,
+        contravariant,
+    })
 }
 
 /// Parses the content string of a `@where` tag.

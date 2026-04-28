@@ -1126,7 +1126,7 @@ fn get_class_string_type_from_ast(
 
 #[inline]
 fn get_template_atomic(defining_entities: &[GenericTemplate], parameter_name: Atom) -> TAtomic {
-    let GenericTemplate { defining_entity: template_source, constraint: template_type } = &defining_entities[0];
+    let GenericTemplate { defining_entity: template_source, constraint: template_type, .. } = &defining_entities[0];
 
     TAtomic::GenericParameter(TGenericParameter {
         parameter_name,

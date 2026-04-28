@@ -140,7 +140,7 @@ pub fn get_template_types_for_class_member(
         let final_map_entry: &mut HashMap<GenericParent, TUnion> =
             expanded_template_types.entry(template_name).or_default();
 
-        for GenericTemplate { defining_entity: template_source, constraint: mut template_type } in type_map_vec {
+        for GenericTemplate { defining_entity: template_source, constraint: mut template_type, .. } in type_map_vec {
             expander::expand_union(
                 codebase,
                 &mut template_type,
