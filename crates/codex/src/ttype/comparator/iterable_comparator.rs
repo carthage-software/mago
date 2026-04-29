@@ -48,7 +48,6 @@ pub fn is_contained_by(
     }
 
     let mut nested_comparison_result = ComparisonResult::new();
-
     if !union_comparator::is_contained_by(
         codebase,
         &input_v,

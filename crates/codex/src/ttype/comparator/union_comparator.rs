@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use mago_atom::Atom;
 
 use crate::metadata::CodebaseMetadata;
@@ -32,238 +30,274 @@ pub fn is_contained_by(
     }
 
     let container_has_template = container_type.has_template_or_static();
-
-    let container_atomic_types = container_type.types.as_ref();
-    let mut input_atomic_types: VecDeque<&TAtomic> = input_type.types.iter().collect();
-
     let mut all_matched = true;
 
-    'outer: while let Some(input_type_part) = input_atomic_types.pop_front() {
-        match input_type_part {
-            TAtomic::Null if ignore_null => {
-                continue;
-            }
-            TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() && ignore_false => {
-                continue;
-            }
-            TAtomic::Variable(name) => {
-                if container_type.is_single()
-                    && let TAtomic::Variable(container_name) = container_type.get_single()
-                    && container_name == name
-                {
-                    continue;
-                }
+    for input_type_part in input_type.types.as_ref() {
+        all_matched &= is_contained_by_atomic(
+            codebase,
+            input_type,
+            input_type_part,
+            container_type,
+            container_has_template,
+            ignore_null,
+            ignore_false,
+            inside_assertion,
+            union_comparison_result,
+        );
+    }
 
-                union_comparison_result
-                    .type_variable_upper_bounds
-                    .push((*name, TemplateBound::new(container_type.clone(), 0, None, None)));
+    all_matched
+}
 
-                continue;
-            }
-            TAtomic::GenericParameter(TGenericParameter { intersection_types: None, constraint, .. })
-                if !container_has_template =>
+#[inline]
+#[allow(clippy::too_many_arguments)]
+fn is_contained_by_atomic(
+    codebase: &CodebaseMetadata,
+    input_type: &TUnion,
+    input_type_part: &TAtomic,
+    container_type: &TUnion,
+    container_has_template: bool,
+    ignore_null: bool,
+    ignore_false: bool,
+    inside_assertion: bool,
+    union_comparison_result: &mut ComparisonResult,
+) -> bool {
+    match input_type_part {
+        TAtomic::Null if ignore_null => return true,
+        TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() && ignore_false => return true,
+        TAtomic::Variable(name) => {
+            if container_type.is_single()
+                && let TAtomic::Variable(container_name) = container_type.get_single()
+                && container_name == name
             {
-                input_atomic_types.extend(constraint.types.iter());
-                continue;
+                return true;
             }
-            _ => (),
+
+            union_comparison_result
+                .type_variable_upper_bounds
+                .push((*name, TemplateBound::new(container_type.clone(), 0, None, None)));
+
+            return true;
         }
-
-        let mut type_match_found = false;
-        let mut all_type_coerced = None;
-        let mut all_type_coerced_from_nested_mixed = None;
-        let mut all_type_coerced_from_as_mixed = None;
-        let mut some_type_coerced = false;
-        let mut some_type_coerced_from_nested_mixed = false;
-
-        if let TAtomic::Scalar(TScalar::ArrayKey) = input_type_part {
-            if container_type.has_int_and_string() {
-                continue;
-            }
-            let mut has_int = false;
-            let mut has_string = false;
-
-            for container_atomic_type in container_atomic_types {
-                if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = container_atomic_type {
-                    if constraint.has_int_and_string() {
-                        continue 'outer;
-                    }
-
-                    if constraint.has_int() {
-                        has_int = true;
-                    }
-
-                    if constraint.has_string() {
-                        has_string = true;
-                    }
-                }
-            }
-
-            if has_int && has_string {
-                continue;
-            }
-        }
-
-        if let TAtomic::Scalar(TScalar::Generic) = input_type_part
-            && !container_type.has_scalar()
-            && container_type.has_scalar_combination()
+        TAtomic::GenericParameter(TGenericParameter { intersection_types: None, constraint, .. })
+            if !container_has_template =>
         {
-            continue;
-        }
-
-        if let TAtomic::Iterable(_) = input_type_part
-            && !container_type.has_iterable()
-            && container_type.has_array()
-            && container_type.has_traversable(codebase)
-        {
-            let mut matched_all = true;
-            for container_atomic_type in container_atomic_types {
-                if !container_atomic_type.is_array() && !container_atomic_type.is_traversable(codebase) {
-                    continue;
-                }
-
-                matched_all &= iterable_comparator::is_contained_by(
+            let mut all_matched = true;
+            for constraint_type_part in constraint.types.as_ref() {
+                all_matched &= is_contained_by_atomic(
                     codebase,
-                    input_type_part,
-                    container_atomic_type,
+                    input_type,
+                    constraint_type_part,
+                    container_type,
+                    container_has_template,
+                    ignore_null,
+                    ignore_false,
                     inside_assertion,
                     union_comparison_result,
                 );
             }
 
-            if matched_all {
-                continue;
+            return all_matched;
+        }
+        _ => (),
+    }
+
+    let container_atomic_types = container_type.types.as_ref();
+    let input_from_template_default = input_type.from_template_default();
+    let mut type_match_found = false;
+    let mut all_type_coerced = None;
+    let mut all_type_coerced_from_nested_mixed = None;
+    let mut all_type_coerced_from_as_mixed = None;
+    let mut some_type_coerced = false;
+    let mut some_type_coerced_from_nested_mixed = false;
+
+    if let TAtomic::Scalar(TScalar::ArrayKey) = input_type_part {
+        if container_type.has_int_and_string() {
+            return true;
+        }
+
+        let mut has_int = false;
+        let mut has_string = false;
+
+        for container_atomic_type in container_atomic_types {
+            if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = container_atomic_type {
+                if constraint.has_int_and_string() {
+                    return true;
+                }
+
+                if constraint.has_int() {
+                    has_int = true;
+                }
+
+                if constraint.has_string() {
+                    has_string = true;
+                }
             }
         }
 
-        if let TAtomic::Scalar(TScalar::Integer(input_integer)) = input_type_part
-            && container_type.has_int()
-            && integer_comparator::is_contained_by_union(*input_integer, container_type)
+        if has_int && has_string {
+            return true;
+        }
+    }
+
+    if let TAtomic::Scalar(TScalar::Generic) = input_type_part
+        && !container_type.has_scalar()
+        && container_type.has_scalar_combination()
+    {
+        return true;
+    }
+
+    if let TAtomic::Iterable(_) = input_type_part
+        && !container_type.has_iterable()
+        && container_type.has_array()
+        && container_type.has_traversable(codebase)
+    {
+        let mut matched_all = true;
+        for container_atomic_type in container_atomic_types {
+            if !container_atomic_type.is_array() && !container_atomic_type.is_traversable(codebase) {
+                continue;
+            }
+
+            matched_all &= iterable_comparator::is_contained_by(
+                codebase,
+                input_type_part,
+                container_atomic_type,
+                inside_assertion,
+                union_comparison_result,
+            );
+        }
+
+        if matched_all {
+            return true;
+        }
+    }
+
+    if let TAtomic::Scalar(TScalar::Integer(input_integer)) = input_type_part
+        && container_type.has_int()
+        && integer_comparator::is_contained_by_union(*input_integer, container_type)
+    {
+        return true;
+    }
+
+    for container_type_part in container_atomic_types {
+        if ignore_null && matches!(container_type_part, TAtomic::Null) && !matches!(input_type_part, TAtomic::Null) {
+            continue;
+        }
+
+        if ignore_false
+            && matches!(container_type_part, TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false())
+            && !matches!(input_type_part, TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false())
         {
             continue;
         }
 
-        for container_type_part in container_atomic_types {
-            if ignore_null && matches!(container_type_part, TAtomic::Null) && !matches!(input_type_part, TAtomic::Null)
-            {
-                continue;
-            }
+        if let TAtomic::Variable(name) = &container_type_part {
+            union_comparison_result
+                .type_variable_lower_bounds
+                .push((*name, TemplateBound::new(input_type.clone(), 0, None, None)));
 
-            if ignore_false
-                && matches!(container_type_part, TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false())
-                && !matches!(input_type_part, TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false())
-            {
-                continue;
-            }
+            type_match_found = true;
 
-            if let TAtomic::Variable(name) = &container_type_part {
-                union_comparison_result
-                    .type_variable_lower_bounds
-                    .push((*name, TemplateBound::new(input_type.clone(), 0, None, None)));
-
-                type_match_found = true;
-
-                continue;
-            }
-
-            let mut atomic_comparison_result = ComparisonResult::new();
-            let is_atomic_contained_by = atomic_comparator::is_contained_by(
-                codebase,
-                input_type_part,
-                container_type_part,
-                inside_assertion,
-                &mut atomic_comparison_result,
-            );
-
-            if (input_type_part.is_mixed() || matches!(input_type_part, TAtomic::Scalar(TScalar::ArrayKey)))
-                && input_type.from_template_default()
-                && atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false)
-            {
-                atomic_comparison_result.type_coerced_from_as_mixed = Some(true);
-            }
-
-            if atomic_comparison_result.type_coerced_to_literal.is_some() {
-                union_comparison_result.type_coerced_to_literal = atomic_comparison_result.type_coerced_to_literal;
-            }
-
-            if is_atomic_contained_by {
-                if let Some(replacement_atomic_type) = atomic_comparison_result.replacement_atomic_type {
-                    if let Some(replacement_union_type) = &mut union_comparison_result.replacement_union_type {
-                        replacement_union_type.replace_type(input_type_part, replacement_atomic_type);
-                    } else {
-                        union_comparison_result.replacement_union_type = Some(wrap_atomic(replacement_atomic_type));
-                    }
-                }
-
-                union_comparison_result
-                    .type_variable_lower_bounds
-                    .extend(atomic_comparison_result.type_variable_lower_bounds);
-
-                union_comparison_result
-                    .type_variable_upper_bounds
-                    .extend(atomic_comparison_result.type_variable_upper_bounds);
-            }
-
-            if atomic_comparison_result.type_coerced.unwrap_or(false) {
-                some_type_coerced = true;
-            }
-
-            if atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false) {
-                some_type_coerced_from_nested_mixed = true;
-            }
-
-            if !atomic_comparison_result.type_coerced.unwrap_or(false) || !all_type_coerced.unwrap_or(true) {
-                all_type_coerced = Some(false);
-            } else {
-                all_type_coerced = Some(true);
-            }
-
-            if !atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false)
-                || !all_type_coerced_from_nested_mixed.unwrap_or(true)
-            {
-                all_type_coerced_from_nested_mixed = Some(false);
-            } else {
-                all_type_coerced_from_nested_mixed = Some(true);
-            }
-
-            if is_atomic_contained_by {
-                type_match_found = true;
-                all_type_coerced_from_nested_mixed = Some(false);
-                all_type_coerced_from_as_mixed = Some(false);
-                all_type_coerced = Some(false);
-            }
+            continue;
         }
 
-        if all_type_coerced.unwrap_or(false) {
-            union_comparison_result.type_coerced = Some(true);
+        let mut atomic_comparison_result = ComparisonResult::new();
+        let is_atomic_contained_by = atomic_comparator::is_contained_by(
+            codebase,
+            input_type_part,
+            container_type_part,
+            inside_assertion,
+            &mut atomic_comparison_result,
+        );
+
+        if (input_type_part.is_mixed() || matches!(input_type_part, TAtomic::Scalar(TScalar::ArrayKey)))
+            && input_from_template_default
+            && atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false)
+        {
+            atomic_comparison_result.type_coerced_from_as_mixed = Some(true);
         }
 
-        if all_type_coerced_from_nested_mixed.unwrap_or(false) {
-            union_comparison_result.type_coerced_from_nested_mixed = Some(true);
-
-            if input_type.from_template_default() || all_type_coerced_from_as_mixed.unwrap_or(false) {
-                union_comparison_result.type_coerced_from_as_mixed = Some(true);
-            }
+        if atomic_comparison_result.type_coerced_to_literal.is_some() {
+            union_comparison_result.type_coerced_to_literal = atomic_comparison_result.type_coerced_to_literal;
         }
 
-        if !type_match_found {
-            if some_type_coerced {
-                union_comparison_result.type_coerced = Some(true);
-            }
-
-            if some_type_coerced_from_nested_mixed {
-                union_comparison_result.type_coerced_from_nested_mixed = Some(true);
-
-                if input_type.from_template_default() || all_type_coerced_from_as_mixed.unwrap_or(false) {
-                    union_comparison_result.type_coerced_from_as_mixed = Some(true);
+        if is_atomic_contained_by {
+            if let Some(replacement_atomic_type) = atomic_comparison_result.replacement_atomic_type {
+                if let Some(replacement_union_type) = &mut union_comparison_result.replacement_union_type {
+                    replacement_union_type.replace_type(input_type_part, replacement_atomic_type);
+                } else {
+                    union_comparison_result.replacement_union_type = Some(wrap_atomic(replacement_atomic_type));
                 }
             }
 
-            all_matched = false;
+            union_comparison_result
+                .type_variable_lower_bounds
+                .extend(atomic_comparison_result.type_variable_lower_bounds);
+
+            union_comparison_result
+                .type_variable_upper_bounds
+                .extend(atomic_comparison_result.type_variable_upper_bounds);
+        }
+
+        if atomic_comparison_result.type_coerced.unwrap_or(false) {
+            some_type_coerced = true;
+        }
+
+        if atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false) {
+            some_type_coerced_from_nested_mixed = true;
+        }
+
+        if !atomic_comparison_result.type_coerced.unwrap_or(false) || !all_type_coerced.unwrap_or(true) {
+            all_type_coerced = Some(false);
+        } else {
+            all_type_coerced = Some(true);
+        }
+
+        if !atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false)
+            || !all_type_coerced_from_nested_mixed.unwrap_or(true)
+        {
+            all_type_coerced_from_nested_mixed = Some(false);
+        } else {
+            all_type_coerced_from_nested_mixed = Some(true);
+        }
+
+        if is_atomic_contained_by {
+            type_match_found = true;
+            all_type_coerced_from_nested_mixed = Some(false);
+            all_type_coerced_from_as_mixed = Some(false);
+            all_type_coerced = Some(false);
         }
     }
 
-    all_matched
+    if all_type_coerced.unwrap_or(false) {
+        union_comparison_result.type_coerced = Some(true);
+    }
+
+    if all_type_coerced_from_nested_mixed.unwrap_or(false) {
+        union_comparison_result.type_coerced_from_nested_mixed = Some(true);
+
+        if input_from_template_default || all_type_coerced_from_as_mixed.unwrap_or(false) {
+            union_comparison_result.type_coerced_from_as_mixed = Some(true);
+        }
+    }
+
+    if type_match_found {
+        return true;
+    }
+
+    if some_type_coerced {
+        union_comparison_result.type_coerced = Some(true);
+    }
+
+    if some_type_coerced_from_nested_mixed {
+        union_comparison_result.type_coerced_from_nested_mixed = Some(true);
+
+        if input_from_template_default || all_type_coerced_from_as_mixed.unwrap_or(false) {
+            union_comparison_result.type_coerced_from_as_mixed = Some(true);
+        }
+    }
+
+    false
 }
 
 pub(crate) fn can_be_contained_by(
