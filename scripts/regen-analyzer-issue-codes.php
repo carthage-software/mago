@@ -79,6 +79,8 @@ final class AnalyzerCodeModuleGenerator
         'array-append-in-read-context',
         'array-append-overflow',
         'possibly-array-append-overflow',
+        'list-destructure-string-key',
+        'list-destructure-negative-key',
         'missing-constructor',
         'missing-return-statement',
         'mixed-property-type-coercion',

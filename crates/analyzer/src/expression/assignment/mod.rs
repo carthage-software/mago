@@ -10,7 +10,10 @@ use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_literal_int;
@@ -766,6 +769,10 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
         }
     }
 
+    if !has_keyed_elements && has_non_keyed_elements && !impossible {
+        check_list_destructure_keys(context, target_span, source_expression, array_type);
+    }
+
     for target_element in target_elements {
         match target_element {
             ArrayElement::KeyValue(key_value_element) => {
@@ -872,6 +879,106 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
     }
 
     Ok(())
+}
+
+fn check_list_destructure_keys<'arena>(
+    context: &mut Context<'_, 'arena>,
+    target_span: Span,
+    source_expression: Option<&Expression<'arena>>,
+    array_type: &TUnion,
+) {
+    let mut has_string_signal = false;
+    let mut has_negative_signal = false;
+
+    for atomic in array_type.types.iter() {
+        let TAtomic::Array(array) = atomic else {
+            continue;
+        };
+
+        let TArray::Keyed(keyed) = array else {
+            continue;
+        };
+
+        if let Some(known_items) = &keyed.known_items {
+            for key in known_items.keys() {
+                match key {
+                    ArrayKey::String(_) => has_string_signal = true,
+                    ArrayKey::Integer(i) if *i < 0 => has_negative_signal = true,
+                    _ => {}
+                }
+            }
+        }
+
+        if let Some((key_type, _)) = &keyed.parameters {
+            if key_type.has_string() {
+                has_string_signal = true;
+            }
+
+            for key_atomic in key_type.types.iter() {
+                if let TAtomic::Scalar(TScalar::Integer(int)) = key_atomic
+                    && int.is_negative()
+                {
+                    has_negative_signal = true;
+                }
+            }
+        }
+    }
+
+    if has_string_signal {
+        let assigned_type_str = array_type.get_id();
+        let mut issue = Issue::warning(format!(
+            "List-style destructuring of a value with non-integer keys (`{assigned_type_str}`).",
+        ))
+        .with_annotation(
+            Annotation::primary(target_span)
+                .with_message("This list-style destructuring only reads keys `0`, `1`, `2`, ..."),
+        );
+
+        if let Some(source_expression) = source_expression {
+            issue = issue.with_annotation(
+                Annotation::secondary(source_expression.span())
+                    .with_message(format!("...but this expression has type `{assigned_type_str}`")),
+            );
+        }
+
+        issue = issue
+            .with_note(
+                "PHP list destructuring (`[$a, $b]`) reads only sequential integer keys; string keys are silently ignored and trigger \"undefined array key\" warnings at runtime.",
+            )
+            .with_help(
+                "Use a keyed pattern like `['name' => $a, 'age' => $b]`, or convert the source to a list with `array_values(...)`.",
+            );
+
+        context.collector.report_with_code(IssueCode::ListDestructureStringKey, issue);
+    }
+
+    if has_negative_signal {
+        let assigned_type_str = array_type.get_id();
+        let mut issue = Issue::warning(format!(
+            "List-style destructuring of a value with negative integer keys (`{assigned_type_str}`).",
+        ))
+        .with_annotation(
+            Annotation::primary(target_span)
+                .with_message("This list-style destructuring only reads keys `0`, `1`, `2`, ..."),
+        );
+
+        if let Some(source_expression) = source_expression {
+            issue = issue.with_annotation(
+                Annotation::secondary(source_expression.span())
+                    .with_message(format!("...but this expression has type `{assigned_type_str}`")),
+            );
+        }
+
+        issue = issue
+            .with_note(
+                "PHP list destructuring starts at key `0`; negative keys present in the source are silently ignored.",
+            )
+            .with_help(
+                "Use a keyed pattern like `[-1 => $a, 0 => $b]` to capture the negative entry, or convert the source to a list with `array_values(...)`.",
+            );
+
+        context.collector.report_with_code(IssueCode::ListDestructureNegativeKey, issue);
+    }
 }
 
 fn analyze_assignment_target<'ctx, 'arena>(
@@ -1374,7 +1481,9 @@ mod tests {
             i_take_string($a);
             i_take_string($b);
         "},
-        issues = []
+        issues = [
+            IssueCode::ListDestructureStringKey,
+        ]
     }
 
     test_analysis! {
