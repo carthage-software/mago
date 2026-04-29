@@ -3,6 +3,8 @@ use std::rc::Rc;
 use mago_atom::Atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::add_union_type;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
@@ -34,6 +36,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
 
     let mut resolved_property_type = None;
     let mut matched_all_properties = true;
+    let mut widened_assigned_type: Option<TUnion> = None;
     for resolved_property in property_resolution.properties {
         if let Some(declaring_class_id) = resolved_property.declaring_class_id {
             artifacts.symbol_references.add_reference_for_property_write(
@@ -101,6 +104,13 @@ pub(crate) fn analyze<'ctx, 'arena>(
             }
         }
 
+        if type_match_found && let Some(replacement) = union_comparison_result.replacement_union_type {
+            widened_assigned_type = Some(match widened_assigned_type {
+                Some(existing) => add_union_type(existing, &replacement, context.codebase, CombinerOptions::default()),
+                None => replacement,
+            });
+        }
+
         if let Some(var_id) = property_access_id {
             block_context.locals.insert(var_id, Rc::new(assigned_value_type.clone()));
         }
@@ -115,7 +125,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
     }
 
     let mut resulting_type = if matched_all_properties && context.settings.memoize_properties {
-        Some(assigned_value_type.clone())
+        Some(widened_assigned_type.unwrap_or_else(|| assigned_value_type.clone()))
     } else {
         resolved_property_type
     };

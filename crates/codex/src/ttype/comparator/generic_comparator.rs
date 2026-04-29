@@ -3,6 +3,7 @@ use mago_atom::Atom;
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::get_specialized_template_type;
@@ -126,9 +127,39 @@ pub(crate) fn is_contained_by(
                 }
             }
         }
+
+        if all_parameters_match
+            && !specialized_template_type.has_template()
+            && !container_type_parameter.has_template()
+            && (specialized_template_type.is_never()
+                || specialized_template_type.is_literal_of(container_type_parameter))
+        {
+            widen_input_param(atomic_comparison_result, input_type_part, parameter_offset, container_type_parameter);
+        }
     }
 
     all_parameters_match
+}
+
+fn widen_input_param(
+    atomic_comparison_result: &mut ComparisonResult,
+    input_type_part: &TAtomic,
+    parameter_offset: usize,
+    container_type_parameter: &TUnion,
+) {
+    if atomic_comparison_result.replacement_atomic_type.is_none() {
+        atomic_comparison_result.replacement_atomic_type = Some(input_type_part.clone());
+    }
+
+    let Some(TAtomic::Object(TObject::Named(TNamedObject { type_parameters: Some(type_parameters), .. }))) =
+        atomic_comparison_result.replacement_atomic_type.as_mut()
+    else {
+        return;
+    };
+
+    if let Some(slot) = type_parameters.get_mut(parameter_offset) {
+        *slot = container_type_parameter.clone();
+    }
 }
 
 pub(crate) fn update_failed_result_from_nested(

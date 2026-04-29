@@ -46,6 +46,13 @@ pub fn is_contained_by(
         );
     }
 
+    if all_matched
+        && union_comparison_result.replacement_union_type.is_none()
+        && input_type.is_literal_of(container_type)
+    {
+        union_comparison_result.replacement_union_type = Some(container_type.clone());
+    }
+
     all_matched
 }
 
