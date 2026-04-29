@@ -566,6 +566,9 @@ interface MY_INTERFACE {}
 Enforces that PHP keywords (like `if`, `else`, `return`, `function`, etc.) be written
 in lowercase. Using uppercase or mixed case is discouraged for consistency and readability.
 
+When the `drupal` integration is enabled, `TRUE`, `FALSE`, and `NULL` are exempted to
+match Drupal's coding standards (and the `drupal` formatter preset).
+
 
 
 ### Configuration

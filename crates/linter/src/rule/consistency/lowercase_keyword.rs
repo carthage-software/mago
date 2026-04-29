@@ -13,6 +13,7 @@ use mago_syntax::ast::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
+use crate::integration::Integration;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
@@ -53,6 +54,9 @@ impl LintRule for LowercaseKeywordRule {
             description: indoc! {"
                 Enforces that PHP keywords (like `if`, `else`, `return`, `function`, etc.) be written
                 in lowercase. Using uppercase or mixed case is discouraged for consistency and readability.
+
+                When the `drupal` integration is enabled, `TRUE`, `FALSE`, and `NULL` are exempted to
+                match Drupal's coding standards (and the `drupal` formatter preset).
             "},
             good_example: indoc! {r#"
                 <?php
@@ -99,6 +103,12 @@ impl LintRule for LowercaseKeywordRule {
             return; // Already in lowercase, no issue to report
         }
 
+        if ctx.registry.is_integration_enabled(Integration::Drupal)
+            && matches!(keyword.value.to_ascii_lowercase().as_str(), "true" | "false" | "null")
+        {
+            return;
+        }
+
         let lowercase = keyword.value.to_ascii_lowercase();
 
         let issue = Issue::new(self.cfg.level(), format!("Keyword `{}` should be in lowercase.", keyword.value))
@@ -110,5 +120,62 @@ impl LintRule for LowercaseKeywordRule {
         ctx.collector.propose(issue, |edits| {
             edits.push(TextEdit::replace(keyword.span, lowercase));
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::LowercaseKeywordRule;
+    use crate::integration::Integration;
+    use crate::settings::Settings;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    fn drupal(s: &mut Settings) {
+        s.integrations.insert(Integration::Drupal);
+    }
+
+    test_lint_success! {
+        name = drupal_uppercase_constants_allowed,
+        rule = LowercaseKeywordRule,
+        settings = drupal,
+        code = indoc! {r#"
+            <?php
+
+            $a = NULL;
+            $b = TRUE;
+            $c = FALSE;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = drupal_other_keywords_still_flagged,
+        rule = LowercaseKeywordRule,
+        count = 2,
+        settings = drupal,
+        code = indoc! {r#"
+            <?php
+
+            IF (TRUE) {
+                $x = NULL;
+            } ELSE {
+                $x = FALSE;
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = uppercase_constants_flagged_without_drupal,
+        rule = LowercaseKeywordRule,
+        count = 3,
+        code = indoc! {r#"
+            <?php
+
+            $a = NULL;
+            $b = TRUE;
+            $c = FALSE;
+        "#}
     }
 }
