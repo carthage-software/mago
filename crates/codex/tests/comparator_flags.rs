@@ -67,7 +67,6 @@ fn lit_int_in_int_no_flags_set() {
     let (v, r) = atomic_is_contained_capturing(&t_lit_int(5), &t_int(), &cb);
     assert!(v);
     assert_eq!(r.type_coerced, None);
-    assert_eq!(r.type_coerced_to_literal, None);
     assert_eq!(r.type_coerced_from_nested_mixed, None);
 }
 
@@ -118,7 +117,6 @@ fn equal_atoms_no_flags() {
         let (v, r) = atomic_is_contained_capturing(&atom, &atom, &cb);
         assert!(v, "{atom:?} should equal itself");
         assert_eq!(r.type_coerced, None);
-        assert_eq!(r.type_coerced_to_literal, None);
         assert_eq!(r.type_coerced_from_nested_mixed, None);
     }
 }

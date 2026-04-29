@@ -185,11 +185,4 @@ pub(crate) fn update_failed_result_from_nested(
         } else {
             param_comparison_result.type_coerced_from_as_mixed.unwrap_or(false)
         });
-
-    atomic_comparison_result.type_coerced_to_literal =
-        Some(if let Some(val) = atomic_comparison_result.type_coerced_to_literal {
-            val
-        } else {
-            param_comparison_result.type_coerced_to_literal.unwrap_or(false)
-        });
 }

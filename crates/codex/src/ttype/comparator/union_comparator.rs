@@ -221,10 +221,6 @@ fn is_contained_by_atomic(
             atomic_comparison_result.type_coerced_from_as_mixed = Some(true);
         }
 
-        if atomic_comparison_result.type_coerced_to_literal.is_some() {
-            union_comparison_result.type_coerced_to_literal = atomic_comparison_result.type_coerced_to_literal;
-        }
-
         if is_atomic_contained_by {
             if let Some(replacement_atomic_type) = atomic_comparison_result.replacement_atomic_type {
                 if let Some(replacement_union_type) = &mut union_comparison_result.replacement_union_type {

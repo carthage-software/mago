@@ -133,9 +133,6 @@ pub fn is_contained_by(
         && container_type_part.is_string_subtype()
     {
         atomic_comparison_result.type_coerced = Some(true);
-        if container_type_part.is_literal() {
-            atomic_comparison_result.type_coerced_to_literal = Some(true);
-        }
 
         return false;
     }
