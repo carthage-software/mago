@@ -125,7 +125,14 @@ pub(crate) fn analyze<'ctx, 'arena>(
     root_array_type = if !key_values.is_empty() {
         update_type_with_key_values(context, root_array_type, &current_type, &key_values, &index_type)
     } else if !root_is_string {
-        update_array_assignment_child_type(context, block_context, &index_type, &current_type, root_array_type)
+        update_array_assignment_child_type(
+            context,
+            block_context,
+            &index_type,
+            &current_type,
+            root_array_type,
+            array_target.span(),
+        )
     } else {
         root_array_type
     };
@@ -414,6 +421,7 @@ fn update_array_assignment_child_type<'ctx>(
     key_type: &Option<Rc<TUnion>>,
     value_type: &TUnion,
     mut root_type: TUnion,
+    target_span: mago_span::Span,
 ) -> TUnion {
     let mut collection_types = Vec::new();
     let mut extended_shape = false;
@@ -534,6 +542,19 @@ fn update_array_assignment_child_type<'ctx>(
                         {
                             let max_int_key =
                                 known_items.keys().filter_map(ArrayKey::get_integer).filter(|&k| k >= 0).max();
+
+                            if max_int_key == Some(i64::MAX) {
+                                let max_entry_optional = known_items
+                                    .get(&ArrayKey::Integer(i64::MAX))
+                                    .is_some_and(|(optional, _)| *optional);
+
+                                report_array_append_overflow(context, target_span, max_entry_optional);
+
+                                collection_types.push(TAtomic::Array(TArray::Keyed(existing_array.clone())));
+                                extended_shape = true;
+                                continue;
+                            }
+
                             let next_key = max_int_key.map_or(0, |m| m + 1);
 
                             let mut new_items = known_items.clone();
@@ -816,4 +837,29 @@ fn get_index_literal_types(expression_index_type: &TUnion) -> Vec<TAtomic> {
     }
 
     valid_offset_types
+}
+
+fn report_array_append_overflow(context: &mut Context<'_, '_>, target_span: mago_span::Span, possibly: bool) {
+    let issue = if possibly {
+        Issue::warning("Appending to this array may fail at runtime: it can already hold an entry at `PHP_INT_MAX`.")
+            .with_annotation(
+                Annotation::primary(target_span).with_message(
+                    "Appending here would overflow the next integer key if the `PHP_INT_MAX` entry is set.",
+                ),
+            )
+            .with_help("Guard the append with `array_key_exists(PHP_INT_MAX, ...)`, or assign at an explicit key.")
+    } else {
+        Issue::error("Appending to this array fails at runtime: it already holds an entry at `PHP_INT_MAX`.")
+            .with_annotation(
+                Annotation::primary(target_span).with_message("Appending here would overflow the next integer key."),
+            )
+            .with_help("Remove this append, or assign at an explicit key smaller than `PHP_INT_MAX`.")
+    };
+
+    let issue = issue.with_note(
+        "PHP refuses to compute the next integer key when the largest key is `PHP_INT_MAX` and raises a fatal error.",
+    );
+
+    let code = if possibly { IssueCode::PossiblyArrayAppendOverflow } else { IssueCode::ArrayAppendOverflow };
+    context.collector.report_with_code(code, issue);
 }

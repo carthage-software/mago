@@ -77,6 +77,8 @@ final class AnalyzerCodeModuleGenerator
         'invalid-operand',
         'mixed-operand',
         'array-append-in-read-context',
+        'array-append-overflow',
+        'possibly-array-append-overflow',
         'missing-constructor',
         'missing-return-statement',
         'mixed-property-type-coercion',

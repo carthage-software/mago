@@ -35,6 +35,9 @@ macro_rules! test_case {
 
 test_case!(accessing_undefined_class_constant);
 test_case!(argument_count);
+test_case!(array_append_no_overflow_when_max_below_php_int_max);
+test_case!(array_append_overflow_after_explicit_assign_php_int_max);
+test_case!(array_append_overflow_explicit_max_key);
 test_case!(array_list_reconciliation);
 test_case!(array_map_non_empty_array);
 test_case!(array_map_non_empty_list);
