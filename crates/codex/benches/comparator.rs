@@ -7,11 +7,13 @@ use criterion::criterion_main;
 
 use mago_atom::ascii_lowercase_atom;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::misc::GenericParent;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -64,6 +66,42 @@ fn bench_union_simple_comparison(c: &mut Criterion) {
     c.bench_function("is_contained_by_int_in_string", |b| {
         let input = get_int();
         let container = get_string();
+        b.iter(|| {
+            let mut result = ComparisonResult::new();
+            std::hint::black_box(union_comparator::is_contained_by(
+                &codebase,
+                &input,
+                &container,
+                false,
+                false,
+                false,
+                &mut result,
+            ))
+        });
+    });
+
+    c.bench_function("is_contained_by_generic_constraint_union", |b| {
+        let input = TUnion::from_atomic(TAtomic::GenericParameter(TGenericParameter::new(
+            ascii_lowercase_atom("T"),
+            Arc::new(TUnion::from_vec(vec![
+                TAtomic::Scalar(TScalar::int()),
+                TAtomic::Scalar(TScalar::string()),
+                TAtomic::Scalar(TScalar::float()),
+                TAtomic::Scalar(TScalar::bool()),
+                TAtomic::Null,
+            ])),
+            GenericParent::FunctionLike((ascii_lowercase_atom("bench"), ascii_lowercase_atom("compare"))),
+        )));
+
+        let container = TUnion::from_vec(vec![
+            TAtomic::Scalar(TScalar::int()),
+            TAtomic::Scalar(TScalar::string()),
+            TAtomic::Scalar(TScalar::float()),
+            TAtomic::Scalar(TScalar::bool()),
+            TAtomic::Null,
+            TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("Foo")))),
+        ]);
+
         b.iter(|| {
             let mut result = ComparisonResult::new();
             std::hint::black_box(union_comparator::is_contained_by(
