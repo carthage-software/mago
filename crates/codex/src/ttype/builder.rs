@@ -832,14 +832,14 @@ fn get_shape_from_ast(
                     if let ArrayKey::Integer(offset) = array_key
                         && offset >= next_offset
                     {
-                        next_offset = offset + 1;
+                        next_offset = offset.saturating_add(1);
                     }
 
                     array_key
                 } else {
                     let array_key = ArrayKey::Integer(next_offset);
 
-                    next_offset += 1;
+                    next_offset = next_offset.saturating_add(1);
 
                     array_key
                 };
