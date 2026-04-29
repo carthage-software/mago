@@ -10,8 +10,9 @@ use mago_span::Span;
 use crate::misc::GenericParent;
 use crate::ttype::union::TUnion;
 
+pub mod bounds;
+pub mod definition_type_replacer;
 pub mod inferred_type_replacer;
-pub mod standin_type_replacer;
 pub mod variance;
 
 /// Represents a template parameter definition with its source and constraint type.

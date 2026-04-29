@@ -20,8 +20,8 @@ use crate::ttype::combiner;
 use crate::ttype::get_never;
 use crate::ttype::template::TemplateBound;
 use crate::ttype::template::TemplateResult;
-use crate::ttype::template::standin_type_replacer;
-use crate::ttype::template::standin_type_replacer::get_most_specific_type_from_bounds;
+use crate::ttype::template::bounds::get_most_specific_type_from_bounds;
+use crate::ttype::template::bounds::get_root_template_type;
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 
@@ -140,13 +140,8 @@ fn replace_template_parameter(
     key: Atom,
 ) -> Option<TUnion> {
     let mut template_type = None;
-    let traversed_type = standin_type_replacer::get_root_template_type(
-        inferred_lower_bounds,
-        parameter_name,
-        defining_entity,
-        HashSet::default(),
-        codebase,
-    );
+    let traversed_type =
+        get_root_template_type(inferred_lower_bounds, parameter_name, defining_entity, HashSet::default(), codebase);
 
     if let Some(traversed_type) = traversed_type {
         let mut template_type_inner = if !constraint.is_mixed() && traversed_type.is_mixed() {
@@ -208,7 +203,7 @@ fn replace_template_parameter(
                     && let Some(bounds_map) = inferred_lower_bounds.get(parameter_name)
                     && let Some(bounds) = bounds_map.get(defining_entity)
                 {
-                    template_type = Some(standin_type_replacer::get_most_specific_type_from_bounds(bounds, codebase));
+                    template_type = Some(get_most_specific_type_from_bounds(bounds, codebase));
                 }
             }
         }

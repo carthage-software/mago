@@ -17,7 +17,7 @@ use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_object;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
-use mago_codex::ttype::template::standin_type_replacer::get_most_specific_type_from_bounds;
+use mago_codex::ttype::template::bounds::get_most_specific_type_from_bounds;
 use mago_codex::ttype::template::variance::Variance;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;

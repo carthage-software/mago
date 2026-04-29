@@ -1,7 +1,4 @@
-use mago_atom::Atom;
-
 use crate::metadata::CodebaseMetadata;
-use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::scalar::TScalar;
@@ -305,51 +302,6 @@ fn is_contained_by_atomic(
     }
 
     false
-}
-
-pub(crate) fn can_be_contained_by(
-    codebase: &CodebaseMetadata,
-    input_type: &TUnion,
-    container_type: &TUnion,
-    ignore_null: bool,
-    ignore_false: bool,
-    matching_input_keys: &mut Vec<Atom>,
-) -> bool {
-    if container_type.is_mixed() {
-        return true;
-    }
-
-    if input_type.is_never() {
-        return true;
-    }
-
-    for container_type_part in container_type.types.as_ref() {
-        if matches!(container_type_part, TAtomic::Null) && ignore_null {
-            continue;
-        }
-
-        if matches!(container_type_part, TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false()) && ignore_false {
-            continue;
-        }
-
-        for input_type_part in input_type.types.as_ref() {
-            let mut atomic_comparison_result = ComparisonResult::new();
-
-            let is_atomic_contained_by = atomic_comparator::is_contained_by(
-                codebase,
-                input_type_part,
-                container_type_part,
-                false,
-                &mut atomic_comparison_result,
-            );
-
-            if is_atomic_contained_by || atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false) {
-                matching_input_keys.push(input_type_part.get_id());
-            }
-        }
-    }
-
-    !matching_input_keys.is_empty()
 }
 
 #[must_use]

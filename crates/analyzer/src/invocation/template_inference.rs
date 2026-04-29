@@ -36,9 +36,9 @@ use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_iterable_parameters;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::definition_type_replacer::DefinitionReplacementOptions;
+use mago_codex::ttype::template::definition_type_replacer::insert_bound_type;
 use mago_codex::ttype::template::inferred_type_replacer;
-use mago_codex::ttype::template::standin_type_replacer::StandinOptions;
-use mago_codex::ttype::template::standin_type_replacer::insert_bound_type;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
@@ -697,7 +697,7 @@ fn infer_templates_from_input_and_container_types(
                                     generic_parameter.parameter_name,
                                     &generic_parameter.defining_entity,
                                     inferred_bound,
-                                    StandinOptions { appearance_depth: 1, ..Default::default() },
+                                    DefinitionReplacementOptions { appearance_depth: 1, ..Default::default() },
                                     options.argument_offset,
                                     options.source_span,
                                 );
@@ -801,7 +801,7 @@ fn infer_templates_from_input_and_container_types(
                     *parameter_name,
                     defining_entity,
                     lower_bound_type,
-                    StandinOptions { appearance_depth: 1, ..Default::default() },
+                    DefinitionReplacementOptions { appearance_depth: 1, ..Default::default() },
                     options.argument_offset,
                     options.source_span,
                 );
@@ -930,7 +930,7 @@ fn infer_templates_from_input_and_container_types(
             *template_parameter_name,
             &container_generic.defining_entity,
             residual_input_type.clone(),
-            StandinOptions { appearance_depth: 1, ..Default::default() },
+            DefinitionReplacementOptions { appearance_depth: 1, ..Default::default() },
             options.argument_offset,
             options.source_span,
         );
@@ -976,7 +976,7 @@ fn infer_templates_from_input_and_container_types(
                 template_parameter_name,
                 &defining_entity,
                 re_resolved_constraint,
-                StandinOptions { appearance_depth: 1, ..Default::default() },
+                DefinitionReplacementOptions { appearance_depth: 1, ..Default::default() },
                 options.argument_offset,
                 options.source_span,
             );

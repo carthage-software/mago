@@ -17,7 +17,7 @@ use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateBound;
 use mago_codex::ttype::template::TemplateResult;
-use mago_codex::ttype::template::standin_type_replacer::get_most_specific_type_from_bounds;
+use mago_codex::ttype::template::bounds::get_most_specific_type_from_bounds;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;

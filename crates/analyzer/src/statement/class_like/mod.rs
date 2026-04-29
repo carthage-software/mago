@@ -24,9 +24,9 @@ use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::definition_type_replacer;
+use mago_codex::ttype::template::definition_type_replacer::DefinitionReplacementOptions;
 use mago_codex::ttype::template::inferred_type_replacer;
-use mago_codex::ttype::template::standin_type_replacer;
-use mago_codex::ttype::template::standin_type_replacer::StandinOptions;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::visibility::Visibility;
 use mago_names::kind::NameKind;
@@ -1765,14 +1765,11 @@ fn check_template_parameters<'ctx>(
                     .push(GenericTemplate::new(GenericParent::ClassLike(parent_metadata.name), extended_type));
             } else {
                 let mut template_result = TemplateResult::new(previous_extended_types.clone(), Default::default());
-                let mut replaced_template_type = standin_type_replacer::replace(
+                let mut replaced_template_type = definition_type_replacer::replace(
                     &template_type,
                     &mut template_result,
                     context.codebase,
-                    &None,
-                    None,
-                    None,
-                    StandinOptions::default(),
+                    DefinitionReplacementOptions::default(),
                 );
 
                 expand_union(
