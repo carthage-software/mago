@@ -109,7 +109,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         if let Some(try_scope) = &try_block_context.finally_scope {
             let mut mutable_try_scope = try_scope.borrow_mut();
 
-            for (variable_id, variable_type) in &block_context.locals {
+            for (variable_id, variable_type) in &try_block_context.locals {
                 if let Some(existing_type) = mutable_try_scope.locals.get_mut(variable_id) {
                     let combined_type = ttype::combine_union_types(
                         existing_type,
