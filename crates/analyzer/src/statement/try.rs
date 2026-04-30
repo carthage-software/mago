@@ -82,7 +82,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         block_context.assigned_variable_ids.extend(assigned_variable_ids);
         block_context.assigned_variable_ids.extend(newly_assigned_variable_ids.iter().map(|(v, u)| (*v, *u)));
 
-        for (variable_id, variable_type) in std::mem::take(&mut block_context.locals) {
+        let post_try_locals = std::mem::take(&mut block_context.locals);
+
+        let invalidated_during_try: Vec<Atom> = old_block_context_locals
+            .keys()
+            .copied()
+            .filter(|variable_id| !post_try_locals.contains_key(variable_id))
+            .collect();
+
+        for variable_id in &invalidated_during_try {
+            try_block_context.locals.remove(variable_id);
+        }
+
+        for (variable_id, variable_type) in post_try_locals {
             match try_block_context.locals.entry(variable_id) {
                 Entry::Occupied(mut occupied_entry) => {
                     let combined_type = ttype::combine_union_types(
