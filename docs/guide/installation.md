@@ -37,6 +37,18 @@ Or with `wget`:
 wget -qO- https://carthage.software/mago.sh | bash -s -- --version=1.24.0
 ```
 
+#### Verifying the download
+
+If the [GitHub CLI (`gh`)](https://cli.github.com/) is on your `PATH`, the install script automatically verifies the downloaded archive against our GitHub build attestation before installing anything. No flag required. If `gh` is missing or too old, the script prints a yellow notice and continues without verification.
+
+To make verification mandatory (hard-fail when `gh` is missing, too old, or the attestation does not match), pass `--always-verify`:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --always-verify
+```
+
+To opt out even when `gh` is available, pass `--no-verify`. See [Verifying release artifacts](#verifying-release-artifacts) for the full picture.
+
 ## Manual download
 
 You can always download a pre-compiled binary directly from our GitHub Releases page. This is the **recommended method for Windows** and a reliable fallback for other systems.
@@ -112,6 +124,95 @@ Publishing to crates.io can sometimes be delayed after a new release.
     ```sh
     mago self-update
     ```
+
+## Verifying release artifacts
+
+Every Mago release archive (per-platform binary tarball, source tarball, source zip, and WASM bundle) is signed at build time via [`actions/attest-build-provenance`](https://github.com/actions/attest-build-provenance). The signature is an [in-toto](https://in-toto.io/) attestation stored on GitHub and tied to the exact workflow run that produced the artifact, so you can prove a download is byte-identical to what came out of `carthage-software/mago`'s release pipeline.
+
+The install script verifies attestations automatically when the GitHub CLI is available. Teams with stricter supply-chain requirements can also make verification mandatory or run it manually.
+
+### Through the install script
+
+The install script picks one of three modes based on the flags you pass:
+
+| Mode             | How to enable                              | Behaviour                                                                                                                                                                                            |
+| :--------------- | :----------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auto` (default) | _no flag_                                  | If `gh` is on `PATH` and supports `gh attestation`, the archive is verified before install. If `gh` is missing or too old, the script prints a yellow notice and installs without verifying.         |
+| `always`         | `--always-verify`                          | Verification is mandatory. Missing `gh`, a `gh` version too old to support `gh attestation`, or a failed attestation match all abort the install before anything is moved into your `PATH`.         |
+| `never`          | `--no-verify`                              | Skip the attestation check even when `gh` is available. Useful when you have already verified out-of-band, or for non-interactive environments where `gh` is present but not authenticated.         |
+
+`--always-verify` and `--no-verify` cannot be combined. The script rejects that combination before doing any work.
+
+When verification runs (auto or always), it executes:
+
+```sh
+gh attestation verify <archive> \
+  --repo carthage-software/mago \
+  --signer-workflow carthage-software/mago/.github/workflows/cd.yml
+```
+
+The `--signer-workflow` pin matters: it ties the attestation not just to the right repository but to the exact release workflow file. A leaked GitHub Actions token that could trigger a *different* workflow inside the same repository would still fail verification.
+
+If the attestation does not match, the script copies the unverified archive to the current working directory as `<file>.unverified.tar.gz` (so it survives the temp-dir cleanup and you can inspect it forensically), prints a red error, and exits before extraction. Nothing is moved into your `PATH`.
+
+Examples:
+
+```sh
+# Auto: verify if `gh` is available, otherwise install without verifying.
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
+
+# Mandatory verification (CI, security-conscious installs).
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh \
+  | bash -s -- --always-verify
+
+# Combine with other flags as usual.
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh \
+  | bash -s -- --always-verify --version=1.24.0 --install-dir=/opt/bin
+
+# Explicit opt-out.
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --no-verify
+```
+
+Pre-requisites for verification: install a recent [GitHub CLI](https://cli.github.com/) that ships the `gh attestation` subcommand. The verify call reads from the public attestations API, so no `gh auth` is required.
+
+### Manual verification (downloaded from GitHub Releases)
+
+If you fetched an archive directly from the [releases page](https://github.com/carthage-software/mago/releases) (for example, on Windows where the install script does not run, or because you want to keep the archive around), you can verify it yourself before extracting:
+
+```sh
+VERSION=1.24.0
+TARGET=x86_64-unknown-linux-gnu                      # match your platform
+ASSET=mago-${VERSION}-${TARGET}.tar.gz
+
+gh release download "$VERSION" --repo carthage-software/mago --pattern "$ASSET"
+gh attestation verify "$ASSET" \
+  --repo carthage-software/mago \
+  --signer-workflow carthage-software/mago/.github/workflows/cd.yml
+
+tar -xzf "$ASSET"
+sudo mv "mago-${VERSION}-${TARGET}/mago" /usr/local/bin/
+```
+
+A successful run prints `✓ Verification succeeded!` along with the workflow run that produced the archive. A failure exits non-zero and explains why.
+
+:::tip
+The attestation is bound to the **archive**, not to the binary inside it. If you only kept the extracted binary, you cannot verify it directly. Re-download the archive, verify it, and compare its inner binary's `sha256sum` to the one already on your system.
+:::
+
+### Pinning the install script
+
+The shell installer URL above (`https://carthage.software/mago.sh`) is a redirect to the latest version of [`scripts/install.sh`](https://github.com/carthage-software/mago/blob/main/scripts/install.sh) in the `main` branch. Future revisions to that file are picked up automatically, which is convenient but means a future change in installer behaviour also lands automatically.
+
+For a stricter supply chain, pin the installer to a specific commit you have reviewed. Pick a commit on `main` whose `scripts/install.sh` you have read end-to-end, then fetch the script from that exact SHA:
+
+```sh
+COMMIT=67d173639d6d7ab5bdb8c005e0fd7579a722eadf   # example; replace with a commit you have reviewed
+curl --proto '=https' --tlsv1.2 -sSf \
+  "https://raw.githubusercontent.com/carthage-software/mago/${COMMIT}/scripts/install.sh" \
+  | bash -s -- --always-verify
+```
+
+GitHub rewrites neither the file nor the SHA after the fact, so the bytes you reviewed are the bytes you run. Updating the pin later is a deliberate decision: read the new commit's `install.sh`, then bump `$COMMIT`.
 
 ## Verify installation
 

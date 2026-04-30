@@ -6,8 +6,11 @@ REPO="carthage-software/mago"
 BIN_NAME="mago"
 TMP_DIR=$(mktemp -d)
 NEW_ISSUE="https://github.com/carthage-software/mago/issues/new"
+SIGNER_WORKFLOW=".github/workflows/cd.yml"
 INSTALL_DIR=""
 VERSION=""
+VERIFY_MODE="auto"
+DO_VERIFY=0
 
 function separator() {
     echo
@@ -43,11 +46,75 @@ for arg in "$@"; do
     --version=*)
       VERSION="${arg#*=}"
       ;;
+    --always-verify)
+      if [ "$VERIFY_MODE" = "never" ]; then
+        fail "Cannot combine --always-verify with --no-verify."
+      fi
+      VERIFY_MODE="always"
+      ;;
+    --no-verify)
+      if [ "$VERIFY_MODE" = "always" ]; then
+        fail "Cannot combine --always-verify with --no-verify."
+      fi
+      VERIFY_MODE="never"
+      ;;
     *)
       fail "Unknown argument: $arg"
       ;;
   esac
 done
+
+gh_supports_attestation() {
+  command -v gh > /dev/null && gh attestation --help > /dev/null 2>&1
+}
+
+case "$VERIFY_MODE" in
+  always)
+    separator
+
+    if ! command -v gh > /dev/null; then
+      red "--always-verify requires the GitHub CLI ('gh'), but it was not found on PATH."
+      red "Install it from https://cli.github.com/ and re-run."
+      fail "Aborting: refusing to install without attestation verification."
+    fi
+
+    if ! gh attestation --help > /dev/null 2>&1; then
+      red "--always-verify requires a 'gh' version that ships the 'gh attestation' subcommand."
+      red "Your installed version is too old."
+      red "Upgrade the GitHub CLI (https://cli.github.com/) and re-run."
+      fail "Aborting: refusing to install without attestation verification."
+    fi
+
+    DO_VERIFY=1
+    green "Attestation verification: ON (--always-verify). Using: $(command -v gh)"
+    ;;
+
+  never)
+    separator
+    yellow "Attestation verification: OFF (--no-verify)."
+    yellow "The downloaded archive will be installed without checking its build attestation."
+    ;;
+
+  auto)
+    if gh_supports_attestation; then
+      DO_VERIFY=1
+      separator
+      green "Attestation verification: ON (auto). Using: $(command -v gh)"
+    else
+      separator
+      yellow "Attestation verification: OFF."
+      if command -v gh > /dev/null; then
+        yellow "Found 'gh' but it does not support 'gh attestation' (version too old)."
+        yellow "Upgrade the GitHub CLI (https://cli.github.com/) to enable verification,"
+        yellow "or pass --always-verify to make this a hard requirement."
+      else
+        yellow "GitHub CLI ('gh') was not found on PATH. Install it from"
+        yellow "https://cli.github.com/ to enable verification, or pass"
+        yellow "--always-verify to make this a hard requirement."
+      fi
+    fi
+    ;;
+esac
 
 separator
 
@@ -256,6 +323,33 @@ fi
 green "Download complete!"
 
 separator
+
+if [ "$DO_VERIFY" -eq 1 ]; then
+  green "Verifying attestation for ${file_name}.tar.gz..."
+  green "  Repository:      ${REPO}"
+  green "  Signer workflow: ${SIGNER_WORKFLOW}"
+  if ! gh attestation verify "${destination}.tar.gz" \
+       --repo "$REPO" \
+       --signer-workflow "${REPO}/${SIGNER_WORKFLOW}"; then
+    quarantine="${PWD}/${file_name}.unverified.tar.gz"
+    cp "${destination}.tar.gz" "$quarantine" || quarantine=""
+
+    red "ATTESTATION VERIFICATION FAILED for ${file_name}.tar.gz."
+    red "The downloaded archive could not be matched to a build attestation"
+    red "signed by ${REPO}/${SIGNER_WORKFLOW}."
+    red "Refusing to install."
+    if [ -n "$quarantine" ]; then
+      red "The archive has been preserved at:"
+      red "  ${quarantine}"
+      red "Inspect it manually; do not run anything from it."
+    fi
+    fail "Aborting installation."
+  fi
+
+  green "Attestation verified."
+
+  separator
+fi
 
 green "Extracting ${file_name}.tar.gz..."
 if ! tar -xzf "${destination}.tar.gz" -C "$TMP_DIR"; then
