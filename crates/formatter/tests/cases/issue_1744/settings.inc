@@ -1,0 +1,20 @@
+FormatSettings {
+    print_width: 120,
+    always_break_named_arguments_list: false,
+    break_promoted_properties_list: false,
+    inline_empty_control_braces: true,
+    inline_empty_closure_braces: true,
+    inline_empty_function_braces: true,
+    inline_empty_method_braces: true,
+    inline_empty_constructor_braces: true,
+    inline_empty_classlike_braces: true,
+    space_after_logical_not_unary_prefix_operator: false,
+    space_within_grouping_parenthesis: false,
+    space_around_concatenation_binary_operator: true,
+    parentheses_in_new_expression: true,
+    space_before_closure_use_clause_parenthesis: true,
+    space_before_closure_parameter_list_parenthesis: false,
+    space_before_arrow_function_parameter_list_parenthesis: false,
+    parentheses_around_new_in_member_access: false,
+    ..mago_formatter::presets::FormatterPreset::Pint.settings()
+}

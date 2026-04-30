@@ -400,7 +400,7 @@ fn print_binaryish_expression_parts<'arena>(
     let line_before_operator = f.settings.line_before_binary_operator && !has_leading_comment_on_right;
     let operator_has_leading_comments = f.has_comment(operator.span(), CommentFlags::LEADING);
 
-    let force_break = f.must_break_condition && line_before_operator;
+    let force_break = f.must_break_condition && line_before_operator && operator.is_logical();
 
     let mut right_document = vec![in f.arena];
 
