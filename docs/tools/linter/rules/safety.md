@@ -291,6 +291,12 @@ array append (`$this->items[] = $item`), and `unset($this->cache)`.
 
 The `__construct` and `reset` methods are allowed by default.
 
+Both `include-namespaces` and `exclude-namespaces` support glob patterns: `*` matches a
+single namespace segment, `**` matches any number of segments, partial wildcards like
+`*Repository` match within a segment, and brace expansion like `App\{Entity,DTO}\`
+matches multiple alternatives. Plain prefix patterns (e.g. `App\Entity\`) continue to
+work as before.
+
 
 ### Requirements
 
