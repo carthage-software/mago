@@ -113,6 +113,10 @@ export default defineConfig({
             text: "Environment Variables",
             link: "/guide/environment-variables",
           },
+          {
+            text: "Shell completions",
+            link: "/guide/generate-completions",
+          },
         ],
       },
       {
@@ -145,6 +149,10 @@ export default defineConfig({
             items: [
               { text: "Overview", link: "/tools/formatter/overview" },
               { text: "Usage", link: "/tools/formatter/usage" },
+              {
+                text: "Format ignore",
+                link: "/tools/formatter/format-ignore",
+              },
               {
                 text: "Configuration reference",
                 link: "/tools/formatter/configuration-reference",
@@ -227,6 +235,7 @@ export default defineConfig({
         items: [
           { text: "Docker", link: "/recipes/docker" },
           { text: "GitHub Actions", link: "/recipes/github-actions" },
+          { text: "Pre-commit hooks", link: "/recipes/pre-commit-hooks" },
           { text: "Zed", link: "/recipes/zed" },
           { text: "Helix", link: "/recipes/helix" },
           { text: "Visual Studio Code", link: "/recipes/vscode" },
