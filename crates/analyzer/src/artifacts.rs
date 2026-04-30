@@ -45,8 +45,14 @@ pub struct AnalysisArtifacts {
     pub closure_bind_scope: Option<ClosureBindScope>,
 }
 
+impl Default for AnalysisArtifacts {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AnalysisArtifacts {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             expression_types: HashMap::default(),
             inferred_return_types: Vec::new(),
@@ -68,12 +74,13 @@ impl AnalysisArtifacts {
         }
     }
 
-    pub fn set_loop_scope(&mut self, loop_scope: LoopScope) {
+    pub(crate) fn set_loop_scope(&mut self, loop_scope: LoopScope) {
         let previous_scope = self.loop_scope.take().map(Box::new);
         self.loop_scope = Some(loop_scope.with_parent_loop(previous_scope));
     }
 
-    pub unsafe fn take_loop_scope_unchecked(&mut self) -> LoopScope {
+    /// SAFETY: the caller must ensure that `self.loop_scope` is not `None`.
+    pub(crate) unsafe fn take_loop_scope_unchecked(&mut self) -> LoopScope {
         let mut loop_scope = unsafe {
             // SAFETY: the caller must ensure that `self.loop_scope` is not `None`.
             self.loop_scope.take().unwrap_unchecked()
@@ -91,7 +98,7 @@ impl AnalysisArtifacts {
         loop_scope
     }
 
-    pub fn get_loop_scope_mut(&mut self) -> Option<&mut LoopScope> {
+    pub(crate) fn get_loop_scope_mut(&mut self) -> Option<&mut LoopScope> {
         self.loop_scope.as_mut()
     }
 

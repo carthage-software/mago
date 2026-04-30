@@ -186,4 +186,12 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
         analysis_result.issues.extend(self.collector.finish());
         analysis_result.symbol_references.extend(artifacts.symbol_references);
     }
+
+    /// Drain the collector into the analysis result and return any
+    /// unreported issues. Used by [`crate::Analyzer::analyze_with_artifacts`]
+    /// when the caller needs to retain ownership of [`AnalysisArtifacts`]
+    /// after analysis completes.
+    pub fn finish_collector(self, analysis_result: &mut AnalysisResult) {
+        analysis_result.issues.extend(self.collector.finish());
+    }
 }

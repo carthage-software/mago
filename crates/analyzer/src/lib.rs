@@ -22,6 +22,7 @@ use crate::settings::Settings;
 use crate::statement::analyze_statements;
 
 pub mod analysis_result;
+pub mod artifacts;
 pub mod code;
 pub mod error;
 pub mod plugin;
@@ -30,7 +31,6 @@ pub mod settings;
 pub mod telemetry;
 
 mod analyzable;
-mod artifacts;
 mod assertion;
 mod common;
 mod context;
@@ -72,6 +72,18 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
         program: &'ast Program<'arena>,
         analysis_result: &mut AnalysisResult,
     ) -> Result<(), AnalysisError> {
+        self.analyze_with_artifacts(program, analysis_result).map(|_| ())
+    }
+
+    /// Same as [`Self::analyze`], but returns the [`AnalysisArtifacts`]
+    /// produced during analysis. Used by editor integrations (e.g. the
+    /// LSP server) that need to query per-expression types after analysis
+    /// has finished.
+    pub fn analyze_with_artifacts(
+        &self,
+        program: &'ast Program<'arena>,
+        analysis_result: &mut AnalysisResult,
+    ) -> Result<AnalysisArtifacts, AnalysisError> {
         #[cfg(not(target_arch = "wasm32"))]
         let start_time = std::time::Instant::now();
 
@@ -81,7 +93,7 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
                 analysis_result.time_in_analysis = start_time.elapsed();
             }
 
-            return Ok(());
+            return Ok(AnalysisArtifacts::new());
         }
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -125,14 +137,15 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
                     context.collector.report_with_code(reported.code, reported.issue);
                 }
 
-                context.finish(artifacts, analysis_result);
+                analysis_result.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
+                context.finish_collector(analysis_result);
 
                 #[cfg(not(target_arch = "wasm32"))]
                 {
                     analysis_result.time_in_analysis = start_time.elapsed();
                 }
 
-                return Ok(());
+                return Ok(artifacts);
             }
 
             for reported in hook_context.take_issues() {
@@ -159,7 +172,8 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 
         #[cfg(not(target_arch = "wasm32"))]
         let finish_start = trace_enabled.then(std::time::Instant::now);
-        context.finish(artifacts, analysis_result);
+        analysis_result.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
+        context.finish_collector(analysis_result);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = finish_start {
             telemetry::record_finish(start.elapsed());
@@ -179,7 +193,7 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
             analysis_result.time_in_analysis = start_time.elapsed();
         }
 
-        Ok(())
+        Ok(artifacts)
     }
 }
 

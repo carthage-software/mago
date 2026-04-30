@@ -8,6 +8,7 @@ use foldhash::HashSet;
 
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
+use mago_analyzer::artifacts::AnalysisArtifacts;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
 use mago_atom::AtomSet;
@@ -821,6 +822,46 @@ impl IncrementalAnalysisService {
         analysis_result.issues = self.collect_all_issues();
 
         Ok(analysis_result)
+    }
+
+    /// Analyzes a single file and returns both its issues and the
+    /// [`AnalysisArtifacts`] (per-expression types, assertions, inferred
+    /// returns, etc.) produced during analysis.
+    ///
+    /// Used by editor integrations that need precise type information at
+    /// arbitrary cursor positions; LSP completion and hover both rely on
+    /// this to answer "what's the type of `$obj` here?".
+    pub fn analyze_file_with_artifacts(&self, file_id: FileId) -> Option<(IssueCollection, AnalysisArtifacts)> {
+        let file = self.database.get(&file_id).ok()?;
+
+        let arena = Bump::new();
+        let program = parse_file_with_settings(&arena, &file, self.parser_settings);
+        let resolved_names = NameResolver::new(&arena).resolve(program);
+
+        let mut issues = IssueCollection::new();
+        if program.has_errors() {
+            for error in program.errors.iter() {
+                issues.push(Issue::from(error));
+            }
+        }
+
+        let semantics_checker = SemanticsChecker::new(self.settings.version);
+        issues.extend(semantics_checker.check(&file, program, &resolved_names));
+
+        let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
+        let analyzer =
+            Analyzer::new(&arena, &file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings.clone());
+
+        let artifacts = match analyzer.analyze_with_artifacts(program, &mut analysis_result) {
+            Ok(artifacts) => artifacts,
+            Err(err) => {
+                issues.push(Issue::error(format!("Analysis error: {err}")));
+                return Some((issues, AnalysisArtifacts::new()));
+            }
+        };
+
+        issues.extend(analysis_result.issues);
+        Some((issues, artifacts))
     }
 
     /// Analyzes a single file synchronously, returning its issues.
