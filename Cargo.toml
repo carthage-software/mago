@@ -2,7 +2,7 @@
 name = "mago"
 version = "1.24.0"
 edition = "2024"
-authors = ["Saif Eddin Gmati <azjezz@carthage.software>"]
+authors = ["Seifeddine Gmati <azjezz@carthage.software>"]
 license = "MIT OR Apache-2.0"
 description = "A comprehensive suite of PHP tooling inspired by Rust’s approach, providing parsing, linting, formatting, and more through a unified CLI and library interface."
 homepage = "https://mago.carthage.software"
@@ -12,7 +12,7 @@ exclude = ["docs", "composer", "scripts"]
 
 [workspace]
 package.edition = "2024"
-package.authors = ["Saif Eddin Gmati <azjezz@carthage.software>"]
+package.authors = ["Seifeddine Gmati <azjezz@carthage.software>"]
 package.license = "MIT OR Apache-2.0"
 package.version = "1.24.0"
 package.homepage = "https://mago.carthage.software"
@@ -133,6 +133,8 @@ mago-algebra = { workspace = true }
 mago-codex = { workspace = true }
 mago-guard = { workspace = true }
 mago-orchestrator = { workspace = true }
+mago-semantics = { workspace = true, optional = true }
+mago-span = { workspace = true, optional = true }
 serde = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }
@@ -161,6 +163,10 @@ unicode-width = { workspace = true }
 notify = { workspace = true }
 dhat = { workspace = true, optional = true }
 schemars = { workspace = true }
+foldhash = { workspace = true, optional = true }
+xxhash-rust = { workspace = true, optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-util", "sync", "time", "signal"], optional = true }
+tower-lsp = { version = "0.20", optional = true }
 
 [dev-dependencies]
 temp-env = "0.3.6"
@@ -175,6 +181,14 @@ mimalloc = { version = "0.1.47" }
 
 [features]
 dhat-heap = ["dhat"]
+language-server = [
+    "dep:tower-lsp",
+    "dep:tokio",
+    "dep:foldhash",
+    "dep:xxhash-rust",
+    "dep:mago-semantics",
+    "dep:mago-span",
+]
 
 [profile.release]
 opt-level = 3

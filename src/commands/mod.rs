@@ -63,6 +63,8 @@ use crate::commands::format::FormatCommand;
 use crate::commands::generate_completions::GenerateCompletionsCommand;
 use crate::commands::guard::GuardCommand;
 use crate::commands::init::InitCommand;
+#[cfg(feature = "language-server")]
+use crate::commands::language_server::LanguageServerCommand;
 use crate::commands::lint::LintCommand;
 use crate::commands::list_files::ListFilesCommand;
 use crate::commands::self_update::SelfUpdateCommand;
@@ -77,6 +79,8 @@ pub mod format;
 pub mod generate_completions;
 pub mod guard;
 pub mod init;
+#[cfg(feature = "language-server")]
+pub mod language_server;
 pub mod lint;
 pub mod list_files;
 pub mod self_update;
@@ -225,6 +229,11 @@ pub enum MagoCommand {
     /// **Usage**: `mago generate-completions`
     #[command(name = "generate-completions")]
     GenerateCompletions(GenerateCompletionsCommand),
+
+    /// Start the Mago language server (LSP over stdio).
+    #[cfg(feature = "language-server")]
+    #[command(name = "language-server")]
+    LanguageServer(LanguageServerCommand),
 }
 
 /// Top-level CLI arguments parsed by [`clap`].
