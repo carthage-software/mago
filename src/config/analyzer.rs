@@ -157,6 +157,18 @@ pub struct AnalyzerConfiguration {
     /// Defaults to `false`.
     pub check_arrow_function_missing_type_hints: bool,
 
+    /// Skip missing-type-hint checks for closures and arrow functions used
+    /// as the right-hand side of the pipe operator (`|>`).
+    ///
+    /// When `true`, an inline pipe callable like
+    /// `$x |> fn($p) => strtoupper($p)` will not warn about missing parameter
+    /// or return types, even when the closure / arrow-function checks are
+    /// otherwise enabled. The pipe operand's type is enough to derive the
+    /// parameter type, so the hint is mostly noise.
+    ///
+    /// Defaults to `false`.
+    pub allow_implicit_pipe_callable_types: bool,
+
     /// Register superglobals (e.g., `$_GET`, `$_POST`, `$_SERVER`) in the analysis context.
     ///
     /// If disabled, super globals won't be available unless explicitly imported using
@@ -418,6 +430,7 @@ impl AnalyzerConfiguration {
             check_missing_type_hints: self.check_missing_type_hints,
             check_closure_missing_type_hints: self.check_closure_missing_type_hints,
             check_arrow_function_missing_type_hints: self.check_arrow_function_missing_type_hints,
+            allow_implicit_pipe_callable_types: self.allow_implicit_pipe_callable_types,
             register_super_globals: self.register_super_globals,
             use_colors: should_use_colors(color_choice),
             diff: enable_diff,
@@ -471,6 +484,7 @@ impl Default for AnalyzerConfiguration {
             check_missing_type_hints: defaults.check_missing_type_hints,
             check_closure_missing_type_hints: defaults.check_closure_missing_type_hints,
             check_arrow_function_missing_type_hints: defaults.check_arrow_function_missing_type_hints,
+            allow_implicit_pipe_callable_types: defaults.allow_implicit_pipe_callable_types,
             register_super_globals: defaults.register_super_globals,
             trust_existence_checks: defaults.trust_existence_checks,
             class_initializers: vec![],

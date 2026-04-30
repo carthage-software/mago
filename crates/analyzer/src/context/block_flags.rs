@@ -20,6 +20,7 @@ impl BlockContextFlags {
     pub const HAS_RETURNED: u32 = 1 << 14;
     pub const COLLECT_INITIALIZATIONS: u32 = 1 << 15;
     pub const CALLS_PARENT_CONSTRUCTOR: u32 = 1 << 16;
+    pub const INSIDE_PIPE_CALLABLE: u32 = 1 << 17;
 
     #[inline]
     pub const fn new() -> Self {
@@ -134,6 +135,11 @@ impl BlockContextFlags {
     }
 
     #[inline(always)]
+    pub const fn inside_pipe_callable(&self) -> bool {
+        self.contains(Self::INSIDE_PIPE_CALLABLE)
+    }
+
+    #[inline(always)]
     pub fn set_inside_conditional(&mut self, value: bool) {
         self.set(Self::INSIDE_CONDITIONAL, value);
     }
@@ -216,5 +222,10 @@ impl BlockContextFlags {
     #[inline(always)]
     pub fn set_calls_parent_constructor(&mut self, value: bool) {
         self.set(Self::CALLS_PARENT_CONSTRUCTOR, value);
+    }
+
+    #[inline(always)]
+    pub fn set_inside_pipe_callable(&mut self, value: bool) {
+        self.set(Self::INSIDE_PIPE_CALLABLE, value);
     }
 }

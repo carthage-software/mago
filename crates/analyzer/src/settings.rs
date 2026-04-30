@@ -145,6 +145,19 @@ pub struct Settings {
     /// Defaults to `false`.
     pub check_arrow_function_missing_type_hints: bool,
 
+    /// Skip the missing-type-hint checks for closures and arrow functions used
+    /// directly as the right-hand side of the pipe operator (`|>`).
+    ///
+    /// When `true`, an inline pipe callable like
+    /// `$x |> fn($p) => strtoupper($p)` will not warn about its parameter or
+    /// return type being missing, even when `check-closure-missing-type-hints`
+    /// or `check-arrow-function-missing-type-hints` is on. The pipe operand's
+    /// type is enough to derive the parameter type, so requiring a hint here
+    /// is mostly noise.
+    ///
+    /// Defaults to `false`.
+    pub allow_implicit_pipe_callable_types: bool,
+
     /// Register superglobals (e.g., `$_GET`, `$_POST`, `$_SERVER`) in the analysis context.
     ///
     /// If disabled, super globals won't be available unless explicitly imported using
@@ -364,6 +377,7 @@ impl Settings {
             check_missing_type_hints: false,
             check_closure_missing_type_hints: false,
             check_arrow_function_missing_type_hints: false,
+            allow_implicit_pipe_callable_types: false,
             register_super_globals: true,
             diff: false,
             trust_existence_checks: true,

@@ -20,8 +20,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Pipe<'arena> {
     ) -> Result<(), AnalysisError> {
         let mut template_result = TemplateResult::default();
 
-        let (invocation_targets, encountered_invalid_targets) =
-            resolve_targets(context, block_context, artifacts, self.callable, &mut template_result)?;
+        let was_inside_pipe_callable = block_context.flags.inside_pipe_callable();
+        block_context.flags.set_inside_pipe_callable(true);
+        let result = resolve_targets(context, block_context, artifacts, self.callable, &mut template_result);
+        block_context.flags.set_inside_pipe_callable(was_inside_pipe_callable);
+        let (invocation_targets, encountered_invalid_targets) = result?;
 
         analyze_invocation_targets(
             context,

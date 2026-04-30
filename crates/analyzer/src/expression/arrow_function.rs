@@ -90,24 +90,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             inner_block_context.variables_possibly_in_scope.insert(variable_atom);
         }
 
-        // Check for missing type hints
-        for parameter in &self.parameter_list.parameters {
-            missing_type_hints::check_parameter_type_hint(
+        if !context.settings.allow_implicit_pipe_callable_types || !block_context.flags.inside_pipe_callable() {
+            for parameter in &self.parameter_list.parameters {
+                missing_type_hints::check_parameter_type_hint(
+                    context,
+                    block_context.scope.get_class_like(),
+                    function_metadata,
+                    parameter,
+                );
+            }
+
+            missing_type_hints::check_return_type_hint(
                 context,
                 block_context.scope.get_class_like(),
                 function_metadata,
-                parameter,
+                "arrow function",
+                self.return_type_hint.as_ref(),
+                self.span(),
             );
         }
-
-        missing_type_hints::check_return_type_hint(
-            context,
-            block_context.scope.get_class_like(),
-            function_metadata,
-            "arrow function",
-            self.return_type_hint.as_ref(),
-            self.span(),
-        );
 
         // Check for imprecise type hints (bare `array` or `iterable`)
         for (i, parameter) in self.parameter_list.parameters.iter().enumerate() {

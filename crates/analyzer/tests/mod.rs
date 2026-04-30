@@ -847,6 +847,34 @@ test_case!(missing_api_or_internal, {
     s.require_api_or_internal = true;
     s
 });
+test_case!(pipe_callable_implicit_types_arrow, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_missing_type_hints = true;
+    s.check_arrow_function_missing_type_hints = true;
+    s.allow_implicit_pipe_callable_types = true;
+    s
+});
+test_case!(pipe_callable_implicit_types_closure, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_missing_type_hints = true;
+    s.check_closure_missing_type_hints = true;
+    s.allow_implicit_pipe_callable_types = true;
+    s
+});
+test_case!(pipe_callable_no_implicit_types_warns, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_missing_type_hints = true;
+    s.check_arrow_function_missing_type_hints = true;
+    s.allow_implicit_pipe_callable_types = false;
+    s
+});
+test_case!(pipe_callable_implicit_types_outside_pipe_warns, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_missing_type_hints = true;
+    s.check_arrow_function_missing_type_hints = true;
+    s.allow_implicit_pipe_callable_types = true;
+    s
+});
 test_case!(spread_list);
 test_case!(or_never);
 test_case!(abstract_method_inheritance);

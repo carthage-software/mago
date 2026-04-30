@@ -123,6 +123,7 @@ These flags control specific, powerful analysis capabilities.
 | `check-missing-type-hints`                | `false` | When `true`, reports missing type hints on parameters, properties, and return types.                                                                                                                |
 | `check-closure-missing-type-hints`        | `false` | When `true`, checks closures for missing type hints when `check-missing-type-hints` is enabled.                                                                                                     |
 | `check-arrow-function-missing-type-hints` | `false` | When `true`, checks arrow functions for missing type hints when `check-missing-type-hints` is enabled.                                                                                              |
+| `allow-implicit-pipe-callable-types`      | `false` | When `true`, the closure / arrow-function missing-type-hint checks above are skipped for callables used directly as the right-hand side of the pipe operator (e.g. `$x \|> fn($p) => $p`).            |
 | `register-super-globals`                  | `true`  | Automatically register PHP superglobals (e.g., `$_GET`, `$_POST`) for analysis.                                                                                                                     |
 | `trust-existence-checks`                  | `true`  | When `true`, narrows types based on `method_exists()`, `property_exists()`, `function_exists()`, and `defined()` checks.                                                                            |
 | `check-property-initialization`           | `false` | When `true`, checks that typed properties are initialized in constructors or class initializers.                                                                                                    |
@@ -404,11 +405,12 @@ trust-existence-checks = false
 
 #### Type hint enforcement
 
-| Option                                    | Strict Value | Effect                                                                                    |
-| :---------------------------------------- | :----------- | :---------------------------------------------------------------------------------------- |
-| `check-missing-type-hints`                | `true`       | Reports missing type hints on function parameters, return types, and class properties.    |
-| `check-closure-missing-type-hints`        | `true`       | Also checks closures for missing type hints (requires `check-missing-type-hints`).        |
-| `check-arrow-function-missing-type-hints` | `true`       | Also checks arrow functions for missing type hints (requires `check-missing-type-hints`). |
+| Option                                    | Strict Value | Effect                                                                                                                                                                |
+| :---------------------------------------- | :----------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `check-missing-type-hints`                | `true`       | Reports missing type hints on function parameters, return types, and class properties.                                                                                |
+| `check-closure-missing-type-hints`        | `true`       | Also checks closures for missing type hints (requires `check-missing-type-hints`).                                                                                    |
+| `check-arrow-function-missing-type-hints` | `true`       | Also checks arrow functions for missing type hints (requires `check-missing-type-hints`).                                                                             |
+| `allow-implicit-pipe-callable-types`      | `true`       | Skips the two checks above when the callable is the right-hand side of `\|>`, since the pipe operand's type is enough to derive the parameter type. Defaults to `false`. |
 
 #### Array access strictness
 
