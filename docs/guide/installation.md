@@ -206,7 +206,8 @@ The shell installer URL above (`https://carthage.software/mago.sh`) is a redirec
 For a stricter supply chain, pin the installer to a specific commit you have reviewed. Pick a commit on `main` whose `scripts/install.sh` you have read end-to-end, then fetch the script from that exact SHA:
 
 ```sh
-COMMIT=67d173639d6d7ab5bdb8c005e0fd7579a722eadf   # example; replace with a commit you have reviewed
+# the commit that shipped --always-verify; replace with a newer one you have reviewed
+COMMIT=cd4cf4dfdbc72bd028ad26d11bcc815a49e27e9a
 curl --proto '=https' --tlsv1.2 -sSf \
   "https://raw.githubusercontent.com/carthage-software/mago/${COMMIT}/scripts/install.sh" \
   | bash -s -- --always-verify
