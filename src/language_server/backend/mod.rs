@@ -11,8 +11,6 @@ use tower_lsp::LanguageServer;
 use tower_lsp::jsonrpc::Result as JsonRpcResult;
 use tower_lsp::lsp_types::*;
 
-use mago_analyzer::plugin::PluginRegistry;
-
 use crate::language_server::ServerConfig;
 use crate::language_server::capabilities;
 use crate::language_server::capabilities::server_capabilities;
@@ -47,9 +45,8 @@ impl LanguageServer for Backend {
                 .log_message(MessageType::INFO, format!("mago-server: workspace root = {}", root.display()))
                 .await;
 
-            let plugin_registry = Arc::new(PluginRegistry::with_library_providers());
             *self.state.lock().unwrap() =
-                BackendState::Pending(PendingConfig { root, plugin_registry, config: Arc::clone(&self.config) });
+                BackendState::Pending(PendingConfig { root, config: Arc::clone(&self.config) });
         } else {
             self.client.log_message(MessageType::WARNING, "mago-server: no workspace root provided").await;
         }
@@ -139,8 +136,13 @@ impl LanguageServer for Backend {
             if !self.config.formatter {
                 return Ok(None);
             }
+
+            let php_version = self.config.configuration.php_version;
+            let settings = self.config.configuration.formatter.settings;
             Ok(self
-                .with_file(&params.text_document.uri, |file, _| capabilities::formatting::compute(file))
+                .with_file(&params.text_document.uri, |file, _| {
+                    capabilities::formatting::compute(file, php_version, settings)
+                })
                 .flatten()
                 .map(|edit| vec![edit]))
         })

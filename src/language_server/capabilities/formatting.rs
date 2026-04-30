@@ -1,9 +1,11 @@
 //! `textDocument/formatting`.
 //!
-//! Runs the file through [`mago_formatter::Formatter`] and returns a single
-//! whole-document [`TextEdit`] when the formatter changes anything. Range
-//! formatting is intentionally not implemented yet; the formatter operates
-//! on whole files.
+//! Runs the file through [`mago_formatter::Formatter`] using the
+//! workspace's configured PHP version and [`FormatSettings`] (sourced
+//! from the user's `mago.toml`), and returns a single whole-document
+//! [`TextEdit`] when the formatter changes anything. Range formatting
+//! is intentionally not implemented yet; the formatter operates on
+//! whole files.
 
 use bumpalo::Bump;
 
@@ -15,9 +17,9 @@ use tower_lsp::lsp_types::Position;
 use tower_lsp::lsp_types::Range;
 use tower_lsp::lsp_types::TextEdit;
 
-pub fn compute(file: &MagoFile) -> Option<TextEdit> {
+pub fn compute(file: &MagoFile, php_version: PHPVersion, settings: FormatSettings) -> Option<TextEdit> {
     let arena = Bump::new();
-    let formatter = Formatter::new(&arena, PHPVersion::LATEST, FormatSettings::default());
+    let formatter = Formatter::new(&arena, php_version, settings);
 
     let formatted = formatter.format_file(file).ok()?;
     if formatted == file.contents.as_ref() {

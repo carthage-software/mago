@@ -19,7 +19,7 @@ use tower_lsp::Server;
 
 mod backend;
 mod capabilities;
-mod config;
+pub(crate) mod config;
 mod diagnostics;
 mod document;
 mod file_analysis;

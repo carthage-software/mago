@@ -250,7 +250,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         MagoCommand::Guard(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
         #[cfg(feature = "language-server")]
-        MagoCommand::LanguageServer(cmd) => cmd.execute(),
+        MagoCommand::LanguageServer(cmd) => cmd.execute(configuration),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }

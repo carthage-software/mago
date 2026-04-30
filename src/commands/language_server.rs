@@ -4,9 +4,13 @@
 //! pick a trimmed-down profile when it only needs a subset of the server.
 
 use std::process::ExitCode;
+use std::sync::Arc;
 
 use clap::Parser;
 
+use mago_analyzer::plugin::create_registry_with_plugins;
+
+use crate::config::Configuration;
 use crate::error::Error;
 use crate::language_server::ServerConfig;
 
@@ -59,9 +63,19 @@ pub struct LanguageServerCommand {
 }
 
 impl LanguageServerCommand {
-    pub fn execute(self) -> Result<ExitCode, Error> {
-        let config =
-            ServerConfig { analyzer: !self.no_analyzer, linter: !self.no_linter, formatter: !self.no_formatter };
+    pub fn execute(self, configuration: Configuration) -> Result<ExitCode, Error> {
+        let plugin_registry = Arc::new(create_registry_with_plugins(
+            &configuration.analyzer.plugins,
+            configuration.analyzer.disable_default_plugins,
+        ));
+
+        let config = ServerConfig {
+            analyzer: !self.no_analyzer,
+            linter: !self.no_linter,
+            formatter: !self.no_formatter,
+            configuration,
+            plugin_registry,
+        };
 
         let runtime =
             tokio::runtime::Builder::new_multi_thread().enable_all().build().map_err(Error::BuildingRuntime)?;
