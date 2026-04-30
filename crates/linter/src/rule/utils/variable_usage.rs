@@ -21,6 +21,13 @@ pub trait Recorder<'arena> {
     fn is_bailed(&self) -> bool;
     fn is_seen(&self, name: &str) -> bool;
     fn tracked_names(&self) -> Vec<&'arena str>;
+
+    fn enter_rescan(&mut self) {}
+    fn exit_rescan(&mut self) {}
+
+    fn rescans_loops(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Default)]
@@ -33,11 +40,16 @@ pub struct RedundantVarInfo {
 pub struct RedundantRecorder<'arena> {
     pub info: HashMap<&'arena str, RedundantVarInfo>,
     pub bailed: bool,
+    rescan_depth: u32,
 }
 
 impl<'arena> RedundantRecorder<'arena> {
     fn entry(&mut self, name: &'arena str) -> &mut RedundantVarInfo {
         self.info.entry(name).or_default()
+    }
+
+    fn in_rescan(&self) -> bool {
+        self.rescan_depth > 0
     }
 }
 
@@ -47,6 +59,10 @@ impl<'arena> Recorder<'arena> for RedundantRecorder<'arena> {
     }
 
     fn record_write(&mut self, name: &'arena str, span: Span) {
+        if self.in_rescan() {
+            return;
+        }
+
         self.entry(name).pending_write = Some(span);
     }
 
@@ -55,6 +71,11 @@ impl<'arena> Recorder<'arena> for RedundantRecorder<'arena> {
     }
 
     fn record_read_then_write(&mut self, name: &'arena str, span: Span) {
+        if self.in_rescan() {
+            self.entry(name).pending_write = None;
+            return;
+        }
+
         self.entry(name).pending_write = Some(span);
     }
 
@@ -88,6 +109,18 @@ impl<'arena> Recorder<'arena> for RedundantRecorder<'arena> {
 
     fn tracked_names(&self) -> Vec<&'arena str> {
         self.info.keys().copied().collect()
+    }
+
+    fn enter_rescan(&mut self) {
+        self.rescan_depth += 1;
+    }
+
+    fn exit_rescan(&mut self) {
+        self.rescan_depth = self.rescan_depth.saturating_sub(1);
+    }
+
+    fn rescans_loops(&self) -> bool {
+        true
     }
 }
 
@@ -416,13 +449,21 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
         }
 
         self.rec.enter_arm();
-        match &fe.body {
-            ForeachBody::Statement(s) => self.walk_statement(s, ctx),
+        let mut walk_body = |w: &mut Self| match &fe.body {
+            ForeachBody::Statement(s) => w.walk_statement(s, ctx),
             ForeachBody::ColonDelimited(b) => {
                 for s in b.statements.iter() {
-                    self.walk_statement(s, ctx);
+                    w.walk_statement(s, ctx);
                 }
             }
+        };
+
+        walk_body(self);
+
+        if self.rec.rescans_loops() {
+            self.rec.enter_rescan();
+            walk_body(self);
+            self.rec.exit_rescan();
         }
 
         self.rec.exit_arm();
@@ -482,13 +523,21 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
     fn walk_while(&mut self, w: &'ast While<'arena>, ctx: &mut ()) {
         self.walk_expression(w.condition, ctx);
         self.rec.enter_arm();
-        match &w.body {
-            WhileBody::Statement(s) => self.walk_statement(s, ctx),
+        let mut walk_body = |w_: &mut Self| match &w.body {
+            WhileBody::Statement(s) => w_.walk_statement(s, ctx),
             WhileBody::ColonDelimited(b) => {
                 for s in b.statements.iter() {
-                    self.walk_statement(s, ctx);
+                    w_.walk_statement(s, ctx);
                 }
             }
+        };
+
+        walk_body(self);
+
+        if self.rec.rescans_loops() {
+            self.rec.enter_rescan();
+            walk_body(self);
+            self.rec.exit_rescan();
         }
 
         self.rec.exit_arm();
@@ -497,6 +546,13 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
     fn walk_do_while(&mut self, d: &'ast DoWhile<'arena>, ctx: &mut ()) {
         self.rec.enter_arm();
         self.walk_statement(d.statement, ctx);
+
+        if self.rec.rescans_loops() {
+            self.rec.enter_rescan();
+            self.walk_statement(d.statement, ctx);
+            self.rec.exit_rescan();
+        }
+
         self.rec.exit_arm();
         self.walk_expression(d.condition, ctx);
     }
@@ -511,17 +567,27 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
         }
 
         self.rec.enter_arm();
-        for e in f.increments.iter() {
-            self.walk_expression(e, ctx);
-        }
+        let mut walk_increments_and_body = |w: &mut Self| {
+            for e in f.increments.iter() {
+                w.walk_expression(e, ctx);
+            }
 
-        match &f.body {
-            ForBody::Statement(s) => self.walk_statement(s, ctx),
-            ForBody::ColonDelimited(b) => {
-                for s in b.statements.iter() {
-                    self.walk_statement(s, ctx);
+            match &f.body {
+                ForBody::Statement(s) => w.walk_statement(s, ctx),
+                ForBody::ColonDelimited(b) => {
+                    for s in b.statements.iter() {
+                        w.walk_statement(s, ctx);
+                    }
                 }
             }
+        };
+
+        walk_increments_and_body(self);
+
+        if self.rec.rescans_loops() {
+            self.rec.enter_rescan();
+            walk_increments_and_body(self);
+            self.rec.exit_rescan();
         }
 
         self.rec.exit_arm();

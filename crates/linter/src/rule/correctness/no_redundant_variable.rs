@@ -381,4 +381,109 @@ mod tests {
             }
         "#}
     }
+
+    test_lint_success! {
+        name = foreach_loop_wraparound_read,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            function f(array $items): void {
+                $shown = false;
+                foreach ($items as $item) {
+                    if (!$shown) {
+                        echo "header\n";
+                        $shown = true;
+                    }
+                    echo $item, "\n";
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = while_loop_wraparound_read,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            function f(): void {
+                $i = 0;
+                $seen = false;
+                while ($i < 10) {
+                    if (!$seen) {
+                        echo "first\n";
+                        $seen = true;
+                    }
+                    $i++;
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = do_while_loop_wraparound_read,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            function f(): void {
+                $seen = false;
+                do {
+                    if (!$seen) {
+                        echo "first\n";
+                        $seen = true;
+                    }
+                } while (random_int(0, 1));
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = for_loop_wraparound_read,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            function f(): void {
+                $seen = false;
+                for ($i = 0; $i < 10; $i++) {
+                    if (!$seen) {
+                        echo "first\n";
+                        $seen = true;
+                    }
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = unused_variable_inside_loop,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            function f(array $items): void {
+                foreach ($items as $item) {
+                    $unused = 1;
+                    echo $item, "\n";
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = body_writes_only_value_never_read,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            function f(array $items): void {
+                foreach ($items as $item) {
+                    $tmp = compute();
+                    echo $item;
+                }
+            }
+        "#}
+    }
 }
