@@ -3,6 +3,7 @@ pub mod consts;
 pub mod isset;
 pub mod laravel;
 pub mod misc;
+pub mod namespace_pattern;
 pub mod pest;
 pub mod phpunit;
 pub mod security;

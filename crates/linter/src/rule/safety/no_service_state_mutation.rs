@@ -17,6 +17,7 @@ use crate::integration::Integration;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::utils::namespace_pattern::matches_namespace_pattern;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -30,7 +31,9 @@ pub struct NoServiceStateMutationRule {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NoServiceStateMutationConfig {
     pub level: Level,
+    /// Namespaces to include. Supports glob patterns: `*`, `**`, `{A,B}`.
     pub include_namespaces: Vec<String>,
+    /// Namespaces to exclude. Supports glob patterns: `*`, `**`, `{A,B}`.
     pub exclude_namespaces: Vec<String>,
     pub allowed_methods: Vec<String>,
     pub reset_interfaces: Vec<String>,
@@ -122,6 +125,12 @@ impl LintRule for NoServiceStateMutationRule {
                 array append (`$this->items[] = $item`), and `unset($this->cache)`.
 
                 The `__construct` and `reset` methods are allowed by default.
+
+                Both `include-namespaces` and `exclude-namespaces` support glob patterns: `*` matches a
+                single namespace segment, `**` matches any number of segments, partial wildcards like
+                `*Repository` match within a segment, and brace expansion like `App\{Entity,DTO}\`
+                matches multiple alternatives. Plain prefix patterns (e.g. `App\Entity\`) continue to
+                work as before.
             "},
             good_example: indoc! {r"
                 <?php
@@ -197,17 +206,14 @@ impl LintRule for NoServiceStateMutationRule {
             return;
         }
 
-        let matches_pattern = |ns: &str, pattern: &str| {
-            ns.starts_with(pattern)
-                || (ns.len() + 1 >= pattern.len() && pattern.ends_with('\\') && pattern[..pattern.len() - 1] == *ns)
-        };
-
-        let in_include = self.cfg.include_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
+        let in_include =
+            self.cfg.include_namespaces.iter().any(|p| matches_namespace_pattern(namespace, p.as_str(), false, true));
         if !in_include {
             return;
         }
 
-        let in_exclude = self.cfg.exclude_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
+        let in_exclude =
+            self.cfg.exclude_namespaces.iter().any(|p| matches_namespace_pattern(namespace, p.as_str(), false, true));
         if in_exclude {
             return;
         }
@@ -914,6 +920,100 @@ mod tests {
                         'id' => $this->id,
                         'name' => $this->name,
                     ];
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = exclude_namespaces_double_wildcard,
+        rule = NoServiceStateMutationRule,
+        settings = |s: &mut Settings| {
+            s.integrations.insert(Integration::Symfony);
+            s.rules.no_service_state_mutation.config.include_namespaces = vec!["App\\".to_string()];
+            s.rules.no_service_state_mutation.config.exclude_namespaces = vec!["App\\Domain\\**".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Domain\Model\User;
+
+            class UserCollection
+            {
+                public function add(): void
+                {
+                    $this->count++;
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = exclude_namespaces_single_wildcard,
+        rule = NoServiceStateMutationRule,
+        settings = |s: &mut Settings| {
+            s.integrations.insert(Integration::Symfony);
+            s.rules.no_service_state_mutation.config.include_namespaces = vec!["App\\".to_string()];
+            s.rules.no_service_state_mutation.config.exclude_namespaces = vec!["App\\*".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Domain;
+
+            class SomeModel
+            {
+                public function setName(string $name): void
+                {
+                    $this->name = $name;
+                }
+            }
+        "#},
+    }
+
+    test_lint_success! {
+        name = exclude_namespaces_brace_expansion,
+        rule = NoServiceStateMutationRule,
+        settings = |s: &mut Settings| {
+            s.integrations.insert(Integration::Symfony);
+            s.rules.no_service_state_mutation.config.include_namespaces = vec!["App\\".to_string()];
+            s.rules.no_service_state_mutation.config.exclude_namespaces =
+                vec!["App\\{Entity,DTO,ValueObject}\\".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            namespace App\DTO;
+
+            class OrderData
+            {
+                public function setTotal(int $total): void
+                {
+                    $this->total = $total;
+                }
+            }
+        "#},
+    }
+
+    test_lint_failure! {
+        name = include_namespaces_single_wildcard,
+        rule = NoServiceStateMutationRule,
+        count = 1,
+        settings = |s: &mut Settings| {
+            s.integrations.insert(Integration::Symfony);
+            s.rules.no_service_state_mutation.config.include_namespaces = vec!["App\\*\\Service".to_string()];
+            s.rules.no_service_state_mutation.config.exclude_namespaces = vec![];
+        },
+        code = indoc! {r#"
+            <?php
+
+            namespace App\Billing\Service;
+
+            class InvoiceService
+            {
+                public function process(): void
+                {
+                    $this->count++;
                 }
             }
         "#},
