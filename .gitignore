@@ -8,3 +8,4 @@
 .mago/
 /corpus/vendor/
 /corpus/composer.lock
+.worktrees
