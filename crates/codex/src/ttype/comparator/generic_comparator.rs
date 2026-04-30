@@ -97,7 +97,15 @@ pub(crate) fn is_contained_by(
 
             update_failed_result_from_nested(atomic_comparison_result, &parameter_comparison_result);
 
-            if !parameter_comparison_result.type_coerced_from_as_mixed.unwrap_or(false) {
+            // The `type_coerced_from_as_mixed` escape hatch lets a `mixed`
+            // input slip past a more specific container with a coercion
+            // warning. That's appropriate for variance-driven contexts
+            // (assignments, parameter passing) but not for invariant
+            // generics, where strict equality is the whole point.
+            let allow_mixed_coercion = !matches!(variance, Variance::Invariant)
+                && parameter_comparison_result.type_coerced_from_as_mixed.unwrap_or(false);
+
+            if !allow_mixed_coercion {
                 all_parameters_match = false;
             }
 
@@ -122,9 +130,11 @@ pub(crate) fn is_contained_by(
             if !reverse_ok {
                 update_failed_result_from_nested(atomic_comparison_result, &reverse_result);
 
-                if !reverse_result.type_coerced_from_as_mixed.unwrap_or(false) {
-                    all_parameters_match = false;
-                }
+                // Same rationale as the forward branch above: invariance
+                // means equality both ways, and a `type_coerced_from_as_mixed`
+                // signal indicates we needed a non-equal coercion to get
+                // here, which is incompatible with an invariant parameter.
+                all_parameters_match = false;
             }
         }
 
