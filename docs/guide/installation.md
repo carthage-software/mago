@@ -28,13 +28,13 @@ wget -qO- https://carthage.software/mago.sh | bash
 To install a specific version of Mago, use the `--version=` flag:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.24.0
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.0
 ```
 
 Or with `wget`:
 
 ```sh
-wget -qO- https://carthage.software/mago.sh | bash -s -- --version=1.24.0
+wget -qO- https://carthage.software/mago.sh | bash -s -- --version=1.25.0
 ```
 
 #### Verifying the download
@@ -66,7 +66,7 @@ The official container image provides a zero-install way to run Mago in any envi
 docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
 ```
 
-Available tags include `latest`, exact versions (e.g., `1.24.0`), minor versions (`1.24`), and major versions (`1`). Both `linux/amd64` and `linux/arm64` are supported.
+Available tags include `latest`, exact versions (e.g., `1.25.0`), minor versions (`1.25`), and major versions (`1`). Both `linux/amd64` and `linux/arm64` are supported.
 
 See the [Docker recipe](/recipes/docker) for detailed usage, CI/CD examples, and limitations.
 
@@ -79,7 +79,7 @@ These methods are convenient but may be managed by the community or experience s
 To add Mago as a development dependency to your PHP project via Composer:
 
 ```sh
-composer require --dev "carthage-software/mago:^1.24.0"
+composer require --dev "carthage-software/mago:^1.25.0"
 ```
 
 The Composer package is a thin wrapper: the first `vendor/bin/mago` invocation downloads the matching pre-built binary from the GitHub release and caches it; later calls reuse the cache and make no HTTP requests.
@@ -167,7 +167,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh \
 
 # Combine with other flags as usual.
 curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh \
-  | bash -s -- --always-verify --version=1.24.0 --install-dir=/opt/bin
+  | bash -s -- --always-verify --version=1.25.0 --install-dir=/opt/bin
 
 # Explicit opt-out.
 curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --no-verify
@@ -180,7 +180,7 @@ Pre-requisites for verification: install a recent [GitHub CLI](https://cli.githu
 If you fetched an archive directly from the [releases page](https://github.com/carthage-software/mago/releases) (for example, on Windows where the install script does not run, or because you want to keep the archive around), you can verify it yourself before extracting:
 
 ```sh
-VERSION=1.24.0
+VERSION=1.25.0
 TARGET=x86_64-unknown-linux-gnu                      # match your platform
 ASSET=mago-${VERSION}-${TARGET}.tar.gz
 
