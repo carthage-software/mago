@@ -36,19 +36,22 @@ static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry:
 /// directives apply.
 const COLLECTOR_CATEGORIES: &[&str] = &["analysis", "analyzer", "analyser"];
 
+/// Marker line that introduces a `FileType::Vendored` section in a test fixture.
+const VENDOR_MARKER: &str = "//=== vendor ===";
+/// Marker line that introduces a `FileType::Patch` section in a test fixture.
+const PATCH_MARKER: &str = "//=== patch ===";
+
 #[derive(Debug, Clone)]
 pub struct TestCase<'src> {
     name: &'src str,
     content: &'src str,
     settings: Option<Settings>,
-    vendor_file: Option<&'src str>,
-    patch_file: Option<&'src str>,
 }
 
 impl<'src> TestCase<'src> {
     #[must_use]
     pub fn new(name: &'src str, content: &'src str) -> Self {
-        Self { name, content, settings: None, vendor_file: None, patch_file: None }
+        Self { name, content, settings: None }
     }
 
     #[must_use]
@@ -57,27 +60,60 @@ impl<'src> TestCase<'src> {
         self
     }
 
-    /// Attach an auxiliary file scanned with `FileType::Vendored`. The vendor file is merged
-    /// into the codebase before the user file, mirroring the production pipeline.
-    #[must_use]
-    pub fn with_vendor(mut self, content: &'src str) -> Self {
-        self.vendor_file = Some(content);
-        self
-    }
-
-    /// Attach an auxiliary file scanned with `FileType::Patch`. The patch file is merged after
-    /// the user file, which is when `apply_patch` runs and `patch_diagnostics` are
-    /// populated. Patch diagnostics whose primary span lies in this file are matched against
-    /// `@mago-expect analysis:<code>` pragmas inside the patch.
-    #[must_use]
-    pub fn with_patch(mut self, content: &'src str) -> Self {
-        self.patch_file = Some(content);
-        self
-    }
-
     pub fn run(self) {
         run_test_case_inner(self);
     }
+}
+
+/// User, vendor, and patch source bodies extracted from a single fixture file by splitting
+/// on `//=== vendor ===` and `//=== patch ===` marker lines. Each marker is replaced with a
+/// fresh `<?php` opener so the resulting sections parse standalone. Vendor and patch are
+/// `None` when their marker is absent.
+struct Sections {
+    user: String,
+    vendor: Option<String>,
+    patch: Option<String>,
+}
+
+fn split_sections(content: &str) -> Sections {
+    enum Phase {
+        User,
+        Vendor,
+        Patch,
+    }
+
+    let mut user = String::new();
+    let mut vendor = String::new();
+    let mut patch = String::new();
+    let mut saw_vendor = false;
+    let mut saw_patch = false;
+    let mut phase = Phase::User;
+
+    for line in content.split_inclusive('\n') {
+        match line.trim() {
+            VENDOR_MARKER => {
+                saw_vendor = true;
+                phase = Phase::Vendor;
+                vendor.push_str("<?php\n");
+                continue;
+            }
+            PATCH_MARKER => {
+                saw_patch = true;
+                phase = Phase::Patch;
+                patch.push_str("<?php\n");
+                continue;
+            }
+            _ => {}
+        }
+        let buf = match phase {
+            Phase::User => &mut user,
+            Phase::Vendor => &mut vendor,
+            Phase::Patch => &mut patch,
+        };
+        buf.push_str(line);
+    }
+
+    Sections { user, vendor: saw_vendor.then_some(vendor), patch: saw_patch.then_some(patch) }
 }
 
 #[must_use]
@@ -139,19 +175,20 @@ fn parse_aux<'arena, 'ctx>(arena: &'arena Bump, file: &'ctx File, label: &str) -
 fn run_test_case_inner(config: TestCase) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 
+    let Sections { user, vendor, patch } = split_sections(config.content);
+
     // Register every file (vendor + user + patch) up front, then borrow them — the database
     // can't hand out refs while it's being mutated.
-    let vendor_file_id = config.vendor_file.map(|content| {
+    let vendor_file_id = vendor.map(|content| {
         let name = format!("{}.vendor.php", config.name);
-        database.add(File::new(Cow::Owned(name), FileType::Vendored, None, Cow::Owned(content.to_string())))
+        database.add(File::new(Cow::Owned(name), FileType::Vendored, None, Cow::Owned(content)))
     });
 
-    let user_file_id =
-        database.add(File::ephemeral(Cow::Owned(config.name.to_string()), Cow::Owned(config.content.to_string())));
+    let user_file_id = database.add(File::ephemeral(Cow::Owned(config.name.to_string()), Cow::Owned(user)));
 
-    let patch_file_id = config.patch_file.map(|content| {
+    let patch_file_id = patch.map(|content| {
         let name = format!("{}.patch.php", config.name);
-        database.add(File::new(Cow::Owned(name), FileType::Patch, None, Cow::Owned(content.to_string())))
+        database.add(File::new(Cow::Owned(name), FileType::Patch, None, Cow::Owned(content)))
     });
 
     let user_file = database.get_ref(&user_file_id).expect("user file just added should exist");
@@ -170,7 +207,7 @@ fn run_test_case_inner(config: TestCase) {
     let patch_parsed = patch_file.map(|f| parse_aux(&arena, f, "Patch"));
 
     // Vendor first — this matches the production merge order so any subsequent patch can
-    // find a target to update.
+    // find a target to refine.
     if let Some(p) = &vendor_parsed {
         metadata.extend(scan_program(&arena, p.file, p.program, &p.resolved));
     }

@@ -1,3 +1,0 @@
-<?php
-
-enum VendorEnum {}
