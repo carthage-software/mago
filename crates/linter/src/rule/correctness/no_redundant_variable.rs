@@ -518,6 +518,44 @@ mod tests {
     }
 
     test_lint_success! {
+        name = for_loop_condition_observes_body_write_on_wraparound,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            /** @param array<int> $par */
+            function test(array &$par): void
+            {
+                $cnt = count($par);
+
+                for ($i = 0; $i < $cnt; $i++) {
+                    if (0 == mt_rand(0, 10)) {
+                        $par[] = mt_rand(100, 200);
+                        $cnt = count($par);
+                    }
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = while_loop_condition_observes_body_write_on_wraparound,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            function f(): void {
+                $items = [];
+                $count = 0;
+                while ($count < 10) {
+                    $items[] = $count;
+                    $count = count($items);
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
         name = closure_by_ref_capture_does_not_flag_outer_assignment,
         rule = NoRedundantVariableRule,
         code = indoc! {r#"

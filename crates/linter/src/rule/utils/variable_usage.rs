@@ -547,20 +547,27 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
     fn walk_while(&mut self, w: &'ast While<'arena>, ctx: &mut ()) {
         self.walk_expression(w.condition, ctx);
         self.rec.enter_arm();
-        let mut walk_body = |w_: &mut Self| match &w.body {
-            WhileBody::Statement(s) => w_.walk_statement(s, ctx),
+
+        match &w.body {
+            WhileBody::Statement(s) => self.walk_statement(s, ctx),
             WhileBody::ColonDelimited(b) => {
                 for s in b.statements.iter() {
-                    w_.walk_statement(s, ctx);
+                    self.walk_statement(s, ctx);
                 }
             }
-        };
-
-        walk_body(self);
+        }
 
         if self.rec.rescans_loops() {
             self.rec.enter_rescan();
-            walk_body(self);
+            self.walk_expression(w.condition, ctx);
+            match &w.body {
+                WhileBody::Statement(s) => self.walk_statement(s, ctx),
+                WhileBody::ColonDelimited(b) => {
+                    for s in b.statements.iter() {
+                        self.walk_statement(s, ctx);
+                    }
+                }
+            }
             self.rec.exit_rescan();
         }
 
@@ -591,26 +598,38 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
         }
 
         self.rec.enter_arm();
-        let mut walk_increments_and_body = |w: &mut Self| {
-            for e in f.increments.iter() {
-                w.walk_expression(e, ctx);
-            }
 
-            match &f.body {
-                ForBody::Statement(s) => w.walk_statement(s, ctx),
-                ForBody::ColonDelimited(b) => {
-                    for s in b.statements.iter() {
-                        w.walk_statement(s, ctx);
-                    }
+        for e in f.increments.iter() {
+            self.walk_expression(e, ctx);
+        }
+
+        match &f.body {
+            ForBody::Statement(s) => self.walk_statement(s, ctx),
+            ForBody::ColonDelimited(b) => {
+                for s in b.statements.iter() {
+                    self.walk_statement(s, ctx);
                 }
             }
-        };
-
-        walk_increments_and_body(self);
+        }
 
         if self.rec.rescans_loops() {
             self.rec.enter_rescan();
-            walk_increments_and_body(self);
+            for e in f.conditions.iter() {
+                self.walk_expression(e, ctx);
+            }
+
+            for e in f.increments.iter() {
+                self.walk_expression(e, ctx);
+            }
+
+            match &f.body {
+                ForBody::Statement(s) => self.walk_statement(s, ctx),
+                ForBody::ColonDelimited(b) => {
+                    for s in b.statements.iter() {
+                        self.walk_statement(s, ctx);
+                    }
+                }
+            }
             self.rec.exit_rescan();
         }
 
