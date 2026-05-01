@@ -127,7 +127,7 @@ impl LintRule for NoRedundantUseRule {
             return;
         }
 
-        let used_fqns = utils::build_used_fqn_set(ctx);
+        let used_fqns = utils::build_used_fqn_set(ctx, &use_declarations);
         let docblocks = utils::get_docblocks(program);
         let inline_contents =
             if check_inline_mentions { utils::get_inline_contents(program) } else { Vec::with_capacity(0) };
@@ -254,6 +254,7 @@ impl LintRule for NoRedundantUseRule {
 }
 
 mod utils {
+    use foldhash::HashSet;
     use mago_atom::concat_atom;
     use mago_database::file::FileId;
     use mago_span::Span;
@@ -468,8 +469,14 @@ mod utils {
         walker.contents
     }
 
-    pub(super) fn build_used_fqn_set(ctx: &LintContext<'_, '_>) -> AtomSet {
-        ctx.resolved_names.iter().map(|(_, _, fqn, _)| atom(fqn)).collect()
+    pub(super) fn build_used_fqn_set(ctx: &LintContext<'_, '_>, declarations: &[UseDeclaration<'_>]) -> AtomSet {
+        let import_starts: HashSet<u32> = declarations.iter().map(|d| d.item.name.span().start.offset).collect();
+
+        ctx.resolved_names
+            .iter()
+            .filter(|(start, _, _, _)| !import_starts.contains(start))
+            .map(|(_, _, fqn, _)| atom(fqn))
+            .collect()
     }
 
     pub(super) fn get_alias(item: &UseItem) -> Atom {
