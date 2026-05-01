@@ -23,6 +23,7 @@ use mago_syntax::ast::StaticPropertyAccess;
 use mago_syntax::ast::Trait;
 use mago_syntax::ast::TraitUse;
 use mago_syntax::ast::Use;
+use mago_syntax::ast::UseItems;
 use mago_syntax::walker::MutWalker;
 
 use crate::ResolvedNames;
@@ -51,6 +52,37 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
 
     fn walk_in_use(&mut self, r#use: &'ast Use<'arena>, context: &mut NameResolutionContext<'arena>) {
         context.populate_from_use(r#use);
+
+        match &r#use.items {
+            UseItems::Sequence(seq) => {
+                for item in &seq.items {
+                    let fqn = item.name.value().trim_start_matches('\\');
+                    self.resolved_names.insert_at(item.name.span(), fqn, true);
+                }
+            }
+            UseItems::TypedSequence(seq) => {
+                for item in &seq.items {
+                    let fqn = item.name.value().trim_start_matches('\\');
+                    self.resolved_names.insert_at(item.name.span(), fqn, true);
+                }
+            }
+            UseItems::TypedList(list) => {
+                let prefix = list.namespace.value().trim_start_matches('\\');
+                self.resolved_names.insert_at(list.namespace.span(), context.intern(prefix), true);
+                for item in &list.items {
+                    let fqn = context.intern(&format!("{prefix}\\{}", item.name.value()));
+                    self.resolved_names.insert_at(item.name.span(), fqn, true);
+                }
+            }
+            UseItems::MixedList(list) => {
+                let prefix = list.namespace.value().trim_start_matches('\\');
+                self.resolved_names.insert_at(list.namespace.span(), context.intern(prefix), true);
+                for mixed in &list.items {
+                    let fqn = context.intern(&format!("{prefix}\\{}", mixed.item.name.value()));
+                    self.resolved_names.insert_at(mixed.item.name.span(), fqn, true);
+                }
+            }
+        }
     }
 
     fn walk_in_constant(&mut self, constant: &'ast Constant<'arena>, context: &mut NameResolutionContext<'arena>) {

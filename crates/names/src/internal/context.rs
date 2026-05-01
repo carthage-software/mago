@@ -87,6 +87,11 @@ impl<'arena> NameResolutionContext<'arena> {
         self.arena.alloc_str(&qualified_str)
     }
 
+    /// Allocates `s` in the arena and returns a borrow with the arena lifetime.
+    pub fn intern(&self, s: &str) -> &'arena str {
+        self.arena.alloc_str(s)
+    }
+
     /// Performs full name resolution for a given identifier within the current scope.
     ///
     /// # Arguments
