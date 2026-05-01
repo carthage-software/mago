@@ -516,4 +516,28 @@ mod tests {
             }
         "#}
     }
+
+    test_lint_success! {
+        name = closure_by_ref_capture_does_not_flag_outer_assignment,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            function test(array &$par): void {
+                $todo = [42 => [1 => 0]];
+
+                $rec = function (int $parent) use (&$todo): array {
+                    $out = [];
+                    if (isset($todo[$parent])) {
+                        foreach ($todo[$parent] as $e => $_dummy) {
+                            $out[$e] = $e;
+                        }
+                    }
+                    return $out;
+                };
+
+                $par['struct'] = $rec(123);
+            }
+        "#}
+    }
 }

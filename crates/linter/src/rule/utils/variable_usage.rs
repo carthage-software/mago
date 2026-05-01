@@ -766,11 +766,7 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
     fn walk_closure(&mut self, c: &'ast Closure<'arena>, _: &mut ()) {
         if let Some(use_clause) = &c.use_clause {
             for cap in use_clause.variables.iter() {
-                let span = cap.variable.span;
                 self.rec.record_read(cap.variable.name);
-                if cap.ampersand.is_some() {
-                    self.rec.record_write(cap.variable.name, span);
-                }
             }
         }
     }
