@@ -18,9 +18,12 @@ This document details the rules available in the `Security` category.
 | No Roles As Capabilities | [`no-roles-as-capabilities`](#no-roles-as-capabilities) |
 | No Short Opening Tag | [`no-short-opening-tag`](#no-short-opening-tag) |
 | No Unescaped Output | [`no-unescaped-output`](#no-unescaped-output) |
+| Nonce Verification | [`nonce-verification`](#nonce-verification) |
+| Prepared SQL | [`prepared-sql`](#prepared-sql) |
 | Require `preg_quote` Delimiter | [`require-preg-quote-delimiter`](#require-preg-quote-delimiter) |
 | Sensitive Parameter | [`sensitive-parameter`](#sensitive-parameter) |
 | Tainted Data to Sink | [`tainted-data-to-sink`](#tainted-data-to-sink) |
+| Validated Sanitized Input | [`validated-sanitized-input`](#validated-sanitized-input) |
 
 
 ## <a id="disallowed-functions"></a>`disallowed-functions`
@@ -404,6 +407,94 @@ echo $_GET['user_comment'];
 ```
 
 
+## <a id="nonce-verification"></a>`nonce-verification`
+
+Detects access to `$_POST`, `$_GET`, `$_REQUEST`, or `$_FILES` superglobals
+inside a function or method that does not call a WordPress nonce verification
+function (`wp_verify_nonce`, `check_admin_referer`, or `check_ajax_referer`).
+
+Nonce verification is essential to protect against Cross-Site Request Forgery
+(CSRF) attacks. All form and request data processing should verify the nonce first.
+
+### Requirements
+
+- **Integration:** `WordPress`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+| `custom-nonce-functions` | `string[]` | `[]` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function process_form() {
+    if (!wp_verify_nonce($_POST['_wpnonce'], 'my_action')) {
+        wp_die('Security check failed');
+    }
+    $name = sanitize_text_field(wp_unslash($_POST['name']));
+    update_option('name', $name);
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function process_form() {
+    $name = sanitize_text_field(wp_unslash($_POST['name']));
+    update_option('name', $name);
+}
+```
+
+
+## <a id="prepared-sql"></a>`prepared-sql`
+
+Detects `$wpdb` query method calls where the SQL string contains variables
+not passed through `$wpdb->prepare()`.
+
+All dynamic values in SQL queries must use `$wpdb->prepare()` with placeholders
+to prevent SQL injection vulnerabilities. Only literal strings and `$wpdb` table
+properties (e.g. `$wpdb->posts`) are safe without preparation.
+
+### Requirements
+
+- **Integration:** `WordPress`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+$wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->posts} WHERE ID = %d", $post_id));
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+$wpdb->query("DELETE FROM {$wpdb->posts} WHERE ID = $post_id");
+```
+
+
 ## <a id="require-preg-quote-delimiter"></a>`require-preg-quote-delimiter`
 
 This rule requires that when using `preg_quote()`, the second `$delimiter` argument is always provided.
@@ -518,5 +609,52 @@ echo htmlspecialchars($_GET['name'] ?? '', ENT_QUOTES, 'UTF-8');
 
 // This is considered unsafe:
 echo $_GET['name'] ?? '';
+```
+
+
+## <a id="validated-sanitized-input"></a>`validated-sanitized-input`
+
+Detects use of superglobal variables (`$_GET`, `$_POST`, `$_REQUEST`,
+`$_COOKIE`, `$_SERVER`) that are not properly sanitized before use.
+
+All superglobal input must be sanitized with an appropriate sanitization
+function (e.g. `sanitize_text_field`) and unslashed with `wp_unslash()`
+before processing to prevent security vulnerabilities.
+
+### Requirements
+
+- **Integration:** `WordPress`
+
+### Configuration
+
+| Option | Type | Default |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+| `custom-sanitization-functions` | `string[]` | `[]` |
+| `custom-unslash-sanitization-functions` | `string[]` | `[]` |
+
+### Examples
+
+#### Correct code
+
+```php
+<?php
+
+function handle_input() {
+    if (isset($_POST['name'])) {
+        $name = sanitize_text_field(wp_unslash($_POST['name']));
+    }
+}
+```
+
+#### Incorrect code
+
+```php
+<?php
+
+function handle_input() {
+    $name = $_POST['name'];
+}
 ```
 

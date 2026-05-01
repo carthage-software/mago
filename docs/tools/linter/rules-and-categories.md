@@ -82,6 +82,9 @@ title: Rules & categories
 - [`no-db-schema-change`](./rules/security#no-db-schema-change)
 - [`no-unescaped-output`](./rules/security#no-unescaped-output)
 - [`no-roles-as-capabilities`](./rules/security#no-roles-as-capabilities)
+- [`nonce-verification`](./rules/security#nonce-verification)
+- [`prepared-sql`](./rules/security#prepared-sql)
+- [`validated-sanitized-input`](./rules/security#validated-sanitized-input)
 
 ### Yii
 
