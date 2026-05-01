@@ -16,59 +16,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Determine latest and current nightly
+      - name: Determine latest nightly
         id: versions
         run: |
           LATEST_DATE=$(curl -sSf https://static.rust-lang.org/dist/channel-rust-nightly.toml \
             | grep '^date = ' | head -1 | sed 's/date = "\([^"]*\)"/\1/')
-          LATEST="nightly-${LATEST_DATE}"
           CURRENT=$(cat nightly-version)
-          echo "latest=${LATEST}" >> $GITHUB_OUTPUT
+          echo "latest=nightly-${LATEST_DATE}" >> $GITHUB_OUTPUT
           echo "current=${CURRENT}" >> $GITHUB_OUTPUT
-          if [ "${CURRENT}" != "${LATEST}" ]; then
-            echo "needed=true" >> $GITHUB_OUTPUT
-          else
-            echo "needed=false" >> $GITHUB_OUTPUT
-            echo "Already pinned to ${CURRENT}, nothing to do."
-          fi
 
-      - name: Configure git
-        if: steps.versions.outputs.needed == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Create or reset update branch
-        if: steps.versions.outputs.needed == 'true'
-        run: git checkout -B chore/update-nightly-toolchain origin/main
-
-      - name: Update nightly-version
-        if: steps.versions.outputs.needed == 'true'
-        run: |
-          echo "${{ steps.versions.outputs.latest }}" > nightly-version
-          git add nightly-version
-          git commit -m "chore: update pinned nightly toolchain to ${{ steps.versions.outputs.latest }}"
-
-      - name: Push branch
-        if: steps.versions.outputs.needed == 'true'
-        run: git push origin chore/update-nightly-toolchain --force
+      - name: Update nightly-version file
+        run: echo "${{ steps.versions.outputs.latest }}" > nightly-version
 
       - name: Create or update pull request
-        if: steps.versions.outputs.needed == 'true'
+        id: cpr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ github.token }}
+          sign-commits: true
+          branch: chore/update-nightly-toolchain
+          base: main
+          title: "chore: update pinned nightly toolchain to ${{ steps.versions.outputs.latest }}"
+          body: "Updates the pinned nightly Rust toolchain from `${{ steps.versions.outputs.current }}` to `${{ steps.versions.outputs.latest }}`."
+          commit-message: "chore: update pinned nightly toolchain to ${{ steps.versions.outputs.latest }}"
+
+      - name: Enable auto-merge
+        if: steps.cpr.outputs.pull-request-number != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          CURRENT="${{ steps.versions.outputs.current }}"
-          LATEST="${{ steps.versions.outputs.latest }}"
-          TITLE="chore: update pinned nightly toolchain to ${LATEST}"
-          BODY="Updates the pinned nightly Rust toolchain from \`${CURRENT}\` to \`${LATEST}\`."
-
-          EXISTING=$(gh pr list --head chore/update-nightly-toolchain --json number --jq '.[0].number // ""')
-          if [ -n "${EXISTING}" ]; then
-            gh pr edit "${EXISTING}" --title "${TITLE}" --body "${BODY}"
-          else
-            gh pr create --title "${TITLE}" --body "${BODY}" \
-              --head chore/update-nightly-toolchain --base main
-            EXISTING=$(gh pr list --head chore/update-nightly-toolchain --json number --jq '.[0].number')
-          fi
-          gh pr merge "${EXISTING}" --auto --squash
+        run: gh pr merge "${{ steps.cpr.outputs.pull-request-number }}" --auto --squash
