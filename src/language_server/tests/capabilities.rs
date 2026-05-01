@@ -47,6 +47,31 @@ async fn goto_definition() {
 }
 
 #[tokio::test]
+async fn goto_definition_on_use_statement() {
+    let lib = "<?php\nnamespace Bar;\nclass G {}\n";
+    let consumer = "<?php\nnamespace Foo;\nuse Bar\\G;\n";
+    let mut h = Harness::start(&[("lib.php", lib), ("c.php", consumer)]).await;
+    h.open("lib.php", lib).await;
+    h.open("c.php", consumer).await;
+
+    let result = h.at("textDocument/definition", "c.php", 2, 8).await;
+    assert!(result["uri"].as_str().unwrap_or("").ends_with("lib.php"), "got {result:?}");
+}
+
+#[tokio::test]
+async fn hover_on_use_statement() {
+    let lib = "<?php\nnamespace Bar;\nclass G {}\n";
+    let consumer = "<?php\nnamespace Foo;\nuse Bar\\G;\n";
+    let mut h = Harness::start(&[("lib.php", lib), ("c.php", consumer)]).await;
+    h.open("lib.php", lib).await;
+    h.open("c.php", consumer).await;
+
+    let result = h.at("textDocument/hover", "c.php", 2, 8).await;
+    let value = result["contents"]["value"].as_str().unwrap_or("");
+    assert!(value.contains("Bar") && value.contains('G'), "got {value:?}");
+}
+
+#[tokio::test]
 async fn formatting() {
     let mut h = Harness::start(&[("a.php", "<?php\n$x   =   1   ;  \n")]).await;
     let result = h
@@ -278,6 +303,31 @@ async fn selection_range() {
         node = &node["parent"];
     }
     assert!(depth >= 2);
+}
+
+#[tokio::test]
+async fn completion_after_lone_dollar_offers_local_variables() {
+    let code = "<?php\n\nfunction demo(): void {\n    $alpha = 1;\n    $beta = 2;\n    $\n}\n";
+    let mut h = Harness::start(&[("a.php", code)]).await;
+    h.open("a.php", code).await;
+    let result = h.at("textDocument/completion", "a.php", 5, 5).await;
+    let labels: Vec<String> =
+        result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("").to_string()).collect();
+    assert!(labels.iter().any(|l| l == "$alpha"), "expected $alpha in {labels:?}");
+    assert!(labels.iter().any(|l| l == "$beta"), "expected $beta in {labels:?}");
+}
+
+#[tokio::test]
+async fn completion_after_arrow_offers_instance_members() {
+    let code = "<?php\n\nclass Greeter {\n    public string $name = '';\n    public function hello(): string { return ''; }\n}\n\nfunction demo(Greeter $activity): void {\n    $activity->\n}\n";
+    let mut h = Harness::start(&[("a.php", code)]).await;
+    h.open("a.php", code).await;
+    let result = h.at("textDocument/completion", "a.php", 8, 15).await;
+    let labels: Vec<String> =
+        result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("").to_string()).collect();
+    assert!(labels.iter().any(|l| l == "name"), "expected `name` property in {labels:?}");
+    assert!(labels.iter().any(|l| l == "hello"), "expected `hello` method in {labels:?}");
+    assert!(!labels.iter().any(|l| l.starts_with('$')), "did not expect variables in {labels:?}");
 }
 
 #[tokio::test]

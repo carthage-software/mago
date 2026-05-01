@@ -21,6 +21,14 @@ use tower_lsp::lsp_types::CompletionResponse;
 use crate::language_server::capabilities::lookup;
 use crate::language_server::state::ExpressionTypeIndex;
 
+fn byte_before(file: &MagoFile, offset: u32) -> Option<u8> {
+    if offset == 0 {
+        return None;
+    }
+
+    file.contents.as_bytes().get((offset - 1) as usize).copied()
+}
+
 mod items;
 
 const MAX_RESULTS: usize = 50;
@@ -42,7 +50,7 @@ pub fn compute(
     offset: u32,
 ) -> CompletionResponse {
     let tokens = lookup::lex(file);
-    let context = classify(&tokens, offset);
+    let context = classify(file, &tokens, offset);
     let items = match context {
         Context::Variable { prefix, scope_start } => items::variable_items(&tokens, scope_start, offset, prefix),
         Context::InstanceMember { receiver_span, prefix } => {
@@ -55,7 +63,7 @@ pub fn compute(
     CompletionResponse::Array(items)
 }
 
-fn classify<'a>(tokens: &'a [Token<'a>], offset: u32) -> Context<'a> {
+fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Context<'a> {
     let mut current_idx: Option<usize> = None;
     for (i, t) in tokens.iter().enumerate() {
         if lookup::is_trivia(t.kind) {
@@ -73,10 +81,11 @@ fn classify<'a>(tokens: &'a [Token<'a>], offset: u32) -> Context<'a> {
 
     let scope_start = enclosing_function_start(tokens, offset);
 
-    let cur = match current_idx {
-        Some(i) => &tokens[i],
-        None => return Context::Bare { prefix: "" },
+    let Some(current_idx) = current_idx else {
+        return classify_after_punctuation(file, tokens, offset, scope_start);
     };
+
+    let cur = &tokens[current_idx];
 
     if matches!(cur.kind, TokenKind::Variable) {
         let raw = cur.value;
@@ -85,7 +94,29 @@ fn classify<'a>(tokens: &'a [Token<'a>], offset: u32) -> Context<'a> {
         return Context::Variable { prefix, scope_start };
     }
 
-    let prev_idx = current_idx.and_then(|i| (0..i).rev().find(|j| !lookup::is_trivia(tokens[*j].kind)));
+    let cursor_at_end_of_cur = offset == cur.start.offset + cur.value.len() as u32;
+    if cursor_at_end_of_cur {
+        match cur.kind {
+            TokenKind::Dollar => return Context::Variable { prefix: "", scope_start },
+            TokenKind::MinusGreaterThan | TokenKind::QuestionMinusGreaterThan => {
+                if let Some(receiver_span) = receiver_before(tokens, current_idx) {
+                    return Context::InstanceMember { receiver_span, prefix: "" };
+                }
+
+                return Context::Bare { prefix: "" };
+            }
+            TokenKind::ColonColon => {
+                if let Some(class) = static_receiver_before(tokens, current_idx) {
+                    return Context::StaticMember { class, prefix: "" };
+                }
+
+                return Context::Bare { prefix: "" };
+            }
+            _ => {}
+        }
+    }
+
+    let prev_idx = (0..current_idx).rev().find(|j| !lookup::is_trivia(tokens[*j].kind));
     let prev = prev_idx.map(|j| tokens[j].kind);
 
     if matches!(prev, Some(TokenKind::MinusGreaterThan) | Some(TokenKind::QuestionMinusGreaterThan)) {
@@ -118,6 +149,44 @@ fn classify<'a>(tokens: &'a [Token<'a>], offset: u32) -> Context<'a> {
         }
         _ => Context::Bare { prefix: "" },
     }
+}
+
+fn classify_after_punctuation<'a>(
+    file: &MagoFile,
+    tokens: &'a [Token<'a>],
+    offset: u32,
+    scope_start: u32,
+) -> Context<'a> {
+    if byte_before(file, offset) == Some(b'$') {
+        return Context::Variable { prefix: "", scope_start };
+    }
+
+    let prev_idx = (0..tokens.len()).rev().find(|i| {
+        let token = &tokens[*i];
+        let token_end = token.start.offset + token.value.len() as u32;
+        token_end <= offset && !lookup::is_trivia(token.kind)
+    });
+
+    let Some(prev_idx) = prev_idx else {
+        return Context::Bare { prefix: "" };
+    };
+
+    let prev_kind = tokens[prev_idx].kind;
+
+    if matches!(prev_kind, TokenKind::MinusGreaterThan | TokenKind::QuestionMinusGreaterThan) {
+        if let Some(receiver_span) = receiver_before(tokens, prev_idx) {
+            return Context::InstanceMember { receiver_span, prefix: "" };
+        }
+        return Context::Bare { prefix: "" };
+    }
+
+    if matches!(prev_kind, TokenKind::ColonColon)
+        && let Some(class) = static_receiver_before(tokens, prev_idx)
+    {
+        return Context::StaticMember { class, prefix: "" };
+    }
+
+    Context::Bare { prefix: "" }
 }
 
 fn receiver_before(tokens: &[Token<'_>], arrow_idx: usize) -> Option<(u32, u32)> {
