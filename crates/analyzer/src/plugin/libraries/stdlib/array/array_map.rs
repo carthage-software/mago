@@ -1,16 +1,27 @@
 //! `array_map()` return type provider.
 //!
 //! Preserves array shape (known items/elements) through `array_map` calls
-//! by replacing value types with the callback's return type.
+//! by replacing value types with the callback's return type. When the
+//! callback's return type contains conditional types (e.g.
+//! `($s is non-empty-string ? non-empty-lowercase-string : '')`), they are
+//! resolved against the input array's element type so the result is a
+//! concrete type rather than the unresolved conditional itself.
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use mago_atom::Atom;
+use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::combiner::CombinerOptions;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
@@ -69,21 +80,35 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
 
         let array_arg = invocation.get_argument(1, &["array"])?;
         let callback_metadata = context.get_callable_metadata(callback_arg)?;
-        let return_type = &callback_metadata.return_type_metadata.as_ref()?.type_union;
+        let raw_return_type = &callback_metadata.return_type_metadata.as_ref()?.type_union;
 
         let array_type = context.get_expression_type(array_arg)?;
         let array = array_type.get_single_array()?;
 
+        let codebase = context.codebase();
+        let first_parameter_name = callback_metadata.parameters.first().map(|parameter| parameter.name.0);
+
+        let resolve_for = |element: &TUnion| -> TUnion {
+            match first_parameter_name {
+                Some(parameter_name) => {
+                    resolve_conditionals_in_return(codebase, raw_return_type, parameter_name, element)
+                }
+                None => raw_return_type.clone(),
+            }
+        };
+
         match array {
             TArray::Keyed(keyed) if keyed.has_known_items() => {
                 let known_items = keyed.get_known_items()?;
-                let new_items: BTreeMap<_, _> =
-                    known_items.iter().map(|(key, (optional, _))| (*key, (*optional, return_type.clone()))).collect();
+                let new_items: BTreeMap<_, _> = known_items
+                    .iter()
+                    .map(|(key, (optional, value))| (*key, (*optional, resolve_for(value))))
+                    .collect();
 
                 let mut result = TKeyedArray::new().with_known_items(new_items).with_non_empty(keyed.is_non_empty());
 
-                if let Some((key_type, _)) = keyed.parameters.as_ref() {
-                    result = result.with_parameters(key_type.clone(), Arc::new(return_type.clone()));
+                if let Some((key_type, value_type)) = keyed.parameters.as_ref() {
+                    result = result.with_parameters(key_type.clone(), Arc::new(resolve_for(value_type)));
                 }
 
                 Some(wrap_atomic(TAtomic::Array(TArray::Keyed(result))))
@@ -92,14 +117,14 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
                 let known_elements = list.known_elements.as_ref()?;
                 let new_elements: BTreeMap<_, _> = known_elements
                     .iter()
-                    .map(|(idx, (optional, _))| (*idx, (*optional, return_type.clone())))
+                    .map(|(idx, (optional, value))| (*idx, (*optional, resolve_for(value))))
                     .collect();
 
                 let result = TList {
                     element_type: if list.element_type.is_never() {
                         list.element_type.clone()
                     } else {
-                        Arc::new(return_type.clone())
+                        Arc::new(resolve_for(&list.element_type))
                     },
                     known_elements: Some(new_elements),
                     known_count: list.known_count,
@@ -111,6 +136,95 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
             _ => None,
         }
     }
+}
+
+fn resolve_conditionals_in_return(
+    codebase: &CodebaseMetadata,
+    return_type: &TUnion,
+    parameter_name: Atom,
+    argument_type: &TUnion,
+) -> TUnion {
+    let mut new_atomics: Vec<TAtomic> = Vec::with_capacity(return_type.types.len());
+    for atomic in return_type.types.as_ref() {
+        new_atomics.extend(resolve_atomic_with_argument(codebase, atomic, parameter_name, argument_type));
+    }
+
+    let mut result = return_type.clone();
+    result.types = Cow::Owned(new_atomics);
+    result
+}
+
+fn resolve_atomic_with_argument(
+    codebase: &CodebaseMetadata,
+    atomic: &TAtomic,
+    parameter_name: Atom,
+    argument_type: &TUnion,
+) -> Vec<TAtomic> {
+    let TAtomic::Conditional(conditional) = atomic else {
+        return vec![atomic.clone()];
+    };
+
+    // Substitute the bound parameter inside each branch so a conditional
+    // whose then/otherwise references the parameter (e.g. `T is X ? T : null`)
+    // also reads as the argument type rather than a bare `TVariable`.
+    let then = substitute_parameter_in_union(&conditional.then, parameter_name, argument_type);
+    let otherwise = substitute_parameter_in_union(&conditional.otherwise, parameter_name, argument_type);
+
+    // Recurse to handle conditionals nested inside the branches.
+    let then = resolve_conditionals_in_return(codebase, &then, parameter_name, argument_type);
+    let otherwise = resolve_conditionals_in_return(codebase, &otherwise, parameter_name, argument_type);
+
+    let subject = substitute_parameter_in_union(&conditional.subject, parameter_name, argument_type);
+
+    if subject.is_never() {
+        return add_union_type(then, &otherwise, codebase, CombinerOptions::default()).types.into_owned();
+    }
+
+    let mut comparison_result = ComparisonResult::new();
+    let subject_is_contained = union_comparator::is_contained_by(
+        codebase,
+        &subject,
+        &conditional.target,
+        false,
+        false,
+        true,
+        &mut comparison_result,
+    );
+
+    let are_disjoint =
+        !union_comparator::can_expression_types_be_identical(codebase, &subject, &conditional.target, false, false);
+
+    if are_disjoint {
+        return if conditional.negated { then.types.into_owned() } else { otherwise.types.into_owned() };
+    }
+
+    if subject_is_contained {
+        return if conditional.negated { otherwise.types.into_owned() } else { then.types.into_owned() };
+    }
+
+    add_union_type(then, &otherwise, codebase, CombinerOptions::default()).types.into_owned()
+}
+
+fn substitute_parameter_in_union(union: &TUnion, parameter_name: Atom, argument_type: &TUnion) -> TUnion {
+    let mut new_atomics: Vec<TAtomic> = Vec::with_capacity(union.types.len());
+    let mut changed = false;
+
+    for atomic in union.types.as_ref() {
+        if matches!(atomic, TAtomic::Variable(name) if *name == parameter_name) {
+            new_atomics.extend(argument_type.types.as_ref().iter().cloned());
+            changed = true;
+        } else {
+            new_atomics.push(atomic.clone());
+        }
+    }
+
+    if !changed {
+        return union.clone();
+    }
+
+    let mut result = union.clone();
+    result.types = Cow::Owned(new_atomics);
+    result
 }
 
 fn zip_input_arrays(

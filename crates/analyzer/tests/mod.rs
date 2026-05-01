@@ -799,6 +799,7 @@ test_case!(issue_1729);
 test_case!(issue_1742);
 test_case!(issue_1746_invariant_generic_var_with_mixed);
 test_case!(finally_inherits_call_invalidations);
+test_case!(issue_1748_array_map_resolves_conditional_return);
 test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
 test_case!(symbol_existence_assertions);
