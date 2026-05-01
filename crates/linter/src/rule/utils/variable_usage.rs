@@ -440,6 +440,30 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
         }
 
         self.with_ctx(ExprCtx::Read, |w| w.walk_expression(fe.expression, ctx));
+
+        match &fe.target {
+            ForeachTarget::Value(v) => {
+                if let Expression::Variable(Variable::Direct(d)) = v.value
+                    && !self.excluded.contains(&d.name)
+                {
+                    self.rec.record_read(d.name);
+                }
+            }
+            ForeachTarget::KeyValue(kv) => {
+                if let Expression::Variable(Variable::Direct(d)) = kv.key
+                    && !self.excluded.contains(&d.name)
+                {
+                    self.rec.record_read(d.name);
+                }
+
+                if let Expression::Variable(Variable::Direct(d)) = kv.value
+                    && !self.excluded.contains(&d.name)
+                {
+                    self.rec.record_read(d.name);
+                }
+            }
+        }
+
         match &fe.target {
             ForeachTarget::Value(v) => self.with_ctx(ExprCtx::Write, |w| w.walk_expression(v.value, ctx)),
             ForeachTarget::KeyValue(kv) => self.with_ctx(ExprCtx::Write, |w| {

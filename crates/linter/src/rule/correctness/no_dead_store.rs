@@ -279,4 +279,44 @@ mod tests {
             }
         "#}
     }
+
+    test_lint_success! {
+        name = foreach_target_does_not_dead_store_pre_loop,
+        rule = NoDeadStoreRule,
+        code = indoc! {r#"
+            <?php
+
+            function some(mixed $_): void {}
+
+            /** @param array<string|null> $a */
+            function t(array $a): void {
+                $child = 0;
+                foreach ($a as $child) {
+                    some($child);
+                }
+                some($child);
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = foreach_key_value_target_does_not_dead_store_pre_loop,
+        rule = NoDeadStoreRule,
+        code = indoc! {r#"
+            <?php
+
+            function some(mixed $_): void {}
+
+            function t(array $a): void {
+                $k = 'pre';
+                $v = 'pre';
+                foreach ($a as $k => $v) {
+                    some($k);
+                    some($v);
+                }
+                some($k);
+                some($v);
+            }
+        "#}
+    }
 }

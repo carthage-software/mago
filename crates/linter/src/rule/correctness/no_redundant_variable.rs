@@ -486,4 +486,34 @@ mod tests {
             }
         "#}
     }
+
+    test_lint_success! {
+        name = nested_loop_running_totals_observed_on_next_iteration,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            /**
+             * @param array<string, array<int, int>> $uploads
+             */
+            function tally(array $uploads, int $left_files, int $left_bytes): void {
+                $files = 0;
+                $bytes = 0;
+
+                foreach ($uploads as $list) {
+                    foreach ($list as $size) {
+                        if ($files >= $left_files) {
+                            continue;
+                        }
+                        $b = (int) $size;
+                        if (($b + $bytes) > $left_bytes) {
+                            continue;
+                        }
+                        ++$files;
+                        $bytes += $b;
+                    }
+                }
+            }
+        "#}
+    }
 }
