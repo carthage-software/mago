@@ -3,12 +3,12 @@
 
 [[redirect]]
 from = "/playground"
-to = "/main/en/playground/"
+to = "/latest/en/playground/"
 preserve_hash = true
 preserve_query = true
 
 [[redirect]]
 from = "/docs"
-to = "/main/en/"
+to = "/latest/en/"
 preserve_hash = false
 preserve_query = false

@@ -461,7 +461,11 @@ fn validate_internal_links(dist_root: &Path, current_version: &str) -> Result<()
             {
                 continue;
             }
-            if target_str.starts_with("/v") && !target_str.starts_with(&version_root_prefix) {
+
+            if let Some(scope) = target_str.strip_prefix('/').and_then(|rest| rest.split('/').next())
+                && scope != current_version
+                && (scope == "main" || scope == "latest" || is_semver_segment(scope))
+            {
                 continue;
             }
 
@@ -478,6 +482,11 @@ fn validate_internal_links(dist_root: &Path, current_version: &str) -> Result<()
     }
 
     Ok(())
+}
+
+fn is_semver_segment(segment: &str) -> bool {
+    let parts: Vec<&str> = segment.split('.').collect();
+    parts.len() == 3 && parts.iter().all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
 }
 
 fn write_root_redirect(dist_root: &Path, current_version: &str, default_language: &str) -> Result<()> {
