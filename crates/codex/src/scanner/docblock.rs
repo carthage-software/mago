@@ -362,7 +362,9 @@ impl FunctionLikeDocblockComment {
         let mut generic_return_type: Option<ReturnTypeTag> = None;
         let mut psalm_return_type: Option<ReturnTypeTag> = None;
         let mut phpstan_return_type: Option<ReturnTypeTag> = None;
-        let mut parameters: Vec<ParameterTag> = Vec::new();
+        let mut plain_parameters: Vec<ParameterTag> = Vec::new();
+        let mut phpstan_parameters: Vec<ParameterTag> = Vec::new();
+        let mut psalm_parameters: Vec<ParameterTag> = Vec::new();
         let mut parameters_out: Vec<ParameterOutTag> = Vec::new();
         let mut where_constraints: Vec<WhereTag> = Vec::new();
         let mut throws: Vec<ThrowsTag> = Vec::new();
@@ -406,9 +408,17 @@ impl FunctionLikeDocblockComment {
                 TagKind::Experimental => {
                     is_experimental = true;
                 }
-                TagKind::PhpstanParam | TagKind::PsalmParam | TagKind::Param => {
+                TagKind::Param => {
                     let param = parse_param_tag(tag.description, tag.description_span)?;
-                    parameters.push(param);
+                    plain_parameters.push(param);
+                }
+                TagKind::PhpstanParam => {
+                    let param = parse_param_tag(tag.description, tag.description_span)?;
+                    phpstan_parameters.push(param);
+                }
+                TagKind::PsalmParam => {
+                    let param = parse_param_tag(tag.description, tag.description_span)?;
+                    psalm_parameters.push(param);
                 }
                 TagKind::NoNamedArguments => {
                     no_named_arguments = true;
@@ -522,7 +532,12 @@ impl FunctionLikeDocblockComment {
             inherits_docs,
             no_named_arguments,
             return_type: psalm_return_type.or(phpstan_return_type).or(generic_return_type),
-            parameters,
+            parameters: {
+                let mut all = plain_parameters;
+                all.extend(phpstan_parameters);
+                all.extend(psalm_parameters);
+                all
+            },
             parameters_out,
             where_constraints,
             throws,
@@ -739,7 +754,9 @@ impl PropertyHookDocblockComment {
         let mut generic_return_type: Option<TypeString> = None;
         let mut psalm_return_type: Option<TypeString> = None;
         let mut phpstan_return_type: Option<TypeString> = None;
-        let mut param: Option<ParameterTag> = None;
+        let mut plain_param: Option<ParameterTag> = None;
+        let mut phpstan_param: Option<ParameterTag> = None;
+        let mut psalm_param: Option<ParameterTag> = None;
 
         let parsed_docblock = parse_trivia(context.arena, docblock)?;
 
@@ -758,9 +775,14 @@ impl PropertyHookDocblockComment {
                 TagKind::Experimental => {
                     is_experimental = true;
                 }
-                TagKind::PhpstanParam | TagKind::PsalmParam | TagKind::Param => {
-                    let p = parse_param_tag(tag.description, tag.description_span)?;
-                    param = Some(p);
+                TagKind::Param => {
+                    plain_param = Some(parse_param_tag(tag.description, tag.description_span)?);
+                }
+                TagKind::PhpstanParam => {
+                    phpstan_param = Some(parse_param_tag(tag.description, tag.description_span)?);
+                }
+                TagKind::PsalmParam => {
+                    psalm_param = Some(parse_param_tag(tag.description, tag.description_span)?);
                 }
                 TagKind::Return => {
                     if let Some((type_string, _)) = split_tag_content(tag.description, tag.description_span) {
@@ -783,7 +805,7 @@ impl PropertyHookDocblockComment {
 
         Ok(Some(PropertyHookDocblockComment {
             span: docblock.span,
-            param_type_string: param,
+            param_type_string: psalm_param.or(phpstan_param).or(plain_param),
             return_type_string: psalm_return_type.or(phpstan_return_type).or(generic_return_type),
             is_deprecated,
             is_internal,
