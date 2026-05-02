@@ -6,6 +6,35 @@
     anchor.addEventListener("click", (event) => event.stopPropagation());
   });
 
+  const openAncestorDetailsFor = (id) => {
+    if (!id) return null;
+    const target = document.getElementById(id);
+    if (!target) return null;
+    let cursor = target;
+    while (cursor) {
+      if (cursor instanceof HTMLDetailsElement) {
+        cursor.open = true;
+      }
+
+      cursor = cursor.parentElement;
+    }
+
+    return target;
+  };
+
+  const revealHashTarget = () => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    const target = openAncestorDetailsFor(id);
+    if (target) {
+      requestAnimationFrame(() =>
+        target.scrollIntoView({ block: "start", behavior: "auto" }),
+      );
+    }
+  };
+
+  revealHashTarget();
+  window.addEventListener("hashchange", revealHashTarget);
+
   if (article.classList.contains("home-article")) {
     article.querySelectorAll(".home-section__head").forEach((head) => {
       const num = head.querySelector(".home-section__num");
@@ -33,9 +62,10 @@
       h3Counter += 1;
     }
 
-    const label = heading.tagName === "H2"
-      ? "§ " + String(h2Counter).padStart(2, "0")
-      : "§ " + String(h2Counter).padStart(2, "0") + "." + h3Counter;
+    const label =
+      heading.tagName === "H2"
+        ? "§ " + String(h2Counter).padStart(2, "0")
+        : "§ " + String(h2Counter).padStart(2, "0") + "." + h3Counter;
 
     const anchor = document.createElement("a");
     anchor.className = "heading-anchor";
@@ -81,19 +111,23 @@
           pick = heading;
         }
       });
+
       if (pick) setActive(pick.id);
     };
 
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) visible.add(entry.target);
-        else visible.delete(entry.target);
-      });
-      pickActive();
-    }, {
-      rootMargin: "-10% 0% -70% 0%",
-      threshold: 0,
-    });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) visible.add(entry.target);
+          else visible.delete(entry.target);
+        });
+        pickActive();
+      },
+      {
+        rootMargin: "-10% 0% -70% 0%",
+        threshold: 0,
+      },
+    );
 
     headings.forEach((heading) => observer.observe(heading));
   }
