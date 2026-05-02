@@ -22,40 +22,58 @@ jobs:
       - name: Update sponsors in docs
         run: php scripts/update-sponsors-docs.php
 
-      # main is branch-protected and requires verified signatures, so we
-      # can't push from a workflow runner the usual way. The Contents API
-      # signs every commit it produces with GitHub's `web-flow` key, which
-      # passes the protection rule. One PUT per file = one verified commit.
-      - name: Commit signed updates via GitHub API
+      - name: Commit signed updates via GitHub GraphQL
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          for path in README.md SPONSORS.md; do
+
+          additions='[]'
+          changed_paths=()
+          for path in README.md SPONSORS.md docs/sponsors.json; do
             if [ ! -f "$path" ]; then
               continue
             fi
 
-            current_sha=$(gh api "repos/${GH_REPO}/contents/${path}?ref=${BRANCH}" --jq '.sha' 2>/dev/null || echo "")
             new_b64=$(base64 < "$path" | tr -d '\n')
 
-            if [ -n "$current_sha" ]; then
-              remote_b64=$(gh api "repos/${GH_REPO}/contents/${path}?ref=${BRANCH}" --jq '.content' | tr -d '\n ')
-              if [ "$remote_b64" = "$new_b64" ]; then
-                echo "No changes in ${path}."
-                continue
-              fi
+            remote_b64=$(gh api "repos/${GH_REPO}/contents/${path}?ref=${BRANCH}" --jq '.content' 2>/dev/null | tr -d '\n ' || echo "")
+            if [ "$remote_b64" = "$new_b64" ]; then
+              echo "No changes in ${path}."
+              continue
             fi
 
-            payload=$(jq -n \
-              --arg message "chore(sponsors): update ${path}" \
-              --arg content "$new_b64" \
-              --arg branch "$BRANCH" \
-              --arg sha "$current_sha" \
-              '{message: $message, content: $content, branch: $branch} + (if $sha == "" then {} else {sha: $sha} end)')
-
-            echo "Pushing signed update to ${path}..."
-            echo "$payload" | gh api --method PUT "repos/${GH_REPO}/contents/${path}" --input -
+            additions=$(jq --arg path "$path" --arg contents "$new_b64" \
+              '. + [{path: $path, contents: $contents}]' <<<"$additions")
+            changed_paths+=("$path")
           done
+
+          if [ ${#changed_paths[@]} -eq 0 ]; then
+            echo "Nothing to publish."
+            exit 0
+          fi
+
+          head_oid=$(gh api "repos/${GH_REPO}/branches/${BRANCH}" --jq '.commit.sha')
+
+          request=$(jq -n \
+            --arg repo "$GH_REPO" \
+            --arg branch "$BRANCH" \
+            --arg headline "chore(sponsors): update sponsors list" \
+            --arg oid "$head_oid" \
+            --argjson additions "$additions" \
+            '{
+              query: "mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { url } } }",
+              variables: {
+                input: {
+                  branch: {repositoryNameWithOwner: $repo, branchName: $branch},
+                  message: {headline: $headline},
+                  expectedHeadOid: $oid,
+                  fileChanges: {additions: $additions}
+                }
+              }
+            }')
+
+          echo "Pushing one signed commit covering: ${changed_paths[*]}"
+          printf '%s' "$request" | gh api graphql --input - >/dev/null

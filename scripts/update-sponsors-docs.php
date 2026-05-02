@@ -13,19 +13,24 @@ use function file_get_contents;
 use function file_put_contents;
 use function implode;
 use function json_decode;
+use function json_encode;
 use function krsort;
 use function preg_replace;
 use function sprintf;
 use function str_contains;
 use function str_starts_with;
 
+use const JSON_PRETTY_PRINT;
 use const JSON_THROW_ON_ERROR;
+use const JSON_UNESCAPED_SLASHES;
 
 const SPONSORS_URL = 'https://raw.githubusercontent.com/azjezz/azjezz/develop/sponsors.json';
 
 const README_PATH = __DIR__ . '/../README.md';
 
 const SPONSORS_PATH = __DIR__ . '/../SPONSORS.md';
+
+const DOCS_SPONSORS_JSON_PATH = __DIR__ . '/../docs/sponsors.json';
 
 /**
  * @mago-expect lint:excessive-parameter-list
@@ -202,6 +207,57 @@ final class SponsorsData
 
         return implode("\n\n---\n\n", $tiers);
     }
+
+    public function renderForDocsJson(): string
+    {
+        /** @var array<string, list<array{name: string, url: string, avatar: string}>> $bucketed */
+        $bucketed = ['large' => [], 'medium' => [], 'small' => [], 'supporter' => []];
+
+        foreach ($this->sponsorsByAmount as $amount => $sponsors) {
+            $tier = match (true) {
+                $amount >= self::LARGE_SPONSOR_THRESHOLD => 'large',
+                $amount >= self::MEDIUM_SPONSOR_THRESHOLD => 'medium',
+                $amount >= self::SMALL_SPONSOR_THRESHOLD => 'small',
+                default => 'supporter',
+            };
+
+            foreach ($sponsors as $sponsor) {
+                $url = $sponsor->websiteUrl ?? sprintf('https://github.com/%s', $sponsor->login);
+                if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+                    $url = sprintf('http://%s', $url);
+                }
+
+                $bucketed[$tier][] = [
+                    'name' => $sponsor->name,
+                    'url' => $url,
+                    'avatar' => $sponsor->avatarUrl,
+                ];
+            }
+        }
+
+        $tiers = [];
+        foreach ([
+            ['id' => 'large', 'size' => 128, 'dense' => false],
+            ['id' => 'medium', 'size' => 80, 'dense' => false],
+            ['id' => 'small', 'size' => 64, 'dense' => false],
+            ['id' => 'supporter', 'size' => 48, 'dense' => true],
+        ] as $tier) {
+            if ([] === $bucketed[$tier['id']]) {
+                continue;
+            }
+
+            $entry = ['id' => $tier['id'], 'size' => $tier['size']];
+            if ($tier['dense']) {
+                $entry['dense'] = true;
+            }
+            $entry['sponsors'] = $bucketed[$tier['id']];
+            $tiers[] = $entry;
+        }
+
+        $payload = ['tiers' => $tiers];
+
+        return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
+    }
 }
 
 function overwrite_sponsors_file(string $new_content): void
@@ -260,6 +316,10 @@ try {
     namespace\overwrite_sponsors_file($sponsorsData->renderForSponsorsPage());
 
     echo "✅ SPONSORS.md updated successfully.\n";
+
+    file_put_contents(DOCS_SPONSORS_JSON_PATH, $sponsorsData->renderForDocsJson());
+
+    echo "✅ docs/sponsors.json updated successfully.\n";
 } catch (RuntimeException $e) {
     echo '❌ Error: {' . $e->getMessage() . "}\n";
 

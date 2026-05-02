@@ -40,7 +40,8 @@
           const avatar = sponsor.avatar ? `${sponsor.avatar}${sponsor.avatar.includes("?") ? "&" : "?"}s=${size * 2}` : "";
           return `<a href="${escape(sponsor.url)}" class="sponsor sponsor--${escape(tier.id)}" target="_blank" rel="noopener"><img src="${escape(avatar)}" alt="${escape(sponsor.name)}" loading="lazy" width="${size}" height="${size}"><span>${escape(sponsor.name)}</span></a>`;
         }).join("");
-        return `<div class="sponsors__tier sponsors__tier--${escape(tier.id)}"><div class="sponsors__tier-label">${escape(tier.label)}</div><div class="${grid}">${cards}</div></div>`;
+
+        return `<div class="sponsors__tier sponsors__tier--${escape(tier.id)}"><div class="${grid}">${cards}</div></div>`;
       })
       .join("");
 
