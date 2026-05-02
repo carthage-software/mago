@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Mago</title>
+  <meta name="description" content="La chaîne d&#x27;outils PHP oxydée. Un analyseur statique, un linter et un formateur écrits en Rust.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Mago">
+  <meta property="og:description" content="La chaîne d&#x27;outils PHP oxydée. Un analyseur statique, un linter et un formateur écrits en Rust.">
+  <meta property="og:url" content="https://mago.carthage.software/1.25.2/fr/">
+  <meta property="og:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta property="og:locale" content="fr">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Mago">
+  <meta name="twitter:description" content="La chaîne d&#x27;outils PHP oxydée. Un analyseur statique, un linter et un formateur écrits en Rust.">
+  <meta name="twitter:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;1.25.2/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;1.25.2/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;1.25.2/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;1.25.2/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;1.25.2/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;1.25.2/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;1.25.2/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/1.25.2/fr/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;1.25.2/fr/">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="Recherche" aria-label="Recherche">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">Appuyez sur &#x2F; pour rechercher</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;1.25.2/fr/guide/getting-started">Guide</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;1.25.2/fr/faq">FAQ</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;1.25.2/fr/playground">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Soutenir</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="Dépôt GitHub" title="Dépôt GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Communauté Discord" title="Communauté Discord">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>1.25.2</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../latest/fr/">
+        <span>latest (1.25.2)</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../main/fr/">
+        <span>main</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../1.25.2/fr/" aria-current="true">
+        <span>1.25.2</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>FR</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../1.25.2/en/">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../1.25.2/fr/" aria-current="true">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../1.25.2/zh/">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Changer le thème">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">Cette traduction peut être obsolète.</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>Cette page n&#x27;est pas encore traduite. Vous avez été redirigé vers la page d&#x27;accueil de la langue.</div>
+
+  
+<div class="home-layout">
+  <aside class="home-aside" aria-hidden="true">
+    <div class="home-aside__label">Mago · 1.25.2</div>
+  </aside>
+
+  <main id="content" class="home-content">
+    <article class="doc-page home-article">
+      <section class="home-hero">
+<div class="home-hero__main">
+<div class="home-hero__plate"><span>Mago</span><span class="home-hero__plate-divider">/</span><span>Chaîne d'outils PHP</span><span class="home-hero__plate-divider">/</span><span>Carthage Software</span></div>
+<h1 class="home-hero__title" id="a-php-toolchain-oxidized">Une chaîne d'outils PHP, <em>oxydée</em>.</h1>
+<p class="home-hero__lede">Mago est un analyseur statique, un linter et un formateur pour PHP, écrits en Rust. Conçu pour les projets qui ont dépassé la patience de leur outillage.</p>
+<div class="home-hero__cta">
+<a class="button button--solid" href="../../1.25.2/fr/guide/getting-started"><span>Commencer</span><span class="button__arrow">→</span></a>
+<a class="button" href="../../1.25.2/fr/playground"><span>Ouvrir le playground</span></a>
+</div>
+</div>
+<div class="home-hero__art">
+<img class="home-hero__logo" src="../../1.25.2/_assets/img/logo.webp" alt="Mago, un fennec coiffé d'un chapeau de magicien" width="416" height="500" loading="eager" decoding="async">
+</div>
+</section>
+<section class="home-section">
+<header class="home-section__head"><span class="home-section__num">§ 01</span><h2 class="home-section__title" id="three-tools-one-binary">Trois outils, un seul binaire</h2></header>
+<div class="feature-grid">
+<article class="feature">
+<span class="feature__num">01 / Analyser</span>
+<h3 class="feature__name" id="static-analysis">Analyse statique</h3>
+<p class="feature__body">Détectez les bugs, le code mort et les types impossibles avant la mise en production. Compatible avec les annotations Psalm et PHPStan ; comprend les génériques, les types conditionnels et l'affinage de flux.</p>
+<div class="feature__stat"><strong>1.46s</strong> · 7M LOC</div>
+</article>
+<article class="feature">
+<span class="feature__num">02 / Linter</span>
+<h3 class="feature__name" id="opinionated-linting">Linting opinié</h3>
+<p class="feature__body">Un catalogue soigné de règles pour la justesse, la cohérence et la clarté. Correction à la sauvegarde quand c'est sûr. Discret quand il le faut.</p>
+<div class="feature__stat"><strong>0.88s</strong> · même projet</div>
+</article>
+<article class="feature">
+<span class="feature__num">03 / Formater</span>
+<h3 class="feature__name" id="formatter">Formateur</h3>
+<p class="feature__body">Un formateur déterministe qui produit une sortie stable et conventionnelle. Pas de roulette de configuration, pas de débat. Vous l'installez et vous passez à autre chose.</p>
+<div class="feature__stat"><strong>0.43s</strong> · même projet</div>
+</article>
+</div>
+</section>
+<section class="home-section">
+<header class="home-section__head"><span class="home-section__num">§ 02</span><h2 class="home-section__title" id="benchmarks">Benchmarks</h2></header>
+<p>Mesuré contre WordPress sur la dernière version stable de chaque outil. Plus bas est meilleur ; la colonne « × » indique combien de fois le pair le plus lent l'est par rapport à Mago. Les chiffres proviennent du tableau de bord <a href="https://carthage-software.github.io/php-toolchain-benchmarks/?project=wordpress&kind=Analyzers">php-toolchain-benchmarks</a> (détails complets : moyenne, écart-type, max, mémoire), dernière mise à jour le 2026-04-15 02:47:37.</p>
+<table class="bench-table">
+<thead>
+<tr><th>Opération</th><th>Mago</th><th>Pair A</th><th>Pair B</th><th class="bench-table__factor">×</th></tr>
+</thead>
+<tbody>
+<tr>
+<td class="bench-table__op">Analyse statique</td>
+<td class="bench-table__mago">1.46s</td>
+<td class="bench-table__other">Phan 66.4s</td>
+<td class="bench-table__other">PHPStan 55.9s</td>
+<td class="bench-table__factor">45</td>
+</tr>
+<tr>
+<td class="bench-table__op">Linting</td>
+<td class="bench-table__mago">0.88s</td>
+<td class="bench-table__other">PHP-CS-Fixer 25.3s</td>
+<td class="bench-table__other"></td>
+<td class="bench-table__factor">29</td>
+</tr>
+<tr>
+<td class="bench-table__op">Formatage</td>
+<td class="bench-table__mago">0.43s</td>
+<td class="bench-table__other">Pretty PHP 24.3s</td>
+<td class="bench-table__other"></td>
+<td class="bench-table__factor">56</td>
+</tr>
+</tbody>
+</table>
+<p><a href="../../1.25.2/fr/benchmarks">Lire la méthodologie complète →</a></p>
+</section>
+<section class="home-section">
+<header class="home-section__head"><span class="home-section__num">§ 03</span><h2 class="home-section__title" id="install">Installation</h2></header>
+<div class="install">
+<div class="install__head"><span><strong>[ INSTALL ]</strong></span><span>shell · macOS · Linux · WSL</span></div>
+<pre class="install__body"><code>curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash</code></pre>
+<div class="install__alt">Ou via <a href="../../1.25.2/fr/guide/installation#composer">Composer</a>, <a href="../../1.25.2/fr/guide/installation#homebrew">Homebrew</a>, <a href="../../1.25.2/fr/guide/installation#cargo">Cargo</a>, ou une <a href="../../1.25.2/fr/recipes/docker">image Docker préconstruite</a>.</div>
+</div>
+</section>
+<section class="home-section">
+<header class="home-section__head"><span class="home-section__num">§ 04</span><h2 class="home-section__title" id="three-steps-to-first-run">Trois étapes pour la première exécution</h2></header>
+<ol class="home-steps">
+<li><strong>Installer.</strong> Une seule commande. Aucun runtime PHP requis. Un seul binaire statique.</li>
+<li><strong>Initialiser.</strong> Lancez <code>mago init</code> à la racine du projet. Mago détecte votre arborescence et écrit un <code>mago.toml</code>.</li>
+<li><strong>Exécuter.</strong> Utilisez <code>mago analyze</code>, <code>mago lint</code> ou <code>mago fmt</code>. Branchez-le à un pre-commit, à la CI ou à votre éditeur.</li>
+</ol>
+</section>
+<section class="home-section">
+<header class="home-section__head"><span class="home-section__num">§ 05</span><h2 class="home-section__title" id="sponsors">Sponsors</h2></header>
+<p>Mago est libre et open source, construit et maintenu par <a href="https://github.com/azjezz">Seifeddine Gmati</a> avec le soutien de ces entreprises et particuliers.</p>
+<div id="home-sponsors" aria-live="polite"></div>
+<div class="sponsors-cta">
+<p>Vous voulez soutenir le développement de Mago ?</p>
+<a class="button button--solid" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener"><span>Devenir sponsor</span><span class="button__arrow">→</span></a>
+</div>
+</section>
+<section class="home-coda">
+<h2 class="home-coda__title" id="try-it-without-installing">Essayez sans installer</h2>
+<p class="home-coda__body">Le playground exécute l'analyseur Mago complet dans votre navigateur via WebAssembly. Collez n'importe quel code PHP, partagez le résultat par URL.</p>
+<p><a class="button button--solid" href="../../1.25.2/fr/playground"><span>Ouvrir le playground</span><span class="button__arrow">→</span></a></p>
+</section>
+    </article>
+  </main>
+
+  <aside class="home-aside home-aside--end" aria-hidden="true">
+    <div class="home-aside__label">Rust core · MIT licence</div>
+  </aside>
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / 1.25.2 / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;1.25.2/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;1.25.2/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;1.25.2/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;1.25.2/_assets/js/highlight.js" defer></script>
+  <script src="..&#x2F;..&#x2F;1.25.2/_assets/js/sponsors.js" defer></script>
+  
+</body>
+</html>

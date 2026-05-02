@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="zh" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>格式化器配置参考 · Mago</title>
+  <meta name="description" content="mago.toml 中 [formatter] 下可设置的所有选项。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="格式化器配置参考 · Mago">
+  <meta property="og:description" content="mago.toml 中 [formatter] 下可设置的所有选项。">
+  <meta property="og:url" content="https://mago.carthage.software/1.25.2/zh/tools&#x2F;formatter&#x2F;configuration-reference/">
+  <meta property="og:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta property="og:locale" content="zh">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="格式化器配置参考 · Mago">
+  <meta name="twitter:description" content="mago.toml 中 [formatter] 下可设置的所有选项。">
+  <meta name="twitter:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/1.25.2/zh/tools&#x2F;formatter&#x2F;configuration-reference/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="搜索" aria-label="搜索">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">按 &#x2F; 搜索</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/guide/getting-started">指南</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/faq">常见问题</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/playground">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">赞助</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub 仓库" title="GitHub 仓库">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord 社区" title="Discord 社区">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>1.25.2</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../latest/zh/tools/formatter/configuration-reference">
+        <span>latest (1.25.2)</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/zh/">
+        <span>main</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../1.25.2/zh/tools/formatter/configuration-reference" aria-current="true">
+        <span>1.25.2</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>ZH</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../1.25.2/en/tools/formatter/configuration-reference">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../1.25.2/fr/tools/formatter/configuration-reference">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../1.25.2/zh/tools/formatter/configuration-reference" aria-current="true">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换主题">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">此翻译可能已过时。</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>此页面尚未翻译,已重定向至该语言的首页。</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">指南</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/getting-started">
+          <span>快速开始</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/installation">
+          <span>安装</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/initialization">
+          <span>初始化</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/configuration">
+          <span>配置</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/environment-variables">
+          <span>环境变量</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/list-files">
+          <span>列出文件</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/generate-completions">
+          <span>Shell 补全</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/inspecting-the-ast">
+          <span>查看 AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/upgrading">
+          <span>升级</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">基础</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/fundamentals/command-line-interface">
+          <span>命令行接口</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/fundamentals/baseline">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/fundamentals/suppressing-issues">
+          <span>抑制问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/fundamentals/shared-reporting-options">
+          <span>报告与修复选项</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/rules">
+            <span>规则</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">工具</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/tools/overview">
+          <span>工具</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/analyzer/overview">
+            <span>分析器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/analyzer/command-reference">
+            <span>分析器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/analyzer/configuration-reference">
+            <span>分析器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection" open>
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/formatter/overview">
+            <span>格式化器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/formatter/usage">
+            <span>格式化器使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/formatter/format-ignore">
+            <span>格式化忽略</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/formatter/command-reference">
+            <span>格式化器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/formatter/configuration-reference" aria-current="page">
+            <span>格式化器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/guard/overview">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/guard/usage">
+            <span>Guard 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/guard/command-reference">
+            <span>Guard 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/guard/configuration-reference">
+            <span>Guard 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/overview">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/usage">
+            <span>Linter 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/integrations">
+            <span>Linter 集成</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/command-reference">
+            <span>Linter 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/configuration-reference">
+            <span>Linter 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">实用方案</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/vscode">
+          <span>Visual Studio Code 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/zed">
+          <span>Zed 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/helix">
+          <span>Helix 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/pre-commit-hooks">
+          <span>Pre-commit hooks 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/github-actions">
+          <span>GitHub Actions 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/docker">
+          <span>Docker 实用方案</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 06</span>
+      <span class="sidebar-section__title">参考</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/faq">
+          <span>常见问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/benchmarks">
+          <span>基准测试</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/contributing">
+          <span>贡献指南</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="configuration-reference">配置参考</h1>
+<p>格式化器是有主见的,默认值即为合理的 PER-CS,但少量选项让你可以调整为不同的团队风格。所有项都位于 <code>[formatter]</code> 表下。</p>
+<pre><code class="language-toml">[formatter]
+print-width = 100
+use-tabs = true
+</code></pre>
+<h2 id="presets">预设</h2>
+<p>预设是为某种编码标准量身打包的一整套格式化器选项。</p>
+<pre><code class="language-toml">[formatter]
+preset = "laravel"
+</code></pre>
+<table><thead><tr><th style="text-align: left">预设</th><th style="text-align: left">含义</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>default</code></td><td style="text-align: left">兼容 PER-CS。等同于内置默认值。</td></tr>
+<tr><td style="text-align: left"><code>psr-12</code></td><td style="text-align: left">PSR-12 编码标准。</td></tr>
+<tr><td style="text-align: left"><code>laravel</code></td><td style="text-align: left">Laravel Pint 的 <code>laravel</code> 预设。</td></tr>
+<tr><td style="text-align: left"><code>drupal</code></td><td style="text-align: left">Drupal 编码标准。</td></tr>
+</tbody></table>
+<p>预设支持版本后缀:</p>
+<pre><code class="language-toml">preset = "psr-12@latest"
+preset = "psr-12"          # same as @latest
+</code></pre>
+<p>目前仅支持 <code>latest</code>。未来的 Mago 版本将允许锁定到具体的标准版本。</p>
+<p>你也可以把预设与单独的选项组合使用。预设提供基础,显式选项会覆盖它。</p>
+<pre><code class="language-toml">[formatter]
+preset = "laravel"
+print-width = 140
+</code></pre>
+<h2 id="tool-wide-options">工具级选项</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>preset</code></td><td style="text-align: left">字符串</td><td style="text-align: left">无</td><td style="text-align: left"><code>default</code>、<code>psr-12</code>、<code>laravel</code>、<code>drupal</code> 之一。</td></tr>
+<tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left">字符串列表</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">格式化器跳过的路径或 glob。叠加在 <code>source.excludes</code> 之上。</td></tr>
+</tbody></table>
+<p>这里的 <code>excludes</code> 是在全局列表之上叠加。被全局匹配到的文件总是会被排除;此选项只能让你额外为格式化器排除一些文件。</p>
+<pre><code class="language-toml">[source]
+excludes = ["cache/**"]                          # excluded from every tool
+
+[formatter]
+excludes = ["src/**/AutoGenerated/**/*.php"]     # additionally excluded from formatting
+</code></pre>
+<h2 id="layout-and-width">布局与宽度</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>print-width</code></td><td style="text-align: left">整数</td><td style="text-align: left"><code>120</code></td><td style="text-align: left">打印器进行换行的最大行长。</td></tr>
+<tr><td style="text-align: left"><code>tab-width</code></td><td style="text-align: left">整数</td><td style="text-align: left"><code>4</code></td><td style="text-align: left">每级缩进所占空格数。</td></tr>
+<tr><td style="text-align: left"><code>use-tabs</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">使用制表符而非空格。</td></tr>
+<tr><td style="text-align: left"><code>end-of-line</code></td><td style="text-align: left">枚举</td><td style="text-align: left"><code>"lf"</code></td><td style="text-align: left">行尾。取值:<code>auto</code>、<code>lf</code>、<code>crlf</code>、<code>cr</code>。</td></tr>
+<tr><td style="text-align: left"><code>single-quote</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">字符串优先使用单引号。</td></tr>
+<tr><td style="text-align: left"><code>indent-heredoc</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">缩进 heredoc/nowdoc 的主体以匹配外层作用域(PER-CS 3.0 §10)。设为 false 时,主体和闭合标签位于第 0 列。</td></tr>
+<tr><td style="text-align: left"><code>trailing-comma</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">在多行数组、参数列表等末尾添加尾随逗号。</td></tr>
+<tr><td style="text-align: left"><code>remove-trailing-close-tag</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">去除文件末尾的 <code>?&gt;</code>。</td></tr>
+</tbody></table>
+<h2 id="brace-placement">大括号位置</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>control-brace-style</code></td><td style="text-align: left">枚举</td><td style="text-align: left"><code>"same-line"</code></td><td style="text-align: left">控制结构的大括号。</td></tr>
+<tr><td style="text-align: left"><code>following-clause-on-newline</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">把 <code>else</code>、<code>elseif</code>、<code>catch</code>、<code>finally</code> 放到新行。</td></tr>
+<tr><td style="text-align: left"><code>closure-brace-style</code></td><td style="text-align: left">枚举</td><td style="text-align: left"><code>"same-line"</code></td><td style="text-align: left">闭包和匿名类的大括号。</td></tr>
+<tr><td style="text-align: left"><code>function-brace-style</code></td><td style="text-align: left">枚举</td><td style="text-align: left"><code>"next-line"</code></td><td style="text-align: left">函数的大括号。</td></tr>
+<tr><td style="text-align: left"><code>method-brace-style</code></td><td style="text-align: left">枚举</td><td style="text-align: left"><code>"next-line"</code></td><td style="text-align: left">方法的大括号。</td></tr>
+<tr><td style="text-align: left"><code>classlike-brace-style</code></td><td style="text-align: left">枚举</td><td style="text-align: left"><code>"always-next-line"</code></td><td style="text-align: left">类、trait、接口、枚举的大括号。</td></tr>
+</tbody></table>
+<p>大括号样式枚举均接受相同的三个值:</p>
+<ul>
+<li><code>same-line</code>:左大括号留在声明所在行。</li>
+<li><code>next-line</code>:对于单行签名,左大括号放到下一行;签名跨行换行时,左大括号留在声明行。</li>
+<li><code>always-next-line</code>:左大括号始终放到下一行,即使签名换行也是如此。</li>
+</ul>
+<p><code>method-brace-style = "next-line"</code> 时:</p>
+<pre><code class="language-php">public function foo(): string
+{
+}
+
+public function bar(
+    string $veryLongParam,
+): string {
+}
+</code></pre>
+<p><code>method-brace-style = "always-next-line"</code> 时:</p>
+<pre><code class="language-php">public function bar(
+    string $veryLongParam,
+): string
+{
+}
+</code></pre>
+<h2 id="empty-bodies">空主体</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>inline-empty-control-braces</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">内联空的控制结构主体。</td></tr>
+<tr><td style="text-align: left"><code>inline-empty-closure-braces</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">内联空的闭包主体。</td></tr>
+<tr><td style="text-align: left"><code>inline-empty-function-braces</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">内联空的函数主体。</td></tr>
+<tr><td style="text-align: left"><code>inline-empty-method-braces</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">内联空的方法主体。</td></tr>
+<tr><td style="text-align: left"><code>inline-empty-constructor-braces</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">内联空的构造函数主体。</td></tr>
+<tr><td style="text-align: left"><code>inline-empty-classlike-braces</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">内联空的类型主体。</td></tr>
+<tr><td style="text-align: left"><code>inline-empty-anonymous-class-braces</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">内联空的匿名类主体。</td></tr>
+</tbody></table>
+<h2 id="method-chains">方法链</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>method-chain-breaking-style</code></td><td style="text-align: left">枚举</td><td style="text-align: left"><code>"next-line"</code></td><td style="text-align: left">一旦链断开,调用所在的位置。取值:<code>same-line</code>、<code>next-line</code>。</td></tr>
+<tr><td style="text-align: left"><code>first-method-chain-on-new-line</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">当对象链(<code>-&gt;</code>、<code>?-&gt;</code>)断开时,把第一个调用放到新行。静态访问(<code>::</code>)保持附着在其目标上(PER-CS 4.7)。</td></tr>
+<tr><td style="text-align: left"><code>method-chain-semicolon-on-next-line</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">当多行链是一条语句时,把终结的分号放到独立的一行。</td></tr>
+<tr><td style="text-align: left"><code>preserve-breaking-member-access-chain</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">保留成员访问链中已有的换行。</td></tr>
+<tr><td style="text-align: left"><code>preserve-breaking-member-access-chain-first-method-on-same-line</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">保留断开链时,把第一个方法保留在接收者所在行。</td></tr>
+</tbody></table>
+<h2 id="preserving-author-breaks">保留作者的换行</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>preserve-breaking-argument-list</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">保留参数列表(实参)中已有的换行。</td></tr>
+<tr><td style="text-align: left"><code>preserve-breaking-array-like</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">保留数组类结构中已有的换行。</td></tr>
+<tr><td style="text-align: left"><code>preserve-breaking-parameter-list</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">保留形参列表中已有的换行。</td></tr>
+<tr><td style="text-align: left"><code>preserve-breaking-attribute-list</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">保留 attribute 列表中已有的换行。</td></tr>
+<tr><td style="text-align: left"><code>preserve-breaking-conditional-expression</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">保留三元表达式中已有的换行。</td></tr>
+<tr><td style="text-align: left"><code>preserve-breaking-condition-expression</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">保留控制结构条件中已有的换行。启用时,每个布尔运算符放在独立的一行。</td></tr>
+<tr><td style="text-align: left"><code>break-promoted-properties-list</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">始终对包含构造器属性提升的形参列表进行换行。</td></tr>
+<tr><td style="text-align: left"><code>parameter-attribute-on-new-line</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">形参列表换行时,把形参 attribute 放到独立的一行(PER-CS 12.2)。</td></tr>
+<tr><td style="text-align: left"><code>line-before-binary-operator</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">二元表达式换行时,把运算符放到下一行。</td></tr>
+<tr><td style="text-align: left"><code>indent-binary-expression-continuation</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">在赋值语句中缩进二元表达式的续行。自 1.19 起可用。</td></tr>
+<tr><td style="text-align: left"><code>omit-redundant-arithmetic-binary-expression-parentheses</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">当比较或空合并已能保留语义时,去除算术运算外多余的括号。</td></tr>
+<tr><td style="text-align: left"><code>omit-redundant-bitwise-binary-expression-parentheses</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">当优先级已能保留语义时,去除位运算子表达式外多余的括号。</td></tr>
+<tr><td style="text-align: left"><code>preserve-redundant-logical-binary-expression-parentheses</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">当父表达式也是逻辑表达式时,保留作者在逻辑子表达式外书写的括号。</td></tr>
+</tbody></table>
+<h2 id="argument-and-parameter-alignment">实参与形参对齐</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>always-break-named-arguments-list</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">始终对命名实参列表换行。</td></tr>
+<tr><td style="text-align: left"><code>always-break-attribute-named-argument-lists</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">始终对 attribute 中的命名实参换行。</td></tr>
+<tr><td style="text-align: left"><code>align-parameters</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">按变量进行多行形参列表的列对齐。</td></tr>
+<tr><td style="text-align: left"><code>align-named-arguments</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">在多行调用和 attribute 中对命名实参进行列对齐。</td></tr>
+<tr><td style="text-align: left"><code>array-table-style-alignment</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">对数组使用表格风格对齐。</td></tr>
+<tr><td style="text-align: left"><code>align-assignment-like</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">对连续的赋值类构造(变量、多行数组键值对、属性、常量、枚举 case、match 分支)进行列对齐。紧凑的内联数组保持不对齐。</td></tr>
+</tbody></table>
+<h2 id="use-statements"><code>use</code> 语句</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>sort-uses</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">按字母顺序排序 <code>use</code> 语句。</td></tr>
+<tr><td style="text-align: left"><code>sort-class-methods</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">按可见性和类型排序类方法:构造函数在前,然后是静态方法,然后按可见性排序的实例方法,析构函数在最后。</td></tr>
+<tr><td style="text-align: left"><code>separate-use-types</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">在不同种类的 <code>use</code> 之间插入空行。</td></tr>
+<tr><td style="text-align: left"><code>expand-use-groups</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">把分组的 <code>use</code> 语句展开为单独的语句。</td></tr>
+</tbody></table>
+<h2 id="type-hints-and-constructs">类型提示和构造</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>null-type-hint</code></td><td style="text-align: left">枚举</td><td style="text-align: left"><code>"question"</code></td><td style="text-align: left">如何格式化可空类型。<code>null_pipe</code> 把 <code>?T</code> 重写为 <code>null|T</code>,保留联合的顺序。<code>null_pipe_last</code> 把 <code>?T</code> 重写为 <code>T|null</code>,并将联合中的 <code>null</code> 放到末尾。<code>question</code> 把 <code>null|T</code> 和 <code>T|null</code> 重写为 <code>?T</code>。</td></tr>
+<tr><td style="text-align: left"><code>parentheses-around-new-in-member-access</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">在成员访问中包裹 <code>new</code>:<code>(new Foo)-&gt;bar()</code>。</td></tr>
+<tr><td style="text-align: left"><code>parentheses-in-new-expression</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">为没有实参的 <code>new</code> 添加 <code>()</code>:<code>new Foo()</code>。</td></tr>
+<tr><td style="text-align: left"><code>parentheses-in-exit-and-die</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">为 <code>exit</code> 和 <code>die</code> 添加 <code>()</code>。</td></tr>
+<tr><td style="text-align: left"><code>parentheses-in-attribute</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">为没有实参的 attribute 添加 <code>()</code>。</td></tr>
+</tbody></table>
+<h2 id="whitespace-around-operators">运算符周围的空白</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>space-before-arrow-function-parameter-list-parenthesis</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">箭头函数参数列表前的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-before-closure-parameter-list-parenthesis</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">闭包参数列表前的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-before-hook-parameter-list-parenthesis</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">属性钩子参数列表前的空格。</td></tr>
+<tr><td style="text-align: left"><code>inline-abstract-property-hooks</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">把抽象属性钩子(<code>get;</code>、<code>set;</code>)保留在一行(PER-CS 4.10)。</td></tr>
+<tr><td style="text-align: left"><code>space-before-closure-use-clause-parenthesis</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">闭包 <code>use (...)</code> 前的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-after-cast-unary-prefix-operators</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">类似 <code>(int)</code> 的转换运算符之后的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-after-reference-unary-prefix-operator</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left"><code>&amp;</code> 之后的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-after-error-control-unary-prefix-operator</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left"><code>@</code> 之后的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-after-logical-not-unary-prefix-operator</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left"><code>!</code> 之后的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-after-bitwise-not-unary-prefix-operator</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left"><code>~</code> 之后的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-after-increment-unary-prefix-operator</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">前缀 <code>++</code> 之后的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-after-decrement-unary-prefix-operator</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">前缀 <code>--</code> 之后的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-after-additive-unary-prefix-operator</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">一元 <code>+</code> 和 <code>-</code> 之后的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-around-concatenation-binary-operator</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left"><code>.</code> 周围的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-around-assignment-in-declare</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left"><code>declare</code> 中 <code>=</code> 周围的空格。</td></tr>
+<tr><td style="text-align: left"><code>space-within-grouping-parenthesis</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">分组括号内部的空格:<code>( 1 + 2 )</code>。</td></tr>
+</tbody></table>
+<h2 id="blank-lines">空行</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>empty-line-after-control-structure</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">控制结构之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>opening-tag-on-own-line</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">在纯 PHP 文件中,把 <code>&lt;?php</code> 放到独立的一行(PER-CS 3.0)。带有内联 HTML 的模板不受影响。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-opening-tag</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left"><code>&lt;?php</code> 之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-declare</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left"><code>declare</code> 之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-namespace</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left"><code>namespace</code> 之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-use</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left"><code>use</code> 块之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-symbols</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">顶层符号之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-between-same-symbols</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">同种类型连续符号之间的空行。仅当 <code>empty-line-after-symbols</code> 为 true 时生效。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-class-like-open</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">类型左大括号之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-class-like-constant</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">类常量之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-before-class-like-close</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">非空类型右大括号之前的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-enum-case</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">枚举 case 之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-trait-use</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">trait <code>use</code> 之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-property</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">属性之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-after-method</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">方法之后的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-before-return</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left"><code>return</code> 之前的空行。</td></tr>
+<tr><td style="text-align: left"><code>empty-line-before-dangling-comments</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">悬挂注释之前的空行。</td></tr>
+<tr><td style="text-align: left"><code>separate-class-like-members</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">不同种类的类成员之间的空行。</td></tr>
+</tbody></table>
+<h2 id="casing">大小写</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>uppercase-literal-keyword</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">设为 true 时,把 <code>true</code>、<code>false</code>、<code>null</code> 格式化为大写。</td></tr>
+</tbody></table>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/zh/tools/formatter/configuration-reference.md">↳ 编辑此页 →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="本页内容">
+  <p class="doc-toc__heading">本页内容</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#presets">预设</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#tool-wide-options">工具级选项</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#layout-and-width">布局与宽度</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#brace-placement">大括号位置</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#empty-bodies">空主体</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#method-chains">方法链</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#preserving-author-breaks">保留作者的换行</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#argument-and-parameter-alignment">实参与形参对齐</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#use-statements">use 语句</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#type-hints-and-constructs">类型提示和构造</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#whitespace-around-operators">运算符周围的空白</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#blank-lines">空行</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#casing">大小写</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / 1.25.2 / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

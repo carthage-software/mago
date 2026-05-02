@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="zh" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>分析器配置参考 · Mago</title>
+  <meta name="description" content="Mago 在 [analyzer] 下接受的所有选项。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="分析器配置参考 · Mago">
+  <meta property="og:description" content="Mago 在 [analyzer] 下接受的所有选项。">
+  <meta property="og:url" content="https://mago.carthage.software/1.25.2/zh/tools&#x2F;analyzer&#x2F;configuration-reference/">
+  <meta property="og:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta property="og:locale" content="zh">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="分析器配置参考 · Mago">
+  <meta name="twitter:description" content="Mago 在 [analyzer] 下接受的所有选项。">
+  <meta name="twitter:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/1.25.2/zh/tools&#x2F;analyzer&#x2F;configuration-reference/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="搜索" aria-label="搜索">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">按 &#x2F; 搜索</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/guide/getting-started">指南</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/faq">常见问题</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/playground">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">赞助</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub 仓库" title="GitHub 仓库">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord 社区" title="Discord 社区">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>1.25.2</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../latest/zh/tools/analyzer/configuration-reference">
+        <span>latest (1.25.2)</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/zh/">
+        <span>main</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../1.25.2/zh/tools/analyzer/configuration-reference" aria-current="true">
+        <span>1.25.2</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>ZH</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../1.25.2/en/tools/analyzer/configuration-reference">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../1.25.2/fr/tools/analyzer/configuration-reference">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../1.25.2/zh/tools/analyzer/configuration-reference" aria-current="true">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换主题">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">此翻译可能已过时。</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>此页面尚未翻译,已重定向至该语言的首页。</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">指南</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/getting-started">
+          <span>快速开始</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/installation">
+          <span>安装</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/initialization">
+          <span>初始化</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/configuration">
+          <span>配置</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/environment-variables">
+          <span>环境变量</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/list-files">
+          <span>列出文件</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/generate-completions">
+          <span>Shell 补全</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/inspecting-the-ast">
+          <span>查看 AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/guide/upgrading">
+          <span>升级</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">基础</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/fundamentals/command-line-interface">
+          <span>命令行接口</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/fundamentals/baseline">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/fundamentals/suppressing-issues">
+          <span>抑制问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/fundamentals/shared-reporting-options">
+          <span>报告与修复选项</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/rules">
+            <span>规则</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">工具</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/tools/overview">
+          <span>工具</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection" open>
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/analyzer/overview">
+            <span>分析器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/analyzer/command-reference">
+            <span>分析器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/analyzer/configuration-reference" aria-current="page">
+            <span>分析器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/formatter/overview">
+            <span>格式化器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/formatter/usage">
+            <span>格式化器使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/formatter/format-ignore">
+            <span>格式化忽略</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/formatter/command-reference">
+            <span>格式化器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/formatter/configuration-reference">
+            <span>格式化器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/guard/overview">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/guard/usage">
+            <span>Guard 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/guard/command-reference">
+            <span>Guard 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/guard/configuration-reference">
+            <span>Guard 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/overview">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/usage">
+            <span>Linter 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/integrations">
+            <span>Linter 集成</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/command-reference">
+            <span>Linter 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/zh/tools/linter/configuration-reference">
+            <span>Linter 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">实用方案</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/vscode">
+          <span>Visual Studio Code 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/zed">
+          <span>Zed 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/helix">
+          <span>Helix 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/pre-commit-hooks">
+          <span>Pre-commit hooks 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/github-actions">
+          <span>GitHub Actions 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/recipes/docker">
+          <span>Docker 实用方案</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 06</span>
+      <span class="sidebar-section__title">参考</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/faq">
+          <span>常见问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/benchmarks">
+          <span>基准测试</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/zh/contributing">
+          <span>贡献指南</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="configuration-reference">配置参考</h1>
+<p>设置位于 <code>mago.toml</code> 的 <code>[analyzer]</code> 下。</p>
+<pre><code class="language-toml">[analyzer]
+ignore = ["mixed-argument"]
+baseline = "analyzer-baseline.toml"
+</code></pre>
+<h2 id="general-options">通用选项</h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">要从分析中排除的路径或 glob 模式。叠加在 <code>[source].excludes</code> 之上。</td></tr>
+<tr><td style="text-align: left"><code>ignore</code></td><td style="text-align: left"><code>(string | object)[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">要忽略的问题代码,可选地限定到特定路径。详见下文。</td></tr>
+<tr><td style="text-align: left"><code>baseline</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">未设置</td><td style="text-align: left">baseline 文件路径。等同于每次运行都传入 <code>--baseline</code>。CLI 标志会覆盖该值。</td></tr>
+<tr><td style="text-align: left"><code>baseline-variant</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"loose"</code></td><td style="text-align: left">新生成的 baseline 所用格式。<code>"loose"</code>(基于计数)或 <code>"strict"</code>(精确到行)。参见 <a href="../../../../../1.25.2/zh/fundamentals/baseline">baseline</a>。</td></tr>
+<tr><td style="text-align: left"><code>minimum-fail-level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"error"</code></td><td style="text-align: left">触发非零退出码的最低严重等级。取值为 <code>"note"</code>、<code>"help"</code>、<code>"warning"</code>、<code>"error"</code> 之一。会被 <code>--minimum-fail-level</code> 覆盖。</td></tr>
+</tbody></table>
+<p>这里的 <code>excludes</code> 是在你在 <code>[source].excludes</code> 中所设置的基础上叠加,绝不会缩小全局列表。</p>
+<pre><code class="language-toml">[source]
+excludes = ["cache/**"]
+
+[analyzer]
+excludes = ["tests/**/*.php"]
+</code></pre>
+<h3 id="path-scoped-ignoring">路径限定的忽略</h3>
+<p><code>ignore</code> 接受普通字符串、单路径对象和多路径对象,可自由混用:</p>
+<pre><code class="language-toml">[analyzer]
+ignore = [
+    "mixed-argument",
+    { code = "missing-return-type", in = "tests/" },
+    { code = "unused-parameter", in = ["tests/", "src/Generated/"] },
+]
+</code></pre>
+<p><code>in</code> 中的每个条目要么是一个目录或文件前缀,要么是一个 glob 模式。任何包含 <code>*</code>、<code>?</code>、<code>[</code> 或 <code>{</code> 的值会被视为 glob,匹配完整的相对路径;其他值按前缀匹配。<code>"tests"</code> 和 <code>"tests/"</code> 都能匹配 <code>tests</code> 下的每个文件。</p>
+<pre><code class="language-toml">[analyzer]
+ignore = [
+    { code = "mixed-assignment", in = [
+        "tests/",
+        "src/Legacy/**/*.php",
+        "modules/*/Generated/*.php",
+    ] },
+]
+</code></pre>
+<p>glob 匹配会遵循 <code>[source.glob]</code> 下的项目级设置,因此像 <code>literal-separator</code> 和 <code>case-insensitive</code> 这样的开关在这里同样适用。</p>
+<p><code>excludes</code> 与 <code>ignore</code> 含义不同。<code>excludes</code> 把文件完全从分析中移除,因此这些文件不会被解析以提供类型信息。<code>ignore</code> 仍会分析文件,但会在输出中抑制所列代码。</p>
+<h2 id="feature-flags">特性开关</h2>
+<p>这些开关用于切换各项独立的分析。默认值已为日常使用调好;在代码库逐步收紧时再开启它们。</p>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>find-unused-expressions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">报告其结果被丢弃的表达式,例如 <code>$a + $b;</code>。</td></tr>
+<tr><td style="text-align: left"><code>find-unused-definitions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">报告从未被引用的私有定义。</td></tr>
+<tr><td style="text-align: left"><code>find-overly-wide-return-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">当声明的返回类型包含主体永远不会产生的分支时发出警告,例如总是返回字符串的函数声明为 <code>: string|false</code>。自 1.20.0 起可用。</td></tr>
+<tr><td style="text-align: left"><code>analyze-dead-code</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">分析看似不可达的代码。</td></tr>
+<tr><td style="text-align: left"><code>memoize-properties</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">跟踪字面量属性值以获得更精准的推断,代价是占用一些额外内存。</td></tr>
+<tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">允许访问可能不存在的键,而不报告。</td></tr>
+<tr><td style="text-align: left"><code>check-throws</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告未被捕获且未通过 <code>@throws</code> 声明的异常。</td></tr>
+<tr><td style="text-align: left"><code>check-missing-override</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告重写方法上缺失的 <code>#[Override]</code> attribute(PHP 8.3+)。</td></tr>
+<tr><td style="text-align: left"><code>find-unused-parameters</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告从未被读取的参数。</td></tr>
+<tr><td style="text-align: left"><code>strict-list-index-checks</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">要求作为列表下标使用的整数必须可被证明非负。</td></tr>
+<tr><td style="text-align: left"><code>no-boolean-literal-comparison</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">禁止与布尔字面量进行直接比较,例如 <code>$a === true</code>。</td></tr>
+<tr><td style="text-align: left"><code>check-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告参数、属性和返回值缺失的类型提示。</td></tr>
+<tr><td style="text-align: left"><code>check-closure-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">把类型提示检查扩展到闭包(需要 <code>check-missing-type-hints</code>)。</td></tr>
+<tr><td style="text-align: left"><code>check-arrow-function-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">把类型提示检查扩展到箭头函数(需要 <code>check-missing-type-hints</code>)。</td></tr>
+<tr><td style="text-align: left"><code>allow-implicit-pipe-callable-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">当可调用对象作为 <code>|&gt;</code> 的右操作数时,跳过对闭包/箭头函数的类型提示检查。</td></tr>
+<tr><td style="text-align: left"><code>register-super-globals</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">自动注册 PHP 超全局变量,如 <code>$_GET</code> 与 <code>$_POST</code>。</td></tr>
+<tr><td style="text-align: left"><code>trust-existence-checks</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">基于 <code>method_exists()</code>、<code>property_exists()</code>、<code>function_exists()</code> 与 <code>defined()</code> 收窄类型。</td></tr>
+<tr><td style="text-align: left"><code>check-property-initialization</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">验证已注解类型的属性是否在构造函数或类初始化器中被初始化。</td></tr>
+<tr><td style="text-align: left"><code>check-use-statements</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告导入了不存在的类、函数或常量的 use 语句。</td></tr>
+<tr><td style="text-align: left"><code>check-name-casing</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告引用类、函数等时的大小写错误。有助于防止在区分大小写的文件系统上自动加载失败。</td></tr>
+<tr><td style="text-align: left"><code>enforce-class-finality</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告未声明为 <code>final</code> 或 <code>abstract</code>、未注解 <code>@api</code>、且没有子类的类。</td></tr>
+<tr><td style="text-align: left"><code>require-api-or-internal</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">要求抽象类、接口和 trait 必须以 <code>@api</code> 或 <code>@internal</code> 注解。</td></tr>
+<tr><td style="text-align: left"><code>check-experimental</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告在非实验性上下文中使用 <code>@experimental</code> 符号的情况。自 1.19.0 起可用。</td></tr>
+<tr><td style="text-align: left"><code>allow-side-effects-in-conditions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">设为 <code>false</code> 时,报告在 <code>if</code>、<code>while</code>、<code>for</code>、三元或 <code>match</code> 条件中调用非纯函数的情况。</td></tr>
+</tbody></table>
+<h2 id="property-initialization">属性初始化</h2>
+<p>启用 <code>check-property-initialization</code> 时,分析器会报告两类问题:</p>
+<ul>
+<li><code>missing-constructor</code>,针对带类型属性但没有构造函数的类。</li>
+<li><code>uninitialized-property</code>,针对在构造函数中未被赋值的带类型属性。</li>
+</ul>
+<p><code>class-initializers</code> 让你可以将更多方法标记为初始化器,与 <code>__construct</code> 一同视作初始化方法。在这些方法中赋值的属性会被视为肯定已初始化。这对于使用生命周期方法的框架很有用。</p>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>class-initializers</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">视作类初始化器的方法名。</td></tr>
+</tbody></table>
+<pre><code class="language-toml">[analyzer]
+check-property-initialization = true
+class-initializers = ["setUp", "initialize", "boot"]
+</code></pre>
+<p>在该配置下,以下代码不会触发误报:</p>
+<pre><code class="language-php">class MyTest extends TestCase
+{
+    private string $name;
+
+    protected function setUp(): void
+    {
+        $this-&gt;name = "test";
+    }
+}
+</code></pre>
+<h2 id="exception-filtering">异常过滤</h2>
+<p>启用 <code>check-throws</code> 时,有两个选项可以让你跳过特定异常。</p>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>unchecked-exceptions</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">要忽略的异常,包括其所有子类(感知继承层级)。</td></tr>
+<tr><td style="text-align: left"><code>unchecked-exception-classes</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">仅按精确类匹配忽略的异常。其子类和父类仍会被检查。</td></tr>
+</tbody></table>
+<pre><code class="language-toml">[analyzer]
+check-throws = true
+
+unchecked-exceptions = [
+    "LogicException",
+    "Psl\\Type\\Exception\\ExceptionInterface",
+]
+
+unchecked-exception-classes = [
+    "Psl\\File\\Exception\\FileNotFoundException",
+]
+</code></pre>
+<p>使用 <code>unchecked-exceptions</code> 来一次性屏蔽某一整类异常,例如所有 <code>LogicException</code> 的子类。当你想忽略某一个具体异常但仍跟踪其同级和父类时,使用 <code>unchecked-exception-classes</code>。</p>
+<h2 id="experimental-api-detection">实验性 API 检测</h2>
+<p>设置 <code>check-experimental = true</code> 来标记从非实验性代码中使用 <code>@experimental</code> 符号的情况。用 PHPDoc 标签标注符号:</p>
+<pre><code class="language-php">/** @experimental */
+class UnstableApi {}
+
+/** @experimental */
+function beta_feature(): void {}
+</code></pre>
+<p>当它们被稳定代码使用时,分析器会发出警告:</p>
+<pre><code class="language-php">new UnstableApi();              // warning
+beta_feature();                 // warning
+class MyService extends UnstableApi {}  // warning
+</code></pre>
+<p>在另一个实验性上下文中使用是允许的:</p>
+<pre><code class="language-php">/** @experimental */
+function also_experimental(): void {
+    new UnstableApi();
+    beta_feature();
+}
+
+class StableService {
+    /** @experimental */
+    public function experimentalMethod(): void {
+        new UnstableApi();
+    }
+}
+</code></pre>
+<h2 id="plugins">插件</h2>
+<p>插件为各种库和框架提供类型提供器,使函数返回精确类型而非泛化类型。</p>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>disable-default-plugins</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">禁用所有默认插件。仅 <code>plugins</code> 中列出的名称会激活。</td></tr>
+<tr><td style="text-align: left"><code>plugins</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">按名称或别名启用的插件。</td></tr>
+</tbody></table>
+<h3 id="available-plugins">可用插件</h3>
+<table><thead><tr><th style="text-align: left">插件</th><th style="text-align: left">别名</th><th style="text-align: left">默认</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>stdlib</code></td><td style="text-align: left"><code>standard</code>、<code>std</code>、<code>php-stdlib</code></td><td style="text-align: left">已启用</td><td style="text-align: left">PHP 内置函数:<code>strlen</code>、<code>array_*</code>、<code>json_*</code> 等。</td></tr>
+<tr><td style="text-align: left"><code>psl</code></td><td style="text-align: left"><code>php-standard-library</code>、<code>azjezz-psl</code></td><td style="text-align: left">未启用</td><td style="text-align: left"><a href="https://github.com/php-standard-library/php-standard-library">php-standard-library</a>。</td></tr>
+<tr><td style="text-align: left"><code>flow-php</code></td><td style="text-align: left"><code>flow</code>、<code>flow-etl</code></td><td style="text-align: left">未启用</td><td style="text-align: left"><a href="https://github.com/flow-php/etl">flow-php/etl</a>。</td></tr>
+<tr><td style="text-align: left"><code>psr-container</code></td><td style="text-align: left"><code>psr-11</code></td><td style="text-align: left">未启用</td><td style="text-align: left"><a href="https://github.com/php-fig/container">psr/container</a>。</td></tr>
+</tbody></table>
+<p>举例来说,<code>stdlib</code> 插件会让分析器知道 <code>strlen($s)</code> 返回 <code>int&lt;0, max&gt;</code>,<code>json_decode($json, true)</code> 返回 <code>array&lt;string, mixed&gt;</code>,而 <code>array_filter($array)</code> 会保留输入形状但可能丢弃元素。</p>
+<h3 id="examples">示例</h3>
+<p>使用默认值(仅 <code>stdlib</code>):</p>
+<pre><code class="language-toml">[analyzer]
+</code></pre>
+<p>启用更多插件:</p>
+<pre><code class="language-toml">[analyzer]
+plugins = ["psl", "flow-php", "psr-container"]
+</code></pre>
+<p>全部禁用:</p>
+<pre><code class="language-toml">[analyzer]
+disable-default-plugins = true
+</code></pre>
+<p>仅使用一个插件:</p>
+<pre><code class="language-toml">[analyzer]
+disable-default-plugins = true
+plugins = ["psl"]
+</code></pre>
+<p>插件别名在所有位置都生效,因此 <code>plugins = ["std"]</code> 与 <code>plugins = ["stdlib"]</code> 等价。</p>
+<h2 id="strict-mode">严格模式</h2>
+<p>分析器默认运行在适中的严格度。开启更多检查会更严格;对遗留代码可适度放宽。</p>
+<h3 id="maximum-strictness">最高严格度</h3>
+<pre><code class="language-toml">[analyzer]
+find-unused-expressions = true
+find-unused-definitions = true
+find-overly-wide-return-types = true
+analyze-dead-code = true
+check-throws = true
+check-missing-override = true
+find-unused-parameters = true
+check-missing-type-hints = true
+check-closure-missing-type-hints = true
+check-arrow-function-missing-type-hints = true
+enforce-class-finality = true
+require-api-or-internal = true
+check-experimental = true
+
+strict-list-index-checks = true
+no-boolean-literal-comparison = true
+
+allow-possibly-undefined-array-keys = false
+trust-existence-checks = false
+</code></pre>
+<h3 id="lenient-mode">宽松模式</h3>
+<pre><code class="language-toml">[analyzer]
+check-missing-type-hints = false
+strict-list-index-checks = false
+no-boolean-literal-comparison = false
+enforce-class-finality = false
+require-api-or-internal = false
+
+allow-possibly-undefined-array-keys = true
+trust-existence-checks = true
+
+check-throws = false
+</code></pre>
+<p>把 Mago 引入既有代码库时,先以宽松模式起步,配合 <a href="../../../../../1.25.2/zh/fundamentals/baseline">baseline</a>,随着代码改善再逐步收紧。</p>
+<h3 id="notes-on-individual-flags">关于个别开关的说明</h3>
+<p><code>trust-existence-checks</code> 决定分析器是否基于运行时检查进行类型收窄。开启时(默认),下面的代码没问题:</p>
+<pre><code class="language-php">function process(object $obj): mixed
+{
+    if (method_exists($obj, 'toArray')) {
+        return $obj-&gt;toArray();
+    }
+
+    return null;
+}
+</code></pre>
+<p>关闭后,该调用就需要显式的类型保证。</p>
+<p><code>allow-implicit-pipe-callable-types</code> 在可调用对象作为 <code>|&gt;</code> 的右操作数时跳过闭包/箭头函数的类型提示检查。管道的左操作数已携带足以推导参数的类型信息,因此那里缺失的类型提示是无害的。</p>
+<h2 id="performance-tuning">性能调优</h2>
+<p>分析器使用内部阈值在分析深度与速度之间取得平衡。设置位于 <code>[analyzer.performance]</code> 下。</p>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>saturation-complexity-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>8192</code></td><td style="text-align: left">CNF 饱和过程中的最大子句数。</td></tr>
+<tr><td style="text-align: left"><code>disjunction-complexity-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>4096</code></td><td style="text-align: left">OR 操作中每一侧的最大子句数。</td></tr>
+<tr><td style="text-align: left"><code>negation-complexity-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>4096</code></td><td style="text-align: left">公式取反时的最大累计复杂度。</td></tr>
+<tr><td style="text-align: left"><code>consensus-limit-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>256</code></td><td style="text-align: left">consensus 优化遍数的上限。</td></tr>
+<tr><td style="text-align: left"><code>formula-size-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>512</code></td><td style="text-align: left">跳过简化前的最大逻辑公式大小。</td></tr>
+<tr><td style="text-align: left"><code>string-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">在泛化为 <code>string</code> 之前能跟踪的最大字面字符串数。</td></tr>
+<tr><td style="text-align: left"><code>integer-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">在泛化为 <code>int</code> 之前能跟踪的最大字面整数数。</td></tr>
+<tr><td style="text-align: left"><code>array-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>32</code></td><td style="text-align: left">在合并之前能单独跟踪的最大封闭键控数组形状数。</td></tr>
+<tr><td style="text-align: left"><code>loop-assignment-depth-threshold</code></td><td style="text-align: left"><code>u8</code></td><td style="text-align: left"><code>1</code></td><td style="text-align: left">循环不动点迭代的最大深度。<code>0</code> 表示禁用重新迭代。</td></tr>
+</tbody></table>
+<p><code>string-concat-combination-threshold</code> 仍作为 <code>string-combination-threshold</code> 的别名被接受。</p>
+<h3 id="when-to-adjust">何时调整</h3>
+<p>默认值适合大多数项目。若分析感觉太慢,可调低这些阈值,代价是部分推断精度。在条件高度复杂的代码中需要更深入的推断时,可调高这些阈值。</p>
+<h3 id="what-each-threshold-controls">每个阈值控制什么</h3>
+<p>分析器会把类型约束转换成合取范式(CNF)的逻辑公式。这些公式会随着复杂条件呈指数级增长,因此使用阈值防止计算失控。</p>
+<ul>
+<li>饱和复杂度限制公式简化过程中处理的子句数。一旦超过,简化会提前停止。</li>
+<li>析取复杂度限制 <code>OR</code> 合并时子句的增长。宽联合和大量分支可能触发此上限。</li>
+<li>否定复杂度限制公式取反时的展开,例如从复杂 <code>if</code> 计算 <code>else</code> 分支。</li>
+<li>consensus 上限限制一种用于检测逻辑恒真式的优化遍数。值越高,可能发现更多简化机会。</li>
+<li>公式大小是分析器回退到更简单推断之前的整体复杂度上限。</li>
+<li>字符串/整数合并上限限制在分析器扩展到 <code>string</code> 或 <code>int</code> 之前可跟踪的字面值数量。没有它,非常大的数组或 switch 语句会把合并代价推到 O(n²)。</li>
+<li>数组合并上限限制在类型合并过程中保持分离的封闭键控数组形状数。当过程式代码在不同分支上为同一变量积累大量略有差异的形状时,合并器会一直保留每一种,直到达到此阈值,然后将它们合并为一个泛化形状。对依赖非常精确的逐键收窄的代码,可调高它。</li>
+<li>循环赋值深度上限限制循环分析器对每个循环主体运行多少次不动点迭代。当存在 <code>N</code> 个跨循环依赖链时,可能需要多达 <code>N</code> 次额外遍历,链末端的类型才能完全稳定;每次遍历都会重新分析整个主体。默认值 <code>1</code> 对几乎所有真实代码都足够。把它调到 <code>2</code> 或 <code>3</code> 适合需要对深度跨循环依赖链做非常精确收窄的代码库。<code>0</code> 表示完全禁用重新迭代,这是最快的设置,但可能让一些自依赖类型比所需更宽。</li>
+</ul>
+<h3 id="examples-2">示例</h3>
+<p>快速分析,精度较低:</p>
+<pre><code class="language-toml">[analyzer.performance]
+saturation-complexity-threshold = 2048
+disjunction-complexity-threshold = 1024
+negation-complexity-threshold = 1024
+consensus-limit-threshold = 64
+formula-size-threshold = 128
+string-combination-threshold = 64
+integer-combination-threshold = 64
+array-combination-threshold = 16
+loop-assignment-depth-threshold = 1
+</code></pre>
+<p>深度分析,速度较慢:</p>
+<pre><code class="language-toml">[analyzer.performance]
+saturation-complexity-threshold = 16384
+disjunction-complexity-threshold = 8192
+negation-complexity-threshold = 8192
+consensus-limit-threshold = 512
+formula-size-threshold = 1024
+string-combination-threshold = 256
+integer-combination-threshold = 256
+array-combination-threshold = 256
+loop-assignment-depth-threshold = 4
+</code></pre>
+<p>在条件逻辑沉重或包含数千次数组操作的代码库上,提高阈值可能会显著拉长分析时间。在部署到 CI 之前先在你的项目上测试。</p>
+<h3 id="diagnosing-slow-runs">诊断慢速运行</h3>
+<p>如果 Mago 感觉慢,通常预示 Mago 中存在 bug,而不是正常表现。作为参考,在 Apple M1 Pro 上,分析器对 <a href="https://github.com/WordPress/wordpress-develop"><code>WordPress/wordpress-develop</code></a> 全量分析耗时不到两秒,对 <a href="https://github.com/php-standard-library/php-standard-library"><code>php-standard-library/php-standard-library</code></a> 不到 200 毫秒。具体数字会随硬件和项目规模而变,但作为粗略阈值:如果 Mago 分析你的项目超过 30 秒,那就有问题,要么在 Mago 中,要么在它撞上了某种病态输入。</p>
+<p>同样的判断也适用于你在版本之间注意到的回归。如果一次先前很快的分析突然变慢,那值得报告。</p>
+<p>使用 <code>MAGO_LOG=trace</code> 重新运行以获取完整的流水线 trace:</p>
+<pre><code class="language-bash">MAGO_LOG=trace mago analyze
+</code></pre>
+<p>启用 trace 后,Mago 会:</p>
+<ul>
+<li>启动一个挂起监视器,标记任何分析时间超过几秒的单个文件。这有助于找出让分析器陷入长时间或死循环的文件。</li>
+<li>打印并行分析阶段中观察到的最慢的若干文件,从而看到哪些输入主导了总耗时。</li>
+<li>输出源发现、编译、代码库合并、元数据填充、并行分析、归约等各阶段的耗时,从而判断哪个阶段拖慢了整体。</li>
+</ul>
+<p>报告慢速运行或回归时,请附上完整的 trace 输出以及挂起监视器指出的文件。匿名化名称、清除敏感字面量即可,我们只需要复现该输入的形状。</p>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/zh/tools/analyzer/configuration-reference.md">↳ 编辑此页 →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="本页内容">
+  <p class="doc-toc__heading">本页内容</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#general-options">通用选项</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#path-scoped-ignoring">路径限定的忽略</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#feature-flags">特性开关</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#property-initialization">属性初始化</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#exception-filtering">异常过滤</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#experimental-api-detection">实验性 API 检测</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#plugins">插件</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#available-plugins">可用插件</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#examples">示例</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#strict-mode">严格模式</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#maximum-strictness">最高严格度</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#lenient-mode">宽松模式</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#notes-on-individual-flags">关于个别开关的说明</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#performance-tuning">性能调优</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#when-to-adjust">何时调整</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#what-each-threshold-controls">每个阈值控制什么</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#examples-2">示例</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#diagnosing-slow-runs">诊断慢速运行</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / 1.25.2 / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

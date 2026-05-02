@@ -5,6 +5,12 @@
             "label": "main",
             "stable": false,
             "paths": []
+        },
+        {
+            "id": "1.25.2",
+            "label": "1.25.2",
+            "stable": true,
+            "paths": []
         }
     ]
 }

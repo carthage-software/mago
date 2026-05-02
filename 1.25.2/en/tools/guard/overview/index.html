@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Guard · Mago</title>
+  <meta name="description" content="What the guard does and how its two halves divide the work.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Guard · Mago">
+  <meta property="og:description" content="What the guard does and how its two halves divide the work.">
+  <meta property="og:url" content="https://mago.carthage.software/1.25.2/en/tools&#x2F;guard&#x2F;overview/">
+  <meta property="og:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta property="og:locale" content="en">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Guard · Mago">
+  <meta name="twitter:description" content="What the guard does and how its two halves divide the work.">
+  <meta name="twitter:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/1.25.2/en/tools&#x2F;guard&#x2F;overview/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/en/">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="Search" aria-label="Search">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">Press &#x2F; to search</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/en/guide/getting-started">Guide</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/en/faq">FAQ</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/en/playground">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Sponsor</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub repository" title="GitHub repository">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord community" title="Discord community">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>1.25.2</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../latest/en/tools/guard/overview">
+        <span>latest (1.25.2)</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/en/">
+        <span>main</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../1.25.2/en/tools/guard/overview" aria-current="true">
+        <span>1.25.2</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>EN</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../1.25.2/en/tools/guard/overview" aria-current="true">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../1.25.2/fr/tools/guard/overview">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../1.25.2/zh/tools/guard/overview">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>This page is not translated yet. You were redirected to the language homepage.</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">Guide</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/en/guide/getting-started">
+          <span>Getting Started</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/guide/installation">
+          <span>Installation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/guide/initialization">
+          <span>Initialization</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/guide/configuration">
+          <span>Configuration</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/guide/environment-variables">
+          <span>Environment variables</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/guide/list-files">
+          <span>Listing files</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/guide/generate-completions">
+          <span>Shell completions</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/guide/inspecting-the-ast">
+          <span>Inspecting the AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/guide/upgrading">
+          <span>Upgrading</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">Fundamentals</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/en/fundamentals/command-line-interface">
+          <span>Command-line interface</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/fundamentals/baseline">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/fundamentals/suppressing-issues">
+          <span>Suppressing issues</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/fundamentals/shared-reporting-options">
+          <span>Reporting and fixing options</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/en/tools/overview">
+          <span>Tools</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/linter/overview">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/linter/usage">
+            <span>Linter usage</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/linter/integrations">
+            <span>Linter integrations</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/linter/command-reference">
+            <span>Linter command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/linter/configuration-reference">
+            <span>Linter configuration reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/linter/rules">
+            <span>Rules</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/analyzer/overview">
+            <span>Analyzer</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/analyzer/command-reference">
+            <span>Analyzer command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/analyzer/configuration-reference">
+            <span>Analyzer configuration reference</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/formatter/overview">
+            <span>Formatter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/formatter/usage">
+            <span>Formatter usage</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/formatter/format-ignore">
+            <span>Format ignore</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/formatter/command-reference">
+            <span>Formatter command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/formatter/configuration-reference">
+            <span>Formatter configuration reference</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection" open>
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/guard/overview" aria-current="page">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/guard/usage">
+            <span>Guard usage</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/guard/command-reference">
+            <span>Guard command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../1.25.2/en/tools/guard/configuration-reference">
+            <span>Guard configuration reference</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">Recipes</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/en/recipes/vscode">
+          <span>Visual Studio Code recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/recipes/zed">
+          <span>Zed recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/recipes/helix">
+          <span>Helix recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/recipes/pre-commit-hooks">
+          <span>Pre-commit hooks recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/recipes/github-actions">
+          <span>GitHub Actions recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/recipes/docker">
+          <span>Docker recipe</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">Reference</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../1.25.2/en/faq">
+          <span>FAQ</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/benchmarks">
+          <span>Benchmarks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../1.25.2/en/contributing">
+          <span>Contributing</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="guard">Guard</h1>
+<p><code>mago guard</code> enforces architectural boundaries and structural conventions across a PHP project. It covers the same ground as deptrac and arkitect, in a single binary running off Mago's parser.</p>
+<p>The tool has two halves: the perimeter guard validates dependencies between layers, and the structural guard enforces conventions on the symbols themselves.</p>
+<h2 id="perimeter-guard">Perimeter guard</h2>
+<p>The perimeter guard validates dependency edges. It ensures that different parts of an application only talk to each other in ways you have explicitly allowed, so the domain stays free of infrastructure leaks and the UI cannot reach past the application layer.</p>
+<p>Typical rules:</p>
+<ul>
+<li>The <code>Domain</code> layer must not depend on any other layer.</li>
+<li>The <code>UI</code> layer can depend on <code>Application</code> but not the other way around.</li>
+<li>A specific module is only allowed to use an approved list of libraries.</li>
+</ul>
+<h2 id="structural-guard">Structural guard</h2>
+<p>The structural guard enforces conventions on the symbols themselves: their names, modifiers, supertypes, attributes, and the shape of their containing namespace.</p>
+<p>Typical rules:</p>
+<ul>
+<li>All classes in <code>App\Http\Controllers</code> must be <code>final</code> and end in <code>Controller</code>.</li>
+<li>Interfaces under <code>Domain</code> must end with <code>Interface</code>.</li>
+<li>A specific namespace may only contain <code>enum</code> definitions.</li>
+</ul>
+<h2 id="where-to-next">Where to next</h2>
+<ul>
+<li><a href="../../../../../1.25.2/en/tools/guard/usage">Usage</a>: the common commands and what their output looks like.</li>
+<li><a href="../../../../../1.25.2/en/tools/guard/command-reference">Command reference</a>: every flag <code>mago guard</code> accepts.</li>
+<li><a href="../../../../../1.25.2/en/tools/guard/configuration-reference">Configuration reference</a>: every option Mago accepts under <code>[guard]</code>.</li>
+</ul>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/en/tools/guard/overview.md">↳ Edit this page →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="On this page">
+  <p class="doc-toc__heading">On this page</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#perimeter-guard">Perimeter guard</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#structural-guard">Structural guard</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#where-to-next">Where to next</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / 1.25.2 / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="zh" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Playground · Mago</title>
+  <meta name="description" content="在哪里找到 Mago 的交互式 Playground。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Playground · Mago">
+  <meta property="og:description" content="在哪里找到 Mago 的交互式 Playground。">
+  <meta property="og:url" content="https://mago.carthage.software/1.25.2/zh/playground/">
+  <meta property="og:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta property="og:locale" content="zh">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Playground · Mago">
+  <meta name="twitter:description" content="在哪里找到 Mago 的交互式 Playground。">
+  <meta name="twitter:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/code.css">
+  
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/playground.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/1.25.2/zh/playground/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body class="is-playground">
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="搜索" aria-label="搜索">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">按 &#x2F; 搜索</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/guide/getting-started">指南</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/faq">常见问题</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;1.25.2/zh/playground">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">赞助</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub 仓库" title="GitHub 仓库">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord 社区" title="Discord 社区">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>1.25.2</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../latest/zh/playground">
+        <span>latest (1.25.2)</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../main/zh/">
+        <span>main</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../1.25.2/zh/playground" aria-current="true">
+        <span>1.25.2</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>ZH</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../1.25.2/en/playground">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../1.25.2/fr/playground">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../1.25.2/zh/playground" aria-current="true">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换主题">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">此翻译可能已过时。</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>此页面尚未翻译,已重定向至该语言的首页。</div>
+
+  
+<div class="pg" id="playground" data-api-base="https://carthage.software/api/playground" data-mago-version="1.25.2">
+  <div class="pg__bar" role="toolbar" aria-label="Playground">
+    <span class="pg__title">[ PLAYGROUND ]</span>
+    <span class="pg__sep">·</span>
+    <label class="pg__field">
+      <span class="pg__field-label">PHP</span>
+      <select id="pg-php-version" class="pg__select" aria-label="PHP version">
+        <option value="8.0">8.0</option>
+        <option value="8.1">8.1</option>
+        <option value="8.2">8.2</option>
+        <option value="8.3">8.3</option>
+        <option value="8.4" selected>8.4</option>
+        <option value="8.5">8.5</option>
+      </select>
+    </label>
+    <span class="pg__sep">·</span>
+    <span class="pg__meta">Mago&nbsp;<strong>1.25.2</strong></span>
+
+    <span class="pg__spacer"></span>
+
+    <span class="pg__status" id="pg-status" aria-live="polite"></span>
+
+    <button type="button" class="pg__btn" id="pg-format" title="格式化 (⌘⇧F)">格式化</button>
+    <button type="button" class="pg__btn" id="pg-share" title="分享 (⌘S)">分享</button>
+    <button type="button" class="pg__btn pg__btn--toggle" id="pg-settings-toggle" aria-pressed="false" aria-controls="pg-settings" title="设置 (⌘,)">设置</button>
+  </div>
+
+  <div class="pg__panes" id="pg-panes">
+    <section class="pg__pane pg__pane--editor" aria-label="PHP source">
+      <header class="pg__pane-bar">
+        <span class="pg__pane-label">source.php</span>
+        <span class="pg__pane-spacer"></span>
+        <span class="pg__pane-hint" id="pg-cursor"></span>
+      </header>
+      <div class="pg__editor" id="pg-editor"></div>
+    </section>
+
+    <section class="pg__pane pg__pane--output" aria-label="问题">
+      <header class="pg__pane-bar">
+        <span class="pg__pane-label">问题</span>
+        <span class="pg__pane-spacer"></span>
+        <span class="pg__time" id="pg-time" hidden></span>
+        <button type="button" class="pg__chip pg__chip--linter" id="pg-filter-linter" aria-pressed="true">
+          <span class="pg__chip-letter">L</span>
+          <span class="pg__chip-count" id="pg-count-linter">0</span>
+        </button>
+        <button type="button" class="pg__chip pg__chip--analyzer" id="pg-filter-analyzer" aria-pressed="true">
+          <span class="pg__chip-letter">A</span>
+          <span class="pg__chip-count" id="pg-count-analyzer">0</span>
+        </button>
+      </header>
+      <div class="pg__output" id="pg-output" aria-live="polite">
+        <div class="pg__placeholder" id="pg-placeholder">
+          <span class="pg__placeholder-mark">⏳</span>
+          <p>正在加载分析器。</p>
+          <p class="pg__placeholder-sub">首次加载需获取 WebAssembly 模块(约 15 MB)。</p>
+        </div>
+      </div>
+    </section>
+
+    <aside class="pg__settings" id="pg-settings" aria-label="设置" hidden>
+      <header class="pg__pane-bar">
+        <span class="pg__pane-label">设置</span>
+        <span class="pg__pane-spacer"></span>
+        <button type="button" class="pg__icon-btn" id="pg-settings-close" aria-label="关闭设置">×</button>
+      </header>
+      <div class="pg__settings-body">
+
+        <details class="pg__group">
+          <summary class="pg__group-summary">
+            <span class="pg__group-name">Analyzer</span>
+            <span class="pg__group-chev" aria-hidden="true">+</span>
+          </summary>
+          <div class="pg__group-body">
+            <p class="pg__hint">逐项开关分析器的检查。</p>
+            <div class="pg__toggle-list" id="pg-analyzer-options"></div>
+
+            <div class="pg__sub">
+              <h4 class="pg__sub-heading">插件</h4>
+              <p class="pg__hint">为 PHP 内置函数和常用库提供类型信息。</p>
+              <div class="pg__toggle-list" id="pg-plugins"></div>
+            </div>
+
+            <div class="pg__sub" id="pg-exceptions" hidden>
+              <h4 class="pg__sub-heading">异常过滤</h4>
+              <p class="pg__hint">因 <code>checkThrows</code> 已开启而显示。</p>
+              <label class="pg__field-block">
+                <span class="pg__field-block-label">忽略的异常</span>
+                <span class="pg__field-block-hint">类及其所有子类,逗号分隔。</span>
+                <input type="text" class="pg__text-input" id="pg-unchecked-exceptions" placeholder="LogicException, Psl\Type\Exception\ExceptionInterface">
+              </label>
+              <label class="pg__field-block">
+                <span class="pg__field-block-label">忽略的异常类</span>
+                <span class="pg__field-block-hint">精确匹配,不含子类。</span>
+                <input type="text" class="pg__text-input" id="pg-unchecked-exception-classes" placeholder="Psl\File\Exception\FileNotFoundException">
+              </label>
+            </div>
+
+            <div class="pg__sub">
+              <h4 class="pg__sub-heading">类初始化方法</h4>
+              <label class="pg__field-block">
+                <span class="pg__field-block-hint">除 <code>__construct</code> 外被视为初始化方法的方法,逗号分隔。</span>
+                <input type="text" class="pg__text-input" id="pg-class-initializers" placeholder="setUp, initialize, boot">
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <details class="pg__group">
+          <summary class="pg__group-summary">
+            <span class="pg__group-name">Linter</span>
+            <span class="pg__group-count" id="pg-rules-count"></span>
+            <span class="pg__group-chev" aria-hidden="true">+</span>
+          </summary>
+          <div class="pg__group-body">
+            <p class="pg__hint">逐项开关每条规则。绑定集成的规则只有在下方对应集成启用时才会触发。</p>
+            <div class="pg__rules-controls">
+              <input type="search" class="pg__text-input" id="pg-rules-search" placeholder="搜索规则。" aria-label="搜索规则。">
+              <button type="button" class="pg__btn" id="pg-rules-enable">全部启用</button>
+              <button type="button" class="pg__btn" id="pg-rules-disable">全部禁用</button>
+            </div>
+            <div class="pg__rules-list" id="pg-rules-list">
+              <p class="pg__hint pg__hint--center">规则会随分析器一起加载。</p>
+            </div>
+
+            <div class="pg__sub">
+              <h4 class="pg__sub-heading">集成</h4>
+              <p class="pg__hint">启用某个库或框架后,会出现它专属的 linter 规则。</p>
+              <div class="pg__toggle-list" id="pg-integrations"></div>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </aside>
+  </div>
+
+</div>
+
+<script id="pg-i18n" type="application/json">
+{
+  "status_loading": "正在加载分析器(约 15 MB)。",
+  "status_formatting": "正在格式化。",
+  "status_formatted": "已格式化。",
+  "status_sharing": "正在分享。",
+  "status_copied": "链接已复制到剪贴板。",
+  "status_share_url": "分享链接:",
+  "err_share": "分享失败:",
+  "err_format": "格式化错误:",
+  "err_analysis": "分析错误:",
+  "err_load": "无法加载分析器:",
+  "no_issues_title": "没有发现问题。",
+  "no_issues_sub": "分析器在你的代码上未报告任何问题。",
+  "filtered_title": "匹配的问题已被过滤。",
+  "filtered_sub": "重新启用上方的过滤标记即可显示。"
+}
+</script>
+
+
+  
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/highlight.js" defer></script>
+  
+  
+
+<script type="importmap">
+{
+  "imports": {
+    "codemirror": "https://esm.sh/*codemirror@6.0.2",
+    "@codemirror/state": "https://esm.sh/*@codemirror/state@6.6.0",
+    "@codemirror/view": "https://esm.sh/*@codemirror/view@6.41.1",
+    "@codemirror/language": "https://esm.sh/*@codemirror/language@6.12.3",
+    "@codemirror/commands": "https://esm.sh/*@codemirror/commands@6.10.3",
+    "@codemirror/autocomplete": "https://esm.sh/*@codemirror/autocomplete@6.20.1",
+    "@codemirror/lint": "https://esm.sh/*@codemirror/lint@6.9.5",
+    "@codemirror/search": "https://esm.sh/*@codemirror/search@6.7.0",
+    "@codemirror/lang-php": "https://esm.sh/*@codemirror/lang-php@6.0.2",
+    "@codemirror/lang-html": "https://esm.sh/*@codemirror/lang-html@6.4.11",
+    "@codemirror/lang-css": "https://esm.sh/*@codemirror/lang-css@6.3.1",
+    "@codemirror/lang-javascript": "https://esm.sh/*@codemirror/lang-javascript@6.2.5",
+    "@lezer/common": "https://esm.sh/*@lezer/common@1.5.2",
+    "@lezer/lr": "https://esm.sh/*@lezer/lr@1.4.10",
+    "@lezer/highlight": "https://esm.sh/*@lezer/highlight@1.2.3",
+    "@lezer/php": "https://esm.sh/*@lezer/php@1.0.5",
+    "@lezer/html": "https://esm.sh/*@lezer/html@1.3.13",
+    "@lezer/css": "https://esm.sh/*@lezer/css@1.3.3",
+    "@lezer/javascript": "https://esm.sh/*@lezer/javascript@1.5.4",
+    "style-mod": "https://esm.sh/style-mod@4.1.3",
+    "w3c-keyname": "https://esm.sh/w3c-keyname@2.2.8",
+    "crelt": "https://esm.sh/crelt@1.0.6",
+    "@marijn/find-cluster-break": "https://esm.sh/@marijn/find-cluster-break@1.0.2"
+  }
+}
+</script>
+<script type="module" src="./_assets/playground.js"></script>
+
+</body>
+</html>

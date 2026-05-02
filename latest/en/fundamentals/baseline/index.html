@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Baseline · Mago</title>
+  <meta name="description" content="Snapshot existing issues so Mago only flags new ones, with two variants for different precision-vs-resilience trade-offs.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Baseline · Mago">
+  <meta property="og:description" content="Snapshot existing issues so Mago only flags new ones, with two variants for different precision-vs-resilience trade-offs.">
+  <meta property="og:url" content="https://mago.carthage.software/1.25.2/en/fundamentals&#x2F;baseline/">
+  <meta property="og:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta property="og:locale" content="en">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Baseline · Mago">
+  <meta name="twitter:description" content="Snapshot existing issues so Mago only flags new ones, with two variants for different precision-vs-resilience trade-offs.">
+  <meta name="twitter:image" content="https://mago.carthage.software/1.25.2/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/1.25.2/en/fundamentals&#x2F;baseline/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/en/">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="Search" aria-label="Search">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">Press &#x2F; to search</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/en/guide/getting-started">Guide</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/en/faq">FAQ</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/en/playground">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Sponsor</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub repository" title="GitHub repository">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord community" title="Discord community">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>1.25.2</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../latest/en/fundamentals/baseline">
+        <span>latest (1.25.2)</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../main/en/">
+        <span>main</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../1.25.2/en/fundamentals/baseline" aria-current="true">
+        <span>1.25.2</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>EN</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../1.25.2/en/fundamentals/baseline" aria-current="true">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../1.25.2/fr/fundamentals/baseline">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../1.25.2/zh/fundamentals/baseline">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>This page is not translated yet. You were redirected to the language homepage.</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">Guide</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../1.25.2/en/guide/getting-started">
+          <span>Getting Started</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/guide/installation">
+          <span>Installation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/guide/initialization">
+          <span>Initialization</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/guide/configuration">
+          <span>Configuration</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/guide/environment-variables">
+          <span>Environment variables</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/guide/list-files">
+          <span>Listing files</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/guide/generate-completions">
+          <span>Shell completions</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/guide/inspecting-the-ast">
+          <span>Inspecting the AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/guide/upgrading">
+          <span>Upgrading</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">Fundamentals</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../1.25.2/en/fundamentals/command-line-interface">
+          <span>Command-line interface</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/fundamentals/baseline" aria-current="page">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/fundamentals/suppressing-issues">
+          <span>Suppressing issues</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/fundamentals/shared-reporting-options">
+          <span>Reporting and fixing options</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../1.25.2/en/tools/overview">
+          <span>Tools</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/linter/overview">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/linter/usage">
+            <span>Linter usage</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/linter/integrations">
+            <span>Linter integrations</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/linter/command-reference">
+            <span>Linter command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/linter/configuration-reference">
+            <span>Linter configuration reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/linter/rules">
+            <span>Rules</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/analyzer/overview">
+            <span>Analyzer</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/analyzer/command-reference">
+            <span>Analyzer command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/analyzer/configuration-reference">
+            <span>Analyzer configuration reference</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/formatter/overview">
+            <span>Formatter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/formatter/usage">
+            <span>Formatter usage</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/formatter/format-ignore">
+            <span>Format ignore</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/formatter/command-reference">
+            <span>Formatter command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/formatter/configuration-reference">
+            <span>Formatter configuration reference</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/guard/overview">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/guard/usage">
+            <span>Guard usage</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/guard/command-reference">
+            <span>Guard command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../1.25.2/en/tools/guard/configuration-reference">
+            <span>Guard configuration reference</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">Recipes</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../1.25.2/en/recipes/vscode">
+          <span>Visual Studio Code recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/recipes/zed">
+          <span>Zed recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/recipes/helix">
+          <span>Helix recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/recipes/pre-commit-hooks">
+          <span>Pre-commit hooks recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/recipes/github-actions">
+          <span>GitHub Actions recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/recipes/docker">
+          <span>Docker recipe</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">Reference</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../1.25.2/en/faq">
+          <span>FAQ</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/benchmarks">
+          <span>Benchmarks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../1.25.2/en/contributing">
+          <span>Contributing</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="baseline">Baseline</h1>
+<p>A baseline file records the issues that exist in your codebase right now and tells Mago to ignore them on future runs. New issues introduced after the baseline still get flagged. Useful when adopting Mago in a project that already has hundreds or thousands of issues, or when staging a tightening of rules over multiple PRs.</p>
+<h2 id="one-file-per-tool">One file per tool</h2>
+<p>The linter and analyzer each carry their own baseline because the issues they report are different. Conventional names:</p>
+<ul>
+<li>Linter: <code>lint-baseline.toml</code></li>
+<li>Analyzer: <code>analysis-baseline.toml</code></li>
+</ul>
+<p>The <code>mago ast</code> command reports parse errors and does not support a baseline.</p>
+<h2 id="generating-a-baseline">Generating a baseline</h2>
+<pre><code class="language-sh">mago lint --generate-baseline --baseline lint-baseline.toml
+mago analyze --generate-baseline --baseline analysis-baseline.toml
+</code></pre>
+<p>The command runs the tool, collects every issue it finds, and serialises them into the specified TOML file.</p>
+<h2 id="using-a-baseline">Using a baseline</h2>
+<pre><code class="language-sh">mago lint --baseline lint-baseline.toml
+mago analyze --baseline analysis-baseline.toml
+</code></pre>
+<p>When a baseline is in use, Mago:</p>
+<ol>
+<li>Finds every issue in the current code.</li>
+<li>Compares them against the baseline.</li>
+<li>Suppresses matches.</li>
+<li>Reports only what is left.</li>
+</ol>
+<p>You can also set the baseline path in <code>mago.toml</code> so you don't have to pass <code>--baseline</code> every time:</p>
+<pre><code class="language-toml">[linter]
+baseline = "lint-baseline.toml"
+
+[analyzer]
+baseline = "analysis-baseline.toml"
+</code></pre>
+<h2 id="two-variants">Two variants</h2>
+<p>Mago supports two baseline shapes with different precision-vs-resilience trade-offs.</p>
+<h3 id="loose-default">Loose (default)</h3>
+<p>Groups issues by <code>(file, code, message)</code> and stores a count. Resilient to line-number shifts: if you reformat or insert code above an issue, the baseline still matches as long as the same kind of issue still occurs.</p>
+<pre><code class="language-toml">variant = "loose"
+
+[[issues]]
+file    = "src/Service/PaymentProcessor.php"
+code    = "possibly-null-argument"
+message = "Argument #1 of `process` expects `Order`, but `?Order` was given."
+count   = 2
+</code></pre>
+<h3 id="strict">Strict</h3>
+<p>Stores exact line ranges per issue. Precise, but the baseline goes stale every time line numbers shift, so you regenerate often.</p>
+<pre><code class="language-toml">variant = "strict"
+
+[[entries."src/Service/PaymentProcessor.php".issues]]
+code = "possibly-null-argument"
+start_line = 42
+end_line   = 42
+
+[[entries."src/Service/PaymentProcessor.php".issues]]
+code = "possibly-null-argument"
+start_line = 87
+end_line   = 90
+</code></pre>
+<h3 id="when-to-pick-which">When to pick which</h3>
+<table><thead><tr><th style="text-align: left">Variant</th><th style="text-align: left">Best for</th><th style="text-align: left">Trade-off</th></tr></thead><tbody>
+<tr><td style="text-align: left">Loose</td><td style="text-align: left">Most projects, CI pipelines</td><td style="text-align: left">Resilient to refactoring, less precise.</td></tr>
+<tr><td style="text-align: left">Strict</td><td style="text-align: left">When exact line tracking matters</td><td style="text-align: left">Precise, but requires frequent regeneration.</td></tr>
+</tbody></table>
+<p>Set the variant for new baseline files in <code>mago.toml</code>:</p>
+<pre><code class="language-toml">[linter]
+baseline = "lint-baseline.toml"
+baseline-variant = "loose"   # or "strict"
+
+[analyzer]
+baseline = "analysis-baseline.toml"
+baseline-variant = "loose"
+</code></pre>
+<p>The setting only affects generation. When reading an existing baseline, Mago detects the variant from the file's <code>variant</code> header.</p>
+<h3 id="backwards-compatibility">Backwards compatibility</h3>
+<p>Baseline files written by older Mago releases (before variant support) have no <code>variant</code> header. Mago treats those as strict and prints a warning recommending you regenerate the file so it gains the header.</p>
+<h2 id="skipping-the-baseline-temporarily">Skipping the baseline temporarily</h2>
+<pre><code class="language-sh">mago lint --ignore-baseline
+mago analyze --ignore-baseline
+</code></pre>
+<p>Useful when you want to see issues currently suppressed by the baseline, for example to clean some of them up.</p>
+<h2 id="keeping-the-baseline-tidy">Keeping the baseline tidy</h2>
+<p>When you fix an issue that was part of the baseline, its entry becomes dead. Mago detects this and warns about stale entries. Regenerate to clean up:</p>
+<pre><code class="language-sh">mago lint --generate-baseline --baseline lint-baseline.toml
+</code></pre>
+<p>Pass <code>--backup-baseline</code> to keep the previous file as <code>lint-baseline.toml.bkp</code> before overwriting.</p>
+<h2 id="json-schema">JSON Schema</h2>
+<p>If you build tooling or IDE integration that needs to parse or generate baseline files, get the schema:</p>
+<pre><code class="language-sh">mago config --schema --show baseline
+</code></pre>
+<p>The output is a JSON Schema (draft 2020-12) covering both variants.</p>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/en/fundamentals/baseline.md">↳ Edit this page →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="On this page">
+  <p class="doc-toc__heading">On this page</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#one-file-per-tool">One file per tool</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#generating-a-baseline">Generating a baseline</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#using-a-baseline">Using a baseline</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#two-variants">Two variants</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#loose-default">Loose (default)</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#strict">Strict</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#when-to-pick-which">When to pick which</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#backwards-compatibility">Backwards compatibility</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#skipping-the-baseline-temporarily">Skipping the baseline temporarily</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#keeping-the-baseline-tidy">Keeping the baseline tidy</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#json-schema">JSON Schema</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / 1.25.2 / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;1.25.2/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>
