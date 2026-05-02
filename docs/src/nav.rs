@@ -290,10 +290,8 @@ pub fn page_route(path_to_root: &str, version: &str, language: &str, logical_pat
     url.push('/');
     if !logical_path.is_empty() {
         url.push_str(logical_path);
-        url.push('/');
     }
 
-    url.push_str("index.html");
     url
 }
 

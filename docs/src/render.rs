@@ -465,10 +465,11 @@ fn validate_internal_links(dist_root: &Path, current_version: &str) -> Result<()
                 continue;
             }
 
-            let normalized = if target_str.ends_with('/') {
-                format!("{target_str}index.html")
+            let normalized = if target_str.ends_with(".html") {
+                target_str.to_string()
             } else {
-                format!("{target_str}/index.html")
+                let trimmed = target_str.trim_end_matches('/');
+                format!("{trimmed}/index.html")
             };
             if !known_paths.contains(&normalized) {
                 anyhow::bail!("broken internal link '{}' found in {}", target_str, entry.path().display());
@@ -611,20 +612,13 @@ fn rewrite_content_urls(
     Ok(rewritten.to_string())
 }
 
-/// Stitch a `path_to_root` prefix onto a logical path, ensuring the URL ends
-/// with a real file name (`index.html`) so it resolves under both http://
-/// and file://.
+/// Stitch a `path_to_root` prefix onto a logical path. Directory-style URLs
+/// have their trailing slash trimmed so the deployed site reads cleanly;
+/// the web server (GitHub Pages, PHP built-in) still resolves them to the
+/// underlying `index.html`.
 fn rebase_content_link(attribute: &str, path_to_root: &str, logical: &str, suffix: &str) -> String {
-    // Anchor-only or query-only suffixes need to land on an actual file.
-    let needs_index = !logical.ends_with(".html")
-        && !logical.contains('.') /* probably a directory */
-        && !suffix.starts_with(".html");
-    let target = if needs_index {
-        let separator = if logical.is_empty() || logical.ends_with('/') { "" } else { "/" };
-        format!("{path_to_root}{logical}{separator}index.html")
-    } else {
-        format!("{path_to_root}{logical}")
-    };
+    let trimmed = logical.trim_end_matches('/');
+    let target = format!("{path_to_root}{trimmed}");
     format!(r#"{attribute}="{target}{suffix}""#)
 }
 
