@@ -1291,6 +1291,7 @@
     background: var(--bg-soft);
     border: var(--hair);
     transition: border-color var(--t-snap);
+    scroll-margin-block-start: calc(var(--header-h) + var(--s-4));
   }
 
   details.rule > summary {
