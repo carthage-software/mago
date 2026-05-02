@@ -1135,18 +1135,6 @@
     border-block-start: var(--hair);
   }
 
-  .sponsors__tier-label {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
   .sponsors__grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1189,25 +1177,25 @@
     transition: filter var(--t-snap);
   }
 
-  .sponsor--gold img,
-  .sponsor--silver img {
+  .sponsor--large img,
+  .sponsor--medium img {
     filter: none;
   }
 
-  .sponsor--gold img { inline-size: 88px; block-size: 88px; }
-  .sponsor--silver img { inline-size: 72px; block-size: 72px; }
+  .sponsor--large img { inline-size: 88px; block-size: 88px; }
+  .sponsor--medium img { inline-size: 72px; block-size: 72px; }
 
-  .sponsor--bronze img,
+  .sponsor--small img,
   .sponsor--supporter img {
     filter: grayscale(100%);
   }
 
-  .sponsor--bronze:hover img,
+  .sponsor--small:hover img,
   .sponsor--supporter:hover img {
     filter: grayscale(0%);
   }
 
-  .sponsor--bronze img { inline-size: 56px; block-size: 56px; }
+  .sponsor--small img { inline-size: 56px; block-size: 56px; }
 
   .sponsor--supporter {
     padding: var(--s-5);
