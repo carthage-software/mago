@@ -119,7 +119,16 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         return Ok(());
     }
 
-    if left_type.is_false() {
+    let is_bitwise = matches!(
+        binary.operator,
+        BinaryOperator::BitwiseAnd(_)
+            | BinaryOperator::BitwiseOr(_)
+            | BinaryOperator::BitwiseXor(_)
+            | BinaryOperator::LeftShift(_)
+            | BinaryOperator::RightShift(_)
+    );
+
+    if left_type.is_false() && !is_bitwise {
         context.collector.report_with_code(
             IssueCode::FalseOperand,
             Issue::warning(
@@ -133,7 +142,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         );
         // We'll treat it as 0 in the loop below, but the warning is issued.
         // If *only* false, Psalm might bail; let's continue for now
-    } else if left_type.is_falsable() && !left_type.ignore_falsable_issues() {
+    } else if left_type.is_falsable() && !left_type.ignore_falsable_issues() && !is_bitwise {
         context.collector.report_with_code(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(
@@ -153,7 +162,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         );
     }
 
-    if right_type.is_false() {
+    if right_type.is_false() && !is_bitwise {
         context.collector.report_with_code(
             IssueCode::FalseOperand,
             Issue::warning(
@@ -170,7 +179,7 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                 "Ensure the right operand is a number (int/float). Using `false` directly in arithmetic is discouraged."
             ),
         );
-    } else if right_type.is_falsable() && !right_type.ignore_falsable_issues() {
+    } else if right_type.is_falsable() && !right_type.ignore_falsable_issues() && !is_bitwise {
         context.collector.report_with_code(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(
@@ -225,6 +234,8 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
     for mut left_atomic in left_atomic_types {
         left_atomic = match left_atomic {
             TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => TAtomic::Scalar(TScalar::literal_int(0)),
+            TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => TAtomic::Scalar(TScalar::literal_int(1)),
+            TAtomic::Scalar(TScalar::Bool(_)) => TAtomic::Scalar(TScalar::int()),
             TAtomic::Null => continue,
             atomic => atomic,
         };
@@ -232,6 +243,8 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
         for right_atomic in &right_atomic_types {
             let right_atomic = match right_atomic {
                 TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => TAtomic::Scalar(TScalar::literal_int(0)),
+                TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => TAtomic::Scalar(TScalar::literal_int(1)),
+                TAtomic::Scalar(TScalar::Bool(_)) => TAtomic::Scalar(TScalar::int()),
                 TAtomic::Null => continue,
                 atomic => atomic.clone(),
             };
@@ -321,6 +334,17 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                     has_valid_right_operand = true;
                     invalid_pair = true;
                 }
+            } else if is_bitwise
+                && matches!(
+                    binary.operator,
+                    BinaryOperator::BitwiseAnd(_) | BinaryOperator::BitwiseOr(_) | BinaryOperator::BitwiseXor(_)
+                )
+                && left_atomic.is_string()
+                && right_atomic.is_string()
+            {
+                pair_result_atomics.push(string_bitwise_result(&binary.operator, &left_atomic, &right_atomic));
+                has_valid_left_operand = true;
+                has_valid_right_operand = true;
             } else if left_atomic.is_numeric() && right_atomic.is_numeric() {
                 if let Some(reason) = definite_arithmetic_runtime_error(&binary.operator, &right_atomic) {
                     invalid_right_messages.push((reason, binary.rhs.span()));
@@ -522,6 +546,29 @@ fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAt
         };
     }
 
+    let is_bitwise_op = matches!(
+        op,
+        BinaryOperator::BitwiseAnd(_)
+            | BinaryOperator::BitwiseOr(_)
+            | BinaryOperator::BitwiseXor(_)
+            | BinaryOperator::LeftShift(_)
+            | BinaryOperator::RightShift(_)
+    );
+
+    if is_bitwise_op {
+        let to_int = |atomic: &TAtomic| match atomic {
+            TAtomic::Scalar(TScalar::Integer(i)) => *i,
+            TAtomic::Scalar(TScalar::Float(TFloat::Literal(v))) => TInteger::Literal(v.into_inner() as i64),
+            _ => TInteger::Unspecified,
+        };
+
+        let left_int = to_int(left);
+        let right_int = to_int(right);
+        let combined = calculate_int_arithmetic(op, left_int, right_int).unwrap_or(TInteger::Unspecified);
+
+        return vec![TAtomic::Scalar(TScalar::Integer(combined))];
+    }
+
     match (left, right) {
         (TAtomic::Scalar(TScalar::Integer(left_int)), TAtomic::Scalar(TScalar::Integer(right_int))) => {
             let result = calculate_int_arithmetic(op, *left_int, *right_int);
@@ -600,6 +647,51 @@ fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAt
                 vec![TAtomic::Scalar(TScalar::int()), TAtomic::Scalar(TScalar::float())]
             }
         },
+    }
+}
+
+/// Compute the result of `string ^ string`, `string & string`, or
+/// `string | string`. PHP applies the op byte-by-byte; the result is a string
+/// whose length follows the operator (min for AND/XOR, max for OR). Falls
+/// back to a generic `string` when either operand isn't a tracked literal.
+fn string_bitwise_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomic) -> TAtomic {
+    let (Some(left_str), Some(right_str)) = (left.get_literal_string_value(), right.get_literal_string_value()) else {
+        return TAtomic::Scalar(TScalar::string());
+    };
+
+    let left_bytes = left_str.as_bytes();
+    let right_bytes = right_str.as_bytes();
+
+    let result_bytes: Vec<u8> = match op {
+        BinaryOperator::BitwiseAnd(_) => {
+            let len = left_bytes.len().min(right_bytes.len());
+
+            (0..len).map(|i| left_bytes[i] & right_bytes[i]).collect()
+        }
+        BinaryOperator::BitwiseXor(_) => {
+            let len = left_bytes.len().min(right_bytes.len());
+
+            (0..len).map(|i| left_bytes[i] ^ right_bytes[i]).collect()
+        }
+        BinaryOperator::BitwiseOr(_) => {
+            let (longer, shorter) = if left_bytes.len() >= right_bytes.len() {
+                (left_bytes, right_bytes)
+            } else {
+                (right_bytes, left_bytes)
+            };
+
+            longer
+                .iter()
+                .enumerate()
+                .map(|(i, byte)| if i < shorter.len() { byte | shorter[i] } else { *byte })
+                .collect()
+        }
+        _ => return TAtomic::Scalar(TScalar::string()),
+    };
+
+    match std::str::from_utf8(&result_bytes) {
+        Ok(text) => TAtomic::Scalar(TScalar::literal_string(mago_atom::atom(text))),
+        Err(_) => TAtomic::Scalar(TScalar::string()),
     }
 }
 

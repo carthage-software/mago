@@ -2422,6 +2422,7 @@ test_case!(issue_1729);
 test_case!(issue_1742);
 test_case!(issue_1746_invariant_generic_var_with_mixed);
 test_case!(issue_1748_array_map_resolves_conditional_return);
+test_case!(issue_1755);
 test_case!(issue_1756, {
     let mut s = crate::framework::default_test_settings();
     s.check_throws = false;
