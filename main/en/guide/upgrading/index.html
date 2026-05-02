@@ -558,13 +558,13 @@
 mago self-update --no-confirm     # skip the prompt
 </code></pre>
 <p>Pin a specific version:</p>
-<pre><code class="language-sh">mago self-update --tag 1.25.1
+<pre><code class="language-sh">mago self-update --tag 1.25.2
 </code></pre>
 <h2 id="sync-with-the-project-s-version-pin">Sync with the project's version pin</h2>
 <p>If your <code>mago.toml</code> uses <a href="../../../../main/en/guide/configuration#version-pinning">version pinning</a>, you can sync the installed binary to whatever the project expects without typing the version yourself:</p>
 <pre><code class="language-sh">mago self-update --to-project-version
 </code></pre>
-<p>For an exact pin (<code>version = "1.25.1"</code>), this resolves directly to that release tag. For a major or minor pin, Mago scans recent GitHub releases and installs the highest one that still satisfies the pin. So <code>version = "1"</code> with 2.0 already shipped still installs the latest 1.x release. <code>version = "1.14"</code> with 1.19.x in the wild walks back to the latest 1.14.x.</p>
+<p>For an exact pin (<code>version = "1.25.2"</code>), this resolves directly to that release tag. For a major or minor pin, Mago scans recent GitHub releases and installs the highest one that still satisfies the pin. So <code>version = "1"</code> with 2.0 already shipped still installs the latest 1.x release. <code>version = "1.14"</code> with 1.19.x in the wild walks back to the latest 1.14.x.</p>
 <p>The command fails only if no published release satisfies the pin at all.</p>
 <h2 id="reference">Reference</h2>
 <pre><code class="language-sh">Usage: mago self-update [OPTIONS]

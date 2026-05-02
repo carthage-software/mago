@@ -587,13 +587,13 @@
 mago self-update --no-confirm     # skip the prompt
 </code></pre>
 <p>锁定到指定版本:</p>
-<pre><code class="language-sh">mago self-update --tag 1.25.1
+<pre><code class="language-sh">mago self-update --tag 1.25.2
 </code></pre>
 <h2 id="sync-with-the-project-s-version-pin">与项目的版本锁定同步</h2>
 <p>如果你的 <code>mago.toml</code> 使用了 <a href="../../../../main/zh/guide/configuration#version-pinning">版本锁定</a>,你可以把已安装二进制同步到项目期望的版本,而不必自己输入版本号:</p>
 <pre><code class="language-sh">mago self-update --to-project-version
 </code></pre>
-<p>对于精确锁定(<code>version = "1.25.1"</code>),会直接解析到对应的发布 tag。对于主版本或次版本锁定,Mago 会扫描近期的 GitHub 发布,安装仍然满足锁定的最高版本。所以即便 2.0 已发布,<code>version = "1"</code> 仍会安装最新的 1.x。<code>version = "1.14"</code> 在 1.19.x 已经流行的情况下,会回退到最新的 1.14.x。</p>
+<p>对于精确锁定(<code>version = "1.25.2"</code>),会直接解析到对应的发布 tag。对于主版本或次版本锁定,Mago 会扫描近期的 GitHub 发布,安装仍然满足锁定的最高版本。所以即便 2.0 已发布,<code>version = "1"</code> 仍会安装最新的 1.x。<code>version = "1.14"</code> 在 1.19.x 已经流行的情况下,会回退到最新的 1.14.x。</p>
 <p>只有在没有任何已发布版本满足锁定时,命令才会失败。</p>
 <h2 id="reference">参考</h2>
 <pre><code class="language-sh">Usage: mago self-update [OPTIONS]

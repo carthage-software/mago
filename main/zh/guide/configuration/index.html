@@ -642,7 +642,7 @@ stack-size = 8388608     # 8 MiB
 editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 </code></pre>
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>version</code></td><td style="text-align: left">string</td><td style="text-align: left">无</td><td style="text-align: left">锁定本项目所基于的 Mago 版本。接受主版本(<code>"1"</code>)、次版本(<code>"1.25"</code>)或精确版本(<code>"1.25.1"</code>)的锁定。参见 <a href="#version-pinning">版本锁定</a>。</td></tr>
+<tr><td style="text-align: left"><code>version</code></td><td style="text-align: left">string</td><td style="text-align: left">无</td><td style="text-align: left">锁定本项目所基于的 Mago 版本。接受主版本(<code>"1"</code>)、次版本(<code>"1.25"</code>)或精确版本(<code>"1.25.2"</code>)的锁定。参见 <a href="#version-pinning">版本锁定</a>。</td></tr>
 <tr><td style="text-align: left"><code>php-version</code></td><td style="text-align: left">string</td><td style="text-align: left">最新稳定版</td><td style="text-align: left">Mago 在解析与分析时应针对的 PHP 版本。<code>mago init</code> 会尽可能从 <code>composer.json</code> 自动检测。</td></tr>
 <tr><td style="text-align: left"><code>allow-unsupported-php-version</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">允许 Mago 运行在它官方不支持的 PHP 版本上。不建议使用。</td></tr>
 <tr><td style="text-align: left"><code>no-version-check</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">在已安装二进制与锁定版本不一致时静默警告。主版本不一致始终是致命错误。</td></tr>
@@ -656,7 +656,7 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <ul>
 <li><strong>主版本锁定</strong>(<code>version = "1"</code>):任何 <code>1.x.y</code> 都满足。升级到 <code>2.x</code> 会硬性报错,因为新主版本可能带来不兼容的默认值、schema 变化或规则行为。这是 <code>mago init</code> 默认写入的级别。</li>
 <li><strong>次版本锁定</strong>(<code>version = "1.25"</code>):任何 <code>1.25.y</code> 都满足。漂移到不同的次版本会发出警告;跨主版本仍然是致命错误。</li>
-<li><strong>精确锁定</strong>(<code>version = "1.25.1"</code>):任何漂移都会发出警告;跨主版本仍然是致命错误。</li>
+<li><strong>精确锁定</strong>(<code>version = "1.25.2"</code>):任何漂移都会发出警告;跨主版本仍然是致命错误。</li>
 </ul>
 <p>警告可通过 <code>--no-version-check</code>、<code>MAGO_NO_VERSION_CHECK</code> 环境变量,或配置中的 <code>no-version-check = true</code> 静默。这些都不会影响主版本漂移,而后者正是版本锁定的全部意义所在。</p>
 <p>把已安装二进制同步到项目的锁定版本:</p>

@@ -613,7 +613,7 @@ stack-size = 8388608     # 8 MiB
 editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 </code></pre>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>version</code></td><td style="text-align: left">string</td><td style="text-align: left">none</td><td style="text-align: left">Pins the Mago version this project is tested against. Accepts a major (<code>"1"</code>), minor (<code>"1.25"</code>), or exact (<code>"1.25.1"</code>) pin. See <a href="#version-pinning">version pinning</a>.</td></tr>
+<tr><td style="text-align: left"><code>version</code></td><td style="text-align: left">string</td><td style="text-align: left">none</td><td style="text-align: left">Pins the Mago version this project is tested against. Accepts a major (<code>"1"</code>), minor (<code>"1.25"</code>), or exact (<code>"1.25.2"</code>) pin. See <a href="#version-pinning">version pinning</a>.</td></tr>
 <tr><td style="text-align: left"><code>php-version</code></td><td style="text-align: left">string</td><td style="text-align: left">latest stable</td><td style="text-align: left">The PHP version Mago should target for parsing and analysis. <code>mago init</code> autodetects this from <code>composer.json</code> when possible.</td></tr>
 <tr><td style="text-align: left"><code>allow-unsupported-php-version</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Allow Mago to run on a PHP version it does not officially support. Not recommended.</td></tr>
 <tr><td style="text-align: left"><code>no-version-check</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Silences the warning emitted when the installed binary drifts from the pinned version. Major-version drift is always fatal.</td></tr>
@@ -627,7 +627,7 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <ul>
 <li><strong>Major pin</strong> (<code>version = "1"</code>): any <code>1.x.y</code> satisfies the pin. A bump to <code>2.x</code> is a hard error because a new major may ship with incompatible defaults, schema changes, or rule behaviour. This is the default <code>mago init</code> writes.</li>
 <li><strong>Minor pin</strong> (<code>version = "1.25"</code>): any <code>1.25.y</code> satisfies the pin. Drift to a different minor warns; drift across majors is still fatal.</li>
-<li><strong>Exact pin</strong> (<code>version = "1.25.1"</code>): any drift warns; drift across majors is still fatal.</li>
+<li><strong>Exact pin</strong> (<code>version = "1.25.2"</code>): any drift warns; drift across majors is still fatal.</li>
 </ul>
 <p>The warning can be silenced with <code>--no-version-check</code>, the <code>MAGO_NO_VERSION_CHECK</code> environment variable, or <code>no-version-check = true</code> in the config. None of those affect major-version drift, which is the entire point of pinning.</p>
 <p>To sync the installed binary to the project's pin:</p>

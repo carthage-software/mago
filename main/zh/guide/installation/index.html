@@ -583,7 +583,7 @@
 <pre><code class="language-sh">wget -qO- https://carthage.software/mago.sh | bash
 </code></pre>
 <h3 id="pin-a-specific-version">锁定特定版本</h3>
-<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.1
+<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.2
 </code></pre>
 <p><code>wget</code> 也支持同样的语法。</p>
 <h3 id="verify-the-download">校验下载</h3>
@@ -600,7 +600,7 @@
 <li>解压归档,把二进制放到 PATH 上的某个位置。</li>
 </ol>
 <p>如果你保留了归档文件,可以在解压前自行校验。</p>
-<pre><code class="language-sh">VERSION=1.25.1
+<pre><code class="language-sh">VERSION=1.25.2
 TARGET=x86_64-unknown-linux-gnu  # adjust for your platform
 ASSET=mago-${VERSION}-${TARGET}.tar.gz
 
@@ -618,12 +618,12 @@ sudo mv "mago-${VERSION}-${TARGET}/mago" /usr/local/bin/
 <p>官方镜像基于 <code>scratch</code> 构建,大约 26 MB,可在任何运行 Docker 的地方使用,支持 <code>linux/amd64</code> 与 <code>linux/arm64</code>,无需宿主机的 PHP 运行时。</p>
 <pre><code class="language-sh">docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
 </code></pre>
-<p>可用的 tag 包括 <code>latest</code>、确切版本号,以及逐级放宽的版本前缀(例如 <code>1.25.1</code>、<code>1.25</code>、<code>1</code>)。<a href="../../../../main/zh/recipes/docker">Docker 实用方案</a> 给出了 CI 示例和需要注意的限制。</p>
+<p>可用的 tag 包括 <code>latest</code>、确切版本号,以及逐级放宽的版本前缀(例如 <code>1.25.2</code>、<code>1.25</code>、<code>1</code>)。<a href="../../../../main/zh/recipes/docker">Docker 实用方案</a> 给出了 CI 示例和需要注意的限制。</p>
 <h2 id="package-managers">包管理器</h2>
 <p>这些方式很方便,但依赖外部的发布节奏,通常会落后于 GitHub 发布。通过其中任何一种安装后,可运行 <a href="../../../../main/zh/guide/upgrading"><code>mago self-update</code></a> 获取最新的官方二进制。</p>
 <h3 id="composer">Composer</h3>
 <p>适用于 PHP 项目:</p>
-<pre><code class="language-sh">composer require --dev "carthage-software/mago:^1.25.1"
+<pre><code class="language-sh">composer require --dev "carthage-software/mago:^1.25.2"
 </code></pre>
 <p>Composer 包是一个轻量封装。第一次调用 <code>vendor/bin/mago</code> 会从 GitHub 发布下载对应的预构建二进制并缓存。后续调用复用缓存,不再发起任何网络请求。</p>
 <p>如果 GitHub 的匿名速率限制阻止了首次下载(在共享 CI runner 上很常见),为该次调用设置 <code>GITHUB_TOKEN</code> 或 <code>GH_TOKEN</code> 即可。在 GitHub Actions 中 token 不会自动导出,需要显式传入:</p>

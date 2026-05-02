@@ -556,7 +556,7 @@
 <pre><code class="language-sh">wget -qO- https://carthage.software/mago.sh | bash
 </code></pre>
 <h3 id="pin-a-specific-version">Épingler une version spécifique</h3>
-<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.1
+<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.2
 </code></pre>
 <p>La même syntaxe fonctionne avec <code>wget</code>.</p>
 <h3 id="verify-the-download">Vérifier le téléchargement</h3>
@@ -573,7 +573,7 @@
 <li>Extrayez l'archive et placez le binaire quelque part dans votre PATH.</li>
 </ol>
 <p>Si vous gardez l'archive, vous pouvez la vérifier vous-même avant l'extraction.</p>
-<pre><code class="language-sh">VERSION=1.25.1
+<pre><code class="language-sh">VERSION=1.25.2
 TARGET=x86_64-unknown-linux-gnu  # adjust for your platform
 ASSET=mago-${VERSION}-${TARGET}.tar.gz
 
@@ -591,12 +591,12 @@ sudo mv "mago-${VERSION}-${TARGET}/mago" /usr/local/bin/
 <p>L'image officielle est construite à partir de <code>scratch</code> et pèse environ 26 Mo. Elle s'exécute partout où Docker s'exécute, prend en charge <code>linux/amd64</code> et <code>linux/arm64</code>, et ne nécessite aucun runtime PHP hôte.</p>
 <pre><code class="language-sh">docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
 </code></pre>
-<p>Les tags incluent <code>latest</code>, des versions exactes et des épinglages progressivement plus larges (par exemple <code>1.25.1</code>, <code>1.25</code>, <code>1</code>). La <a href="../../../../main/fr/recipes/docker">recette Docker</a> couvre les exemples CI et les limitations à connaître.</p>
+<p>Les tags incluent <code>latest</code>, des versions exactes et des épinglages progressivement plus larges (par exemple <code>1.25.2</code>, <code>1.25</code>, <code>1</code>). La <a href="../../../../main/fr/recipes/docker">recette Docker</a> couvre les exemples CI et les limitations à connaître.</p>
 <h2 id="package-managers">Gestionnaires de paquets</h2>
 <p>Ces voies sont pratiques mais dépendent de calendriers de publication externes qui sont souvent en retard sur la release GitHub. Après une installation par l'une d'elles, lancez <a href="../../../../main/fr/guide/upgrading"><code>mago self-update</code></a> pour récupérer le dernier binaire officiel.</p>
 <h3 id="composer">Composer</h3>
 <p>Pour les projets PHP :</p>
-<pre><code class="language-sh">composer require --dev "carthage-software/mago:^1.25.1"
+<pre><code class="language-sh">composer require --dev "carthage-software/mago:^1.25.2"
 </code></pre>
 <p>Le paquet Composer est un fin wrapper. Le premier appel à <code>vendor/bin/mago</code> télécharge le binaire pré-construit correspondant depuis la release GitHub et le met en cache. Les appels suivants réutilisent le cache et ne font aucune requête réseau.</p>
 <p>Si la limite de taux anonyme de GitHub bloque le premier téléchargement (fréquent sur les runners CI partagés), définissez <code>GITHUB_TOKEN</code> ou <code>GH_TOKEN</code> pour cette invocation. Dans GitHub Actions, le jeton n'est pas exporté automatiquement, donc passez-le explicitement :</p>

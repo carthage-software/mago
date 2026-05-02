@@ -560,13 +560,13 @@
 mago self-update --no-confirm     # skip the prompt
 </code></pre>
 <p>Épingler une version spécifique :</p>
-<pre><code class="language-sh">mago self-update --tag 1.25.1
+<pre><code class="language-sh">mago self-update --tag 1.25.2
 </code></pre>
 <h2 id="sync-with-the-project-s-version-pin">Synchroniser avec l'épinglage de version du projet</h2>
 <p>Si votre <code>mago.toml</code> utilise l'<a href="../../../../main/fr/guide/configuration#version-pinning">épinglage de version</a>, vous pouvez synchroniser le binaire installé avec ce que le projet attend sans saisir la version vous-même :</p>
 <pre><code class="language-sh">mago self-update --to-project-version
 </code></pre>
-<p>Pour un épinglage exact (<code>version = "1.25.1"</code>), cela résout directement vers ce tag de release. Pour un épinglage majeur ou mineur, Mago parcourt les releases GitHub récentes et installe la plus haute qui satisfait toujours l'épinglage. Ainsi, <code>version = "1"</code> avec 2.0 déjà sortie installe quand même la dernière release 1.x. <code>version = "1.14"</code> avec du 1.19.x dans la nature redescend vers le dernier 1.14.x.</p>
+<p>Pour un épinglage exact (<code>version = "1.25.2"</code>), cela résout directement vers ce tag de release. Pour un épinglage majeur ou mineur, Mago parcourt les releases GitHub récentes et installe la plus haute qui satisfait toujours l'épinglage. Ainsi, <code>version = "1"</code> avec 2.0 déjà sortie installe quand même la dernière release 1.x. <code>version = "1.14"</code> avec du 1.19.x dans la nature redescend vers le dernier 1.14.x.</p>
 <p>La commande échoue uniquement si aucune release publiée ne satisfait l'épinglage.</p>
 <h2 id="reference">Référence</h2>
 <pre><code class="language-sh">Usage: mago self-update [OPTIONS]
