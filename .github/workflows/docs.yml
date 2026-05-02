@@ -78,29 +78,38 @@ jobs:
         run: |
           cargo run -p mago-documentation
 
-      - name: Check out gh-pages worktree
+      - name: Check out existing gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+        continue-on-error: true
+
+      - name: Initialise gh-pages on first deploy
         shell: bash
         run: |
           set -euo pipefail
-          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
-            git fetch origin gh-pages
-            git worktree add -B gh-pages gh-pages-worktree origin/gh-pages
-          else
-            git worktree add --detach gh-pages-worktree
-            git -C gh-pages-worktree checkout --orphan gh-pages
-            git -C gh-pages-worktree rm -rf . >/dev/null 2>&1 || true
+          if [ ! -d gh-pages/.git ]; then
+            mkdir -p gh-pages
+            cd gh-pages
+            git init -b gh-pages
+            git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
           fi
 
-      - name: Stage gh-pages worktree
-        run: php scripts/publish-docs.php "${{ steps.version.outputs.value }}" docs gh-pages-worktree
+      - name: Stage gh-pages
+        run: php scripts/publish-docs.php "${{ steps.version.outputs.value }}" docs gh-pages
 
       - name: Commit and push gh-pages
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          repository: gh-pages-worktree
-          branch: gh-pages
-          commit_message: "Deploy docs (${{ steps.version.outputs.value }})"
-
-      - name: Clean up worktree
-        if: always()
-        run: git worktree remove gh-pages-worktree --force || true
+        working-directory: gh-pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          touch .nojekyll
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "deploy: ${{ steps.version.outputs.value }}"
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" 2>/dev/null \
+            || git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git push origin HEAD:gh-pages --force
