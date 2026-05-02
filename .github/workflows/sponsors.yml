@@ -11,13 +11,51 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          coverage: none
 
       - name: Update sponsors in docs
         run: php scripts/update-sponsors-docs.php
 
-      - name: Commit changes
-        uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-          commit_message: "chore(sponsors): update sponsors list"
-          file_pattern: "*.md"
+      # main is branch-protected and requires verified signatures, so we
+      # can't push from a workflow runner the usual way. The Contents API
+      # signs every commit it produces with GitHub's `web-flow` key, which
+      # passes the protection rule. One PUT per file = one verified commit.
+      - name: Commit signed updates via GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          for path in README.md SPONSORS.md; do
+            if [ ! -f "$path" ]; then
+              continue
+            fi
+
+            current_sha=$(gh api "repos/${GH_REPO}/contents/${path}?ref=${BRANCH}" --jq '.sha' 2>/dev/null || echo "")
+            new_b64=$(base64 < "$path" | tr -d '\n')
+
+            if [ -n "$current_sha" ]; then
+              remote_b64=$(gh api "repos/${GH_REPO}/contents/${path}?ref=${BRANCH}" --jq '.content' | tr -d '\n ')
+              if [ "$remote_b64" = "$new_b64" ]; then
+                echo "No changes in ${path}."
+                continue
+              fi
+            fi
+
+            payload=$(jq -n \
+              --arg message "chore(sponsors): update ${path}" \
+              --arg content "$new_b64" \
+              --arg branch "$BRANCH" \
+              --arg sha "$current_sha" \
+              '{message: $message, content: $content, branch: $branch} + (if $sha == "" then {} else {sha: $sha} end)')
+
+            echo "Pushing signed update to ${path}..."
+            echo "$payload" | gh api --method PUT "repos/${GH_REPO}/contents/${path}" --input -
+          done
