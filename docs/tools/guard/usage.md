@@ -107,4 +107,86 @@ error[must-be-final]: Structural flaw in `App\UI\Controller\UserController`
    │
    = Controllers should be final to prevent extension.
    = Help: Declare this class as `final`.
-```The report identifies the symbol, the location, the exact flaw, and the reason provided in the configuration.
+```
+
+The report identifies the symbol, the location, the exact flaw, and the reason provided in the configuration.
+
+## Auto-Fixing Structural Flaws
+
+For structural violations that have a safe, unambiguous fix, you can run `mago guard --fix` to apply them automatically — no manual editing required.
+
+```sh
+# Preview what would change (no files written)
+mago guard --fix --dry-run
+
+# Apply fixes
+mago guard --fix
+
+# Apply fixes, then format changed files
+mago guard --fix --format-after-fix
+```
+
+### What gets fixed
+
+| Rule | Fix applied |
+|:-----|:------------|
+| `must-be-final = true` | Inserts `final` before the `class` keyword |
+| `must-be-final = false` | Removes the `final` modifier |
+| `must-be-readonly = true` | Inserts `readonly` before the `class` keyword |
+| `must-be-readonly = false` | Removes the `readonly` modifier |
+| `must-implement = "FQN"` | Adds the interface to the `implements` clause (or creates it) |
+| `must-implement = { all-of = [...] }` | Adds every missing interface to the `implements` clause |
+| `must-extend = "FQN"` | Adds `extends BaseClass` when the class has no parent yet |
+| `must-use-trait = "FQN"` | Inserts `use TraitName;` as the first statement in the class body |
+| `must-use-trait = { all-of = [...] }` | Inserts all missing trait `use` statements |
+
+**Example** — given this rule:
+
+```toml
+[[guard.structural.rules]]
+on = "App\\Domain\\**\\Command\\**\\*Command"
+target = "class"
+must-be-final = true
+must-be-readonly = true
+reason = "CQRS: Commands must be immutable value objects"
+```
+
+Before:
+```php
+class CreateUserCommand
+{
+    public function __construct(
+        public readonly string $email,
+    ) {}
+}
+```
+
+After `mago guard --fix`:
+```php
+final readonly class CreateUserCommand
+{
+    public function __construct(
+        public readonly string $email,
+    ) {}
+}
+```
+
+### What is NOT auto-fixed
+
+Some violations intentionally require human review:
+
+| Rule | Why it's not auto-fixed |
+|:-----|:------------------------|
+| `must-be-abstract` | Semantic change — existing concrete methods may need rework |
+| `must-not-be-abstract` | Requires providing implementations for abstract methods |
+| `must-be-named` | Renaming affects all references across the codebase |
+| `must-be` (symbol kind) | Converting class ↔ interface ↔ enum is a structural rewrite |
+| `must-use-attribute` | Attributes often need arguments; correct values are unknown |
+| `must-implement = { any-of = [...] }` | Ambiguous — Mago cannot determine which option to pick |
+| `must-extend` when class already extends | Replacing a parent class can break method overrides |
+
+These violations remain in the report and must be resolved manually.
+
+### FQN format
+
+All inserted type references use fully-qualified names with a leading backslash (e.g. `\App\Domain\Command\Command`). This is always safe regardless of the current namespace and avoids any ambiguity with `use` imports. Running `mago guard --fix --format-after-fix` will clean up any whitespace and normalise the inserted code to your project's style.

@@ -31,6 +31,8 @@ For example, you can enforce rules like:
 
 This helps maintain a high level of code quality and consistency across the entire project.
 
+Many structural violations can be **automatically fixed** using `mago guard --fix`. Mago will insert or remove modifiers (`final`, `readonly`), add missing `implements` or `extends` clauses, and inject `use TraitName;` statements — leaving only violations that require human judgment in the report.
+
 ## Dive In
 
 - **[Configuration Reference](./configuration-reference.md)**: A detailed guide to all `guard` settings in `mago.toml`.
