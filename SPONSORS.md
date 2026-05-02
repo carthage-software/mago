@@ -9,10 +9,6 @@ To become a sponsor, please visit [the sponsorship page](https://github.com/spon
 
 ---
 
-<a href="https://github.com/zip-fa" title="zip-fa"><kbd><img src="https://avatars.githubusercontent.com/u/61551308?v=4&s=160" width="80" height="80" alt="zip-fa" /></kbd></a>
-
----
-
 <a href="https://github.com/jasonrm" title="Jason R. McNeil"><kbd><img src="https://avatars.githubusercontent.com/u/39949?u=69c0e4fb08c439250978d41dbc3371d2f0609b98&v=4&s=160" width="80" height="80" alt="Jason R. McNeil" /></kbd></a><a href="https://ofcompute.rs/" title="Vincent Berset"><kbd><img src="https://avatars.githubusercontent.com/u/5173120?u=95efc76cd8fc804536dc6dd25781a95b650bf902&v=4&s=160" width="80" height="80" alt="Vincent Berset" /></kbd></a>
 
 ---
