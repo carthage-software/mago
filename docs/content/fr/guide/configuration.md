@@ -97,7 +97,7 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 
 | Option | Type | Défaut | Description |
 | :--- | :--- | :--- | :--- |
-| `version` | string | aucun | Fixe la version de Mago contre laquelle ce projet est testé. Accepte un majeur (`"1"`), mineur (`"1.25"`) ou exact (`"1.25.1"`). Voir [épinglage de version](#version-pinning). |
+| `version` | string | aucun | Fixe la version de Mago contre laquelle ce projet est testé. Accepte un majeur (`"1"`), mineur (`"1.25"`) ou exact (`"1.25.2"`). Voir [épinglage de version](#version-pinning). |
 | `php-version` | string | dernière stable | La version PHP que Mago doit cibler pour l'analyse syntaxique et l'analyse. `mago init` la détecte automatiquement depuis `composer.json` quand c'est possible. |
 | `allow-unsupported-php-version` | boolean | `false` | Autoriser Mago à s'exécuter sur une version PHP qu'il ne prend pas officiellement en charge. Non recommandé. |
 | `no-version-check` | boolean | `false` | Réduit au silence l'avertissement émis quand le binaire installé diverge de la version épinglée. Une divergence de version majeure est toujours fatale. |
@@ -113,7 +113,7 @@ Trois niveaux d'épinglage :
 
 - **Épinglage majeur** (`version = "1"`) : tout `1.x.y` satisfait l'épinglage. Une montée vers `2.x` est une erreur fatale, car une nouvelle version majeure peut introduire des défauts incompatibles, des changements de schéma ou de comportement de règles. C'est ce que `mago init` écrit par défaut.
 - **Épinglage mineur** (`version = "1.25"`) : tout `1.25.y` satisfait l'épinglage. Une divergence vers un mineur différent émet un avertissement ; une divergence majeure reste fatale.
-- **Épinglage exact** (`version = "1.25.1"`) : toute divergence émet un avertissement ; une divergence majeure reste fatale.
+- **Épinglage exact** (`version = "1.25.2"`) : toute divergence émet un avertissement ; une divergence majeure reste fatale.
 
 L'avertissement peut être réduit au silence avec `--no-version-check`, la variable d'environnement `MAGO_NO_VERSION_CHECK`, ou `no-version-check = true` dans la configuration. Aucun de ces moyens n'affecte la divergence de version majeure, qui est tout l'intérêt de l'épinglage.
 

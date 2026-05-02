@@ -30,7 +30,7 @@ mago self-update --no-confirm     # skip the prompt
 锁定到指定版本:
 
 ```sh
-mago self-update --tag 1.25.1
+mago self-update --tag 1.25.2
 ```
 
 ## 与项目的版本锁定同步
@@ -41,7 +41,7 @@ mago self-update --tag 1.25.1
 mago self-update --to-project-version
 ```
 
-对于精确锁定(`version = "1.25.1"`),会直接解析到对应的发布 tag。对于主版本或次版本锁定,Mago 会扫描近期的 GitHub 发布,安装仍然满足锁定的最高版本。所以即便 2.0 已发布,`version = "1"` 仍会安装最新的 1.x。`version = "1.14"` 在 1.19.x 已经流行的情况下,会回退到最新的 1.14.x。
+对于精确锁定(`version = "1.25.2"`),会直接解析到对应的发布 tag。对于主版本或次版本锁定,Mago 会扫描近期的 GitHub 发布,安装仍然满足锁定的最高版本。所以即便 2.0 已发布,`version = "1"` 仍会安装最新的 1.x。`version = "1.14"` 在 1.19.x 已经流行的情况下,会回退到最新的 1.14.x。
 
 只有在没有任何已发布版本满足锁定时,命令才会失败。
 

@@ -1524,7 +1524,7 @@ dependencies = [
 
 [[package]]
 name = "mago"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "clap",
@@ -1584,7 +1584,7 @@ dependencies = [
 
 [[package]]
 name = "mago-algebra"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "codspeed-criterion-compat",
  "foldhash 0.2.0",
@@ -1596,7 +1596,7 @@ dependencies = [
 
 [[package]]
 name = "mago-analyzer"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "codspeed-criterion-compat",
@@ -1624,7 +1624,7 @@ dependencies = [
 
 [[package]]
 name = "mago-atom"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "itoa",
  "ryu",
@@ -1633,14 +1633,14 @@ dependencies = [
 
 [[package]]
 name = "mago-casing"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "cruet",
 ]
 
 [[package]]
 name = "mago-codex"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "codspeed-criterion-compat",
@@ -1664,7 +1664,7 @@ dependencies = [
 
 [[package]]
 name = "mago-collector"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
@@ -1677,7 +1677,7 @@ dependencies = [
 
 [[package]]
 name = "mago-composer"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "foldhash 0.2.0",
  "serde",
@@ -1686,7 +1686,7 @@ dependencies = [
 
 [[package]]
 name = "mago-database"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "foldhash 0.2.0",
  "glob",
@@ -1703,7 +1703,7 @@ dependencies = [
 
 [[package]]
 name = "mago-docblock"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "mago-database",
@@ -1714,7 +1714,7 @@ dependencies = [
 
 [[package]]
 name = "mago-documentation"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1735,7 +1735,7 @@ dependencies = [
 
 [[package]]
 name = "mago-fingerprint"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
@@ -1750,7 +1750,7 @@ dependencies = [
 
 [[package]]
 name = "mago-formatter"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
@@ -1769,7 +1769,7 @@ dependencies = [
 
 [[package]]
 name = "mago-guard"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
@@ -1791,7 +1791,7 @@ dependencies = [
 
 [[package]]
 name = "mago-linter"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
@@ -1816,7 +1816,7 @@ dependencies = [
 
 [[package]]
 name = "mago-names"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
@@ -1828,7 +1828,7 @@ dependencies = [
 
 [[package]]
 name = "mago-orchestrator"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
@@ -1852,7 +1852,7 @@ dependencies = [
 
 [[package]]
 name = "mago-php-version"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "schemars",
  "serde",
@@ -1861,7 +1861,7 @@ dependencies = [
 
 [[package]]
 name = "mago-prelude"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bincode",
  "bumpalo",
@@ -1876,7 +1876,7 @@ dependencies = [
 
 [[package]]
 name = "mago-reporting"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "ariadne",
  "blake3",
@@ -1896,7 +1896,7 @@ dependencies = [
 
 [[package]]
 name = "mago-semantics"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "mago-database",
  "mago-names",
@@ -1908,7 +1908,7 @@ dependencies = [
 
 [[package]]
 name = "mago-span"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "mago-database",
  "serde",
@@ -1916,7 +1916,7 @@ dependencies = [
 
 [[package]]
 name = "mago-syntax"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "codspeed-criterion-compat",
@@ -1937,7 +1937,7 @@ dependencies = [
 
 [[package]]
 name = "mago-syntax-core"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "mago-database",
@@ -1948,7 +1948,7 @@ dependencies = [
 
 [[package]]
 name = "mago-text-edit"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "pretty_assertions",
  "serde",
@@ -1958,7 +1958,7 @@ dependencies = [
 
 [[package]]
 name = "mago-twig-syntax"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "codspeed-criterion-compat",
@@ -1975,7 +1975,7 @@ dependencies = [
 
 [[package]]
 name = "mago-type-syntax"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "codspeed-criterion-compat",
@@ -1989,7 +1989,7 @@ dependencies = [
 
 [[package]]
 name = "mago-wasm"
-version = "1.25.1"
+version = "1.25.2"
 dependencies = [
  "bumpalo",
  "mago-analyzer",

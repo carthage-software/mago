@@ -27,7 +27,7 @@ wget -qO- https://carthage.software/mago.sh | bash
 ### Épingler une version spécifique
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.1
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.2
 ```
 
 La même syntaxe fonctionne avec `wget`.
@@ -55,7 +55,7 @@ La voie recommandée sur Windows et un bon repli sur tout système sans `bash`.
 Si vous gardez l'archive, vous pouvez la vérifier vous-même avant l'extraction.
 
 ```sh
-VERSION=1.25.1
+VERSION=1.25.2
 TARGET=x86_64-unknown-linux-gnu  # adjust for your platform
 ASSET=mago-${VERSION}-${TARGET}.tar.gz
 
@@ -80,7 +80,7 @@ L'image officielle est construite à partir de `scratch` et pèse environ 26 Mo.
 docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
 ```
 
-Les tags incluent `latest`, des versions exactes et des épinglages progressivement plus larges (par exemple `1.25.1`, `1.25`, `1`). La [recette Docker](/recipes/docker/) couvre les exemples CI et les limitations à connaître.
+Les tags incluent `latest`, des versions exactes et des épinglages progressivement plus larges (par exemple `1.25.2`, `1.25`, `1`). La [recette Docker](/recipes/docker/) couvre les exemples CI et les limitations à connaître.
 
 ## Gestionnaires de paquets
 
@@ -91,7 +91,7 @@ Ces voies sont pratiques mais dépendent de calendriers de publication externes 
 Pour les projets PHP :
 
 ```sh
-composer require --dev "carthage-software/mago:^1.25.1"
+composer require --dev "carthage-software/mago:^1.25.2"
 ```
 
 Le paquet Composer est un fin wrapper. Le premier appel à `vendor/bin/mago` télécharge le binaire pré-construit correspondant depuis la release GitHub et le met en cache. Les appels suivants réutilisent le cache et ne font aucune requête réseau.

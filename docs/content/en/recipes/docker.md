@@ -19,7 +19,7 @@ Each release publishes several tags so you can pin at the precision you want:
 | Tag | Example | Description |
 | :--- | :--- | :--- |
 | `latest` | `ghcr.io/carthage-software/mago:latest` | Always points to the newest release. |
-| `<version>` | `ghcr.io/carthage-software/mago:1.25.1` | Pinned to an exact version. |
+| `<version>` | `ghcr.io/carthage-software/mago:1.25.2` | Pinned to an exact version. |
 | `<major>.<minor>` | `ghcr.io/carthage-software/mago:1.25` | Tracks the latest patch within a minor version. |
 | `<major>` | `ghcr.io/carthage-software/mago:1` | Tracks the latest release within a major version. |
 

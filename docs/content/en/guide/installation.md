@@ -27,7 +27,7 @@ wget -qO- https://carthage.software/mago.sh | bash
 ### Pin a specific version
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.1
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.2
 ```
 
 The same syntax works with `wget`.
@@ -55,7 +55,7 @@ The recommended path on Windows and a fine fallback on any system without `bash`
 If you keep the archive around, you can verify it yourself before extracting.
 
 ```sh
-VERSION=1.25.1
+VERSION=1.25.2
 TARGET=x86_64-unknown-linux-gnu  # adjust for your platform
 ASSET=mago-${VERSION}-${TARGET}.tar.gz
 
@@ -80,7 +80,7 @@ The official image is built from `scratch` and weighs roughly 26 MB. It runs any
 docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
 ```
 
-Tags include `latest`, exact versions, and progressively looser pins (for example `1.25.1`, `1.25`, `1`). The [Docker recipe](/recipes/docker/) covers CI examples and the limitations to be aware of.
+Tags include `latest`, exact versions, and progressively looser pins (for example `1.25.2`, `1.25`, `1`). The [Docker recipe](/recipes/docker/) covers CI examples and the limitations to be aware of.
 
 ## Package managers
 
@@ -91,7 +91,7 @@ These routes are convenient but rely on external publishing schedules that often
 For PHP projects:
 
 ```sh
-composer require --dev "carthage-software/mago:^1.25.1"
+composer require --dev "carthage-software/mago:^1.25.2"
 ```
 
 The Composer package is a thin wrapper. The first call to `vendor/bin/mago` downloads the matching pre-built binary from the GitHub release and caches it. Subsequent calls reuse the cache and make no network requests.

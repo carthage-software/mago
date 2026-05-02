@@ -30,7 +30,7 @@ mago self-update --no-confirm     # skip the prompt
 Épingler une version spécifique :
 
 ```sh
-mago self-update --tag 1.25.1
+mago self-update --tag 1.25.2
 ```
 
 ## Synchroniser avec l'épinglage de version du projet
@@ -41,7 +41,7 @@ Si votre `mago.toml` utilise l'[épinglage de version](/guide/configuration/#ver
 mago self-update --to-project-version
 ```
 
-Pour un épinglage exact (`version = "1.25.1"`), cela résout directement vers ce tag de release. Pour un épinglage majeur ou mineur, Mago parcourt les releases GitHub récentes et installe la plus haute qui satisfait toujours l'épinglage. Ainsi, `version = "1"` avec 2.0 déjà sortie installe quand même la dernière release 1.x. `version = "1.14"` avec du 1.19.x dans la nature redescend vers le dernier 1.14.x.
+Pour un épinglage exact (`version = "1.25.2"`), cela résout directement vers ce tag de release. Pour un épinglage majeur ou mineur, Mago parcourt les releases GitHub récentes et installe la plus haute qui satisfait toujours l'épinglage. Ainsi, `version = "1"` avec 2.0 déjà sortie installe quand même la dernière release 1.x. `version = "1.14"` avec du 1.19.x dans la nature redescend vers le dernier 1.14.x.
 
 La commande échoue uniquement si aucune release publiée ne satisfait l'épinglage.
 

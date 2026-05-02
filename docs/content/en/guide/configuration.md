@@ -97,7 +97,7 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `version` | string | none | Pins the Mago version this project is tested against. Accepts a major (`"1"`), minor (`"1.25"`), or exact (`"1.25.1"`) pin. See [version pinning](#version-pinning). |
+| `version` | string | none | Pins the Mago version this project is tested against. Accepts a major (`"1"`), minor (`"1.25"`), or exact (`"1.25.2"`) pin. See [version pinning](#version-pinning). |
 | `php-version` | string | latest stable | The PHP version Mago should target for parsing and analysis. `mago init` autodetects this from `composer.json` when possible. |
 | `allow-unsupported-php-version` | boolean | `false` | Allow Mago to run on a PHP version it does not officially support. Not recommended. |
 | `no-version-check` | boolean | `false` | Silences the warning emitted when the installed binary drifts from the pinned version. Major-version drift is always fatal. |
@@ -113,7 +113,7 @@ Three pin levels:
 
 - **Major pin** (`version = "1"`): any `1.x.y` satisfies the pin. A bump to `2.x` is a hard error because a new major may ship with incompatible defaults, schema changes, or rule behaviour. This is the default `mago init` writes.
 - **Minor pin** (`version = "1.25"`): any `1.25.y` satisfies the pin. Drift to a different minor warns; drift across majors is still fatal.
-- **Exact pin** (`version = "1.25.1"`): any drift warns; drift across majors is still fatal.
+- **Exact pin** (`version = "1.25.2"`): any drift warns; drift across majors is still fatal.
 
 The warning can be silenced with `--no-version-check`, the `MAGO_NO_VERSION_CHECK` environment variable, or `no-version-check = true` in the config. None of those affect major-version drift, which is the entire point of pinning.
 

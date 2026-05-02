@@ -27,7 +27,7 @@ wget -qO- https://carthage.software/mago.sh | bash
 ### 锁定特定版本
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.1
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.2
 ```
 
 `wget` 也支持同样的语法。
@@ -55,7 +55,7 @@ Windows 上的推荐方式,也是任何没有 `bash` 的系统上的不错备选
 如果你保留了归档文件,可以在解压前自行校验。
 
 ```sh
-VERSION=1.25.1
+VERSION=1.25.2
 TARGET=x86_64-unknown-linux-gnu  # adjust for your platform
 ASSET=mago-${VERSION}-${TARGET}.tar.gz
 
@@ -80,7 +80,7 @@ sudo mv "mago-${VERSION}-${TARGET}/mago" /usr/local/bin/
 docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
 ```
 
-可用的 tag 包括 `latest`、确切版本号,以及逐级放宽的版本前缀(例如 `1.25.1`、`1.25`、`1`)。[Docker 实用方案](/recipes/docker/) 给出了 CI 示例和需要注意的限制。
+可用的 tag 包括 `latest`、确切版本号,以及逐级放宽的版本前缀(例如 `1.25.2`、`1.25`、`1`)。[Docker 实用方案](/recipes/docker/) 给出了 CI 示例和需要注意的限制。
 
 ## 包管理器
 
@@ -91,7 +91,7 @@ docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
 适用于 PHP 项目:
 
 ```sh
-composer require --dev "carthage-software/mago:^1.25.1"
+composer require --dev "carthage-software/mago:^1.25.2"
 ```
 
 Composer 包是一个轻量封装。第一次调用 `vendor/bin/mago` 会从 GitHub 发布下载对应的预构建二进制并缓存。后续调用复用缓存,不再发起任何网络请求。
