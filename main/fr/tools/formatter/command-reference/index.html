@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Référence de commande du formateur · Mago</title>
+  <meta name="description" content="Tous les indicateurs que mago format accepte.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Référence de commande du formateur · Mago">
+  <meta property="og:description" content="Tous les indicateurs que mago format accepte.">
+  <meta property="og:url" content="https://mago.carthage.software/main/fr/tools&#x2F;formatter&#x2F;command-reference/">
+  <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta property="og:locale" content="fr">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Référence de commande du formateur · Mago">
+  <meta name="twitter:description" content="Tous les indicateurs que mago format accepte.">
+  <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/main/fr/tools&#x2F;formatter&#x2F;command-reference/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/index.html">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="Recherche" aria-label="Recherche">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">Appuyez sur &#x2F; pour rechercher</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/guide/getting-started/index.html">Guide</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/faq/index.html">FAQ</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/playground/index.html">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Soutenir</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="Dépôt GitHub" title="Dépôt GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Communauté Discord" title="Communauté Discord">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>main</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../main/fr/tools/formatter/command-reference/index.html" aria-current="true">
+        <span>main</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>FR</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../main/en/tools/formatter/command-reference/index.html">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/fr/tools/formatter/command-reference/index.html" aria-current="true">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/zh/tools/formatter/command-reference/index.html">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Changer le thème">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">Cette traduction peut être obsolète.</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>Cette page n&#x27;est pas encore traduite. Vous avez été redirigé vers la page d&#x27;accueil de la langue.</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">Guide</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/fr/guide/getting-started/index.html">
+          <span>Premiers pas</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/installation/index.html">
+          <span>Installation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/initialization/index.html">
+          <span>Initialisation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/configuration/index.html">
+          <span>Configuration</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/environment-variables/index.html">
+          <span>Variables d&#x27;environnement</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/list-files/index.html">
+          <span>Lister les fichiers</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/generate-completions/index.html">
+          <span>Complétions du shell</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/inspecting-the-ast/index.html">
+          <span>Inspecter l&#x27;AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/upgrading/index.html">
+          <span>Mettre à jour</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">Fondamentaux</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/fr/fundamentals/command-line-interface/index.html">
+          <span>Interface en ligne de commande</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/fundamentals/baseline/index.html">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/fundamentals/suppressing-issues/index.html">
+          <span>Supprimer les problèmes</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/fundamentals/shared-reporting-options/index.html">
+          <span>Options de rapport et de correction</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/fr/tools/overview/index.html">
+          <span>Outils</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/overview/index.html">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/usage/index.html">
+            <span>Utilisation du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/integrations/index.html">
+            <span>Intégrations du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/command-reference/index.html">
+            <span>Référence de commande du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/configuration-reference/index.html">
+            <span>Référence de configuration du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/rules/index.html">
+            <span>Règles</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/fr/tools/analyzer/overview/index.html">
+            <span>Analyseur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/analyzer/command-reference/index.html">
+            <span>Référence de commande de l&#x27;analyseur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/analyzer/configuration-reference/index.html">
+            <span>Référence de configuration de l&#x27;analyseur</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection" open>
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/fr/tools/formatter/overview/index.html">
+            <span>Formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/formatter/usage/index.html">
+            <span>Utilisation du formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/formatter/format-ignore/index.html">
+            <span>Format ignore</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/formatter/command-reference/index.html" aria-current="page">
+            <span>Référence de commande du formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/formatter/configuration-reference/index.html">
+            <span>Référence de configuration du formateur</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/fr/tools/guard/overview/index.html">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/guard/usage/index.html">
+            <span>Utilisation du guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/guard/command-reference/index.html">
+            <span>Référence de commande du guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/guard/configuration-reference/index.html">
+            <span>Référence de configuration du guard</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">Recettes</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/vscode/index.html">
+          <span>Recette Visual Studio Code</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/zed/index.html">
+          <span>Recette Zed</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/helix/index.html">
+          <span>Recette Helix</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/pre-commit-hooks/index.html">
+          <span>Recette pre-commit hooks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/github-actions/index.html">
+          <span>Recette GitHub Actions</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/docker/index.html">
+          <span>Recette Docker</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">Référence</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/fr/faq/index.html">
+          <span>FAQ</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/benchmarks/index.html">
+          <span>Benchmarks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/contributing/index.html">
+          <span>Contribuer</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="command-reference">Référence de commande</h1>
+<pre><code class="language-sh">Usage: mago format [OPTIONS] [PATH]...
+</code></pre>
+<p><code>mago fmt</code> est un alias pour <code>mago format</code>. Les deux fonctionnent.</p>
+<p>Les indicateurs globaux doivent venir avant <code>format</code>. Voir l'<a href="../../../../../main/fr/fundamentals/command-line-interface/index.html">aperçu de la CLI</a> pour la liste globale.</p>
+<h2 id="arguments">Arguments</h2>
+<table><thead><tr><th style="text-align: left">Argument</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>[PATH]...</code></td><td style="text-align: left">Fichiers ou répertoires à formater. Lorsqu'ils sont fournis, ils remplacent les <code>paths</code> de <code>mago.toml</code> pour cette exécution.</td></tr>
+</tbody></table>
+<pre><code class="language-sh">mago fmt src/index.php tests/
+</code></pre>
+<h2 id="options">Options</h2>
+<table><thead><tr><th style="text-align: left">Indicateur</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--dry-run</code>, <code>-d</code></td><td style="text-align: left">Imprime un diff unifié des changements qui seraient effectués, sans rien écrire.</td></tr>
+<tr><td style="text-align: left"><code>--check</code>, <code>-c</code></td><td style="text-align: left">Vérifie que chaque fichier source est déjà formaté. Sort <code>0</code> en cas de correspondance, <code>1</code> si un fichier changerait.</td></tr>
+<tr><td style="text-align: left"><code>--stdin-input</code>, <code>-i</code></td><td style="text-align: left">Lit le source depuis stdin, le formate, imprime le résultat sur stdout.</td></tr>
+<tr><td style="text-align: left"><code>--stdin-filepath &lt;PATH&gt;</code></td><td style="text-align: left">Chemin logique du buffer stdin. Nécessite <code>--stdin-input</code>. Vérifié par rapport à <code>source.excludes</code> et <code>formatter.excludes</code> ; en cas de correspondance, l'entrée est renvoyée telle quelle. Remplace également <code>&lt;stdin&gt;</code> dans les messages de diagnostic.</td></tr>
+<tr><td style="text-align: left"><code>--staged</code>, <code>-s</code></td><td style="text-align: left">Formate uniquement les fichiers stagés dans git et les re-stage. Conçu pour les hooks de pre-commit.</td></tr>
+<tr><td style="text-align: left"><code>-h</code>, <code>--help</code></td><td style="text-align: left">Affiche l'aide et quitte.</td></tr>
+</tbody></table>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/fr/tools/formatter/command-reference.md">↳ Modifier cette page →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="Sur cette page">
+  <p class="doc-toc__heading">Sur cette page</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#arguments">Arguments</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#options">Options</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / main / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

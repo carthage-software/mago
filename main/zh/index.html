@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="zh" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Mago</title>
+  <meta name="description" content="氧化版 PHP 工具链。一款用 Rust 编写的静态分析器、linter 和格式化器。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Mago">
+  <meta property="og:description" content="氧化版 PHP 工具链。一款用 Rust 编写的静态分析器、linter 和格式化器。">
+  <meta property="og:url" content="https://mago.carthage.software/main/zh/">
+  <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta property="og:locale" content="zh">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Mago">
+  <meta name="twitter:description" content="氧化版 PHP 工具链。一款用 Rust 编写的静态分析器、linter 和格式化器。">
+  <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;main/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;main/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;main/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;main/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;main/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;main/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;main/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;main/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/main/zh/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;main/zh/index.html">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="搜索" aria-label="搜索">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">按 &#x2F; 搜索</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;main/zh/guide/getting-started/index.html">指南</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;main/zh/faq/index.html">常见问题</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;main/zh/playground/index.html">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">赞助</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub 仓库" title="GitHub 仓库">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord 社区" title="Discord 社区">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>main</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../main/zh/index.html" aria-current="true">
+        <span>main</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>ZH</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../main/en/index.html">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../main/fr/index.html">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../main/zh/index.html" aria-current="true">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换主题">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">此翻译可能已过时。</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>此页面尚未翻译,已重定向至该语言的首页。</div>
+
+  
+<div class="home-layout">
+  <aside class="home-aside" aria-hidden="true">
+    <div class="home-aside__label">Mago · main</div>
+  </aside>
+
+  <main id="content" class="home-content">
+    <article class="doc-page home-article">
+      <section class="home-hero">
+<div class="home-hero__main">
+<div class="home-hero__plate"><span>Mago</span><span class="home-hero__plate-divider">/</span><span>PHP 工具链</span><span class="home-hero__plate-divider">/</span><span>Carthage Software</span></div>
+<h1 class="home-hero__title" id="a-php-toolchain-oxidized">一款 <em>氧化</em> 的 PHP 工具链。</h1>
+<p class="home-hero__lede">Mago 是一款用 Rust 编写的 PHP 静态分析器、linter 和格式化器。专为那些已经超出现有工具链耐心的项目而打造。</p>
+<div class="home-hero__cta">
+<a class="button button--solid" href="../../main/zh/guide/getting-started/index.html"><span>快速开始</span><span class="button__arrow">→</span></a>
+<a class="button" href="../../main/zh/playground/index.html"><span>打开 Playground</span></a>
+</div>
+</div>
+<div class="home-hero__art">
+<img class="home-hero__logo" src="../../main/_assets/img/logo.webp" alt="Mago,头戴巫师帽的耳廓狐" width="416" height="500" loading="eager" decoding="async">
+</div>
+</section>
+<section class="home-section">
+<header class="home-section__head"><span class="home-section__num">§ 01</span><h2 class="home-section__title" id="three-tools-one-binary">三款工具,一个二进制</h2></header>
+<div class="feature-grid">
+<article class="feature">
+<span class="feature__num">01 / Analyze</span>
+<h3 class="feature__name" id="static-analysis">静态分析</h3>
+<p class="feature__body">在代码上线前发现 bug、死代码和不可能的类型。兼容 Psalm 和 PHPStan 注解;理解泛型、条件类型和流向收窄。</p>
+<div class="feature__stat"><strong>1.46s</strong> · 7M 行代码</div>
+</article>
+<article class="feature">
+<span class="feature__num">02 / Lint</span>
+<h3 class="feature__name" id="opinionated-linting">有主张的 lint 检查</h3>
+<p class="feature__body">面向正确性、一致性与清晰度的精选规则集合。在安全的地方保存即修。该静默时静默。</p>
+<div class="feature__stat"><strong>0.88s</strong> · 同一项目</div>
+</article>
+<article class="feature">
+<span class="feature__num">03 / Format</span>
+<h3 class="feature__name" id="formatter">格式化器</h3>
+<p class="feature__body">一款确定性的格式化器,产出稳定且符合惯例的输出。无配置赌局,无争论。装上即用,无需多想。</p>
+<div class="feature__stat"><strong>0.43s</strong> · 同一项目</div>
+</article>
+</div>
+</section>
+<section class="home-section">
+<header class="home-section__head"><span class="home-section__num">§ 02</span><h2 class="home-section__title" id="benchmarks">基准测试</h2></header>
+<p>对照 WordPress,在每个工具的最新稳定版本上测量。数值越低越好;"×"列显示最慢同类工具相对 Mago 的倍数。数据来自 <a href="https://carthage-software.github.io/php-toolchain-benchmarks/?project=wordpress&kind=Analyzers">php-toolchain-benchmarks</a> 仪表盘(包含完整的均值、标准差、最大值、内存等指标),最近一次更新:2026-04-15 02:47:37。</p>
+<table class="bench-table">
+<thead>
+<tr><th>操作</th><th>Mago</th><th>同类 A</th><th>同类 B</th><th class="bench-table__factor">×</th></tr>
+</thead>
+<tbody>
+<tr>
+<td class="bench-table__op">静态分析</td>
+<td class="bench-table__mago">1.46s</td>
+<td class="bench-table__other">Phan 66.4s</td>
+<td class="bench-table__other">PHPStan 55.9s</td>
+<td class="bench-table__factor">45</td>
+</tr>
+<tr>
+<td class="bench-table__op">Lint 检查</td>
+<td class="bench-table__mago">0.88s</td>
+<td class="bench-table__other">PHP-CS-Fixer 25.3s</td>
+<td class="bench-table__other"></td>
+<td class="bench-table__factor">29</td>
+</tr>
+<tr>
+<td class="bench-table__op">格式化</td>
+<td class="bench-table__mago">0.43s</td>
+<td class="bench-table__other">Pretty PHP 24.3s</td>
+<td class="bench-table__other"></td>
+<td class="bench-table__factor">56</td>
+</tr>
+</tbody>
+</table>
+<p><a href="../../main/zh/benchmarks/index.html">阅读完整方法论 →</a></p>
+</section>
+<section class="home-section">
+<header class="home-section__head"><span class="home-section__num">§ 03</span><h2 class="home-section__title" id="install">安装</h2></header>
+<div class="install">
+<div class="install__head"><span><strong>[ INSTALL ]</strong></span><span>shell · macOS · Linux · WSL</span></div>
+<pre class="install__body"><code>curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash</code></pre>
+<div class="install__alt">或通过 <a href="../../main/zh/guide/installation/index.html#composer">Composer</a>、<a href="../../main/zh/guide/installation/index.html#homebrew">Homebrew</a>、<a href="../../main/zh/guide/installation/index.html#cargo">Cargo</a>,或 <a href="../../main/zh/recipes/docker/index.html">预构建 Docker 镜像</a>。</div>
+</div>
+</section>
+<section class="home-section">
+<header class="home-section__head"><span class="home-section__num">§ 04</span><h2 class="home-section__title" id="three-steps-to-first-run">三步开跑</h2></header>
+<ol class="home-steps">
+<li><strong>安装。</strong>一条命令。无需 PHP 运行时。单一静态二进制。</li>
+<li><strong>初始化。</strong>在项目根目录运行 <code>mago init</code>。Mago 会探测你的项目布局并写入 <code>mago.toml</code>。</li>
+<li><strong>运行。</strong>使用 <code>mago analyze</code>、<code>mago lint</code> 或 <code>mago fmt</code>。把它接入 pre-commit、CI 或编辑器。</li>
+</ol>
+</section>
+<section class="home-section">
+<header class="home-section__head"><span class="home-section__num">§ 05</span><h2 class="home-section__title" id="sponsors">赞助商</h2></header>
+<p>Mago 是免费的开源项目,由 <a href="https://github.com/azjezz">Seifeddine Gmati</a> 构建并维护,得到下列公司与个人的支持。</p>
+<div id="home-sponsors" aria-live="polite"></div>
+<div class="sponsors-cta">
+<p>想支持 Mago 的开发?</p>
+<a class="button button--solid" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener"><span>成为赞助者</span><span class="button__arrow">→</span></a>
+</div>
+</section>
+<section class="home-coda">
+<h2 class="home-coda__title" id="try-it-without-installing">无需安装即可试用</h2>
+<p class="home-coda__body">Playground 通过 WebAssembly 在浏览器里运行完整的 Mago 分析器。粘贴任意 PHP 代码,通过 URL 分享结果。</p>
+<p><a class="button button--solid" href="../../main/zh/playground/index.html"><span>打开 Playground</span><span class="button__arrow">→</span></a></p>
+</section>
+    </article>
+  </main>
+
+  <aside class="home-aside home-aside--end" aria-hidden="true">
+    <div class="home-aside__label">Rust core · MIT licence</div>
+  </aside>
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / main / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;main/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;main/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;main/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;main/_assets/js/highlight.js" defer></script>
+  <script src="..&#x2F;..&#x2F;main/_assets/js/sponsors.js" defer></script>
+  
+</body>
+</html>

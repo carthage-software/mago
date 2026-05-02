@@ -1,0 +1,25 @@
+@layer rtl {
+  html[dir="rtl"] .header-dropdown[open] .header-dropdown__menu {
+    inset-inline-end: auto;
+    inset-inline-start: 0;
+  }
+
+  html[dir="rtl"] .doc-page ul {
+    list-style-type: "‹  ";
+  }
+
+  html[dir="rtl"] .home-aside__label {
+    writing-mode: vertical-lr;
+    transform: none;
+  }
+
+  html[dir="rtl"] .home-aside--end .home-aside__label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
+
+  html[dir="rtl"] .pagefind-ui__search-clear {
+    inset-inline-end: auto !important;
+    inset-inline-start: 12px !important;
+  }
+}

@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Analyzer configuration reference · Mago</title>
+  <meta name="description" content="Every option Mago accepts under [analyzer].">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Analyzer configuration reference · Mago">
+  <meta property="og:description" content="Every option Mago accepts under [analyzer].">
+  <meta property="og:url" content="https://mago.carthage.software/main/en/tools&#x2F;analyzer&#x2F;configuration-reference/">
+  <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta property="og:locale" content="en">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Analyzer configuration reference · Mago">
+  <meta name="twitter:description" content="Every option Mago accepts under [analyzer].">
+  <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/main/en/tools&#x2F;analyzer&#x2F;configuration-reference/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/en/index.html">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="Search" aria-label="Search">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">Press &#x2F; to search</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/en/guide/getting-started/index.html">Guide</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/en/faq/index.html">FAQ</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/en/playground/index.html">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Sponsor</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub repository" title="GitHub repository">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord community" title="Discord community">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>main</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../main/en/tools/analyzer/configuration-reference/index.html" aria-current="true">
+        <span>main</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>EN</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../main/en/tools/analyzer/configuration-reference/index.html" aria-current="true">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/fr/tools/analyzer/configuration-reference/index.html">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/zh/tools/analyzer/configuration-reference/index.html">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>This page is not translated yet. You were redirected to the language homepage.</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">Guide</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/en/guide/getting-started/index.html">
+          <span>Getting Started</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/guide/installation/index.html">
+          <span>Installation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/guide/initialization/index.html">
+          <span>Initialization</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/guide/configuration/index.html">
+          <span>Configuration</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/guide/environment-variables/index.html">
+          <span>Environment variables</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/guide/list-files/index.html">
+          <span>Listing files</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/guide/generate-completions/index.html">
+          <span>Shell completions</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/guide/inspecting-the-ast/index.html">
+          <span>Inspecting the AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/guide/upgrading/index.html">
+          <span>Upgrading</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">Fundamentals</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/en/fundamentals/command-line-interface/index.html">
+          <span>Command-line interface</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/fundamentals/baseline/index.html">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/fundamentals/suppressing-issues/index.html">
+          <span>Suppressing issues</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/fundamentals/shared-reporting-options/index.html">
+          <span>Reporting and fixing options</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/en/tools/overview/index.html">
+          <span>Tools</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/en/tools/linter/overview/index.html">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/linter/usage/index.html">
+            <span>Linter usage</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/linter/integrations/index.html">
+            <span>Linter integrations</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/linter/command-reference/index.html">
+            <span>Linter command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/linter/configuration-reference/index.html">
+            <span>Linter configuration reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/linter/rules/index.html">
+            <span>Rules</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection" open>
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/en/tools/analyzer/overview/index.html">
+            <span>Analyzer</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/analyzer/command-reference/index.html">
+            <span>Analyzer command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/analyzer/configuration-reference/index.html" aria-current="page">
+            <span>Analyzer configuration reference</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/en/tools/formatter/overview/index.html">
+            <span>Formatter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/formatter/usage/index.html">
+            <span>Formatter usage</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/formatter/format-ignore/index.html">
+            <span>Format ignore</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/formatter/command-reference/index.html">
+            <span>Formatter command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/formatter/configuration-reference/index.html">
+            <span>Formatter configuration reference</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/en/tools/guard/overview/index.html">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/guard/usage/index.html">
+            <span>Guard usage</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/guard/command-reference/index.html">
+            <span>Guard command reference</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/en/tools/guard/configuration-reference/index.html">
+            <span>Guard configuration reference</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">Recipes</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/en/recipes/vscode/index.html">
+          <span>Visual Studio Code recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/recipes/zed/index.html">
+          <span>Zed recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/recipes/helix/index.html">
+          <span>Helix recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/recipes/pre-commit-hooks/index.html">
+          <span>Pre-commit hooks recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/recipes/github-actions/index.html">
+          <span>GitHub Actions recipe</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/recipes/docker/index.html">
+          <span>Docker recipe</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">Reference</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/en/faq/index.html">
+          <span>FAQ</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/benchmarks/index.html">
+          <span>Benchmarks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/en/contributing/index.html">
+          <span>Contributing</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="configuration-reference">Configuration reference</h1>
+<p>Settings live under <code>[analyzer]</code> in <code>mago.toml</code>.</p>
+<pre><code class="language-toml">[analyzer]
+ignore = ["mixed-argument"]
+baseline = "analyzer-baseline.toml"
+</code></pre>
+<h2 id="general-options">General options</h2>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Paths or glob patterns to exclude from analysis. Additive to <code>[source].excludes</code>.</td></tr>
+<tr><td style="text-align: left"><code>ignore</code></td><td style="text-align: left"><code>(string | object)[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Issue codes to ignore, optionally scoped to specific paths. See below.</td></tr>
+<tr><td style="text-align: left"><code>baseline</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">unset</td><td style="text-align: left">Path to a baseline file. Equivalent to passing <code>--baseline</code> on every run. The CLI flag overrides this.</td></tr>
+<tr><td style="text-align: left"><code>baseline-variant</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"loose"</code></td><td style="text-align: left">Format for newly generated baselines. <code>"loose"</code> (count-based) or <code>"strict"</code> (exact line matching). See <a href="../../../../../main/en/fundamentals/baseline/index.html">baseline</a>.</td></tr>
+<tr><td style="text-align: left"><code>minimum-fail-level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"error"</code></td><td style="text-align: left">Minimum severity that causes a non-zero exit. One of <code>"note"</code>, <code>"help"</code>, <code>"warning"</code>, <code>"error"</code>. Overridden by <code>--minimum-fail-level</code>.</td></tr>
+</tbody></table>
+<p><code>excludes</code> here is added to whatever you set in <code>[source].excludes</code>; it never narrows the global list.</p>
+<pre><code class="language-toml">[source]
+excludes = ["cache/**"]
+
+[analyzer]
+excludes = ["tests/**/*.php"]
+</code></pre>
+<h3 id="path-scoped-ignoring">Path-scoped ignoring</h3>
+<p><code>ignore</code> accepts plain strings, single-path objects, and multi-path objects, mixed freely:</p>
+<pre><code class="language-toml">[analyzer]
+ignore = [
+    "mixed-argument",
+    { code = "missing-return-type", in = "tests/" },
+    { code = "unused-parameter", in = ["tests/", "src/Generated/"] },
+]
+</code></pre>
+<p>Each entry in <code>in</code> is either a directory or file prefix, or a glob pattern. Any value containing <code>*</code>, <code>?</code>, <code>[</code>, or <code>{</code> is treated as a glob and matched against the full relative path; everything else is matched as a prefix. <code>"tests"</code> and <code>"tests/"</code> both match every file under <code>tests</code>.</p>
+<pre><code class="language-toml">[analyzer]
+ignore = [
+    { code = "mixed-assignment", in = [
+        "tests/",
+        "src/Legacy/**/*.php",
+        "modules/*/Generated/*.php",
+    ] },
+]
+</code></pre>
+<p>Glob matching honours the project-wide settings under <code>[source.glob]</code>, so toggles like <code>literal-separator</code> and <code>case-insensitive</code> apply here as well.</p>
+<p><code>excludes</code> and <code>ignore</code> are not the same. <code>excludes</code> removes files from analysis entirely, so they are not parsed for type information. <code>ignore</code> still analyses the file but suppresses the listed codes in the output.</p>
+<h2 id="feature-flags">Feature flags</h2>
+<p>These flags toggle individual analyses. Defaults are tuned for everyday use; flip them on as your codebase tightens up.</p>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>find-unused-expressions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Report expressions whose result is discarded, like <code>$a + $b;</code>.</td></tr>
+<tr><td style="text-align: left"><code>find-unused-definitions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Report private definitions that are never referenced.</td></tr>
+<tr><td style="text-align: left"><code>find-overly-wide-return-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Warn when a declared return type contains a branch the body never produces, like <code>: string|false</code> on a function that always returns a string. Available since 1.20.0.</td></tr>
+<tr><td style="text-align: left"><code>analyze-dead-code</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Analyse code that appears unreachable.</td></tr>
+<tr><td style="text-align: left"><code>memoize-properties</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Track literal property values for sharper inference, at the cost of some memory.</td></tr>
+<tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Allow accessing keys that may be missing without flagging it.</td></tr>
+<tr><td style="text-align: left"><code>check-throws</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report exceptions that are not caught and not declared with <code>@throws</code>.</td></tr>
+<tr><td style="text-align: left"><code>check-missing-override</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report missing <code>#[Override]</code> attributes on overriding methods (PHP 8.3+).</td></tr>
+<tr><td style="text-align: left"><code>find-unused-parameters</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report parameters that are never read.</td></tr>
+<tr><td style="text-align: left"><code>strict-list-index-checks</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Require any integer used as a list index to be provably non-negative.</td></tr>
+<tr><td style="text-align: left"><code>no-boolean-literal-comparison</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Disallow direct comparisons to boolean literals like <code>$a === true</code>.</td></tr>
+<tr><td style="text-align: left"><code>check-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report missing type hints on parameters, properties, and return types.</td></tr>
+<tr><td style="text-align: left"><code>check-closure-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Extend the type-hint check to closures (requires <code>check-missing-type-hints</code>).</td></tr>
+<tr><td style="text-align: left"><code>check-arrow-function-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Extend the type-hint check to arrow functions (requires <code>check-missing-type-hints</code>).</td></tr>
+<tr><td style="text-align: left"><code>allow-implicit-pipe-callable-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Skip the closure / arrow-function type-hint checks when the callable is the right-hand side of <code>|&gt;</code>.</td></tr>
+<tr><td style="text-align: left"><code>register-super-globals</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Register PHP superglobals like <code>$_GET</code> and <code>$_POST</code> automatically.</td></tr>
+<tr><td style="text-align: left"><code>trust-existence-checks</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Narrow types based on <code>method_exists()</code>, <code>property_exists()</code>, <code>function_exists()</code>, and <code>defined()</code>.</td></tr>
+<tr><td style="text-align: left"><code>check-property-initialization</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Verify that typed properties are initialised in a constructor or class initialiser.</td></tr>
+<tr><td style="text-align: left"><code>check-use-statements</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report use statements that import non-existent classes, functions, or constants.</td></tr>
+<tr><td style="text-align: left"><code>check-name-casing</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report incorrect casing when referencing classes, functions, etc. Helps prevent autoload failures on case-sensitive filesystems.</td></tr>
+<tr><td style="text-align: left"><code>enforce-class-finality</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report classes that are not <code>final</code>, <code>abstract</code>, or annotated <code>@api</code> and have no children.</td></tr>
+<tr><td style="text-align: left"><code>require-api-or-internal</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Require abstract classes, interfaces, and traits to be annotated <code>@api</code> or <code>@internal</code>.</td></tr>
+<tr><td style="text-align: left"><code>check-experimental</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report use of <code>@experimental</code> symbols from non-experimental contexts. Available since 1.19.0.</td></tr>
+<tr><td style="text-align: left"><code>allow-side-effects-in-conditions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">When <code>false</code>, report calls to impure functions inside <code>if</code>, <code>while</code>, <code>for</code>, ternary, or <code>match</code> conditions.</td></tr>
+</tbody></table>
+<h2 id="property-initialization">Property initialization</h2>
+<p>When <code>check-property-initialization</code> is enabled, the analyzer reports two issues:</p>
+<ul>
+<li><code>missing-constructor</code> for classes with typed properties and no constructor.</li>
+<li><code>uninitialized-property</code> for typed properties not assigned in the constructor.</li>
+</ul>
+<p><code>class-initializers</code> lets you mark additional methods that should count as initialisers, alongside <code>__construct</code>. Properties assigned in those methods are treated as definitely initialised. This is useful for frameworks that use lifecycle methods.</p>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>class-initializers</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Method names treated as class initialisers.</td></tr>
+</tbody></table>
+<pre><code class="language-toml">[analyzer]
+check-property-initialization = true
+class-initializers = ["setUp", "initialize", "boot"]
+</code></pre>
+<p>With this configuration, the following code does not trigger a false positive:</p>
+<pre><code class="language-php">class MyTest extends TestCase
+{
+    private string $name;
+
+    protected function setUp(): void
+    {
+        $this-&gt;name = "test";
+    }
+}
+</code></pre>
+<h2 id="exception-filtering">Exception filtering</h2>
+<p>When <code>check-throws</code> is enabled, two options let you skip specific exceptions.</p>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>unchecked-exceptions</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Exceptions to ignore, including all subclasses (hierarchy-aware).</td></tr>
+<tr><td style="text-align: left"><code>unchecked-exception-classes</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Exceptions to ignore as exact class matches only. Subclasses and parents are still checked.</td></tr>
+</tbody></table>
+<pre><code class="language-toml">[analyzer]
+check-throws = true
+
+unchecked-exceptions = [
+    "LogicException",
+    "Psl\\Type\\Exception\\ExceptionInterface",
+]
+
+unchecked-exception-classes = [
+    "Psl\\File\\Exception\\FileNotFoundException",
+]
+</code></pre>
+<p>Use <code>unchecked-exceptions</code> to silence an entire category, like every <code>LogicException</code> subclass. Use <code>unchecked-exception-classes</code> when you want to ignore one specific exception while still tracking siblings and parents.</p>
+<h2 id="experimental-api-detection">Experimental API detection</h2>
+<p>Set <code>check-experimental = true</code> to flag use of <code>@experimental</code> symbols from non-experimental code. Mark the symbol with the PHPDoc tag:</p>
+<pre><code class="language-php">/** @experimental */
+class UnstableApi {}
+
+/** @experimental */
+function beta_feature(): void {}
+</code></pre>
+<p>The analyzer warns when these are used from stable code:</p>
+<pre><code class="language-php">new UnstableApi();              // warning
+beta_feature();                 // warning
+class MyService extends UnstableApi {}  // warning
+</code></pre>
+<p>Use from another experimental context is allowed:</p>
+<pre><code class="language-php">/** @experimental */
+function also_experimental(): void {
+    new UnstableApi();
+    beta_feature();
+}
+
+class StableService {
+    /** @experimental */
+    public function experimentalMethod(): void {
+        new UnstableApi();
+    }
+}
+</code></pre>
+<h2 id="plugins">Plugins</h2>
+<p>Plugins ship type providers for libraries and frameworks, so functions return precise types instead of generic ones.</p>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>disable-default-plugins</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Disable all default plugins. Only the names you list in <code>plugins</code> are active.</td></tr>
+<tr><td style="text-align: left"><code>plugins</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Plugins to enable, by name or alias.</td></tr>
+</tbody></table>
+<h3 id="available-plugins">Available plugins</h3>
+<table><thead><tr><th style="text-align: left">Plugin</th><th style="text-align: left">Aliases</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>stdlib</code></td><td style="text-align: left"><code>standard</code>, <code>std</code>, <code>php-stdlib</code></td><td style="text-align: left">enabled</td><td style="text-align: left">PHP built-in functions: <code>strlen</code>, <code>array_*</code>, <code>json_*</code>, and friends.</td></tr>
+<tr><td style="text-align: left"><code>psl</code></td><td style="text-align: left"><code>php-standard-library</code>, <code>azjezz-psl</code></td><td style="text-align: left">disabled</td><td style="text-align: left"><a href="https://github.com/php-standard-library/php-standard-library">php-standard-library</a>.</td></tr>
+<tr><td style="text-align: left"><code>flow-php</code></td><td style="text-align: left"><code>flow</code>, <code>flow-etl</code></td><td style="text-align: left">disabled</td><td style="text-align: left"><a href="https://github.com/flow-php/etl">flow-php/etl</a>.</td></tr>
+<tr><td style="text-align: left"><code>psr-container</code></td><td style="text-align: left"><code>psr-11</code></td><td style="text-align: left">disabled</td><td style="text-align: left"><a href="https://github.com/php-fig/container">psr/container</a>.</td></tr>
+</tbody></table>
+<p>For example, the <code>stdlib</code> plugin teaches the analyzer that <code>strlen($s)</code> returns <code>int&lt;0, max&gt;</code>, that <code>json_decode($json, true)</code> returns <code>array&lt;string, mixed&gt;</code>, and that <code>array_filter($array)</code> keeps the input shape but possibly drops elements.</p>
+<h3 id="examples">Examples</h3>
+<p>Use the defaults (just <code>stdlib</code>):</p>
+<pre><code class="language-toml">[analyzer]
+</code></pre>
+<p>Enable additional plugins:</p>
+<pre><code class="language-toml">[analyzer]
+plugins = ["psl", "flow-php", "psr-container"]
+</code></pre>
+<p>Disable everything:</p>
+<pre><code class="language-toml">[analyzer]
+disable-default-plugins = true
+</code></pre>
+<p>Use only one plugin:</p>
+<pre><code class="language-toml">[analyzer]
+disable-default-plugins = true
+plugins = ["psl"]
+</code></pre>
+<p>Plugin aliases work everywhere, so <code>plugins = ["std"]</code> is the same as <code>plugins = ["stdlib"]</code>.</p>
+<h2 id="strict-mode">Strict mode</h2>
+<p>The analyzer runs at a moderate strictness by default. Crank it up by enabling more checks; ease it off for legacy code.</p>
+<h3 id="maximum-strictness">Maximum strictness</h3>
+<pre><code class="language-toml">[analyzer]
+find-unused-expressions = true
+find-unused-definitions = true
+find-overly-wide-return-types = true
+analyze-dead-code = true
+check-throws = true
+check-missing-override = true
+find-unused-parameters = true
+check-missing-type-hints = true
+check-closure-missing-type-hints = true
+check-arrow-function-missing-type-hints = true
+enforce-class-finality = true
+require-api-or-internal = true
+check-experimental = true
+
+strict-list-index-checks = true
+no-boolean-literal-comparison = true
+
+allow-possibly-undefined-array-keys = false
+trust-existence-checks = false
+</code></pre>
+<h3 id="lenient-mode">Lenient mode</h3>
+<pre><code class="language-toml">[analyzer]
+check-missing-type-hints = false
+strict-list-index-checks = false
+no-boolean-literal-comparison = false
+enforce-class-finality = false
+require-api-or-internal = false
+
+allow-possibly-undefined-array-keys = true
+trust-existence-checks = true
+
+check-throws = false
+</code></pre>
+<p>When introducing Mago to an existing codebase, start lenient with a <a href="../../../../../main/en/fundamentals/baseline/index.html">baseline</a> and tighten the screws as the code improves.</p>
+<h3 id="notes-on-individual-flags">Notes on individual flags</h3>
+<p><code>trust-existence-checks</code> decides whether the analyzer narrows on runtime checks. With it on (the default), this is fine:</p>
+<pre><code class="language-php">function process(object $obj): mixed
+{
+    if (method_exists($obj, 'toArray')) {
+        return $obj-&gt;toArray();
+    }
+
+    return null;
+}
+</code></pre>
+<p>Turn it off and the call requires an explicit type guarantee instead.</p>
+<p><code>allow-implicit-pipe-callable-types</code> skips the closure / arrow-function type-hint checks when the callable is the right operand of <code>|&gt;</code>. The pipe's left operand carries enough type information to derive the parameter, so the missing hint is harmless there.</p>
+<h2 id="performance-tuning">Performance tuning</h2>
+<p>The analyzer uses internal thresholds to balance depth against speed. Settings live under <code>[analyzer.performance]</code>.</p>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>saturation-complexity-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>8192</code></td><td style="text-align: left">Maximum clauses during CNF saturation.</td></tr>
+<tr><td style="text-align: left"><code>disjunction-complexity-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>4096</code></td><td style="text-align: left">Maximum clauses per side in OR operations.</td></tr>
+<tr><td style="text-align: left"><code>negation-complexity-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>4096</code></td><td style="text-align: left">Maximum cumulative complexity when negating formulas.</td></tr>
+<tr><td style="text-align: left"><code>consensus-limit-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>256</code></td><td style="text-align: left">Upper limit for consensus optimisation passes.</td></tr>
+<tr><td style="text-align: left"><code>formula-size-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>512</code></td><td style="text-align: left">Maximum logical formula size before simplification is skipped.</td></tr>
+<tr><td style="text-align: left"><code>string-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">Maximum literal strings tracked before generalising to <code>string</code>.</td></tr>
+<tr><td style="text-align: left"><code>integer-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">Maximum literal integers tracked before generalising to <code>int</code>.</td></tr>
+<tr><td style="text-align: left"><code>array-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>32</code></td><td style="text-align: left">Maximum sealed keyed-array shapes tracked individually before merging.</td></tr>
+<tr><td style="text-align: left"><code>loop-assignment-depth-threshold</code></td><td style="text-align: left"><code>u8</code></td><td style="text-align: left"><code>1</code></td><td style="text-align: left">Maximum loop fixed-point iteration depth. <code>0</code> disables re-iteration.</td></tr>
+</tbody></table>
+<p><code>string-concat-combination-threshold</code> is still accepted as an alias for <code>string-combination-threshold</code>.</p>
+<h3 id="when-to-adjust">When to adjust</h3>
+<p>Defaults work for most projects. Lower the thresholds if analysis feels too slow at the cost of some inference precision. Raise them if you need deeper inference on highly conditional code.</p>
+<h3 id="what-each-threshold-controls">What each threshold controls</h3>
+<p>The analyzer turns type constraints into Conjunctive Normal Form (CNF) logical formulas. These can grow exponentially with complex conditions, so the thresholds prevent runaway computation.</p>
+<ul>
+<li>Saturation complexity caps clauses processed during formula simplification. When exceeded, simplification stops early.</li>
+<li>Disjunction complexity bounds clause growth when combining <code>OR</code>. Wide unions and many branches can hit this.</li>
+<li>Negation complexity bounds expansion when negating formulas, for example computing <code>else</code> branches from a complicated <code>if</code>.</li>
+<li>Consensus limit caps an optimisation pass that detects logical tautologies. Higher values may find more simplifications.</li>
+<li>Formula size is the overall complexity ceiling before the analyzer falls back to simpler inference.</li>
+<li>String / integer combination caps how many literal values are tracked before the analyzer widens to <code>string</code> or <code>int</code>. Without these, very large arrays or switch statements would push combine cost to O(n²).</li>
+<li>Array combination caps how many distinct sealed keyed-array shapes are kept separate during type combination. When procedural code accumulates many slightly different shapes for the same variable across branches, the combiner keeps each one until this threshold is hit and merges them into a generalised shape. Increase it for code that depends on very precise per-key narrowing.</li>
+<li>Loop assignment depth caps how many fixed-point iterations the loop analyzer runs over each loop body. With a chain of <code>N</code> loop-carried dependencies, up to <code>N</code> extra passes may be needed for types at the end of the chain to fully stabilise; each pass re-analyses the whole body. The default of <code>1</code> is enough for almost all real code. Raise it to <code>2</code> or <code>3</code> for codebases that need very precise narrowing of deep loop-carried chains. <code>0</code> disables re-iteration entirely, which is the fastest setting but may leave some self-dependent types wider than necessary.</li>
+</ul>
+<h3 id="examples-2">Examples</h3>
+<p>Fast analysis, lower precision:</p>
+<pre><code class="language-toml">[analyzer.performance]
+saturation-complexity-threshold = 2048
+disjunction-complexity-threshold = 1024
+negation-complexity-threshold = 1024
+consensus-limit-threshold = 64
+formula-size-threshold = 128
+string-combination-threshold = 64
+integer-combination-threshold = 64
+array-combination-threshold = 16
+loop-assignment-depth-threshold = 1
+</code></pre>
+<p>Deep analysis, slower:</p>
+<pre><code class="language-toml">[analyzer.performance]
+saturation-complexity-threshold = 16384
+disjunction-complexity-threshold = 8192
+negation-complexity-threshold = 8192
+consensus-limit-threshold = 512
+formula-size-threshold = 1024
+string-combination-threshold = 256
+integer-combination-threshold = 256
+array-combination-threshold = 256
+loop-assignment-depth-threshold = 4
+</code></pre>
+<p>Raising thresholds can swing analysis time noticeably on codebases with heavy conditional logic or files with thousands of array operations. Test on your project before deploying to CI.</p>
+<h3 id="diagnosing-slow-runs">Diagnosing slow runs</h3>
+<p>If Mago feels slow, that usually points to a bug in Mago rather than normal behaviour. For reference, on an Apple M1 Pro the analyzer covers all of <a href="https://github.com/WordPress/wordpress-develop"><code>WordPress/wordpress-develop</code></a> in under two seconds and <a href="https://github.com/php-standard-library/php-standard-library"><code>php-standard-library/php-standard-library</code></a> in under 200 milliseconds. Numbers will vary with hardware and project size, but as a rough threshold: if Mago takes more than 30 seconds to analyse your project, something is off, either in Mago or in a pathological input it is tripping over.</p>
+<p>The same applies to a regression you notice between releases. If a previously fast analysis suddenly becomes slow, that is worth reporting.</p>
+<p>Re-run with <code>MAGO_LOG=trace</code> to get a full pipeline trace:</p>
+<pre><code class="language-bash">MAGO_LOG=trace mago analyze
+</code></pre>
+<p>With tracing on, Mago:</p>
+<ul>
+<li>Starts a hang watcher that flags any single file analysing for more than a few seconds. Useful for catching the file that sends the analyzer into a long or infinite loop.</li>
+<li>Prints the slowest files seen during the parallel analyse phase, so you can see which inputs dominated total time.</li>
+<li>Emits per-phase durations for source discovery, compilation, codebase merge, metadata population, parallel analyse, reduce, and so on, so you can tell which stage is responsible.</li>
+</ul>
+<p>When reporting a slow run or a regression, include the full trace output and the file the hang watcher points at. Anonymising names and scrubbing sensitive literals is enough; we just need to reproduce the shape of the input.</p>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/en/tools/analyzer/configuration-reference.md">↳ Edit this page →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="On this page">
+  <p class="doc-toc__heading">On this page</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#general-options">General options</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#path-scoped-ignoring">Path-scoped ignoring</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#feature-flags">Feature flags</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#property-initialization">Property initialization</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#exception-filtering">Exception filtering</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#experimental-api-detection">Experimental API detection</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#plugins">Plugins</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#available-plugins">Available plugins</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#examples">Examples</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#strict-mode">Strict mode</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#maximum-strictness">Maximum strictness</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#lenient-mode">Lenient mode</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#notes-on-individual-flags">Notes on individual flags</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#performance-tuning">Performance tuning</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#when-to-adjust">When to adjust</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#what-each-threshold-controls">What each threshold controls</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#examples-2">Examples</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#diagnosing-slow-runs">Diagnosing slow runs</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / main / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

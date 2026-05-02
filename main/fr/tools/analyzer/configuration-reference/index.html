@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Référence de configuration de l&#x27;analyseur · Mago</title>
+  <meta name="description" content="Toutes les options que Mago accepte sous [analyzer].">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Référence de configuration de l&#x27;analyseur · Mago">
+  <meta property="og:description" content="Toutes les options que Mago accepte sous [analyzer].">
+  <meta property="og:url" content="https://mago.carthage.software/main/fr/tools&#x2F;analyzer&#x2F;configuration-reference/">
+  <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta property="og:locale" content="fr">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Référence de configuration de l&#x27;analyseur · Mago">
+  <meta name="twitter:description" content="Toutes les options que Mago accepte sous [analyzer].">
+  <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/main/fr/tools&#x2F;analyzer&#x2F;configuration-reference/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/index.html">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="Recherche" aria-label="Recherche">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">Appuyez sur &#x2F; pour rechercher</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/guide/getting-started/index.html">Guide</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/faq/index.html">FAQ</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/playground/index.html">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Soutenir</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="Dépôt GitHub" title="Dépôt GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Communauté Discord" title="Communauté Discord">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>main</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../main/fr/tools/analyzer/configuration-reference/index.html" aria-current="true">
+        <span>main</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>FR</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../main/en/tools/analyzer/configuration-reference/index.html">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/fr/tools/analyzer/configuration-reference/index.html" aria-current="true">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/zh/tools/analyzer/configuration-reference/index.html">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Changer le thème">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">Cette traduction peut être obsolète.</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>Cette page n&#x27;est pas encore traduite. Vous avez été redirigé vers la page d&#x27;accueil de la langue.</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">Guide</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/fr/guide/getting-started/index.html">
+          <span>Premiers pas</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/installation/index.html">
+          <span>Installation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/initialization/index.html">
+          <span>Initialisation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/configuration/index.html">
+          <span>Configuration</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/environment-variables/index.html">
+          <span>Variables d&#x27;environnement</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/list-files/index.html">
+          <span>Lister les fichiers</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/generate-completions/index.html">
+          <span>Complétions du shell</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/inspecting-the-ast/index.html">
+          <span>Inspecter l&#x27;AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/guide/upgrading/index.html">
+          <span>Mettre à jour</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">Fondamentaux</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/fr/fundamentals/command-line-interface/index.html">
+          <span>Interface en ligne de commande</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/fundamentals/baseline/index.html">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/fundamentals/suppressing-issues/index.html">
+          <span>Supprimer les problèmes</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/fundamentals/shared-reporting-options/index.html">
+          <span>Options de rapport et de correction</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/fr/tools/overview/index.html">
+          <span>Outils</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/overview/index.html">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/usage/index.html">
+            <span>Utilisation du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/integrations/index.html">
+            <span>Intégrations du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/command-reference/index.html">
+            <span>Référence de commande du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/configuration-reference/index.html">
+            <span>Référence de configuration du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/linter/rules/index.html">
+            <span>Règles</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection" open>
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/fr/tools/analyzer/overview/index.html">
+            <span>Analyseur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/analyzer/command-reference/index.html">
+            <span>Référence de commande de l&#x27;analyseur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/analyzer/configuration-reference/index.html" aria-current="page">
+            <span>Référence de configuration de l&#x27;analyseur</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/fr/tools/formatter/overview/index.html">
+            <span>Formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/formatter/usage/index.html">
+            <span>Utilisation du formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/formatter/format-ignore/index.html">
+            <span>Format ignore</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/formatter/command-reference/index.html">
+            <span>Référence de commande du formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/formatter/configuration-reference/index.html">
+            <span>Référence de configuration du formateur</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/fr/tools/guard/overview/index.html">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/guard/usage/index.html">
+            <span>Utilisation du guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/guard/command-reference/index.html">
+            <span>Référence de commande du guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/fr/tools/guard/configuration-reference/index.html">
+            <span>Référence de configuration du guard</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">Recettes</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/vscode/index.html">
+          <span>Recette Visual Studio Code</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/zed/index.html">
+          <span>Recette Zed</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/helix/index.html">
+          <span>Recette Helix</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/pre-commit-hooks/index.html">
+          <span>Recette pre-commit hooks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/github-actions/index.html">
+          <span>Recette GitHub Actions</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/recipes/docker/index.html">
+          <span>Recette Docker</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">Référence</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/fr/faq/index.html">
+          <span>FAQ</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/benchmarks/index.html">
+          <span>Benchmarks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/fr/contributing/index.html">
+          <span>Contribuer</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="configuration-reference">Référence de configuration</h1>
+<p>Les paramètres se trouvent sous <code>[analyzer]</code> dans <code>mago.toml</code>.</p>
+<pre><code class="language-toml">[analyzer]
+ignore = ["mixed-argument"]
+baseline = "analyzer-baseline.toml"
+</code></pre>
+<h2 id="general-options">Options générales</h2>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Chemins ou motifs glob à exclure de l'analyse. S'ajoute à <code>[source].excludes</code>.</td></tr>
+<tr><td style="text-align: left"><code>ignore</code></td><td style="text-align: left"><code>(string | object)[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Codes de problèmes à ignorer, optionnellement délimités à des chemins spécifiques. Voir ci-dessous.</td></tr>
+<tr><td style="text-align: left"><code>baseline</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">non défini</td><td style="text-align: left">Chemin vers un fichier de baseline. Équivalent à passer <code>--baseline</code> à chaque exécution. L'indicateur CLI le remplace.</td></tr>
+<tr><td style="text-align: left"><code>baseline-variant</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"loose"</code></td><td style="text-align: left">Format pour les baselines nouvellement générées. <code>"loose"</code> (basée sur le compte) ou <code>"strict"</code> (correspondance exacte de ligne). Voir <a href="../../../../../main/fr/fundamentals/baseline/index.html">baseline</a>.</td></tr>
+<tr><td style="text-align: left"><code>minimum-fail-level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"error"</code></td><td style="text-align: left">Sévérité minimale qui provoque un code de sortie non nul. L'un de <code>"note"</code>, <code>"help"</code>, <code>"warning"</code>, <code>"error"</code>. Remplacé par <code>--minimum-fail-level</code>.</td></tr>
+</tbody></table>
+<p><code>excludes</code> ici s'ajoute à ce que vous avez défini dans <code>[source].excludes</code> ; il ne réduit jamais la liste globale.</p>
+<pre><code class="language-toml">[source]
+excludes = ["cache/**"]
+
+[analyzer]
+excludes = ["tests/**/*.php"]
+</code></pre>
+<h3 id="path-scoped-ignoring">Ignorer par chemin</h3>
+<p><code>ignore</code> accepte des chaînes simples, des objets à un seul chemin et des objets à plusieurs chemins, mélangés librement :</p>
+<pre><code class="language-toml">[analyzer]
+ignore = [
+    "mixed-argument",
+    { code = "missing-return-type", in = "tests/" },
+    { code = "unused-parameter", in = ["tests/", "src/Generated/"] },
+]
+</code></pre>
+<p>Chaque entrée dans <code>in</code> est soit un préfixe de répertoire ou de fichier, soit un motif glob. Toute valeur contenant <code>*</code>, <code>?</code>, <code>[</code> ou <code>{</code> est traitée comme un glob et associée au chemin relatif complet ; tout le reste est associé comme préfixe. <code>"tests"</code> et <code>"tests/"</code> correspondent tous deux à chaque fichier sous <code>tests</code>.</p>
+<pre><code class="language-toml">[analyzer]
+ignore = [
+    { code = "mixed-assignment", in = [
+        "tests/",
+        "src/Legacy/**/*.php",
+        "modules/*/Generated/*.php",
+    ] },
+]
+</code></pre>
+<p>La correspondance glob respecte les paramètres globaux du projet sous <code>[source.glob]</code>, donc des bascules comme <code>literal-separator</code> et <code>case-insensitive</code> s'appliquent ici aussi.</p>
+<p><code>excludes</code> et <code>ignore</code> ne sont pas la même chose. <code>excludes</code> retire entièrement les fichiers de l'analyse, ils ne sont donc pas analysés pour les informations de type. <code>ignore</code> analyse toujours le fichier mais supprime les codes listés dans la sortie.</p>
+<h2 id="feature-flags">Indicateurs de fonctionnalité</h2>
+<p>Ces indicateurs activent ou désactivent des analyses individuelles. Les valeurs par défaut sont ajustées pour un usage quotidien ; activez-les à mesure que votre base de code se renforce.</p>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>find-unused-expressions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Signale les expressions dont le résultat est ignoré, comme <code>$a + $b;</code>.</td></tr>
+<tr><td style="text-align: left"><code>find-unused-definitions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Signale les définitions privées qui ne sont jamais référencées.</td></tr>
+<tr><td style="text-align: left"><code>find-overly-wide-return-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Avertit lorsqu'un type de retour déclaré contient une branche que le corps ne produit jamais, comme <code>: string|false</code> sur une fonction qui retourne toujours une chaîne. Disponible depuis 1.20.0.</td></tr>
+<tr><td style="text-align: left"><code>analyze-dead-code</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Analyse le code qui semble inaccessible.</td></tr>
+<tr><td style="text-align: left"><code>memoize-properties</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Suit les valeurs littérales de propriété pour une inférence plus précise, au prix d'un peu de mémoire.</td></tr>
+<tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Autorise l'accès aux clés qui peuvent manquer sans le signaler.</td></tr>
+<tr><td style="text-align: left"><code>check-throws</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les exceptions non capturées et non déclarées avec <code>@throws</code>.</td></tr>
+<tr><td style="text-align: left"><code>check-missing-override</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les attributs <code>#[Override]</code> manquants sur les méthodes redéfinissantes (PHP 8.3+).</td></tr>
+<tr><td style="text-align: left"><code>find-unused-parameters</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les paramètres qui ne sont jamais lus.</td></tr>
+<tr><td style="text-align: left"><code>strict-list-index-checks</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Exige que tout entier utilisé comme index de liste soit prouvé non négatif.</td></tr>
+<tr><td style="text-align: left"><code>no-boolean-literal-comparison</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Interdit les comparaisons directes aux littéraux booléens comme <code>$a === true</code>.</td></tr>
+<tr><td style="text-align: left"><code>check-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les indications de types manquantes sur les paramètres, propriétés et types de retour.</td></tr>
+<tr><td style="text-align: left"><code>check-closure-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Étend la vérification d'indications de types aux closures (nécessite <code>check-missing-type-hints</code>).</td></tr>
+<tr><td style="text-align: left"><code>check-arrow-function-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Étend la vérification d'indications de types aux fonctions fléchées (nécessite <code>check-missing-type-hints</code>).</td></tr>
+<tr><td style="text-align: left"><code>allow-implicit-pipe-callable-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Ignore les vérifications d'indications de types des closures / fonctions fléchées lorsque le callable est l'opérande de droite de <code>|&gt;</code>.</td></tr>
+<tr><td style="text-align: left"><code>register-super-globals</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Enregistre automatiquement les superglobales PHP comme <code>$_GET</code> et <code>$_POST</code>.</td></tr>
+<tr><td style="text-align: left"><code>trust-existence-checks</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Affine les types selon <code>method_exists()</code>, <code>property_exists()</code>, <code>function_exists()</code> et <code>defined()</code>.</td></tr>
+<tr><td style="text-align: left"><code>check-property-initialization</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Vérifie que les propriétés typées sont initialisées dans un constructeur ou un initialiseur de classe.</td></tr>
+<tr><td style="text-align: left"><code>check-use-statements</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les instructions use qui importent des classes, fonctions ou constantes inexistantes.</td></tr>
+<tr><td style="text-align: left"><code>check-name-casing</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les casses incorrectes lors du référencement des classes, fonctions, etc. Aide à prévenir les échecs d'autoload sur les systèmes de fichiers sensibles à la casse.</td></tr>
+<tr><td style="text-align: left"><code>enforce-class-finality</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les classes qui ne sont pas <code>final</code>, <code>abstract</code> ou annotées <code>@api</code> et n'ont pas d'enfants.</td></tr>
+<tr><td style="text-align: left"><code>require-api-or-internal</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Exige que les classes abstraites, interfaces et traits soient annotés <code>@api</code> ou <code>@internal</code>.</td></tr>
+<tr><td style="text-align: left"><code>check-experimental</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale l'utilisation de symboles <code>@experimental</code> depuis des contextes non expérimentaux. Disponible depuis 1.19.0.</td></tr>
+<tr><td style="text-align: left"><code>allow-side-effects-in-conditions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Lorsque <code>false</code>, signale les appels à des fonctions impures à l'intérieur des conditions de <code>if</code>, <code>while</code>, <code>for</code>, ternaire ou <code>match</code>.</td></tr>
+</tbody></table>
+<h2 id="property-initialization">Initialisation des propriétés</h2>
+<p>Lorsque <code>check-property-initialization</code> est activé, l'analyseur signale deux problèmes :</p>
+<ul>
+<li><code>missing-constructor</code> pour les classes avec des propriétés typées et sans constructeur.</li>
+<li><code>uninitialized-property</code> pour les propriétés typées non assignées dans le constructeur.</li>
+</ul>
+<p><code>class-initializers</code> vous permet de marquer des méthodes supplémentaires qui doivent compter comme initialiseurs, aux côtés de <code>__construct</code>. Les propriétés assignées dans ces méthodes sont traitées comme définitivement initialisées. C'est utile pour les frameworks qui utilisent des méthodes de cycle de vie.</p>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>class-initializers</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Noms de méthodes traitées comme initialiseurs de classe.</td></tr>
+</tbody></table>
+<pre><code class="language-toml">[analyzer]
+check-property-initialization = true
+class-initializers = ["setUp", "initialize", "boot"]
+</code></pre>
+<p>Avec cette configuration, le code suivant ne déclenche pas un faux positif :</p>
+<pre><code class="language-php">class MyTest extends TestCase
+{
+    private string $name;
+
+    protected function setUp(): void
+    {
+        $this-&gt;name = "test";
+    }
+}
+</code></pre>
+<h2 id="exception-filtering">Filtrage d'exceptions</h2>
+<p>Lorsque <code>check-throws</code> est activé, deux options vous permettent d'ignorer des exceptions spécifiques.</p>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>unchecked-exceptions</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Exceptions à ignorer, y compris toutes les sous-classes (conscient de la hiérarchie).</td></tr>
+<tr><td style="text-align: left"><code>unchecked-exception-classes</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Exceptions à ignorer comme correspondances exactes de classe uniquement. Les sous-classes et parents sont toujours vérifiés.</td></tr>
+</tbody></table>
+<pre><code class="language-toml">[analyzer]
+check-throws = true
+
+unchecked-exceptions = [
+    "LogicException",
+    "Psl\\Type\\Exception\\ExceptionInterface",
+]
+
+unchecked-exception-classes = [
+    "Psl\\File\\Exception\\FileNotFoundException",
+]
+</code></pre>
+<p>Utilisez <code>unchecked-exceptions</code> pour faire taire toute une catégorie, comme chaque sous-classe de <code>LogicException</code>. Utilisez <code>unchecked-exception-classes</code> lorsque vous voulez ignorer une exception spécifique tout en suivant les frères et parents.</p>
+<h2 id="experimental-api-detection">Détection d'API expérimentale</h2>
+<p>Définissez <code>check-experimental = true</code> pour signaler l'utilisation de symboles <code>@experimental</code> depuis du code non expérimental. Marquez le symbole avec la balise PHPDoc :</p>
+<pre><code class="language-php">/** @experimental */
+class UnstableApi {}
+
+/** @experimental */
+function beta_feature(): void {}
+</code></pre>
+<p>L'analyseur avertit lorsque ceux-ci sont utilisés depuis du code stable :</p>
+<pre><code class="language-php">new UnstableApi();              // warning
+beta_feature();                 // warning
+class MyService extends UnstableApi {}  // warning
+</code></pre>
+<p>L'utilisation depuis un autre contexte expérimental est autorisée :</p>
+<pre><code class="language-php">/** @experimental */
+function also_experimental(): void {
+    new UnstableApi();
+    beta_feature();
+}
+
+class StableService {
+    /** @experimental */
+    public function experimentalMethod(): void {
+        new UnstableApi();
+    }
+}
+</code></pre>
+<h2 id="plugins">Plugins</h2>
+<p>Les plugins fournissent des fournisseurs de types pour les bibliothèques et frameworks, afin que les fonctions retournent des types précis au lieu de génériques.</p>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>disable-default-plugins</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Désactive tous les plugins par défaut. Seuls les noms que vous listez dans <code>plugins</code> sont actifs.</td></tr>
+<tr><td style="text-align: left"><code>plugins</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Plugins à activer, par nom ou alias.</td></tr>
+</tbody></table>
+<h3 id="available-plugins">Plugins disponibles</h3>
+<table><thead><tr><th style="text-align: left">Plugin</th><th style="text-align: left">Alias</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>stdlib</code></td><td style="text-align: left"><code>standard</code>, <code>std</code>, <code>php-stdlib</code></td><td style="text-align: left">activé</td><td style="text-align: left">Fonctions intégrées PHP : <code>strlen</code>, <code>array_*</code>, <code>json_*</code>, et autres.</td></tr>
+<tr><td style="text-align: left"><code>psl</code></td><td style="text-align: left"><code>php-standard-library</code>, <code>azjezz-psl</code></td><td style="text-align: left">désactivé</td><td style="text-align: left"><a href="https://github.com/php-standard-library/php-standard-library">php-standard-library</a>.</td></tr>
+<tr><td style="text-align: left"><code>flow-php</code></td><td style="text-align: left"><code>flow</code>, <code>flow-etl</code></td><td style="text-align: left">désactivé</td><td style="text-align: left"><a href="https://github.com/flow-php/etl">flow-php/etl</a>.</td></tr>
+<tr><td style="text-align: left"><code>psr-container</code></td><td style="text-align: left"><code>psr-11</code></td><td style="text-align: left">désactivé</td><td style="text-align: left"><a href="https://github.com/php-fig/container">psr/container</a>.</td></tr>
+</tbody></table>
+<p>Par exemple, le plugin <code>stdlib</code> apprend à l'analyseur que <code>strlen($s)</code> retourne <code>int&lt;0, max&gt;</code>, que <code>json_decode($json, true)</code> retourne <code>array&lt;string, mixed&gt;</code> et que <code>array_filter($array)</code> conserve la forme d'entrée mais peut perdre des éléments.</p>
+<h3 id="examples">Exemples</h3>
+<p>Utiliser les valeurs par défaut (juste <code>stdlib</code>) :</p>
+<pre><code class="language-toml">[analyzer]
+</code></pre>
+<p>Activer des plugins supplémentaires :</p>
+<pre><code class="language-toml">[analyzer]
+plugins = ["psl", "flow-php", "psr-container"]
+</code></pre>
+<p>Tout désactiver :</p>
+<pre><code class="language-toml">[analyzer]
+disable-default-plugins = true
+</code></pre>
+<p>Utiliser un seul plugin :</p>
+<pre><code class="language-toml">[analyzer]
+disable-default-plugins = true
+plugins = ["psl"]
+</code></pre>
+<p>Les alias de plugin fonctionnent partout, donc <code>plugins = ["std"]</code> est identique à <code>plugins = ["stdlib"]</code>.</p>
+<h2 id="strict-mode">Mode strict</h2>
+<p>L'analyseur s'exécute à une rigueur modérée par défaut. Augmentez-la en activant plus de vérifications ; assouplissez-la pour le code hérité.</p>
+<h3 id="maximum-strictness">Rigueur maximale</h3>
+<pre><code class="language-toml">[analyzer]
+find-unused-expressions = true
+find-unused-definitions = true
+find-overly-wide-return-types = true
+analyze-dead-code = true
+check-throws = true
+check-missing-override = true
+find-unused-parameters = true
+check-missing-type-hints = true
+check-closure-missing-type-hints = true
+check-arrow-function-missing-type-hints = true
+enforce-class-finality = true
+require-api-or-internal = true
+check-experimental = true
+
+strict-list-index-checks = true
+no-boolean-literal-comparison = true
+
+allow-possibly-undefined-array-keys = false
+trust-existence-checks = false
+</code></pre>
+<h3 id="lenient-mode">Mode indulgent</h3>
+<pre><code class="language-toml">[analyzer]
+check-missing-type-hints = false
+strict-list-index-checks = false
+no-boolean-literal-comparison = false
+enforce-class-finality = false
+require-api-or-internal = false
+
+allow-possibly-undefined-array-keys = true
+trust-existence-checks = true
+
+check-throws = false
+</code></pre>
+<p>Lors de l'introduction de Mago dans une base de code existante, commencez en mode indulgent avec une <a href="../../../../../main/fr/fundamentals/baseline/index.html">baseline</a> et serrez les vis à mesure que le code s'améliore.</p>
+<h3 id="notes-on-individual-flags">Notes sur les indicateurs individuels</h3>
+<p><code>trust-existence-checks</code> décide si l'analyseur affine sur les vérifications à l'exécution. Avec lui activé (le défaut), ceci convient :</p>
+<pre><code class="language-php">function process(object $obj): mixed
+{
+    if (method_exists($obj, 'toArray')) {
+        return $obj-&gt;toArray();
+    }
+
+    return null;
+}
+</code></pre>
+<p>Désactivez-le et l'appel exige une garantie de type explicite à la place.</p>
+<p><code>allow-implicit-pipe-callable-types</code> ignore les vérifications d'indications de types des closures / fonctions fléchées lorsque le callable est l'opérande de droite de <code>|&gt;</code>. L'opérande de gauche du pipe porte assez d'informations de type pour dériver le paramètre, donc l'indication manquante est inoffensive là.</p>
+<h2 id="performance-tuning">Réglage des performances</h2>
+<p>L'analyseur utilise des seuils internes pour équilibrer profondeur et vitesse. Les paramètres se trouvent sous <code>[analyzer.performance]</code>.</p>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>saturation-complexity-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>8192</code></td><td style="text-align: left">Nombre maximal de clauses pendant la saturation CNF.</td></tr>
+<tr><td style="text-align: left"><code>disjunction-complexity-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>4096</code></td><td style="text-align: left">Nombre maximal de clauses par côté dans les opérations OR.</td></tr>
+<tr><td style="text-align: left"><code>negation-complexity-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>4096</code></td><td style="text-align: left">Complexité cumulative maximale lors de la négation des formules.</td></tr>
+<tr><td style="text-align: left"><code>consensus-limit-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>256</code></td><td style="text-align: left">Limite supérieure pour les passes d'optimisation par consensus.</td></tr>
+<tr><td style="text-align: left"><code>formula-size-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>512</code></td><td style="text-align: left">Taille maximale de la formule logique avant que la simplification soit ignorée.</td></tr>
+<tr><td style="text-align: left"><code>string-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">Nombre maximal de chaînes littérales suivies avant la généralisation à <code>string</code>.</td></tr>
+<tr><td style="text-align: left"><code>integer-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">Nombre maximal d'entiers littéraux suivis avant la généralisation à <code>int</code>.</td></tr>
+<tr><td style="text-align: left"><code>array-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>32</code></td><td style="text-align: left">Nombre maximal de formes de tableaux clés scellés suivies individuellement avant fusion.</td></tr>
+<tr><td style="text-align: left"><code>loop-assignment-depth-threshold</code></td><td style="text-align: left"><code>u8</code></td><td style="text-align: left"><code>1</code></td><td style="text-align: left">Profondeur maximale d'itération à point fixe de boucle. <code>0</code> désactive la ré-itération.</td></tr>
+</tbody></table>
+<p><code>string-concat-combination-threshold</code> est toujours accepté comme alias pour <code>string-combination-threshold</code>.</p>
+<h3 id="when-to-adjust">Quand ajuster</h3>
+<p>Les valeurs par défaut fonctionnent pour la plupart des projets. Abaissez les seuils si l'analyse semble trop lente au prix d'une certaine précision d'inférence. Augmentez-les si vous avez besoin d'une inférence plus profonde sur du code hautement conditionnel.</p>
+<h3 id="what-each-threshold-controls">Ce que chaque seuil contrôle</h3>
+<p>L'analyseur transforme les contraintes de type en formules logiques sous Forme Normale Conjonctive (CNF). Celles-ci peuvent croître exponentiellement avec des conditions complexes, donc les seuils empêchent un calcul incontrôlé.</p>
+<ul>
+<li>La complexité de saturation plafonne les clauses traitées pendant la simplification de formule. Une fois dépassée, la simplification s'arrête tôt.</li>
+<li>La complexité de disjonction borne la croissance des clauses lors de la combinaison <code>OR</code>. Les unions larges et de nombreuses branches peuvent atteindre cela.</li>
+<li>La complexité de négation borne l'expansion lors de la négation des formules, par exemple le calcul des branches <code>else</code> à partir d'un <code>if</code> compliqué.</li>
+<li>La limite de consensus plafonne une passe d'optimisation qui détecte les tautologies logiques. Des valeurs plus élevées peuvent trouver plus de simplifications.</li>
+<li>La taille de formule est le plafond global de complexité avant que l'analyseur ne se rabatte sur une inférence plus simple.</li>
+<li>Les seuils de combinaison de chaînes / entiers plafonnent combien de valeurs littérales sont suivies avant que l'analyseur ne s'élargisse à <code>string</code> ou <code>int</code>. Sans ceux-ci, de très grands tableaux ou instructions switch pousseraient le coût de combinaison à O(n²).</li>
+<li>Le seuil de combinaison de tableaux plafonne combien de formes distinctes de tableaux clés scellés sont gardées séparées pendant la combinaison de types. Lorsque du code procédural accumule de nombreuses formes légèrement différentes pour la même variable à travers les branches, le combinateur garde chacune jusqu'à ce que ce seuil soit atteint et les fusionne en une forme généralisée. Augmentez-le pour du code qui dépend d'un raffinement très précis par clé.</li>
+<li>Le seuil de profondeur d'affectation de boucle plafonne combien d'itérations à point fixe l'analyseur de boucle exécute sur chaque corps de boucle. Avec une chaîne de <code>N</code> dépendances portées par la boucle, jusqu'à <code>N</code> passes supplémentaires peuvent être nécessaires pour que les types à la fin de la chaîne se stabilisent complètement ; chaque passe ré-analyse tout le corps. Le défaut de <code>1</code> est suffisant pour presque tout code réel. Augmentez-le à <code>2</code> ou <code>3</code> pour les bases de code qui ont besoin d'un raffinement très précis de chaînes profondes portées par les boucles. <code>0</code> désactive complètement la ré-itération, ce qui est le réglage le plus rapide mais peut laisser certains types auto-dépendants plus larges que nécessaire.</li>
+</ul>
+<h3 id="examples-2">Exemples</h3>
+<p>Analyse rapide, précision moindre :</p>
+<pre><code class="language-toml">[analyzer.performance]
+saturation-complexity-threshold = 2048
+disjunction-complexity-threshold = 1024
+negation-complexity-threshold = 1024
+consensus-limit-threshold = 64
+formula-size-threshold = 128
+string-combination-threshold = 64
+integer-combination-threshold = 64
+array-combination-threshold = 16
+loop-assignment-depth-threshold = 1
+</code></pre>
+<p>Analyse profonde, plus lente :</p>
+<pre><code class="language-toml">[analyzer.performance]
+saturation-complexity-threshold = 16384
+disjunction-complexity-threshold = 8192
+negation-complexity-threshold = 8192
+consensus-limit-threshold = 512
+formula-size-threshold = 1024
+string-combination-threshold = 256
+integer-combination-threshold = 256
+array-combination-threshold = 256
+loop-assignment-depth-threshold = 4
+</code></pre>
+<p>Augmenter les seuils peut faire varier sensiblement le temps d'analyse sur les bases de code avec une lourde logique conditionnelle ou des fichiers contenant des milliers d'opérations sur tableau. Testez sur votre projet avant de déployer en CI.</p>
+<h3 id="diagnosing-slow-runs">Diagnostiquer les exécutions lentes</h3>
+<p>Si Mago semble lent, cela pointe généralement vers un bug dans Mago plutôt que vers un comportement normal. À titre de référence, sur un Apple M1 Pro l'analyseur couvre tout <a href="https://github.com/WordPress/wordpress-develop"><code>WordPress/wordpress-develop</code></a> en moins de deux secondes et <a href="https://github.com/php-standard-library/php-standard-library"><code>php-standard-library/php-standard-library</code></a> en moins de 200 millisecondes. Les chiffres varient avec le matériel et la taille du projet, mais comme seuil grossier : si Mago prend plus de 30 secondes pour analyser votre projet, quelque chose ne va pas, soit dans Mago, soit dans une entrée pathologique sur laquelle il bute.</p>
+<p>Le même principe s'applique à une régression que vous remarquez entre versions. Si une analyse précédemment rapide devient soudainement lente, cela mérite d'être signalé.</p>
+<p>Relancez avec <code>MAGO_LOG=trace</code> pour obtenir une trace complète du pipeline :</p>
+<pre><code class="language-bash">MAGO_LOG=trace mago analyze
+</code></pre>
+<p>Avec le traçage activé, Mago :</p>
+<ul>
+<li>Démarre un surveillant de blocage qui signale tout fichier unique dont l'analyse dure plus de quelques secondes. Utile pour attraper le fichier qui envoie l'analyseur dans une boucle longue ou infinie.</li>
+<li>Imprime les fichiers les plus lents vus pendant la phase d'analyse parallèle, vous pouvez donc voir quelles entrées ont dominé le temps total.</li>
+<li>Émet les durées par phase pour la découverte des sources, la compilation, la fusion de la base de code, le peuplement des métadonnées, l'analyse parallèle, la réduction, etc., vous pouvez donc dire quelle étape est responsable.</li>
+</ul>
+<p>Lorsque vous signalez une exécution lente ou une régression, incluez la sortie complète de la trace et le fichier sur lequel le surveillant de blocage pointe. Anonymiser les noms et nettoyer les littéraux sensibles suffit ; nous avons juste besoin de reproduire la forme de l'entrée.</p>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/fr/tools/analyzer/configuration-reference.md">↳ Modifier cette page →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="Sur cette page">
+  <p class="doc-toc__heading">Sur cette page</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#general-options">Options générales</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#path-scoped-ignoring">Ignorer par chemin</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#feature-flags">Indicateurs de fonctionnalité</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#property-initialization">Initialisation des propriétés</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#exception-filtering">Filtrage d&#x27;exceptions</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#experimental-api-detection">Détection d&#x27;API expérimentale</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#plugins">Plugins</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#available-plugins">Plugins disponibles</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#examples">Exemples</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#strict-mode">Mode strict</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#maximum-strictness">Rigueur maximale</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#lenient-mode">Mode indulgent</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#notes-on-individual-flags">Notes sur les indicateurs individuels</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#performance-tuning">Réglage des performances</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#when-to-adjust">Quand ajuster</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#what-each-threshold-controls">Ce que chaque seuil contrôle</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#examples-2">Exemples</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#diagnosing-slow-runs">Diagnostiquer les exécutions lentes</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / main / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

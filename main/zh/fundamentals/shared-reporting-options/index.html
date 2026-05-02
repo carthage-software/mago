@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="zh" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>报告与修复选项 · Mago</title>
+  <meta name="description" content="lint、analyze 和 ast 共用的一组参数,用于报告问题、应用修复以及管理 baseline。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="报告与修复选项 · Mago">
+  <meta property="og:description" content="lint、analyze 和 ast 共用的一组参数,用于报告问题、应用修复以及管理 baseline。">
+  <meta property="og:url" content="https://mago.carthage.software/main/zh/fundamentals&#x2F;shared-reporting-options/">
+  <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta property="og:locale" content="zh">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="报告与修复选项 · Mago">
+  <meta name="twitter:description" content="lint、analyze 和 ast 共用的一组参数,用于报告问题、应用修复以及管理 baseline。">
+  <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/main/zh/fundamentals&#x2F;shared-reporting-options/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/index.html">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="搜索" aria-label="搜索">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">按 &#x2F; 搜索</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/guide/getting-started/index.html">指南</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/faq/index.html">常见问题</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/playground/index.html">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">赞助</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub 仓库" title="GitHub 仓库">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord 社区" title="Discord 社区">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>main</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../main/zh/fundamentals/shared-reporting-options/index.html" aria-current="true">
+        <span>main</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>ZH</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../main/en/fundamentals/shared-reporting-options/index.html">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../main/fr/fundamentals/shared-reporting-options/index.html">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../main/zh/fundamentals/shared-reporting-options/index.html" aria-current="true">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换主题">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">此翻译可能已过时。</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>此页面尚未翻译,已重定向至该语言的首页。</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">指南</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/zh/guide/getting-started/index.html">
+          <span>快速开始</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/installation/index.html">
+          <span>安装</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/initialization/index.html">
+          <span>初始化</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/configuration/index.html">
+          <span>配置</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/environment-variables/index.html">
+          <span>环境变量</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/list-files/index.html">
+          <span>列出文件</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/generate-completions/index.html">
+          <span>Shell 补全</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/inspecting-the-ast/index.html">
+          <span>查看 AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/upgrading/index.html">
+          <span>升级</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">基础</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/zh/fundamentals/command-line-interface/index.html">
+          <span>命令行接口</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/fundamentals/baseline/index.html">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/fundamentals/suppressing-issues/index.html">
+          <span>抑制问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/fundamentals/shared-reporting-options/index.html" aria-current="page">
+          <span>报告与修复选项</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/rules/index.html">
+            <span>规则</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">工具</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/zh/tools/overview/index.html">
+          <span>工具</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/analyzer/overview/index.html">
+            <span>分析器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/analyzer/command-reference/index.html">
+            <span>分析器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/analyzer/configuration-reference/index.html">
+            <span>分析器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/overview/index.html">
+            <span>格式化器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/usage/index.html">
+            <span>格式化器使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/format-ignore/index.html">
+            <span>格式化忽略</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/command-reference/index.html">
+            <span>格式化器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/configuration-reference/index.html">
+            <span>格式化器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/guard/overview/index.html">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/guard/usage/index.html">
+            <span>Guard 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/guard/command-reference/index.html">
+            <span>Guard 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/guard/configuration-reference/index.html">
+            <span>Guard 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/overview/index.html">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/usage/index.html">
+            <span>Linter 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/integrations/index.html">
+            <span>Linter 集成</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/command-reference/index.html">
+            <span>Linter 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/configuration-reference/index.html">
+            <span>Linter 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">实用方案</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/zh/recipes/vscode/index.html">
+          <span>Visual Studio Code 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/recipes/zed/index.html">
+          <span>Zed 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/recipes/helix/index.html">
+          <span>Helix 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/recipes/pre-commit-hooks/index.html">
+          <span>Pre-commit hooks 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/recipes/github-actions/index.html">
+          <span>GitHub Actions 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/recipes/docker/index.html">
+          <span>Docker 实用方案</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 06</span>
+      <span class="sidebar-section__title">参考</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/zh/faq/index.html">
+          <span>常见问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/benchmarks/index.html">
+          <span>基准测试</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/contributing/index.html">
+          <span>贡献指南</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="reporting-and-fixing-options">报告与修复选项</h1>
+<p><code>mago lint</code>、<code>mago analyze</code> 和 <code>mago ast</code> 共用一组参数,用来控制问题如何被报告、修复如何被应用。本页是这些参数的中心参考,这样我们就不必在每个命令页里重复它们。</p>
+<h2 id="auto-fixing">自动修复</h2>
+<p>大多数 linter 规则以及若干分析器检查都附带了自动修复。下列参数控制如何应用修复,以及哪些类别可被修复。</p>
+<table><thead><tr><th style="text-align: left">参数</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--fix</code></td><td style="text-align: left">对发现的问题应用所有安全修复。</td></tr>
+<tr><td style="text-align: left"><code>--fixable-only</code>, <code>-f</code></td><td style="text-align: left">把输出过滤到具有自动修复的问题上。</td></tr>
+<tr><td style="text-align: left"><code>--unsafe</code></td><td style="text-align: left">应用被标记为 unsafe 的修复。这些修复可能改变行为,需要审阅。</td></tr>
+<tr><td style="text-align: left"><code>--potentially-unsafe</code></td><td style="text-align: left">应用被标记为 potentially-unsafe 的修复。比 unsafe 风险低,但仍值得简单审阅。</td></tr>
+<tr><td style="text-align: left"><code>--format-after-fix</code>, <code>fmt</code></td><td style="text-align: left">在每个被 <code>--fix</code> 修改过的文件上运行格式化器。</td></tr>
+<tr><td style="text-align: left"><code>--dry-run</code>, <code>-d</code>, <code>diff</code></td><td style="text-align: left">以统一 diff 的形式预览修复,不写入任何内容。</td></tr>
+</tbody></table>
+<h2 id="reporting">报告</h2>
+<p>Mago 如何呈现它发现的问题。</p>
+<table><thead><tr><th style="text-align: left">参数</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--sort</code></td><td style="text-align: left">按级别、code、位置依次排序报告中的问题。</td></tr>
+<tr><td style="text-align: left"><code>--reporting-target &lt;TARGET&gt;</code></td><td style="text-align: left">报告写入的目标。可选值:<code>stdout</code>(默认)、<code>stderr</code>。</td></tr>
+<tr><td style="text-align: left"><code>--reporting-format &lt;FORMAT&gt;</code></td><td style="text-align: left">输出格式。详见下文;默认自动检测。</td></tr>
+<tr><td style="text-align: left"><code>--minimum-fail-level &lt;LEVEL&gt;</code>, <code>-m</code></td><td style="text-align: left">触发非零退出的最低级别。可选值:<code>note</code>、<code>help</code>、<code>warning</code>、<code>error</code>。默认采用配置文件中的值,若无则为 <code>error</code>。</td></tr>
+<tr><td style="text-align: left"><code>--minimum-report-level &lt;LEVEL&gt;</code></td><td style="text-align: left">报告中包含的最低级别。低于此值的问题在打印前被过滤掉。</td></tr>
+<tr><td style="text-align: left"><code>--retain-code &lt;CODE&gt;</code></td><td style="text-align: left">仅保留指定 code 的问题。这是报告过滤,不是执行过滤。可重复使用。</td></tr>
+</tbody></table>
+<p><code>--retain-code</code> 与 <code>--only</code>(只有 <code>mago lint</code> 接受)不同:</p>
+<ul>
+<li><code>mago lint --only &lt;RULE&gt;</code> 仅运行指定的规则。其他规则被完全跳过,因此更快。</li>
+<li><code>mago lint --retain-code &lt;CODE&gt;</code> 运行所有规则,然后把输出过滤到你列出的 code。</li>
+</ul>
+<pre><code class="language-sh">mago lint --only no-unused-variable                                  # only run that rule
+mago lint --retain-code no-unused-variable                           # run everything, show only this code
+mago lint --retain-code no-unused-variable --retain-code semantics   # multiple codes
+mago analyze --retain-code invalid-argument --retain-code type-mismatch
+</code></pre>
+<p>当你想对某条具体规则做快速反馈时,使用 <code>--only</code>。当你想全面覆盖但聚焦报告时,使用 <code>--retain-code</code>。</p>
+<h3 id="reporting-formats">报告格式</h3>
+<p>用 <code>--reporting-format</code> 显式选择:</p>
+<ul>
+<li>人类可读:<code>rich</code>、<code>medium</code>、<code>short</code>、<code>ariadne</code>、<code>emacs</code>。</li>
+<li>CI / 机器可读:<code>github</code>、<code>gitlab</code>、<code>json</code>、<code>checkstyle</code>、<code>sarif</code>。</li>
+<li>摘要:<code>count</code>、<code>code-count</code>。</li>
+</ul>
+<h3 id="auto-detection">自动检测</h3>
+<p>未设置 <code>--reporting-format</code> 时,Mago 会根据环境选择一种格式:</p>
+<table><thead><tr><th style="text-align: left">环境</th><th style="text-align: left">通过什么检测</th><th style="text-align: left">默认格式</th></tr></thead><tbody>
+<tr><td style="text-align: left">GitHub Actions</td><td style="text-align: left"><code>GITHUB_ACTIONS</code></td><td style="text-align: left"><code>github</code></td></tr>
+<tr><td style="text-align: left">GitLab CI</td><td style="text-align: left"><code>GITLAB_CI</code></td><td style="text-align: left"><code>gitlab</code></td></tr>
+<tr><td style="text-align: left">AI 编码助手</td><td style="text-align: left"><code>CLAUDECODE</code>、<code>GEMINI_CLI</code>、<code>CODEX_SANDBOX</code>、<code>OPENCODE_CLIENT</code></td><td style="text-align: left"><code>medium</code></td></tr>
+<tr><td style="text-align: left">其他</td><td style="text-align: left">(无)</td><td style="text-align: left"><code>rich</code></td></tr>
+</tbody></table>
+<p>因此 CI 流水线得到原生注解,AI 助手得到一种节省 token 的格式,不需要任何配置。显式传入 <code>--reporting-format</code> 可覆盖。</p>
+<blockquote>
+<p>自动检测自 Mago 1.18 起可用。在 1.17 及更早版本中,请显式设置 <code>--reporting-format=github</code> 或 <code>--reporting-format=gitlab</code>。</p>
+</blockquote>
+<h2 id="baseline">Baseline</h2>
+<p>用于管理 baseline 文件的参数。完整指南在 <a href="../../../../main/zh/fundamentals/baseline/index.html">baseline 页面</a>。</p>
+<table><thead><tr><th style="text-align: left">参数</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--generate-baseline</code></td><td style="text-align: left">生成一份新的 baseline 文件,记录当前所有问题。</td></tr>
+<tr><td style="text-align: left"><code>--baseline &lt;PATH&gt;</code></td><td style="text-align: left">使用给定路径的 baseline。</td></tr>
+<tr><td style="text-align: left"><code>--backup-baseline</code></td><td style="text-align: left">重新生成时,在覆盖前把旧 baseline 复制为 <code>&lt;file&gt;.bkp</code>。</td></tr>
+<tr><td style="text-align: left"><code>--ignore-baseline</code></td><td style="text-align: left">忽略任何已配置或指定的 baseline,报告所有问题。</td></tr>
+</tbody></table>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/zh/fundamentals/shared-reporting-options.md">↳ 编辑此页 →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="本页内容">
+  <p class="doc-toc__heading">本页内容</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#auto-fixing">自动修复</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#reporting">报告</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#reporting-formats">报告格式</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#auto-detection">自动检测</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#baseline">Baseline</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / main / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

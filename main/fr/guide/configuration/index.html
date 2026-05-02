@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Configuration · Mago</title>
+  <meta name="description" content="Comment Mago découvre les fichiers de configuration, ce que fait chaque option de mago.toml, et comment partager une configuration entre projets.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Configuration · Mago">
+  <meta property="og:description" content="Comment Mago découvre les fichiers de configuration, ce que fait chaque option de mago.toml, et comment partager une configuration entre projets.">
+  <meta property="og:url" content="https://mago.carthage.software/main/fr/guide&#x2F;configuration/">
+  <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta property="og:locale" content="fr">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Configuration · Mago">
+  <meta name="twitter:description" content="Comment Mago découvre les fichiers de configuration, ce que fait chaque option de mago.toml, et comment partager une configuration entre projets.">
+  <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/main/fr/guide&#x2F;configuration/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/index.html">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="Recherche" aria-label="Recherche">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">Appuyez sur &#x2F; pour rechercher</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/guide/getting-started/index.html">Guide</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/faq/index.html">FAQ</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/playground/index.html">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Soutenir</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="Dépôt GitHub" title="Dépôt GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Communauté Discord" title="Communauté Discord">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>main</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../main/fr/guide/configuration/index.html" aria-current="true">
+        <span>main</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>FR</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../main/en/guide/configuration/index.html">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../main/fr/guide/configuration/index.html" aria-current="true">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../main/zh/guide/configuration/index.html">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Changer le thème">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">Cette traduction peut être obsolète.</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>Cette page n&#x27;est pas encore traduite. Vous avez été redirigé vers la page d&#x27;accueil de la langue.</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">Guide</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/fr/guide/getting-started/index.html">
+          <span>Premiers pas</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/installation/index.html">
+          <span>Installation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/initialization/index.html">
+          <span>Initialisation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/configuration/index.html" aria-current="page">
+          <span>Configuration</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/environment-variables/index.html">
+          <span>Variables d&#x27;environnement</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/list-files/index.html">
+          <span>Lister les fichiers</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/generate-completions/index.html">
+          <span>Complétions du shell</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/inspecting-the-ast/index.html">
+          <span>Inspecter l&#x27;AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/upgrading/index.html">
+          <span>Mettre à jour</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">Fondamentaux</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/fr/fundamentals/command-line-interface/index.html">
+          <span>Interface en ligne de commande</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/fundamentals/baseline/index.html">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/fundamentals/suppressing-issues/index.html">
+          <span>Supprimer les problèmes</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/fundamentals/shared-reporting-options/index.html">
+          <span>Options de rapport et de correction</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/fr/tools/overview/index.html">
+          <span>Outils</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/overview/index.html">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/usage/index.html">
+            <span>Utilisation du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/integrations/index.html">
+            <span>Intégrations du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/command-reference/index.html">
+            <span>Référence de commande du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/configuration-reference/index.html">
+            <span>Référence de configuration du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/rules/index.html">
+            <span>Règles</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/fr/tools/analyzer/overview/index.html">
+            <span>Analyseur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/analyzer/command-reference/index.html">
+            <span>Référence de commande de l&#x27;analyseur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/analyzer/configuration-reference/index.html">
+            <span>Référence de configuration de l&#x27;analyseur</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/overview/index.html">
+            <span>Formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/usage/index.html">
+            <span>Utilisation du formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/format-ignore/index.html">
+            <span>Format ignore</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/command-reference/index.html">
+            <span>Référence de commande du formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/configuration-reference/index.html">
+            <span>Référence de configuration du formateur</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/fr/tools/guard/overview/index.html">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/guard/usage/index.html">
+            <span>Utilisation du guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/guard/command-reference/index.html">
+            <span>Référence de commande du guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/guard/configuration-reference/index.html">
+            <span>Référence de configuration du guard</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">Recettes</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/fr/recipes/vscode/index.html">
+          <span>Recette Visual Studio Code</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/recipes/zed/index.html">
+          <span>Recette Zed</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/recipes/helix/index.html">
+          <span>Recette Helix</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/recipes/pre-commit-hooks/index.html">
+          <span>Recette pre-commit hooks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/recipes/github-actions/index.html">
+          <span>Recette GitHub Actions</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/recipes/docker/index.html">
+          <span>Recette Docker</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">Référence</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/fr/faq/index.html">
+          <span>FAQ</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/benchmarks/index.html">
+          <span>Benchmarks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/contributing/index.html">
+          <span>Contribuer</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="configuration">Configuration</h1>
+<p>Mago lit sa configuration depuis un seul fichier, généralement <code>mago.toml</code> à la racine de votre projet. Lancez <code>mago init</code> pour en générer un, ou écrivez-le à la main.</p>
+<p>Cette page couvre la découverte de la configuration, la directive <code>extends</code>, les options globales et les sections <code>[source]</code> et <code>[parser]</code>. Les options spécifiques à chaque outil sont documentées sur la page de référence de l'outil concerné.</p>
+<h2 id="discovery">Découverte</h2>
+<p>Lorsque vous ne passez pas <code>--config</code>, Mago cherche un fichier de configuration dans cet ordre :</p>
+<ol>
+<li>Le répertoire de travail (le répertoire courant, ou le chemin donné par <code>--workspace</code>).</li>
+<li><code>$XDG_CONFIG_HOME</code> s'il est défini, par exemple <code>$XDG_CONFIG_HOME/mago.toml</code>.</li>
+<li><code>$HOME/.config</code>, par exemple <code>~/.config/mago.toml</code>.</li>
+<li><code>$HOME</code>, par exemple <code>~/mago.toml</code>.</li>
+</ol>
+<p>Dans chaque emplacement, il cherche d'abord <code>mago.{toml,yaml,yml,json}</code>, puis <code>mago.dist.{toml,yaml,yml,json}</code>. La précédence des formats au sein d'un même répertoire est <code>toml &gt; yaml &gt; yml &gt; json</code>. Le premier fichier trouvé l'emporte, ce qui vous permet de garder une configuration globale dans <code>~/.config/mago.toml</code> pour les projets qui n'en ont pas localement.</p>
+<h2 id="sharing-configuration-with-extends">Partager une configuration avec <code>extends</code></h2>
+<blockquote>
+<p>Disponible depuis Mago 1.25. Les versions antérieures ignorent silencieusement la directive.</p>
+</blockquote>
+<p>La directive <code>extends</code> permet à une configuration de s'appuyer sur d'autres sans copier-coller. Pratique quand plusieurs projets partagent un standard commun.</p>
+<pre><code class="language-toml"># Single parent
+extends = "vendor/some-org/mago-config/mago.toml"
+
+# Or a list, applied left-to-right; each later layer overrides earlier ones
+extends = [
+  "vendor/some-org/mago-config",     # directory: mago.{toml,yaml,yml,json} inside
+  "configs/strict.json",              # mixing formats is fine
+  "../shared/team-defaults.toml",
+]
+
+# This file's own keys override anything from the layers above
+php-version = "8.3"
+</code></pre>
+<h3 id="resolution">Résolution</h3>
+<p>Les chemins absolus sont utilisés tels quels. Les chemins relatifs sont résolus par rapport au répertoire du fichier qui déclare <code>extends</code>, et non par rapport au répertoire de travail courant. Ainsi, <code>mago --config some/dir/config.toml</code> avec <code>extends = "base.toml"</code> cherche <code>some/dir/base.toml</code>.</p>
+<p>Les entrées de fichier doivent exister et utiliser une extension reconnue (<code>.toml</code>, <code>.yaml</code>, <code>.yml</code>, <code>.json</code>). Les entrées de répertoire sont parcourues à la recherche de <code>mago.{toml,yaml,yml,json}</code> selon cette précédence ; un répertoire sans fichier reconnu est ignoré avec un avertissement plutôt que de faire échouer la construction.</p>
+<h3 id="effective-precedence">Précédence effective</h3>
+<p>Les couches sont fusionnées de la plus profonde à la plus superficielle, la dernière l'emportant :</p>
+<ol>
+<li>Valeurs par défaut intégrées.</li>
+<li>Chaque couche <code>extends</code>, récursivement. Le <code>extends</code> propre à un parent est résolu avant que ses clés ne s'appliquent.</li>
+<li>Les clés du fichier propriétaire.</li>
+<li>Les variables d'environnement <code>MAGO_*</code> pour les <a href="../../../../main/fr/guide/environment-variables/index.html">scalaires pris en charge</a>.</li>
+<li>Les drapeaux CLI tels que <code>--php-version</code>, <code>--threads</code>.</li>
+</ol>
+<h3 id="merge-semantics">Sémantique de fusion</h3>
+<p>Par clé de premier niveau :</p>
+<ul>
+<li>Les tables et objets sont fusionnés en profondeur. Un enfant peut surcharger une seule clé d'une table imbriquée sans redéfinir toute la table.</li>
+<li>Les tableaux comme <code>source.excludes</code> et les listes <code>exclude</code> par règle sont concaténés, parent en premier. Si une configuration de base exclut <code>vendor/</code>, vous gardez cette exclusion et ajoutez la vôtre.</li>
+<li>Les scalaires (chaînes, nombres, booléens) sont écrasés par l'enfant.</li>
+</ul>
+<pre><code class="language-toml"># base.toml
+threads = 4
+[source]
+excludes = ["vendor", "node_modules"]
+</code></pre>
+<pre><code class="language-toml"># project mago.toml
+extends = "base.toml"
+threads = 8
+[source]
+excludes = ["build"]   # appended -&gt; ["vendor", "node_modules", "build"]
+</code></pre>
+<p>Les cycles sont détectés via le suivi des chemins canoniques et déclenchent une erreur claire au lieu de récurer indéfiniment. L'héritage en losange (A étend B et C, qui étendent tous deux D) traite D une seule fois et fonctionne sans souci. Les couches peuvent mélanger les formats librement ; chacune est analysée par son propre driver et fusionnée à un niveau de valeur générique avant que le document final ne soit validé contre le schéma.</p>
+<h2 id="global-options">Options globales</h2>
+<p>Ces clés se trouvent à la racine de <code>mago.toml</code>.</p>
+<pre><code class="language-toml">version = "1"
+php-version = "8.2"
+threads = 8
+stack-size = 8388608     # 8 MiB
+editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
+</code></pre>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>version</code></td><td style="text-align: left">string</td><td style="text-align: left">aucun</td><td style="text-align: left">Fixe la version de Mago contre laquelle ce projet est testé. Accepte un majeur (<code>"1"</code>), mineur (<code>"1.25"</code>) ou exact (<code>"1.25.1"</code>). Voir <a href="#version-pinning">épinglage de version</a>.</td></tr>
+<tr><td style="text-align: left"><code>php-version</code></td><td style="text-align: left">string</td><td style="text-align: left">dernière stable</td><td style="text-align: left">La version PHP que Mago doit cibler pour l'analyse syntaxique et l'analyse. <code>mago init</code> la détecte automatiquement depuis <code>composer.json</code> quand c'est possible.</td></tr>
+<tr><td style="text-align: left"><code>allow-unsupported-php-version</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Autoriser Mago à s'exécuter sur une version PHP qu'il ne prend pas officiellement en charge. Non recommandé.</td></tr>
+<tr><td style="text-align: left"><code>no-version-check</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Réduit au silence l'avertissement émis quand le binaire installé diverge de la version épinglée. Une divergence de version majeure est toujours fatale.</td></tr>
+<tr><td style="text-align: left"><code>threads</code></td><td style="text-align: left">integer</td><td style="text-align: left">CPUs logiques</td><td style="text-align: left">Nombre de threads pour le travail en parallèle.</td></tr>
+<tr><td style="text-align: left"><code>stack-size</code></td><td style="text-align: left">integer</td><td style="text-align: left">2 MiB</td><td style="text-align: left">Taille de pile par thread en octets. Minimum 2 MiB, maximum 8 MiB.</td></tr>
+<tr><td style="text-align: left"><code>editor-url</code></td><td style="text-align: left">string</td><td style="text-align: left">aucun</td><td style="text-align: left">Modèle d'URL pour les chemins de fichiers cliquables dans la sortie du terminal. Voir <a href="#editor-integration">intégration éditeur</a>.</td></tr>
+</tbody></table>
+<h3 id="version-pinning">Épinglage de version</h3>
+<p>Épingler la version fait remonter rapidement les divergences entre le binaire installé et les attentes du projet, plutôt que de produire silencieusement une sortie différente.</p>
+<p>Trois niveaux d'épinglage :</p>
+<ul>
+<li><strong>Épinglage majeur</strong> (<code>version = "1"</code>) : tout <code>1.x.y</code> satisfait l'épinglage. Une montée vers <code>2.x</code> est une erreur fatale, car une nouvelle version majeure peut introduire des défauts incompatibles, des changements de schéma ou de comportement de règles. C'est ce que <code>mago init</code> écrit par défaut.</li>
+<li><strong>Épinglage mineur</strong> (<code>version = "1.25"</code>) : tout <code>1.25.y</code> satisfait l'épinglage. Une divergence vers un mineur différent émet un avertissement ; une divergence majeure reste fatale.</li>
+<li><strong>Épinglage exact</strong> (<code>version = "1.25.1"</code>) : toute divergence émet un avertissement ; une divergence majeure reste fatale.</li>
+</ul>
+<p>L'avertissement peut être réduit au silence avec <code>--no-version-check</code>, la variable d'environnement <code>MAGO_NO_VERSION_CHECK</code>, ou <code>no-version-check = true</code> dans la configuration. Aucun de ces moyens n'affecte la divergence de version majeure, qui est tout l'intérêt de l'épinglage.</p>
+<p>Pour synchroniser le binaire installé avec l'épinglage du projet :</p>
+<pre><code class="language-sh">mago self-update --to-project-version
+</code></pre>
+<p>Pour les épinglages exacts, cela résout directement vers ce tag de release. Pour les épinglages majeurs ou mineurs, Mago parcourt les releases GitHub récentes et installe la plus haute qui satisfait l'épinglage. Ainsi, <code>version = "1"</code> avec 2.0 déjà sortie installe quand même la dernière release 1.x sans vous tirer en avant.</p>
+<p><code>version</code> est actuellement optionnel. Une future version de Mago pourrait commencer à émettre un avertissement quand il est absent, afin de préparer les projets à l'éventuelle montée vers la 2.0.</p>
+<h2 id="source"><code>[source]</code></h2>
+<p>La section <code>[source]</code> contrôle la manière dont Mago découvre et traite les fichiers.</p>
+<h3 id="three-categories-of-paths">Trois catégories de chemins</h3>
+<p>Mago distingue votre code, le code tiers et le code à ignorer entièrement :</p>
+<ul>
+<li><strong><code>paths</code></strong> sont vos fichiers source. Mago les analyse, les linte et les formate.</li>
+<li><strong><code>includes</code></strong> sont les dépendances (généralement <code>vendor</code>). Mago les analyse pour pouvoir résoudre les symboles et les types, mais ne les analyse, ne les linte ni ne les réécrit jamais.</li>
+<li><strong><code>excludes</code></strong> sont des chemins ou des globs que Mago ignore entièrement. Ils s'appliquent à chaque outil.</li>
+</ul>
+<p>Si un fichier correspond à la fois à <code>paths</code> et à <code>includes</code>, le motif le plus spécifique l'emporte. Les chemins de fichier exacts sont les plus spécifiques, puis les chemins de répertoires plus profonds, puis les moins profonds, puis les motifs glob. Quand les motifs sont également spécifiques, <code>includes</code> l'emporte, ce qui vous permet de marquer explicitement un chemin comme dépendance.</p>
+<pre><code class="language-toml">[source]
+paths     = ["src", "tests"]
+includes  = ["vendor"]
+excludes  = ["cache/**", "build/**", "var/**"]
+extensions = ["php"]
+</code></pre>
+<p>Les motifs glob fonctionnent dans les trois listes :</p>
+<pre><code class="language-toml">[source]
+paths    = ["src/**/*.php"]
+includes = ["vendor/symfony/**/*.php"]   # only Symfony from vendor
+excludes = [
+  "**/*_generated.php",
+  "**/tests/**",
+  "src/Legacy/**",
+]
+</code></pre>
+<h3 id="reference">Référence</h3>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>paths</code></td><td style="text-align: left">liste de strings</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Répertoires ou globs pour votre code source. Si vide, l'ensemble du workspace est scanné.</td></tr>
+<tr><td style="text-align: left"><code>includes</code></td><td style="text-align: left">liste de strings</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Répertoires ou globs pour le code tiers que Mago doit analyser sans le modifier.</td></tr>
+<tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left">liste de strings</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Globs ou chemins exclus de tous les outils.</td></tr>
+<tr><td style="text-align: left"><code>extensions</code></td><td style="text-align: left">liste de strings</td><td style="text-align: left"><code>["php"]</code></td><td style="text-align: left">Extensions de fichiers traitées comme du PHP.</td></tr>
+</tbody></table>
+<h3 id="glob-settings">Réglages des globs</h3>
+<p><code>[source.glob]</code> ajuste la façon dont les globs correspondent. Disponible depuis 1.19.</p>
+<pre><code class="language-toml">[source.glob]
+literal-separator = true     # `*` does not match `/`; use `**` for recursion
+case-insensitive  = false
+backslash-escape  = true     # `\` escapes special characters
+empty-alternates  = false    # `{,a}` matches "" and "a" when true
+</code></pre>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>case-insensitive</code></td><td style="text-align: left">bool</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Faire correspondre les motifs sans tenir compte de la casse.</td></tr>
+<tr><td style="text-align: left"><code>literal-separator</code></td><td style="text-align: left">bool</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Quand <code>true</code>, <code>*</code> ne correspond pas aux séparateurs de chemin. Utilisez <code>**</code> pour la correspondance récursive.</td></tr>
+<tr><td style="text-align: left"><code>backslash-escape</code></td><td style="text-align: left">bool</td><td style="text-align: left"><code>true</code> (false sous Windows)</td><td style="text-align: left">Indique si <code>\</code> échappe les caractères spéciaux.</td></tr>
+<tr><td style="text-align: left"><code>empty-alternates</code></td><td style="text-align: left">bool</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Indique si les alternatives vides sont autorisées.</td></tr>
+</tbody></table>
+<blockquote>
+<p>Les projets générés par <code>mago init</code> mettent <code>literal-separator = true</code>. Cela fait que <code>*</code> se comporte comme la plupart des utilisateurs s'y attendent, en ne correspondant qu'à un seul niveau de répertoire, comme dans <code>.gitignore</code>.</p>
+</blockquote>
+<h3 id="tool-specific-excludes">Exclusions par outil</h3>
+<p>Chaque outil a son propre <code>excludes</code> optionnel. Ils sont additifs : un fichier est exclu s'il correspond à la liste globale ou à la liste spécifique à l'outil.</p>
+<pre><code class="language-toml">[source]
+paths    = ["src", "tests"]
+excludes = ["cache/**"]            # all tools
+
+[analyzer]
+excludes = ["tests/**/*.php"]      # only the analyzer
+
+[formatter]
+excludes = ["src/**/AutoGenerated/**/*.php"]
+
+[linter]
+excludes = ["database/migrations/**"]
+</code></pre>
+<p>Le linter prend également en charge des exclusions de chemin par règle, utiles quand vous voulez qu'une règle ignore un chemin alors que le reste continue à s'appliquer. Les motifs glob y nécessitent Mago 1.20 ou plus récent. La référence complète se trouve sur la <a href="../../../../main/fr/tools/linter/configuration-reference/index.html#per-rule-excludes">page de configuration du linter</a>.</p>
+<pre><code class="language-toml">[linter.rules]
+prefer-static-closure = { exclude = ["tests/"] }
+no-global             = { exclude = ["**/*Test.php"] }
+</code></pre>
+<blockquote>
+<p>Utilisez <code>mago list-files</code> pour vérifier quels fichiers Mago va traiter. <code>mago list-files --command formatter</code> montre ce que le formateur va toucher, <code>--command analyzer</code> montre la vue de l'analyseur, et ainsi de suite.</p>
+</blockquote>
+<h2 id="parser"><code>[parser]</code></h2>
+<pre><code class="language-toml">[parser]
+enable-short-tags = false
+</code></pre>
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>enable-short-tags</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Indique s'il faut reconnaître la balise courte <code>&lt;?</code> en plus de <code>&lt;?php</code> et <code>&lt;?=</code>. Équivalent à la directive ini PHP <code>short_open_tag</code>.</td></tr>
+</tbody></table>
+<p>Désactivez les balises ouvertes courtes lorsque vos fichiers <code>.php</code> contiennent des déclarations littérales <code>&lt;?xml</code> ou des fragments de modèles qui ne sont pas du PHP. Avec <code>enable-short-tags = false</code>, des séquences telles que <code>&lt;?xml version="1.0"?&gt;</code> sont traitées comme du texte intégré plutôt que comme des erreurs d'analyse. Le compromis : tout code qui s'appuie sur <code>&lt;?</code> comme balise d'ouverture PHP ne sera plus reconnu.</p>
+<h2 id="editor-integration">Intégration éditeur</h2>
+<p>Mago peut afficher les chemins de fichiers dans la sortie de diagnostic sous forme de <a href="https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda">liens hypertextes OSC 8</a>. Cliquez sur le chemin dans votre terminal et votre éditeur ouvre le fichier à la bonne ligne et la bonne colonne. Les terminaux pris en charge incluent iTerm2, WezTerm, Kitty, Windows Terminal, Ghostty, et quelques autres.</p>
+<p>Mago détecte automatiquement l'éditeur en cours d'exécution quand c'est possible. Sur macOS, il lit <code>__CFBundleIdentifier</code> ; ailleurs il vérifie <code>TERM_PROGRAM</code>. Les éditeurs suivants sont reconnus directement :</p>
+<ul>
+<li>PhpStorm, IntelliJ IDEA, WebStorm</li>
+<li>VS Code, VS Code Insiders</li>
+<li>Zed</li>
+<li>Sublime Text</li>
+</ul>
+<p>Si la détection automatique échoue, configurez l'URL explicitement. La précédence est de type premier-trouvé-l'emporte :</p>
+<ol>
+<li>Variable d'environnement <code>MAGO_EDITOR_URL</code>.</li>
+<li><code>editor-url</code> dans <code>mago.toml</code>.</li>
+<li>Détection automatique.</li>
+</ol>
+<pre><code class="language-sh">export MAGO_EDITOR_URL="vscode://file/%file%:%line%:%column%"
+</code></pre>
+<pre><code class="language-toml">editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
+</code></pre>
+<table><thead><tr><th style="text-align: left">Variable</th><th style="text-align: left">Signification</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>%file%</code></td><td style="text-align: left">Chemin absolu vers le fichier.</td></tr>
+<tr><td style="text-align: left"><code>%line%</code></td><td style="text-align: left">Numéro de ligne, base 1.</td></tr>
+<tr><td style="text-align: left"><code>%column%</code></td><td style="text-align: left">Numéro de colonne, base 1.</td></tr>
+</tbody></table>
+<p>Modèles courants :</p>
+<table><thead><tr><th style="text-align: left">Éditeur</th><th style="text-align: left">Modèle</th></tr></thead><tbody>
+<tr><td style="text-align: left">VS Code</td><td style="text-align: left"><code>vscode://file/%file%:%line%:%column%</code></td></tr>
+<tr><td style="text-align: left">VS Code Insiders</td><td style="text-align: left"><code>vscode-insiders://file/%file%:%line%:%column%</code></td></tr>
+<tr><td style="text-align: left">Cursor</td><td style="text-align: left"><code>cursor://file/%file%:%line%:%column%</code></td></tr>
+<tr><td style="text-align: left">Windsurf</td><td style="text-align: left"><code>windsurf://file/%file%:%line%:%column%</code></td></tr>
+<tr><td style="text-align: left">PhpStorm / IntelliJ</td><td style="text-align: left"><code>phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%</code></td></tr>
+<tr><td style="text-align: left">Zed</td><td style="text-align: left"><code>zed://file/%file%:%line%:%column%</code></td></tr>
+<tr><td style="text-align: left">Sublime Text</td><td style="text-align: left"><code>subl://open?url=file://%file%&amp;line=%line%&amp;column=%column%</code></td></tr>
+<tr><td style="text-align: left">Emacs</td><td style="text-align: left"><code>emacs://open?url=file://%file%&amp;line=%line%&amp;column=%column%</code></td></tr>
+<tr><td style="text-align: left">Atom</td><td style="text-align: left"><code>atom://core/open/file?filename=%file%&amp;line=%line%&amp;column=%column%</code></td></tr>
+</tbody></table>
+<blockquote>
+<p>Les liens hypertextes ne sont rendus que lorsque la sortie est un terminal avec les couleurs activées. Ils sont automatiquement supprimés quand la sortie est redirigée vers un pipe ou que <code>--colors=never</code> est utilisé, afin de ne pas interférer avec les scripts ou la CI.</p>
+</blockquote>
+<p>Les liens hypertextes apparaissent dans les formats de rapport <code>rich</code> (par défaut), <code>medium</code>, <code>short</code> et <code>emacs</code>. Les formats lisibles par machine (<code>json</code>, <code>github</code>, <code>gitlab</code>, <code>checkstyle</code>, <code>sarif</code>) ne sont pas affectés.</p>
+<h2 id="tool-specific-configuration">Configuration spécifique aux outils</h2>
+<p>Chaque outil a sa propre page de référence couvrant ses options :</p>
+<ul>
+<li><a href="../../../../main/fr/tools/linter/configuration-reference/index.html">Linter</a></li>
+<li><a href="../../../../main/fr/tools/formatter/configuration-reference/index.html">Formateur</a></li>
+<li><a href="../../../../main/fr/tools/analyzer/configuration-reference/index.html">Analyseur</a></li>
+<li><a href="../../../../main/fr/tools/guard/configuration-reference/index.html">Guard</a></li>
+</ul>
+<h2 id="inspecting-the-merged-configuration">Inspecter la configuration fusionnée</h2>
+<p><code>mago config</code> affiche la configuration que Mago utilise réellement, après fusion des défauts, de chaque couche <code>extends</code>, des variables d'environnement et des drapeaux CLI. Pratique quand quelque chose ne se comporte pas comme prévu.</p>
+<pre><code class="language-sh">mago config                       # full config as pretty-printed JSON
+mago config --show linter         # only the [linter] section
+mago config --show formatter
+mago config --default             # the built-in defaults
+mago config --schema              # JSON Schema for the whole config
+mago config --schema --show linter
+</code></pre>
+<table><thead><tr><th style="text-align: left">Drapeau</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--show &lt;SECTION&gt;</code></td><td style="text-align: left">Affiche une seule section. Valeurs : <code>source</code>, <code>parser</code>, <code>linter</code>, <code>formatter</code>, <code>analyzer</code>, <code>guard</code>.</td></tr>
+<tr><td style="text-align: left"><code>--default</code></td><td style="text-align: left">Affiche les valeurs par défaut intégrées au lieu du résultat fusionné.</td></tr>
+<tr><td style="text-align: left"><code>--schema</code></td><td style="text-align: left">Affiche le JSON Schema, utile pour l'intégration IDE ou un outillage externe.</td></tr>
+<tr><td style="text-align: left"><code>-h</code>, <code>--help</code></td><td style="text-align: left">Affiche l'aide et quitte.</td></tr>
+</tbody></table>
+<p>Les drapeaux globaux doivent venir avant <code>config</code>. Voir l'<a href="../../../../main/fr/fundamentals/command-line-interface/index.html">aperçu CLI</a> pour la liste complète.</p>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/fr/guide/configuration.md">↳ Modifier cette page →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="Sur cette page">
+  <p class="doc-toc__heading">Sur cette page</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#discovery">Découverte</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#sharing-configuration-with-extends">Partager une configuration avec extends</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#resolution">Résolution</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#effective-precedence">Précédence effective</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#merge-semantics">Sémantique de fusion</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#global-options">Options globales</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#version-pinning">Épinglage de version</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#source">[source]</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#three-categories-of-paths">Trois catégories de chemins</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#reference">Référence</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#glob-settings">Réglages des globs</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#tool-specific-excludes">Exclusions par outil</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#parser">[parser]</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#editor-integration">Intégration éditeur</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#tool-specific-configuration">Configuration spécifique aux outils</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#inspecting-the-merged-configuration">Inspecter la configuration fusionnée</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / main / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

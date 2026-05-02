@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Installation · Mago</title>
+  <meta name="description" content="Installer Mago via le script shell, un téléchargement manuel, Docker, ou le gestionnaire de paquets de votre langage.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Installation · Mago">
+  <meta property="og:description" content="Installer Mago via le script shell, un téléchargement manuel, Docker, ou le gestionnaire de paquets de votre langage.">
+  <meta property="og:url" content="https://mago.carthage.software/main/fr/guide&#x2F;installation/">
+  <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta property="og:locale" content="fr">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Installation · Mago">
+  <meta name="twitter:description" content="Installer Mago via le script shell, un téléchargement manuel, Docker, ou le gestionnaire de paquets de votre langage.">
+  <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/main/fr/guide&#x2F;installation/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/index.html">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="Recherche" aria-label="Recherche">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">Appuyez sur &#x2F; pour rechercher</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/guide/getting-started/index.html">Guide</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/faq/index.html">FAQ</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/fr/playground/index.html">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">Soutenir</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="Dépôt GitHub" title="Dépôt GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Communauté Discord" title="Communauté Discord">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>main</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../main/fr/guide/installation/index.html" aria-current="true">
+        <span>main</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>FR</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../main/en/guide/installation/index.html">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../main/fr/guide/installation/index.html" aria-current="true">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../main/zh/guide/installation/index.html">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Changer le thème">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">Cette traduction peut être obsolète.</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>Cette page n&#x27;est pas encore traduite. Vous avez été redirigé vers la page d&#x27;accueil de la langue.</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">Guide</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/fr/guide/getting-started/index.html">
+          <span>Premiers pas</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/installation/index.html" aria-current="page">
+          <span>Installation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/initialization/index.html">
+          <span>Initialisation</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/configuration/index.html">
+          <span>Configuration</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/environment-variables/index.html">
+          <span>Variables d&#x27;environnement</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/list-files/index.html">
+          <span>Lister les fichiers</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/generate-completions/index.html">
+          <span>Complétions du shell</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/inspecting-the-ast/index.html">
+          <span>Inspecter l&#x27;AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/guide/upgrading/index.html">
+          <span>Mettre à jour</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">Fondamentaux</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/fr/fundamentals/command-line-interface/index.html">
+          <span>Interface en ligne de commande</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/fundamentals/baseline/index.html">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/fundamentals/suppressing-issues/index.html">
+          <span>Supprimer les problèmes</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/fundamentals/shared-reporting-options/index.html">
+          <span>Options de rapport et de correction</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/fr/tools/overview/index.html">
+          <span>Outils</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/overview/index.html">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/usage/index.html">
+            <span>Utilisation du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/integrations/index.html">
+            <span>Intégrations du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/command-reference/index.html">
+            <span>Référence de commande du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/configuration-reference/index.html">
+            <span>Référence de configuration du linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/linter/rules/index.html">
+            <span>Règles</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/fr/tools/analyzer/overview/index.html">
+            <span>Analyseur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/analyzer/command-reference/index.html">
+            <span>Référence de commande de l&#x27;analyseur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/analyzer/configuration-reference/index.html">
+            <span>Référence de configuration de l&#x27;analyseur</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/overview/index.html">
+            <span>Formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/usage/index.html">
+            <span>Utilisation du formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/format-ignore/index.html">
+            <span>Format ignore</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/command-reference/index.html">
+            <span>Référence de commande du formateur</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/configuration-reference/index.html">
+            <span>Référence de configuration du formateur</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/fr/tools/guard/overview/index.html">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/guard/usage/index.html">
+            <span>Utilisation du guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/guard/command-reference/index.html">
+            <span>Référence de commande du guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/fr/tools/guard/configuration-reference/index.html">
+            <span>Référence de configuration du guard</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">Recettes</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/fr/recipes/vscode/index.html">
+          <span>Recette Visual Studio Code</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/recipes/zed/index.html">
+          <span>Recette Zed</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/recipes/helix/index.html">
+          <span>Recette Helix</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/recipes/pre-commit-hooks/index.html">
+          <span>Recette pre-commit hooks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/recipes/github-actions/index.html">
+          <span>Recette GitHub Actions</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/recipes/docker/index.html">
+          <span>Recette Docker</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">Référence</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/fr/faq/index.html">
+          <span>FAQ</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/benchmarks/index.html">
+          <span>Benchmarks</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/fr/contributing/index.html">
+          <span>Contribuer</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="installation">Installation</h1>
+<p>Mago est livré sous forme de binaire statique unique. Choisissez la méthode d'installation qui convient à votre environnement.</p>
+<h2 id="shell-installer-macos-linux">Script shell (macOS, Linux)</h2>
+<p>La voie recommandée sur macOS et Linux. Le script détecte votre plateforme, récupère l'archive de release correspondante et dépose le binaire dans votre PATH.</p>
+<p>Avec <code>curl</code> :</p>
+<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
+</code></pre>
+<p>Avec <code>wget</code> :</p>
+<pre><code class="language-sh">wget -qO- https://carthage.software/mago.sh | bash
+</code></pre>
+<h3 id="pin-a-specific-version">Épingler une version spécifique</h3>
+<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.1
+</code></pre>
+<p>La même syntaxe fonctionne avec <code>wget</code>.</p>
+<h3 id="verify-the-download">Vérifier le téléchargement</h3>
+<p>Si la <a href="https://cli.github.com/">GitHub CLI</a> est dans votre PATH, le script vérifie l'archive contre l'attestation de build GitHub de Mago avant de la décompresser. Aucun drapeau requis. Si <code>gh</code> est absent ou trop ancien, le script affiche un avis et continue sans vérification.</p>
+<p>Pour rendre la vérification obligatoire, passez <code>--always-verify</code>. Le script s'interrompt avant de toucher votre PATH si <code>gh</code> est indisponible, trop ancien ou si l'attestation ne correspond pas.</p>
+<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --always-verify
+</code></pre>
+<p>Pour désactiver entièrement, passez <code>--no-verify</code>. Les deux drapeaux sont mutuellement exclusifs.</p>
+<h2 id="manual-download">Téléchargement manuel</h2>
+<p>La voie recommandée sur Windows et un bon repli sur tout système sans <code>bash</code>.</p>
+<ol>
+<li>Ouvrez la <a href="https://github.com/carthage-software/mago/releases">page des releases</a>.</li>
+<li>Téléchargez l'archive correspondant à votre système d'exploitation. Le nom suit <code>mago-&lt;version&gt;-&lt;target&gt;.tar.gz</code> (ou <code>.zip</code> sous Windows).</li>
+<li>Extrayez l'archive et placez le binaire quelque part dans votre PATH.</li>
+</ol>
+<p>Si vous gardez l'archive, vous pouvez la vérifier vous-même avant l'extraction.</p>
+<pre><code class="language-sh">VERSION=1.25.1
+TARGET=x86_64-unknown-linux-gnu  # adjust for your platform
+ASSET=mago-${VERSION}-${TARGET}.tar.gz
+
+gh release download "$VERSION" --repo carthage-software/mago --pattern "$ASSET"
+gh attestation verify "$ASSET" \
+  --repo carthage-software/mago \
+  --signer-workflow carthage-software/mago/.github/workflows/cd.yml
+
+tar -xzf "$ASSET"
+sudo mv "mago-${VERSION}-${TARGET}/mago" /usr/local/bin/
+</code></pre>
+<p>Une vérification réussie affiche <code>Verification succeeded!</code> et l'exécution de workflow qui a produit l'archive.</p>
+<p>L'attestation est liée à l'archive, pas au binaire extrait. Si vous n'avez gardé que le binaire, vous ne pouvez pas le vérifier directement. Re-téléchargez l'archive, vérifiez-la, et comparez le <code>sha256sum</code> du binaire interne à celui déjà sur votre système.</p>
+<h2 id="docker">Docker</h2>
+<p>L'image officielle est construite à partir de <code>scratch</code> et pèse environ 26 Mo. Elle s'exécute partout où Docker s'exécute, prend en charge <code>linux/amd64</code> et <code>linux/arm64</code>, et ne nécessite aucun runtime PHP hôte.</p>
+<pre><code class="language-sh">docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
+</code></pre>
+<p>Les tags incluent <code>latest</code>, des versions exactes et des épinglages progressivement plus larges (par exemple <code>1.25.1</code>, <code>1.25</code>, <code>1</code>). La <a href="../../../../main/fr/recipes/docker/index.html">recette Docker</a> couvre les exemples CI et les limitations à connaître.</p>
+<h2 id="package-managers">Gestionnaires de paquets</h2>
+<p>Ces voies sont pratiques mais dépendent de calendriers de publication externes qui sont souvent en retard sur la release GitHub. Après une installation par l'une d'elles, lancez <a href="../../../../main/fr/guide/upgrading/index.html"><code>mago self-update</code></a> pour récupérer le dernier binaire officiel.</p>
+<h3 id="composer">Composer</h3>
+<p>Pour les projets PHP :</p>
+<pre><code class="language-sh">composer require --dev "carthage-software/mago:^1.25.1"
+</code></pre>
+<p>Le paquet Composer est un fin wrapper. Le premier appel à <code>vendor/bin/mago</code> télécharge le binaire pré-construit correspondant depuis la release GitHub et le met en cache. Les appels suivants réutilisent le cache et ne font aucune requête réseau.</p>
+<p>Si la limite de taux anonyme de GitHub bloque le premier téléchargement (fréquent sur les runners CI partagés), définissez <code>GITHUB_TOKEN</code> ou <code>GH_TOKEN</code> pour cette invocation. Dans GitHub Actions, le jeton n'est pas exporté automatiquement, donc passez-le explicitement :</p>
+<pre><code class="language-yaml">- run: vendor/bin/mago lint
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+</code></pre>
+<h3 id="homebrew">Homebrew</h3>
+<p>La formule maintenue par la communauté est souvent en retard sur la release officielle. Installez-la, puis lancez <code>mago self-update</code> immédiatement.</p>
+<pre><code class="language-sh">brew install mago
+mago self-update
+</code></pre>
+<h3 id="cargo">Cargo</h3>
+<p>La publication sur Crates.io peut avoir quelques heures de retard sur une release. Même schéma qu'avec Homebrew.</p>
+<pre><code class="language-sh">cargo install mago
+mago self-update
+</code></pre>
+<h2 id="verifying-releases-in-detail">Vérification des releases en détail</h2>
+<p>Chaque archive de release (tarball par plateforme, tarball source, zip source et bundle WASM) est signée au moment du build via <a href="https://github.com/actions/attest-build-provenance"><code>actions/attest-build-provenance</code></a>. La signature est une attestation <a href="https://in-toto.io/">in-toto</a> stockée sur GitHub et liée à l'exécution de workflow qui a produit l'artefact, donc un téléchargement vérifié est prouvablement octet-identique à ce qui est sorti du pipeline de release de Mago.</p>
+<p>Le script shell choisit l'un de trois modes selon les drapeaux que vous passez.</p>
+<table><thead><tr><th style="text-align: left">Mode</th><th style="text-align: left">Drapeau</th><th style="text-align: left">Comportement</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>auto</code></td><td style="text-align: left">aucun</td><td style="text-align: left">Vérifie si <code>gh</code> est disponible ; sinon installe sans vérifier.</td></tr>
+<tr><td style="text-align: left"><code>always</code></td><td style="text-align: left"><code>--always-verify</code></td><td style="text-align: left">La vérification est obligatoire. Un <code>gh</code> manquant ou trop ancien, ou une correspondance échouée, interrompt l'installation.</td></tr>
+<tr><td style="text-align: left"><code>never</code></td><td style="text-align: left"><code>--no-verify</code></td><td style="text-align: left">Saute la vérification même quand <code>gh</code> est disponible.</td></tr>
+</tbody></table>
+<p>Quand la vérification s'exécute, le script lance :</p>
+<pre><code class="language-sh">gh attestation verify &lt;archive&gt; \
+  --repo carthage-software/mago \
+  --signer-workflow carthage-software/mago/.github/workflows/cd.yml
+</code></pre>
+<p>L'épinglage <code>--signer-workflow</code> est important. Il lie l'attestation au fichier exact du workflow de release. Un jeton GitHub Actions compromis qui pourrait déclencher un workflow différent dans le même dépôt échouerait quand même à la vérification.</p>
+<p>Si la vérification échoue, le script copie l'archive non vérifiée dans votre répertoire de travail courant sous <code>&lt;file&gt;.unverified.tar.gz</code> (afin qu'elle survive au nettoyage du répertoire temp et que vous puissiez l'inspecter), affiche une erreur en rouge et quitte avant l'extraction. Rien n'atteint votre PATH.</p>
+<p>L'appel de vérification lit depuis l'API publique des attestations, donc aucun <code>gh auth</code> n'est requis. Vous avez seulement besoin d'un <code>gh</code> récent qui inclut la sous-commande <code>gh attestation</code>.</p>
+<h3 id="pinning-the-install-script">Épingler le script d'installation</h3>
+<p><code>https://carthage.software/mago.sh</code> redirige vers <a href="https://github.com/carthage-software/mago/blob/main/scripts/install.sh"><code>scripts/install.sh</code></a> sur la branche <code>main</code>. Les futures révisions sont prises automatiquement, ce qui est pratique mais signifie aussi que les futurs changements du script arrivent sans préavis.</p>
+<p>Pour une hygiène de chaîne d'approvisionnement plus stricte, épinglez le script à un commit spécifique que vous avez relu :</p>
+<pre><code class="language-sh">COMMIT=cd4cf4dfdbc72bd028ad26d11bcc815a49e27e9a  # replace with a commit you have read
+curl --proto '=https' --tlsv1.2 -sSf \
+  "https://raw.githubusercontent.com/carthage-software/mago/${COMMIT}/scripts/install.sh" \
+  | bash -s -- --always-verify
+</code></pre>
+<p>GitHub ne réécrit pas les fichiers à un SHA donné, donc les octets que vous avez relus sont les octets que vous exécutez. Mettre l'épinglage à jour est un acte délibéré : relisez le nouveau commit, puis bumpez <code>COMMIT</code>.</p>
+<h2 id="verify-the-install">Vérifier l'installation</h2>
+<pre><code class="language-sh">mago --version
+</code></pre>
+<p>Si cela affiche une version, vous êtes prêt à <a href="../../../../main/fr/guide/getting-started/index.html">exécuter Mago contre votre code</a>.</p>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/fr/guide/installation.md">↳ Modifier cette page →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="Sur cette page">
+  <p class="doc-toc__heading">Sur cette page</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#shell-installer-macos-linux">Script shell (macOS, Linux)</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#pin-a-specific-version">Épingler une version spécifique</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#verify-the-download">Vérifier le téléchargement</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#manual-download">Téléchargement manuel</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#docker">Docker</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#package-managers">Gestionnaires de paquets</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#composer">Composer</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#homebrew">Homebrew</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#cargo">Cargo</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#verifying-releases-in-detail">Vérification des releases en détail</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#pinning-the-install-script">Épingler le script d&#x27;installation</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#verify-the-install">Vérifier l&#x27;installation</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / main / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

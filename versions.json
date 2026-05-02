@@ -1,0 +1,10 @@
+{
+    "versions": [
+        {
+            "id": "main",
+            "label": "main",
+            "stable": false,
+            "paths": []
+        }
+    ]
+}

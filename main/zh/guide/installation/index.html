@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="zh" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>安装 · Mago</title>
+  <meta name="description" content="通过 shell 安装脚本、手动下载、Docker 或你所用语言的包管理器安装 Mago。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="安装 · Mago">
+  <meta property="og:description" content="通过 shell 安装脚本、手动下载、Docker 或你所用语言的包管理器安装 Mago。">
+  <meta property="og:url" content="https://mago.carthage.software/main/zh/guide&#x2F;installation/">
+  <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta property="og:locale" content="zh">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="安装 · Mago">
+  <meta name="twitter:description" content="通过 shell 安装脚本、手动下载、Docker 或你所用语言的包管理器安装 Mago。">
+  <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/main/zh/guide&#x2F;installation/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/index.html">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="搜索" aria-label="搜索">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">按 &#x2F; 搜索</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/guide/getting-started/index.html">指南</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/faq/index.html">常见问题</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/playground/index.html">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">赞助</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub 仓库" title="GitHub 仓库">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord 社区" title="Discord 社区">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>main</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../main/zh/guide/installation/index.html" aria-current="true">
+        <span>main</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>ZH</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../main/en/guide/installation/index.html">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../main/fr/guide/installation/index.html">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../main/zh/guide/installation/index.html" aria-current="true">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换主题">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">此翻译可能已过时。</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>此页面尚未翻译,已重定向至该语言的首页。</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">指南</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/zh/guide/getting-started/index.html">
+          <span>快速开始</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/installation/index.html" aria-current="page">
+          <span>安装</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/initialization/index.html">
+          <span>初始化</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/configuration/index.html">
+          <span>配置</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/environment-variables/index.html">
+          <span>环境变量</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/list-files/index.html">
+          <span>列出文件</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/generate-completions/index.html">
+          <span>Shell 补全</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/inspecting-the-ast/index.html">
+          <span>查看 AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/guide/upgrading/index.html">
+          <span>升级</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">基础</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/zh/fundamentals/command-line-interface/index.html">
+          <span>命令行接口</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/fundamentals/baseline/index.html">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/fundamentals/suppressing-issues/index.html">
+          <span>抑制问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/fundamentals/shared-reporting-options/index.html">
+          <span>报告与修复选项</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/rules/index.html">
+            <span>规则</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">工具</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/zh/tools/overview/index.html">
+          <span>工具</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/analyzer/overview/index.html">
+            <span>分析器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/analyzer/command-reference/index.html">
+            <span>分析器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/analyzer/configuration-reference/index.html">
+            <span>分析器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/overview/index.html">
+            <span>格式化器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/usage/index.html">
+            <span>格式化器使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/format-ignore/index.html">
+            <span>格式化忽略</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/command-reference/index.html">
+            <span>格式化器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/configuration-reference/index.html">
+            <span>格式化器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/guard/overview/index.html">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/guard/usage/index.html">
+            <span>Guard 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/guard/command-reference/index.html">
+            <span>Guard 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/guard/configuration-reference/index.html">
+            <span>Guard 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/overview/index.html">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/usage/index.html">
+            <span>Linter 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/integrations/index.html">
+            <span>Linter 集成</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/command-reference/index.html">
+            <span>Linter 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/zh/tools/linter/configuration-reference/index.html">
+            <span>Linter 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">实用方案</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/zh/recipes/vscode/index.html">
+          <span>Visual Studio Code 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/recipes/zed/index.html">
+          <span>Zed 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/recipes/helix/index.html">
+          <span>Helix 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/recipes/pre-commit-hooks/index.html">
+          <span>Pre-commit hooks 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/recipes/github-actions/index.html">
+          <span>GitHub Actions 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/recipes/docker/index.html">
+          <span>Docker 实用方案</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 06</span>
+      <span class="sidebar-section__title">参考</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../main/zh/faq/index.html">
+          <span>常见问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/benchmarks/index.html">
+          <span>基准测试</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../main/zh/contributing/index.html">
+          <span>贡献指南</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="installation">安装</h1>
+<p>Mago 以单一静态二进制的形式发布。挑一种适合你环境的安装方式即可。</p>
+<h2 id="shell-installer-macos-linux">Shell 安装脚本(macOS、Linux)</h2>
+<p>macOS 和 Linux 上的推荐方式。脚本会探测你的平台、获取匹配的发行归档,并把二进制放到你的 PATH 上。</p>
+<p>使用 <code>curl</code>:</p>
+<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
+</code></pre>
+<p>使用 <code>wget</code>:</p>
+<pre><code class="language-sh">wget -qO- https://carthage.software/mago.sh | bash
+</code></pre>
+<h3 id="pin-a-specific-version">锁定特定版本</h3>
+<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.1
+</code></pre>
+<p><code>wget</code> 也支持同样的语法。</p>
+<h3 id="verify-the-download">校验下载</h3>
+<p>如果 <a href="https://cli.github.com/">GitHub CLI</a> 在你的 PATH 上,安装脚本会在解压前根据 Mago 的 GitHub 构建证明(build attestation)校验归档。无需任何参数。如果 <code>gh</code> 缺失或版本太旧,脚本会打印提示并继续运行而不进行校验。</p>
+<p>要让校验成为强制项,请传 <code>--always-verify</code>。如果 <code>gh</code> 不可用、版本太旧,或证明不匹配,安装脚本会在动到 PATH 之前中止。</p>
+<pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --always-verify
+</code></pre>
+<p>要完全跳过校验,请传 <code>--no-verify</code>。这两个参数互斥。</p>
+<h2 id="manual-download">手动下载</h2>
+<p>Windows 上的推荐方式,也是任何没有 <code>bash</code> 的系统上的不错备选。</p>
+<ol>
+<li>打开 <a href="https://github.com/carthage-software/mago/releases">发布页面</a>。</li>
+<li>下载对应你操作系统的归档。命名遵循 <code>mago-&lt;version&gt;-&lt;target&gt;.tar.gz</code>(Windows 上是 <code>.zip</code>)。</li>
+<li>解压归档,把二进制放到 PATH 上的某个位置。</li>
+</ol>
+<p>如果你保留了归档文件,可以在解压前自行校验。</p>
+<pre><code class="language-sh">VERSION=1.25.1
+TARGET=x86_64-unknown-linux-gnu  # adjust for your platform
+ASSET=mago-${VERSION}-${TARGET}.tar.gz
+
+gh release download "$VERSION" --repo carthage-software/mago --pattern "$ASSET"
+gh attestation verify "$ASSET" \
+  --repo carthage-software/mago \
+  --signer-workflow carthage-software/mago/.github/workflows/cd.yml
+
+tar -xzf "$ASSET"
+sudo mv "mago-${VERSION}-${TARGET}/mago" /usr/local/bin/
+</code></pre>
+<p>校验成功时会打印 <code>Verification succeeded!</code> 以及生成该归档的工作流运行记录。</p>
+<p>证明绑定到归档,而非解压后的二进制。如果你只保留了二进制,就无法直接校验。请重新下载归档,完成校验,再用其中的二进制的 <code>sha256sum</code> 与系统上已有的二进制做对比。</p>
+<h2 id="docker">Docker</h2>
+<p>官方镜像基于 <code>scratch</code> 构建,大约 26 MB,可在任何运行 Docker 的地方使用,支持 <code>linux/amd64</code> 与 <code>linux/arm64</code>,无需宿主机的 PHP 运行时。</p>
+<pre><code class="language-sh">docker run --rm -v $(pwd):/app -w /app ghcr.io/carthage-software/mago lint
+</code></pre>
+<p>可用的 tag 包括 <code>latest</code>、确切版本号,以及逐级放宽的版本前缀(例如 <code>1.25.1</code>、<code>1.25</code>、<code>1</code>)。<a href="../../../../main/zh/recipes/docker/index.html">Docker 实用方案</a> 给出了 CI 示例和需要注意的限制。</p>
+<h2 id="package-managers">包管理器</h2>
+<p>这些方式很方便,但依赖外部的发布节奏,通常会落后于 GitHub 发布。通过其中任何一种安装后,可运行 <a href="../../../../main/zh/guide/upgrading/index.html"><code>mago self-update</code></a> 获取最新的官方二进制。</p>
+<h3 id="composer">Composer</h3>
+<p>适用于 PHP 项目:</p>
+<pre><code class="language-sh">composer require --dev "carthage-software/mago:^1.25.1"
+</code></pre>
+<p>Composer 包是一个轻量封装。第一次调用 <code>vendor/bin/mago</code> 会从 GitHub 发布下载对应的预构建二进制并缓存。后续调用复用缓存,不再发起任何网络请求。</p>
+<p>如果 GitHub 的匿名速率限制阻止了首次下载(在共享 CI runner 上很常见),为该次调用设置 <code>GITHUB_TOKEN</code> 或 <code>GH_TOKEN</code> 即可。在 GitHub Actions 中 token 不会自动导出,需要显式传入:</p>
+<pre><code class="language-yaml">- run: vendor/bin/mago lint
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+</code></pre>
+<h3 id="homebrew">Homebrew</h3>
+<p>社区维护的 formula 通常会落后于官方发布。安装后请立即运行 <code>mago self-update</code>。</p>
+<pre><code class="language-sh">brew install mago
+mago self-update
+</code></pre>
+<h3 id="cargo">Cargo</h3>
+<p>Crates.io 的发布可能比正式发布晚几个小时。和 Homebrew 一样的做法。</p>
+<pre><code class="language-sh">cargo install mago
+mago self-update
+</code></pre>
+<h2 id="verifying-releases-in-detail">校验发布的细节</h2>
+<p>每一份发行归档(各平台的 tarball、源码 tarball、源码 zip,以及 WASM 包)都在构建时通过 <a href="https://github.com/actions/attest-build-provenance"><code>actions/attest-build-provenance</code></a> 进行签名。签名是一份存储在 GitHub 上的 <a href="https://in-toto.io/">in-toto</a> 证明,绑定到生成该工件的工作流运行,因此校验通过的下载,可证明与 Mago 发布流水线产出的字节完全一致。</p>
+<p>shell 安装脚本会根据你传入的参数,在三种模式之间选择。</p>
+<table><thead><tr><th style="text-align: left">模式</th><th style="text-align: left">参数</th><th style="text-align: left">行为</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>auto</code></td><td style="text-align: left">无</td><td style="text-align: left">如果 <code>gh</code> 可用就校验;否则跳过校验直接安装。</td></tr>
+<tr><td style="text-align: left"><code>always</code></td><td style="text-align: left"><code>--always-verify</code></td><td style="text-align: left">强制校验。<code>gh</code> 缺失、版本太旧或匹配失败都会中止安装。</td></tr>
+<tr><td style="text-align: left"><code>never</code></td><td style="text-align: left"><code>--no-verify</code></td><td style="text-align: left">即便 <code>gh</code> 可用也跳过校验。</td></tr>
+</tbody></table>
+<p>校验执行的是:</p>
+<pre><code class="language-sh">gh attestation verify &lt;archive&gt; \
+  --repo carthage-software/mago \
+  --signer-workflow carthage-software/mago/.github/workflows/cd.yml
+</code></pre>
+<p><code>--signer-workflow</code> 这一项很关键。它把证明绑定到具体的发布工作流文件。即便有人通过泄露的 GitHub Actions token 在同一仓库内触发了另一个工作流,校验也会失败。</p>
+<p>如果校验失败,脚本会把未经校验的归档复制到当前工作目录,命名为 <code>&lt;file&gt;.unverified.tar.gz</code>(这样它能在临时目录清理后留存,便于你做事后取证),打印一条红色错误信息,然后在解压之前退出。任何东西都不会进入你的 PATH。</p>
+<p>校验调用读取的是公开的证明 API,因此无需 <code>gh auth</code>。你只需要一个包含 <code>gh attestation</code> 子命令的较新版本 <code>gh</code>。</p>
+<h3 id="pinning-the-install-script">锁定安装脚本</h3>
+<p><code>https://carthage.software/mago.sh</code> 会重定向到 <code>main</code> 分支上的 <a href="https://github.com/carthage-software/mago/blob/main/scripts/install.sh"><code>scripts/install.sh</code></a>。未来的修订会被自动采用,这很方便,但也意味着将来对安装脚本的改动会在没有预警的情况下生效。</p>
+<p>为了更严格的供应链卫生,可以把脚本锁定到你审阅过的某个提交:</p>
+<pre><code class="language-sh">COMMIT=cd4cf4dfdbc72bd028ad26d11bcc815a49e27e9a  # replace with a commit you have read
+curl --proto '=https' --tlsv1.2 -sSf \
+  "https://raw.githubusercontent.com/carthage-software/mago/${COMMIT}/scripts/install.sh" \
+  | bash -s -- --always-verify
+</code></pre>
+<p>GitHub 不会重写某一 SHA 上的文件,所以你审阅过的字节就是你运行的字节。更新这个锁定值是一个有意识的动作:先读懂新提交,再调整 <code>COMMIT</code>。</p>
+<h2 id="verify-the-install">校验安装</h2>
+<pre><code class="language-sh">mago --version
+</code></pre>
+<p>如果它打印出版本号,你就可以 <a href="../../../../main/zh/guide/getting-started/index.html">开始用 Mago 处理代码</a> 了。</p>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/zh/guide/installation.md">↳ 编辑此页 →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="本页内容">
+  <p class="doc-toc__heading">本页内容</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#shell-installer-macos-linux">Shell 安装脚本(macOS、Linux)</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#pin-a-specific-version">锁定特定版本</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#verify-the-download">校验下载</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#manual-download">手动下载</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#docker">Docker</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#package-managers">包管理器</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#composer">Composer</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#homebrew">Homebrew</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#cargo">Cargo</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#verifying-releases-in-detail">校验发布的细节</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#pinning-the-install-script">锁定安装脚本</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#verify-the-install">校验安装</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / main / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

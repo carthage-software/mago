@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="zh" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Linter 配置参考 · Mago</title>
+  <meta name="description" content="Mago 在 [linter] 与 [linter.rules] 下接受的所有选项。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Linter 配置参考 · Mago">
+  <meta property="og:description" content="Mago 在 [linter] 与 [linter.rules] 下接受的所有选项。">
+  <meta property="og:url" content="https://mago.carthage.software/main/zh/tools&#x2F;linter&#x2F;configuration-reference/">
+  <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta property="og:locale" content="zh">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Linter 配置参考 · Mago">
+  <meta name="twitter:description" content="Mago 在 [linter] 与 [linter.rules] 下接受的所有选项。">
+  <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/reset.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/base.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/typography.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/layout.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/components.css">
+  <link rel="stylesheet" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/css/code.css">
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/main/zh/tools&#x2F;linter&#x2F;configuration-reference/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/index.html">
+      <img class="brand__mark" src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="搜索" aria-label="搜索">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">按 &#x2F; 搜索</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/guide/getting-started/index.html">指南</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/faq/index.html">常见问题</a>
+      <a class="header-link" href="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/zh/playground/index.html">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">赞助</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub 仓库" title="GitHub 仓库">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord 社区" title="Discord 社区">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>main</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../main/zh/tools/linter/configuration-reference/index.html" aria-current="true">
+        <span>main</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>ZH</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../main/en/tools/linter/configuration-reference/index.html">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/fr/tools/linter/configuration-reference/index.html">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/zh/tools/linter/configuration-reference/index.html" aria-current="true">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换主题">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">此翻译可能已过时。</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>此页面尚未翻译,已重定向至该语言的首页。</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">指南</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/zh/guide/getting-started/index.html">
+          <span>快速开始</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/installation/index.html">
+          <span>安装</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/initialization/index.html">
+          <span>初始化</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/configuration/index.html">
+          <span>配置</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/environment-variables/index.html">
+          <span>环境变量</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/list-files/index.html">
+          <span>列出文件</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/generate-completions/index.html">
+          <span>Shell 补全</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/inspecting-the-ast/index.html">
+          <span>查看 AST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/upgrading/index.html">
+          <span>升级</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">基础</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/zh/fundamentals/command-line-interface/index.html">
+          <span>命令行接口</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/fundamentals/baseline/index.html">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/fundamentals/suppressing-issues/index.html">
+          <span>抑制问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/fundamentals/shared-reporting-options/index.html">
+          <span>报告与修复选项</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/rules/index.html">
+            <span>规则</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">工具</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/zh/tools/overview/index.html">
+          <span>工具</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/analyzer/overview/index.html">
+            <span>分析器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/analyzer/command-reference/index.html">
+            <span>分析器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/analyzer/configuration-reference/index.html">
+            <span>分析器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/overview/index.html">
+            <span>格式化器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/usage/index.html">
+            <span>格式化器使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/format-ignore/index.html">
+            <span>格式化忽略</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/command-reference/index.html">
+            <span>格式化器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/configuration-reference/index.html">
+            <span>格式化器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/guard/overview/index.html">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/guard/usage/index.html">
+            <span>Guard 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/guard/command-reference/index.html">
+            <span>Guard 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/guard/configuration-reference/index.html">
+            <span>Guard 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection" open>
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/overview/index.html">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/usage/index.html">
+            <span>Linter 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/integrations/index.html">
+            <span>Linter 集成</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/command-reference/index.html">
+            <span>Linter 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/configuration-reference/index.html" aria-current="page">
+            <span>Linter 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">实用方案</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/vscode/index.html">
+          <span>Visual Studio Code 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/zed/index.html">
+          <span>Zed 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/helix/index.html">
+          <span>Helix 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/pre-commit-hooks/index.html">
+          <span>Pre-commit hooks 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/github-actions/index.html">
+          <span>GitHub Actions 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/docker/index.html">
+          <span>Docker 实用方案</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 06</span>
+      <span class="sidebar-section__title">参考</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/zh/faq/index.html">
+          <span>常见问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/benchmarks/index.html">
+          <span>基准测试</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/contributing/index.html">
+          <span>贡献指南</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="configuration-reference">配置参考</h1>
+<p>linter 在 <code>mago.toml</code> 中由两个表配置:<code>[linter]</code> 用于工具级设置,<code>[linter.rules]</code> 用于逐规则的设置。</p>
+<pre><code class="language-toml">[linter]
+integrations = ["symfony", "phpunit"]
+excludes = ["src/Generated/"]
+baseline = "linter-baseline.toml"
+
+[linter.rules]
+# Disable a rule completely
+ambiguous-function-call = { enabled = false }
+
+# Change a rule's severity level
+no-else-clause = { level = "warning" }
+
+# Configure a rule's specific options
+cyclomatic-complexity = { threshold = 20 }
+
+# Exclude specific paths from one rule
+prefer-static-closure = { exclude = ["tests/"] }
+</code></pre>
+<h2 id="linter"><code>[linter]</code></h2>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left">字符串列表</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">linter 跳过的路径或 glob。叠加在全局 <code>source.excludes</code> 之上。</td></tr>
+<tr><td style="text-align: left"><code>integrations</code></td><td style="text-align: left">字符串列表</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">要启用的框架集成。完整列表见<a href="../../../../../main/zh/tools/linter/integrations/index.html">集成页面</a>。</td></tr>
+<tr><td style="text-align: left"><code>baseline</code></td><td style="text-align: left">字符串</td><td style="text-align: left">无</td><td style="text-align: left">baseline 文件路径。设置后,linter 会将其作为默认 baseline,你不必每次都传 <code>--baseline</code>。CLI 的 <code>--baseline</code> 会覆盖该值。</td></tr>
+<tr><td style="text-align: left"><code>baseline-variant</code></td><td style="text-align: left">字符串</td><td style="text-align: left"><code>"loose"</code></td><td style="text-align: left">新生成的 baseline 所用的变体。可选 <code>"loose"</code>(基于计数,具备容错性)或 <code>"strict"</code>(精确到行)。参见 <a href="../../../../../main/zh/fundamentals/baseline/index.html#two-variants">baseline 变体</a>。</td></tr>
+<tr><td style="text-align: left"><code>minimum-fail-level</code></td><td style="text-align: left">字符串</td><td style="text-align: left"><code>"error"</code></td><td style="text-align: left">触发非零退出码的最低严重等级。取值:<code>"note"</code>、<code>"help"</code>、<code>"warning"</code>、<code>"error"</code>。CLI 的 <code>--minimum-fail-level</code> 会覆盖该值。</td></tr>
+</tbody></table>
+<p>这里的 <code>excludes</code> 是在全局列表之上叠加。被全局匹配到的文件总是会被排除;此选项只能让你额外为 linter 排除一些文件。</p>
+<pre><code class="language-toml">[source]
+excludes = ["cache/**"]              # excluded from every tool
+
+[linter]
+excludes = ["database/migrations/**"]  # additionally excluded from the linter only
+</code></pre>
+<h2 id="linter-rules"><code>[linter.rules]</code></h2>
+<p>此表下的每个键都是一条规则的代码,以 <code>kebab-case</code> 书写。每条规则都接受下面的通用选项;部分规则还接受自身的选项。</p>
+<h3 id="common-options">通用选项</h3>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>enabled</code></td><td style="text-align: left">布尔值</td><td style="text-align: left">视规则而定</td><td style="text-align: left">启用或禁用该规则。</td></tr>
+<tr><td style="text-align: left"><code>level</code></td><td style="text-align: left">字符串</td><td style="text-align: left">视规则而定</td><td style="text-align: left">严重等级。取值:<code>"error"</code>、<code>"warning"</code>、<code>"help"</code>、<code>"note"</code>。</td></tr>
+<tr><td style="text-align: left"><code>exclude</code></td><td style="text-align: left">字符串列表</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">该规则跳过的路径或 glob。其他规则仍会作用于这些文件。</td></tr>
+</tbody></table>
+<h3 id="per-rule-excludes">逐规则的 excludes</h3>
+<p>当一条规则总体上有价值,但不适用于代码库的某一部分(例如生成代码或测试夹具)时,<code>exclude</code> 就很有用。</p>
+<pre><code class="language-toml">[linter.rules]
+prefer-static-closure = { enabled = true, exclude = ["tests/"] }
+no-goto              = { exclude = ["src/Legacy/"] }
+no-eval              = { exclude = ["src/Templating/Compiler.php"] }
+no-global            = { exclude = ["**/*Test.php"] }
+</code></pre>
+<p>每个条目可以是普通路径或 glob:</p>
+<ul>
+<li>普通路径(<code>"tests"</code>、<code>"tests/"</code>、<code>"src/Foo.php"</code>)以前缀匹配的方式针对项目根目录的相对路径进行匹配。</li>
+<li>glob 模式(任何包含 <code>*</code>、<code>?</code>、<code>[</code> 或 <code>{</code> 的条目)使用与全局 <code>source.excludes</code> 相同的 glob 引擎,匹配完整的相对路径,并应用 <code>[source.glob]</code> 设置。</li>
+</ul>
+<p>逐规则 <code>exclude</code> 中使用 glob 模式需要 Mago 1.20 或更高版本。早期版本仅接受普通前缀路径。</p>
+<p>逐规则 <code>exclude</code> 与 <code>[linter].excludes</code> 不同:</p>
+<ul>
+<li><code>[linter].excludes</code> 会从所有规则中移除文件。</li>
+<li>规则自身的 <code>exclude</code> 只会从这一条规则中移除文件,其他规则仍然作用于该文件。</li>
+</ul>
+<h3 id="rule-specific-options">规则专属选项</h3>
+<p>部分规则接受额外选项。<code>cyclomatic-complexity</code> 是一个典型例子:</p>
+<pre><code class="language-toml">[linter.rules]
+cyclomatic-complexity = { level = "error", threshold = 15 }
+</code></pre>
+<p>要查看某条规则的专属选项,可询问 Mago:</p>
+<pre><code class="language-sh">mago lint --explain cyclomatic-complexity
+</code></pre>
+<p>完整的逐规则参考见<a href="../../../../../main/zh/tools/linter/rules/index.html">规则页面</a>。</p>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/zh/tools/linter/configuration-reference.md">↳ 编辑此页 →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="本页内容">
+  <p class="doc-toc__heading">本页内容</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#linter">[linter]</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#linter-rules">[linter.rules]</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#common-options">通用选项</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#per-rule-excludes">逐规则的 excludes</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#rule-specific-options">规则专属选项</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / main / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/theme.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/search.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/anchors.js" defer></script>
+  <script src="..&#x2F;..&#x2F;..&#x2F;..&#x2F;..&#x2F;main/_assets/js/highlight.js" defer></script>
+  
+  
+</body>
+</html>

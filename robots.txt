@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://mago.carthage.software/main/sitemap.xml
