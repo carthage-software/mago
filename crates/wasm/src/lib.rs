@@ -20,6 +20,8 @@ use mago_database::ReadDatabase;
 use mago_database::file::File;
 use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
+use mago_linter::integration::Integration;
+use mago_linter::integration::IntegrationSet;
 use mago_linter::registry::RuleRegistry;
 use mago_linter::rule::AnyRule;
 use mago_linter::settings::Settings as LinterSettings;
@@ -32,6 +34,7 @@ use mago_syntax::parser::parse_file;
 use mago_syntax::settings::ParserSettings;
 
 use crate::types::IssueSource;
+use crate::types::WasmIntegrationInfo;
 use crate::types::WasmIssue;
 use crate::types::WasmPluginInfo;
 use crate::types::WasmRuleInfo;
@@ -46,6 +49,16 @@ const PRELUDE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/prelude.b
 ///
 /// Accepts formats like "8.4", "8.3", "8.2", etc.
 /// Returns `PHPVersion::default()` if parsing fails.
+fn parse_integrations(values: &[String]) -> IntegrationSet {
+    let mut set = IntegrationSet::empty();
+    for value in values {
+        if let Ok(integration) = value.parse::<Integration>() {
+            set.insert(integration);
+        }
+    }
+    set
+}
+
 fn parse_php_version(version: &str) -> PHPVersion {
     match version {
         "8.6" => PHPVersion::PHP86,
@@ -79,20 +92,33 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
     let file_id = file.id;
 
     let disabled_rules: HashSet<String> = settings.linter.disabled_rules.into_iter().collect();
+    let integrations = parse_integrations(&settings.linter.integrations);
 
-    let linter_settings = LinterSettings { php_version: version, ..Default::default() };
+    let linter_settings = LinterSettings { php_version: version, integrations, ..Default::default() };
     let database = ReadDatabase::empty();
-    let service = LintService::new(database, linter_settings, ParserSettings::default(), false);
-    let linter_issues = service.lint_file(&file, LintMode::Full, None);
+    let service = LintService::new(database, linter_settings.clone(), ParserSettings::default(), false);
+    let linter_issues = service.lint_file(&file, LintMode::Full, None, true);
+
+    let requirements_by_code: HashMap<String, _> = RuleRegistry::build(&linter_settings, None, true)
+        .rules()
+        .iter()
+        .map(|rule| (rule.code().to_string(), rule.meta().requirements))
+        .collect();
 
     let mut issue_map: HashMap<(String, u32, u32), WasmIssue> = HashMap::new();
     let mut issues_without_key: Vec<WasmIssue> = Vec::new();
 
     for issue in &linter_issues {
-        if let Some(code) = &issue.code
-            && disabled_rules.contains(code)
-        {
-            continue;
+        if let Some(code) = &issue.code {
+            if disabled_rules.contains(code) {
+                continue;
+            }
+
+            if let Some(req) = requirements_by_code.get(code)
+                && !req.are_met_by(version, integrations)
+            {
+                continue;
+            }
         }
 
         let wasm_issue = WasmIssue::from_issue(issue, &file, IssueSource::Linter);
@@ -193,7 +219,7 @@ pub fn lint(code: String, php_version: &str) -> Result<JsValue, JsValue> {
 
     let database = ReadDatabase::empty();
     let service = LintService::new(database, settings, ParserSettings::default(), false);
-    let issues = service.lint_file(&file, LintMode::Full, None);
+    let issues = service.lint_file(&file, LintMode::Full, None, true);
 
     let wasm_issues: Vec<WasmIssue> =
         issues.iter().map(|i| WasmIssue::from_issue(i, &file, IssueSource::Linter)).collect();
@@ -310,6 +336,8 @@ pub fn get_rules() -> Result<JsValue, JsValue> {
                 name: meta.name.to_string(),
                 description: meta.description.to_string(),
                 category: meta.category.as_str().to_string(),
+                default_enabled: AnyRule::default_enabled(rule),
+                requires_integration: !meta.requirements.required_integrations().is_empty(),
             }
         })
         .collect();
@@ -336,4 +364,72 @@ pub fn get_plugins() -> Result<JsValue, JsValue> {
         .collect();
 
     serde_wasm_bindgen::to_value(&plugins).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+/// Returns metadata for all linter integrations the playground can toggle.
+#[wasm_bindgen(js_name = getIntegrations)]
+pub fn get_integrations() -> Result<JsValue, JsValue> {
+    let integrations: Vec<WasmIntegrationInfo> = [
+        Integration::Psl,
+        Integration::Guzzle,
+        Integration::Monolog,
+        Integration::Carbon,
+        Integration::Amphp,
+        Integration::ReactPHP,
+        Integration::Symfony,
+        Integration::Laravel,
+        Integration::Tempest,
+        Integration::Neutomic,
+        Integration::Spiral,
+        Integration::CakePHP,
+        Integration::Yii,
+        Integration::Laminas,
+        Integration::Cycle,
+        Integration::Doctrine,
+        Integration::WordPress,
+        Integration::Drupal,
+        Integration::Magento,
+        Integration::PHPUnit,
+        Integration::Pest,
+        Integration::Behat,
+        Integration::Codeception,
+        Integration::PHPSpec,
+    ]
+    .into_iter()
+    .map(|integration| WasmIntegrationInfo {
+        id: integration_id(integration).to_string(),
+        name: integration.to_string(),
+    })
+    .collect();
+
+    serde_wasm_bindgen::to_value(&integrations).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+fn integration_id(integration: Integration) -> &'static str {
+    match integration {
+        Integration::Psl => "psl",
+        Integration::Guzzle => "guzzle",
+        Integration::Monolog => "monolog",
+        Integration::Carbon => "carbon",
+        Integration::Amphp => "amphp",
+        Integration::ReactPHP => "reactphp",
+        Integration::Symfony => "symfony",
+        Integration::Laravel => "laravel",
+        Integration::Tempest => "tempest",
+        Integration::Neutomic => "neutomic",
+        Integration::Spiral => "spiral",
+        Integration::CakePHP => "cakephp",
+        Integration::Yii => "yii",
+        Integration::Laminas => "laminas",
+        Integration::Cycle => "cycle",
+        Integration::Doctrine => "doctrine",
+        Integration::WordPress => "wordpress",
+        Integration::Drupal => "drupal",
+        Integration::Magento => "magento",
+        Integration::PHPUnit => "phpunit",
+        Integration::Pest => "pest",
+        Integration::Behat => "behat",
+        Integration::Codeception => "codeception",
+        Integration::PHPSpec => "phpspec",
+    }
 }

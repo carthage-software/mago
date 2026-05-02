@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block layout %}
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    {% include "partials/sidebar.html" %}
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      {{ content | safe }}
+    </article>
+
+    <p class="doc-edit"><a href="{{ edit_url | safe }}">↳ {{ ui.edit_page }} →</a></p>
+  </main>
+
+  {% include "partials/toc.html" %}
+</div>
+{% endblock layout %}

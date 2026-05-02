@@ -129,6 +129,13 @@ macro_rules! define_rules {
             }
 
             #[inline]
+            pub fn default_enabled(&self) -> bool {
+                match self {
+                    $( AnyRule::$variant(_) => <$rule as LintRule>::Config::default_enabled(), )*
+                }
+            }
+
+            #[inline]
             pub fn meta(&self) -> &'static RuleMeta {
                 match self {
                     $( AnyRule::$variant(_) => $rule::meta(), )*

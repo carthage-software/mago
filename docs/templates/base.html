@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="{{ lang_code }}" dir="{{ lang_dir }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% set full_title = page_title ~ " · " ~ site_name %}{% if page_title == site_name %}{% set full_title = site_name %}{% endif %}
+  <title>{{ full_title }}</title>
+  <meta name="description" content="{{ page_description }}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ full_title }}">
+  <meta property="og:description" content="{{ page_description }}">
+  <meta property="og:url" content="{{ base_url | safe }}/{{ current_version }}/{{ lang_code }}/{% if logical_path %}{{ logical_path }}/{% endif %}">
+  <meta property="og:image" content="{{ base_url | safe }}/{{ current_version }}/_assets/img/logo.webp">
+  <meta property="og:locale" content="{{ lang_code }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ full_title }}">
+  <meta name="twitter:description" content="{{ page_description }}">
+  <meta name="twitter:image" content="{{ base_url | safe }}/{{ current_version }}/_assets/img/logo.webp">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ path_to_root }}{{ current_version }}/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ path_to_root }}{{ current_version }}/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ path_to_root }}{{ current_version }}/_assets/img/apple-touch-icon.png">
+  {# Preload critical fonts so font fetch starts in parallel with CSS parse,
+     not after. Saves ~100ms FCP on cold loads. Limit to the three fonts
+     used above the fold (serif body, sans display, mono labels). #}
+  <link rel="preload" href="{{ path_to_root }}{{ current_version }}/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ path_to_root }}{{ current_version }}/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ path_to_root }}{{ current_version }}/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/reset.css">
+  <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/base.css">
+  <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/typography.css">
+  <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/layout.css">
+  <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/components.css">
+  <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/code.css">
+  {% if is_playground %}
+  <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/playground.css">
+  {% endif %}
+  {% if lang_dir == "rtl" %}
+  <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/rtl.css">
+  {% endif %}
+  <style>:root { --accent: {{ accent_color }}; }</style>
+  <link rel="canonical" href="{{ base_url | safe }}/{{ current_version }}/{{ lang_code }}/{% if logical_path %}{{ logical_path }}/{% endif %}">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body{% if is_playground %} class="is-playground"{% endif %}>
+  {% include "partials/header.html" %}
+  <div id="search-root" class="search-root" hidden></div>
+
+  {# Translations are always flagged as possibly stale. We don't track
+     translation freshness; pretending we do would lie to readers. The
+     banner appears on every non-default-language page. #}
+  {% if not is_default_language %}
+  <div class="doc-banner">{{ ui.translation_stale }}</div>
+  {% endif %}
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>{{ ui.untranslated_banner }}</div>
+
+  {% block layout %}{% endblock layout %}
+
+  {# The playground fills the entire viewport below the header, so a footer
+     would force a page scrollbar. Skip it on that route. #}
+  {% if not is_playground %}
+  {% include "partials/footer.html" %}
+  {% endif %}
+
+  <script src="{{ path_to_root }}{{ current_version }}/_assets/js/theme.js" defer></script>
+  <script src="{{ path_to_root }}{{ current_version }}/_assets/js/search.js" defer></script>
+  <script src="{{ path_to_root }}{{ current_version }}/_assets/js/anchors.js" defer></script>
+  <script src="{{ path_to_root }}{{ current_version }}/_assets/js/highlight.js" defer></script>
+  {% if is_homepage %}<script src="{{ path_to_root }}{{ current_version }}/_assets/js/sponsors.js" defer></script>{% endif %}
+  {% block page_scripts %}{% endblock page_scripts %}
+</body>
+</html>

@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block layout %}
+<div class="pg" id="playground" data-api-base="https://carthage.software/api/playground" data-mago-version="{{ current_version }}">
+  <div class="pg__bar" role="toolbar" aria-label="{{ ui.playground_title }}">
+    <span class="pg__title">[ {{ ui.playground_title | upper }} ]</span>
+    <span class="pg__sep">·</span>
+    <label class="pg__field">
+      <span class="pg__field-label">PHP</span>
+      <select id="pg-php-version" class="pg__select" aria-label="PHP version">
+        <option value="8.0">8.0</option>
+        <option value="8.1">8.1</option>
+        <option value="8.2">8.2</option>
+        <option value="8.3">8.3</option>
+        <option value="8.4" selected>8.4</option>
+        <option value="8.5">8.5</option>
+      </select>
+    </label>
+    <span class="pg__sep">·</span>
+    <span class="pg__meta">Mago&nbsp;<strong>{{ current_version }}</strong></span>
+
+    <span class="pg__spacer"></span>
+
+    <span class="pg__status" id="pg-status" aria-live="polite"></span>
+
+    <button type="button" class="pg__btn" id="pg-format" title="{{ ui.playground_format }} (⌘⇧F)">{{ ui.playground_format }}</button>
+    <button type="button" class="pg__btn" id="pg-share" title="{{ ui.playground_share }} (⌘S)">{{ ui.playground_share }}</button>
+    <button type="button" class="pg__btn pg__btn--toggle" id="pg-settings-toggle" aria-pressed="false" aria-controls="pg-settings" title="{{ ui.pg_settings }} (⌘,)">{{ ui.pg_settings }}</button>
+  </div>
+
+  <div class="pg__panes" id="pg-panes">
+    <section class="pg__pane pg__pane--editor" aria-label="PHP source">
+      <header class="pg__pane-bar">
+        <span class="pg__pane-label">source.php</span>
+        <span class="pg__pane-spacer"></span>
+        <span class="pg__pane-hint" id="pg-cursor"></span>
+      </header>
+      <div class="pg__editor" id="pg-editor"></div>
+    </section>
+
+    <section class="pg__pane pg__pane--output" aria-label="{{ ui.pg_pane_issues }}">
+      <header class="pg__pane-bar">
+        <span class="pg__pane-label">{{ ui.pg_pane_issues }}</span>
+        <span class="pg__pane-spacer"></span>
+        <span class="pg__time" id="pg-time" hidden></span>
+        <button type="button" class="pg__chip pg__chip--linter" id="pg-filter-linter" aria-pressed="true">
+          <span class="pg__chip-letter">L</span>
+          <span class="pg__chip-count" id="pg-count-linter">0</span>
+        </button>
+        <button type="button" class="pg__chip pg__chip--analyzer" id="pg-filter-analyzer" aria-pressed="true">
+          <span class="pg__chip-letter">A</span>
+          <span class="pg__chip-count" id="pg-count-analyzer">0</span>
+        </button>
+      </header>
+      <div class="pg__output" id="pg-output" aria-live="polite">
+        <div class="pg__placeholder" id="pg-placeholder">
+          <span class="pg__placeholder-mark">⏳</span>
+          <p>{{ ui.pg_loading_title }}</p>
+          <p class="pg__placeholder-sub">{{ ui.pg_loading_sub }}</p>
+        </div>
+      </div>
+    </section>
+
+    <aside class="pg__settings" id="pg-settings" aria-label="{{ ui.pg_pane_settings }}" hidden>
+      <header class="pg__pane-bar">
+        <span class="pg__pane-label">{{ ui.pg_pane_settings }}</span>
+        <span class="pg__pane-spacer"></span>
+        <button type="button" class="pg__icon-btn" id="pg-settings-close" aria-label="{{ ui.pg_settings_close }}">×</button>
+      </header>
+      <div class="pg__settings-body">
+
+        <details class="pg__group">
+          <summary class="pg__group-summary">
+            <span class="pg__group-name">{{ ui.pg_section_analyzer }}</span>
+            <span class="pg__group-chev" aria-hidden="true">+</span>
+          </summary>
+          <div class="pg__group-body">
+            <p class="pg__hint">{{ ui.pg_hint_analyzer }}</p>
+            <div class="pg__toggle-list" id="pg-analyzer-options"></div>
+
+            <div class="pg__sub">
+              <h4 class="pg__sub-heading">{{ ui.pg_section_plugins }}</h4>
+              <p class="pg__hint">{{ ui.pg_hint_plugins }}</p>
+              <div class="pg__toggle-list" id="pg-plugins"></div>
+            </div>
+
+            <div class="pg__sub" id="pg-exceptions" hidden>
+              <h4 class="pg__sub-heading">{{ ui.pg_section_exceptions }}</h4>
+              <p class="pg__hint">{{ ui.pg_hint_exceptions | safe }}</p>
+              <label class="pg__field-block">
+                <span class="pg__field-block-label">{{ ui.pg_label_unchecked }}</span>
+                <span class="pg__field-block-hint">{{ ui.pg_hint_unchecked }}</span>
+                <input type="text" class="pg__text-input" id="pg-unchecked-exceptions" placeholder="LogicException, Psl\Type\Exception\ExceptionInterface">
+              </label>
+              <label class="pg__field-block">
+                <span class="pg__field-block-label">{{ ui.pg_label_unchecked_classes }}</span>
+                <span class="pg__field-block-hint">{{ ui.pg_hint_unchecked_classes }}</span>
+                <input type="text" class="pg__text-input" id="pg-unchecked-exception-classes" placeholder="Psl\File\Exception\FileNotFoundException">
+              </label>
+            </div>
+
+            <div class="pg__sub">
+              <h4 class="pg__sub-heading">{{ ui.pg_section_initializers }}</h4>
+              <label class="pg__field-block">
+                <span class="pg__field-block-hint">{{ ui.pg_hint_initializers | safe }}</span>
+                <input type="text" class="pg__text-input" id="pg-class-initializers" placeholder="setUp, initialize, boot">
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <details class="pg__group">
+          <summary class="pg__group-summary">
+            <span class="pg__group-name">{{ ui.pg_section_linter }}</span>
+            <span class="pg__group-count" id="pg-rules-count"></span>
+            <span class="pg__group-chev" aria-hidden="true">+</span>
+          </summary>
+          <div class="pg__group-body">
+            <p class="pg__hint">{{ ui.pg_hint_rules }}</p>
+            <div class="pg__rules-controls">
+              <input type="search" class="pg__text-input" id="pg-rules-search" placeholder="{{ ui.pg_search_rules }}" aria-label="{{ ui.pg_search_rules }}">
+              <button type="button" class="pg__btn" id="pg-rules-enable">{{ ui.pg_enable_all }}</button>
+              <button type="button" class="pg__btn" id="pg-rules-disable">{{ ui.pg_disable_all }}</button>
+            </div>
+            <div class="pg__rules-list" id="pg-rules-list">
+              <p class="pg__hint pg__hint--center">{{ ui.pg_rules_load }}</p>
+            </div>
+
+            <div class="pg__sub">
+              <h4 class="pg__sub-heading">{{ ui.pg_section_integrations }}</h4>
+              <p class="pg__hint">{{ ui.pg_hint_integrations }}</p>
+              <div class="pg__toggle-list" id="pg-integrations"></div>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </aside>
+  </div>
+
+</div>
+{# Translations consumed by the playground.js controller for runtime
+   strings (status messages, output empty states). Static chrome strings
+   above are rendered directly by Tera; this block covers what the JS
+   inserts into the DOM at runtime. #}
+<script id="pg-i18n" type="application/json">
+{
+  "status_loading": {{ ui.pg_status_loading | json_encode | safe }},
+  "status_formatting": {{ ui.pg_status_formatting | json_encode | safe }},
+  "status_formatted": {{ ui.pg_status_formatted | json_encode | safe }},
+  "status_sharing": {{ ui.pg_status_sharing | json_encode | safe }},
+  "status_copied": {{ ui.pg_status_copied | json_encode | safe }},
+  "status_share_url": {{ ui.pg_status_share_url | json_encode | safe }},
+  "err_share": {{ ui.pg_err_share | json_encode | safe }},
+  "err_format": {{ ui.pg_err_format | json_encode | safe }},
+  "err_analysis": {{ ui.pg_err_analysis | json_encode | safe }},
+  "err_load": {{ ui.pg_err_load | json_encode | safe }},
+  "no_issues_title": {{ ui.pg_no_issues_title | json_encode | safe }},
+  "no_issues_sub": {{ ui.pg_no_issues_sub | json_encode | safe }},
+  "filtered_title": {{ ui.pg_filtered_title | json_encode | safe }},
+  "filtered_sub": {{ ui.pg_filtered_sub | json_encode | safe }}
+}
+</script>
+{% endblock layout %}
+
+{% block page_scripts %}
+{# CodeMirror is loaded from esm.sh. The `*` prefix on each URL externalises
+   the package's peer dependencies, and this import map pins every shared
+   module to ONE URL, so direct and transitive imports resolve to the same
+   instance. Without this, `@codemirror/lang-php` ships its own copy of
+   `@lezer/lr` and the PHP parser table fails to deserialise against the
+   `@lezer/common` instance held by `@codemirror/state`. #}
+<script type="importmap">
+{
+  "imports": {
+    "codemirror": "https://esm.sh/*codemirror@6.0.2",
+    "@codemirror/state": "https://esm.sh/*@codemirror/state@6.6.0",
+    "@codemirror/view": "https://esm.sh/*@codemirror/view@6.41.1",
+    "@codemirror/language": "https://esm.sh/*@codemirror/language@6.12.3",
+    "@codemirror/commands": "https://esm.sh/*@codemirror/commands@6.10.3",
+    "@codemirror/autocomplete": "https://esm.sh/*@codemirror/autocomplete@6.20.1",
+    "@codemirror/lint": "https://esm.sh/*@codemirror/lint@6.9.5",
+    "@codemirror/search": "https://esm.sh/*@codemirror/search@6.7.0",
+    "@codemirror/lang-php": "https://esm.sh/*@codemirror/lang-php@6.0.2",
+    "@codemirror/lang-html": "https://esm.sh/*@codemirror/lang-html@6.4.11",
+    "@codemirror/lang-css": "https://esm.sh/*@codemirror/lang-css@6.3.1",
+    "@codemirror/lang-javascript": "https://esm.sh/*@codemirror/lang-javascript@6.2.5",
+    "@lezer/common": "https://esm.sh/*@lezer/common@1.5.2",
+    "@lezer/lr": "https://esm.sh/*@lezer/lr@1.4.10",
+    "@lezer/highlight": "https://esm.sh/*@lezer/highlight@1.2.3",
+    "@lezer/php": "https://esm.sh/*@lezer/php@1.0.5",
+    "@lezer/html": "https://esm.sh/*@lezer/html@1.3.13",
+    "@lezer/css": "https://esm.sh/*@lezer/css@1.3.3",
+    "@lezer/javascript": "https://esm.sh/*@lezer/javascript@1.5.4",
+    "style-mod": "https://esm.sh/style-mod@4.1.3",
+    "w3c-keyname": "https://esm.sh/w3c-keyname@2.2.8",
+    "crelt": "https://esm.sh/crelt@1.0.6",
+    "@marijn/find-cluster-break": "https://esm.sh/@marijn/find-cluster-break@1.0.2"
+  }
+}
+</script>
+<script type="module" src="./_assets/playground.js"></script>
+{% endblock page_scripts %}

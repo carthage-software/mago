@@ -115,6 +115,15 @@ pub struct WasmRuleInfo {
     pub name: String,
     pub description: String,
     pub category: String,
+    pub default_enabled: bool,
+    pub requires_integration: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WasmIntegrationInfo {
+    pub id: String,
+    pub name: String,
 }
 
 /// WASM-safe plugin info for exposing available plugins to the frontend.
@@ -203,6 +212,7 @@ impl Default for WasmAnalyzerSettings {
 #[serde(rename_all = "camelCase", default)]
 pub struct WasmLinterSettings {
     pub disabled_rules: Vec<String>,
+    pub integrations: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Default)]

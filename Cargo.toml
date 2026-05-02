@@ -8,7 +8,7 @@ description = "A comprehensive suite of PHP tooling inspired by Rust’s approac
 homepage = "https://mago.carthage.software"
 repository = "https://github.com/carthage-software/mago"
 rust-version = "1.95.0"
-exclude = ["docs", "composer", "scripts"]
+exclude = ["composer", "scripts"]
 
 [workspace]
 package.edition = "2024"
@@ -18,7 +18,7 @@ package.version = "1.25.1"
 package.homepage = "https://mago.carthage.software"
 package.repository = "https://github.com/carthage-software/mago"
 package.rust-version = "1.95.0"
-members = ["crates/*"]
+members = ["crates/*", "docs"]
 exclude = ["crates/syntax/fuzz", "crates/twig-syntax/fuzz", "crates/type-syntax/fuzz"]
 
 [workspace.lints.clippy]
@@ -114,6 +114,9 @@ xxhash-rust = { version = "0.8", features = ["xxh3"] }
 serde-sarif = "0.8"
 schemars = { version = "1.1", features = ["preserve_order"] }
 simdutf8 = { version = "0.1.5" }
+anyhow = "1"
+pulldown-cmark = "0.13"
+tera = "1.20"
 
 [dependencies]
 mago-atom = { workspace = true }

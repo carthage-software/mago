@@ -1,13 +1,8 @@
 {
-  "scripts": {
-    "dev": "vitepress dev",
-    "build": "vitepress build",
-    "preview": "vitepress preview"
-  },
+  "name": "mago-documentation-tooling",
+  "private": true,
+  "version": "0.1.0",
   "devDependencies": {
-    "chart.js": "^4.4.0",
-    "codejar": "^4.2.0",
-    "prismjs": "^1.29.0",
-    "vitepress": "^2.0.0-alpha.12"
+    "pagefind": "^1.1.1"
   }
 }

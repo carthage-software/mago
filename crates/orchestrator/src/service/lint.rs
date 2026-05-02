@@ -98,7 +98,13 @@ impl LintService {
     ///
     /// An `IssueCollection` containing all issues found in the file.
     #[must_use]
-    pub fn lint_file(&self, file: &File, mode: LintMode, only: Option<&[String]>) -> IssueCollection {
+    pub fn lint_file(
+        &self,
+        file: &File,
+        mode: LintMode,
+        only: Option<&[String]>,
+        include_disabled: bool,
+    ) -> IssueCollection {
         let arena = Bump::new();
         let program = parse_file_with_settings(&arena, file, self.parser_settings);
         let resolved_names = NameResolver::new(&arena).resolve(program);
@@ -112,7 +118,7 @@ impl LintService {
         issues.extend(semantics_checker.check(file, program, &resolved_names));
 
         if mode == LintMode::Full {
-            let registry = Arc::new(self.create_registry(only, false));
+            let registry = Arc::new(self.create_registry(only, include_disabled));
             let linter = Linter::from_registry(&arena, registry, self.settings.php_version);
 
             issues.extend(linter.lint(file, program, &resolved_names));

@@ -1,0 +1,15 @@
+<details class="header-dropdown header-dropdown--version">
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>{{ current_version }}</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    {% for version in version_switch %}
+    <li>
+      <a href="{{ version.url | safe }}"{% if version.active %} aria-current="true"{% endif %}>
+        <span>{{ version.label }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</details>

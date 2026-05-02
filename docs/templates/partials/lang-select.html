@@ -1,0 +1,15 @@
+<details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>{{ lang_code | upper }}</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    {% for language in language_switch %}
+    <li>
+      <a href="{{ language.url | safe }}"{% if language.active %} aria-current="true"{% endif %}>
+        <span>{{ language.name }}{% if language.untranslated %} *{% endif %}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</details>

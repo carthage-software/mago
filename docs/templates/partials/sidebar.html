@@ -1,0 +1,62 @@
+<nav class="sidebar-nav" aria-label="Documentation navigation">
+  {% for section in sidebar %}
+  <details class="sidebar-section"{% if section.is_active %} open{% endif %}>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ {% if loop.index < 10 %}0{% endif %}{{ loop.index }}</span>
+      <span class="sidebar-section__title">{{ section.title }}</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    {% if section.items | length > 0 %}
+    <ul class="sidebar-section__items">
+      {% for item in section.items %}
+      <li>
+        <a href="{{ item.url | safe }}"{% if item.active %} aria-current="page"{% endif %}>
+          <span>{{ item.title }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% for subsection in section.subsections %}
+    <details class="sidebar-subsection"{% if subsection.is_active %} open{% endif %}>
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">{{ subsection.title }}</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      {% if subsection.items | length > 0 %}
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        {% for item in subsection.items %}
+        <li>
+          <a href="{{ item.url | safe }}"{% if item.active %} aria-current="page"{% endif %}>
+            <span>{{ item.title }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% for sub2 in subsection.subsubsections %}
+      <details class="sidebar-subsubsection"{% if sub2.is_active %} open{% endif %}>
+        <summary class="sidebar-subsubsection__heading">
+          <span class="sidebar-subsubsection__title">{{ sub2.title }}</span>
+          <span class="sidebar-subsubsection__chev" aria-hidden="true">+</span>
+        </summary>
+        <ul class="sidebar-section__items sidebar-subsubsection__items">
+          {% for item in sub2.items %}
+          <li>
+            <a href="{{ item.url | safe }}"{% if item.active %} aria-current="page"{% endif %}>
+              <span>{{ item.title }}</span>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endfor %}
+    </details>
+    {% endfor %}
+  </details>
+  {% endfor %}
+</nav>

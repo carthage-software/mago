@@ -1,0 +1,38 @@
+site-name = "Mago"
+site-description = "The oxidized PHP toolchain"
+default-language = "en"
+accent-color = "#3c8d58"
+base-url = "https://mago.carthage.software"
+source-edit-url = "https://github.com/carthage-software/mago/edit/main/documentation"
+
+# Top-level sidebar sections, in display order. The list is interleaved across
+# languages: each language's section name takes the slot it appears in, so all
+# languages see the same logical order regardless of whether their section
+# names are translated.
+nav-sections = [
+  "Overview", "Aperçu", "概览",
+  "Guide", "指南",
+  "Fundamentals", "Fondamentaux", "基础",
+  "Tools", "工具",
+  "Recipes", "Recettes", "实用方案",
+  "Reference", "Référence", "参考",
+]
+
+# Subsection order under specific parents. Anything missing falls to alpha.
+[nav-subsections]
+"Tools" = ["Linter", "Analyzer", "Formatter", "Guard"]
+
+[[languages]]
+code = "en"
+name = "English"
+dir = "ltr"
+
+[[languages]]
+code = "fr"
+name = "Français"
+dir = "ltr"
+
+[[languages]]
+code = "zh"
+name = "简体中文"
+dir = "ltr"

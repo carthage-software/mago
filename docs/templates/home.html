@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block layout %}
+<div class="home-layout">
+  <aside class="home-aside" aria-hidden="true">
+    <div class="home-aside__label">Mago · {{ current_version }}</div>
+  </aside>
+
+  <main id="content" class="home-content">
+    <article class="doc-page home-article">
+      {{ content | safe }}
+    </article>
+  </main>
+
+  <aside class="home-aside home-aside--end" aria-hidden="true">
+    <div class="home-aside__label">Rust core · MIT licence</div>
+  </aside>
+</div>
+{% endblock layout %}

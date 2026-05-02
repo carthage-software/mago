@@ -1,0 +1,35 @@
+[package]
+name = "mago-documentation"
+description = "Static site generator for the Mago documentation."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints.clippy]
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"
+let_underscore_lock = "deny"
+large_enum_variant = "allow"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+mago-linter = { workspace = true }
+mago-php-version = { workspace = true }
+mago-reporting = { workspace = true }
+pulldown-cmark = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tera = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+ureq = { workspace = true }
+walkdir = { workspace = true }

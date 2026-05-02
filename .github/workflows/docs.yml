@@ -3,74 +3,104 @@ name: Deploy Docs
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: true
+  group: docs-gh-pages
+  cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: wasm-build
 
-      - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          version: latest
+          node-version: 22
 
-      - name: Build WASM module
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          coverage: none
+
+      - name: Cache wasm-pack
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-pack
+          key: wasm-pack-0.13.1-${{ runner.os }}
+
+      - name: Build playground WASM
         run: |
-          cd crates/wasm
-          wasm-pack build --target web --out-dir pkg-web --release
+          if ! command -v wasm-pack &>/dev/null; then
+            cargo install wasm-pack --version 0.13.1 --locked
+          fi
+          wasm-pack build crates/wasm --target web --release --out-dir pkg-web
+          mkdir -p docs/static/playground_wasm
+          cp crates/wasm/pkg-web/mago_wasm.js \
+             crates/wasm/pkg-web/mago_wasm_bg.wasm \
+             crates/wasm/pkg-web/mago_wasm.d.ts \
+             crates/wasm/pkg-web/mago_wasm_bg.wasm.d.ts \
+             crates/wasm/pkg-web/package.json \
+             docs/static/playground_wasm/
 
-      - name: Copy WASM to docs
+      - name: Install documentation Node dependencies
+        run: npm install --prefix docs
+
+      - name: Determine documentation version
+        id: version
+        shell: bash
         run: |
-          mkdir -p docs/public/wasm
-          cp crates/wasm/pkg-web/mago_wasm.js docs/public/wasm/
-          cp crates/wasm/pkg-web/mago_wasm_bg.wasm docs/public/wasm/
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "value=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "value=main" >> "${GITHUB_OUTPUT}"
+          fi
 
-      - uses: oven-sh/setup-bun@v2
+      - name: Build static documentation
+        env:
+          MAGO_DOCS_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          cargo run -p mago-documentation
+
+      - name: Check out gh-pages worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git fetch origin gh-pages
+            git worktree add -B gh-pages gh-pages-worktree origin/gh-pages
+          else
+            git worktree add --detach gh-pages-worktree
+            git -C gh-pages-worktree checkout --orphan gh-pages
+            git -C gh-pages-worktree rm -rf . >/dev/null 2>&1 || true
+          fi
+
+      - name: Stage gh-pages worktree
+        run: php scripts/publish-docs.php "${{ steps.version.outputs.value }}" docs gh-pages-worktree
+
+      - name: Commit and push gh-pages
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          bun-version: latest
+          repository: gh-pages-worktree
+          branch: gh-pages
+          commit_message: "Deploy docs (${{ steps.version.outputs.value }})"
 
-      - name: Install dependencies
-        run: cd docs && bun install --frozen-lockfile
-
-      - name: Build docs
-        run: cd docs && bun run build
-
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs/.vitepress/dist
-
-  deploy:
-    needs: [build]
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Clean up worktree
+        if: always()
+        run: git worktree remove gh-pages-worktree --force || true

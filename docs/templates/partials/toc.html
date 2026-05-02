@@ -1,0 +1,12 @@
+{% if toc | length > 0 %}
+<aside class="doc-toc" aria-label="{{ ui.on_this_page }}">
+  <p class="doc-toc__heading">{{ ui.on_this_page }}</p>
+  <ol class="doc-toc__list">
+    {% for heading in toc %}
+    <li class="doc-toc__item doc-toc__item--lvl{{ heading.level }}">
+      <a class="doc-toc__link" href="#{{ heading.id }}">{{ heading.title }}</a>
+    </li>
+    {% endfor %}
+  </ol>
+</aside>
+{% endif %}

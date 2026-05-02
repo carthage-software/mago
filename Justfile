@@ -4,11 +4,7 @@ template_dir := `mktemp -d`
 list:
     @just --list
 
-# Document linter rules
-doc-linter-rules:
-    php scripts/linter-rules-docs.php
-
-# Update sponsors in docs
+# Update sponsors data
 update-sponsors:
     php scripts/update-sponsors-docs.php
 

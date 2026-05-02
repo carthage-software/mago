@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/public/assets/banner.svg" alt="Mago Banner" width="600" />
+  <img src="docs/static/img/banner.svg" alt="Mago Banner" width="600" />
 </p>
 
 <div align="center">
