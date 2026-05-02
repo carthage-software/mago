@@ -281,8 +281,8 @@ function decode_toml_scalar(string $value): string|bool|null
 function update_versions_file(string $path, string $version): array
 {
     $versions = namespace\read_versions_file($path);
-    $stable = 1 === preg_match('/^v\d+\.\d+\.\d+$/', $version);
-    $label = str_starts_with($version, 'v') ? substr($version, 1) : $version;
+    $stable = 1 === preg_match('/^\d+\.\d+\.\d+$/', $version);
+    $label = $version;
 
     $updated = false;
     foreach ($versions as $index => $entry) {
@@ -428,7 +428,7 @@ function semver_compare(string $a, string $b): int
 function semver_tuple(string $id): array
 {
     $matches = [];
-    if (1 !== preg_match('/^v(\d+)\.(\d+)\.(\d+)$/', $id, $matches)) {
+    if (1 !== preg_match('/^(\d+)\.(\d+)\.(\d+)$/', $id, $matches)) {
         return [-1, -1, -1];
     }
 

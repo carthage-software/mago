@@ -32,10 +32,11 @@ impl VersionsFile {
             VersionsFile { versions: Vec::new() }
         };
 
-        if current_version.starts_with('v') && !versions.versions.iter().any(|version| version.id == current_version) {
+        if is_semver_release(current_version) && !versions.versions.iter().any(|version| version.id == current_version)
+        {
             versions.versions.push(VersionInfo {
                 id: current_version.to_string(),
-                label: current_version.trim_start_matches('v').to_string(),
+                label: current_version.to_string(),
                 stable: true,
                 paths: Vec::new(),
             });
@@ -43,4 +44,10 @@ impl VersionsFile {
 
         Ok(versions)
     }
+}
+
+fn is_semver_release(id: &str) -> bool {
+    let mut parts = id.split('.');
+    let valid = matches!((parts.next(), parts.next(), parts.next(), parts.next()), (Some(a), Some(b), Some(c), None) if !a.is_empty() && !b.is_empty() && !c.is_empty() && a.bytes().chain(b.bytes()).chain(c.bytes()).all(|b| b.is_ascii_digit()));
+    valid
 }

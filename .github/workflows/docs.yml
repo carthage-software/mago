@@ -3,8 +3,13 @@ name: Deploy Docs
 on:
   push:
     branches: [main]
-    tags: ["v*"]
+    tags: ["[0-9]+.[0-9]+.[0-9]+"]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "override the documentation version. leave empty to derive from the dispatched ref."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -64,9 +69,13 @@ jobs:
 
       - name: Determine documentation version
         id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         shell: bash
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+          if [[ -n "${INPUT_VERSION}" ]]; then
+            echo "value=${INPUT_VERSION}" >> "${GITHUB_OUTPUT}"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             echo "value=${GITHUB_REF_NAME}" >> "${GITHUB_OUTPUT}"
           else
             echo "value=main" >> "${GITHUB_OUTPUT}"
