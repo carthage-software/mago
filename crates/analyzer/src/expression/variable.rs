@@ -124,7 +124,7 @@ fn read_variable<'ctx>(
         Some(variable_type) => Rc::clone(variable_type),
         None => {
             if block_context.variables_possibly_in_scope.contains(&variable_atom) {
-                if !block_context.flags.inside_isset() {
+                if !block_context.flags.inside_isset() && !block_context.flags.inside_unset() {
                     context.collector.report_with_code(
                         IssueCode::PossiblyUndefinedVariable,
                         Issue::warning(format!(
