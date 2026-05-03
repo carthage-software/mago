@@ -190,6 +190,18 @@ mod tests {
     }
 
     test_analysis! {
+        name = class_magic_constant_on_undefined_class,
+        code = indoc! {"
+            <?php
+
+            $_ = NonExistentClass::class;
+        "},
+        issues = [
+            IssueCode::NonExistentClassLike,
+        ]
+    }
+
+    test_analysis! {
         name = const_access_on_generic_object_type,
         code = indoc! {"
             <?php
