@@ -1,11 +1,11 @@
 <?php
 
 /**
- * @param string $file
+ * @param resource|string $file
  */
 function exif_read_data(
     $file,
-    ?string $required_sections,
+    ?string $required_sections = null,
     bool $as_arrays = false,
     bool $read_thumbnail = false,
 ): array|false {}

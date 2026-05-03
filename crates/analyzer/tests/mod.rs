@@ -2430,6 +2430,7 @@ test_case!(issue_1756, {
     s.check_throws = false;
     s
 });
+test_case!(issue_1758);
 test_case!(issue_1759);
 
 #[test]
