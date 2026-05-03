@@ -155,6 +155,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
 
                     *strings = new_strings;
                 }
+            } else {
+                // resulting_strings was already cleared by an earlier non-literal part; keep it as None
             }
 
             if resulting_strings

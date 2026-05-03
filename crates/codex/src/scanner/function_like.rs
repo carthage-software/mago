@@ -106,7 +106,7 @@ pub fn scan_method<'arena>(
         } else {
             Visibility::Public
         },
-        where_constraints: Default::default(),
+        where_constraints: AtomMap::default(),
     };
 
     if let MethodBody::Concrete(block) = &method.body {
@@ -318,7 +318,7 @@ fn scan_function_like_docblock(
     functionlike_id: (Atom, Atom),
     metadata: &mut FunctionLikeMetadata,
     classname: Option<Atom>,
-    context: &mut Context<'_, '_>,
+    context: &Context<'_, '_>,
     scope: &mut NamespaceScope,
 ) {
     let docblock = match FunctionLikeDocblockComment::create(context, span, scope) {

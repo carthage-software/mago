@@ -110,10 +110,12 @@ impl Reporter {
     /// # Errors
     ///
     /// Returns a [`ReportingError`] if formatting or writing the issues fails.
-    pub fn report(&self, issues: IssueCollection, baseline: Option<Baseline>) -> Result<ReportStatus, ReportingError> {
+    pub fn report(
+        &self,
+        mut issues: IssueCollection,
+        baseline: Option<Baseline>,
+    ) -> Result<ReportStatus, ReportingError> {
         let mut writer = self.config.target.resolve();
-
-        let mut issues = issues;
 
         // Apply baseline filtering
         let mut baseline_dead_issues = 0;
@@ -191,12 +193,10 @@ impl Reporter {
     /// ```
     pub fn report_to<W: Write>(
         &self,
-        issues: IssueCollection,
+        mut issues: IssueCollection,
         baseline: Option<Baseline>,
         writer: &mut W,
     ) -> Result<ReportStatus, ReportingError> {
-        let mut issues = issues;
-
         // Apply baseline filtering
         let mut baseline_dead_issues = 0;
         let mut baseline_filtered_issues = 0;

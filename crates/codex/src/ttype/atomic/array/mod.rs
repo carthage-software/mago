@@ -315,17 +315,17 @@ impl TArray {
         match self {
             Self::Keyed(keyed_array) => {
                 if let Some(parameters) = keyed_array.parameters.as_mut() {
-                    if let TAtomic::Placeholder = parameters.0.get_single() {
+                    if matches!(parameters.0.get_single(), TAtomic::Placeholder) {
                         *Arc::make_mut(&mut parameters.0) = get_arraykey();
                     }
 
-                    if let TAtomic::Placeholder = parameters.1.get_single() {
+                    if matches!(parameters.1.get_single(), TAtomic::Placeholder) {
                         *Arc::make_mut(&mut parameters.1) = get_mixed();
                     }
                 }
             }
             Self::List(list) => {
-                if let TAtomic::Placeholder = list.element_type.get_single() {
+                if matches!(list.element_type.get_single(), TAtomic::Placeholder) {
                     *Arc::make_mut(&mut list.element_type) = get_mixed();
                 }
             }

@@ -68,7 +68,10 @@ impl FunctionCallHook for SessionSetCookieParamsHook {
         }
 
         // The 1st argument is an array, only 1 argument is allowed.
-        let second_arg = arguments.get(1).unwrap();
+        let Some(second_arg) = arguments.get(1) else {
+            return Ok(());
+        };
+
         let span = match second_arg {
             Argument::Positional(arg) => arg.value.span(),
             Argument::Named(arg) => arg.span(),

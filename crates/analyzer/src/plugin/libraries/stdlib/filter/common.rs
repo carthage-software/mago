@@ -29,7 +29,7 @@ const FILTER_SANITIZE_NUMBER_FLOAT: i64 = 520;
 const FILTER_SANITIZE_FULL_SPECIAL_CHARS: i64 = 522;
 const FILTER_SANITIZE_ADD_SLASHES: i64 = 523;
 
-const FILTER_NULL_ON_FAILURE: i64 = 134217728;
+const FILTER_NULL_ON_FAILURE: i64 = 0x0800_0000;
 
 /// Resolves the return type for filter functions (`filter_var` and `filter_input`).
 ///

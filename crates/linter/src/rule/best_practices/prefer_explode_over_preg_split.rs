@@ -176,7 +176,7 @@ impl LintRule for PreferExplodeOverPregSplitRule {
                             found_comma = true;
                             break;
                         }
-                        Some(&b) if (b as char).is_whitespace() => continue,
+                        Some(&b) if (b as char).is_whitespace() => {}
                         _ => return,
                     }
                 }
@@ -283,9 +283,9 @@ fn quote_as_double(content: &str) -> String {
             '\\' => out.push_str("\\\\"),
             '"' => out.push_str("\\\""),
             '$' => out.push_str("\\$"),
-            c if (c as u32) < 0x80 && is_ascii_control_byte(c as u8) => {
+            ctrl if (ctrl as u32) < 0x80 && is_ascii_control_byte(ctrl as u8) => {
                 use std::fmt::Write as _;
-                let _ = write!(out, "\\x{:02x}", c as u32);
+                let _ = write!(out, "\\x{:02x}", ctrl as u32);
             }
             _ => out.push(c),
         }

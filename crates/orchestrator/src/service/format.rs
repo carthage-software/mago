@@ -48,12 +48,22 @@ impl FormatService {
         Self { database, php_version, settings, parser_settings, use_progress_bars }
     }
 
+    /// Formats a single file, allocating a fresh arena.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] if the formatter fails outside of recoverable parse errors.
     pub fn format_file(self, file: &File) -> Result<FileFormatStatus, OrchestratorError> {
         let arena = Bump::new();
 
         self.format_file_in(file, &arena)
     }
 
+    /// Formats a single file using a caller-provided bump arena.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] if the formatter fails outside of recoverable parse errors.
     pub fn format_file_in(self, file: &File, arena: &Bump) -> Result<FileFormatStatus, OrchestratorError> {
         let formatter =
             Formatter::new(arena, self.php_version, self.settings).with_parser_settings(self.parser_settings);
@@ -70,6 +80,11 @@ impl FormatService {
         }
     }
 
+    /// Runs the formatter pipeline over every file in the database.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when a worker fails or the pipeline cannot reduce results.
     pub fn run(self) -> Result<FormatResult, OrchestratorError> {
         let context = FormatContext {
             php_version: self.php_version,
@@ -119,6 +134,10 @@ impl FormatService {
     /// # Returns
     ///
     /// A [`FormatResult`] containing the formatting status for each processed file.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when a worker fails or a requested `FileId` cannot be resolved.
     pub fn run_on_files<Iter>(self, file_ids: Iter) -> Result<FormatResult, OrchestratorError>
     where
         Iter: IntoIterator<Item = FileId>,

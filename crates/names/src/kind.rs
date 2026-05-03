@@ -7,6 +7,7 @@ use strum::Display;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum NameKind {
     /// Represents class, interface, trait, enum, or namespace names.
     /// Typically imported using `use Some\Name;`.

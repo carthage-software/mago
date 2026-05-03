@@ -4,6 +4,7 @@ use std::sync::Arc;
 use foldhash::HashMap;
 
 use mago_atom::Atom;
+use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 
@@ -202,7 +203,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
                 block_context.flags.set_inside_return(true);
                 value.analyze(context, block_context, &mut artifacts)?;
                 block_context.flags.set_inside_return(false);
-                block_context.conditionally_referenced_variable_ids = Default::default();
+                block_context.conditionally_referenced_variable_ids = AtomSet::default();
 
                 let value_type =
                     artifacts.get_rc_expression_type(value).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
@@ -385,6 +386,8 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
 
                         context.collector.report_with_code(IssueCode::DocblockParameterNarrowing, issue);
                     }
+                } else {
+                    // overriding method or template-bearing types; narrowing check would be unreliable
                 }
             }
 
@@ -522,8 +525,8 @@ fn is_unresolved_template_with_mixed_bound(union: &TUnion) -> bool {
 }
 
 fn expand_type_metadata<'ctx>(
-    context: &mut Context<'ctx, '_>,
-    block_context: &mut BlockContext<'ctx>,
+    context: &Context<'ctx, '_>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &FunctionLikeMetadata,
     type_metadata: &TypeMetadata,
@@ -790,7 +793,7 @@ fn add_symbol_references(
 /// value the body actually returns.
 fn check_return_type_width<'ctx>(
     context: &mut Context<'ctx, '_>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &'ctx FunctionLikeMetadata,
 ) {
@@ -923,7 +926,7 @@ fn check_return_type_width<'ctx>(
 
 fn check_thrown_types<'ctx>(
     context: &mut Context<'ctx, '_>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &'ctx FunctionLikeMetadata,
 ) {
@@ -977,7 +980,7 @@ fn check_thrown_types<'ctx>(
                 false,
                 false,
                 false,
-                &mut Default::default(),
+                &mut ComparisonResult::default(),
             ) {
                 is_expected = true;
                 break;

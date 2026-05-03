@@ -267,6 +267,7 @@ impl FunctionLikeMetadata {
 
     /// Returns a new instance with the parameters replaced.
     #[inline]
+    #[must_use]
     pub fn with_parameters(mut self, parameters: impl IntoIterator<Item = FunctionLikeParameterMetadata>) -> Self {
         self.set_parameters(parameters);
         self

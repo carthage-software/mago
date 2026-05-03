@@ -144,7 +144,7 @@ pub fn is_contained_by(
         return false;
     }
 
-    if let TAtomic::Scalar(TScalar::ArrayKey) = input_type_part
+    if matches!(input_type_part, TAtomic::Scalar(TScalar::ArrayKey))
         && (container_type_part.is_int() || container_type_part.is_any_string())
     {
         atomic_comparison_result.type_coerced = Some(true);

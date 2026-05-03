@@ -9,7 +9,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse a `(` group - which may be a parenthesised expression, an
     /// arrow function's parameter list, or an empty-parameter arrow.
     /// Handles: `()`, `( expr )`, `( name ) => body`, `(a, b) => body`,
@@ -46,7 +46,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         let right_parenthesis = self.stream.span_of(&rp_tok);
 
         if let Some(arrow_tok) = self.stream.try_consume(TwigTokenKind::FatArrow)?
-            && let Expression::Name(ref n) = inner
+            && let Expression::Name(n) = &inner
         {
             let fat_arrow = self.stream.span_of(&arrow_tok);
             let mut param_nodes = self.new_vec();
@@ -72,7 +72,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     ) -> Result<Expression<'arena>, ParseError> {
         let mut parameters = self.new_vec();
         let mut commas = self.new_vec();
-        let Expression::Name(ref n) = inner else {
+        let Expression::Name(n) = &inner else {
             return Err(ParseError::UnexpectedToken(
                 "arrow function parameters must be simple names".to_string(),
                 inner.span(),
@@ -92,12 +92,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         let rp_tok = self.stream.expect_kind(TwigTokenKind::RightParen, "expected `)`")?;
         let right_parenthesis = self.stream.span_of(&rp_tok);
 
-        let arrow_tok = match self.stream.try_consume(TwigTokenKind::FatArrow)? {
-            Some(token) => token,
-            None => {
-                let next = self.stream.lookahead(0)?;
-                return Err(self.stream.unexpected(next, &[TwigTokenKind::FatArrow]));
-            }
+        let Some(arrow_tok) = self.stream.try_consume(TwigTokenKind::FatArrow)? else {
+            let next = self.stream.lookahead(0)?;
+            return Err(self.stream.unexpected(next, &[TwigTokenKind::FatArrow]));
         };
         let fat_arrow = self.stream.span_of(&arrow_tok);
         let body = self.parse_expression()?;

@@ -8,7 +8,7 @@ use crate::ast::ast::ShortOpeningTag;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_opening_tag(&mut self) -> Result<OpeningTag<'arena>, ParseError> {
         let token = self.stream.consume()?;
 

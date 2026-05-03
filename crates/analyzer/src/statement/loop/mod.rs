@@ -41,16 +41,10 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Access;
-use mago_syntax::ast::Array;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Foreach;
-use mago_syntax::ast::LegacyArray;
-use mago_syntax::ast::List;
 use mago_syntax::ast::Statement;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::analyze_statements;
@@ -105,7 +99,7 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
 
     let mut loop_scope = LoopScope::new(span, block_context.locals.clone(), None);
     loop_scope.variables_possibly_in_scope =
-        if infinite_loop { block_context.variables_possibly_in_scope.clone() } else { Default::default() };
+        if infinite_loop { block_context.variables_possibly_in_scope.clone() } else { AtomSet::default() };
 
     let (inner_loop_block_context, loop_scope) = analyze(
         context,
@@ -185,7 +179,7 @@ fn inherit_loop_block_context<'ctx>(
         if !always_enters_loop {
             if loop_scope.condition_always_false {
                 for (variable, pre_loop_type) in &loop_scope.parent_context_variables {
-                    block_context.locals.insert(*variable, pre_loop_type.clone());
+                    block_context.locals.insert(*variable, Rc::clone(pre_loop_type));
                 }
             }
 
@@ -225,6 +219,7 @@ fn inherit_loop_block_context<'ctx>(
     }
 }
 
+#[allow(clippy::similar_names)]
 fn analyze<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     statements: &'ast [Statement<'arena>],
@@ -239,10 +234,10 @@ fn analyze<'ctx, 'ast, 'arena>(
 ) -> Result<(BlockContext<'ctx>, LoopScope), AnalysisError> {
     let always_enters_loop = Cell::new(always_enters_loop);
 
-    let (assignment_map, first_variable_id) = get_assignment_map(pre_conditions, &post_expressions, statements);
+    let (mut assignment_map, first_variable_id) = get_assignment_map(pre_conditions, &post_expressions, statements);
     let assignment_depth_limit = context.settings.loop_assignment_depth_threshold as usize;
     let assignment_depth = if let Some(first_variable_id) = first_variable_id {
-        get_assignment_map_depth(first_variable_id, &mut assignment_map.clone(), assignment_depth_limit)
+        get_assignment_map_depth(first_variable_id, &mut assignment_map, assignment_depth_limit)
     } else {
         0
     };
@@ -343,6 +338,8 @@ fn analyze<'ctx, 'ast, 'arena>(
 
         pre_conditions_applied = true;
         if !pre_conditions.is_empty() {
+            // SAFETY: `artifacts.loop_scope` is set to `Some(loop_scope)` immediately before entering
+            // this branch (it was placed there for the pre-condition analysis), so taking it now is sound.
             loop_scope = unsafe { artifacts.take_loop_scope_unchecked() };
             if loop_scope.truthy_pre_conditions {
                 always_enters_loop.set(true);
@@ -357,7 +354,7 @@ fn analyze<'ctx, 'ast, 'arena>(
             artifacts.take_loop_scope_unchecked()
         };
 
-        update_loop_scope_contexts(&mut loop_scope, loop_context, &mut continue_context, loop_parent_context, context);
+        update_loop_scope_contexts(&loop_scope, loop_context, &mut continue_context, loop_parent_context, context);
 
         loop_context.flags.set_inside_loop_expressions(true);
         for post_expression in post_expressions {
@@ -391,6 +388,8 @@ fn analyze<'ctx, 'ast, 'arena>(
 
                 pre_conditions_applied = true;
 
+                // SAFETY: `artifacts.loop_scope` was set above before analyzing pre-conditions; taking it
+                // back into the local `loop_scope` binding is sound because no other code path consumes it.
                 loop_scope = unsafe { artifacts.take_loop_scope_unchecked() };
             }
 
@@ -407,7 +406,7 @@ fn analyze<'ctx, 'ast, 'arena>(
             };
 
             update_loop_scope_contexts(
-                &mut loop_scope,
+                &loop_scope,
                 loop_context,
                 &mut continue_context,
                 &original_parent_context,
@@ -667,7 +666,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                         true
                     } {
                         if let Some(pre_loop_context_type) = pre_loop_context_type {
-                            continue_context.locals.insert(*variable_id, pre_loop_context_type.clone());
+                            continue_context.locals.insert(*variable_id, Rc::clone(pre_loop_context_type));
                         } else {
                             continue_context.locals.remove(variable_id);
                         }
@@ -678,7 +677,7 @@ fn analyze<'ctx, 'ast, 'arena>(
 
                 clean_nodes(statements, artifacts);
 
-                let mut loop_scope = {
+                let loop_scope = {
                     artifacts.set_loop_scope(loop_scope);
                     analyze_statements(statements, context, &mut continue_context, artifacts)?;
 
@@ -689,7 +688,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                 };
 
                 update_loop_scope_contexts(
-                    &mut loop_scope,
+                    &loop_scope,
                     loop_context,
                     &mut continue_context,
                     &original_parent_context,
@@ -754,7 +753,7 @@ fn analyze<'ctx, 'ast, 'arena>(
             {
                 if let Some(do_context_type) = inner_do_context_inner.locals.get_mut(variable_id) {
                     *do_context_type = if do_context_type == possibly_redefined_variable_type {
-                        possibly_redefined_variable_type.clone()
+                        Rc::clone(possibly_redefined_variable_type)
                     } else {
                         Rc::new(combine_union_types(
                             possibly_redefined_variable_type,
@@ -812,6 +811,8 @@ fn analyze<'ctx, 'ast, 'arena>(
                 && loop_parent_context_type != loop_context_type
             {
                 *loop_parent_context_type = Rc::clone(loop_context_type);
+            } else {
+                // type already matches between loop and parent context; nothing to update
             }
         }
     }
@@ -838,6 +839,8 @@ fn analyze<'ctx, 'ast, 'arena>(
                     loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
                 } else if let Some(loop_parent_context_type) = loop_parent_context.locals.get_mut(&variable_id) {
                     *loop_parent_context_type = Rc::clone(continue_context_type);
+                } else {
+                    // continue context matches the parent type; nothing to write back
                 }
             } else {
                 loop_parent_context.locals.remove(&variable_id);
@@ -880,7 +883,7 @@ fn analyze<'ctx, 'ast, 'arena>(
             for variable_id in changed_variable_ids {
                 if let Some(reconciled_type) = continue_context.locals.get(&variable_id) {
                     if loop_parent_context.locals.contains_key(&variable_id) {
-                        loop_parent_context.locals.insert(variable_id, reconciled_type.clone());
+                        loop_parent_context.locals.insert(variable_id, Rc::clone(reconciled_type));
                     }
 
                     loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
@@ -924,9 +927,11 @@ fn analyze<'ctx, 'ast, 'arena>(
                             },
                         )),
                     );
+                } else {
+                    // variable wasn't recorded as possibly-defined or possibly-redefined in the loop scope
                 }
             } else {
-                loop_parent_context.locals.insert(*variable_id, variable_type.clone());
+                loop_parent_context.locals.insert(*variable_id, Rc::clone(variable_type));
             }
         }
     }
@@ -1040,6 +1045,7 @@ fn get_assignment_map_depth(
 /// For simple comparisons like `$i < $n`, tests whether the types' bounds
 /// allow the comparison to be false. For example, `int(0) < int<0, max>`
 /// can be false when `$n = 0`.
+#[allow(clippy::similar_names)]
 fn can_condition_be_initially_false(pre_condition: &Expression<'_>, artifacts: &AnalysisArtifacts) -> bool {
     let Expression::Binary(binary) = pre_condition else {
         return artifacts.get_expression_type(pre_condition).is_none_or(|ct| !ct.is_always_truthy());
@@ -1100,7 +1106,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     pre_condition: &Expression<'arena>,
     pre_condition_clauses: &[Clause],
     loop_context: &mut BlockContext<'ctx>,
-    loop_parent_context: &mut BlockContext<'ctx>,
+    loop_parent_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     is_do: bool,
     first_application: bool,
@@ -1135,6 +1141,8 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
             {
                 loop_scope.truthy_pre_conditions = false;
             }
+        } else {
+            // condition is always truthy; loop scope's truthy_pre_conditions stays true
         }
     }
 
@@ -1153,7 +1161,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
         &context.settings.algebra_thresholds(),
     )
     .into_iter()
-    .map(|v| Rc::new(v.clone()))
+    .map(Rc::new)
     .collect();
 
     let (reconcilable_while_types, active_while_types) = find_satisfying_assignments(
@@ -1194,7 +1202,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
 }
 
 fn update_loop_scope_contexts<'ctx>(
-    loop_scope: &mut LoopScope,
+    loop_scope: &LoopScope,
     loop_context: &mut BlockContext<'ctx>,
     continue_context: &mut BlockContext<'ctx>,
     pre_outer_context: &BlockContext<'ctx>,
@@ -1202,7 +1210,7 @@ fn update_loop_scope_contexts<'ctx>(
 ) {
     if loop_scope.final_actions.contains(ControlAction::Continue) {
         for (variable_id, variable_type) in &loop_scope.redefined_loop_variables {
-            continue_context.locals.insert(*variable_id, variable_type.clone());
+            continue_context.locals.insert(*variable_id, Rc::clone(variable_type));
         }
 
         for (variable_id, variable_type) in &loop_scope.possibly_redefined_loop_variables {
@@ -1222,14 +1230,14 @@ fn update_loop_scope_contexts<'ctx>(
             }
         }
     } else {
-        loop_context.locals = pre_outer_context.locals.clone();
+        loop_context.locals.clone_from(&pre_outer_context.locals);
     }
 
     for (variable_id, pre_type) in &pre_outer_context.locals {
         if let Some(current_type) = continue_context.locals.get(variable_id)
             && current_type.is_never()
         {
-            continue_context.locals.insert(*variable_id, pre_type.clone());
+            continue_context.locals.insert(*variable_id, Rc::clone(pre_type));
         }
     }
 }
@@ -1361,7 +1369,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
         };
 
         match iterator_atomic {
-            TAtomic::Null | TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false), .. })) => {}
+            TAtomic::Null | TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })) => {}
             TAtomic::Array(array) => {
                 has_valid_iterable_type = true;
                 if array.is_non_empty() {
@@ -1539,6 +1547,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
 
         return Ok((false, get_mixed(), get_mixed()));
     }
+    // every atomic in the iterator type is iterable; no diagnostic needed
 
     Ok((has_at_least_one_entry, key_type.unwrap_or_else(get_mixed), value_type.unwrap_or_else(get_mixed)))
 }
@@ -1602,59 +1611,4 @@ fn simplify_generic_subset_arrays(union: TUnion) -> TUnion {
     }
 
     TUnion::from_vec(types)
-}
-
-/// Scrapes all direct variable names from an expression and indicates if a reference operator (`&`)
-/// was encountered anywhere within the expression.
-///
-/// # Arguments
-///
-/// * `expression` - The AST expression node to scrape.
-///
-/// # Returns
-///
-/// A `HashSet<String>` contains the string names of all `Variable::Direct` found.
-fn scrape_variables_from_expression<'arena>(expression: &Expression<'arena>) -> HashSet<&'arena str> {
-    let mut set = HashSet::default();
-
-    fn walk<'arena>(current_expression: &Expression<'arena>, current_set: &mut HashSet<&'arena str>) {
-        match current_expression {
-            Expression::UnaryPrefix(UnaryPrefix { operand, .. }) => {
-                walk(operand, current_set);
-            }
-            Expression::Access(access) => match access {
-                Access::Property(property_access) => {
-                    walk(property_access.object, current_set);
-                }
-                Access::NullSafeProperty(null_safe_property_access) => {
-                    walk(null_safe_property_access.object, current_set);
-                }
-                Access::StaticProperty(static_property_access) => {
-                    walk(static_property_access.class, current_set);
-                }
-                _ => {}
-            },
-            Expression::Variable(Variable::Direct(var)) => {
-                current_set.insert(var.name);
-            }
-            Expression::List(List { elements, .. })
-            | Expression::Array(Array { elements, .. })
-            | Expression::LegacyArray(LegacyArray { elements, .. }) => {
-                for element in elements {
-                    if let Some(key_expression) = element.get_key() {
-                        walk(key_expression, current_set);
-                    }
-
-                    if let Some(value_expression) = element.get_value() {
-                        walk(value_expression, current_set);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    walk(expression, &mut set);
-
-    set
 }

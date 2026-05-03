@@ -6,7 +6,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse a conditional expression starting at `?`.
     ///
     /// Accepts every Twig form:

@@ -18,21 +18,23 @@ pub struct PrecedingDocblocks<'arena, 'pat> {
 }
 
 impl<'arena> PrecedingDocblocks<'arena, 'static> {
+    #[must_use]
     pub fn new(trivia: &'arena [Trivia<'arena>], start_offset: u32) -> Self {
         Self { trivia, start: start_offset, important_patterns: &[] }
     }
 }
 
-impl<'arena, 'pat> PrecedingDocblocks<'arena, 'pat> {
+impl<'arena> PrecedingDocblocks<'arena, '_> {
     /// Restrict this iterator to docblocks whose text contains at least one of
     /// `patterns`. Non-matching docblocks are skipped; the search continues
     /// backward past them.
+    #[must_use]
     pub fn important_only<'new_pat>(self, patterns: &'new_pat [&'new_pat str]) -> PrecedingDocblocks<'arena, 'new_pat> {
         PrecedingDocblocks { trivia: self.trivia, start: self.start, important_patterns: patterns }
     }
 }
 
-impl<'arena, 'pat> Iterator for PrecedingDocblocks<'arena, 'pat> {
+impl<'arena> Iterator for PrecedingDocblocks<'arena, '_> {
     type Item = &'arena Trivia<'arena>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -62,6 +64,7 @@ impl<'arena, 'pat> Iterator for PrecedingDocblocks<'arena, 'pat> {
 /// An `Option` containing a reference to the `Trivia` representing the docblock comment if found,
 /// or `None` if no suitable docblock comment exists before the node.
 #[inline]
+#[must_use]
 pub fn get_docblock_for_node<'arena>(
     program: &'arena Program<'arena>,
     node: impl HasSpan,
@@ -83,6 +86,7 @@ pub fn get_docblock_for_node<'arena>(
 /// # Returns
 ///
 /// An `Option` containing a reference to the `Trivia` representing the docblock comment if found,
+#[must_use]
 pub fn get_docblock_before_position<'arena>(
     trivias: &'arena [Trivia<'arena>],
     node_start_offset: u32,
@@ -127,6 +131,7 @@ pub fn get_docblock_before_position<'arena>(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use bumpalo::Bump;
     use mago_database::file::FileId;

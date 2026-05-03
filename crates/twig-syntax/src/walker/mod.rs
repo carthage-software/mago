@@ -4,7 +4,7 @@
 //! and a set of free `walk_*` / `walk_*_mut` standalone functions - one method
 //! per AST node type, auto-generated from a single DSL description below.
 
-#![allow(unused_variables, clippy::only_used_in_recursion)]
+#![allow(unused_variables, clippy::only_used_in_recursion, clippy::wildcard_imports)]
 
 use crate::ast::*;
 

@@ -272,7 +272,7 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
     check_for_promoted_properties_outside_constructor(&arrow_function.parameter_list, context);
 
     // Check for $this usage in static arrow functions
-    if arrow_function.r#static.is_some()
+    if let Some(static_) = arrow_function.r#static.as_ref()
         && let Some(this_span) = contains_this_in_expression(arrow_function.expression)
     {
         context.report(
@@ -281,8 +281,7 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
                     Annotation::primary(this_span).with_message("`$this` is not available in static context."),
                 )
                 .with_annotation(
-                    Annotation::secondary(arrow_function.r#static.unwrap().span)
-                        .with_message("Arrow function is declared as static here."),
+                    Annotation::secondary(static_.span).with_message("Arrow function is declared as static here."),
                 )
                 .with_help("Remove the `static` keyword or avoid using `$this` in the arrow function body."),
         );
@@ -332,7 +331,7 @@ pub fn check_closure<'arena>(closure: &Closure<'arena>, context: &mut Context<'_
     check_for_promoted_properties_outside_constructor(&closure.parameter_list, context);
 
     // Check for $this usage in static closures
-    if closure.r#static.is_some()
+    if let Some(static_) = closure.r#static.as_ref()
         && let Some(this_span) = contains_this_in_block(&closure.body)
     {
         context.report(
@@ -341,8 +340,7 @@ pub fn check_closure<'arena>(closure: &Closure<'arena>, context: &mut Context<'_
                     Annotation::primary(this_span).with_message("`$this` is not available in static context."),
                 )
                 .with_annotation(
-                    Annotation::secondary(closure.r#static.unwrap().span)
-                        .with_message("Closure is declared as static here."),
+                    Annotation::secondary(static_.span).with_message("Closure is declared as static here."),
                 )
                 .with_help("Remove the `static` keyword or avoid using `$this` in the closure body."),
         );

@@ -90,6 +90,7 @@ impl LintRule for NoInsecureComparisonRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
+    #[allow(clippy::similar_names)]
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Binary(binary) = node else {
             return;

@@ -210,14 +210,11 @@ impl LintRule for HalsteadRule {
             metrics.push("effort");
         }
 
-        let metrics_label = match metrics.len() {
-            1 => metrics[0].to_string(),
-            2 => format!("{} and {}", metrics[0], metrics[1]),
-            _ => {
-                let (last, rest) = metrics.split_last().unwrap();
-
-                format!("{}, and {last}", rest.join(", "))
-            }
+        let metrics_label = match metrics.as_slice() {
+            [only] => (*only).to_string(),
+            [first, second] => format!("{first} and {second}"),
+            [rest @ .., last] => format!("{}, and {last}", rest.join(", ")),
+            [] => String::new(),
         };
 
         let mut issue = Issue::new(self.cfg.level, format!("{kind} has a high halstead {metrics_label}"))

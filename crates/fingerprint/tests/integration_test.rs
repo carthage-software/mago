@@ -73,7 +73,7 @@ fn test_identical_code_same_fingerprint() {
 fn test_fingerprint_deterministic() {
     let code = "<?php namespace App; class User { public function getName(): string {} }";
 
-    let fingerprints: Vec<u64> = (0..5).map(|_| get_fingerprint(code)).collect();
+    let fingerprints: Vec<u64> = std::iter::repeat_with(|| get_fingerprint(code)).take(5).collect();
 
     for fp in &fingerprints[1..] {
         assert_eq!(*fp, fingerprints[0], "Fingerprints should be deterministic");

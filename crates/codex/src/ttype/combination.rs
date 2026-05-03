@@ -54,11 +54,13 @@ impl CombinationFlags {
     }
 
     #[inline]
+    #[must_use]
     pub const fn contains(self, other: CombinationFlags) -> bool {
         (self.0 & other.0) == other.0
     }
 
     #[inline]
+    #[must_use]
     pub const fn intersects(self, other: CombinationFlags) -> bool {
         (self.0 & other.0) != 0
     }

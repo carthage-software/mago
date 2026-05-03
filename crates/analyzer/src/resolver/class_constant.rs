@@ -152,7 +152,7 @@ pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
 /// Specific handler for the `::class` magic constant.
 fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class_resolution: &ResolvedClassname,
     class_expr: &'ast Expression<'arena>,

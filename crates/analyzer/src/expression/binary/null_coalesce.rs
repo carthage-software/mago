@@ -42,6 +42,7 @@ use crate::utils::misc::unwrap_expression;
 /// - If the LHS is nullable (can be `null` or other types), the result type is the union of the
 ///   non-null parts of the LHS and the type of the RHS.
 /// - If the LHS type is unknown (`mixed`), the result type is `mixed`.
+#[allow(clippy::unwrap_used)]
 pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     binary: &Binary<'arena>,
     context: &mut Context<'ctx, 'arena>,

@@ -46,6 +46,7 @@ impl ImportResolution {
     /// already imported (possibly under an alias) or it resolves through the
     /// current namespace.
     #[inline]
+    #[must_use]
     pub const fn is_already_available(&self) -> bool {
         self.use_statement_edit.is_none()
     }
@@ -450,6 +451,7 @@ fn is_reserved_type_name(short: &str, kind: ImportKind) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -1044,8 +1046,8 @@ mod tests {
 
     #[test]
     fn extremely_deep_namespace_does_not_panic() {
-        let segments: Vec<String> = (0..100).map(|i| format!("N{:03}", i)).collect();
-        let fqn = segments.join("\\") + "\\Target";
+        let segments: Vec<String> = (0..100).map(|i| format!("N{i:03}")).collect();
+        let fqn = format!("{}\\Target", segments.join("\\"));
         let mut tracker = tracker_with_anchor(Some("App"), 10);
         let r = tracker.import(&fqn, ImportKind::Name).unwrap();
         assert_eq!(r.local_name.as_str(), "Target");

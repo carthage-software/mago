@@ -276,13 +276,13 @@ fn is_equal(a_node: &DefSignatureNode, b_node: &DefSignatureNode) -> bool {
 /// Extracts the diff elements from the Myers trace.
 ///
 /// Walks backward through the trace to build a sequence of Keep, Remove, and Add operations.
-fn extract_diff<'a>(
+fn extract_diff<'nodes>(
     trace: &[HashMap<isize, usize>],
     mut x: usize,
     mut y: usize,
-    a_nodes: &'a [DefSignatureNode],
-    b_nodes: &'a [DefSignatureNode],
-) -> Vec<AstDiffElem<'a>> {
+    a_nodes: &'nodes [DefSignatureNode],
+    b_nodes: &'nodes [DefSignatureNode],
+) -> Vec<AstDiffElem<'nodes>> {
     let mut result = vec![];
     let mut d = trace.len() as isize - 1;
 
@@ -327,11 +327,11 @@ fn extract_diff<'a>(
 
 /// Represents a single element in the AST diff.
 #[derive(Debug)]
-enum AstDiffElem<'a> {
+enum AstDiffElem<'nodes> {
     /// Node unchanged in both old and new versions
-    Keep(&'a DefSignatureNode, &'a DefSignatureNode),
+    Keep(&'nodes DefSignatureNode, &'nodes DefSignatureNode),
     /// Node was removed in the new version
-    Remove(&'a DefSignatureNode),
+    Remove(&'nodes DefSignatureNode),
     /// Node was added in the new version
-    Add(&'a DefSignatureNode),
+    Add(&'nodes DefSignatureNode),
 }

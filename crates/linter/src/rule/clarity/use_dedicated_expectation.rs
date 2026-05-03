@@ -281,7 +281,7 @@ impl UseDedicatedExpectationRule {
             _ => {
                 ctx.collector.report(issue);
             }
-        };
+        }
     }
 }
 

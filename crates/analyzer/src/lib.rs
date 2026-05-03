@@ -1,4 +1,9 @@
 #![allow(clippy::too_many_arguments)]
+#![allow(clippy::wildcard_imports)]
+#![allow(clippy::exhaustive_enums)]
+#![allow(clippy::float_arithmetic)]
+#![allow(clippy::pub_use)]
+#![allow(clippy::match_wildcard_for_single_variants)]
 
 use bumpalo::Bump;
 
@@ -64,9 +69,14 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
         plugin_registry: &'ctx PluginRegistry,
         settings: Settings,
     ) -> Self {
-        Self { arena, source_file, resolved_names, codebase, plugin_registry, settings }
+        Self { arena, source_file, resolved_names, codebase, settings, plugin_registry }
     }
 
+    /// Runs the analyzer over `program` and accumulates findings into `analysis_result`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AnalysisError`] when a plugin hook fails or analysis cannot complete.
     pub fn analyze(
         &self,
         program: &'ast Program<'arena>,
@@ -79,6 +89,10 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
     /// produced during analysis. Used by editor integrations (e.g. the
     /// LSP server) that need to query per-expression types after analysis
     /// has finished.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AnalysisError`] when a plugin hook fails or analysis cannot complete.
     pub fn analyze_with_artifacts(
         &self,
         program: &'ast Program<'arena>,
@@ -130,9 +144,7 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
         if self.plugin_registry.has_program_hooks() {
             let mut hook_context = HookContext::new(context.codebase, &mut block_context, &mut artifacts);
 
-            if let HookAction::Skip =
-                self.plugin_registry.before_program(self.source_file, program, &mut hook_context)?
-            {
+            if self.plugin_registry.before_program(self.source_file, program, &mut hook_context)? == HookAction::Skip {
                 for reported in hook_context.take_issues() {
                     context.collector.report_with_code(reported.code, reported.issue);
                 }
@@ -201,6 +213,7 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 mod tests {
     use std::borrow::Cow;
     use std::collections::BTreeMap;
+    use std::fmt::Write as _;
 
     use foldhash::HashSet;
 
@@ -341,7 +354,7 @@ mod tests {
         if !discrepancies.is_empty() {
             let mut panic_message = format!("Test '{test_name}' failed with issue discrepancies:\n");
             for d in discrepancies {
-                panic_message.push_str(&format!("  {d}\n"));
+                let _ = writeln!(panic_message, "  {d}");
             }
 
             panic!("{}", panic_message);
@@ -350,11 +363,12 @@ mod tests {
         if expected_issue_codes.is_empty() && actual_issues_count != 0 {
             let mut panic_message = format!("Test '{test_name}': Expected no issues, but found:\n");
             for issue in actual_issues_collected {
-                panic_message.push_str(&format!(
-                    "  - Code: `{}`, Message: \"{}\"\n",
+                let _ = writeln!(
+                    panic_message,
+                    "  - Code: `{}`, Message: \"{}\"",
                     issue.code.unwrap_or_default(),
                     issue.message
-                ));
+                );
             }
 
             panic!("{}", panic_message);

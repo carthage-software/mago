@@ -32,6 +32,7 @@ pub struct State {
 ///
 /// The parser holds an arena reference, the token stream, and parsing state.
 #[derive(Debug)]
+#[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct Parser<'input, 'arena> {
     pub(crate) arena: &'arena Bump,
     pub(crate) state: State,

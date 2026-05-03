@@ -9,7 +9,7 @@ use mago_codex::ttype::atomic::TAtomic;
 #[test]
 fn idempotent_zoo() {
     for atom in scalar_atom_zoo() {
-        for n in [1_usize, 2, 3, 5, 10, 25] {
+        for n in [1usize, 2, 3, 5, 10, 25] {
             assert_self_idempotent(atom.clone(), n);
         }
     }
@@ -89,7 +89,7 @@ fn float_absorbs_literal_float_either_order() {
 
 #[test]
 fn distinct_literal_floats_kept_apart() {
-    for vs in [vec![1.0_f64, 2.0], vec![-1.0, 0.0, 1.0], vec![1.0, 2.0, 3.0, 4.0]] {
+    for vs in [vec![1.0f64, 2.0], vec![-1.0, 0.0, 1.0], vec![1.0, 2.0, 3.0, 4.0]] {
         let inputs: Vec<TAtomic> = vs.iter().map(|&v| t_lit_float(v)).collect();
         let result = combine_default(inputs);
         assert_eq!(result.len(), vs.len());
@@ -105,7 +105,7 @@ fn equal_literal_floats_collapse() {
 
 #[test]
 fn int_absorbs_literal_int_either_order() {
-    for v in [-1_000_000_i64, -100, -1, 0, 1, 42, 1_000_000] {
+    for v in [-1_000_000i64, -100, -1, 0, 1, 42, 1_000_000] {
         assert_combines_to(vec![t_int(), t_lit_int(v)], vec![t_int()]);
         assert_combines_to(vec![t_lit_int(v), t_int()], vec![t_int()]);
     }
@@ -162,7 +162,7 @@ fn numeric_absorbs_float_only_when_first() {
 
 #[test]
 fn numeric_absorbs_literal_int_only_when_first() {
-    for v in [-5_i64, 0, 5, 100] {
+    for v in [-5i64, 0, 5, 100] {
         assert_combines_to(vec![t_numeric(), t_lit_int(v)], vec![t_numeric()]);
         assert_combines_to(vec![t_lit_int(v), t_numeric()], vec![t_lit_int(v), t_numeric()]);
     }
@@ -170,7 +170,7 @@ fn numeric_absorbs_literal_int_only_when_first() {
 
 #[test]
 fn numeric_absorbs_literal_float_only_when_first() {
-    for v in [-1.0_f64, 0.0, 1.5, 100.0] {
+    for v in [-1.0f64, 0.0, 1.5, 100.0] {
         assert_combines_to(vec![t_numeric(), t_lit_float(v)], vec![t_numeric()]);
         assert_combines_to(vec![t_lit_float(v), t_numeric()], vec![t_lit_float(v), t_numeric()]);
     }
@@ -203,7 +203,7 @@ fn array_key_absorbs_string_either_order() {
 
 #[test]
 fn array_key_absorbs_literal_int_either_order() {
-    for v in [-5_i64, 0, 5, 42] {
+    for v in [-5i64, 0, 5, 42] {
         assert_combines_to(vec![t_array_key(), t_lit_int(v)], vec![t_array_key()]);
         assert_combines_to(vec![t_lit_int(v), t_array_key()], vec![t_array_key()]);
     }
@@ -413,7 +413,7 @@ fn numeric_bool_kept_separate() {
 
 #[test]
 fn lit_int_lit_string_kept_separate() {
-    for (i, s) in [(0_i64, "a"), (-1, "b"), (42, "hello")] {
+    for (i, s) in [(0i64, "a"), (-1, "b"), (42, "hello")] {
         let result = combine_default(vec![t_lit_int(i), t_lit_string(s)]);
         assert_eq!(result.len(), 2);
     }

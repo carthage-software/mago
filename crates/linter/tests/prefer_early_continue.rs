@@ -1,3 +1,6 @@
+#![allow(clippy::needless_raw_strings)]
+#![allow(clippy::needless_raw_string_hashes)]
+
 use std::borrow::Cow;
 
 use bumpalo::Bump;

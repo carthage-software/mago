@@ -8,7 +8,7 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_enum_case_with_attributes(
         &mut self,
         attributes: Sequence<'arena, AttributeList<'arena>>,

@@ -67,6 +67,7 @@ impl MetadataFlags {
     }
 
     #[inline]
+    #[must_use]
     pub const fn contains(self, other: MetadataFlags) -> bool {
         (self.0 & other.0) == other.0
     }
@@ -77,6 +78,7 @@ impl MetadataFlags {
     }
 
     #[inline]
+    #[must_use]
     pub const fn intersects(self, other: MetadataFlags) -> bool {
         (self.0 & other.0) != 0
     }

@@ -15,6 +15,7 @@ pub enum HookAction {
 }
 
 /// Result type for expression hooks that can provide a custom type when skipping.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum ExpressionHookResult {
     /// Continue with normal analysis.

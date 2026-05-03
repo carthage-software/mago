@@ -188,26 +188,26 @@ pub fn scan_properties<'arena>(
             .map(|item| {
                 let (name, name_span, has_default, default_type) = scan_property_item(item, classname, context, scope);
 
-                let mut flags = flags;
+                let mut item_flags = flags;
 
                 if has_default {
-                    flags |= MetadataFlags::HAS_DEFAULT;
+                    item_flags |= MetadataFlags::HAS_DEFAULT;
                 }
 
                 if plain_property.modifiers.contains_readonly() {
-                    flags |= MetadataFlags::READONLY;
+                    item_flags |= MetadataFlags::READONLY;
                 }
 
                 if plain_property.modifiers.contains_abstract() {
-                    flags |= MetadataFlags::ABSTRACT;
+                    item_flags |= MetadataFlags::ABSTRACT;
                 }
 
                 if plain_property.modifiers.contains_static() {
-                    flags |= MetadataFlags::STATIC;
+                    item_flags |= MetadataFlags::STATIC;
                 }
 
                 if plain_property.modifiers.contains_final() {
-                    flags |= MetadataFlags::FINAL;
+                    item_flags |= MetadataFlags::FINAL;
                 }
 
                 let read_visibility = match plain_property.modifiers.get_first_read_visibility() {
@@ -226,7 +226,7 @@ pub fn scan_properties<'arena>(
                     }
                 };
 
-                let mut metadata = PropertyMetadata::new(name, flags);
+                let mut metadata = PropertyMetadata::new(name, item_flags);
 
                 metadata.set_name_span(Some(name_span));
                 metadata.set_default_type_metadata(default_type);
@@ -482,7 +482,7 @@ fn create_implicit_value_parameter(property_metadata: &PropertyMetadata, span: S
 pub fn scan_property_item<'arena>(
     property_item: &'arena PropertyItem<'arena>,
     classname: Atom,
-    context: &mut Context<'_, 'arena>,
+    context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
 ) -> (VariableIdentifier, Span, bool, Option<TypeMetadata>) {
     match property_item {

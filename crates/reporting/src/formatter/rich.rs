@@ -142,19 +142,19 @@ pub(super) fn codespan_format_with_config(
     Ok(())
 }
 
-struct DatabaseFiles<'a> {
-    database: &'a ReadDatabase,
-    editor_url: Option<&'a str>,
+struct DatabaseFiles<'db> {
+    database: &'db ReadDatabase,
+    editor_url: Option<&'db str>,
     line_hint: Cell<Option<u32>>,
     column_hint: Cell<Option<u32>>,
 }
 
-impl<'a> Files<'a> for DatabaseFiles<'_> {
+impl<'files> Files<'files> for DatabaseFiles<'_> {
     type FileId = FileId;
-    type Name = Cow<'a, str>;
-    type Source = &'a str;
+    type Name = Cow<'files, str>;
+    type Source = &'files str;
 
-    fn name(&'a self, file_id: FileId) -> Result<Cow<'a, str>, Error> {
+    fn name(&'files self, file_id: FileId) -> Result<Cow<'files, str>, Error> {
         let file = self.database.get_ref(&file_id).map_err(|_| Error::FileMissing)?;
         let name = file.name.as_ref();
 
@@ -169,7 +169,7 @@ impl<'a> Files<'a> for DatabaseFiles<'_> {
         }
     }
 
-    fn source(&'a self, file_id: FileId) -> Result<&'a str, Error> {
+    fn source(&'files self, file_id: FileId) -> Result<&'files str, Error> {
         self.database.get_ref(&file_id).map(|source| source.contents.as_ref()).map_err(|_| Error::FileMissing)
     }
 
@@ -190,7 +190,10 @@ impl<'a> Files<'a> for DatabaseFiles<'_> {
 
 fn codespan_line_start(lines: &[u32], size: u32, line_index: usize) -> Result<usize, Error> {
     match line_index.cmp(&lines.len()) {
-        Ordering::Less => Ok(lines.get(line_index).copied().expect("failed despite previous check") as usize),
+        // The `Ordering::Less` arm guarantees `line_index < lines.len()`, so `get` is `Some`;
+        // a missing value here would mean a `Vec::len`/indexing inconsistency, so we fall back
+        // to `0` defensively rather than panicking.
+        Ordering::Less => Ok(lines.get(line_index).copied().unwrap_or(0) as usize),
         Ordering::Equal => Ok(size as usize),
         Ordering::Greater => Err(Error::LineTooLarge { given: line_index, max: lines.len() - 1 }),
     }
@@ -229,7 +232,7 @@ impl From<&Annotation> for Label<FileId> {
         let mut label = Label::new(annotation.kind.into(), annotation.span.file_id, annotation.span);
 
         if let Some(message) = &annotation.message {
-            label.message = message.clone();
+            label.message.clone_from(message);
         }
 
         label

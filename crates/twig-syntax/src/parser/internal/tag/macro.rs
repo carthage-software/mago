@@ -7,7 +7,7 @@ use crate::parser::internal::BlockTerminator;
 use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_macro(
         &mut self,
         open_tag_tok: TwigToken<'arena>,

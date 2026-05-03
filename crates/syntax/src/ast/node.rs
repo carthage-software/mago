@@ -2388,6 +2388,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
     /// This allocates on every call. Prefer [`Self::visit_children`] when you don't need a
     /// collected list — for example, when searching for a node or applying a transformation.
     #[inline]
+    #[must_use]
     pub fn children(&self) -> Vec<Node<'ast, 'arena>> {
         let mut children = vec![];
         self.visit_children(|child| children.push(child));

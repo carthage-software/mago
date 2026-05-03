@@ -386,7 +386,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
 
 fn get_current_generator_parameters<'ctx>(
     context: &mut Context<'ctx, '_>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     yield_span: Span,
 ) -> Option<(TUnion, TUnion, TUnion, TUnion)> {
     let Some(function) = block_context.scope.get_function_like() else {

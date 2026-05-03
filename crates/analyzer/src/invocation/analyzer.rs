@@ -451,6 +451,8 @@ pub fn analyze_invocation<'ctx, 'arena>(
         } else if *argument_offset >= parameter_refs.len() {
             has_too_many_arguments = true;
             continue;
+        } else {
+            // positional argument with no matching parameter and not over the limit; fall through to record offset
         }
 
         last_argument_offset = *argument_offset as isize;
@@ -738,6 +740,8 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 )
                 .with_help("Remove the argument unpacking (`...`)."),
             );
+        } else {
+            // target accepts no parameters and no unpacking was attempted; nothing to validate
         }
     }
 
@@ -833,6 +837,8 @@ pub fn analyze_invocation<'ctx, 'arena>(
             .with_help("Remove the extra argument(s).");
 
         context.collector.report_with_code(IssueCode::TooManyArguments, issue);
+    } else {
+        // argument count is within the parameter range; nothing to report
     }
 
     check_template_result(context, template_result, invocation.span);
@@ -1164,6 +1170,8 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                     }),
                 );
             }
+        } else {
+            // integer array key with no matching parameter; already handled via continue above
         }
     }
 }
@@ -1218,15 +1226,15 @@ fn extract_class_name_from_scope_arg(context: &Context<'_, '_>, scope_type: &TUn
             TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Literal { value })) => {
                 return Some(*value);
             }
-            TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
-                if let Some(name) = extract_class_name_from_atomic(constraint) {
-                    return Some(name);
-                }
+            TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. }))
+                if let Some(name) = extract_class_name_from_atomic(constraint) =>
+            {
+                return Some(name);
             }
-            TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(value)), .. })) => {
-                if context.codebase.get_class_like(value).is_some() {
-                    return Some(*value);
-                }
+            TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(value)), .. }))
+                if context.codebase.get_class_like(value).is_some() =>
+            {
+                return Some(*value);
             }
             TAtomic::Object(TObject::Named(named)) => {
                 return Some(named.name);
@@ -1234,7 +1242,7 @@ fn extract_class_name_from_scope_arg(context: &Context<'_, '_>, scope_type: &TUn
             TAtomic::Object(TObject::Enum(enum_obj)) => {
                 return Some(enum_obj.name);
             }
-            _ => continue,
+            _ => {}
         }
     }
 

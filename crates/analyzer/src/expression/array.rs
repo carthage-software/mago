@@ -780,7 +780,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_empty_square_brackets,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -795,7 +795,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_empty_array_keyword,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -900,7 +900,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_duplicate_literal_int_key,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -932,7 +932,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_duplicate_coerced_key,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -987,7 +987,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_spread_empty_array,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @param array{} $_arr */
@@ -1029,7 +1029,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_spread_non_iterable_int,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @param array<array-key, mixed> $_arr */
@@ -1044,7 +1044,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_missing_element,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $arr = [1, , 3];
@@ -1054,7 +1054,7 @@ mod tests {
 
     test_analysis! {
         name = array_literal_results_in_list_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @param list<int> $_arr */
@@ -1093,7 +1093,7 @@ mod tests {
 
     test_analysis! {
         name = list_array_comparison,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -1116,7 +1116,7 @@ mod tests {
 
     test_analysis! {
         name = create_array_using_generic_key,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**

@@ -1177,7 +1177,7 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
         return Err(ParseError::InvalidMethodTag(span, "Missing method signature".to_string()));
     }
 
-    let mut chars = rest_slice.char_indices().peekable();
+    let mut chars = rest_slice.char_indices();
 
     let mut name_end = None;
 
@@ -1247,7 +1247,7 @@ fn consume_whitespace(input: &str) -> (&str, usize) {
     (&input[byte_count..], byte_count)
 }
 
-fn try_consume<'a>(input: &'a str, token: &str) -> Option<(&'a str, usize)> {
+fn try_consume<'input>(input: &'input str, token: &str) -> Option<(&'input str, usize)> {
     let (input, whitespace_count) = consume_whitespace(input);
 
     if !input.starts_with(token) {
@@ -1367,6 +1367,7 @@ fn is_valid_identifier_start(mut identifier: &str, allow_qualified: bool) -> boo
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::single_char_lifetime_names)]
 mod tests {
     use mago_database::file::FileId;
     use mago_span::Position;
@@ -1613,14 +1614,14 @@ mod tests {
     fn test_param_out_no_type() {
         let content = " $myVar ";
         let span = test_span(content, 0);
-        assert!(parse_param_out_tag(content, span).is_err());
+        parse_param_out_tag(content, span).unwrap_err();
     }
 
     #[test]
     fn test_param_out_no_var() {
         let content = " string ";
         let span = test_span(content, 0);
-        assert!(parse_param_out_tag(content, span).is_err());
+        parse_param_out_tag(content, span).unwrap_err();
     }
 
     #[test]

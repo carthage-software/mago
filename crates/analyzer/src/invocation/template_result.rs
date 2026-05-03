@@ -47,7 +47,7 @@ use crate::utils::template::get_template_types_for_class_member;
 /// This function assumes that the `TemplateResult` is initially empty and will be populated with
 /// template types and bounds derived from the invocation's target metadata.
 pub fn populate_template_result_from_invocation<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+    context: &Context<'ctx, 'arena>,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &mut TemplateResult,
 ) {

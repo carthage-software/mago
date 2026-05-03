@@ -216,6 +216,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 
         return Ok(get_never());
     }
+    // class kind is a regular class; no kind-specific instantiation diagnostic to emit
 
     if classname.is_from_class_string() && (metadata.kind.is_interface() || metadata.kind.is_trait()) {
         let kind_name = if metadata.kind.is_interface() { "interface" } else { "trait" };
@@ -424,6 +425,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
                 .map(|(_, _)| if is_spl_object_storage { get_never() } else { wrap_atomic(TAtomic::Placeholder) })
                 .collect(),
         );
+    } else {
+        // class has no constructor, no extra arguments, and no templates; no type parameters to record
     }
 
     let skip_constructor_warning =
@@ -570,6 +573,8 @@ pub fn analyze_anonymous_class_constructor<'ctx, 'arena>(
         );
 
         argument_list.analyze(context, block_context, artifacts)?;
+    } else {
+        // anonymous class has no constructor and no arguments were provided; nothing to report
     }
 
     Ok(())
@@ -584,7 +589,7 @@ mod tests {
 
     test_analysis! {
         name = templated_class_instantiation,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -632,7 +637,7 @@ mod tests {
 
     test_analysis! {
         name = ambiguous_instantiation_target,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class A {}
@@ -658,7 +663,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_of_interface,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             interface MyInterface {}
@@ -673,7 +678,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_of_trait,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             trait MyTrait {}
@@ -688,7 +693,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_of_enum,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             enum MyEnum {}
@@ -703,7 +708,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_of_abstract_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             abstract class MyAbstractClass {}
@@ -718,7 +723,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_self_outside_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $a = new self();
@@ -731,7 +736,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_static_outside_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $a = new static();
@@ -744,7 +749,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_parent_outside_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $a = new parent();
@@ -757,7 +762,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_of_undefined_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $a = new NonExistentClass();
@@ -770,7 +775,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_from_invalid_expression_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $className = 123; // Not a class string
@@ -785,7 +790,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_from_general_string_variable,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @param string $className */
@@ -800,7 +805,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_from_mixed_variable,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param mixed $className */
             function create_instance_mixed($className) {
@@ -814,7 +819,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_too_many_args_no_constructor,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class NoConstructor {}
             $a = new NoConstructor(1, 2, 3);
@@ -824,7 +829,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_too_many_args_with_constructor,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class WithConstructor {
                 public function __construct(int $a, int $b) {}
@@ -836,7 +841,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_with_child_constructor,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class Base {
@@ -856,7 +861,7 @@ mod tests {
 
     test_analysis! {
         name = instantiation_with_parent_constructor,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class Base {
@@ -872,7 +877,7 @@ mod tests {
 
     test_analysis! {
         name = resolve_nested_type_parameters,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -906,7 +911,7 @@ mod tests {
 
     test_analysis! {
         name = handles_recursive_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @template T */
@@ -922,7 +927,7 @@ mod tests {
 
     test_analysis! {
         name = self_is_static_in_final_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**

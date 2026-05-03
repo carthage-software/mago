@@ -2,10 +2,12 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use bumpalo::Bump;
 use mago_atom::Atom;
+use mago_atom::AtomSet;
 use mago_atom::atom;
 
 use mago_codex::metadata::CodebaseMetadata;
@@ -62,7 +64,7 @@ pub fn codebase_from_php(code: &'static str) -> CodebaseMetadata {
         codebase.extend(program_codebase);
     }
 
-    populate_codebase(&mut codebase, &mut SymbolReferences::new(), Default::default(), Default::default());
+    populate_codebase(&mut codebase, &mut SymbolReferences::new(), AtomSet::default(), HashSet::default());
 
     codebase
 }

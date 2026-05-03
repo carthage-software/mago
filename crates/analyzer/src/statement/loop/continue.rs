@@ -164,7 +164,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
                         context.codebase,
                         CombinerOptions::default(),
                     )),
-                    None => var_type.clone(),
+                    None => Rc::clone(&var_type),
                 },
             );
         }
@@ -180,7 +180,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
                         CombinerOptions::default(),
                     ));
                 } else {
-                    finally_scope.locals.insert(*var_id, var_type.clone());
+                    finally_scope.locals.insert(*var_id, Rc::clone(var_type));
                 }
             }
         }

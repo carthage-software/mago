@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -45,8 +46,8 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
     block_context.flags.set_inside_general_use(was_inside_general_use);
 
     let fallback = Rc::new(get_mixed());
-    let left_type = artifacts.get_rc_expression_type(&binary.lhs).cloned().unwrap_or_else(|| fallback.clone());
-    let right_type = artifacts.get_rc_expression_type(&binary.rhs).cloned().unwrap_or_else(|| fallback.clone());
+    let left_type = artifacts.get_rc_expression_type(&binary.lhs).cloned().unwrap_or_else(|| Rc::clone(&fallback));
+    let right_type = artifacts.get_rc_expression_type(&binary.rhs).cloned().unwrap_or_else(|| Rc::clone(&fallback));
 
     if left_type.is_never() || right_type.is_never() {
         assign_arithmetic_type(artifacts, get_never(), binary);
@@ -80,6 +81,8 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                 "Ensure the left operand is non-null before the operation, potentially using checks or assertions.",
             ),
         );
+    } else {
+        // left operand is not null and not possibly-null; no nullability diagnostic needed
     }
 
     if right_type.is_null() {
@@ -105,12 +108,16 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                 "Ensure the right operand is non-null before the operation, potentially using checks or assertions.",
             ),
         );
+    } else {
+        // right operand is not null and not possibly-null; no nullability diagnostic needed
     }
 
     if is_arithmetic_compatible_generic(context, &left_type, &right_type) {
         final_result_type = Some(left_type.as_ref().clone());
     } else if is_arithmetic_compatible_generic(context, &right_type, &left_type) {
         final_result_type = Some(right_type.as_ref().clone());
+    } else {
+        // neither operand is a compatible generic; fall through to per-atomic arithmetic resolution
     }
 
     if let Some(final_result_type) = final_result_type {
@@ -160,6 +167,8 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                 "Ensure the left operand is non-falsy before the operation, or explicitly cast if coercion is intended."
             ),
         );
+    } else {
+        // left operand is bitwise-safe or not falsable; no false-operand diagnostic needed
     }
 
     if right_type.is_false() && !is_bitwise {
@@ -197,6 +206,8 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
                 "Ensure the right operand is non-falsy before the operation, or explicitly cast if coercion is intended."
             ),
         );
+    } else {
+        // right operand is bitwise-safe or not falsable; no false-operand diagnostic needed
     }
 
     let mut result_atomic_types: Vec<TAtomic> = Vec::new();
@@ -739,7 +750,7 @@ fn calculate_int_arithmetic(op: &BinaryOperator<'_>, left: TInteger, right: TInt
 }
 
 /// Compose two array shapes under PHP's `+` operator.
-fn compose_array_plus<'ctx, 'arena>(left: &TArray, right: &TArray, context: &Context<'ctx, 'arena>) -> Vec<TAtomic> {
+fn compose_array_plus(left: &TArray, right: &TArray, context: &Context<'_, '_>) -> Vec<TAtomic> {
     if let (TArray::Keyed(left_keyed), TArray::Keyed(right_keyed)) = (left, right) {
         let composed = compose_keyed_plus(left_keyed, right_keyed);
         return vec![TAtomic::Array(TArray::Keyed(composed))];
@@ -787,7 +798,7 @@ fn compose_keyed_plus(left: &TKeyedArray, right: &TKeyedArray) -> TKeyedArray {
                 let merged_value = mago_codex::ttype::combine_optional_union_types(
                     Some(&merged_value),
                     Some(right_value),
-                    &Default::default(),
+                    &CodebaseMetadata::default(),
                 );
                 let new_optional = *left_optional && *right_optional;
                 composed_known.insert(*key, (new_optional, merged_value));
@@ -800,7 +811,7 @@ fn compose_keyed_plus(left: &TKeyedArray, right: &TKeyedArray) -> TKeyedArray {
                     let merged_value = mago_codex::ttype::combine_optional_union_types(
                         Some(left_value),
                         Some(right_value_type),
-                        &Default::default(),
+                        &CodebaseMetadata::default(),
                     );
                     composed_known.insert(*key, (false, merged_value));
                     continue;
@@ -827,7 +838,7 @@ fn compose_keyed_plus(left: &TKeyedArray, right: &TKeyedArray) -> TKeyedArray {
                 let merged_value = mago_codex::ttype::combine_optional_union_types(
                     Some(left_value_type),
                     Some(right_value),
-                    &Default::default(),
+                    &CodebaseMetadata::default(),
                 );
 
                 composed_known.insert(*key, (*right_optional, merged_value));
@@ -839,8 +850,10 @@ fn compose_keyed_plus(left: &TKeyedArray, right: &TKeyedArray) -> TKeyedArray {
 
     let composed_parameters = match (left.parameters.as_ref(), right.parameters.as_ref()) {
         (Some((lk, lv)), Some((rk, rv))) => {
-            let merged_k = mago_codex::ttype::combine_optional_union_types(Some(lk), Some(rk), &Default::default());
-            let merged_v = mago_codex::ttype::combine_optional_union_types(Some(lv), Some(rv), &Default::default());
+            let merged_k =
+                mago_codex::ttype::combine_optional_union_types(Some(lk), Some(rk), &CodebaseMetadata::default());
+            let merged_v =
+                mago_codex::ttype::combine_optional_union_types(Some(lv), Some(rv), &CodebaseMetadata::default());
             Some((Arc::new(merged_k), Arc::new(merged_v)))
         }
         (Some(p), None) | (None, Some(p)) => Some(p.clone()),

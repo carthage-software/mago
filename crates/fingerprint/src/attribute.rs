@@ -6,6 +6,7 @@ use mago_syntax::ast::AttributeList;
 use std::hash::Hash;
 
 impl Fingerprintable for AttributeList<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -19,6 +20,7 @@ impl Fingerprintable for AttributeList<'_> {
 }
 
 impl Fingerprintable for Attribute<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

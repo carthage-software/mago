@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used, clippy::default_constructed_unit_structs, clippy::missing_assert_message)]
+
 use std::hint::black_box;
 
 use bumpalo::Bump;

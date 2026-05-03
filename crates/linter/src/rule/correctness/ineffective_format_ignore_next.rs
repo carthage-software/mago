@@ -167,8 +167,8 @@ fn build_ignore_next_markers(program: &mago_syntax::ast::Program<'_>) -> Vec<Ign
     markers
 }
 
-struct IgnoreNextChecker<'a> {
-    markers: &'a mut [IgnoreNextMarker],
+struct IgnoreNextChecker<'markers> {
+    markers: &'markers mut [IgnoreNextMarker],
 }
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for IgnoreNextChecker<'_> {

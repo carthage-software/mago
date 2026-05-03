@@ -26,6 +26,7 @@ use crate::invocation::analyzer::analyze_invocation;
 use crate::resolver::method::resolve_method_targets;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena> {
+    #[allow(clippy::expect_used)]
     fn analyze<'ctx>(
         &'ast self,
         context: &mut Context<'ctx, 'arena>,
@@ -192,7 +193,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_ambiguous_object,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param object $obj */
             function test($obj) {
@@ -246,7 +247,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_from_interface_method,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             interface Logger { public function log(string $message): void; }
             class FileLogger implements Logger {
@@ -283,7 +284,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_non_existent_method,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class MyClass {}
             $obj = new MyClass();
@@ -310,7 +311,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_definitely_null,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             $obj = null;
             $closure = $obj->method(...);
@@ -323,7 +324,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_possibly_null_object,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class MyClass { public function method(): void {} }
             /** @param MyClass|null $obj */
@@ -338,7 +339,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_mixed_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param mixed $obj */
             function test($obj) {
@@ -352,7 +353,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_generic_object,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param object $obj */
             function test($obj) {
@@ -380,7 +381,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_with_invalid_selector_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class DynamicCaller {
                 public function methodA(): int { return 1; }
@@ -397,7 +398,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_union_of_object_and_non_object,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class MyClass { public function method(): void {} }
@@ -413,7 +414,7 @@ mod tests {
 
     test_analysis! {
         name = method_closure_creation_on_union_where_one_lacks_method,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class ClassA { public function thing(): void {} }
             class ClassB { /* has no thing method */ }

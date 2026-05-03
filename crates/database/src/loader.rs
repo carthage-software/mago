@@ -33,35 +33,37 @@ struct FileWithSpecificity {
 }
 
 /// Builder for loading files into a Database from the filesystem and memory.
-pub struct DatabaseLoader<'a> {
-    database: Option<Database<'a>>,
-    configuration: DatabaseConfiguration<'a>,
+pub struct DatabaseLoader<'config> {
+    database: Option<Database<'config>>,
+    configuration: DatabaseConfiguration<'config>,
     memory_sources: Vec<(&'static str, &'static str, FileType)>,
-    /// When set, content for this file (by logical name) is taken from here instead of disk.
-    /// Used for editor integrations: read content from stdin but use the given path for baseline and reporting.
-    stdin_override: Option<(Cow<'a, str>, String)>,
+    stdin_override: Option<(Cow<'config, str>, String)>,
 }
 
-impl<'a> DatabaseLoader<'a> {
+impl<'config> DatabaseLoader<'config> {
+    #[inline]
     #[must_use]
-    pub fn new(configuration: DatabaseConfiguration<'a>) -> Self {
+    pub fn new(configuration: DatabaseConfiguration<'config>) -> Self {
         Self { configuration, memory_sources: vec![], database: None, stdin_override: None }
     }
 
+    #[inline]
     #[must_use]
-    pub fn with_database(mut self, database: Database<'a>) -> Self {
+    pub fn with_database(mut self, database: Database<'config>) -> Self {
         self.database = Some(database);
         self
     }
 
     /// When set, the file with this logical name (workspace-relative path) will use the given
     /// content instead of being read from disk. The logical name is used for baseline and reporting.
+    #[inline]
     #[must_use]
-    pub fn with_stdin_override(mut self, logical_name: impl Into<Cow<'a, str>>, content: String) -> Self {
+    pub fn with_stdin_override(mut self, logical_name: impl Into<Cow<'config, str>>, content: String) -> Self {
         self.stdin_override = Some((logical_name.into(), content));
         self
     }
 
+    #[inline]
     pub fn add_memory_source(&mut self, name: &'static str, contents: &'static str, file_type: FileType) {
         self.memory_sources.push((name, contents, file_type));
     }
@@ -74,7 +76,8 @@ impl<'a> DatabaseLoader<'a> {
     /// - A glob pattern is invalid
     /// - File system operations fail (reading directories, files)
     /// - File content cannot be read as valid UTF-8
-    pub fn load(mut self) -> Result<Database<'a>, DatabaseError> {
+    #[inline]
+    pub fn load(mut self) -> Result<Database<'config>, DatabaseError> {
         let mut db = self.database.take().unwrap_or_else(|| Database::new(self.configuration.clone()));
 
         // Update database configuration to use the loader's configuration
@@ -115,7 +118,7 @@ impl<'a> DatabaseLoader<'a> {
             .iter()
             .filter_map(|ex| match ex {
                 Exclusion::Path(p) => Some(p),
-                _ => None,
+                Exclusion::Pattern(_) => None,
             })
             .collect();
 
@@ -153,15 +156,15 @@ impl<'a> DatabaseLoader<'a> {
         // (covers new/unsaved files, not on disk). Excluded paths are skipped
         // so that editor integrations using `--stdin-input` honor the same
         // exclude rules as a regular filesystem scan.
-        if let Some((ref name, ref content)) = self.stdin_override {
+        if let Some((name, content)) = &self.stdin_override {
             let virtual_path = self.configuration.workspace.join(name.as_ref());
             let virtual_path_canonical = virtual_path.canonicalize().unwrap_or_else(|_| virtual_path.clone());
             let virtual_path_str = virtual_path_canonical.to_string_lossy();
 
-            let glob_excluded = !glob_excludes.is_empty()
+            let matched_glob = !glob_excludes.is_empty()
                 && (glob_excludes.is_match(virtual_path_canonical.as_path()) || glob_excludes.is_match(name.as_ref()));
 
-            let path_excluded = path_excludes.iter().any(|excl| {
+            let matched_path = path_excludes.iter().any(|excl| {
                 let canonical = if Path::new(excl.as_ref()).is_absolute() {
                     excl.as_ref().to_path_buf()
                 } else {
@@ -174,7 +177,7 @@ impl<'a> DatabaseLoader<'a> {
                     && matches!(virtual_path_str.as_bytes().get(canonical_str.len()), None | Some(&b'/' | &b'\\'))
             });
 
-            if !glob_excluded && !path_excluded {
+            if !matched_glob && !matched_path {
                 let file = File::ephemeral(Cow::Owned(name.as_ref().to_string()), Cow::Owned(content.clone()));
                 let file_id = file.id;
                 if let Entry::Vacant(e) = all_files.entry(file_id) {
@@ -228,12 +231,12 @@ impl<'a> DatabaseLoader<'a> {
     /// Returns files along with their pattern specificity for conflict resolution.
     fn load_paths(
         &self,
-        roots: &[Cow<'a, str>],
+        roots: &[Cow<'config, str>],
         file_type: FileType,
         extensions: &HashSet<OsString>,
         glob_excludes: &GlobSet,
         dir_prune_globs: &GlobSet,
-        path_excludes: &HashSet<&Cow<'a, Path>>,
+        path_excludes: &HashSet<&Cow<'config, Path>>,
     ) -> Result<Vec<FileWithSpecificity>, DatabaseError> {
         // Canonicalize the workspace once.  All WalkDir roots are canonicalized
         // before traversal so their paths inherit the canonical prefix without
@@ -350,7 +353,10 @@ impl<'a> DatabaseLoader<'a> {
                 });
 
                 for entry in walker.filter_map(Result::ok) {
-                    if entry.file_type().is_file() {
+                    let file_type = entry.file_type();
+                    #[allow(clippy::filetype_is_file)]
+                    let include = file_type.is_file() || file_type.is_symlink();
+                    if include {
                         paths_to_process.push((entry.into_path(), specificity));
                     }
                 }
@@ -397,7 +403,7 @@ impl<'a> DatabaseLoader<'a> {
                 let logical_name =
                     path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
 
-                if let Some((ref override_name, ref override_content)) = self.stdin_override
+                if let Some((override_name, override_content)) = &self.stdin_override
                     && override_name.as_ref() == logical_name
                 {
                     let file = File::new(
@@ -442,7 +448,10 @@ impl<'a> DatabaseLoader<'a> {
                 })
                 .count();
             non_wildcard_components * 10
-        } else if pattern_path.is_file() || pattern_path.extension().is_some() || pattern.ends_with(".php") {
+        } else if pattern_path.is_file()
+            || pattern_path.extension().is_some()
+            || pattern.rsplit('.').next().is_some_and(|ext| ext.eq_ignore_ascii_case("php"))
+        {
             component_count * 1000
         } else {
             component_count * 100
@@ -451,6 +460,7 @@ impl<'a> DatabaseLoader<'a> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::DatabaseReader;

@@ -75,9 +75,14 @@ impl std::fmt::Debug for IncrementalAnalysisService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IncrementalAnalysisService")
             .field("database", &"<ReadDatabase>")
+            .field("codebase", &"<CodebaseMetadata>")
+            .field("symbol_references", &"<SymbolReferences>")
+            .field("base_codebase", &"<Arc<CodebaseMetadata>>")
+            .field("base_symbol_references", &"<Arc<SymbolReferences>>")
             .field("settings", &self.settings)
             .field("parser_settings", &self.parser_settings)
-            .field("file_states", &format!("{} tracked files", self.file_states.len()))
+            .field("file_states", &format_args!("{} tracked files", self.file_states.len()))
+            .field("plugin_registry", &"<Arc<PluginRegistry>>")
             .field("initialized", &self.initialized)
             .field("codebase_issues", &self.codebase_issues.len())
             .finish()
@@ -236,6 +241,11 @@ impl IncrementalAnalysisService {
     ///
     /// After this call, [`analyze_incremental()`](Self::analyze_incremental) can be used
     /// for subsequent runs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when source scanning, codebase population, or per-file
+    /// analysis fails.
     pub fn analyze(&mut self) -> Result<AnalysisResult, OrchestratorError> {
         let source_files: Vec<_> = self.database.files().filter(|f| f.file_type != FileType::Builtin).collect();
 
@@ -341,14 +351,19 @@ impl IncrementalAnalysisService {
     ///   Files not in this set are assumed unchanged, avoiding O(all files) hashing.
     ///   Pass `None` to hash all files (correct but slower).
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if called before [`analyze()`](Self::analyze) has been run at least once.
+    /// Returns [`OrchestratorError::General`] if `analyze()` has not been called yet, or when
+    /// re-scanning, populator updates, or per-file analysis fails for the changed subset.
     pub fn analyze_incremental(
         &mut self,
         changed_hint: Option<&[FileId]>,
     ) -> Result<AnalysisResult, OrchestratorError> {
-        assert!(self.initialized, "analyze() must be called before analyze_incremental()");
+        if !self.initialized {
+            return Err(OrchestratorError::General(
+                "analyze() must be called before analyze_incremental()".to_string(),
+            ));
+        }
 
         let source_files: Vec<_> = self.database.files().filter(|f| f.file_type != FileType::Builtin).collect();
 
@@ -831,6 +846,7 @@ impl IncrementalAnalysisService {
     /// Used by editor integrations that need precise type information at
     /// arbitrary cursor positions; LSP completion and hover both rely on
     /// this to answer "what's the type of `$obj` here?".
+    #[must_use]
     pub fn analyze_file_with_artifacts(&self, file_id: FileId) -> Option<(IssueCollection, AnalysisArtifacts)> {
         let file = self.database.get(&file_id).ok()?;
 
@@ -912,7 +928,7 @@ impl IncrementalAnalysisService {
         skip_files: &HashSet<FileId>,
     ) -> Result<(AnalysisResult, HashMap<FileId, IssueCollection>), OrchestratorError> {
         #[cfg(not(target_arch = "wasm32"))]
-        const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_millis(5000);
+        const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_secs(5);
 
         let host_files: Vec<_> = self
             .database
@@ -980,6 +996,7 @@ impl IncrementalAnalysisService {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used, clippy::similar_names)]
 mod tests {
     use super::*;
 
@@ -2031,7 +2048,7 @@ mod tests {
             .analyze_incremental(Some(&[child_id]))
             .expect("Incremental analysis failed after signature change following body-only change.");
 
-        let mut fresh2 = make_service_with_settings(&db, settings.clone());
+        let mut fresh2 = make_service_with_settings(&db, settings);
         let full2 = fresh2.analyze().expect("Full analysis failed.");
 
         let (only_incr2, only_full2) = diff_issues(&cycle2.issues, &full2.issues);

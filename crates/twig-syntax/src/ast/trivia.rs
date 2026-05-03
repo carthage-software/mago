@@ -54,16 +54,16 @@ impl HasSpan for Trivia<'_> {
 
 /// Iteration helpers over a trivia [`Sequence`].
 pub trait TriviaSequenceExt<'arena> {
-    fn comments<'a>(&'a self) -> impl Iterator<Item = &'a Trivia<'arena>>
+    fn comments<'borrow>(&'borrow self) -> impl Iterator<Item = &'borrow Trivia<'arena>>
     where
-        'arena: 'a;
+        'arena: 'borrow;
 }
 
 impl<'arena> TriviaSequenceExt<'arena> for Sequence<'arena, Trivia<'arena>> {
     #[inline]
-    fn comments<'a>(&'a self) -> impl Iterator<Item = &'a Trivia<'arena>>
+    fn comments<'borrow>(&'borrow self) -> impl Iterator<Item = &'borrow Trivia<'arena>>
     where
-        'arena: 'a,
+        'arena: 'borrow,
     {
         self.iter().filter(|t| t.kind.is_comment())
     }

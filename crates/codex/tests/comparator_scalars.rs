@@ -18,7 +18,7 @@ fn int_in_int() {
 
 #[test]
 fn lit_int_in_int() {
-    for v in [-1000_i64, -1, 0, 1, 100, 1_000_000] {
+    for v in [-1000i64, -1, 0, 1, 100, 1_000_000] {
         assert_atomic_subtype(&t_lit_int(v), &t_int());
     }
 }
@@ -32,7 +32,7 @@ fn int_not_in_lit_int() {
 
 #[test]
 fn distinct_lit_ints_disjoint() {
-    for (a, b) in [(0_i64, 1), (-1, 1), (10, 100), (1, 2)] {
+    for (a, b) in [(0i64, 1), (-1, 1), (10, 100), (1, 2)] {
         assert_atomic_not_subtype(&t_lit_int(a), &t_lit_int(b));
         assert_atomic_not_subtype(&t_lit_int(b), &t_lit_int(a));
     }
@@ -40,7 +40,7 @@ fn distinct_lit_ints_disjoint() {
 
 #[test]
 fn equal_lit_ints_subtype() {
-    for v in [-100_i64, -1, 0, 1, 100] {
+    for v in [-100i64, -1, 0, 1, 100] {
         assert_atomic_subtype(&t_lit_int(v), &t_lit_int(v));
     }
 }
@@ -52,21 +52,21 @@ fn float_in_float() {
 
 #[test]
 fn lit_float_in_float() {
-    for v in [-3.14_f64, 0.0, 1.5, 100.0] {
+    for v in [-3.14f64, 0.0, 1.5, 100.0] {
         assert_atomic_subtype(&t_lit_float(v), &t_float());
     }
 }
 
 #[test]
 fn float_not_in_lit_float() {
-    for v in [0.0_f64, 1.5, -3.14] {
+    for v in [0.0f64, 1.5, -3.14] {
         assert_atomic_not_subtype(&t_float(), &t_lit_float(v));
     }
 }
 
 #[test]
 fn distinct_lit_floats_disjoint() {
-    for (a, b) in [(0.0_f64, 1.0), (1.5, 2.5), (-1.0, 1.0)] {
+    for (a, b) in [(0.0f64, 1.0), (1.5, 2.5), (-1.0, 1.0)] {
         assert_atomic_not_subtype(&t_lit_float(a), &t_lit_float(b));
     }
 }
@@ -163,14 +163,14 @@ fn non_numeric_lit_string_not_in_numeric() {
 
 #[test]
 fn lit_int_in_numeric() {
-    for v in [-1000_i64, -1, 0, 1, 100] {
+    for v in [-1000i64, -1, 0, 1, 100] {
         assert_atomic_subtype(&t_lit_int(v), &t_numeric());
     }
 }
 
 #[test]
 fn lit_float_in_numeric() {
-    for v in [-1.5_f64, 0.0, 1.5] {
+    for v in [-1.5f64, 0.0, 1.5] {
         assert_atomic_subtype(&t_lit_float(v), &t_numeric());
     }
 }
@@ -192,7 +192,7 @@ fn string_in_array_key() {
 
 #[test]
 fn lit_int_in_array_key() {
-    for v in [-100_i64, 0, 1, 100] {
+    for v in [-100i64, 0, 1, 100] {
         assert_atomic_subtype(&t_lit_int(v), &t_array_key());
     }
 }
@@ -286,7 +286,7 @@ fn class_string_in_scalar() {
 
 #[test]
 fn lit_int_in_scalar() {
-    for v in [-100_i64, 0, 100] {
+    for v in [-100i64, 0, 100] {
         assert_atomic_subtype(&t_lit_int(v), &t_scalar());
     }
 }

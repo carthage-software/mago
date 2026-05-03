@@ -402,7 +402,7 @@ impl ClassLikeMetadata {
     }
 
     #[must_use]
-    pub fn get_missing_required_interface<'a>(&self, other: &'a ClassLikeMetadata) -> Option<&'a Atom> {
+    pub fn get_missing_required_interface<'meta>(&self, other: &'meta ClassLikeMetadata) -> Option<&'meta Atom> {
         for required_interface in &other.require_implements {
             if self.all_parent_interfaces.contains(required_interface) {
                 continue;
@@ -421,7 +421,7 @@ impl ClassLikeMetadata {
     }
 
     #[must_use]
-    pub fn get_missing_required_extends<'a>(&self, other: &'a ClassLikeMetadata) -> Option<&'a Atom> {
+    pub fn get_missing_required_extends<'meta>(&self, other: &'meta ClassLikeMetadata) -> Option<&'meta Atom> {
         for required_extend in &other.require_extends {
             if self.all_parent_classes.contains(required_extend) {
                 continue;

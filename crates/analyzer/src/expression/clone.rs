@@ -158,7 +158,7 @@ mod tests {
 
     test_analysis! {
         name = clone_valid,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class Example {}
@@ -171,7 +171,7 @@ mod tests {
 
     test_analysis! {
         name = clone_maybe_invalid_valid,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class Example {}
@@ -188,7 +188,7 @@ mod tests {
 
     test_analysis! {
         name = clone_enum,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             enum Color { case Red; }

@@ -27,7 +27,12 @@ pub struct LookaheadBuf<T: Copy, const CAP: usize> {
 
 impl<T: Copy, const CAP: usize> Debug for LookaheadBuf<T, CAP> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("LookaheadBuf").field("cap", &CAP).field("head", &self.head).field("len", &self.len).finish()
+        f.debug_struct("LookaheadBuf")
+            .field("cap", &CAP)
+            .field("head", &self.head)
+            .field("len", &self.len)
+            .field("slots", &"<opaque>")
+            .finish()
     }
 }
 
@@ -40,7 +45,12 @@ impl<T: Copy, const CAP: usize> Default for LookaheadBuf<T, CAP> {
 impl<T: Copy, const CAP: usize> LookaheadBuf<T, CAP> {
     /// Create an empty buffer. `CAP` must be a power of two; violating
     /// this in debug builds trips a panic on first use.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if `CAP` is not a power of two.
     #[inline(always)]
+    #[must_use]
     pub fn new() -> Self {
         debug_assert!(CAP.is_power_of_two(), "LookaheadBuf CAP must be a power of two");
         Self { slots: [const { MaybeUninit::uninit() }; CAP], head: 0, len: 0 }
@@ -78,6 +88,10 @@ impl<T: Copy, const CAP: usize> LookaheadBuf<T, CAP> {
     /// overwriting the oldest slot would silently corrupt the buffer.
     /// Callers must size `CAP` large enough for the deepest lookahead
     /// the parser ever performs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `CAP` tokens have been pushed without any being consumed.
     #[inline(always)]
     pub fn push_back(&mut self, value: T) {
         assert!(self.len < CAP, "LookaheadBuf overflow: pushed {CAP} tokens without consuming");

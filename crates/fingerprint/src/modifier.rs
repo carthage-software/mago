@@ -5,6 +5,7 @@ use mago_syntax::ast::Modifier;
 use std::hash::Hash;
 
 impl Fingerprintable for Modifier<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -26,8 +27,9 @@ impl Fingerprintable for Modifier<'_> {
     }
 }
 
-pub fn fingerprint_modifiers<'a, H: std::hash::Hasher>(
-    modifiers: impl IntoIterator<Item = &'a Modifier<'a>>,
+#[inline]
+pub fn fingerprint_modifiers<'modifier, H: std::hash::Hasher>(
+    modifiers: impl IntoIterator<Item = &'modifier Modifier<'modifier>>,
     hasher: &mut H,
     _resolved_names: &ResolvedNames,
     _options: &FingerprintOptions<'_>,

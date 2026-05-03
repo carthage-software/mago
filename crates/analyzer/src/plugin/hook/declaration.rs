@@ -19,6 +19,10 @@ use crate::plugin::provider::Provider;
 /// and modify analysis state.
 pub trait ClassDeclarationHook: Provider {
     /// Called when entering a class declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn on_enter_class(
         &self,
         _class: &Class<'_>,
@@ -29,6 +33,10 @@ pub trait ClassDeclarationHook: Provider {
     }
 
     /// Called when leaving a class declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn on_leave_class(
         &self,
         _class: &Class<'_>,
@@ -42,6 +50,10 @@ pub trait ClassDeclarationHook: Provider {
 /// Hook trait for intercepting interface declaration analysis.
 pub trait InterfaceDeclarationHook: Provider {
     /// Called when entering an interface declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn on_enter_interface(
         &self,
         _interface: &Interface<'_>,
@@ -52,6 +64,10 @@ pub trait InterfaceDeclarationHook: Provider {
     }
 
     /// Called when leaving an interface declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn on_leave_interface(
         &self,
         _interface: &Interface<'_>,
@@ -65,6 +81,10 @@ pub trait InterfaceDeclarationHook: Provider {
 /// Hook trait for intercepting trait declaration analysis.
 pub trait TraitDeclarationHook: Provider {
     /// Called when entering a trait declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn on_enter_trait(
         &self,
         _trait_: &Trait<'_>,
@@ -75,6 +95,10 @@ pub trait TraitDeclarationHook: Provider {
     }
 
     /// Called when leaving a trait declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn on_leave_trait(
         &self,
         _trait_: &Trait<'_>,
@@ -88,6 +112,10 @@ pub trait TraitDeclarationHook: Provider {
 /// Hook trait for intercepting enum declaration analysis.
 pub trait EnumDeclarationHook: Provider {
     /// Called when entering an enum declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn on_enter_enum(
         &self,
         _enum_: &Enum<'_>,
@@ -98,6 +126,10 @@ pub trait EnumDeclarationHook: Provider {
     }
 
     /// Called when leaving an enum declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn on_leave_enum(
         &self,
         _enum_: &Enum<'_>,
@@ -115,6 +147,10 @@ pub trait EnumDeclarationHook: Provider {
 /// and modify analysis state.
 pub trait FunctionDeclarationHook: Provider {
     /// Called when entering a function declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn on_enter_function(
         &self,
         _function: &Function<'_>,
@@ -125,6 +161,10 @@ pub trait FunctionDeclarationHook: Provider {
     }
 
     /// Called when leaving a function declaration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn on_leave_function(
         &self,
         _function: &Function<'_>,

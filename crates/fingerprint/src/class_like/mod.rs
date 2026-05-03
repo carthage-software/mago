@@ -36,6 +36,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for AnonymousClass<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -57,6 +58,7 @@ impl Fingerprintable for AnonymousClass<'_> {
 }
 
 impl Fingerprintable for Extends<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -71,6 +73,7 @@ impl Fingerprintable for Extends<'_> {
 }
 
 impl Fingerprintable for Implements<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -85,6 +88,7 @@ impl Fingerprintable for Implements<'_> {
 }
 
 impl Fingerprintable for ClassLikeMember<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -112,6 +116,7 @@ impl Fingerprintable for ClassLikeMember<'_> {
 }
 
 impl Fingerprintable for TraitUse<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -127,6 +132,7 @@ impl Fingerprintable for TraitUse<'_> {
 }
 
 impl Fingerprintable for TraitUseSpecification<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -149,6 +155,7 @@ impl Fingerprintable for TraitUseSpecification<'_> {
 }
 
 impl Fingerprintable for TraitUseAdaptation<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -176,6 +183,7 @@ impl Fingerprintable for TraitUseAdaptation<'_> {
 }
 
 impl Fingerprintable for TraitUseMethodReference<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -196,6 +204,7 @@ impl Fingerprintable for TraitUseMethodReference<'_> {
 }
 
 impl Fingerprintable for TraitUseAbsoluteMethodReference<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -208,6 +217,7 @@ impl Fingerprintable for TraitUseAbsoluteMethodReference<'_> {
 }
 
 impl Fingerprintable for ClassLikeConstant<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -228,6 +238,7 @@ impl Fingerprintable for ClassLikeConstant<'_> {
 }
 
 impl Fingerprintable for ClassLikeConstantItem<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -241,6 +252,7 @@ impl Fingerprintable for ClassLikeConstantItem<'_> {
 }
 
 impl Fingerprintable for Property<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -261,6 +273,7 @@ impl Fingerprintable for Property<'_> {
 }
 
 impl Fingerprintable for PlainProperty<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -281,6 +294,7 @@ impl Fingerprintable for PlainProperty<'_> {
 }
 
 impl Fingerprintable for HookedProperty<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -299,6 +313,7 @@ impl Fingerprintable for HookedProperty<'_> {
 }
 
 impl Fingerprintable for PropertyItem<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -320,6 +335,7 @@ impl Fingerprintable for PropertyItem<'_> {
 }
 
 impl Fingerprintable for PropertyHookList<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -334,6 +350,7 @@ impl Fingerprintable for PropertyHookList<'_> {
 }
 
 impl Fingerprintable for PropertyHook<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -355,6 +372,7 @@ impl Fingerprintable for PropertyHook<'_> {
 }
 
 impl Fingerprintable for PropertyHookBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -374,6 +392,7 @@ impl Fingerprintable for PropertyHookBody<'_> {
 }
 
 impl Fingerprintable for PropertyHookConcreteBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -394,6 +413,7 @@ impl Fingerprintable for PropertyHookConcreteBody<'_> {
 }
 
 impl Fingerprintable for EnumCase<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -410,6 +430,7 @@ impl Fingerprintable for EnumCase<'_> {
 }
 
 impl Fingerprintable for EnumCaseItem<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -431,6 +452,7 @@ impl Fingerprintable for EnumCaseItem<'_> {
 }
 
 impl Fingerprintable for Method<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -463,6 +485,7 @@ impl Fingerprintable for Method<'_> {
 }
 
 impl Fingerprintable for MethodBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -482,6 +505,7 @@ impl Fingerprintable for MethodBody<'_> {
 }
 
 impl Fingerprintable for Class<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -510,6 +534,7 @@ impl Fingerprintable for Class<'_> {
 }
 
 impl Fingerprintable for Interface<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -536,6 +561,7 @@ impl Fingerprintable for Interface<'_> {
 }
 
 impl Fingerprintable for Trait<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -561,6 +587,7 @@ impl Fingerprintable for Trait<'_> {
 }
 
 impl Fingerprintable for Enum<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -588,6 +615,7 @@ impl Fingerprintable for Enum<'_> {
 }
 
 impl Fingerprintable for EnumBackingTypeHint<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

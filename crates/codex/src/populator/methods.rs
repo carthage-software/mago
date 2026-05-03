@@ -41,7 +41,7 @@ pub fn inherit_methods_from_parent(
 
         process_name(*method_name_lc);
 
-        if let Some(ref reverse_map) = reverse_alias_map
+        if let Some(reverse_map) = reverse_alias_map.as_ref()
             && let Some(aliases) = reverse_map.get(method_name_lc)
         {
             for alias in aliases.iter().copied() {
@@ -100,7 +100,7 @@ pub fn inherit_methods_from_parent(
 
         process_name(*method_name_lc, metadata);
 
-        if let Some(ref reverse_map) = reverse_alias_map
+        if let Some(reverse_map) = reverse_alias_map.as_ref()
             && let Some(aliases) = reverse_map.get(method_name_lc)
         {
             for alias in aliases.iter().copied() {

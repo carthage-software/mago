@@ -203,6 +203,7 @@ impl Scanner {
     }
 }
 
+#[allow(clippy::expect_used)]
 impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner {
     #[inline]
     fn walk_in_namespace(&mut self, namespace: &'arena Namespace<'arena>, _context: &mut Context<'ctx, 'arena>) {
@@ -559,6 +560,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             Some(type_resolution_context),
         );
 
+        #[allow(clippy::unreachable)]
         let Some(method_metadata) = &function_like_metadata.method_metadata else {
             unreachable!("Method info should be present for method.",);
         };
@@ -656,7 +658,8 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
     }
 }
 
-fn finalize_class_like(scanner: &mut Scanner, context: &mut Context<'_, '_>) {
+#[allow(clippy::expect_used)]
+fn finalize_class_like(scanner: &mut Scanner, context: &Context<'_, '_>) {
     let has_constructor = scanner.has_constructor;
     scanner.has_constructor = false;
 
@@ -696,6 +699,7 @@ fn finalize_class_like(scanner: &mut Scanner, context: &mut Context<'_, '_>) {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod polyfill_tests {
     use std::borrow::Cow;
 
@@ -754,92 +758,92 @@ mod polyfill_tests {
 
     #[test]
     fn class_in_not_class_exists_is_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (!class_exists('Foo')) {
                 class Foo {}
             }
-        "#;
+        ";
         assert!(class_flags(&scan(code), "Foo").is_polyfill());
     }
 
     #[test]
     fn interface_in_not_interface_exists_is_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (!interface_exists('Bar')) {
                 interface Bar {}
             }
-        "#;
+        ";
         assert!(class_flags(&scan(code), "Bar").is_polyfill());
     }
 
     #[test]
     fn trait_in_not_trait_exists_is_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (!trait_exists('Mix')) {
                 trait Mix {}
             }
-        "#;
+        ";
         assert!(class_flags(&scan(code), "Mix").is_polyfill());
     }
 
     #[test]
     fn enum_in_not_enum_exists_is_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (!enum_exists('Kind')) {
                 enum Kind { case A; }
             }
-        "#;
+        ";
         assert!(class_flags(&scan(code), "Kind").is_polyfill());
     }
 
     #[test]
     fn function_in_not_function_exists_is_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (!function_exists('foo')) {
                 function foo(): void {}
             }
-        "#;
+        ";
         assert!(function_flags(&scan(code), "foo").is_polyfill());
     }
 
     #[test]
     fn const_in_not_defined_is_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (!defined('FOO')) {
                 const FOO = 1;
             }
-        "#;
+        ";
         assert!(constant_flags(&scan(code), "FOO").is_polyfill());
     }
 
     #[test]
     fn define_call_in_not_defined_is_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (!defined('BAR')) {
                 define('BAR', 1);
             }
-        "#;
+        ";
         assert!(constant_flags(&scan(code), "BAR").is_polyfill());
     }
 
     #[test]
     fn class_in_else_branch_of_positive_check_is_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (class_exists('Foo')) {
             } else {
                 class Foo {}
             }
-        "#;
+        ";
         assert!(class_flags(&scan(code), "Foo").is_polyfill());
     }
 
     #[test]
     fn class_in_then_branch_of_positive_check_is_not_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (class_exists('Foo')) {
                 class Bar {}
             }
-        "#;
+        ";
         assert!(!class_flags(&scan(code), "Bar").is_polyfill());
     }
 
@@ -851,33 +855,33 @@ mod polyfill_tests {
 
     #[test]
     fn class_inside_unrelated_if_is_not_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (PHP_VERSION_ID > 80000) {
                 class Modern {}
             }
-        "#;
+        ";
         assert!(!class_flags(&scan(code), "Modern").is_polyfill());
     }
 
     #[test]
     fn class_in_then_branch_when_condition_is_not_exists_check_is_not_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (!some_other_check()) {
                 class Other {}
             }
-        "#;
+        ";
         assert!(!class_flags(&scan(code), "Other").is_polyfill());
     }
 
     #[test]
     fn polyfill_flag_does_not_leak_to_siblings() {
-        let code = r#"<?php
+        let code = "<?php
             if (!class_exists('Polyfilled')) {
                 class Polyfilled {}
             }
 
             class Real {}
-        "#;
+        ";
         let codebase = scan(code);
         assert!(class_flags(&codebase, "Polyfilled").is_polyfill());
         assert!(!class_flags(&codebase, "Real").is_polyfill());
@@ -885,13 +889,13 @@ mod polyfill_tests {
 
     #[test]
     fn class_inside_else_does_not_leak_to_preceding_sibling() {
-        let code = r#"<?php
+        let code = "<?php
             if (class_exists('Gate')) {
                 class Sibling {}
             } else {
                 class Gate {}
             }
-        "#;
+        ";
         let codebase = scan(code);
         assert!(!class_flags(&codebase, "Sibling").is_polyfill());
         assert!(class_flags(&codebase, "Gate").is_polyfill());
@@ -899,19 +903,19 @@ mod polyfill_tests {
 
     #[test]
     fn class_nested_inside_polyfill_guard_is_still_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (!class_exists('Wrapper')) {
                 if (PHP_VERSION_ID >= 80000) {
                     class Wrapper {}
                 }
             }
-        "#;
+        ";
         assert!(class_flags(&scan(code), "Wrapper").is_polyfill());
     }
 
     #[test]
     fn nested_polyfill_guards_unwind_correctly() {
-        let code = r#"<?php
+        let code = "<?php
             if (!class_exists('A')) {
                 class A {}
             }
@@ -920,7 +924,7 @@ mod polyfill_tests {
                 class C {}
             }
             class D {}
-        "#;
+        ";
         let codebase = scan(code);
         assert!(class_flags(&codebase, "A").is_polyfill());
         assert!(!class_flags(&codebase, "B").is_polyfill());
@@ -941,22 +945,22 @@ mod polyfill_tests {
 
     #[test]
     fn class_in_alternative_syntax_then_branch_is_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (!class_exists('Alt')):
                 class Alt {}
             endif;
-        "#;
+        ";
         assert!(class_flags(&scan(code), "Alt").is_polyfill());
     }
 
     #[test]
     fn class_in_alternative_syntax_else_branch_is_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (class_exists('AltElse')):
             else:
                 class AltElse {}
             endif;
-        "#;
+        ";
         assert!(class_flags(&scan(code), "AltElse").is_polyfill());
     }
 
@@ -972,53 +976,53 @@ mod polyfill_tests {
 
     #[test]
     fn guard_function_case_insensitive() {
-        let code = r#"<?php
+        let code = "<?php
             if (!CLASS_EXISTS('Uppercase')) {
                 class Uppercase {}
             }
-        "#;
+        ";
         assert!(class_flags(&scan(code), "Uppercase").is_polyfill());
     }
 
     #[test]
     fn parenthesized_guard_expression_is_recognized() {
-        let code = r#"<?php
+        let code = "<?php
             if (!(class_exists('Parenned'))) {
                 class Parenned {}
             }
-        "#;
+        ";
         assert!(class_flags(&scan(code), "Parenned").is_polyfill());
     }
 
     #[test]
     fn doubly_parenthesized_guard_is_recognized() {
-        let code = r#"<?php
+        let code = "<?php
             if ((!((class_exists('DoubleParen'))))) {
                 class DoubleParen {}
             }
-        "#;
+        ";
         assert!(class_flags(&scan(code), "DoubleParen").is_polyfill());
     }
 
     #[test]
     fn class_in_elseif_branch_is_not_polyfill() {
-        let code = r#"<?php
+        let code = "<?php
             if (false) {
             } elseif (!class_exists('Never')) {
                 class Never {}
             }
-        "#;
+        ";
         assert!(!class_flags(&scan(code), "Never").is_polyfill());
     }
 
     #[test]
     fn merge_non_polyfill_overrides_polyfill() {
         let mut stub = scan(
-            r#"<?php
+            "<?php
             if (!class_exists('Shared')) {
                 class Shared {}
             }
-        "#,
+        ",
         );
         let real = scan("<?php class Shared { public int $x = 1; }");
         stub.extend(real);
@@ -1030,11 +1034,11 @@ mod polyfill_tests {
     fn merge_polyfill_does_not_override_non_polyfill() {
         let mut real = scan("<?php class Shared { public int $x = 1; }");
         let stub = scan(
-            r#"<?php
+            "<?php
             if (!class_exists('Shared')) {
                 class Shared {}
             }
-        "#,
+        ",
         );
         real.extend(stub);
         assert!(!class_flags(&real, "Shared").is_polyfill());
@@ -1043,11 +1047,11 @@ mod polyfill_tests {
     #[test]
     fn merge_only_polyfill_is_kept() {
         let codebase = scan(
-            r#"<?php
+            "<?php
             if (!class_exists('OnlyStub')) {
                 class OnlyStub {}
             }
-        "#,
+        ",
         );
         assert!(class_flags(&codebase, "OnlyStub").is_polyfill());
     }
@@ -1055,11 +1059,11 @@ mod polyfill_tests {
     #[test]
     fn merge_function_non_polyfill_overrides_polyfill() {
         let mut stub = scan(
-            r#"<?php
+            "<?php
             if (!function_exists('array_is_list')) {
                 function array_is_list(array $arr): bool { return true; }
             }
-        "#,
+        ",
         );
         let real = scan("<?php function array_is_list(array $arr): bool { return false; }");
         stub.extend(real);
@@ -1069,11 +1073,11 @@ mod polyfill_tests {
     #[test]
     fn merge_constant_non_polyfill_overrides_polyfill() {
         let mut stub = scan(
-            r#"<?php
+            "<?php
             if (!defined('MY_CONST')) {
                 const MY_CONST = 1;
             }
-        "#,
+        ",
         );
         let real = scan("<?php const MY_CONST = 2;");
         stub.extend(real);

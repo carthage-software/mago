@@ -2,7 +2,7 @@ mod comparator_common;
 
 use comparator_common::*;
 
-const HIERARCHY: &str = r"
+const HIERARCHY: &str = "
     <?php
     interface Animal {}
     interface Mammal extends Animal {}
@@ -126,7 +126,7 @@ fn class_not_in_object_when_not_a_subtype() {
     assert!(!atomic_is_contained(&t_named("Cat"), &t_named("Cocker"), &cb));
 }
 
-const ENUMS: &str = r"
+const ENUMS: &str = "
     <?php
     enum Status { case Active; case Inactive; }
     enum Color: string { case Red = 'r'; case Blue = 'b'; }
@@ -191,7 +191,7 @@ fn class_in_mixed() {
     assert!(atomic_is_contained(&t_object_any(), &mixed(), &cb));
 }
 
-const GENERICS: &str = r"
+const GENERICS: &str = "
     <?php
     /** @template T */
     interface Collection {}

@@ -5,7 +5,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Expects and consumes a keyword token.
     #[inline]
     pub(crate) fn expect_keyword(&mut self, kind: TokenKind) -> Result<Keyword<'arena>, ParseError> {

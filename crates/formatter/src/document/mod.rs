@@ -174,11 +174,13 @@ impl<'arena> Group<'arena> {
         Self { contents, break_mode: RefCell::new(BreakMode::Auto), id: None, expanded_states: Some(expanded_states) }
     }
 
+    #[must_use]
     pub fn with_break_mode(mut self, mode: BreakMode) -> Self {
         self.break_mode = RefCell::new(mode);
         self
     }
 
+    #[must_use]
     pub fn with_id(mut self, id: GroupIdentifier) -> Self {
         self.id = Some(id);
         self
@@ -366,7 +368,7 @@ pub fn clone_in_arena<'arena>(arena: &'arena Bump, document: &Document<'arena>) 
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::use_debug)]
 #[cfg(debug_assertions)]
 pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &Document<'arena>) -> String {
     use bumpalo::collections::CollectIn;
@@ -400,7 +402,8 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
 
     match document {
         Document::String(s) => {
-            buffer.push_str(&format!("{s:?}"));
+            use std::fmt::Write as _;
+            let _ = write!(buffer, "{s:?}");
         }
         Document::Array(docs) => {
             write_documents_vec_to_buffer(&mut buffer, arena, docs);
@@ -414,7 +417,8 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
             buffer.push_str("indentIfBreak(");
             write_documents_vec_to_buffer(&mut buffer, arena, contents);
             buffer.push_str(", { groupId: ");
-            buffer.push_str(&format!("{group_id}"));
+            use std::fmt::Write as _;
+            let _ = write!(buffer, "{group_id}");
             buffer.push('}');
             buffer.push(')');
         }
@@ -498,7 +502,8 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
         Document::BreakParent => buffer.push_str("breakParent"),
         Document::Align(Align { alignment, contents }) => {
             buffer.push_str("dedentToRoot(align(");
-            buffer.push_str(&format!("{alignment:?}, "));
+            use std::fmt::Write as _;
+            let _ = write!(buffer, "{alignment:?}, ");
             write_documents_vec_to_buffer(&mut buffer, arena, contents);
             buffer.push(')');
             buffer.push(')');

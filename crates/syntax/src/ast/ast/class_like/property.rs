@@ -223,6 +223,7 @@ impl<'arena> Property<'arena> {
     /// Panics if the property declaration has no variables. This indicates a bug in the parser,
     /// as valid PHP properties must have at least one variable.
     #[must_use]
+    #[allow(clippy::expect_used)]
     pub fn first_variable(&self) -> &DirectVariable<'arena> {
         self.variables()
             .first()

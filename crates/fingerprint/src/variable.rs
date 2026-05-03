@@ -10,6 +10,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Variable<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -25,6 +26,7 @@ impl Fingerprintable for Variable<'_> {
 }
 
 impl Fingerprintable for DirectVariable<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -37,6 +39,7 @@ impl Fingerprintable for DirectVariable<'_> {
 }
 
 impl Fingerprintable for IndirectVariable<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -49,6 +52,7 @@ impl Fingerprintable for IndirectVariable<'_> {
 }
 
 impl Fingerprintable for NestedVariable<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

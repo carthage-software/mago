@@ -334,7 +334,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
 
         let substituted_return_type = if let Some(parent_return) = parent_return_type.as_ref() {
             let mut return_type = parent_return.type_union.clone();
-            if let Some(ref template_result) = template_result {
+            if let Some(template_result) = template_result.as_ref() {
                 return_type = inferred_type_replacer::replace(&return_type, template_result, codebase);
             }
             Some((return_type, parent_return.span, parent_return.from_docblock))
@@ -347,7 +347,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             .map(|parent_param| {
                 if let Some(parent_param_type) = parent_param.type_metadata.as_ref() {
                     let mut param_type = parent_param_type.type_union.clone();
-                    if let Some(ref template_result) = template_result {
+                    if let Some(template_result) = template_result.as_ref() {
                         param_type = inferred_type_replacer::replace(&param_type, template_result, codebase);
                     }
                     Some((param_type, parent_param_type.span, parent_param_type.from_docblock))
@@ -361,7 +361,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             .iter()
             .map(|throw_type| {
                 let mut throw_type_union = throw_type.type_union.clone();
-                if let Some(ref template_result) = template_result {
+                if let Some(template_result) = template_result.as_ref() {
                     throw_type_union = inferred_type_replacer::replace(&throw_type_union, template_result, codebase);
                 }
 
@@ -440,7 +440,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             assertions
                 .iter()
                 .map(|(name, assertions)| {
-                    let resolved = if let Some(ref template_result) = template_result {
+                    let resolved = if let Some(template_result) = template_result.as_ref() {
                         assertions.iter().flat_map(|a| a.resolve_templates(codebase, template_result)).collect()
                     } else {
                         assertions.clone()
@@ -503,7 +503,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
         }
 
         for (i, substituted_param) in substituted_param_types.into_iter().enumerate() {
-            if let Some(true) = params_to_inherit.get(i).copied()
+            if params_to_inherit.get(i).copied() == Some(true)
                 && let Some(child_param) = child_method.parameters.get_mut(i)
                 && let Some((type_union, span, from_docblock)) = substituted_param
             {

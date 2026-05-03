@@ -206,7 +206,7 @@ impl LintRule for UseSpecificExpectationsRule {
 
         if method_name_matches_any(method_call, &["toBe", "toEqual"]).is_none() {
             return;
-        };
+        }
 
         let Some(expect_call) = find_expect_call(method_call) else {
             return;

@@ -96,7 +96,7 @@ impl TGenericParameter {
     pub fn without_intersection_types(&self) -> Self {
         Self {
             parameter_name: self.parameter_name,
-            constraint: self.constraint.clone(),
+            constraint: Arc::clone(&self.constraint),
             defining_entity: self.defining_entity,
             intersection_types: None,
         }

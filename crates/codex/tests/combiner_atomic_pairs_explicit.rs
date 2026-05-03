@@ -10,7 +10,7 @@ fn check(input: Vec<TAtomic>, expected: &[&str]) {
     actual.sort();
     let mut e: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
     e.sort();
-    assert_eq!(actual, e);
+    assert_eq!(actual, e, "combine output mismatch");
 }
 
 #[test]

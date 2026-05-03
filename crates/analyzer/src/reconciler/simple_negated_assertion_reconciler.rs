@@ -372,6 +372,9 @@ fn subtract_object(
                     acceptable_types.push(atomic);
                 }
             }
+
+            // Otherwise (no concrete subtracting class to compare against) the object atomic is dropped:
+            // negating `is_object` removes every object branch from the union.
         } else {
             acceptable_types.push(atomic);
         }
@@ -555,7 +558,7 @@ fn subtract_string(
             } else {
                 acceptable_types.push(atomic);
             }
-        } else if let TAtomic::Scalar(TScalar::ArrayKey) = atomic {
+        } else if atomic == TAtomic::Scalar(TScalar::ArrayKey) {
             did_remove_type = true;
 
             if is_equality {
@@ -563,7 +566,7 @@ fn subtract_string(
             } else {
                 acceptable_types.push(TAtomic::Scalar(TScalar::int()));
             }
-        } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
+        } else if atomic == TAtomic::Scalar(TScalar::Generic) {
             did_remove_type = true;
 
             if is_equality {
@@ -579,7 +582,7 @@ fn subtract_string(
             if is_equality {
                 acceptable_types.push(atomic);
             }
-        } else if let TAtomic::Scalar(TScalar::Numeric) = atomic {
+        } else if atomic == TAtomic::Scalar(TScalar::Numeric) {
             did_remove_type = true;
 
             if is_equality {
@@ -637,7 +640,7 @@ fn subtract_numeric(
             } else {
                 acceptable_types.push(atomic);
             }
-        } else if let TAtomic::Scalar(TScalar::ArrayKey) = atomic {
+        } else if atomic == TAtomic::Scalar(TScalar::ArrayKey) {
             did_remove_type = true;
 
             if is_equality {
@@ -645,7 +648,7 @@ fn subtract_numeric(
             } else {
                 acceptable_types.push(TAtomic::Scalar(TScalar::string()));
             }
-        } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
+        } else if atomic == TAtomic::Scalar(TScalar::Generic) {
             did_remove_type = true;
 
             if is_equality {
@@ -654,7 +657,7 @@ fn subtract_numeric(
                 acceptable_types.push(TAtomic::Scalar(TScalar::string()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::bool()));
             }
-        } else if let TAtomic::Scalar(TScalar::Numeric) = atomic {
+        } else if atomic == TAtomic::Scalar(TScalar::Numeric) {
             did_remove_type = true;
 
             if is_equality {
@@ -733,7 +736,7 @@ fn subtract_int(
             } else {
                 acceptable_types.push(atomic);
             }
-        } else if let TAtomic::Scalar(TScalar::ArrayKey) = atomic {
+        } else if atomic == TAtomic::Scalar(TScalar::ArrayKey) {
             did_remove_type = true;
 
             if is_equality {
@@ -741,7 +744,7 @@ fn subtract_int(
             } else {
                 acceptable_types.push(TAtomic::Scalar(TScalar::string()));
             }
-        } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
+        } else if atomic == TAtomic::Scalar(TScalar::Generic) {
             did_remove_type = true;
 
             if is_equality {
@@ -819,7 +822,7 @@ fn subtract_float(
             }
 
             did_remove_type = true;
-        } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
+        } else if atomic == TAtomic::Scalar(TScalar::Generic) {
             if is_equality {
                 acceptable_types.push(atomic);
             } else {
@@ -884,7 +887,7 @@ fn subtract_arraykey(
                 new_existing_var_type.remove_type(&atomic);
                 new_existing_var_type.types.to_mut().push(atomic);
             }
-        } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
+        } else if matches!(atomic, TAtomic::Scalar(TScalar::Generic)) {
             if !is_equality {
                 new_existing_var_type.remove_type(atomic);
                 new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::float()));
@@ -898,6 +901,8 @@ fn subtract_arraykey(
             if !is_equality {
                 new_existing_var_type.remove_type(atomic);
             }
+        } else {
+            // atomic isn't an int/string/array-key family; arraykey subtraction doesn't apply
         }
     }
 
@@ -945,7 +950,7 @@ fn subtract_bool(
             } else {
                 did_remove_type = true;
             }
-        } else if let TAtomic::Scalar(TScalar::Generic) = atomic {
+        } else if matches!(atomic, TAtomic::Scalar(TScalar::Generic)) {
             if !is_equality {
                 new_existing_var_type.remove_type(atomic);
                 new_existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::string()));
@@ -960,6 +965,8 @@ fn subtract_bool(
             if !is_equality {
                 new_existing_var_type.remove_type(atomic);
             }
+        } else {
+            // atomic isn't a bool; bool subtraction doesn't apply
         }
     }
 
@@ -1420,9 +1427,13 @@ fn reconcile_not_exactly_countable(
                 }
             } else if !atomic.is_falsy() {
                 did_remove_type = true;
+            } else {
+                // list with no known count and possibly empty; no fixed-count contradiction to detect
             }
         } else if atomic.is_keyed_array() && !atomic.is_false() {
             did_remove_type = true;
+        } else {
+            // atomic isn't a list or non-false keyed array; count assertion doesn't apply
         }
 
         acceptable_types.push(atomic);
@@ -1489,6 +1500,8 @@ fn reconcile_no_array_key(
                         if known_item.0 {
                             known_items.remove(key_name);
                             did_remove_type = true;
+                        } else {
+                            // entry is non-optional and present; assertion can't remove it
                         }
                     } else if let Some((key_parameter, _)) = parameters
                         && union_comparator::can_expression_types_be_identical(
@@ -1500,6 +1513,8 @@ fn reconcile_no_array_key(
                         )
                     {
                         did_remove_type = true;
+                    } else {
+                        // key not in known items and parameters don't admit it; nothing to remove
                     }
                 } else if let Some((key_parameter, _)) = parameters
                     && union_comparator::can_expression_types_be_identical(
@@ -1511,6 +1526,8 @@ fn reconcile_no_array_key(
                     )
                 {
                     did_remove_type = true;
+                } else {
+                    // no known items and parameters don't admit this key; nothing to remove
                 }
 
                 acceptable_types.push(atomic);
@@ -1522,12 +1539,18 @@ fn reconcile_no_array_key(
                             if known_element.0 {
                                 known_elements.remove(&(*i as usize));
                                 did_remove_type = true;
+                            } else {
+                                // element is non-optional and present; assertion can't remove it
                             }
                         } else if !element_type.is_never() {
                             did_remove_type = true;
+                        } else {
+                            // index missing and no element type to fall back on; nothing to remove
                         }
                     } else if !element_type.is_never() {
                         did_remove_type = true;
+                    } else {
+                        // no known elements and the element type is never; nothing to remove
                     }
                 }
 
@@ -1540,6 +1563,8 @@ fn reconcile_no_array_key(
                     reconcile_no_array_key(context, assertion, constraint, None, None, key_name, negated)
                 }) {
                     acceptable_types.push(atomic);
+                } else {
+                    // constraint reconciles to nothing; drop the parameter entirely
                 }
 
                 did_remove_type = true;

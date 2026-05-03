@@ -108,9 +108,9 @@ pub mod union;
 
 /// A reference to a type in the type system, which can be either a union or an atomic type.
 #[derive(Clone, Copy, Debug)]
-pub enum TypeRef<'a> {
-    Union(&'a TUnion),
-    Atomic(&'a TAtomic),
+pub enum TypeRef<'ty> {
+    Union(&'ty TUnion),
+    Atomic(&'ty TAtomic),
 }
 
 /// A trait to be implemented by all types in the type system.
@@ -190,8 +190,8 @@ pub trait TType {
 }
 
 /// Implements the `TType` trait for `TypeRef`.
-impl<'a> TType for TypeRef<'a> {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'a>> {
+impl<'ty> TType for TypeRef<'ty> {
+    fn get_child_nodes(&self) -> Vec<TypeRef<'ty>> {
         match self {
             TypeRef::Union(ttype) => ttype.get_child_nodes(),
             TypeRef::Atomic(ttype) => ttype.get_child_nodes(),
@@ -255,14 +255,14 @@ impl<'a> TType for TypeRef<'a> {
     }
 }
 
-impl<'a> From<&'a TUnion> for TypeRef<'a> {
-    fn from(reference: &'a TUnion) -> Self {
+impl<'ty> From<&'ty TUnion> for TypeRef<'ty> {
+    fn from(reference: &'ty TUnion) -> Self {
         TypeRef::Union(reference)
     }
 }
 
-impl<'a> From<&'a TAtomic> for TypeRef<'a> {
-    fn from(reference: &'a TAtomic) -> Self {
+impl<'ty> From<&'ty TAtomic> for TypeRef<'ty> {
+    fn from(reference: &'ty TAtomic) -> Self {
         TypeRef::Atomic(reference)
     }
 }
@@ -485,6 +485,7 @@ pub fn get_string() -> TUnion {
 /// This function maps all possible boolean property combinations to a canonical,
 /// static `TAtomic` instance, avoiding heap allocations for common string types.
 #[must_use]
+#[allow(clippy::fn_params_excessive_bools)]
 pub fn get_string_with_props(
     is_numeric: bool,
     is_truthy: bool,
@@ -715,6 +716,7 @@ pub fn get_callable_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(CALLABLE_STRING_ATOMIC))
 }
 
+#[must_use]
 pub fn get_numeric_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NUMERIC_STRING_ATOMIC))
 }

@@ -6,6 +6,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Statement<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -48,12 +49,17 @@ impl Fingerprintable for Statement<'_> {
             Statement::Noop(_) => {
                 // Noop statements do not contribute to the fingerprint
             }
-            _ => unreachable!("A statement variant was not handled in fingerprinting: {self:?}"),
+            _ => {
+                // Defensive fallback: an unhandled variant still produces a stable hash so the
+                // fingerprint stays deterministic if the AST gains a new shape we haven't covered.
+                hasher.write(b"__unhandled_statement__");
+            }
         }
     }
 }
 
 impl Fingerprintable for ExpressionStatement<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

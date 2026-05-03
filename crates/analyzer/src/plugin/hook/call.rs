@@ -21,6 +21,10 @@ pub trait FunctionCallHook: Provider {
     /// Return `ExpressionHookResult::Continue` to proceed with normal analysis,
     /// `ExpressionHookResult::Skip` to skip analysis (type will be `mixed`), or
     /// `ExpressionHookResult::SkipWithType(ty)` to skip with a custom return type.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn before_function_call(
         &self,
         _call: &FunctionCall<'_>,
@@ -30,6 +34,10 @@ pub trait FunctionCallHook: Provider {
     }
 
     /// Called after a function call has been analyzed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn after_function_call(&self, _call: &FunctionCall<'_>, _context: &mut HookContext<'_, '_>) -> HookResult<()> {
         Ok(())
     }
@@ -46,6 +54,10 @@ pub trait MethodCallHook: Provider {
     /// Return `ExpressionHookResult::Continue` to proceed with normal analysis,
     /// `ExpressionHookResult::Skip` to skip analysis (type will be `mixed`), or
     /// `ExpressionHookResult::SkipWithType(ty)` to skip with a custom return type.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn before_method_call(
         &self,
         _call: &MethodCall<'_>,
@@ -55,6 +67,10 @@ pub trait MethodCallHook: Provider {
     }
 
     /// Called after a method call has been analyzed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn after_method_call(&self, _call: &MethodCall<'_>, _context: &mut HookContext<'_, '_>) -> HookResult<()> {
         Ok(())
     }
@@ -63,6 +79,10 @@ pub trait MethodCallHook: Provider {
 /// Hook trait for intercepting static method call analysis.
 pub trait StaticMethodCallHook: Provider {
     /// Called before a static method call is analyzed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn before_static_method_call(
         &self,
         _call: &StaticMethodCall<'_>,
@@ -72,6 +92,10 @@ pub trait StaticMethodCallHook: Provider {
     }
 
     /// Called after a static method call has been analyzed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn after_static_method_call(
         &self,
         _call: &StaticMethodCall<'_>,
@@ -84,6 +108,10 @@ pub trait StaticMethodCallHook: Provider {
 /// Hook trait for intercepting nullsafe method call analysis.
 pub trait NullSafeMethodCallHook: Provider {
     /// Called before a nullsafe method call is analyzed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn before_nullsafe_method_call(
         &self,
         _call: &NullSafeMethodCall<'_>,
@@ -93,6 +121,10 @@ pub trait NullSafeMethodCallHook: Provider {
     }
 
     /// Called after a nullsafe method call has been analyzed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn after_nullsafe_method_call(
         &self,
         _call: &NullSafeMethodCall<'_>,

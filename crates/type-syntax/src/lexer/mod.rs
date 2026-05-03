@@ -298,17 +298,23 @@ impl<'arena> TypeLexer<'arena> {
                 length += 1;
                 continue;
             }
+
             if b == b'-' && length + 1 < total {
+                // SAFETY: `length + 1 < total` was just checked.
                 let b2 = unsafe { *remaining.get_unchecked(length + 1) };
                 if mago_syntax_core::utils::is_part_of_identifier(&b2) {
                     next_is_hyphen = true;
                 }
             } else if b == b'\\' && length + 1 < total {
+                // SAFETY: `length + 1 < total` was just checked.
                 let b2 = unsafe { *remaining.get_unchecked(length + 1) };
                 if mago_syntax_core::utils::is_start_of_identifier(&b2) {
                     next_is_backslash = true;
                 }
+            } else {
+                // Any other byte ends the identifier scan; nothing to record.
             }
+
             break;
         }
 
@@ -327,26 +333,32 @@ impl<'arena> TypeLexer<'arena> {
 
         let base_len = length;
         while length < total {
+            // SAFETY: `length < total` was just checked.
             let b = unsafe { *remaining.get_unchecked(length) };
             if mago_syntax_core::utils::is_part_of_identifier(&b) {
                 length += 1;
                 continue;
             }
+
             if b == b'-' && length + 1 < total {
+                // SAFETY: `length + 1 < total` was just checked.
                 let b2 = unsafe { *remaining.get_unchecked(length + 1) };
                 if mago_syntax_core::utils::is_part_of_identifier(&b2) {
                     length += 1;
                     continue;
                 }
             }
+
             break;
         }
 
+        // SAFETY: `length` was only ever advanced while `length < total`, so it is in bounds.
         let bytes = unsafe { remaining.get_unchecked(..length) };
         if let Some(kind) = keyword::lookup_keyword(bytes) {
             return (kind, length);
         }
 
+        // SAFETY: `base_len <= length <= total`.
         let base_bytes = unsafe { remaining.get_unchecked(..base_len) };
         if let Some(kind) = keyword::lookup_keyword(base_bytes) {
             return (kind, base_len);

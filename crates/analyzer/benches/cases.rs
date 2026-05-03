@@ -1,5 +1,7 @@
 //! Per-category analyzer benchmarks driven by the `tests/cases/` corpus.
 
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;

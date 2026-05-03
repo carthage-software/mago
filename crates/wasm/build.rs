@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_in_result, clippy::expect_used)]
+
 use std::fs;
 use std::io;
 use std::path::Path;

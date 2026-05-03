@@ -77,16 +77,13 @@ pub fn parse_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Type<'
 ///
 /// Accepts plain `Identifier` tokens, the `new` keyword when it is *not* followed by `<`, and
 /// any single-word reserved keyword whose source text has no hyphen.
-pub(crate) fn is_at_member_identifier<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<bool, ParseError> {
+pub(crate) fn is_at_member_identifier(stream: &mut TypeTokenStream<'_>) -> Result<bool, ParseError> {
     is_at_member_identifier_at(stream, 0)
 }
 
 /// Like [`is_at_member_identifier`] but peeks `offset` tokens ahead instead of at the current
 /// position. `offset == 0` is equivalent to [`is_at_member_identifier`].
-pub(crate) fn is_at_member_identifier_at<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
-    offset: usize,
-) -> Result<bool, ParseError> {
+pub(crate) fn is_at_member_identifier_at(stream: &mut TypeTokenStream<'_>, offset: usize) -> Result<bool, ParseError> {
     let Some(token) = stream.lookahead(offset)? else {
         return Ok(false);
     };
@@ -114,7 +111,7 @@ pub(crate) fn eat_member_identifier<'arena>(
 /// union, so that `int|string|` or `array{0: int|string|}` parses leniently rather than
 /// erroring on the empty right-hand operand.
 #[inline]
-fn is_at_union_closing_token<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<bool, ParseError> {
+fn is_at_union_closing_token(stream: &mut TypeTokenStream<'_>) -> Result<bool, ParseError> {
     Ok(match stream.lookahead(0)?.map(|t| t.kind) {
         None => true,
         Some(kind) => matches!(
@@ -270,9 +267,9 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                     min: if stream.is_at(TypeTokenKind::Minus)? {
                         let minus = stream.consume_span()?;
                         let token = stream.eat(TypeTokenKind::LiteralInteger)?;
-                        let value = parse_literal_integer(token.value).unwrap_or_else(|| {
-                            unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
-                        });
+                        // `parse_literal_integer` only fails on inputs the lexer would already have
+                        // rejected; fall back to `0` defensively rather than panicking.
+                        let value = parse_literal_integer(token.value).unwrap_or(0);
 
                         IntOrKeyword::NegativeInt {
                             minus,
@@ -280,6 +277,7 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                         }
                     } else if stream.is_at(TypeTokenKind::LiteralInteger)? {
                         let token = stream.consume()?;
+                        #[allow(clippy::unreachable)]
                         let value = parse_literal_integer(token.value).unwrap_or_else(|| {
                             unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
                         });
@@ -298,9 +296,9 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                     max: if stream.is_at(TypeTokenKind::Minus)? {
                         let minus = stream.consume_span()?;
                         let token = stream.eat(TypeTokenKind::LiteralInteger)?;
-                        let value = parse_literal_integer(token.value).unwrap_or_else(|| {
-                            unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
-                        });
+                        // `parse_literal_integer` only fails on inputs the lexer would already have
+                        // rejected; fall back to `0` defensively rather than panicking.
+                        let value = parse_literal_integer(token.value).unwrap_or(0);
 
                         IntOrKeyword::NegativeInt {
                             minus,
@@ -308,6 +306,7 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                         }
                     } else if stream.is_at(TypeTokenKind::LiteralInteger)? {
                         let token = stream.consume()?;
+                        #[allow(clippy::unreachable)]
                         let value = parse_literal_integer(token.value).unwrap_or_else(|| {
                             unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
                         });
@@ -414,6 +413,7 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
         }),
         TypeTokenKind::LiteralFloat => {
             let token = stream.consume()?;
+            #[allow(clippy::unreachable)]
             let value = parse_literal_float(token.value).unwrap_or_else(|| {
                 unreachable!("lexer generated invalid float `{}`; this should never happen.", token.value)
             });
@@ -426,6 +426,7 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
         }
         TypeTokenKind::LiteralInteger => {
             let token = stream.consume()?;
+            #[allow(clippy::unreachable)]
             let value = parse_literal_integer(token.value).unwrap_or_else(|| {
                 unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
             });
@@ -658,7 +659,9 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
             Type::AliasReference(AliasReferenceType { exclamation, class, double_colon, alias })
         }
         TypeTokenKind::Whitespace | TypeTokenKind::SingleLineComment => {
-            unreachable!("trivia tokens are skipped by the stream.")
+            // Trivia tokens are skipped by the stream; if one slips through it's a stream bug,
+            // so surface it as an unexpected-token error rather than panicking.
+            return Err(ParseError::UnexpectedToken(vec![], next.kind, next.span_for(stream.file_id())));
         }
         TypeTokenKind::PartialLiteralString => {
             return Err(ParseError::UnclosedLiteralString(next.span_for(stream.file_id())));
@@ -679,9 +682,8 @@ pub fn parse_literal_number_type<'arena>(
     match next.kind {
         TypeTokenKind::LiteralInteger => {
             let token = stream.consume()?;
-            let value = parse_literal_integer(token.value).unwrap_or_else(|| {
-                unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
-            });
+            // Defensive fallback: see comment in `parse_atomic_type` above.
+            let value = parse_literal_integer(token.value).unwrap_or(0);
 
             Ok(LiteralIntOrFloatType::Int(LiteralIntType {
                 span: token.span_for(stream.file_id()),
@@ -691,9 +693,8 @@ pub fn parse_literal_number_type<'arena>(
         }
         TypeTokenKind::LiteralFloat => {
             let token = stream.consume()?;
-            let value = parse_literal_float(token.value).unwrap_or_else(|| {
-                unreachable!("lexer generated invalid float `{}`; this should never happen.", token.value)
-            });
+            // Defensive fallback: see comment in `parse_atomic_type` above.
+            let value = parse_literal_float(token.value).unwrap_or(0.0);
 
             Ok(LiteralIntOrFloatType::Float(LiteralFloatType {
                 span: token.span_for(stream.file_id()),

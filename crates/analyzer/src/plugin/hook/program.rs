@@ -22,6 +22,10 @@ pub trait ProgramHook: Provider {
     ///
     /// Return `HookAction::Continue` to proceed with normal analysis, or
     /// `HookAction::Skip` to skip analysis of this program entirely.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn before_program(
         &self,
         _file: &File,
@@ -32,6 +36,10 @@ pub trait ProgramHook: Provider {
     }
 
     /// Called after a program has been analyzed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn after_program(
         &self,
         _file: &File,

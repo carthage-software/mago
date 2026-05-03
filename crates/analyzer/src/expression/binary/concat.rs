@@ -33,7 +33,7 @@ use crate::error::AnalysisError;
 ///
 /// For `"a" . "b" . "c"`, this returns `["a", "b", "c"]` instead of recursing through the nested binary nodes.
 /// This avoids stack overflow on deeply nested concatenations.
-fn collect_concat_operands<'a, 'arena>(binary: &'a Binary<'arena>) -> Vec<&'a Expression<'arena>> {
+fn collect_concat_operands<'ast, 'arena>(binary: &'ast Binary<'arena>) -> Vec<&'ast Expression<'arena>> {
     let mut operands = Vec::new();
     let mut stack: Vec<&Expression<'arena>> = vec![&binary.rhs, &binary.lhs];
 
@@ -94,7 +94,7 @@ pub fn analyze_string_concat_operation<'ctx, 'arena>(
 #[inline]
 fn analyze_string_concat_operand<'arena>(
     context: &mut Context<'_, 'arena>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
     operand: &Expression<'arena>,
     side: &'static str,
 ) {
@@ -424,6 +424,8 @@ fn analyze_string_concat_operand<'arena>(
                 "Ensure the operand always has a compatible type using checks or assertions before concatenation.",
             ),
         );
+    } else {
+        // operand fully matches concatenation, or an invalid-operand issue was already reported
     }
 }
 

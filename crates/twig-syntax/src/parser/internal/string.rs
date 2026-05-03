@@ -7,7 +7,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse an interpolated double-quoted string, producing a sequence of
     /// literal chunks and `#{ ... }` interpolations.
     pub(crate) fn parse_interpolated_string(&mut self) -> Result<Expression<'arena>, ParseError> {

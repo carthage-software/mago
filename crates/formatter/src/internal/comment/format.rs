@@ -759,6 +759,7 @@ impl<'arena> FormatterState<'_, 'arena> {
                 let mut buf = Vec::with_capacity_in(trimmed_line.len() + 1, self.arena);
                 buf.push(b' ');
                 buf.extend_from_slice(trimmed_line.trim_end().as_bytes());
+                // SAFETY: ASCII byte plus bytes from a valid UTF-8 `&str` is valid UTF-8.
                 unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
             } else if trimmed_line.is_empty() {
                 " *"
@@ -766,11 +767,13 @@ impl<'arena> FormatterState<'_, 'arena> {
                 let mut buf = Vec::with_capacity_in(trimmed_line.len() + 1, self.arena);
                 buf.push(b' ');
                 buf.extend_from_slice(trimmed_line.trim_end().as_bytes());
+                // SAFETY: ASCII byte plus bytes from a valid UTF-8 `&str` is valid UTF-8.
                 unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
             } else {
                 let mut buf = Vec::with_capacity_in(trimmed_line.len() + 3, self.arena);
                 buf.extend_from_slice(b" * ");
                 buf.extend_from_slice(trimmed_line.trim_end().as_bytes());
+                // SAFETY: ASCII bytes plus bytes from a valid UTF-8 `&str` is valid UTF-8.
                 unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
             };
 

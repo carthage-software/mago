@@ -54,7 +54,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
         // Call plugin before_statement hooks
         if context.plugin_registry.has_statement_hooks() {
             let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
-            if let HookAction::Skip = context.plugin_registry.before_statement(self, &mut hook_context)? {
+            if context.plugin_registry.before_statement(self, &mut hook_context)? == HookAction::Skip {
                 for reported in hook_context.take_issues() {
                     context.collector.report_with_code(reported.code, reported.issue);
                 }
@@ -192,6 +192,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
             Statement::Static(r#static) => r#static.analyze(context, block_context, artifacts),
             Statement::Unset(unset) => unset.analyze(context, block_context, artifacts),
             Statement::Switch(r#switch) => r#switch.analyze(context, block_context, artifacts),
+            #[allow(clippy::unreachable)]
             _ => unreachable!("A statement variant was not handled in analyzer: {self:?}"),
         };
 
@@ -256,6 +257,8 @@ pub fn analyze_statements<'ctx, 'arena>(
                             .with_note("Execution cannot reach this point due to preceding code (e.g., return, throw, break, continue, exit, or an infinite loop).")
                             .with_help("Consider removing this unreachable code."),
                     );
+                } else {
+                    // declaration after a return; kept silent because hoisted declarations are still useful
                 }
             }
 
@@ -275,7 +278,7 @@ fn detect_unused_statement_expressions<'ast, 'arena>(
     expression: &'ast Expression<'arena>,
     statement: &'ast Statement<'arena>,
     context: &mut Context<'_, 'arena>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
 ) {
     if let Some((issue_kind, name)) = has_unused_must_use(expression, context, artifacts) {
         context.collector.report_with_code(

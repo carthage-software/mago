@@ -86,7 +86,7 @@ pub fn scan_class_like_constants<'arena>(
                 meta.inferred_type = Some(TAtomic::Never);
             }
 
-            if let Some(ref docblock) = docblock {
+            if let Some(docblock) = docblock.as_ref() {
                 if docblock.is_deprecated {
                     meta.flags |= MetadataFlags::DEPRECATED;
                 }

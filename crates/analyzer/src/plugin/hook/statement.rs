@@ -16,11 +16,19 @@ pub trait StatementHook: Provider {
     ///
     /// Return `HookAction::Continue` to proceed with normal analysis, or
     /// `HookAction::Skip` to skip analysis of this statement.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn before_statement(&self, _stmt: &Statement<'_>, _context: &mut HookContext<'_, '_>) -> HookResult<HookAction> {
         Ok(HookAction::Continue)
     }
 
     /// Called after a statement has been analyzed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn after_statement(&self, _stmt: &Statement<'_>, _context: &mut HookContext<'_, '_>) -> HookResult<()> {
         Ok(())
     }

@@ -126,6 +126,7 @@ pub(super) fn print_assignment_with_alignment<'arena>(
         let padding = if align.name_padding > 0 {
             let mut spaces = Vec::with_capacity_in(align.name_padding, f.arena);
             spaces.resize(align.name_padding, b' ');
+            // SAFETY: the buffer holds only ASCII space bytes, which is valid UTF-8.
             let spaces = Document::String(unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) });
 
             if let Some(group_id) = align.break_group_id {

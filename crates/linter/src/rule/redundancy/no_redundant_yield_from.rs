@@ -144,6 +144,7 @@ impl LintRule for NoRedundantYieldFromRule {
                     edits.push(TextEdit::delete(legacy_array.left_parenthesis));
                     edits.push(TextEdit::delete(legacy_array.right_parenthesis));
                 }
+                #[allow(clippy::unreachable)]
                 _ => unreachable!("Already filtered out non-array literals"),
             }
         });

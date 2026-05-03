@@ -79,9 +79,9 @@ pub mod service;
 /// - **Service Creation**: Acts as a factory for creating tool-specific services
 /// - **Path Management**: Manages source paths and exclusion patterns
 #[derive(Debug)]
-pub struct Orchestrator<'a> {
+pub struct Orchestrator<'cfg> {
     /// Configuration for all operations.
-    pub config: OrchestratorConfiguration<'a>,
+    pub config: OrchestratorConfiguration<'cfg>,
     /// Plugin registry for the analyzer, lazily initialized.
     plugin_registry: OnceLock<Arc<PluginRegistry>>,
     /// Original source paths moved aside by [`set_source_paths`](Self::set_source_paths).
@@ -91,14 +91,14 @@ pub struct Orchestrator<'a> {
     context_paths: Vec<String>,
 }
 
-impl<'a> Orchestrator<'a> {
+impl<'cfg> Orchestrator<'cfg> {
     /// Creates a new orchestrator with the given configuration.
     ///
     /// # Arguments
     ///
     /// * `config` - The configuration specifying PHP version, paths, tool settings, etc.
     #[must_use]
-    pub fn new(config: OrchestratorConfiguration<'a>) -> Self {
+    pub fn new(config: OrchestratorConfiguration<'cfg>) -> Self {
         Self { config, plugin_registry: OnceLock::new(), context_paths: Vec::new() }
     }
 
@@ -128,9 +128,9 @@ impl<'a> Orchestrator<'a> {
     /// # Arguments
     ///
     /// * `patterns` - A vector of string patterns to exclude from file scanning
-    pub fn add_exclude_patterns<T>(&mut self, patterns: impl Iterator<Item = &'a T>)
+    pub fn add_exclude_patterns<T>(&mut self, patterns: impl Iterator<Item = &'cfg T>)
     where
-        T: AsRef<str> + 'a,
+        T: AsRef<str> + 'cfg,
     {
         self.config.excludes.extend(patterns.map(std::convert::AsRef::as_ref));
     }
@@ -173,18 +173,21 @@ impl<'a> Orchestrator<'a> {
     ///
     /// Returns a [`Database`] containing all discovered PHP files, or an [`OrchestratorError`]
     /// if the database could not be loaded.
-    pub fn load_database<'b>(
-        &'b self,
-        workspace: &'a Path,
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when filesystem traversal or database initialization fails.
+    pub fn load_database<'borrow>(
+        &'borrow self,
+        workspace: &'cfg Path,
         include_externals: bool,
         prelude_database: Option<Database<'static>>,
         stdin_override: Option<(String, String)>,
-    ) -> Result<Database<'a>, OrchestratorError>
+    ) -> Result<Database<'cfg>, OrchestratorError>
     where
-        'b: 'a,
+        'borrow: 'cfg,
     {
         /// Converts string patterns from the configuration into `Exclusion` types.
-        fn create_excludes_from_patterns<'a>(patterns: &[&'a str], root: &Path) -> Vec<Exclusion<'a>> {
+        fn create_excludes_from_patterns<'pat>(patterns: &[&'pat str], root: &Path) -> Vec<Exclusion<'pat>> {
             patterns
                 .iter()
                 .map(|pattern| {
@@ -215,7 +218,7 @@ impl<'a> Orchestrator<'a> {
                 .map(std::string::String::as_str)
                 .chain(self.context_paths.iter().map(std::string::String::as_str).filter(|p| !active_paths.contains(p)))
                 .map(Cow::Borrowed)
-                .collect::<Vec<Cow<'a, str>>>()
+                .collect::<Vec<Cow<'cfg, str>>>()
         } else {
             Vec::new()
         };
@@ -226,7 +229,7 @@ impl<'a> Orchestrator<'a> {
             excludes.extend(create_excludes_from_patterns(&include_strs, workspace));
         }
 
-        let configuration: DatabaseConfiguration<'a> = DatabaseConfiguration {
+        let configuration: DatabaseConfiguration<'cfg> = DatabaseConfiguration {
             workspace: Cow::Borrowed(workspace),
             paths: self.config.paths.iter().map(|s| Cow::Borrowed(s.as_ref())).collect(),
             includes,
@@ -403,6 +406,11 @@ impl<'a> Orchestrator<'a> {
     /// This method allocates a new bump arena for each call. For formatting multiple files,
     /// consider using [`get_format_service`](Self::get_format_service) and calling the
     /// service's methods with a reused arena.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when formatting cannot complete (file IO, syntax errors that
+    /// prevent emission, etc.).
     pub fn format_file(&self, file: &File) -> Result<FileFormatStatus, OrchestratorError> {
         let service = self.get_format_service(ReadDatabase::empty());
 
@@ -432,6 +440,11 @@ impl<'a> Orchestrator<'a> {
     /// Using this method with a reused arena (resetting it between calls) is significantly
     /// more efficient than calling [`format_file`](Self::format_file) repeatedly, as it
     /// avoids repeated allocator initialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when formatting cannot complete (file IO, syntax errors that
+    /// prevent emission, etc.).
     pub fn format_file_in(&self, file: &File, arena: &Bump) -> Result<FileFormatStatus, OrchestratorError> {
         let service = self.get_format_service(ReadDatabase::empty());
 

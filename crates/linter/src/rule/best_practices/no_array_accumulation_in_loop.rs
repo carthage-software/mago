@@ -134,7 +134,7 @@ impl LintRule for NoArrayAccumulationInLoopRule {
             },
             Node::DoWhile(do_while) => collector.walk_statement(do_while.statement, ctx),
             _ => return,
-        };
+        }
 
         for finding in &collector.findings {
             let (message, span, help) = match finding {

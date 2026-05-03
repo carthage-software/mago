@@ -37,11 +37,9 @@ pub fn extract_function_constant_existence(
             extract_function_constant_existence(lhs, artifacts, block_context, negated);
             extract_function_constant_existence(rhs, artifacts, block_context, negated);
         }
-        Expression::Call(Call::Function(FunctionCall {
-            function: Expression::Identifier(ident),
-            argument_list,
-            ..
-        })) if !negated => {
+        Expression::Call(Call::Function(FunctionCall { function: Expression::Identifier(ident), argument_list }))
+            if !negated =>
+        {
             let func_name = ident.value().to_ascii_lowercase();
             match func_name.as_str() {
                 "function_exists" => {

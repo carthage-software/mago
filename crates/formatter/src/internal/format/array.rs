@@ -250,7 +250,8 @@ fn has_floating_comments<'arena>(f: &mut FormatterState<'_, 'arena>, array_like:
     };
 
     for element in array_like.elements().windows(2) {
-        if has_comments(element[0], element[1]) {
+        let [prev, next] = element else { continue };
+        if has_comments(prev, next) {
             return true;
         }
     }
@@ -339,8 +340,8 @@ fn argument_list_is_substantial<'arena>(argument_list: &'arena mago_syntax::ast:
 }
 
 #[inline]
-fn has_nested_array_like_value<'arena>(expression: &'arena Expression<'arena>) -> bool {
-    fn element_contains_array_like<'arena>(element: &ArrayElement<'arena>) -> bool {
+fn has_nested_array_like_value(expression: &Expression<'_>) -> bool {
+    fn element_contains_array_like(element: &ArrayElement<'_>) -> bool {
         let value = match element {
             ArrayElement::KeyValue(key_value) => key_value.value,
             ArrayElement::Value(value) => value.value,
@@ -394,7 +395,7 @@ fn format_row_with_alignment<'arena>(
                 Document::Group(group)
             }
         }
-        document => document,
+        other => other,
     }
 }
 

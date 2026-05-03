@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 //! Focused tests that every `ParseError` and `SyntaxError` variant has a
 //! minimal trigger and is distinguished by variant (not just `Err(_)`).
 

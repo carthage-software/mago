@@ -1,4 +1,6 @@
 use mago_atom::Atom;
+use std::collections::BTreeMap;
+
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
 use mago_atom::ascii_lowercase_atom;
@@ -1175,8 +1177,9 @@ fn scan_class_like<'arena>(
         }
     }
 
-    if class_like_metadata.kind.is_enum() {
-        let enum_name_span = class_like_metadata.name_span.expect("Enum name span should be present");
+    if class_like_metadata.kind.is_enum()
+        && let Some(enum_name_span) = class_like_metadata.name_span
+    {
         let mut name_types = vec![];
         let mut value_types = vec![];
         let backing_type = class_like_metadata.enum_type.clone();
@@ -1541,15 +1544,15 @@ fn create_enum_from_method(enum_name: &str, enum_method_span: Span, backing_type
             is_static: true,
             is_constructor: false,
             visibility: Visibility::Public,
-            where_constraints: Default::default(),
+            where_constraints: AtomMap::default(),
         }),
         type_resolution_context: None,
         thrown_types: vec![TypeMetadata::new(get_named_object(atom("ValueError"), None), enum_method_span)],
-        issues: Default::default(),
-        assertions: Default::default(),
-        if_true_assertions: Default::default(),
-        if_false_assertions: Default::default(),
-        globals_accessed: Default::default(),
+        issues: Vec::default(),
+        assertions: BTreeMap::default(),
+        if_true_assertions: BTreeMap::default(),
+        if_false_assertions: BTreeMap::default(),
+        globals_accessed: AtomSet::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
     }
@@ -1598,15 +1601,15 @@ fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_
             is_static: true,
             is_constructor: false,
             visibility: Visibility::Public,
-            where_constraints: Default::default(),
+            where_constraints: AtomMap::default(),
         }),
         type_resolution_context: None,
         thrown_types: vec![],
-        issues: Default::default(),
-        assertions: Default::default(),
-        if_true_assertions: Default::default(),
-        if_false_assertions: Default::default(),
-        globals_accessed: Default::default(),
+        issues: Vec::default(),
+        assertions: BTreeMap::default(),
+        if_true_assertions: BTreeMap::default(),
+        if_false_assertions: BTreeMap::default(),
+        globals_accessed: AtomSet::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
     }
@@ -1656,15 +1659,15 @@ fn create_enum_cases_method(enum_name: &str, enum_method_span: Span, has_cases: 
             is_static: true,
             is_constructor: false,
             visibility: Visibility::Public,
-            where_constraints: Default::default(),
+            where_constraints: AtomMap::default(),
         }),
         type_resolution_context: None,
         thrown_types: vec![],
-        issues: Default::default(),
-        assertions: Default::default(),
-        if_true_assertions: Default::default(),
-        if_false_assertions: Default::default(),
-        globals_accessed: Default::default(),
+        issues: Vec::default(),
+        assertions: BTreeMap::default(),
+        if_true_assertions: BTreeMap::default(),
+        if_false_assertions: BTreeMap::default(),
+        globals_accessed: AtomSet::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
     }

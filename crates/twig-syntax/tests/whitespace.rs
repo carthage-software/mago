@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::missing_asserts_for_indexing)]
+
 //! Focused tests for whitespace-control markers.
 
 #[path = "common/mod.rs"]

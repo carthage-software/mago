@@ -52,6 +52,7 @@ impl Default for AnalysisArtifacts {
 }
 
 impl AnalysisArtifacts {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             expression_types: HashMap::default(),

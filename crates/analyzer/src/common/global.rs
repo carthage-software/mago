@@ -98,9 +98,9 @@ std::thread_local! {
             ])),
         )))));
 
-        map.insert("$_GET", user_input_type_union.clone());
-        map.insert("$_POST", user_input_type_union.clone());
-        map.insert("$_REQUEST", user_input_type_union.clone());
+        map.insert("$_GET", Rc::clone(&user_input_type_union));
+        map.insert("$_POST", Rc::clone(&user_input_type_union));
+        map.insert("$_REQUEST", Rc::clone(&user_input_type_union));
         map.insert("$_COOKIE", user_input_type_union);
 
         map.insert("$_SERVER", Rc::new({
@@ -358,7 +358,7 @@ std::thread_local! {
 
 /// Return a read reference to the superglobals map.
 pub fn get_super_globals() -> impl Iterator<Item = (&'static str, Rc<TUnion>)> {
-    SUPERGLOBALS_MAP.with(|map| map.iter().map(|(k, v)| (*k, v.clone())).collect::<Vec<_>>().into_iter())
+    SUPERGLOBALS_MAP.with(|map| map.iter().map(|(k, v)| (*k, Rc::clone(v))).collect::<Vec<_>>().into_iter())
 }
 
 pub fn get_global_variable_type(variable_name: &str) -> Option<Rc<TUnion>> {

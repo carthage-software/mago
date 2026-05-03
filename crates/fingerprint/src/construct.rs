@@ -16,6 +16,7 @@ use crate::Fingerprintable;
 use std::hash::Hash;
 
 impl Fingerprintable for Construct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -49,6 +50,7 @@ impl Fingerprintable for Construct<'_> {
 }
 
 impl Fingerprintable for IssetConstruct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -63,6 +65,7 @@ impl Fingerprintable for IssetConstruct<'_> {
 }
 
 impl Fingerprintable for EmptyConstruct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -75,6 +78,7 @@ impl Fingerprintable for EmptyConstruct<'_> {
 }
 
 impl Fingerprintable for EvalConstruct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -87,6 +91,7 @@ impl Fingerprintable for EvalConstruct<'_> {
 }
 
 impl Fingerprintable for IncludeConstruct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -99,6 +104,7 @@ impl Fingerprintable for IncludeConstruct<'_> {
 }
 
 impl Fingerprintable for IncludeOnceConstruct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -111,6 +117,7 @@ impl Fingerprintable for IncludeOnceConstruct<'_> {
 }
 
 impl Fingerprintable for RequireConstruct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -123,6 +130,7 @@ impl Fingerprintable for RequireConstruct<'_> {
 }
 
 impl Fingerprintable for RequireOnceConstruct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -135,6 +143,7 @@ impl Fingerprintable for RequireOnceConstruct<'_> {
 }
 
 impl Fingerprintable for PrintConstruct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -147,6 +156,7 @@ impl Fingerprintable for PrintConstruct<'_> {
 }
 
 impl Fingerprintable for ExitConstruct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -160,6 +170,7 @@ impl Fingerprintable for ExitConstruct<'_> {
 }
 
 impl Fingerprintable for DieConstruct<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

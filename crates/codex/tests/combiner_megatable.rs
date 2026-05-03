@@ -213,9 +213,9 @@ fn array_megatable() {
         &["array<string, int|string>"],
     );
 
-    let sa = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1)))]));
+    let sa = t_sealed_list(BTreeMap::from([(0usize, (false, ui(1)))]));
     expect("sealed_a", vec![sa.clone()], &["list{int(1)}"]);
-    expect("sealed_a∨unsealed", vec![sa.clone(), t_list(u(t_int()), false)], &["list<int>"]);
+    expect("sealed_a∨unsealed", vec![sa, t_list(u(t_int()), false)], &["list<int>"]);
 }
 
 #[test]

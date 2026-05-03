@@ -11,6 +11,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Call<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -27,6 +28,7 @@ impl Fingerprintable for Call<'_> {
 }
 
 impl Fingerprintable for FunctionCall<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -40,6 +42,7 @@ impl Fingerprintable for FunctionCall<'_> {
 }
 
 impl Fingerprintable for MethodCall<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -54,6 +57,7 @@ impl Fingerprintable for MethodCall<'_> {
 }
 
 impl Fingerprintable for NullSafeMethodCall<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -69,6 +73,7 @@ impl Fingerprintable for NullSafeMethodCall<'_> {
 }
 
 impl Fingerprintable for StaticMethodCall<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

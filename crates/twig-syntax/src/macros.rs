@@ -11,11 +11,13 @@
 //! }
 //! ```
 
-/// Map a punctuation / operator lexeme or keyword to its
-/// [`TwigTokenKind`](crate::token::TwigTokenKind) variant. The macro
-/// accepts a single lexeme (`T!["=="]`) or an or-pattern spanning several
-/// (`T!["+" | "-"]`), suitable for use inside `match` arms and
+/// Map a punctuation / operator lexeme or keyword to its [`TwigTokenKind`].
+///
+/// The macro accepts a single lexeme (`T!["=="]`) or an or-pattern spanning
+/// several (`T!["+" | "-"]`), suitable for use inside `match` arms and
 /// `matches!`.
+///
+/// [`TwigTokenKind`]: crate::token::TwigTokenKind
 #[macro_export]
 macro_rules! T {
     [ $first:tt $( | $rest:tt )+ ] => {

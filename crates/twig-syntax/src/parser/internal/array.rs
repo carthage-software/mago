@@ -10,7 +10,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse an array literal: `[ elements ]`.
     pub(crate) fn parse_array(&mut self) -> Result<Expression<'arena>, ParseError> {
         let result = self.parse_comma_separated_sequence(

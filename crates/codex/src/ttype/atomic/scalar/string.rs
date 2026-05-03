@@ -98,6 +98,7 @@ impl TStringLiteral {
 impl TString {
     /// Creates a new instance of `TString` with the specified properties.
     #[must_use]
+    #[allow(clippy::fn_params_excessive_bools)]
     pub const fn new(
         literal: Option<TStringLiteral>,
         is_numeric: bool,
@@ -194,6 +195,7 @@ impl TString {
     /// Creates a general string instance with explicitly set guaranteed properties (from analysis).
     #[inline]
     #[must_use]
+    #[allow(clippy::fn_params_excessive_bools)]
     pub const fn general_with_props(
         is_numeric: bool,
         is_truthy: bool,
@@ -215,6 +217,7 @@ impl TString {
     /// Creates an unspecified literal string instance with explicitly set guaranteed properties (from analysis).
     #[inline]
     #[must_use]
+    #[allow(clippy::fn_params_excessive_bools)]
     pub const fn unspecified_literal_with_props(
         is_numeric: bool,
         is_truthy: bool,

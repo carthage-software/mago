@@ -24,7 +24,7 @@ use crate::ttype::resolution::TypeResolutionContext;
 #[inline]
 pub fn scan_constant<'arena>(
     constant: &'arena Constant<'arena>,
-    context: &mut Context<'_, 'arena>,
+    context: &Context<'_, 'arena>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
 ) -> Vec<ConstantMetadata> {
@@ -62,7 +62,7 @@ pub fn scan_constant<'arena>(
 #[inline]
 pub fn scan_defined_constant<'arena>(
     define: &'arena FunctionCall<'arena>,
-    context: &mut Context<'_, 'arena>,
+    context: &Context<'_, 'arena>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
 ) -> Option<ConstantMetadata> {
@@ -75,12 +75,11 @@ pub fn scan_defined_constant<'arena>(
         return None;
     }
 
-    let arguments = define.argument_list.arguments.as_slice();
-    if arguments.len() != 2 {
+    let [first_arg, value_arg] = define.argument_list.arguments.as_slice() else {
         return None;
-    }
+    };
 
-    let Expression::Literal(Literal::String(name_string)) = arguments[0].value() else {
+    let Expression::Literal(Literal::String(name_string)) = first_arg.value() else {
         return None;
     };
 
@@ -95,7 +94,7 @@ pub fn scan_defined_constant<'arena>(
     }
 
     let mut metadata = ConstantMetadata::new(name, define.span(), flags);
-    metadata.inferred_type = infer(context, scope, arguments[1].value(), None);
+    metadata.inferred_type = infer(context, scope, value_arg.value(), None);
 
     process_constant_docblock(context.arena, &mut metadata, &docblock, None, type_context, scope);
 

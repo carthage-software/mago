@@ -35,6 +35,7 @@ impl FunctionReturnTypeProvider for MaxProvider {
         FunctionTarget::ExactMultiple(&["max", "psl\\math\\max", "psl\\math\\maxva"])
     }
 
+    #[allow(clippy::similar_names)]
     fn get_return_type(
         &self,
         context: &ProviderContext<'_, '_, '_>,
@@ -85,6 +86,7 @@ impl FunctionReturnTypeProvider for MaxProvider {
     }
 }
 
+#[allow(clippy::similar_names)]
 fn get_max_of_args(context: &ProviderContext<'_, '_, '_>, invocation: &InvocationInfo<'_, '_, '_>) -> Option<TUnion> {
     let first = invocation.get_argument(0, &["value"])?;
     let first_type = context.get_expression_type(first)?;

@@ -1,5 +1,3 @@
-#![allow(clippy::too_many_arguments)]
-
 //! A high-performance, globally-interned string library for the Mago ecosystem.
 //!
 //! This crate provides `Atom`, a canonical string type that guarantees any given
@@ -53,8 +51,15 @@ use std::hash::BuildHasherDefault;
 
 use ustr::IdentityHasher;
 
-pub use ustr::Ustr as Atom;
-pub use ustr::ustr as atom;
+/// A canonical, globally-interned string. Two `Atom`s with the same content always share storage.
+pub type Atom = ustr::Ustr;
+
+/// Interns a string and returns its canonical [`Atom`].
+#[inline]
+#[must_use]
+pub fn atom(s: &str) -> Atom {
+    ustr::ustr(s)
+}
 
 /// A high-performance `HashMap` using `Atom` as the key.
 ///
@@ -231,6 +236,9 @@ pub fn starts_with_ignore_case(haystack: &str, prefix: &str) -> bool {
     #[cfg(target_arch = "x86_64")]
     #[target_feature(enable = "avx2")]
     unsafe fn starts_with_avx2(haystack: &str, prefix: &str, len: usize) -> bool {
+        #[allow(clippy::multiple_unsafe_ops_per_block)]
+        // SAFETY: caller has verified AVX2 is available and `haystack.len() >= len`; loads of 32 bytes from
+        // `haystack[i..i+32]` and `prefix[i..i+32]` stay within bounds because the loop guard is `i + 32 <= len`.
         unsafe {
             let haystack_bytes = haystack.as_bytes();
             let prefix_bytes = prefix.as_bytes();
@@ -275,6 +283,10 @@ pub fn starts_with_ignore_case(haystack: &str, prefix: &str) -> bool {
     #[cfg(target_arch = "aarch64")]
     #[target_feature(enable = "neon")]
     unsafe fn starts_with_neon(haystack: &str, prefix: &str, len: usize) -> bool {
+        #[allow(clippy::multiple_unsafe_ops_per_block)]
+        // SAFETY: NEON is always available on aarch64 and the caller has verified `haystack.len() >= len`; loads of
+        // 16 bytes from `haystack[i..i+16]` and `prefix[i..i+16]` stay within bounds because the loop guard is
+        // `i + 16 <= len`.
         unsafe {
             let haystack_bytes = haystack.as_bytes();
             let prefix_bytes = prefix.as_bytes();
@@ -386,6 +398,7 @@ macro_rules! concat_fns {
             #[inline]
             #[must_use]
             #[allow(unused_assignments)]
+            #[allow(clippy::too_many_arguments)]
             pub fn $func_name($($s: &str),+) -> Atom {
                 let total_len = 0 $(+ $s.len())+;
 
@@ -396,7 +409,12 @@ macro_rules! concat_fns {
                         buffer[index..index + $s.len()].copy_from_slice($s.as_bytes());
                         index += $s.len();
                     )+
-                    return atom(unsafe { std::str::from_utf8_unchecked(&buffer[..total_len]) });
+
+                    return atom(
+                        // SAFETY: every byte written to `buffer` came from `&str::as_bytes()`, so the
+                        // sub-slice `&buffer[..total_len]` is a concatenation of valid UTF-8 sequences.
+                        unsafe { std::str::from_utf8_unchecked(&buffer[..total_len]) },
+                    );
                 }
 
                 // Fallback to heap for very long strings.

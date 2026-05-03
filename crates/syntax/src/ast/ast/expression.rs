@@ -130,7 +130,7 @@ impl<'arena> Expression<'arena> {
                     matches!(property, ClassLikeMemberSelector::Identifier(_))
                         && object.is_constant(version, initialization)
                 }
-                _ => false,
+                Access::StaticProperty(_) => false,
             },
             Self::ArrayAccess(access) => {
                 access.array.is_constant(version, initialization) && access.index.is_constant(version, initialization)
@@ -402,6 +402,7 @@ impl<'arena> Expression<'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub const fn is_throw(&self) -> bool {
         if let Expression::Parenthesized(expression) = self {
             expression.expression.is_throw()

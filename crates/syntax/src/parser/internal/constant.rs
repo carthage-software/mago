@@ -7,7 +7,7 @@ use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_constant_with_attributes(
         &mut self,
         attribute_lists: Sequence<'arena, AttributeList<'arena>>,

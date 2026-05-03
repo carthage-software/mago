@@ -89,6 +89,7 @@ impl TypeMetadata {
     /// # Returns
     ///
     /// A new `TypeMetadata` instance with the transformed `TUnion` and the same metadata flags and span.
+    #[must_use]
     pub fn map_type_union<F>(self, f: F) -> Self
     where
         F: FnOnce(TUnion) -> TUnion,

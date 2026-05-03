@@ -10,6 +10,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Declare<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -27,6 +28,7 @@ impl Fingerprintable for Declare<'_> {
 }
 
 impl Fingerprintable for DeclareItem<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -40,6 +42,7 @@ impl Fingerprintable for DeclareItem<'_> {
 }
 
 impl Fingerprintable for DeclareBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -59,6 +62,7 @@ impl Fingerprintable for DeclareBody<'_> {
 }
 
 impl Fingerprintable for DeclareColonDelimitedBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

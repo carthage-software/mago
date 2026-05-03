@@ -1,3 +1,5 @@
+#![allow(clippy::pub_use, clippy::exhaustive_enums)]
+
 //! Issue reporting and formatting for Mago.
 //!
 //! This crate provides functionality for reporting code issues identified by the linter and analyzer.
@@ -35,7 +37,7 @@ use mago_text_edit::TextEdit;
 /// plain directory/file prefixes (e.g. `"tests/"`, `"src/Legacy.php"`) and
 /// glob patterns (e.g. `"src/**/*.php"`); entries
 /// containing any of `*`, `?`, `[`, `{` are matched with [`ExclusionMatcher`].
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum IgnoreEntry {
     /// Ignore a code everywhere: `"code1"`
@@ -604,9 +606,9 @@ impl IssueCollection {
             return;
         }
 
-        enum CompiledEntry<'a> {
-            Code(&'a str),
-            Scoped { code: &'a str, matcher: ExclusionMatcher<&'a str> },
+        enum CompiledEntry<'entry> {
+            Code(&'entry str),
+            Scoped { code: &'entry str, matcher: ExclusionMatcher<&'entry str> },
         }
 
         let compiled: Vec<CompiledEntry<'_>> = ignore
@@ -632,13 +634,13 @@ impl IssueCollection {
                 return true;
             };
 
-            let mut resolved_file_name: Option<Option<String>> = None;
+            let mut cached_path: Option<Option<String>> = None;
 
             for entry in &compiled {
                 match entry {
-                    CompiledEntry::Code(ignored) if *ignored == code => return false,
-                    CompiledEntry::Scoped { code: ignored, matcher } if *ignored == code => {
-                        let file_name = resolved_file_name
+                    CompiledEntry::Code(ignored_code) if *ignored_code == code => return false,
+                    CompiledEntry::Scoped { code: ignored_code, matcher } if *ignored_code == code => {
+                        let file_name = cached_path
                             .get_or_insert_with(|| {
                                 issue.primary_span().and_then(|span| resolve_file_name(span.file_id))
                             })
@@ -738,10 +740,10 @@ impl IntoIterator for IssueCollection {
     }
 }
 
-impl<'a> IntoIterator for &'a IssueCollection {
-    type Item = &'a Issue;
+impl<'collection> IntoIterator for &'collection IssueCollection {
+    type Item = &'collection Issue;
 
-    type IntoIter = std::slice::Iter<'a, Issue>;
+    type IntoIter = std::slice::Iter<'collection, Issue>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.issues.iter()
@@ -909,8 +911,8 @@ mod tests {
     #[test]
     pub fn test_primary_span_is_deterministic() {
         let file = FileId::zero();
-        let span_later = Span::new(file, 20_u32.into(), 25_u32.into());
-        let span_earlier = Span::new(file, 5_u32.into(), 10_u32.into());
+        let span_later = Span::new(file, 20u32.into(), 25u32.into());
+        let span_earlier = Span::new(file, 5u32.into(), 10u32.into());
 
         let issue = Issue::error("x")
             .with_annotation(Annotation::primary(span_later))
@@ -932,8 +934,8 @@ mod tests {
                 mapping.insert(id, *p);
                 Issue::error("oops").with_code("invalid-global").with_annotation(Annotation::primary(Span::new(
                     id,
-                    0_u32.into(),
-                    1_u32.into(),
+                    0u32.into(),
+                    1u32.into(),
                 )))
             })
             .collect();
@@ -951,7 +953,7 @@ mod tests {
 
         let remaining: Vec<String> = collection
             .iter()
-            .flat_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
+            .filter_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
             .map(String::from)
             .collect();
 
@@ -977,7 +979,7 @@ mod tests {
 
         let remaining: Vec<String> = collection
             .iter()
-            .flat_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
+            .filter_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
             .map(String::from)
             .collect();
 
@@ -996,7 +998,7 @@ mod tests {
 
         let remaining: Vec<String> = collection
             .iter()
-            .flat_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
+            .filter_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
             .map(String::from)
             .collect();
 

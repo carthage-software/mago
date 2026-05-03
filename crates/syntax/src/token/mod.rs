@@ -269,10 +269,10 @@ pub enum TokenKind {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct Token<'a> {
+pub struct Token<'src> {
     pub kind: TokenKind,
     pub start: Position,
-    pub value: &'a str,
+    pub value: &'src str,
 }
 
 impl HasPosition for Token<'_> {

@@ -215,6 +215,7 @@ impl Serialize for Path {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -249,21 +250,21 @@ mod tests {
 
     #[test]
     fn test_valid_patterns_parse_correctly() {
-        assert!("App\\*".parse::<Path>().is_ok());
-        assert!("App\\**".parse::<Path>().is_ok());
-        assert!("App\\*Something".parse::<Path>().is_ok());
-        assert!("App\\*Something*".parse::<Path>().is_ok());
-        assert!("App\\*Some*thing".parse::<Path>().is_ok());
+        "App\\*".parse::<Path>().unwrap();
+        "App\\**".parse::<Path>().unwrap();
+        "App\\*Something".parse::<Path>().unwrap();
+        "App\\*Something*".parse::<Path>().unwrap();
+        "App\\*Some*thing".parse::<Path>().unwrap();
     }
 
     #[test]
     fn test_invalid_paths_fail_to_parse() {
-        assert!("Invalid-Class".parse::<Path>().is_err());
-        assert!("My\\Invalid-Namespace\\".parse::<Path>().is_err());
-        assert!("1LeadingNumber".parse::<Path>().is_err());
-        assert!("My\\1LeadingNumber".parse::<Path>().is_err());
-        assert!("@My\\Namespace\\".parse::<Path>().is_err());
-        assert!("My\\Invalid-Namespace\\".parse::<Path>().is_err());
-        assert!("App\\Invalid-*.php".parse::<Path>().is_err());
+        "Invalid-Class".parse::<Path>().unwrap_err();
+        "My\\Invalid-Namespace\\".parse::<Path>().unwrap_err();
+        "1LeadingNumber".parse::<Path>().unwrap_err();
+        "My\\1LeadingNumber".parse::<Path>().unwrap_err();
+        "@My\\Namespace\\".parse::<Path>().unwrap_err();
+        "My\\Invalid-Namespace\\".parse::<Path>().unwrap_err();
+        "App\\Invalid-*.php".parse::<Path>().unwrap_err();
     }
 }

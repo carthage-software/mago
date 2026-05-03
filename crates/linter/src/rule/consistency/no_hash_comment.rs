@@ -87,7 +87,7 @@ impl LintRule for NoHashCommentRule {
         };
 
         for trivia in &program.trivia {
-            if let TriviaKind::HashComment = trivia.kind {
+            if trivia.kind == TriviaKind::HashComment {
                 let issue = Issue::new(self.cfg.level(), "Shell-style comments ('#') are not allowed.")
                     .with_code(self.meta.code)
                     .with_annotation(Annotation::primary(trivia.span).with_message("This is a shell-style comment"))

@@ -6,7 +6,7 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_try(&mut self) -> Result<Try<'arena>, ParseError> {
         Ok(Try {
             r#try: self.expect_keyword(T!["try"])?,

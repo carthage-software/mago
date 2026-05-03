@@ -4,7 +4,7 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_block(&mut self) -> Result<Block<'arena>, ParseError> {
         let left_brace = self.stream.eat_span(T!["{"])?;
         let mut statements = self.new_vec();
@@ -18,7 +18,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                         Ok(statement) => statements.push(statement),
                         Err(err) => self.errors.push(err),
                     }
-                    // Safety: prevent infinite loop if statement parsing didn't advance
+                    // Forward-progress guard: prevent an infinite loop if statement parsing didn't advance.
                     if self.stream.current_position() == position_before
                         && let Ok(Some(token)) = self.stream.lookahead(0)
                     {

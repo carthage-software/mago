@@ -79,6 +79,7 @@ impl File {
     /// Creates a new `File` instance from its name, type, path, and contents.
     ///
     /// It automatically calculates the size, and line start offsets.
+    #[inline]
     #[must_use]
     pub fn new(
         name: Cow<'static, str>,
@@ -118,6 +119,7 @@ impl File {
     /// This is a convenience method for situations like testing or formatting where
     /// a full file context (e.g., a real path) is not required. It defaults to
     /// `FileType::Host` and a `path` of `None`.
+    #[inline]
     #[must_use]
     pub fn ephemeral(name: Cow<'static, str>, contents: Cow<'static, str>) -> Self {
         Self::new(name, FileType::Host, None, contents)
@@ -147,6 +149,7 @@ impl File {
     /// # Returns
     ///
     /// The byte offset for the start of the given line (0-based index).
+    #[inline]
     #[must_use]
     pub fn get_line_start_offset(&self, line: u32) -> Option<u32> {
         self.lines.get(line as usize).copied()
@@ -161,6 +164,7 @@ impl File {
     /// # Returns
     ///
     /// The byte offset for the end of the given line (0-based index).
+    #[inline]
     #[must_use]
     pub fn get_line_end_offset(&self, line: u32) -> Option<u32> {
         match self.lines.get(line as usize + 1) {
@@ -191,18 +195,21 @@ impl File {
 
 impl FileType {
     /// Returns `true` if the file is a host file, meaning it is part of the project's source code.
+    #[inline]
     #[must_use]
     pub const fn is_host(self) -> bool {
         matches!(self, FileType::Host)
     }
 
     /// Returns `true` if the file is a vendored file, meaning it comes from an external library or dependency.
+    #[inline]
     #[must_use]
     pub const fn is_vendored(self) -> bool {
         matches!(self, FileType::Vendored)
     }
 
     /// Returns `true` if the file is a built-in file, meaning it represents a core language construct.
+    #[inline]
     #[must_use]
     pub const fn is_builtin(self) -> bool {
         matches!(self, FileType::Builtin)
@@ -210,6 +217,7 @@ impl FileType {
 }
 
 impl FileId {
+    #[inline]
     #[must_use]
     pub fn new(logical_name: &str) -> Self {
         let mut hasher = DefaultHasher::new();
@@ -217,16 +225,19 @@ impl FileId {
         Self(hasher.finish())
     }
 
+    #[inline]
     #[must_use]
     pub const fn zero() -> Self {
         Self(0)
     }
 
+    #[inline]
     #[must_use]
     pub const fn is_zero(self) -> bool {
         self.0 == 0
     }
 
+    #[inline]
     #[must_use]
     pub fn as_u64(self) -> u64 {
         self.0
@@ -234,12 +245,14 @@ impl FileId {
 }
 
 impl HasFileId for File {
+    #[inline]
     fn file_id(&self) -> FileId {
         self.id
     }
 }
 
 impl std::fmt::Display for FileId {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }

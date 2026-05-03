@@ -27,7 +27,6 @@ use crate::ttype::wrap_atomic;
 
 #[must_use]
 pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &CodebaseMetadata) -> TUnion {
-    let mut keys_to_unset = HashSet::default();
     let mut new_types = Vec::new();
 
     for atomic_type in union.types.as_ref() {
@@ -49,13 +48,12 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
                     defining_entity,
                     codebase,
                     constraint,
-                    intersection_types,
+                    intersection_types.as_ref(),
                     template_result,
                     *key,
                 );
 
                 if let Some(template_type) = template_type {
-                    keys_to_unset.insert(*key);
                     new_types.extend(template_type.types.into_owned());
                 } else {
                     new_types.push(atomic_type);
@@ -106,7 +104,6 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
                     }
 
                     if !class_template_types.is_empty() {
-                        keys_to_unset.insert(*parameter_name);
                         new_types.extend(class_template_types);
                     } else {
                         new_types.push(atomic_type);
@@ -135,7 +132,7 @@ fn replace_template_parameter(
     defining_entity: &GenericParent,
     codebase: &CodebaseMetadata,
     constraint: &TUnion,
-    intersection_types: &Option<Vec<TAtomic>>,
+    intersection_types: Option<&Vec<TAtomic>>,
     template_result: &TemplateResult,
     key: Atom,
 ) -> Option<TUnion> {
@@ -147,7 +144,7 @@ fn replace_template_parameter(
         let mut template_type_inner = if !constraint.is_mixed() && traversed_type.is_mixed() {
             if constraint.is_array_key() { wrap_atomic(TAtomic::Scalar(TScalar::ArrayKey)) } else { constraint.clone() }
         } else {
-            traversed_type.clone()
+            traversed_type
         };
 
         if let Some(intersection_types) = intersection_types

@@ -184,7 +184,7 @@ fn contains_this_reference(root: Node<'_, '_>) -> bool {
             Node::Closure(closure) if closure.r#static.is_some() => continue,
             Node::ArrowFunction(arrow_function) if arrow_function.r#static.is_some() => continue,
             Node::AnonymousClass(_) => continue,
-            node if node.is_declaration() => continue,
+            other if other.is_declaration() => continue,
             _ => {}
         }
 

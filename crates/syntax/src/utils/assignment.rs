@@ -19,9 +19,9 @@ use crate::ast::Yield;
 /// If no assignment operation is found, it will return `None`.
 #[inline]
 #[must_use]
-pub fn get_assignment_from_expression<'a, 'arena>(
-    expression: &'a Expression<'arena>,
-) -> Option<&'a Assignment<'arena>> {
+pub fn get_assignment_from_expression<'expr, 'arena>(
+    expression: &'expr Expression<'arena>,
+) -> Option<&'expr Assignment<'arena>> {
     match &expression {
         Expression::Assignment(assignment_operation) => Some(assignment_operation),
         Expression::Parenthesized(parenthesized) => get_assignment_from_expression(parenthesized.expression),

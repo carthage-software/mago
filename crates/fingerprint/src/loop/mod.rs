@@ -21,6 +21,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for For<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -42,6 +43,7 @@ impl Fingerprintable for For<'_> {
 }
 
 impl Fingerprintable for ForBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -56,6 +58,7 @@ impl Fingerprintable for ForBody<'_> {
 }
 
 impl Fingerprintable for ForColonDelimitedBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -70,6 +73,7 @@ impl Fingerprintable for ForColonDelimitedBody<'_> {
 }
 
 impl Fingerprintable for Foreach<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -84,6 +88,7 @@ impl Fingerprintable for Foreach<'_> {
 }
 
 impl Fingerprintable for ForeachTarget<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -98,6 +103,7 @@ impl Fingerprintable for ForeachTarget<'_> {
 }
 
 impl Fingerprintable for ForeachValueTarget<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -110,6 +116,7 @@ impl Fingerprintable for ForeachValueTarget<'_> {
 }
 
 impl Fingerprintable for ForeachKeyValueTarget<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -123,6 +130,7 @@ impl Fingerprintable for ForeachKeyValueTarget<'_> {
 }
 
 impl Fingerprintable for ForeachBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -137,6 +145,7 @@ impl Fingerprintable for ForeachBody<'_> {
 }
 
 impl Fingerprintable for ForeachColonDelimitedBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -151,6 +160,7 @@ impl Fingerprintable for ForeachColonDelimitedBody<'_> {
 }
 
 impl Fingerprintable for While<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -164,6 +174,7 @@ impl Fingerprintable for While<'_> {
 }
 
 impl Fingerprintable for WhileBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -178,6 +189,7 @@ impl Fingerprintable for WhileBody<'_> {
 }
 
 impl Fingerprintable for WhileColonDelimitedBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -192,6 +204,7 @@ impl Fingerprintable for WhileColonDelimitedBody<'_> {
 }
 
 impl Fingerprintable for DoWhile<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -205,6 +218,7 @@ impl Fingerprintable for DoWhile<'_> {
 }
 
 impl Fingerprintable for Continue<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -217,6 +231,7 @@ impl Fingerprintable for Continue<'_> {
 }
 
 impl Fingerprintable for Break<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

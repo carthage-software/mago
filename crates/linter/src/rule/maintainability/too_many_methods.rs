@@ -147,6 +147,7 @@ impl LintRule for TooManyMethodsRule {
                 NodeKind::Enum => "Enum",
                 NodeKind::Interface => "Interface",
                 NodeKind::AnonymousClass => "Anonymous class",
+                #[allow(clippy::unreachable)]
                 _ => unreachable!(),
             };
 

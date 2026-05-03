@@ -371,6 +371,8 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 }
             }
         }
+
+        context.structural_flaws.extend(structural_flaws);
     }
 
     fn walk_in_enum(&mut self, r#enum: &'ast Enum<'arena>, context: &mut GuardContext<'ctx, 'arena>) {

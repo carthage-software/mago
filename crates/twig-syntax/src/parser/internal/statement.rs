@@ -29,7 +29,7 @@ impl Terminator for BlockTerminator {
     }
 }
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse a sequence of top-level statements until `terminator` matches
     /// or EOF is reached.
     pub(crate) fn parse_statements<T: Terminator>(

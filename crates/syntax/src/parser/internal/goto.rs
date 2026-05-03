@@ -4,7 +4,7 @@ use crate::ast::ast::Label;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_goto(&mut self) -> Result<Goto<'arena>, ParseError> {
         Ok(Goto {
             goto: self.expect_keyword(T!["goto"])?,

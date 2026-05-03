@@ -112,6 +112,7 @@ pub struct ConstantDocblockComment {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[allow(clippy::struct_field_names)]
 pub struct TraitUseDocblockComment {
     pub template_extends: Vec<TypeString>,
     pub template_implements: Vec<TypeString>,

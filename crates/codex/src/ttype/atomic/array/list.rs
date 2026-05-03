@@ -118,7 +118,7 @@ impl TList {
     #[must_use]
     pub fn clone_non_empty(&self) -> Self {
         Self {
-            element_type: self.element_type.clone(),
+            element_type: Arc::clone(&self.element_type),
             known_elements: self.known_elements.clone(),
             known_count: self.known_count,
             non_empty: true,
@@ -130,7 +130,7 @@ impl TList {
     #[must_use]
     pub fn clone_non_empty_with_count(&self, count: Option<usize>) -> Self {
         Self {
-            element_type: self.element_type.clone(),
+            element_type: Arc::clone(&self.element_type),
             known_elements: self.known_elements.clone(),
             known_count: count,
             non_empty: true,

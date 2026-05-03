@@ -171,7 +171,7 @@ mod tests {
 
     test_analysis! {
         name = assertions_are_applied,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             const PHP_INT_MAX = 9223372036854775807;
@@ -252,7 +252,7 @@ mod tests {
 
     test_analysis! {
         name = bitwise_or_binary_operator,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             const JSON_BIGINT_AS_STRING = 2;
@@ -268,7 +268,7 @@ mod tests {
 
     test_analysis! {
         name = arithmetic_on_generics,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -323,7 +323,7 @@ mod tests {
 
     test_analysis! {
         name = codepoints,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             // stub
@@ -363,7 +363,7 @@ mod tests {
 
     test_analysis! {
         name = null_coalescing_mixed,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function test($foo = null) {
@@ -374,7 +374,7 @@ mod tests {
 
     test_analysis! {
         name = cant_determine_if_types_are_identical_for_mixed_template,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -393,7 +393,7 @@ mod tests {
 
     test_analysis! {
         name = int_mod,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             const NANOSECONDS_PER_SECOND = 1_000_000_000;
@@ -566,7 +566,7 @@ mod tests {
 
     test_analysis! {
         name = assert_instanceof_class_string,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**

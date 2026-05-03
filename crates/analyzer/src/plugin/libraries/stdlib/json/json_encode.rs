@@ -17,7 +17,7 @@ use crate::plugin::provider::ProviderMeta;
 use crate::plugin::provider::function::FunctionReturnTypeProvider;
 use crate::plugin::provider::function::FunctionTarget;
 
-const JSON_THROW_ON_ERROR: i64 = 4_194_304;
+const JSON_THROW_ON_ERROR: i64 = 0x0040_0000;
 
 static META: ProviderMeta = ProviderMeta::new(
     "php::json::json_encode",

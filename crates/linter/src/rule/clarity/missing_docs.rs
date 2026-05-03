@@ -130,11 +130,11 @@ impl LintRule for MissingDocsRule {
 }
 
 impl MissingDocsRule {
-    fn check_statement<'a, 'arena>(
+    fn check_statement<'ast, 'arena>(
         &self,
         ctx: &mut LintContext<'_, 'arena>,
-        program: &'a Program<'arena>,
-        stmt: &'a Statement<'arena>,
+        program: &'ast Program<'arena>,
+        stmt: &'ast Statement<'arena>,
     ) {
         match stmt {
             Statement::Function(func) if self.cfg.functions => {
@@ -176,18 +176,18 @@ impl MissingDocsRule {
             Statement::Constant(constant) if self.cfg.constants => {
                 self.check_docs(ctx, program, constant, "constant");
             }
-            Statement::Static(stat) if self.cfg.statics => {
-                self.check_docs(ctx, program, stat, "static variable");
+            Statement::Static(static_decl) if self.cfg.statics => {
+                self.check_docs(ctx, program, static_decl, "static variable");
             }
             _ => {}
         }
     }
 
-    fn check_members<'a, 'arena>(
+    fn check_members<'ast, 'arena>(
         &self,
         ctx: &mut LintContext<'_, 'arena>,
-        program: &'a Program<'arena>,
-        members: impl Iterator<Item = &'a ClassLikeMember<'arena>>,
+        program: &'ast Program<'arena>,
+        members: impl Iterator<Item = &'ast ClassLikeMember<'arena>>,
     ) {
         for member in members {
             match member {
@@ -208,11 +208,11 @@ impl MissingDocsRule {
         }
     }
 
-    fn check_docs<'a, 'arena>(
+    fn check_docs<'ast, 'arena>(
         &self,
         ctx: &mut LintContext<'_, 'arena>,
-        program: &'a Program<'arena>,
-        node: &'a impl HasSpan,
+        program: &'ast Program<'arena>,
+        node: &'ast impl HasSpan,
         subject: &'static str,
     ) {
         let trivia = get_docblock_for_node(program, node);

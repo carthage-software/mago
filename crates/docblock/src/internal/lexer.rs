@@ -4,7 +4,7 @@ use crate::error::ParseError;
 use crate::internal::token::Token;
 
 #[inline]
-pub fn tokenize<'a>(comment: &'a str, span: Span) -> Result<Vec<Token<'a>>, ParseError> {
+pub fn tokenize<'src>(comment: &'src str, span: Span) -> Result<Vec<Token<'src>>, ParseError> {
     if comment.len() < 5 || !comment.starts_with("/**") || !comment.ends_with("*/") {
         return Err(ParseError::InvalidComment(span));
     }
@@ -15,7 +15,7 @@ pub fn tokenize<'a>(comment: &'a str, span: Span) -> Result<Vec<Token<'a>>, Pars
     let content = &comment[3..(comment.len() - 2)];
 
     if content.contains('\n') {
-        let lines_with_positions: Vec<(&'a str, u32)> = content
+        let lines_with_positions: Vec<(&'src str, u32)> = content
             .split('\n')
             .map(|line| {
                 let cleaned_line = line.strip_suffix('\r').unwrap_or(line);
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_lex_multi_line_comment() {
-        let comment = r"/**
+        let comment = "/**
                 * This is a multi-line comment.
                 * It has multiple lines.
                 * Each line starts with an asterisk.
@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_lex_multi_line_comment_inconsistent_indentation() {
-        let comment = r"/**
+        let comment = "/**
         * This is a multi-line comment.
             * It has multiple lines.
         * Each line starts with an asterisk.
@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_lex_multi_line_comment_missing_asterisk() {
-        let comment = r"/**
+        let comment = "/**
         * This is a multi-line comment.
         It has multiple lines.
         * Each line starts with an asterisk.
@@ -348,7 +348,7 @@ mod tests {
 
     #[test]
     fn test_lex_multi_line_comment_missing_whitespace_after_asterisk() {
-        let comment = r"/**
+        let comment = "/**
         * This is a multi-line comment.
         *It has multiple lines.
         * Each line starts with an asterisk.

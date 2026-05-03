@@ -16,7 +16,7 @@ use crate::parser::Parser;
 use crate::token::Precedence;
 use crate::token::TokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parses a `clone` expression, handling the syntactic ambiguity introduced in PHP 8.5.
     ///
     /// PHP 8.5 allows `clone` to be used like a function (e.g., `clone($foo, $bar)`). This
@@ -94,12 +94,15 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         let cloned_expression = match partial_args.arguments.into_iter().next() {
             Some(PartialArgument::Positional(arg)) => arg.value,
             Some(PartialArgument::Named(arg)) => arg.value,
-            None => unreachable!("handled by is_function_call check above"),
-            Some(
+            // The branches above are guaranteed by the `is_function_call` and `has_placeholders`
+            // checks earlier in this function; if we ever land here it's a parser bug, so we
+            // surface a generic unexpected-token error rather than panicking.
+            None
+            | Some(
                 PartialArgument::Placeholder(_)
                 | PartialArgument::NamedPlaceholder(_)
                 | PartialArgument::VariadicPlaceholder(_),
-            ) => unreachable!("handled by has_placeholders check above"),
+            ) => return Err(self.stream.unexpected(None, &[])),
         };
 
         Ok(Expression::Clone(Clone {

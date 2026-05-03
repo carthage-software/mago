@@ -141,10 +141,9 @@ impl LintRule for NoRedundantMethodOverrideRule {
             .map(|parameter| (parameter.ellipsis.is_some(), parameter.variable.name))
             .collect::<Vec<_>>();
 
-        let statement = block
-            .statements
-            .first()
-            .expect("Method body is guaranteed to have at least one statement, so this unwrap is safe");
+        let Some(statement) = block.statements.first() else {
+            return;
+        };
 
         let expression = match statement {
             Statement::Return(Return { value: Some(expression), .. }) => expression,

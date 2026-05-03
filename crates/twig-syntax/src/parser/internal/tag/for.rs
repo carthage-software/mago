@@ -9,7 +9,7 @@ use crate::parser::internal::BlockTerminator;
 use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_for(
         &mut self,
         open_tag_tok: TwigToken<'arena>,
@@ -27,12 +27,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
         }
         let targets = TokenSeparatedSequence::new(target_nodes, target_commas);
 
-        let in_tok = match self.stream.try_consume(TwigTokenKind::In)? {
-            Some(token) => token,
-            None => {
-                let next = self.stream.lookahead(0)?;
-                return Err(self.stream.unexpected(next, &[TwigTokenKind::In]));
-            }
+        let Some(in_tok) = self.stream.try_consume(TwigTokenKind::In)? else {
+            let next = self.stream.lookahead(0)?;
+            return Err(self.stream.unexpected(next, &[TwigTokenKind::In]));
         };
         let in_keyword = self.keyword_from(&in_tok);
 

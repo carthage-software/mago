@@ -1,7 +1,8 @@
+use std::io;
 use std::io::Write;
-use std::io::{self};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::PoisonError;
 
 /// Target for report output.
 #[derive(strum::Display, strum::EnumString, strum::VariantNames)]
@@ -25,7 +26,7 @@ impl Clone for ReportingTarget {
         match self {
             ReportingTarget::Stdout => ReportingTarget::Stdout,
             ReportingTarget::Stderr => ReportingTarget::Stderr,
-            ReportingTarget::Writer(writer) => ReportingTarget::Writer(writer.clone()),
+            ReportingTarget::Writer(writer) => ReportingTarget::Writer(Arc::clone(writer)),
         }
     }
 }
@@ -51,7 +52,7 @@ impl ReportingTarget {
     #[must_use]
     pub fn buffer() -> (Self, Arc<Mutex<Vec<u8>>>) {
         let buffer = Arc::new(Mutex::new(Vec::new()));
-        let writer_buffer = buffer.clone();
+        let writer_buffer = Arc::clone(&buffer);
         let target = ReportingTarget::Writer(Arc::new(Mutex::new(Box::new(BufferWriter { buffer: writer_buffer }))));
         (target, buffer)
     }
@@ -65,7 +66,7 @@ impl ReportingTarget {
         match self {
             ReportingTarget::Stdout => Box::new(io::stdout()),
             ReportingTarget::Stderr => Box::new(io::stderr()),
-            ReportingTarget::Writer(writer) => Box::new(LockedWriter { writer: writer.clone() }),
+            ReportingTarget::Writer(writer) => Box::new(LockedWriter { writer: Arc::clone(writer) }),
         }
     }
 }
@@ -77,11 +78,11 @@ struct LockedWriter {
 
 impl Write for LockedWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.writer.lock().unwrap().write(buf)
+        self.writer.lock().unwrap_or_else(PoisonError::into_inner).write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.writer.lock().unwrap().flush()
+        self.writer.lock().unwrap_or_else(PoisonError::into_inner).flush()
     }
 }
 
@@ -92,10 +93,10 @@ struct BufferWriter {
 
 impl Write for BufferWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.buffer.lock().unwrap().write(buf)
+        self.buffer.lock().unwrap_or_else(PoisonError::into_inner).write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.buffer.lock().unwrap().flush()
+        self.buffer.lock().unwrap_or_else(PoisonError::into_inner).flush()
     }
 }

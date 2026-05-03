@@ -347,6 +347,7 @@ where
             measure!(trace_enabled, reduce_duration, self.reducer.reduce(final_codebase, symbol_references, results));
 
         #[cfg(not(target_arch = "wasm32"))]
+        #[allow(clippy::float_arithmetic)]
         if let Some(start) = pipeline_start {
             let compile_per_file_us = compile_parallel_duration.as_micros() as f64 / source_count as f64;
             let analyze_per_file_us = analyze_parallel_duration.as_micros() as f64 / host_count as f64;
@@ -470,6 +471,7 @@ where
         let reduced = measure!(trace_enabled, reduce_duration, self.reducer.reduce(results));
 
         #[cfg(not(target_arch = "wasm32"))]
+        #[allow(clippy::float_arithmetic)]
         if let Some(start) = pipeline_start {
             let per_file_us = map_duration.as_micros() as f64 / host_count as f64;
 
@@ -576,6 +578,7 @@ where
         let reduced = measure!(trace_enabled, reduce_duration, self.reducer.reduce(results));
 
         #[cfg(not(target_arch = "wasm32"))]
+        #[allow(clippy::float_arithmetic)]
         if let Some(start) = pipeline_start {
             let per_file_us = map_duration.as_micros() as f64 / file_count as f64;
 

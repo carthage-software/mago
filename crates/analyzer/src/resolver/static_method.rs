@@ -120,7 +120,7 @@ pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
 
 fn resolve_method_from_classname<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
     method_name: Atom,
     class_span: Span,
@@ -337,7 +337,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
 
 fn resolve_method_from_metadata<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
     method_name: Atom,
     fq_class_id: Atom,
@@ -663,7 +663,7 @@ fn report_non_existent_mixin_static_method(
 /// In such cases, we fall back to using the constraint type.
 fn find_static_method_in_mixins<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     mixins: &[TUnion],
     method_name: Atom,
     selector: &ClassLikeMemberSelector<'arena>,
@@ -729,7 +729,7 @@ fn find_static_method_in_mixins<'ctx, 'arena>(
 /// Searches for a static method in a single mixin class.
 fn find_static_method_in_single_mixin<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     mixin_class_name: Atom,
     method_name: Atom,
     selector: &ClassLikeMemberSelector<'arena>,

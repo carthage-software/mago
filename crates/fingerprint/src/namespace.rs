@@ -9,6 +9,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Namespace<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -22,6 +23,7 @@ impl Fingerprintable for Namespace<'_> {
 }
 
 impl Fingerprintable for NamespaceBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -36,6 +38,7 @@ impl Fingerprintable for NamespaceBody<'_> {
 }
 
 impl Fingerprintable for NamespaceImplicitBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

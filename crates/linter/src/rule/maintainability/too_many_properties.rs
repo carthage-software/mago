@@ -122,6 +122,7 @@ impl LintRule for TooManyPropertiesRule {
                 NodeKind::Trait => "Trait",
                 NodeKind::Interface => "Interface",
                 NodeKind::AnonymousClass => "Anonymous class",
+                #[allow(clippy::unreachable)]
                 _ => unreachable!(),
             };
 

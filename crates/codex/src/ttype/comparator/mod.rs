@@ -54,8 +54,10 @@ impl ComparisonResult {
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
+    use std::collections::HashSet;
 
     use bumpalo::Bump;
+    use mago_atom::AtomSet;
     use mago_atom::atom;
     use mago_database::Database;
     use mago_database::DatabaseReader;
@@ -91,7 +93,7 @@ mod tests {
             codebase.extend(program_codebase);
         }
 
-        populate_codebase(&mut codebase, &mut SymbolReferences::new(), Default::default(), Default::default());
+        populate_codebase(&mut codebase, &mut SymbolReferences::new(), AtomSet::default(), HashSet::default());
 
         codebase
     }
@@ -110,7 +112,7 @@ mod tests {
 
     #[test]
     fn test_order_is_not_important() {
-        let code = r"
+        let code = "
             <?php
 
             interface DateTimeInterface {}
@@ -160,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_union_order_with_multiple_coercible_types() {
-        let code = r"
+        let code = "
             <?php
 
             interface A {}
@@ -198,7 +200,7 @@ mod tests {
 
     #[test]
     fn test_union_order_with_non_coercible_types() {
-        let code = r"
+        let code = "
             <?php
 
             class Foo {}
@@ -228,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_union_order_with_mixed_coercion() {
-        let code = r"
+        let code = "
             <?php
 
             interface ParentInterface {}

@@ -42,7 +42,7 @@ use crate::token::GetPrecedence;
 use crate::token::Precedence;
 use crate::token::TokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_expression(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {
         self.parse_expression_with_precedence(Precedence::Lowest)
     }
@@ -473,7 +473,10 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 operand: lhs,
                 operator: UnaryPostfixOperator::PostDecrement(self.stream.consume_span()?),
             }),
-            _ => unreachable!(),
+            // The dispatch above already filtered the postfix operators we accept; reaching the
+            // wildcard means the caller passed a non-postfix kind, which is a parser bug — bubble
+            // it up as an unexpected-token error instead of panicking.
+            _ => return Err(self.stream.unexpected(None, &[])),
         }))
     }
 
@@ -774,7 +777,10 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 
                 Expression::Pipe(Pipe { input: lhs, operator, callable })
             }
-            _ => unreachable!(),
+            // The dispatch above already filtered the infix operators we accept; reaching the
+            // wildcard means the caller passed a non-infix kind, which is a parser bug — bubble
+            // it up as an unexpected-token error instead of panicking.
+            _ => return Err(self.stream.unexpected(None, &[])),
         }))
     }
 

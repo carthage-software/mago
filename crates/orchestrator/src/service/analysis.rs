@@ -135,9 +135,13 @@ impl AnalysisService {
     /// Runs the full analysis pipeline.
     ///
     /// This method scans all source files, builds the codebase, and runs the analyzer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when scanning, codebase population, or per-file analysis fails.
     pub fn run(self) -> Result<AnalysisResult, OrchestratorError> {
         #[cfg(not(target_arch = "wasm32"))]
-        const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_millis(5000);
+        const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_secs(5);
         const ANALYSIS_PROGRESS_PREFIX: &str = "🔬 Analyzing";
 
         let pipeline = ParallelPipeline::new(

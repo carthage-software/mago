@@ -17,7 +17,7 @@ use super::super::ttype::union::TUnion;
 pub fn scan_enum_case<'arena>(
     enum_name: Atom,
     case: &'arena EnumCase<'arena>,
-    context: &mut Context<'_, 'arena>,
+    context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
 ) -> EnumCaseMetadata {
     let span = case.span();

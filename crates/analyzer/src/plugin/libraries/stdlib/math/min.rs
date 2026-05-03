@@ -35,6 +35,7 @@ impl FunctionReturnTypeProvider for MinProvider {
         FunctionTarget::ExactMultiple(&["min", "psl\\math\\min", "psl\\math\\minva"])
     }
 
+    #[allow(clippy::similar_names)]
     fn get_return_type(
         &self,
         context: &ProviderContext<'_, '_, '_>,
@@ -89,6 +90,7 @@ impl FunctionReturnTypeProvider for MinProvider {
     }
 }
 
+#[allow(clippy::similar_names)]
 fn get_min_of_args(context: &ProviderContext<'_, '_, '_>, invocation: &InvocationInfo<'_, '_, '_>) -> Option<TUnion> {
     let first = invocation.get_argument(0, &["value"])?;
     let first_type = context.get_expression_type(first)?;

@@ -1,3 +1,11 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::needless_raw_strings,
+    clippy::needless_raw_string_hashes,
+    clippy::single_char_lifetime_names
+)]
+
 //! Focused tests for the expression parser.
 
 #[path = "common/mod.rs"]

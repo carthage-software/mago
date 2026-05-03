@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use std::fs;
 
 use crate::framework::default_test_settings;

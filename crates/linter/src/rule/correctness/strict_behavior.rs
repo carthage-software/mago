@@ -135,7 +135,7 @@ impl LintRule for StrictBehaviorRule {
                         break;
                     }
                 }
-                _ => {}
+                Argument::Positional(_) => {}
             }
         }
 

@@ -62,7 +62,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_on_undefined_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $_ = NonExistentClass::SOME_CONST;
@@ -75,7 +75,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_self_outside_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $_ = self::SOME_CONST;
@@ -88,7 +88,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_static_outside_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $_ = static::SOME_CONST;
@@ -101,7 +101,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_parent_outside_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $_ = parent::SOME_CONST;
@@ -114,7 +114,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_dynamic_class_unknown_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             $const = $unknownVar::{KNOWN_CONST};
@@ -129,7 +129,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_dynamic_const_name_unknown_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class MyClass { const C = 1; }
@@ -163,7 +163,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_dynamic_const_name_invalid_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class MyClass { const C = 1; }
@@ -191,7 +191,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_on_generic_object_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class stdClass {} // stub
 
@@ -208,7 +208,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_on_generic_class_string,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param class-string $cs */
             function process_class_string(string $cs) {
@@ -222,7 +222,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_undefined_on_enum,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             enum Suit { case Hearts; }
             $_ = Suit::Diamonds; // Accessing 'Diamonds' like a const/case
@@ -247,7 +247,7 @@ mod tests {
 
     test_analysis! {
         name = const_access_on_interface_directly,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             interface ConstantsInterface { const MY_CONST = 42; }
             $_ = ConstantsInterface::MY_CONST;
@@ -281,7 +281,7 @@ mod tests {
 
     test_analysis! {
         name = const_var_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class NumberFormatter

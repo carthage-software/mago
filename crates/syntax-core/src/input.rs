@@ -46,15 +46,16 @@ const IDENT_START_TABLE: [bool; 256] = {
 /// The `Input` struct provides methods to read, peek, consume, and skip characters
 /// from the bytes input code while keeping track of the current position (line, column, offset).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Input<'a> {
-    pub(crate) bytes: &'a [u8],
+#[allow(clippy::field_scoped_visibility_modifiers)]
+pub struct Input<'src> {
+    pub(crate) bytes: &'src [u8],
     pub(crate) length: usize,
     pub(crate) offset: usize,
     pub(crate) starting_position: Position,
     pub(crate) file_id: FileId,
 }
 
-impl<'a> Input<'a> {
+impl<'src> Input<'src> {
     /// Creates a new `Input` instance from the given input.
     ///
     /// # Arguments
@@ -66,7 +67,7 @@ impl<'a> Input<'a> {
     ///
     /// A new `Input` instance initialized at the beginning of the input.
     #[must_use]
-    pub fn new(file_id: FileId, bytes: &'a [u8]) -> Self {
+    pub fn new(file_id: FileId, bytes: &'src [u8]) -> Self {
         let length = bytes.len();
 
         Self { bytes, length, offset: 0, file_id, starting_position: Position::new(0) }
@@ -82,7 +83,7 @@ impl<'a> Input<'a> {
     ///
     /// A new `Input` instance initialized with the file's ID and contents.
     #[must_use]
-    pub fn from_file(file: &'a File) -> Self {
+    pub fn from_file(file: &'src File) -> Self {
         Self::new(file.id, file.contents.as_bytes())
     }
 
@@ -95,7 +96,7 @@ impl<'a> Input<'a> {
     /// # Returns
     ///
     /// A new `Input` instance initialized with the file's ID and contents.
-    pub fn from_file_in(arena: &'a Bump, file: &File) -> Self {
+    pub fn from_file_in(arena: &'src Bump, file: &File) -> Self {
         Self::new(file.id, arena.alloc_slice_clone(file.contents.as_bytes()))
     }
 
@@ -120,7 +121,7 @@ impl<'a> Input<'a> {
     /// A new `Input` instance ready to lex the `bytes`, maintaining positions
     /// relative to `anchor_position`.
     #[must_use]
-    pub fn anchored_at(file_id: FileId, bytes: &'a [u8], anchor_position: Position) -> Self {
+    pub fn anchored_at(file_id: FileId, bytes: &'src [u8], anchor_position: Position) -> Self {
         let length = bytes.len();
 
         Self { bytes, length, offset: 0, file_id, starting_position: anchor_position }
@@ -202,7 +203,7 @@ impl<'a> Input<'a> {
     /// A byte slice `&[u8]` corresponding to the requested range.
     #[inline]
     #[must_use]
-    pub fn slice_in_range(&self, from: u32, to: u32) -> &'a [u8] {
+    pub fn slice_in_range(&self, from: u32, to: u32) -> &'src [u8] {
         let base_offset = self.starting_position.offset;
 
         // Calculate the start and end positions relative to the local `bytes` slice.
@@ -263,7 +264,7 @@ impl<'a> Input<'a> {
     ///
     /// A byte slice containing the consumed characters.
     #[inline(always)]
-    pub fn consume(&mut self, count: usize) -> &'a [u8] {
+    pub fn consume(&mut self, count: usize) -> &'src [u8] {
         let from = self.offset;
         let until = (from + count).min(self.length);
         self.offset = until;
@@ -279,7 +280,7 @@ impl<'a> Input<'a> {
     ///
     /// A byte slice containing the remaining characters.
     #[inline]
-    pub fn consume_remaining(&mut self) -> &'a [u8] {
+    pub fn consume_remaining(&mut self) -> &'src [u8] {
         if self.has_reached_eof() {
             return &[];
         }
@@ -304,7 +305,7 @@ impl<'a> Input<'a> {
     ///
     /// A byte slice containing the consumed characters.
     #[inline]
-    pub fn consume_until(&mut self, search: &[u8], ignore_ascii_case: bool) -> &'a [u8] {
+    pub fn consume_until(&mut self, search: &[u8], ignore_ascii_case: bool) -> &'src [u8] {
         let start = self.offset;
         if ignore_ascii_case {
             while !self.has_reached_eof() && !self.is_at(search, ignore_ascii_case) {
@@ -333,7 +334,7 @@ impl<'a> Input<'a> {
     }
 
     #[inline]
-    pub fn consume_through(&mut self, search: u8) -> &'a [u8] {
+    pub fn consume_through(&mut self, search: u8) -> &'src [u8] {
         let start = self.offset;
         if let Some(pos) = memchr::memchr(search, &self.bytes[self.offset..]) {
             self.offset += pos + 1;
@@ -352,13 +353,13 @@ impl<'a> Input<'a> {
     ///
     /// A byte slice containing the consumed whitespaces.
     #[inline(always)]
-    pub fn consume_whitespaces(&mut self) -> &'a [u8] {
+    pub fn consume_whitespaces(&mut self) -> &'src [u8] {
         let start = self.offset;
         let bytes = self.bytes;
         let len = self.length;
 
-        // SAFETY: offset < len is checked in condition, table lookup is always valid
         while self.offset < len {
+            // SAFETY: `self.offset < len` was just checked, so the index is in bounds.
             let b = unsafe { *bytes.get_unchecked(self.offset) };
             if !WHITESPACE_TABLE[b as usize] {
                 break;
@@ -366,7 +367,8 @@ impl<'a> Input<'a> {
             self.offset += 1;
         }
 
-        // SAFETY: start <= self.offset <= len
+        // SAFETY: `start` and `self.offset` are both in `0..=len`, and `start <= self.offset` because
+        // the loop only ever increments `self.offset` from its initial `start` value.
         unsafe { bytes.get_unchecked(start..self.offset) }
     }
 
@@ -376,6 +378,7 @@ impl<'a> Input<'a> {
     ///
     /// This is optimized for the common case of scanning simple identifiers.
     #[inline(always)]
+    #[must_use]
     pub fn scan_identifier(&self, offset_from_current: usize) -> (usize, bool) {
         let start = self.offset + offset_from_current;
         if start >= self.length {
@@ -386,12 +389,13 @@ impl<'a> Input<'a> {
         let len = self.length;
         let mut pos = start + 1; // Skip first byte (already validated by caller)
 
-        // SAFETY: pos < len checked in condition, table lookups are always valid
         while pos < len {
+            // SAFETY: `pos < len` was just checked.
             let b = unsafe { *bytes.get_unchecked(pos) };
             if IDENT_PART_TABLE[b as usize] {
                 pos += 1;
             } else if b == b'\\' && pos + 1 < len {
+                // SAFETY: `pos + 1 < len` was just checked in the `else if` guard.
                 let next = unsafe { *bytes.get_unchecked(pos + 1) };
                 if IDENT_START_TABLE[next as usize] {
                     // Found \ followed by identifier start
@@ -417,7 +421,7 @@ impl<'a> Input<'a> {
     /// A byte slice containing the next `n` characters.
     #[inline(always)]
     #[must_use]
-    pub fn read(&self, n: usize) -> &'a [u8] {
+    pub fn read(&self, n: usize) -> &'src [u8] {
         let from = self.offset;
         let until = (from + n).min(self.length);
         // SAFETY: from <= until <= self.length is guaranteed by min()
@@ -427,9 +431,11 @@ impl<'a> Input<'a> {
     /// Reads all remaining characters from the current position to the end of input,
     /// without advancing the position.
     #[inline(always)]
-    pub fn read_remaining(&self) -> &'a [u8] {
+    #[must_use]
+    pub fn read_remaining(&self) -> &'src [u8] {
         let from = self.offset;
 
+        // SAFETY: `from = self.offset` is always in `0..=self.length`, so the open-ended range is in bounds.
         unsafe { self.bytes.get_unchecked(from..) }
     }
 
@@ -452,7 +458,7 @@ impl<'a> Input<'a> {
     /// This method **panics** if the provided `at` offset is out of bounds
     /// for the input byte slice (i.e., if `at >= self.bytes.len()`).
     #[must_use]
-    pub fn read_at(&self, at: usize) -> &'a u8 {
+    pub fn read_at(&self, at: usize) -> &'src u8 {
         &self.bytes[at]
     }
 
@@ -464,7 +470,8 @@ impl<'a> Input<'a> {
     /// The caller must ensure that `at` is a valid index within the bounds of the input slice
     /// (i.e., `at < self.bytes.len()`). Failing to do so results in undefined behavior.
     #[inline(always)]
-    pub unsafe fn read_at_unchecked(&self, at: usize) -> &'a u8 {
+    #[must_use]
+    pub unsafe fn read_at_unchecked(&self, at: usize) -> &'src u8 {
         // SAFETY: Caller must ensure at < self.length
         unsafe { self.bytes.get_unchecked(at) }
     }
@@ -568,12 +575,13 @@ impl<'a> Input<'a> {
     /// A byte slice containing the peeked characters.
     #[inline(always)]
     #[must_use]
-    pub fn peek(&self, offset: usize, n: usize) -> &'a [u8] {
+    pub fn peek(&self, offset: usize, n: usize) -> &'src [u8] {
         let from = self.offset + offset;
         let len = self.length;
         if from >= len {
             return &[];
         }
+
         let until = (from + n).min(len);
         // SAFETY: We verified from < len and until <= len above
         unsafe { self.bytes.get_unchecked(from..until) }

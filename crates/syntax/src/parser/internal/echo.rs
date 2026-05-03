@@ -5,7 +5,7 @@ use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_echo_tag(&mut self) -> Result<EchoTag<'arena>, ParseError> {
         Ok(EchoTag {
             tag: self.stream.eat_span(T!["<?="])?,

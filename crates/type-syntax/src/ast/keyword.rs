@@ -21,6 +21,7 @@ impl HasSpan for Keyword<'_> {
 impl<'arena> Keyword<'arena> {
     /// Creates a Keyword from a TypeToken and file_id.
     #[inline]
+    #[must_use]
     pub fn from_token(token: TypeToken<'arena>, file_id: FileId) -> Self {
         debug_assert!(
             token.kind.is_keyword()

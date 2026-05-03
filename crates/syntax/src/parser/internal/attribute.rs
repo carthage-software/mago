@@ -5,7 +5,7 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_attribute_list_sequence(
         &mut self,
     ) -> Result<Sequence<'arena, AttributeList<'arena>>, ParseError> {

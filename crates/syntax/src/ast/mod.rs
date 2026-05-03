@@ -37,6 +37,7 @@ pub struct Program<'arena> {
 impl Program<'_> {
     /// Returns `true` if the program contains any parsing errors.
     #[inline]
+    #[must_use]
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()
     }

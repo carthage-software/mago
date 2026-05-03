@@ -54,6 +54,7 @@ impl<'arena> ResolvedNames<'arena> {
     ///
     /// Panics if no resolved name is found at the specified `position`.
     /// Use `contains` first if unsure.
+    #[allow(clippy::expect_used)]
     pub fn get<T: HasPosition>(&self, position: &T) -> &'arena str {
         self.names.get(&position.offset()).map(|(_, (name, _))| *name).expect("resolved name not found at position")
     }
@@ -79,6 +80,7 @@ impl<'arena> ResolvedNames<'arena> {
     /// Identifier ranges in `ResolvedNames` never overlap, so at most one entry can
     /// match. Returns `Some((start, end, fqn, imported))` for the covering entry, or
     /// `None` if the offset falls outside every tracked identifier.
+    #[must_use]
     pub fn at_offset(&self, offset: u32) -> Option<(u32, u32, &'arena str, bool)> {
         self.names.iter().find_map(|(&start, &(end, (name, imported)))| {
             if start <= offset && offset < end { Some((start, end, name, imported)) } else { None }

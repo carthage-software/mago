@@ -49,10 +49,16 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     /// This position represents the end location of the most recently
     /// consumed significant token via `advance()` or `consume()`.
     #[inline]
+    #[must_use]
     pub const fn current_position(&self) -> Position {
         self.position
     }
 
+    /// Returns whether the stream has consumed all tokens up to EOF.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`SyntaxError`] if the lexer fails to produce the next token.
     #[inline]
     pub fn has_reached_eof(&mut self) -> Result<bool, SyntaxError> {
         Ok(self.fill_buffer(1)?.is_none())
@@ -60,7 +66,9 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
 
     /// Consumes and returns the next significant token.
     ///
-    /// Returns an error if EOF is reached or a lexer error occurs.
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if EOF is reached or a lexer error occurs.
     #[inline]
     pub fn consume(&mut self) -> Result<Token<'input>, ParseError> {
         match self.advance() {
@@ -73,6 +81,10 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     /// Consumes the next token only if it matches the expected kind.
     ///
     /// Returns the token if it matches, otherwise returns an error.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if the next token's kind does not match `kind`, or if EOF is reached.
     #[inline]
     pub fn eat(&mut self, kind: TokenKind) -> Result<Token<'input>, ParseError> {
         // Fast path: head already buffered. Avoids the Result<Option<...>>
@@ -94,8 +106,13 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
         match current_kind {
             Some(k) if k == kind => self.consume(),
             Some(_) => {
-                let token = self.lookahead(0)?.unwrap();
-                Err(self.unexpected(Some(token), &[kind]))
+                // The kind we just peeked guarantees a token is buffered, so `lookahead(0)`
+                // must yield `Some`; if the lexer somehow disagrees we surface an EOF error
+                // rather than panicking.
+                match self.lookahead(0)? {
+                    Some(token) => Err(self.unexpected(Some(token), &[kind])),
+                    None => Err(self.unexpected(None, &[kind])),
+                }
             }
             None => Err(self.unexpected(None, &[kind])),
         }
@@ -104,6 +121,10 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     /// Consumes and returns the span of the next significant token.
     ///
     /// This is a convenience method equivalent to `consume()?.span_for(file_id())`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if EOF is reached or a lexer error occurs.
     #[inline]
     pub fn consume_span(&mut self) -> Result<Span, ParseError> {
         let file_id = self.file_id();
@@ -113,6 +134,10 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     /// Consumes the next token only if it matches the expected kind, returning its span.
     ///
     /// This is a convenience method equivalent to `eat(kind)?.span_for(file_id())`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if the next token's kind does not match `kind`, or if EOF is reached.
     #[inline]
     pub fn eat_span(&mut self, kind: TokenKind) -> Result<Span, ParseError> {
         let file_id = self.file_id();
@@ -146,6 +171,10 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     /// Checks if the next token matches the given kind without consuming it.
     ///
     /// Returns `false` if at EOF.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if the lexer fails to produce the next token.
     #[inline]
     pub fn is_at(&mut self, kind: TokenKind) -> Result<bool, ParseError> {
         if let Some(token) = self.buffer.get(0) {
@@ -158,6 +187,10 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     /// Peeks at the nth (0-indexed) significant token ahead without consuming it.
     ///
     /// Returns `Ok(None)` if EOF is reached before the nth token.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if the lexer fails to produce a token while filling the lookahead buffer.
     #[inline]
     pub fn lookahead(&mut self, n: usize) -> Result<Option<Token<'input>>, ParseError> {
         if n < self.buffer.len() {
@@ -175,6 +208,10 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     ///
     /// More efficient than `lookahead(n)?.map(|t| t.kind)` as it avoids
     /// copying the full token when only the kind is needed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ParseError`] if the lexer fails to produce a token while filling the lookahead buffer.
     #[inline]
     pub fn peek_kind(&mut self, n: usize) -> Result<Option<TokenKind>, ParseError> {
         if n < self.buffer.len() {
@@ -190,6 +227,7 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
 
     /// Creates a `ParseError` for an unexpected token or EOF.
     #[inline]
+    #[must_use]
     pub fn unexpected(&self, found: Option<Token<'_>>, expected: &[TokenKind]) -> ParseError {
         let expected_kinds: Box<[TokenKind]> = expected.into();
         if let Some(token) = found {
@@ -209,22 +247,20 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
         Sequence::new(
             tokens
                 .into_iter()
-                .map(|token| {
+                .filter_map(|token| {
                     let span = token.span_for(file_id);
-                    match token.kind {
-                        TokenKind::Whitespace => Trivia { kind: TriviaKind::WhiteSpace, span, value: token.value },
-                        TokenKind::HashComment => Trivia { kind: TriviaKind::HashComment, span, value: token.value },
-                        TokenKind::SingleLineComment => {
-                            Trivia { kind: TriviaKind::SingleLineComment, span, value: token.value }
-                        }
-                        TokenKind::MultiLineComment => {
-                            Trivia { kind: TriviaKind::MultiLineComment, span, value: token.value }
-                        }
-                        TokenKind::DocBlockComment => {
-                            Trivia { kind: TriviaKind::DocBlockComment, span, value: token.value }
-                        }
-                        _ => unreachable!(),
-                    }
+                    let kind = match token.kind {
+                        TokenKind::Whitespace => TriviaKind::WhiteSpace,
+                        TokenKind::HashComment => TriviaKind::HashComment,
+                        TokenKind::SingleLineComment => TriviaKind::SingleLineComment,
+                        TokenKind::MultiLineComment => TriviaKind::MultiLineComment,
+                        TokenKind::DocBlockComment => TriviaKind::DocBlockComment,
+                        // Tokens collected into `self.trivia` are guaranteed by `fill_buffer_slow`
+                        // to satisfy `kind.is_trivia()`; any non-trivia kind here is a parser bug
+                        // and the safe response is to drop it rather than panic.
+                        _ => return None,
+                    };
+                    Some(Trivia { kind, span, value: token.value })
                 })
                 .collect_in(self.arena),
         )

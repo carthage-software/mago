@@ -149,6 +149,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
                         AssignmentOperator::LeftShift(span) => BinaryOperator::LeftShift(*span),
                         AssignmentOperator::RightShift(span) => BinaryOperator::RightShift(*span),
                         AssignmentOperator::Coalesce(span) => BinaryOperator::NullCoalesce(*span),
+                        #[allow(clippy::unreachable)]
                         AssignmentOperator::Assign(_) => unreachable!(),
                     },
                     rhs: context.arena.alloc(source_expression.clone()),
@@ -366,7 +367,7 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
 }
 
 fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+    context: &Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     target_expression: &'ast Expression<'arena>,
     source_expression: &'ast Expression<'arena>,
@@ -1032,7 +1033,7 @@ fn analyze_assignment_target<'ctx, 'arena>(
 fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
     variable_expression_id: Span,
     source_expression: &Expression<'arena>,
     variable_id: Atom,
@@ -1113,7 +1114,7 @@ mod tests {
 
     test_analysis! {
         name = test_var_docblock,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             namespace Example;
@@ -1163,7 +1164,7 @@ mod tests {
 
     test_analysis! {
         name = test_var_docblock_override_narrow,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             namespace Example;
@@ -1182,7 +1183,7 @@ mod tests {
 
     test_analysis! {
         name = test_var_docblock_override_widen,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -1199,7 +1200,7 @@ mod tests {
 
     test_analysis! {
         name = test_var_docblock_overridei,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -1219,7 +1220,7 @@ mod tests {
 
     test_analysis! {
         name = list_assignment,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -1250,7 +1251,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_shape,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -1290,7 +1291,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_keyed_shape_to_variables,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @return array{name: string, age: int, hobbies: list<string>} */
             function get_user_shape(): array {
@@ -1314,7 +1315,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_list_to_variables,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @return list<string> */
             function get_simple_list(): array { return ['a', 'b', 'c']; }
@@ -1331,7 +1332,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_list_with_skipped_elements,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param 'one' $_s */
             function i_take_one(string $_s): void {}
@@ -1348,7 +1349,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_list_with_trailing_comma_skip,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param 10 $_i */
             function i_take_ten(int $_i): void {}
@@ -1360,7 +1361,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_nested_list_within_keyed,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @return array{name: string, data: list<int>} */
             function get_shape_with_list(): array { return ['name' => 'test', 'data' => [10, 20]]; }
@@ -1379,7 +1380,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_nested_keyed_within_list,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @return list<array{id: int}> */
             function get_list_of_shapes(): array { return [['id' => 1], ['id' => 2]]; }
@@ -1395,7 +1396,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_empty_array_results_in_null,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param null $_n */
             function i_take_null($_n): void {}
@@ -1411,7 +1412,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_missing_keyed_element_results_in_null,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param null $_n */
             function i_take_null($_n): void {}
@@ -1428,7 +1429,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_list_with_fewer_elements_results_in_null,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param null $_n */
             function i_take_null($_n): void {}
@@ -1446,7 +1447,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_list_syntax_basic,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param string $_s */
             function i_take_string(string $_s): void {}
@@ -1459,7 +1460,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_list_syntax_with_skipped_elements,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param string $_s */
             function i_take_string(string $_s): void {}
@@ -1472,7 +1473,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_list_syntax_with_keyed_source,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param string $_s */
             function i_take_string(string $_s): void {}
@@ -1488,7 +1489,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_keyed_with_integer_keys,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param string $_s */
             function i_take_string(string $_s): void {}
@@ -1502,7 +1503,7 @@ mod tests {
 
     test_analysis! {
         name = destructuring_empty_target_is_valid,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             [] = [1, 2, 3]; // This is valid syntax, should produce no errors.
         "},
@@ -1530,7 +1531,7 @@ mod tests {
             allow_possibly_undefined_array_keys: false,
             ..Default::default()
         },
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @param array<int, float> $source */
@@ -1554,7 +1555,7 @@ mod tests {
             allow_possibly_undefined_array_keys: true,
             ..Default::default()
         },
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @param array<int, float> $source */
@@ -1570,7 +1571,7 @@ mod tests {
 
     test_analysis! {
         name = expression_is_too_complex,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function is_special_case(int $id, int $count, float $score, float $threshold, bool $is_active, bool $is_admin, string $name, string $role, string $permission, string $category): bool {

@@ -244,7 +244,7 @@ impl<'arena> FunctionLikeParts<'arena> {
                     return Document::space();
                 }
 
-                if let Some(false) = parameter_list_will_break {
+                if parameter_list_will_break == Some(false) {
                     return Document::Line(Line::hard());
                 }
 

@@ -128,8 +128,8 @@ impl LintRule for ReadableLiteralRule {
 fn count_significant_digits(raw: &str) -> usize {
     let raw_bytes = raw.as_bytes();
 
-    if raw_bytes.len() >= 2 && raw_bytes[0] == b'0' {
-        match raw_bytes[1] {
+    if let [b'0', second, ..] = raw_bytes {
+        match *second {
             b'x' | b'X' => {
                 return raw[2..].chars().filter(|c| c.is_ascii_hexdigit()).count();
             }
@@ -168,8 +168,8 @@ fn count_significant_digits(raw: &str) -> usize {
 fn suggest_separated_literal(raw: &str) -> String {
     let raw_bytes = raw.as_bytes();
 
-    if raw_bytes.len() >= 2 && raw_bytes[0] == b'0' {
-        match raw_bytes[1] {
+    if let [b'0', second, ..] = raw_bytes {
+        match *second {
             b'x' | b'X' => {
                 // Hex: group by 4 digits, preserve prefix case
                 let prefix = &raw[..2];

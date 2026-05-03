@@ -57,6 +57,7 @@ pub struct ScopeStack<'arena> {
 }
 
 impl FunctionLikeScope<'_> {
+    #[must_use]
     pub const fn is_by_ref(&self) -> bool {
         match self {
             FunctionLikeScope::Function(_, by_ref)

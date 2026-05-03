@@ -107,7 +107,7 @@ impl LintRule for ValidDocblockRule {
         };
 
         for trivia in &program.trivia {
-            if let TriviaKind::DocBlockComment = trivia.kind {
+            if trivia.kind == TriviaKind::DocBlockComment {
                 let Err(parse_error) = mago_docblock::parse_trivia(ctx.arena, trivia) else {
                     continue;
                 };

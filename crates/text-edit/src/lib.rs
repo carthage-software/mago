@@ -7,6 +7,7 @@ use serde::Serialize;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
 #[derive(Default)]
+#[non_exhaustive]
 pub enum Safety {
     /// Safe to apply automatically. The semantic meaning of the code is preserved.
     /// Example: Formatting, renaming a local variable.
@@ -29,18 +30,21 @@ pub struct TextRange {
 
 impl TextRange {
     #[inline(always)]
+    #[must_use]
     pub fn new(start: u32, end: u32) -> Self {
         Self { start, end }
     }
 
     /// Returns the length of the range in bytes.
     #[inline(always)]
+    #[must_use]
     pub fn len(&self) -> u32 {
         self.end - self.start
     }
 
     /// Returns true if the range has a length of zero.
     #[inline(always)]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.start == self.end
     }
@@ -65,6 +69,8 @@ impl TextRange {
     /// is treated as overlap, as is any interior overlap between two
     /// non-empty ranges.
     #[inline(always)]
+    #[must_use]
+    #[allow(clippy::suspicious_operation_groupings)]
     pub fn overlaps(&self, other: &TextRange) -> bool {
         match (self.is_empty(), other.is_empty()) {
             (true, true) => false,
@@ -76,6 +82,7 @@ impl TextRange {
 
     /// Checks if this range contains a specific offset.
     #[inline(always)]
+    #[must_use]
     pub fn contains(&self, offset: u32) -> bool {
         offset >= self.start && offset < self.end
     }
@@ -119,16 +126,22 @@ pub struct TextEdit {
 
 impl TextEdit {
     /// Creates a delete edit (defaults to Safe).
+    #[inline]
+    #[must_use]
     pub fn delete(range: impl Into<TextRange>) -> Self {
         Self { range: range.into(), new_text: String::new(), safety: Safety::Safe }
     }
 
     /// Creates an insert edit (defaults to Safe).
+    #[inline]
+    #[must_use]
     pub fn insert(offset: u32, text: impl Into<String>) -> Self {
         Self { range: TextRange::new(offset, offset), new_text: text.into(), safety: Safety::Safe }
     }
 
     /// Creates a replace edit (defaults to Safe).
+    #[inline]
+    #[must_use]
     pub fn replace(range: impl Into<TextRange>, text: impl Into<String>) -> Self {
         Self { range: range.into(), new_text: text.into(), safety: Safety::Safe }
     }
@@ -142,6 +155,7 @@ impl TextEdit {
     /// let edit = TextEdit::replace(1..2, "b").with_safety(Safety::Unsafe);
     /// assert_eq!(edit.safety, Safety::Unsafe);
     /// ```
+    #[inline]
     #[must_use]
     pub fn with_safety(mut self, safety: Safety) -> Self {
         self.safety = safety;
@@ -150,6 +164,7 @@ impl TextEdit {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ApplyResult {
     /// The edits were successfully applied.
     Applied,
@@ -170,17 +185,18 @@ pub enum ApplyResult {
 /// It accumulates edits and applies them in a single pass when `finish()` is called.
 /// It ensures all edits are valid, non-overlapping, and safe according to optional user checks.
 #[derive(Debug, Clone)]
-pub struct TextEditor<'a> {
-    original_text: &'a str,
+pub struct TextEditor<'src> {
+    original_text: &'src str,
     original_len: u32,
     edits: Vec<TextEdit>,
-    /// Maximum safety level to accept. Edits above this level are rejected.
     safety_threshold: Safety,
 }
 
-impl<'a> TextEditor<'a> {
+impl<'src> TextEditor<'src> {
     /// Creates a new TextEditor with the default safety threshold (Unsafe - accepts all edits).
-    pub fn new(text: &'a str) -> Self {
+    #[inline]
+    #[must_use]
+    pub fn new(text: &'src str) -> Self {
         Self {
             original_text: text,
             original_len: text.len() as u32,
@@ -200,7 +216,9 @@ impl<'a> TextEditor<'a> {
     /// // Only accept Safe edits
     /// let editor = TextEditor::with_safety("hello", Safety::Safe);
     /// ```
-    pub fn with_safety(text: &'a str, threshold: Safety) -> Self {
+    #[inline]
+    #[must_use]
+    pub fn with_safety(text: &'src str, threshold: Safety) -> Self {
         Self { original_text: text, original_len: text.len() as u32, edits: Vec::new(), safety_threshold: threshold }
     }
 
@@ -212,7 +230,7 @@ impl<'a> TextEditor<'a> {
             Some(match edit_safety {
                 Safety::Unsafe => ApplyResult::Unsafe,
                 Safety::PotentiallyUnsafe => ApplyResult::PotentiallyUnsafe,
-                Safety::Safe => unreachable!(),
+                Safety::Safe => ApplyResult::Unsafe,
             })
         } else {
             None
@@ -223,6 +241,7 @@ impl<'a> TextEditor<'a> {
     ///
     /// Uses binary search to check for overlaps in O(log N).
     /// Rejects edits that exceed the safety threshold.
+    #[inline]
     pub fn apply<F>(&mut self, edit: TextEdit, checker: Option<F>) -> ApplyResult
     where
         F: FnOnce(&str) -> bool,
@@ -260,6 +279,7 @@ impl<'a> TextEditor<'a> {
     ///
     /// Either all edits are applied, or none are (if overlap/check/safety fails).
     /// If any edit in the batch exceeds the safety threshold, the entire batch is rejected.
+    #[inline]
     pub fn apply_batch<F>(&mut self, mut new_edits: Vec<TextEdit>, checker: Option<F>) -> ApplyResult
     where
         F: FnOnce(&str) -> bool,
@@ -322,16 +342,22 @@ impl<'a> TextEditor<'a> {
     }
 
     /// Consumes the editor and returns the final modified string.
+    #[inline]
+    #[must_use]
     pub fn finish(self) -> String {
         stitch(self.original_text, &self.edits)
     }
 
     /// Returns a slice of the currently applied edits.
+    #[inline]
+    #[must_use]
     pub fn get_edits(&self) -> &[TextEdit] {
         &self.edits
     }
 
     /// Returns the current safety threshold.
+    #[inline]
+    #[must_use]
     pub fn safety_threshold(&self) -> Safety {
         self.safety_threshold
     }
@@ -681,6 +707,7 @@ mod tests {
         let batch = vec![TextEdit::insert(0, "Y")];
         assert_eq!(editor.apply_batch(batch, Some(checker)), ApplyResult::Applied);
 
+        #[allow(clippy::expect_used)]
         let simulated = simulated.borrow().clone().expect("checker called");
         let final_str = editor.finish();
         assert_eq!(simulated, final_str, "checker saw `{simulated}` but final output is `{final_str}`");

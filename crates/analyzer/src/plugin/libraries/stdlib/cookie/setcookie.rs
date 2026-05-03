@@ -78,7 +78,9 @@ impl FunctionCallHook for SetCookieHook {
 
         // The 3rd argument is an array, only 3 arguments are allowed.
         // Report the 4th argument as unexpected.
-        let fourth_arg = arguments.get(3).unwrap();
+        let Some(fourth_arg) = arguments.get(3) else {
+            return Ok(());
+        };
         let fourth_arg_span = match fourth_arg {
             Argument::Positional(arg) => arg.value.span(),
             Argument::Named(arg) => arg.span(),

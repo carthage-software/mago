@@ -75,6 +75,7 @@ pub struct CodebaseEntryKeys {
 /// their members, inheritance, dependencies, and associated types.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[non_exhaustive]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct CodebaseMetadata {
     /// Configuration flag: Should types be inferred based on usage patterns?
     pub infer_types_from_usage: bool,
@@ -431,7 +432,7 @@ impl CodebaseMetadata {
 
     /// Gets the type of a class constant, considering both type hints and inferred types.
     #[must_use]
-    pub fn get_class_constant_type<'a>(&'a self, class: &str, constant: &str) -> Option<Cow<'a, TUnion>> {
+    pub fn get_class_constant_type<'meta>(&'meta self, class: &str, constant: &str) -> Option<Cow<'meta, TUnion>> {
         let lowercase_class = ascii_lowercase_atom(class);
         let constant_name = atom(constant);
         let class_meta = self.class_likes.get(&lowercase_class)?;
@@ -743,11 +744,11 @@ impl CodebaseMetadata {
 
     /// Gets thrown types for a function-like, including inherited throws.
     #[must_use]
-    pub fn get_function_like_thrown_types<'a>(
-        &'a self,
-        class_like: Option<&'a ClassLikeMetadata>,
-        function_like: &'a FunctionLikeMetadata,
-    ) -> &'a [TypeMetadata] {
+    pub fn get_function_like_thrown_types<'meta>(
+        &'meta self,
+        class_like: Option<&'meta ClassLikeMetadata>,
+        function_like: &'meta FunctionLikeMetadata,
+    ) -> &'meta [TypeMetadata] {
         if !function_like.thrown_types.is_empty() {
             return function_like.thrown_types.as_slice();
         }
@@ -830,19 +831,25 @@ impl CodebaseMetadata {
 
     /// Generates a unique name for an anonymous class based on its span.
     #[must_use]
+    #[allow(clippy::semicolon_outside_block)]
     pub fn get_anonymous_class_name(span: mago_span::Span) -> Atom {
         use std::io::Write;
 
         let mut buffer = [0u8; 64];
         let mut writer = &mut buffer[..];
 
+        // SAFETY: writing into a 64-byte buffer with three small numeric values (FileId
+        // and two u32 offsets formatted as decimal) cannot exceed the buffer; the
+        // `Write` impl for `&mut [u8]` only fails when the slice is full.
         unsafe {
             write!(writer, "class@anonymous:{}-{}:{}", span.file_id, span.start.offset, span.end.offset)
                 .unwrap_unchecked();
-        };
+        }
 
         let written_len = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
 
+        // SAFETY: every byte written above was ASCII (digits, '@', ':', '-', alphabet),
+        // so the prefix `&buffer[..written_len]` is valid UTF-8.
         atom(unsafe { std::str::from_utf8(&buffer[..written_len]).unwrap_unchecked() })
     }
 
@@ -1051,7 +1058,7 @@ impl CodebaseMetadata {
             self.file_signatures.insert(*k, v.clone());
         }
         self.safe_symbols.extend(other.safe_symbols.iter().copied());
-        self.safe_symbol_members.extend(other.safe_symbol_members.iter().cloned());
+        self.safe_symbol_members.extend(other.safe_symbol_members.iter().copied());
         self.infer_types_from_usage |= other.infer_types_from_usage;
     }
 
@@ -1093,6 +1100,7 @@ impl CodebaseMetadata {
     ///
     /// This is much cheaper than keeping a full `CodebaseMetadata` clone — it only stores
     /// the keys needed to undo an `extend_ref()` operation.
+    #[must_use]
     pub fn extract_keys(&self) -> CodebaseEntryKeys {
         CodebaseEntryKeys {
             class_like_names: self.class_likes.keys().copied().collect(),
@@ -1117,6 +1125,7 @@ impl CodebaseMetadata {
     /// By only recording the keys whose spans still match *this* metadata, removing the
     /// fingerprint later becomes a safe no-op when another file won the merge. The
     /// removal only drops the entries this file genuinely put into the merged codebase.
+    #[must_use]
     pub fn extract_owned_keys(&self, merged: &CodebaseMetadata) -> CodebaseEntryKeys {
         let class_like_names = self
             .class_likes

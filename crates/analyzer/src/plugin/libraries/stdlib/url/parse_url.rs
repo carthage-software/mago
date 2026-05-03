@@ -168,7 +168,7 @@ fn get_component_return_type(component: i64) -> TUnion {
             TUnion::from_vec(vec![
                 false_type,
                 TAtomic::Null,
-                TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 65535))),
+                TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 0xFFFF))),
             ])
         }
         -1 => {
@@ -185,7 +185,7 @@ fn get_component_return_type(component: i64) -> TUnion {
 fn get_all_components_return_type() -> TUnion {
     let mut all_components_return_type = get_full_array_return_type();
     all_components_return_type.types.to_mut().push(TAtomic::Null);
-    all_components_return_type.types.to_mut().push(TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 65535))));
+    all_components_return_type.types.to_mut().push(TAtomic::Scalar(TScalar::Integer(TInteger::Range(0, 0xFFFF))));
     all_components_return_type.types.to_mut().push(TAtomic::Scalar(TScalar::String(TString::general())));
 
     all_components_return_type
@@ -200,7 +200,7 @@ fn get_full_array_return_type() -> TUnion {
         known_items.insert(ArrayKey::String(Atom::from(field)), (true, get_non_empty_string()));
     }
 
-    known_items.insert(ArrayKey::String(Atom::from("port")), (true, get_int_range(Some(0), Some(65535))));
+    known_items.insert(ArrayKey::String(Atom::from("port")), (true, get_int_range(Some(0), Some(0xFFFF))));
 
     let keyed_array = TKeyedArray::new().with_known_items(known_items);
 

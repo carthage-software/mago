@@ -44,9 +44,9 @@ use crate::ttype::wrap_atomic;
 /// tracks how deeply nested we are (invariant params bump this so the bound
 /// resolver can prefer the shallowest contribution).
 #[derive(Copy, Clone, Debug)]
-pub struct DefinitionReplacementOptions<'a> {
+pub struct DefinitionReplacementOptions<'fn_id> {
     pub calling_class: Option<Atom>,
-    pub calling_function: Option<&'a FunctionLikeIdentifier>,
+    pub calling_function: Option<&'fn_id FunctionLikeIdentifier>,
     pub add_lower_bound: bool,
     pub iteration_depth: usize,
     pub appearance_depth: usize,
@@ -257,6 +257,7 @@ fn handle_template_param_substitution(
     options: DefinitionReplacementOptions<'_>,
     had_template: &mut bool,
 ) -> Vec<TAtomic> {
+    #[allow(clippy::unreachable)]
     let TAtomic::GenericParameter(TGenericParameter { defining_entity, intersection_types, constraint, .. }) =
         atomic_type
     else {
@@ -428,9 +429,10 @@ pub fn insert_bound_type(
 
 fn handle_template_param_class_substitution(
     atomic_type: &TAtomic,
-    template_result: &mut TemplateResult,
+    template_result: &TemplateResult,
     options: DefinitionReplacementOptions<'_>,
 ) -> Vec<TAtomic> {
+    #[allow(clippy::unreachable)]
     let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
         kind,
         parameter_name,
@@ -452,15 +454,14 @@ fn handle_template_param_class_substitution(
 
     let mut atomic_types = vec![];
 
-    let template_type = template_result
+    let Some(template_type) = template_result
         .template_types
         .get(parameter_name)
-        .unwrap()
-        .iter()
-        .filter(|t| &t.defining_entity == defining_entity)
+        .and_then(|entries| entries.iter().find(|t| &t.defining_entity == defining_entity))
         .map(|t| &t.constraint)
-        .next()
-        .unwrap();
+    else {
+        return atomic_types;
+    };
 
     for template_atomic_type in template_type.types.as_ref() {
         if let TAtomic::Object(_) = &template_atomic_type {
@@ -482,7 +483,7 @@ fn handle_template_param_class_substitution(
         } else {
             atomic_types.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
                 kind: *kind,
-                constraint: Arc::new(atomic_type_as.clone()),
+                constraint: Arc::new(atomic_type_as),
             })));
         }
     }
@@ -490,11 +491,11 @@ fn handle_template_param_class_substitution(
     atomic_types
 }
 
-fn template_types_contains<'a>(
-    template_types: &'a IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
+fn template_types_contains<'tt>(
+    template_types: &'tt IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
     parameter_name: Atom,
     defining_entity: &GenericParent,
-) -> Option<&'a TUnion> {
+) -> Option<&'tt TUnion> {
     template_types.get(&parameter_name).and_then(|mapped_classes| {
         mapped_classes
             .iter()
@@ -503,6 +504,7 @@ fn template_types_contains<'a>(
     })
 }
 
+#[must_use]
 pub fn get_mapped_generic_type_parameters(
     codebase: &CodebaseMetadata,
     input_type_part: &TAtomic,
@@ -633,10 +635,10 @@ pub fn get_mapped_generic_type_parameters(
 }
 
 #[must_use]
-pub fn get_extended_templated_types<'a>(
-    atomic_type: &'a TAtomic,
-    extends: &'a AtomMap<IndexMap<Atom, TUnion, RandomState>>,
-) -> Vec<&'a TAtomic> {
+pub fn get_extended_templated_types<'ty>(
+    atomic_type: &'ty TAtomic,
+    extends: &'ty AtomMap<IndexMap<Atom, TUnion, RandomState>>,
+) -> Vec<&'ty TAtomic> {
     let mut extra_added_types = Vec::new();
 
     if let TAtomic::GenericParameter(TGenericParameter {

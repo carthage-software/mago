@@ -16,6 +16,7 @@ use crate::registry::RuleRegistry;
 use crate::scope::ScopeStack;
 
 #[derive(Debug)]
+#[allow(clippy::partial_pub_fields)]
 pub struct LintContext<'ctx, 'arena> {
     pub php_version: PHPVersion,
     pub arena: &'arena Bump,
@@ -91,6 +92,7 @@ impl<'ctx, 'arena> LintContext<'ctx, 'arena> {
     ///
     /// Constant expression contexts include attribute arguments, parameter default values,
     /// property default values, and constant values.
+    #[must_use]
     pub fn is_in_constant_expression(&self) -> bool {
         self.constant_expression_depth > 0
     }

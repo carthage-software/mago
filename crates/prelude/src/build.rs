@@ -29,6 +29,7 @@ pub(crate) fn build_prelude_internal() -> Prelude {
     let mut metadata = get_prelude_metadata(&mut arena, &read_db);
     let mut symbol_references = SymbolReferences::default();
 
+    #[allow(clippy::default_trait_access)]
     populate_codebase(&mut metadata, &mut symbol_references, Default::default(), Default::default());
 
     Prelude { database, metadata, symbol_references }

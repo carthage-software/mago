@@ -31,7 +31,7 @@ pub type DeletionRange = (usize, usize);
 /// (signature, body, modifiers, attributes) produces a different hash, triggering re-analysis.
 ///
 /// Provides a comprehensive API for modification and querying following established conventions.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CodebaseDiff {
     /// Set of `(Symbol, Member)` pairs whose fingerprint hash is UNCHANGED.
     /// These symbols can be safely skipped during re-analysis.
@@ -65,6 +65,7 @@ impl CodebaseDiff {
     /// which can be kept unchanged, and what text diffs exist for source files.
     ///
     /// It aggregates this information into a `CodebaseDiff` instance that can be used for incremental analysis.
+    #[must_use]
     pub fn between(old_metadata: &CodebaseMetadata, new_metadata: &CodebaseMetadata) -> Self {
         let mut aggregate_diff = CodebaseDiff::new();
 
@@ -134,6 +135,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with the 'keep' set replaced.
     #[inline]
+    #[must_use]
     pub fn with_keep(mut self, keep_set: impl IntoIterator<Item = SymbolIdentifier>) -> Self {
         self.set_keep(keep_set);
         self
@@ -161,6 +163,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with multiple entries added to the 'keep' set.
     #[inline]
+    #[must_use]
     pub fn with_added_keep_entries(mut self, entries: impl IntoIterator<Item = SymbolIdentifier>) -> Self {
         self.add_keep_entries(entries);
         self
@@ -188,6 +191,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with the 'changed' set replaced.
     #[inline]
+    #[must_use]
     pub fn with_changed(mut self, change_set: impl IntoIterator<Item = SymbolIdentifier>) -> Self {
         self.set_changed(change_set);
         self
@@ -222,6 +226,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with multiple entries added to the 'changed' set.
     #[inline]
+    #[must_use]
     pub fn with_added_changed_entries(mut self, entries: impl IntoIterator<Item = SymbolIdentifier>) -> Self {
         self.add_changed_entries(entries);
         self
@@ -277,6 +282,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with the diff hunks for the source file extended.
     #[inline]
+    #[must_use]
     pub fn with_added_diffs_for_source(mut self, source: FileId, diffs: impl IntoIterator<Item = DiffHunk>) -> Self {
         self.add_diffs_for_source(source, diffs);
         self
@@ -336,6 +342,7 @@ impl CodebaseDiff {
 
     /// Returns a new instance with the deletion ranges for the source file extended.
     #[inline]
+    #[must_use]
     pub fn with_added_deletion_ranges_for_source(
         mut self,
         file: FileId,

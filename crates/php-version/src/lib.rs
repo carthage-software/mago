@@ -214,6 +214,7 @@ impl PHPVersion {
     /// assert!(version.is_at_least(7, 4, 30)); // 8.0.0 is newer than 7.4.30
     /// assert!(!version.is_at_least(8, 1, 0));
     /// ```
+    #[inline]
     #[must_use]
     pub const fn is_at_least(&self, major: u32, minor: u32, patch: u32) -> bool {
         self.0 >= ((major << 16) | (minor << 8) | patch)
@@ -235,6 +236,7 @@ impl PHPVersion {
     /// assert!(version.is_supported(Feature::NullCoalesceAssign));
     /// assert!(!version.is_supported(Feature::NamedArguments));
     /// ```
+    #[inline]
     #[must_use]
     pub const fn is_supported(&self, feature: Feature) -> bool {
         match feature {
@@ -351,6 +353,7 @@ impl PHPVersion {
     /// assert!(version.is_deprecated(Feature::RequiredParameterAfterOptional));
     /// assert!(!version.is_deprecated(Feature::DynamicProperties)); // that is 8.2+
     /// ```
+    #[inline]
     #[must_use]
     pub const fn is_deprecated(&self, feature: Feature) -> bool {
         match feature {
@@ -376,6 +379,7 @@ impl PHPVersion {
     /// let version = PHPVersion::new(8, 4, 0);
     /// assert_eq!(version.to_version_id(), 0x080400);
     /// ```
+    #[inline]
     #[must_use]
     pub const fn to_version_id(&self) -> u32 {
         self.0
@@ -390,24 +394,28 @@ impl PHPVersionRange {
     pub const PHP8: PHPVersionRange = Self::between(PHPVersion::new(8, 0, 0), PHPVersion::new(8, 99, 99));
 
     /// Creates a new `PHPVersionRange` that includes all versions.
+    #[inline]
     #[must_use]
     pub const fn any() -> Self {
         Self { min: None, max: None }
     }
 
     /// Creates a new `PHPVersionRange` that includes all versions up to (and including) the specified version.
+    #[inline]
     #[must_use]
     pub const fn until(version: PHPVersion) -> Self {
         Self { min: None, max: Some(version) }
     }
 
     /// Creates a new `PHPVersionRange` that includes all versions from (and including) the specified version.
+    #[inline]
     #[must_use]
     pub const fn from(version: PHPVersion) -> Self {
         Self { min: Some(version), max: None }
     }
 
     /// Creates a new `PHPVersionRange` that includes all versions between (and including) the specified minimum and maximum versions.
+    #[inline]
     #[must_use]
     pub const fn between(min: PHPVersion, max: PHPVersion) -> Self {
         Self { min: Some(min), max: Some(max) }
@@ -434,18 +442,21 @@ impl PHPVersionRange {
 }
 
 impl std::default::Default for PHPVersion {
+    #[inline]
     fn default() -> Self {
         Self::LATEST
     }
 }
 
 impl std::fmt::Display for PHPVersion {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}.{}.{}", self.major(), self.minor(), self.patch())
     }
 }
 
 impl Serialize for PHPVersion {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -455,6 +466,7 @@ impl Serialize for PHPVersion {
 }
 
 impl<'de> Deserialize<'de> for PHPVersion {
+    #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -468,6 +480,7 @@ impl<'de> Deserialize<'de> for PHPVersion {
 impl FromStr for PHPVersion {
     type Err = ParsingError;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
             return Err(ParsingError::InvalidFormat);
@@ -499,6 +512,7 @@ impl FromStr for PHPVersion {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

@@ -2,7 +2,7 @@ use bumpalo::collections::Vec as BVec;
 
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// A fresh arena-backed vector.
     #[inline]
     pub(crate) fn new_vec<T>(&self) -> BVec<'arena, T> {

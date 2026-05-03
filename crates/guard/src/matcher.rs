@@ -127,6 +127,7 @@ fn segment_matches(fqcn_part: &str, pattern_part: &str, case_sensitive: bool) ->
     if pattern_part == "*" {
         return true;
     }
+
     if !pattern_part.contains('*') {
         return if case_sensitive { fqcn_part == pattern_part } else { fqcn_part.eq_ignore_ascii_case(pattern_part) };
     }
@@ -140,23 +141,30 @@ fn segment_matches(fqcn_part: &str, pattern_part: &str, case_sensitive: bool) ->
         if remainder.len() < p_chunks[0].len() {
             return false;
         }
+
         let prefix = &remainder[..p_chunks[0].len()];
         if !(if case_sensitive { prefix == p_chunks[0] } else { prefix.eq_ignore_ascii_case(p_chunks[0]) }) {
             return false;
         }
+
         remainder = &remainder[p_chunks[0].len()..];
     }
 
-    // Check last chunk (after the last `*`).
-    let last_chunk = p_chunks.last().unwrap();
+    let last_chunk = match p_chunks.last() {
+        Some(chunk) => *chunk,
+        None => return false,
+    };
+
     if !last_chunk.is_empty() {
         if remainder.len() < last_chunk.len() {
             return false;
         }
+
         let suffix = &remainder[remainder.len() - last_chunk.len()..];
-        if !(if case_sensitive { suffix == *last_chunk } else { suffix.eq_ignore_ascii_case(last_chunk) }) {
+        if !(if case_sensitive { suffix == last_chunk } else { suffix.eq_ignore_ascii_case(last_chunk) }) {
             return false;
         }
+
         remainder = &remainder[..remainder.len() - last_chunk.len()];
     }
 
@@ -165,6 +173,7 @@ fn segment_matches(fqcn_part: &str, pattern_part: &str, case_sensitive: bool) ->
         if chunk.is_empty() {
             continue;
         }
+
         let found = if case_sensitive { remainder.find(chunk) } else { find_ignore_ascii_case(remainder, chunk) };
         if let Some(pos) = found {
             remainder = &remainder[pos + chunk.len()..];

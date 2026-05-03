@@ -11,7 +11,7 @@ use crate::error::ParseError;
 use crate::parser::MAX_RECURSION_DEPTH;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         self.state.recursion_depth += 1;
         if self.state.recursion_depth > MAX_RECURSION_DEPTH {

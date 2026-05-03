@@ -1,3 +1,10 @@
+#![allow(clippy::wildcard_imports)]
+#![allow(clippy::exhaustive_enums)]
+#![allow(clippy::float_arithmetic)]
+#![allow(clippy::pub_use)]
+#![allow(clippy::else_if_without_else)]
+#![allow(clippy::match_wildcard_for_single_variants)]
+
 use mago_atom::Atom;
 use mago_atom::atom;
 use mago_span::Span;

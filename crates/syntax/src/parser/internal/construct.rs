@@ -19,7 +19,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::Precedence;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_construct(&mut self) -> Result<Expression<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
@@ -83,12 +83,12 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                                 argument_list: partial_args,
                             },
                         )));
-                    } else {
-                        Construct::Exit(ExitConstruct {
-                            exit,
-                            arguments: Some(partial_args.into_argument_list(self.arena)),
-                        })
                     }
+
+                    Construct::Exit(ExitConstruct {
+                        exit,
+                        arguments: Some(partial_args.into_argument_list(self.arena)),
+                    })
                 } else {
                     Construct::Exit(ExitConstruct { exit, arguments: None })
                 }
@@ -109,12 +109,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                                 argument_list: partial_args,
                             },
                         )));
-                    } else {
-                        Construct::Die(DieConstruct {
-                            die,
-                            arguments: Some(partial_args.into_argument_list(self.arena)),
-                        })
                     }
+
+                    Construct::Die(DieConstruct { die, arguments: Some(partial_args.into_argument_list(self.arena)) })
                 } else {
                     Construct::Die(DieConstruct { die, arguments: None })
                 }

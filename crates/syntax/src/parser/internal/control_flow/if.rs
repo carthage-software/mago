@@ -11,7 +11,7 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_if(&mut self) -> Result<If<'arena>, ParseError> {
         Ok(If {
             r#if: self.expect_keyword(T!["if"])?,

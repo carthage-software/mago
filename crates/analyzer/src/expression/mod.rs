@@ -229,6 +229,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
 
                 Ok(())
             }
+            #[allow(clippy::unreachable)]
             _ => unreachable!("An expression variant was not handled in analyzer: {self:?}"),
         };
 
@@ -278,8 +279,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Parenthesized<'arena> {
 pub fn find_expression_logic_issues<'ctx, 'arena>(
     expression: &Expression<'arena>,
     context: &mut Context<'ctx, 'arena>,
-    block_context: &mut BlockContext<'ctx>,
-    artifacts: &mut AnalysisArtifacts,
+    block_context: &BlockContext<'ctx>,
+    artifacts: &AnalysisArtifacts,
 ) {
     let mut if_block_context = block_context.clone();
     let mut cond_referenced_var_ids = if_block_context.conditionally_referenced_variable_ids.clone();

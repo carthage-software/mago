@@ -23,22 +23,22 @@ fn full_atom_zoo() -> Vec<TAtomic> {
     atoms.push(t_negative_int());
     atoms.push(t_non_negative_int());
     atoms.push(t_non_positive_int());
-    for v in [-1000_i64, -100, -10, -1, 0, 1, 10, 100, 1000] {
+    for v in [-1000i64, -100, -10, -1, 0, 1, 10, 100, 1000] {
         atoms.push(t_lit_int(v));
     }
-    for from in [-100_i64, -1, 0, 1, 100] {
+    for from in [-100i64, -1, 0, 1, 100] {
         atoms.push(t_int_from(from));
     }
-    for to in [-100_i64, -1, 0, 1, 100] {
+    for to in [-100i64, -1, 0, 1, 100] {
         atoms.push(t_int_to(to));
     }
-    for (lo, hi) in [(-50_i64, 50), (0, 100), (-100, 0), (-10, 10)] {
+    for (lo, hi) in [(-50i64, 50), (0, 100), (-100, 0), (-10, 10)] {
         atoms.push(t_int_range(lo, hi));
     }
 
     atoms.push(t_float());
     atoms.push(t_unspec_lit_float());
-    for v in [-100.0_f64, -1.0, 0.0, 1.0, 1.5, 100.0] {
+    for v in [-100.0f64, -1.0, 0.0, 1.0, 1.5, 100.0] {
         atoms.push(t_lit_float(v));
     }
 
@@ -100,8 +100,8 @@ fn full_atom_zoo() -> Vec<TAtomic> {
     atoms.push(t_keyed_unsealed(u(t_int()), u(t_string()), false));
     atoms.push(t_keyed_unsealed(u(t_array_key()), u(t_mixed()), false));
 
-    atoms.push(t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1)))])));
-    atoms.push(t_sealed_list(BTreeMap::from([(0_usize, (false, u(t_int()))), (1_usize, (false, u(t_string())))])));
+    atoms.push(t_sealed_list(BTreeMap::from([(0usize, (false, ui(1)))])));
+    atoms.push(t_sealed_list(BTreeMap::from([(0usize, (false, u(t_int()))), (1usize, (false, u(t_string())))])));
 
     atoms.push(t_keyed_sealed(BTreeMap::from([(ak_str("a"), (false, ui(1)))]), false));
     atoms.push(t_keyed_sealed(
@@ -132,7 +132,7 @@ fn self_idempotency_basic() {
         if is_known_non_idempotent_under_combine(&atom) {
             continue;
         }
-        for n in [2_usize, 3, 5, 10] {
+        for n in [2usize, 3, 5, 10] {
             let r = combine_default(vec![atom.clone(); n]);
             assert_eq!(r.len(), 1, "self-idempotency broke for {atom:?} (n={n})");
             assert_eq!(atomic_id_string(&r[0]), atomic_id_string(&atom));

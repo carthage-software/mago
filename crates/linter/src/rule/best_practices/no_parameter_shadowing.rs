@@ -153,7 +153,7 @@ struct ShadowCollector<'rule, 'arena> {
     shadows: HashMap<&'arena str, Vec<Span>>,
 }
 
-impl<'rule, 'arena> ShadowCollector<'rule, 'arena> {
+impl<'arena> ShadowCollector<'_, 'arena> {
     fn check_variable(&mut self, name: &'arena str, span: Span) {
         if self.params.contains_key(name) {
             self.shadows.entry(name).or_default().push(span);
@@ -169,7 +169,7 @@ impl<'rule, 'arena> ShadowCollector<'rule, 'arena> {
     }
 }
 
-impl<'rule, 'ast, 'arena> MutWalker<'ast, 'arena, ()> for ShadowCollector<'rule, 'arena> {
+impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for ShadowCollector<'_, 'arena> {
     fn walk_in_foreach(&mut self, foreach: &'ast Foreach<'arena>, _: &mut ()) {
         match &foreach.target {
             ForeachTarget::Value(v) => self.check_expression(v.value),

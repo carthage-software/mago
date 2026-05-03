@@ -7,6 +7,7 @@ use crate::rule::AnyRule;
 use crate::settings::Settings;
 
 #[derive(Debug, Clone)]
+#[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct RuleRegistry {
     pub(crate) only: Option<Vec<String>>,
     integrations: IntegrationSet,

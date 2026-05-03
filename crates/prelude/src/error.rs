@@ -2,6 +2,7 @@ use bincode::error::DecodeError;
 use bincode::error::EncodeError;
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum PreludeError {
     Encode(EncodeError),
     Decode(DecodeError),

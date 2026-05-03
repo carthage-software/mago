@@ -26,11 +26,13 @@ pub enum Change {
 /// can then be applied later in a single batch operation. This pattern avoids lock
 /// contention on the main database during processing.
 #[derive(Clone, Debug)]
+#[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct ChangeLog {
     pub(crate) changes: Arc<Mutex<Vec<Change>>>,
 }
 
 impl Default for ChangeLog {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -38,6 +40,7 @@ impl Default for ChangeLog {
 
 impl ChangeLog {
     /// Creates a new, empty `ChangeLog`.
+    #[inline]
     #[must_use]
     pub fn new() -> Self {
         Self { changes: Arc::new(Mutex::new(Vec::new())) }
@@ -49,6 +52,7 @@ impl ChangeLog {
     ///
     /// Returns a `DatabaseError::PoisonedLogMutex` if another thread panicked
     /// while holding the lock, leaving the change log in an unusable state.
+    #[inline]
     pub fn add(&self, file: File) -> Result<(), DatabaseError> {
         self.changes.lock().map_err(|_| DatabaseError::PoisonedLogMutex)?.push(Change::Add(file));
         Ok(())
@@ -60,6 +64,7 @@ impl ChangeLog {
     ///
     /// Returns a `DatabaseError::PoisonedLogMutex` if another thread panicked
     /// while holding the lock, leaving the change log in an unusable state.
+    #[inline]
     pub fn update(&self, id: FileId, new_contents: Cow<'static, str>) -> Result<(), DatabaseError> {
         self.changes.lock().map_err(|_| DatabaseError::PoisonedLogMutex)?.push(Change::Update(id, new_contents));
         Ok(())
@@ -71,6 +76,7 @@ impl ChangeLog {
     ///
     /// Returns a `DatabaseError::PoisonedLogMutex` if another thread panicked
     /// while holding the lock, leaving the change log in an unusable state.
+    #[inline]
     pub fn delete(&self, id: FileId) -> Result<(), DatabaseError> {
         self.changes.lock().map_err(|_| DatabaseError::PoisonedLogMutex)?.push(Change::Delete(id));
         Ok(())
@@ -83,6 +89,7 @@ impl ChangeLog {
     /// # Errors
     ///
     /// - `DatabaseError::PoisonedLogMutex`: Returned if the internal lock was poisoned
+    #[inline]
     pub fn changed_file_ids(&self) -> Result<Vec<FileId>, DatabaseError> {
         let changes = self.changes.lock().map_err(|_| DatabaseError::PoisonedLogMutex)?;
         let mut ids = Vec::new();
@@ -107,6 +114,7 @@ impl ChangeLog {
     ///
     /// - `DatabaseError::ChangeLogInUse`: Returned if other `Arc` references to this change log still exist.
     /// - `DatabaseError::PoisonedLogMutex`: Returned if the internal lock was poisoned because another thread panicked while holding it.
+    #[inline]
     pub fn into_inner(self) -> Result<Vec<Change>, DatabaseError> {
         match Arc::try_unwrap(self.changes) {
             Ok(mutex) => mutex.into_inner().map_err(|_| DatabaseError::PoisonedLogMutex),

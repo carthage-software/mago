@@ -415,10 +415,9 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
                 .constraint
                 .types
                 .iter()
-                .filter_map(|constraint_atomic| {
+                .find_map(|constraint_atomic| {
                     get_class_name_from_atomic_impl(codebase, constraint_atomic, active_class_string)
                 })
-                .next()
                 .unwrap_or_else(ResolvedClassname::invalid),
             TAtomic::Object(object) => match object {
                 TObject::Any => {

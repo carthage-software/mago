@@ -102,14 +102,14 @@ fn many_lists_with_various_elements_combine_into_one() {
 
 #[test]
 fn single_sealed_list_passthrough() {
-    let sealed = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1))), (1_usize, (false, ui(2)))]));
-    let r = combine_default(vec![sealed.clone()]);
+    let sealed = t_sealed_list(BTreeMap::from([(0usize, (false, ui(1))), (1usize, (false, ui(2)))]));
+    let r = combine_default(vec![sealed]);
     assert_eq!(r.len(), 1);
 }
 
 #[test]
 fn sealed_list_meets_unsealed_list_collapses() {
-    let sealed = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1))), (1_usize, (false, ui(2)))]));
+    let sealed = t_sealed_list(BTreeMap::from([(0usize, (false, ui(1))), (1usize, (false, ui(2)))]));
     let unsealed = t_list(u(t_int()), false);
     let r = combine_default(vec![sealed, unsealed]);
     assert_eq!(r.len(), 1);
@@ -235,31 +235,28 @@ fn mixed_dominates_array() {
 
 #[test]
 fn many_distinct_sealed_lists_generalise() {
-    let inputs: Vec<TAtomic> =
-        (0..40_i64).map(|i| t_sealed_list(BTreeMap::from([(0_usize, (false, ui(i)))]))).collect();
+    let inputs: Vec<TAtomic> = (0..40i64).map(|i| t_sealed_list(BTreeMap::from([(0usize, (false, ui(i)))]))).collect();
     let r = combine_default(inputs);
     assert!(r.len() <= 40);
 }
 
 #[test]
 fn under_array_threshold_keeps_sealed_lists() {
-    let inputs: Vec<TAtomic> =
-        (0..16_i64).map(|i| t_sealed_list(BTreeMap::from([(0_usize, (false, ui(i)))]))).collect();
+    let inputs: Vec<TAtomic> = (0..16i64).map(|i| t_sealed_list(BTreeMap::from([(0usize, (false, ui(i)))]))).collect();
     let r = combine_default(inputs);
     assert!(!r.is_empty());
 }
 
 #[test]
 fn custom_low_array_threshold_generalises_quickly() {
-    let inputs: Vec<TAtomic> =
-        (0..10_i64).map(|i| t_sealed_list(BTreeMap::from([(0_usize, (false, ui(i)))]))).collect();
+    let inputs: Vec<TAtomic> = (0..10i64).map(|i| t_sealed_list(BTreeMap::from([(0usize, (false, ui(i)))]))).collect();
     let r = combine_with_array_threshold(inputs, 3);
     assert!(r.len() <= 10);
 }
 
 #[test]
 fn list_with_known_elements_idempotent() {
-    let l = t_sealed_list(BTreeMap::from([(0_usize, (false, u(t_int()))), (1_usize, (false, u(t_string())))]));
+    let l = t_sealed_list(BTreeMap::from([(0usize, (false, u(t_int()))), (1usize, (false, u(t_string())))]));
     for n in 1..=4 {
         let r = combine_default(vec![l.clone(); n]);
         assert!(r.len() <= n, "n={n}");

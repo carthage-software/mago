@@ -15,6 +15,7 @@ use crate::Fingerprintable;
 use std::hash::Hash;
 
 impl Fingerprintable for ArgumentList<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -33,6 +34,7 @@ impl Fingerprintable for ArgumentList<'_> {
 }
 
 impl Fingerprintable for Argument<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -47,6 +49,7 @@ impl Fingerprintable for Argument<'_> {
 }
 
 impl Fingerprintable for PositionalArgument<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -60,6 +63,7 @@ impl Fingerprintable for PositionalArgument<'_> {
 }
 
 impl Fingerprintable for NamedArgument<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -73,6 +77,7 @@ impl Fingerprintable for NamedArgument<'_> {
 }
 
 impl Fingerprintable for PartialArgumentList<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -91,6 +96,7 @@ impl Fingerprintable for PartialArgumentList<'_> {
 }
 
 impl Fingerprintable for PartialArgument<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -114,6 +120,7 @@ impl Fingerprintable for PartialArgument<'_> {
 }
 
 impl Fingerprintable for PlaceholderArgument {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -125,6 +132,7 @@ impl Fingerprintable for PlaceholderArgument {
 }
 
 impl Fingerprintable for VariadicPlaceholderArgument {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -136,6 +144,7 @@ impl Fingerprintable for VariadicPlaceholderArgument {
 }
 
 impl Fingerprintable for NamedPlaceholderArgument<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

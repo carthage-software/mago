@@ -89,7 +89,7 @@ pub fn analyze<'ctx, 'arena>(
 
             let mut issue;
 
-            if let Some(true) = union_comparison_result.type_coerced {
+            if union_comparison_result.type_coerced == Some(true) {
                 let issue_kind;
 
                 if union_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false) {
@@ -203,7 +203,7 @@ pub fn analyze<'ctx, 'arena>(
     if context.settings.memoize_properties
         && let Some(property_access_id) = property_access_id
     {
-        block_context.locals.insert(property_access_id, resulting_type.clone());
+        block_context.locals.insert(property_access_id, Rc::clone(&resulting_type));
     }
 
     artifacts.set_rc_expression_type(property_access, resulting_type);
@@ -229,7 +229,7 @@ mod tests {
 
     test_analysis! {
         name = memoized_property_assignment,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class A {

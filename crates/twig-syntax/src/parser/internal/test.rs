@@ -5,7 +5,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse a test expression suffix: `operand is [not] name [second_word] [arguments]`.
     /// The leading `is` token must already have been consumed.
     pub(crate) fn parse_test(

@@ -18,7 +18,7 @@ pub struct TokenSeparatedSequenceResult<'arena, T> {
     pub close: Span,
 }
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse a comma-separated sequence.
     ///
     /// This method handles common patterns like:

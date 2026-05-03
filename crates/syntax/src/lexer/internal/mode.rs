@@ -28,10 +28,10 @@ pub enum Interpolation {
 /// such as inline text, PHP scripts, strings, and heredoc/nowdoc documents.
 /// This allows the lexer to correctly tokenize the input based on the current context.
 ///
-/// The lifetime `'a` is associated with the `DocumentString` variant to tie the label's lifetime
+/// The lifetime `'src` is associated with the `DocumentString` variant to tie the label's lifetime
 /// to the input being lexed.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
-pub enum LexerMode<'a> {
+pub enum LexerMode<'src> {
     /// **Inline Mode**
     ///
     /// Used when tokenizing content outside of PHP tags.
@@ -74,7 +74,7 @@ pub enum LexerMode<'a> {
     ///
     /// In this mode, the lexer reads until it encounters the closing label that matches the provided label,
     /// typically at the start of a line. Heredocs allow interpolation, whereas nowdocs do not.
-    DocumentString(DocumentKind, &'a [u8], Interpolation),
+    DocumentString(DocumentKind, &'src [u8], Interpolation),
 
     /// **Halt Mode**
     ///

@@ -8,6 +8,7 @@ use mago_syntax::ast::UnaryPrefixOperator;
 use std::hash::Hash;
 
 impl Fingerprintable for UnaryPrefix<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -21,6 +22,7 @@ impl Fingerprintable for UnaryPrefix<'_> {
 }
 
 impl Fingerprintable for UnaryPostfix<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -34,6 +36,7 @@ impl Fingerprintable for UnaryPostfix<'_> {
 }
 
 impl Fingerprintable for UnaryPrefixOperator<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -85,6 +88,7 @@ impl Fingerprintable for UnaryPrefixOperator<'_> {
 }
 
 impl Fingerprintable for UnaryPostfixOperator {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

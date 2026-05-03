@@ -3,7 +3,7 @@ use crate::ast::ast::Return;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_return(&mut self) -> Result<Return<'arena>, ParseError> {
         Ok(Return {
             r#return: self.expect_keyword(T!["return"])?,

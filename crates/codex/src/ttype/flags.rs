@@ -53,11 +53,13 @@ impl UnionFlags {
     }
 
     #[inline]
+    #[must_use]
     pub const fn contains(self, flag: UnionFlags) -> bool {
         (self.0 & flag.0) == flag.0
     }
 
     #[inline]
+    #[must_use]
     pub const fn intersects(self, other: UnionFlags) -> bool {
         (self.0 & other.0) != 0
     }

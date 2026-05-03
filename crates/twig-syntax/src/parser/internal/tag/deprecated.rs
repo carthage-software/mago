@@ -6,7 +6,7 @@ use crate::parser::Parser;
 use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_deprecated(
         &mut self,
         open_tag_tok: TwigToken<'arena>,
@@ -26,12 +26,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 ));
             }
             let name = self.identifier_from(&option_tok);
-            let eq_tok = match self.stream.try_consume(TwigTokenKind::Equal)? {
-                Some(token) => token,
-                None => {
-                    let next = self.stream.lookahead(0)?;
-                    return Err(self.stream.unexpected(next, &[TwigTokenKind::Equal]));
-                }
+            let Some(eq_tok) = self.stream.try_consume(TwigTokenKind::Equal)? else {
+                let next = self.stream.lookahead(0)?;
+                return Err(self.stream.unexpected(next, &[TwigTokenKind::Equal]));
             };
             let equal = self.stream.span_of(&eq_tok);
             let value = self.parse_expression()?;

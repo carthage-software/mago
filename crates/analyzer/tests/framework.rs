@@ -1,5 +1,8 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::sync::LazyLock;
 
 use foldhash::HashSet;
@@ -23,15 +26,15 @@ static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
 
 #[derive(Debug, Clone)]
-pub struct TestCase<'a> {
-    name: &'a str,
-    content: &'a str,
+pub struct TestCase<'src> {
+    name: &'src str,
+    content: &'src str,
     settings: Option<Settings>,
 }
 
-impl<'a> TestCase<'a> {
+impl<'src> TestCase<'src> {
     #[must_use]
-    pub fn new(name: &'a str, content: &'a str) -> Self {
+    pub fn new(name: &'src str, content: &'src str) -> Self {
         Self { name, content, settings: None }
     }
 
@@ -142,7 +145,7 @@ fn verify_reported_issues(test_name: &str, mut analysis_result: AnalysisResult, 
 
         let mut panic_message = format!("Test '{test_name}' failed with issue discrepancies:\n");
         for d in discrepancies {
-            panic_message.push_str(&format!("  {d}\n"));
+            let _ = writeln!(panic_message, "  {d}");
         }
 
         panic!("{}", panic_message);

@@ -54,7 +54,7 @@ pub fn is_contained_by(
 }
 
 #[inline]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 fn is_contained_by_atomic(
     codebase: &CodebaseMetadata,
     input_type: &TUnion,
@@ -115,7 +115,7 @@ fn is_contained_by_atomic(
     let mut some_type_coerced = false;
     let mut some_type_coerced_from_nested_mixed = false;
 
-    if let TAtomic::Scalar(TScalar::ArrayKey) = input_type_part {
+    if matches!(input_type_part, TAtomic::Scalar(TScalar::ArrayKey)) {
         if container_type.has_int_and_string() {
             return true;
         }
@@ -144,7 +144,7 @@ fn is_contained_by_atomic(
         }
     }
 
-    if let TAtomic::Scalar(TScalar::Generic) = input_type_part
+    if matches!(input_type_part, TAtomic::Scalar(TScalar::Generic))
         && !container_type.has_scalar()
         && container_type.has_scalar_combination()
     {

@@ -201,6 +201,7 @@ pub fn are_definitely_not_identical(
     } else if rhs.is_bool() && !lhs.has_bool() {
         return true;
     }
+    // neither side is a fixed bool; fall through to literal-value comparisons
 
     if let Some(l) = lhs.get_single_literal_int_value()
         && let Some(r) = rhs.get_single_literal_int_value()

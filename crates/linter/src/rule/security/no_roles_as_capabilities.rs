@@ -134,7 +134,7 @@ fn is_wordpress_role(role: &str) -> bool {
 }
 
 /// Extract string literal value from an expression
-fn extract_string_literal<'a>(expr: &'a Expression<'a>) -> Option<&'a str> {
+fn extract_string_literal<'arena>(expr: &Expression<'arena>) -> Option<&'arena str> {
     match expr {
         Expression::Literal(Literal::String(string_literal)) => string_literal.value,
         _ => None,

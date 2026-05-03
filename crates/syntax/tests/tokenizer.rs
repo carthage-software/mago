@@ -1,3 +1,5 @@
+#![allow(clippy::panic_in_result_fn)]
+
 use mago_database::file::FileId;
 use pretty_assertions::assert_eq;
 
@@ -984,7 +986,7 @@ fn test_escape() -> Result<(), SyntaxError> {
 
 #[test]
 fn test_sep_literal_num() -> Result<(), SyntaxError> {
-    let code = r"<?= 1_200;";
+    let code = "<?= 1_200;";
 
     let expected = &[TokenKind::EchoTag, TokenKind::Whitespace, TokenKind::LiteralInteger, TokenKind::Semicolon];
 

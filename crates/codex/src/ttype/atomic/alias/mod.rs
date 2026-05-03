@@ -46,7 +46,7 @@ impl TAlias {
     ///
     /// Returns None if the alias cannot be resolved.
     #[must_use]
-    pub fn resolve<'a>(&self, codebase: &'a CodebaseMetadata) -> Option<&'a TUnion> {
+    pub fn resolve<'codebase>(&self, codebase: &'codebase CodebaseMetadata) -> Option<&'codebase TUnion> {
         let class_like = codebase.get_class_like(&self.class_name)?;
         if let Some(type_alias) = class_like.type_aliases.get(&self.alias_name) {
             return Some(&type_alias.type_union);

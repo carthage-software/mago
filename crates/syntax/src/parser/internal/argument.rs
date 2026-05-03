@@ -12,7 +12,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_optional_argument_list(&mut self) -> Result<Option<ArgumentList<'arena>>, ParseError> {
         if let Some(T!["("]) = self.stream.peek_kind(0)? { Ok(Some(self.parse_argument_list()?)) } else { Ok(None) }
     }

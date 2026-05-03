@@ -8,7 +8,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_match(&mut self) -> Result<Match<'arena>, ParseError> {
         let r#match = self.expect_keyword(T!["match"])?;
         let left_parenthesis = self.stream.eat_span(T!["("])?;

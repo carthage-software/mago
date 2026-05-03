@@ -173,7 +173,7 @@ impl LintRule for StrictTypesRule {
                 };
 
                 // If the first statement is a shebang.
-                if let Statement::Inline(Inline { kind: InlineKind::Shebang, value, span, .. }) = first_statement {
+                if let Statement::Inline(Inline { kind: InlineKind::Shebang, value, span }) = first_statement {
                     // Skip the shebang and look for the first PHP statement.
                     first_statement = if let Some(statement) = program.statements.get(1) {
                         statement
@@ -226,6 +226,7 @@ impl LintRule for StrictTypesRule {
                                 .with_safety(Safety::PotentiallyUnsafe),
                         );
                     }
+                    #[allow(clippy::unreachable)]
                     _ => unreachable!(),
                 }
             });

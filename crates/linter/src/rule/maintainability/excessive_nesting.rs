@@ -175,11 +175,7 @@ impl NestingWalker {
         false
     }
 
-    fn enter_function_like_body<'ctx, 'ast, 'arena>(
-        &mut self,
-        body: &'ast Block<'arena>,
-        ctx: &mut LintContext<'ctx, 'arena>,
-    ) {
+    fn enter_function_like_body<'arena>(&mut self, body: &Block<'arena>, ctx: &mut LintContext<'_, 'arena>) {
         let Some(fn_threshold) = self.function_like_threshold else {
             return;
         };

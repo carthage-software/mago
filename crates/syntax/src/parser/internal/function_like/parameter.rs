@@ -5,7 +5,7 @@ use crate::ast::ast::FunctionLikeParameterList;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_optional_function_like_parameter_list(
         &mut self,
     ) -> Result<Option<FunctionLikeParameterList<'arena>>, ParseError> {

@@ -9,7 +9,7 @@ pub mod r#for;
 pub mod foreach;
 pub mod r#while;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_continue(&mut self) -> Result<Continue<'arena>, ParseError> {
         Ok(Continue {
             r#continue: self.expect_keyword(T!["continue"])?,

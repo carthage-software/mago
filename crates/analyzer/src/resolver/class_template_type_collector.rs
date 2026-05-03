@@ -147,6 +147,8 @@ pub(crate) fn resolve_template_parameter(
                     output_type_extends =
                         Some(add_optional_union_type(nested_output_type, output_type_extends.as_ref(), codebase));
                 }
+            } else {
+                // template parameter isn't bound by this class hierarchy; leave the output unchanged
             }
         } else {
             output_type_extends = Some(add_optional_union_type(

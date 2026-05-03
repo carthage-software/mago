@@ -11,7 +11,7 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_classlike_member(&mut self) -> Result<ClassLikeMember<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
         Ok(match token.kind {
@@ -84,13 +84,10 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     pub(crate) fn parse_classlike_member_selector(&mut self) -> Result<ClassLikeMemberSelector<'arena>, ParseError> {
-        let token = match self.stream.lookahead(0)? {
-            Some(token) => token,
-            None => {
-                let pos = self.stream.current_position();
-                let span = Span::new(self.stream.file_id(), pos, pos);
-                return Ok(ClassLikeMemberSelector::Missing(span));
-            }
+        let Some(token) = self.stream.lookahead(0)? else {
+            let pos = self.stream.current_position();
+            let span = Span::new(self.stream.file_id(), pos, pos);
+            return Ok(ClassLikeMemberSelector::Missing(span));
         };
 
         Ok(match token.kind {

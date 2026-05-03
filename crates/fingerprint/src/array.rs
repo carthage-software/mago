@@ -16,6 +16,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Array<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -30,6 +31,7 @@ impl Fingerprintable for Array<'_> {
 }
 
 impl Fingerprintable for LegacyArray<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -44,6 +46,7 @@ impl Fingerprintable for LegacyArray<'_> {
 }
 
 impl Fingerprintable for List<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -58,6 +61,7 @@ impl Fingerprintable for List<'_> {
 }
 
 impl Fingerprintable for ArrayElement<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -74,6 +78,7 @@ impl Fingerprintable for ArrayElement<'_> {
 }
 
 impl Fingerprintable for KeyValueArrayElement<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -87,6 +92,7 @@ impl Fingerprintable for KeyValueArrayElement<'_> {
 }
 
 impl Fingerprintable for ValueArrayElement<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -99,6 +105,7 @@ impl Fingerprintable for ValueArrayElement<'_> {
 }
 
 impl Fingerprintable for VariadicArrayElement<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -111,6 +118,7 @@ impl Fingerprintable for VariadicArrayElement<'_> {
 }
 
 impl Fingerprintable for MissingArrayElement {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -122,6 +130,7 @@ impl Fingerprintable for MissingArrayElement {
 }
 
 impl Fingerprintable for ArrayAccess<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -135,6 +144,7 @@ impl Fingerprintable for ArrayAccess<'_> {
 }
 
 impl Fingerprintable for ArrayAppend<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

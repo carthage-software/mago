@@ -108,7 +108,7 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
         let target =
             get_function_like_target_with_skip(context, identifier, alternative, expression.span(), None, skip_error);
 
-        if let Some(ref t) = target
+        if let Some(t) = target.as_ref()
             && let Some(metadata) = t.get_function_like_metadata()
         {
             let span = function_name.span();
@@ -211,7 +211,7 @@ mod tests {
 
     test_analysis! {
         name = call_simple_addition,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function add(int $a, int $b): int {
@@ -293,7 +293,7 @@ mod tests {
 
     test_analysis! {
         name = call_wrong_argument_type_int_for_string,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function needs_string(string $s): void {
@@ -321,7 +321,7 @@ mod tests {
 
     test_analysis! {
         name = call_too_few_arguments,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function requires_two(int $a, int $b): void {}
@@ -335,7 +335,7 @@ mod tests {
 
     test_analysis! {
         name = call_too_many_arguments,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function accepts_one(int $a): void {}
@@ -349,7 +349,7 @@ mod tests {
 
     test_analysis! {
         name = call_null_for_non_nullable_string,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function needs_string(string $s): void {}
@@ -363,7 +363,7 @@ mod tests {
 
     test_analysis! {
         name = call_nullable_for_non_nullable_string,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function needs_string(string $s): void {}
@@ -380,7 +380,7 @@ mod tests {
 
     test_analysis! {
         name = call_false_for_non_falsable_string,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function needs_string(string $s): void {}
@@ -394,7 +394,7 @@ mod tests {
 
     test_analysis! {
         name = call_falsable_for_non_falsable_string,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function needs_string(string $s): void {}
@@ -517,7 +517,7 @@ mod tests {
 
     test_analysis! {
         name = call_array_element_type_mismatch,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -561,7 +561,7 @@ mod tests {
 
     test_analysis! {
         name = call_non_empty_list_constraint_violation,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -583,7 +583,7 @@ mod tests {
 
     test_analysis! {
         name = call_non_empty_array_key_type_mismatch,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -605,7 +605,7 @@ mod tests {
 
     test_analysis! {
         name = call_union_param_invalid_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -627,7 +627,7 @@ mod tests {
 
     test_analysis! {
         name = call_template_callable_param_mismatch,
-        code = indoc!{r"
+        code = indoc!{"
             <?php
 
             /**
@@ -659,7 +659,7 @@ mod tests {
 
     test_analysis! {
         name = map_twice,
-        code = indoc!{r"
+        code = indoc!{"
             <?php
 
             /**
@@ -704,7 +704,7 @@ mod tests {
 
     test_analysis! {
         name = call_with_generic_constraints,
-        code = indoc!{r"
+        code = indoc!{"
             <?php
 
             /**
@@ -779,7 +779,7 @@ mod tests {
 
     test_analysis! {
         name = conditional_returns,
-        code = indoc!{r"
+        code = indoc!{"
             <?php
 
             /**
@@ -820,7 +820,7 @@ mod tests {
 
     test_analysis! {
         name = call_capture_groups,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -922,7 +922,7 @@ mod tests {
 
     test_analysis! {
         name = member_reference_argument,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class ChangeKind {
@@ -951,7 +951,7 @@ mod tests {
 
     test_analysis! {
         name = iterable_for_traversable_or_array,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -993,7 +993,7 @@ mod tests {
 
     test_analysis! {
         name = invalid_member_reference_argument,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class ChangeKind {
@@ -1028,7 +1028,7 @@ mod tests {
 
     test_analysis! {
         name = enum_member_reference_argument,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             enum ChangeKind {
@@ -1054,7 +1054,7 @@ mod tests {
 
     test_analysis! {
         name = invalid_enum_member_reference_argument,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             enum ChangeKind {
@@ -1083,7 +1083,7 @@ mod tests {
 
     test_analysis! {
         name = type_logic_sanity_test,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             interface A {}

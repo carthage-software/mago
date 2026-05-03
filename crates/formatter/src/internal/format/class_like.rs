@@ -308,9 +308,9 @@ const fn should_add_empty_line_after(
 ///
 /// Returns sorted members paired with their original comment indices, ensuring that
 /// leading comments (including doc comments) move with their associated methods.
-fn sort_class_members<'a, 'arena>(
+fn sort_class_members<'arena>(
     arena: &'arena bumpalo::Bump,
-    f: &FormatterState<'a, 'arena>,
+    f: &FormatterState<'_, 'arena>,
     members: &'arena Sequence<'arena, ClassLikeMember<'arena>>,
 ) -> Vec<'arena, SortedMember<'arena>> {
     let mut members_with_indices: Vec<'arena, SortedMember<'arena>> = Vec::new_in(arena);

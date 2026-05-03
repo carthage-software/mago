@@ -9,6 +9,7 @@ use crate::Fingerprintable;
 use std::hash::Hash;
 
 impl Fingerprintable for PartialApplication<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -26,6 +27,7 @@ impl Fingerprintable for PartialApplication<'_> {
 }
 
 impl Fingerprintable for FunctionPartialApplication<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -39,6 +41,7 @@ impl Fingerprintable for FunctionPartialApplication<'_> {
 }
 
 impl Fingerprintable for MethodPartialApplication<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -53,6 +56,7 @@ impl Fingerprintable for MethodPartialApplication<'_> {
 }
 
 impl Fingerprintable for StaticMethodPartialApplication<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

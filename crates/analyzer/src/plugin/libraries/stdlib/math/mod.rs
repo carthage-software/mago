@@ -15,6 +15,7 @@ use mago_codex::ttype::union::TUnion;
 
 /// Extract a `TInteger` from a union type by computing the combined bounds of all integer atomics.
 /// Returns `None` if any atomic in the union is not an integer.
+#[allow(clippy::similar_names)]
 fn get_integer_from_type(ty: &TUnion) -> Option<TInteger> {
     let mut result_lb: Option<Option<i64>> = None;
     let mut result_ub: Option<Option<i64>> = None;

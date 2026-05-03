@@ -71,11 +71,11 @@ fn resolve_self_class(defining_entity: &GenericParent) -> Option<Atom> {
     }
 }
 
-fn expand_template_constraint<'a>(
+fn expand_template_constraint<'ty>(
     codebase: &CodebaseMetadata,
-    constraint: &'a TUnion,
+    constraint: &'ty TUnion,
     self_class: Option<Atom>,
-) -> Cow<'a, TUnion> {
+) -> Cow<'ty, TUnion> {
     if !constraint.is_expandable() {
         return Cow::Borrowed(constraint);
     }
@@ -985,7 +985,7 @@ fn infer_templates_from_input_and_container_types(
 }
 
 pub fn infer_templates_for_method_call<'ctx>(
-    context: &mut Context<'ctx, '_>,
+    context: &Context<'ctx, '_>,
     object_type: &TNamedObject,
     method_target_context: &MethodTargetContext<'ctx>,
     method_metadata: &'ctx MethodMetadata,
@@ -1041,7 +1041,7 @@ pub fn infer_templates_for_method_call<'ctx>(
             &actual_type,
             template_result,
             InferenceOptions { source_span: Some(where_constraint.span), ..Default::default() },
-            &mut Default::default(),
+            &mut Vec::default(),
         );
     }
 }
@@ -1124,7 +1124,7 @@ pub fn infer_parameter_templates_from_argument(
 /// * `default_type`: The type of the parameter's default value (the "input").
 /// * `template_result`: The map where inferred template types are stored.
 pub fn infer_parameter_templates_from_default(
-    context: &mut Context<'_, '_>,
+    context: &Context<'_, '_>,
     parameter_type: &TUnion,
     default_type: &TUnion,
     template_result: &mut TemplateResult,

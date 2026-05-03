@@ -58,7 +58,7 @@ use std::path::Path;
 /// Exclusions are ordered first by variant (Path before Pattern), then by the
 /// value within the variant. This enables efficient deduplication and set operations.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
-pub enum Exclusion<'a> {
+pub enum Exclusion<'pattern> {
     /// Exclude a specific file or directory by its exact path.
     ///
     /// The path can be absolute or relative to the workspace directory.
@@ -66,7 +66,7 @@ pub enum Exclusion<'a> {
     ///
     /// Uses `Cow` to allow borrowing paths from configuration while supporting
     /// owned paths when canonicalization is required.
-    Path(Cow<'a, Path>),
+    Path(Cow<'pattern, Path>),
 
     /// Exclude files and directories matching a glob pattern.
     ///
@@ -75,5 +75,5 @@ pub enum Exclusion<'a> {
     /// character classes, and recursive matchers.
     ///
     /// Uses `Cow` to avoid allocating when borrowing patterns from configuration.
-    Pattern(Cow<'a, str>),
+    Pattern(Cow<'pattern, str>),
 }

@@ -298,7 +298,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
                     StringPart::BracedExpression(braced_expression_string_part) => {
                         controls.extend(find_control_flows_in_expression(braced_expression_string_part.expression));
                     }
-                    _ => {}
+                    StringPart::Literal(_) => {}
                 }
             }
         }
@@ -329,7 +329,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
                     ArrayElement::Variadic(variadic_array_element) => {
                         controls.extend(find_control_flows_in_expression(variadic_array_element.value));
                     }
-                    _ => {}
+                    ArrayElement::Missing(_) => {}
                 }
             }
         }

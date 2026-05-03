@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::needless_raw_strings, clippy::needless_raw_string_hashes)]
+
 //! Focused tests for the Twig lexer.
 
 #[path = "common/mod.rs"]

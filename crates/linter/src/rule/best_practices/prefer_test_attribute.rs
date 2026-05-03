@@ -151,7 +151,7 @@ impl LintRule for PreferTestAttributeRule {
     }
 }
 
-fn has_test_attribute(ctx: &mut LintContext<'_, '_>, method: &Method<'_>) -> bool {
+fn has_test_attribute(ctx: &LintContext<'_, '_>, method: &Method<'_>) -> bool {
     for attribute_list in method.attribute_lists.iter() {
         for attribute in attribute_list.attributes.iter() {
             let resolved_name = ctx.resolved_names.get(&attribute.name);
@@ -164,7 +164,7 @@ fn has_test_attribute(ctx: &mut LintContext<'_, '_>, method: &Method<'_>) -> boo
     false
 }
 
-fn compute_new_name<'a>(name: &'a str) -> Cow<'a, str> {
+fn compute_new_name(name: &str) -> Cow<'_, str> {
     let prefix_was_lowercase = name.starts_with("test");
     let after_test = &name[4..];
 
@@ -178,7 +178,7 @@ fn compute_new_name<'a>(name: &'a str) -> Cow<'a, str> {
     } else if prefix_was_lowercase {
         // testSomethingBad -> somethingBad
         let mut chars = after_test.chars();
-        let first = chars.next().unwrap();
+        let Some(first) = chars.next() else { return Cow::Borrowed(after_test) };
         Cow::Owned(format!("{}{}", first.to_ascii_lowercase(), chars.as_str()))
     } else {
         // TestSomethingBad -> SomethingBad
