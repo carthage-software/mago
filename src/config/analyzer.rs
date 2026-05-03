@@ -96,6 +96,17 @@ pub struct AnalyzerConfiguration {
     pub memoize_properties: bool,
 
     /// Allow accessing array keys that may not be defined without reporting an issue.
+    ///
+    /// **Deprecated:** prefer `strict_array_index_existence` for new configurations.
+    /// Setting this option to `false` only emits a warning on possibly-undefined
+    /// `array<K, V>` reads with a single literal key, and does not widen the result
+    /// to `T|null` — so downstream `=== null` and `??` checks behave inconsistently.
+    /// `strict_array_index_existence = true` warns more thoroughly (lists, shapes,
+    /// and `array<K, V>`), and widens the type to `T|null` so the runtime semantics
+    /// are reflected in the type system.
+    ///
+    /// This setting is retained for backwards compatibility and may be removed in
+    /// a future release.
     pub allow_possibly_undefined_array_keys: bool,
 
     /// Whether to check for thrown exceptions.
@@ -125,6 +136,18 @@ pub struct AnalyzerConfiguration {
     /// When `false` (the default), any `int` is permitted as an index, offering
     /// more flexibility at the cost of type safety.
     pub strict_list_index_checks: bool,
+
+    /// Treat array/list indices that are not provably present as `T|null` and warn on access.
+    ///
+    /// When `true`, reading an array or list key whose presence is not guaranteed emits a
+    /// `possibly-undefined-{int,string}-array-index` warning and the resulting type is
+    /// widened to include `null`. This applies to `list<T>` (non-zero indices),
+    /// optional entries of `array{...}` shapes, and `array<K, V>` lookups by arbitrary keys.
+    /// It lets `=== null`, `??`, and `??=` reflect PHP's actual runtime semantics.
+    ///
+    /// Defaults to `false` to keep existing PHP-friendly behavior, where missing keys are
+    /// merely tracked internally as possibly-undefined without emitting a warning.
+    pub strict_array_index_existence: bool,
 
     /// Disallow comparisons where a boolean literal is used as an operand.
     ///
@@ -410,6 +433,15 @@ impl AnalyzerConfiguration {
         let check_missing_override = self.perform_heuristic_checks.unwrap_or(self.check_missing_override);
         let find_unused_parameters = self.perform_heuristic_checks.unwrap_or(self.find_unused_parameters);
 
+        if !self.allow_possibly_undefined_array_keys {
+            tracing::warn!(
+                "`allow-possibly-undefined-array-keys = false` is deprecated and will be removed in a future release. \
+                 Prefer `strict-array-index-existence = true`, which warns more thoroughly (lists, shapes, and \
+                 `array<K, V>`) and widens the result type to `T|null` so `=== null` and `??` checks reflect runtime \
+                 semantics."
+            );
+        }
+
         Settings {
             version: php_version,
             analyze_dead_code: self.analyze_dead_code,
@@ -424,6 +456,7 @@ impl AnalyzerConfiguration {
             check_missing_override,
             find_unused_parameters,
             strict_list_index_checks: self.strict_list_index_checks,
+            strict_array_index_existence: self.strict_array_index_existence,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
             enforce_class_finality: self.enforce_class_finality,
             require_api_or_internal: self.require_api_or_internal,
@@ -478,6 +511,7 @@ impl Default for AnalyzerConfiguration {
             check_missing_override: defaults.check_missing_override,
             find_unused_parameters: defaults.find_unused_parameters,
             strict_list_index_checks: defaults.strict_list_index_checks,
+            strict_array_index_existence: defaults.strict_array_index_existence,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
             enforce_class_finality: defaults.enforce_class_finality,
             require_api_or_internal: defaults.require_api_or_internal,

@@ -135,6 +135,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_parameters: false,
                 memoize_properties: true,
                 strict_list_index_checks: false,
+                strict_array_index_existence: false,
                 no_boolean_literal_comparison: false,
                 check_missing_type_hints: false,
                 register_super_globals: true,
@@ -150,6 +151,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_parameters: false,
                 memoize_properties: true,
                 strict_list_index_checks: false,
+                strict_array_index_existence: false,
                 no_boolean_literal_comparison: false,
                 check_missing_type_hints: false,
                 register_super_globals: true,
@@ -165,6 +167,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_parameters: true,
                 memoize_properties: true,
                 strict_list_index_checks: true,
+                strict_array_index_existence: false,
                 no_boolean_literal_comparison: false,
                 check_missing_type_hints: false,
                 register_super_globals: true,
@@ -180,6 +183,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_parameters: true,
                 memoize_properties: true,
                 strict_list_index_checks: true,
+                strict_array_index_existence: true,
                 no_boolean_literal_comparison: true,
                 check_missing_type_hints: true,
                 register_super_globals: true,
@@ -402,6 +406,8 @@ struct InitializationAnalyzerSettings {
     memoize_properties: bool,
     /// Whether to enforce strict checks when accessing list elements by index
     strict_list_index_checks: bool,
+    /// Whether to widen possibly-undefined array/list reads to `T|null` and warn
+    strict_array_index_existence: bool,
     /// Whether to disallow comparisons with boolean literals
     no_boolean_literal_comparison: bool,
     /// Whether to check for missing type hints
@@ -662,6 +668,10 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
         settings.strict_list_index_checks = Confirm::with_theme(theme)
             .with_prompt(" │  Enforce strict checks for list index access?")
             .default(settings.strict_list_index_checks)
+            .interact()?;
+        settings.strict_array_index_existence = Confirm::with_theme(theme)
+            .with_prompt(" │  Treat possibly-undefined array/list reads as `T|null` and warn?")
+            .default(settings.strict_array_index_existence)
             .interact()?;
 
         println!("  │");
@@ -939,6 +949,7 @@ fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> 
     lines.push(format!("check-missing-override = {}", settings.check_missing_override));
     lines.push(format!("find-unused-parameters = {}", settings.find_unused_parameters));
     lines.push(format!("strict-list-index-checks = {}", settings.strict_list_index_checks));
+    lines.push(format!("strict-array-index-existence = {}", settings.strict_array_index_existence));
     lines.push(format!("no-boolean-literal-comparison = {}", settings.no_boolean_literal_comparison));
     lines.push(format!("check-missing-type-hints = {}", settings.check_missing_type_hints));
     lines.push(format!("register-super-globals = {}", settings.register_super_globals));
@@ -964,6 +975,7 @@ mod tests {
             find_unused_parameters: false,
             memoize_properties: true,
             strict_list_index_checks: false,
+            strict_array_index_existence: false,
             no_boolean_literal_comparison: false,
             check_missing_type_hints: false,
             register_super_globals: true,
@@ -1049,6 +1061,7 @@ mod tests {
             find_unused_parameters: false,
             memoize_properties: true,
             strict_list_index_checks: true,
+            strict_array_index_existence: true,
             no_boolean_literal_comparison: true,
             check_missing_type_hints: true,
             register_super_globals: false,

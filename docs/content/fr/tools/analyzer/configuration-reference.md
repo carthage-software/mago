@@ -76,11 +76,12 @@ Ces indicateurs activent ou désactivent des analyses individuelles. Les valeurs
 | `find-overly-wide-return-types` | `false` | Avertit lorsqu'un type de retour déclaré contient une branche que le corps ne produit jamais, comme `: string\|false` sur une fonction qui retourne toujours une chaîne. Disponible depuis 1.20.0. |
 | `analyze-dead-code` | `false` | Analyse le code qui semble inaccessible. |
 | `memoize-properties` | `true` | Suit les valeurs littérales de propriété pour une inférence plus précise, au prix d'un peu de mémoire. |
-| `allow-possibly-undefined-array-keys` | `true` | Autorise l'accès aux clés qui peuvent manquer sans le signaler. |
+| `allow-possibly-undefined-array-keys` | `true` | **Déprécié.** Autorise l'accès aux clés qui peuvent manquer sans le signaler. Le passer à `false` signale uniquement les lectures de `array<K, V>` avec une clé littérale unique et n'élargit pas le type à `T\|null`. Préférez `strict-array-index-existence`. |
 | `check-throws` | `false` | Signale les exceptions non capturées et non déclarées avec `@throws`. |
 | `check-missing-override` | `false` | Signale les attributs `#[Override]` manquants sur les méthodes redéfinissantes (PHP 8.3+). |
 | `find-unused-parameters` | `false` | Signale les paramètres qui ne sont jamais lus. |
 | `strict-list-index-checks` | `false` | Exige que tout entier utilisé comme index de liste soit prouvé non négatif. |
+| `strict-array-index-existence` | `false` | Traite les lectures de tableau ou de liste dont la clé n'est pas prouvée présente comme `T\|null` et émet un avertissement `possibly-undefined-{int,string}-array-index`. Remplace `allow-possibly-undefined-array-keys = false`. |
 | `no-boolean-literal-comparison` | `false` | Interdit les comparaisons directes aux littéraux booléens comme `$a === true`. |
 | `check-missing-type-hints` | `false` | Signale les indications de types manquantes sur les paramètres, propriétés et types de retour. |
 | `check-closure-missing-type-hints` | `false` | Étend la vérification d'indications de types aux closures (nécessite `check-missing-type-hints`). |
@@ -264,11 +265,9 @@ check-arrow-function-missing-type-hints = true
 enforce-class-finality = true
 require-api-or-internal = true
 check-experimental = true
-
 strict-list-index-checks = true
+strict-array-index-existence = true
 no-boolean-literal-comparison = true
-
-allow-possibly-undefined-array-keys = false
 trust-existence-checks = false
 ```
 
@@ -278,13 +277,11 @@ trust-existence-checks = false
 [analyzer]
 check-missing-type-hints = false
 strict-list-index-checks = false
+strict-array-index-existence = false
 no-boolean-literal-comparison = false
 enforce-class-finality = false
 require-api-or-internal = false
-
-allow-possibly-undefined-array-keys = true
 trust-existence-checks = true
-
 check-throws = false
 ```
 
@@ -308,6 +305,10 @@ function process(object $obj): mixed
 Désactivez-le et l'appel exige une garantie de type explicite à la place.
 
 `allow-implicit-pipe-callable-types` ignore les vérifications d'indications de types des closures / fonctions fléchées lorsque le callable est l'opérande de droite de `|>`. L'opérande de gauche du pipe porte assez d'informations de type pour dériver le paramètre, donc l'indication manquante est inoffensive là.
+
+`strict-array-index-existence` aligne le système de types sur la sémantique d'exécution de PHP pour les clés manquantes. À l'exécution, PHP convertit une lecture absente en `null` et émet un avertissement `Undefined array key` ; lorsque ce drapeau est activé, l'analyseur émet `possibly-undefined-int-array-index` (ou `-string-array-index`) et élargit le résultat à `T|null`, de sorte que les vérifications `=== null` et `??` qui suivent se comportent comme attendu. Cela s'applique aux lectures de `list<T>` à des indices non nuls, aux entrées optionnelles des formes `array{...}` et aux recherches `array<K, V>` par clés arbitraires. Le drapeau est désactivé par défaut car en faire la valeur par défaut serait bruyant pour le PHP idiomatique qui déstructure ou indexe les listes sans d'abord vérifier l'existence.
+
+`allow-possibly-undefined-array-keys = false` est déprécié. Il signalait uniquement les lectures de `array<K, V>` avec une clé littérale unique et n'élargissait jamais le type à `T|null`, donc une comparaison `=== null` après la lecture était signalée comme redondante. Remplacez-le par `strict-array-index-existence = true`, qui signale plus largement et reflète la sémantique d'exécution dans le type. Définir `allow-possibly-undefined-array-keys = false` émet un avertissement de dépréciation sur la CLI.
 
 ## Réglage des performances
 

@@ -708,7 +708,33 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
 
         let mut result = if type_param.is_never() { get_mixed() } else { type_param.into_owned() };
         if !in_assignment {
-            result.set_possibly_undefined(true, None);
+            if context.settings.strict_array_index_existence
+                && *has_valid_expected_index
+                && !block_context.flags.inside_isset()
+                && !block_context.flags.inside_unset()
+                && let Some(span) = span
+            {
+                let key_label = dim_type
+                    .get_single_literal_int_value()
+                    .map(|v| format!("`{v}`"))
+                    .unwrap_or_else(|| "the requested index".to_string());
+                context.collector.report_with_code(
+                    IssueCode::PossiblyUndefinedIntArrayIndex,
+                    Issue::warning(format!("Possibly undefined array index accessed on `{}`.", list.get_id()))
+                        .with_annotation(
+                            Annotation::primary(span).with_message(format!("{key_label} might not exist.")),
+                        )
+                        .with_note(
+                            "The list is not guaranteed to contain this index, so the access may produce `null` at runtime.",
+                        )
+                        .with_help(
+                            "Ensure the index is always present before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing indices.",
+                        ),
+                );
+                result = result.as_nullable();
+            } else {
+                result.set_possibly_undefined(true, None);
+            }
         }
 
         return result;
@@ -738,7 +764,41 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
 
             let is_definitely_defined = *non_empty && dim_type.get_single_literal_int_value() == Some(0);
             if !is_definitely_defined {
-                elem_type.set_possibly_undefined(true, None);
+                if context.settings.strict_array_index_existence
+                    && *has_valid_expected_index
+                    && !in_assignment
+                    && !block_context.flags.inside_isset()
+                    && !block_context.flags.inside_unset()
+                    && let Some(span) = span
+                {
+                    let key_label = dim_type
+                        .get_single_literal_int_value()
+                        .map(|v| format!("`{v}`"))
+                        .unwrap_or_else(|| "the requested index".to_string());
+                    context.collector.report_with_code(
+                        IssueCode::PossiblyUndefinedIntArrayIndex,
+                        Issue::warning(format!(
+                            "Possibly undefined array index accessed on `{}`.",
+                            list.get_id()
+                        ))
+                        .with_annotation(
+                            Annotation::primary(span)
+                                .with_message(format!("{key_label} might not exist.")),
+                        )
+                        .with_note(
+                            "The list is not guaranteed to contain this index, so the access may produce `null` at runtime.",
+                        )
+                        .with_help(
+                            "Ensure the index is always present before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing indices.",
+                        ),
+                    );
+
+                    // PHP turns missing list indices into `null` at runtime; surface that
+                    // explicitly so `=== null`, `??`, and `??=` checks behave correctly.
+                    elem_type = elem_type.as_nullable();
+                } else {
+                    elem_type.set_possibly_undefined(true, None);
+                }
             }
 
             elem_type
@@ -1098,6 +1158,46 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
 
         *has_possibly_undefined = true;
 
+        if context.settings.strict_array_index_existence
+            && !in_assignment
+            && !block_context.flags.inside_isset()
+            && !block_context.flags.inside_unset()
+        {
+            let index_type_str = index_type.get_id();
+            let code = match index_type.get_single_array_key() {
+                Some(ArrayKey::Integer(_)) => IssueCode::PossiblyUndefinedIntArrayIndex,
+                Some(ArrayKey::String(_)) => IssueCode::PossiblyUndefinedStringArrayIndex,
+                Some(ArrayKey::ClassLikeConstant { .. }) => IssueCode::PossiblyUndefinedArrayIndex,
+                None => {
+                    if index_type.types.iter().any(|t| matches!(t, TAtomic::Scalar(TScalar::String(_)))) {
+                        IssueCode::PossiblyUndefinedStringArrayIndex
+                    } else {
+                        IssueCode::PossiblyUndefinedIntArrayIndex
+                    }
+                }
+            };
+
+            context.collector.report_with_code(
+                code,
+                Issue::warning(format!(
+                    "Possibly undefined array key `{index_type_str}` accessed on `{}`.",
+                    keyed_array.get_id()
+                ))
+                .with_annotation(
+                    Annotation::primary(span)
+                        .with_message(format!("Key `{index_type_str}` might not exist.")),
+                )
+                .with_note(
+                    "The analysis indicates this specific key might not be set when this access occurs.",
+                )
+                .with_help(format!(
+                    "Ensure the key {index_type_str} is always set before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                )),
+            );
+
+            return value_parameter.into_owned().as_nullable();
+        }
+
         value_parameter.into_owned()
     } else {
         // TODO Handle Assignments
@@ -1124,37 +1224,51 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
             if !in_assignment && !key_is_definitely_defined {
                 *has_possibly_undefined = true;
 
-                if !context.settings.allow_possibly_undefined_array_keys
-                    && !block_context.flags.inside_isset()
-                    && !block_context.flags.inside_unset()
-                    && let Some(single_array_key) = index_type.get_single_array_key()
-                {
-                    let index_type_str = index_type.get_id();
-                    let code = match single_array_key {
-                        ArrayKey::Integer(_) => IssueCode::PossiblyUndefinedIntArrayIndex,
-                        ArrayKey::String(_) => IssueCode::PossiblyUndefinedStringArrayIndex,
-                        ArrayKey::ClassLikeConstant { .. } => IssueCode::PossiblyUndefinedArrayIndex,
-                    };
+                let inside_isset_or_unset = block_context.flags.inside_isset() || block_context.flags.inside_unset();
+                let lax_warn = !context.settings.allow_possibly_undefined_array_keys;
+                let strict = context.settings.strict_array_index_existence;
 
-                    context.collector.report_with_code(
-                        code,
-                        Issue::warning(format!(
-                            "Possibly undefined array key `{index_type_str}` accessed on `{}`.",
-                            keyed_array.get_id()
-                        ))
-                        .with_annotation(
-                            Annotation::primary(span)
-                                .with_message(format!("Key `{index_type_str}` might not exist."))
-                        )
-                        .with_note(
-                            "The analysis indicates this specific key might not be set when this access occurs."
-                        )
-                        .with_help(
-                            format!(
-                                "Ensure the key {index_type_str} is always set before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                if !inside_isset_or_unset && (lax_warn || strict) {
+                    let single_key = index_type.get_single_array_key();
+                    if strict || single_key.is_some() {
+                        let index_type_str = index_type.get_id();
+                        let code = match &single_key {
+                            Some(ArrayKey::Integer(_)) => IssueCode::PossiblyUndefinedIntArrayIndex,
+                            Some(ArrayKey::String(_)) => IssueCode::PossiblyUndefinedStringArrayIndex,
+                            Some(ArrayKey::ClassLikeConstant { .. }) => IssueCode::PossiblyUndefinedArrayIndex,
+                            None => {
+                                if index_type.types.iter().any(|t| matches!(t, TAtomic::Scalar(TScalar::String(_)))) {
+                                    IssueCode::PossiblyUndefinedStringArrayIndex
+                                } else {
+                                    IssueCode::PossiblyUndefinedIntArrayIndex
+                                }
+                            }
+                        };
+
+                        context.collector.report_with_code(
+                            code,
+                            Issue::warning(format!(
+                                "Possibly undefined array key `{index_type_str}` accessed on `{}`.",
+                                keyed_array.get_id()
+                            ))
+                            .with_annotation(
+                                Annotation::primary(span)
+                                    .with_message(format!("Key `{index_type_str}` might not exist."))
                             )
-                        ),
-                    );
+                            .with_note(
+                                "The analysis indicates this specific key might not be set when this access occurs."
+                            )
+                            .with_help(
+                                format!(
+                                    "Ensure the key {index_type_str} is always set before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                                )
+                            ),
+                        );
+                    }
+                }
+
+                if strict && !inside_isset_or_unset {
+                    return value_parameter.into_owned().as_nullable();
                 }
             }
 

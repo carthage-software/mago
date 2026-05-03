@@ -76,11 +76,12 @@ These flags toggle individual analyses. Defaults are tuned for everyday use; fli
 | `find-overly-wide-return-types` | `false` | Warn when a declared return type contains a branch the body never produces, like `: string\|false` on a function that always returns a string. Available since 1.20.0. |
 | `analyze-dead-code` | `false` | Analyse code that appears unreachable. |
 | `memoize-properties` | `true` | Track literal property values for sharper inference, at the cost of some memory. |
-| `allow-possibly-undefined-array-keys` | `true` | Allow accessing keys that may be missing without flagging it. |
+| `allow-possibly-undefined-array-keys` | `true` | **Deprecated.** Allow accessing keys that may be missing without flagging it. Setting this to `false` warns on `array<K, V>` reads with a single literal key but does not widen the type to `T\|null`. Use `strict-array-index-existence` instead. |
 | `check-throws` | `false` | Report exceptions that are not caught and not declared with `@throws`. |
 | `check-missing-override` | `false` | Report missing `#[Override]` attributes on overriding methods (PHP 8.3+). |
 | `find-unused-parameters` | `false` | Report parameters that are never read. |
 | `strict-list-index-checks` | `false` | Require any integer used as a list index to be provably non-negative. |
+| `strict-array-index-existence` | `false` | Treat array/list reads whose key is not provably present as `T\|null` and emit a `possibly-undefined-{int,string}-array-index` warning. Replaces `allow-possibly-undefined-array-keys = false`. |
 | `no-boolean-literal-comparison` | `false` | Disallow direct comparisons to boolean literals like `$a === true`. |
 | `check-missing-type-hints` | `false` | Report missing type hints on parameters, properties, and return types. |
 | `check-closure-missing-type-hints` | `false` | Extend the type-hint check to closures (requires `check-missing-type-hints`). |
@@ -264,11 +265,9 @@ check-arrow-function-missing-type-hints = true
 enforce-class-finality = true
 require-api-or-internal = true
 check-experimental = true
-
 strict-list-index-checks = true
+strict-array-index-existence = true
 no-boolean-literal-comparison = true
-
-allow-possibly-undefined-array-keys = false
 trust-existence-checks = false
 ```
 
@@ -278,13 +277,11 @@ trust-existence-checks = false
 [analyzer]
 check-missing-type-hints = false
 strict-list-index-checks = false
+strict-array-index-existence = false
 no-boolean-literal-comparison = false
 enforce-class-finality = false
 require-api-or-internal = false
-
-allow-possibly-undefined-array-keys = true
 trust-existence-checks = true
-
 check-throws = false
 ```
 
@@ -308,6 +305,10 @@ function process(object $obj): mixed
 Turn it off and the call requires an explicit type guarantee instead.
 
 `allow-implicit-pipe-callable-types` skips the closure / arrow-function type-hint checks when the callable is the right operand of `|>`. The pipe's left operand carries enough type information to derive the parameter, so the missing hint is harmless there.
+
+`strict-array-index-existence` aligns the type system with PHP's runtime semantics for missing keys. PHP turns a missing read into `null` and emits an `Undefined array key` warning at runtime; with this flag on, the analyzer emits `possibly-undefined-int-array-index` (or `-string-array-index`) and widens the result to `T|null`, so subsequent `=== null` and `??` checks behave as expected. It applies to `list<T>` reads at non-zero indices, optional entries of `array{...}` shapes, and `array<K, V>` lookups by arbitrary keys. It is opt-in because making it the default is noisy on idiomatic PHP that destructures or indexes lists without first asserting existence.
+
+`allow-possibly-undefined-array-keys = false` is deprecated. It only warned on `array<K, V>` reads with a single literal key and never widened the type to `T|null`, so `=== null` after the read was reported as redundant. Replace it with `strict-array-index-existence = true`, which warns more thoroughly and reflects the runtime semantics in the type. Setting `allow-possibly-undefined-array-keys = false` will emit a deprecation warning on the CLI.
 
 ## Performance tuning
 

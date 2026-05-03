@@ -2436,6 +2436,18 @@ test_case!(issue_1759);
 test_case!(issue_1760);
 test_case!(issue_1762);
 test_case!(issue_1764);
+test_case!(issue_1766, {
+    let mut s = crate::framework::default_test_settings();
+    s.allow_possibly_undefined_array_keys = true;
+    s.strict_array_index_existence = true;
+    s
+});
+test_case!(issue_1766_off, {
+    let mut s = crate::framework::default_test_settings();
+    s.allow_possibly_undefined_array_keys = true;
+    s.strict_array_index_existence = false;
+    s
+});
 
 #[test]
 fn test_all_test_cases_are_ran() {

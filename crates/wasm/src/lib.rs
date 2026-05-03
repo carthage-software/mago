@@ -162,6 +162,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         check_missing_override: s.check_missing_override,
         find_unused_parameters: s.find_unused_parameters,
         strict_list_index_checks: s.strict_list_index_checks,
+        strict_array_index_existence: s.strict_array_index_existence,
         no_boolean_literal_comparison: s.no_boolean_literal_comparison,
         check_missing_type_hints: s.check_missing_type_hints,
         check_closure_missing_type_hints: s.check_closure_missing_type_hints,

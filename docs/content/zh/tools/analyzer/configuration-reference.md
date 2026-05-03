@@ -76,11 +76,12 @@ glob 匹配会遵循 `[source.glob]` 下的项目级设置,因此像 `literal-se
 | `find-overly-wide-return-types` | `false` | 当声明的返回类型包含主体永远不会产生的分支时发出警告,例如总是返回字符串的函数声明为 `: string\|false`。自 1.20.0 起可用。 |
 | `analyze-dead-code` | `false` | 分析看似不可达的代码。 |
 | `memoize-properties` | `true` | 跟踪字面量属性值以获得更精准的推断,代价是占用一些额外内存。 |
-| `allow-possibly-undefined-array-keys` | `true` | 允许访问可能不存在的键,而不报告。 |
+| `allow-possibly-undefined-array-keys` | `true` | **已弃用。**允许访问可能不存在的键,而不报告。设为 `false` 时仅对带有单个字面量键的 `array<K, V>` 读取发出警告,且不会将类型扩展为 `T\|null`。请改用 `strict-array-index-existence`。 |
 | `check-throws` | `false` | 报告未被捕获且未通过 `@throws` 声明的异常。 |
 | `check-missing-override` | `false` | 报告重写方法上缺失的 `#[Override]` attribute(PHP 8.3+)。 |
 | `find-unused-parameters` | `false` | 报告从未被读取的参数。 |
 | `strict-list-index-checks` | `false` | 要求作为列表下标使用的整数必须可被证明非负。 |
+| `strict-array-index-existence` | `false` | 当数组或列表读取的键无法证明存在时,将结果视为 `T\|null` 并发出 `possibly-undefined-{int,string}-array-index` 警告。用于替代 `allow-possibly-undefined-array-keys = false`。 |
 | `no-boolean-literal-comparison` | `false` | 禁止与布尔字面量进行直接比较,例如 `$a === true`。 |
 | `check-missing-type-hints` | `false` | 报告参数、属性和返回值缺失的类型提示。 |
 | `check-closure-missing-type-hints` | `false` | 把类型提示检查扩展到闭包(需要 `check-missing-type-hints`)。 |
@@ -264,11 +265,9 @@ check-arrow-function-missing-type-hints = true
 enforce-class-finality = true
 require-api-or-internal = true
 check-experimental = true
-
 strict-list-index-checks = true
+strict-array-index-existence = true
 no-boolean-literal-comparison = true
-
-allow-possibly-undefined-array-keys = false
 trust-existence-checks = false
 ```
 
@@ -278,11 +277,11 @@ trust-existence-checks = false
 [analyzer]
 check-missing-type-hints = false
 strict-list-index-checks = false
+strict-array-index-existence = false
 no-boolean-literal-comparison = false
 enforce-class-finality = false
 require-api-or-internal = false
 
-allow-possibly-undefined-array-keys = true
 trust-existence-checks = true
 
 check-throws = false
@@ -308,6 +307,10 @@ function process(object $obj): mixed
 关闭后,该调用就需要显式的类型保证。
 
 `allow-implicit-pipe-callable-types` 在可调用对象作为 `|>` 的右操作数时跳过闭包/箭头函数的类型提示检查。管道的左操作数已携带足以推导参数的类型信息,因此那里缺失的类型提示是无害的。
+
+`strict-array-index-existence` 让类型系统与 PHP 的运行时语义保持一致。在运行时,PHP 会把缺失的读取结果视为 `null`,并发出 `Undefined array key` 警告;开启该开关后,分析器会发出 `possibly-undefined-int-array-index`(或 `-string-array-index`)并把结果类型扩展为 `T|null`,这样后续的 `=== null` 与 `??` 检查就能按预期工作。它适用于 `list<T>` 中非零下标的读取、`array{...}` 形状中的可选条目,以及通过任意键访问 `array<K, V>` 的情况。该选项默认关闭,因为对于不显式断言键存在便对列表进行解构或下标访问的 PHP 代码来说,把它设为默认值会过于嘈杂。
+
+`allow-possibly-undefined-array-keys = false` 已弃用。它仅对带有单个字面量键的 `array<K, V>` 读取发出警告,且不会把类型扩展为 `T|null`,因此读取后的 `=== null` 检查会被报告为冗余。请改用 `strict-array-index-existence = true`,它的覆盖更全面,并将运行时语义体现到类型上。设置 `allow-possibly-undefined-array-keys = false` 时,CLI 会输出弃用警告。
 
 ## 性能调优
 

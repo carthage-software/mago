@@ -94,6 +94,23 @@ pub struct Settings {
     /// more flexibility at the cost of type safety.
     pub strict_list_index_checks: bool,
 
+    /// Treat array/list indices that are not provably present as `T|null` and warn on access.
+    ///
+    /// When `true`, reading a key from any array-like type whose presence is not
+    /// guaranteed emits `possibly-undefined-int-array-index` /
+    /// `possibly-undefined-string-array-index` and the resulting type is widened to
+    /// `T|null`. This applies to `list<T>` (non-zero indices), non-required entries of
+    /// `array{...}` shapes, and `array<K, V>` lookups with arbitrary keys. It lets
+    /// `=== null`, `??`, and `??=` checks behave correctly against PHP's runtime
+    /// semantics — PHP turns missing reads into `null` with an `Undefined array key`
+    /// warning.
+    ///
+    /// When `false` (the default), the analyzer keeps the looser behavior: the value is
+    /// flagged as possibly-undefined internally but is not unioned with `null` and no
+    /// warning is emitted. This is friendlier for typical PHP code that destructures or
+    /// reads from arrays/lists by index without first asserting existence.
+    pub strict_array_index_existence: bool,
+
     /// Disable comparisons to boolean literals (`true`/`false`).
     ///
     /// When enabled, comparisons to boolean literals will not be reported as issues.
@@ -371,6 +388,7 @@ impl Settings {
             check_missing_override: false,
             find_unused_parameters: false,
             strict_list_index_checks: false,
+            strict_array_index_existence: false,
             no_boolean_literal_comparison: false,
             enforce_class_finality: false,
             require_api_or_internal: false,
