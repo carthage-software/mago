@@ -602,11 +602,12 @@ ignore = [
 <tr><td style="text-align: left"><code>find-overly-wide-return-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Warn when a declared return type contains a branch the body never produces, like <code>: string|false</code> on a function that always returns a string. Available since 1.20.0.</td></tr>
 <tr><td style="text-align: left"><code>analyze-dead-code</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Analyse code that appears unreachable.</td></tr>
 <tr><td style="text-align: left"><code>memoize-properties</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Track literal property values for sharper inference, at the cost of some memory.</td></tr>
-<tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Allow accessing keys that may be missing without flagging it.</td></tr>
+<tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left"><strong>Deprecated.</strong> Allow accessing keys that may be missing without flagging it. Setting this to <code>false</code> warns on <code>array&lt;K, V&gt;</code> reads with a single literal key but does not widen the type to <code>T|null</code>. Use <code>strict-array-index-existence</code> instead.</td></tr>
 <tr><td style="text-align: left"><code>check-throws</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report exceptions that are not caught and not declared with <code>@throws</code>.</td></tr>
 <tr><td style="text-align: left"><code>check-missing-override</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report missing <code>#[Override]</code> attributes on overriding methods (PHP 8.3+).</td></tr>
 <tr><td style="text-align: left"><code>find-unused-parameters</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report parameters that are never read.</td></tr>
 <tr><td style="text-align: left"><code>strict-list-index-checks</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Require any integer used as a list index to be provably non-negative.</td></tr>
+<tr><td style="text-align: left"><code>strict-array-index-existence</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Treat array/list reads whose key is not provably present as <code>T|null</code> and emit a <code>possibly-undefined-{int,string}-array-index</code> warning. Replaces <code>allow-possibly-undefined-array-keys = false</code>.</td></tr>
 <tr><td style="text-align: left"><code>no-boolean-literal-comparison</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Disallow direct comparisons to boolean literals like <code>$a === true</code>.</td></tr>
 <tr><td style="text-align: left"><code>check-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report missing type hints on parameters, properties, and return types.</td></tr>
 <tr><td style="text-align: left"><code>check-closure-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Extend the type-hint check to closures (requires <code>check-missing-type-hints</code>).</td></tr>
@@ -742,24 +743,20 @@ check-arrow-function-missing-type-hints = true
 enforce-class-finality = true
 require-api-or-internal = true
 check-experimental = true
-
 strict-list-index-checks = true
+strict-array-index-existence = true
 no-boolean-literal-comparison = true
-
-allow-possibly-undefined-array-keys = false
 trust-existence-checks = false
 </code></pre>
 <h3 id="lenient-mode">Lenient mode</h3>
 <pre><code class="language-toml">[analyzer]
 check-missing-type-hints = false
 strict-list-index-checks = false
+strict-array-index-existence = false
 no-boolean-literal-comparison = false
 enforce-class-finality = false
 require-api-or-internal = false
-
-allow-possibly-undefined-array-keys = true
 trust-existence-checks = true
-
 check-throws = false
 </code></pre>
 <p>When introducing Mago to an existing codebase, start lenient with a <a href="../../../../../main/en/fundamentals/baseline">baseline</a> and tighten the screws as the code improves.</p>
@@ -776,6 +773,8 @@ check-throws = false
 </code></pre>
 <p>Turn it off and the call requires an explicit type guarantee instead.</p>
 <p><code>allow-implicit-pipe-callable-types</code> skips the closure / arrow-function type-hint checks when the callable is the right operand of <code>|&gt;</code>. The pipe's left operand carries enough type information to derive the parameter, so the missing hint is harmless there.</p>
+<p><code>strict-array-index-existence</code> aligns the type system with PHP's runtime semantics for missing keys. PHP turns a missing read into <code>null</code> and emits an <code>Undefined array key</code> warning at runtime; with this flag on, the analyzer emits <code>possibly-undefined-int-array-index</code> (or <code>-string-array-index</code>) and widens the result to <code>T|null</code>, so subsequent <code>=== null</code> and <code>??</code> checks behave as expected. It applies to <code>list&lt;T&gt;</code> reads at non-zero indices, optional entries of <code>array{...}</code> shapes, and <code>array&lt;K, V&gt;</code> lookups by arbitrary keys. It is opt-in because making it the default is noisy on idiomatic PHP that destructures or indexes lists without first asserting existence.</p>
+<p><code>allow-possibly-undefined-array-keys = false</code> is deprecated. It only warned on <code>array&lt;K, V&gt;</code> reads with a single literal key and never widened the type to <code>T|null</code>, so <code>=== null</code> after the read was reported as redundant. Replace it with <code>strict-array-index-existence = true</code>, which warns more thoroughly and reflects the runtime semantics in the type. Setting <code>allow-possibly-undefined-array-keys = false</code> will emit a deprecation warning on the CLI.</p>
 <h2 id="performance-tuning">Performance tuning</h2>
 <p>The analyzer uses internal thresholds to balance depth against speed. Settings live under <code>[analyzer.performance]</code>.</p>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>

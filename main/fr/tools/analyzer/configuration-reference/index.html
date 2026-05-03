@@ -604,11 +604,12 @@ ignore = [
 <tr><td style="text-align: left"><code>find-overly-wide-return-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Avertit lorsqu'un type de retour déclaré contient une branche que le corps ne produit jamais, comme <code>: string|false</code> sur une fonction qui retourne toujours une chaîne. Disponible depuis 1.20.0.</td></tr>
 <tr><td style="text-align: left"><code>analyze-dead-code</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Analyse le code qui semble inaccessible.</td></tr>
 <tr><td style="text-align: left"><code>memoize-properties</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Suit les valeurs littérales de propriété pour une inférence plus précise, au prix d'un peu de mémoire.</td></tr>
-<tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Autorise l'accès aux clés qui peuvent manquer sans le signaler.</td></tr>
+<tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left"><strong>Déprécié.</strong> Autorise l'accès aux clés qui peuvent manquer sans le signaler. Le passer à <code>false</code> signale uniquement les lectures de <code>array&lt;K, V&gt;</code> avec une clé littérale unique et n'élargit pas le type à <code>T|null</code>. Préférez <code>strict-array-index-existence</code>.</td></tr>
 <tr><td style="text-align: left"><code>check-throws</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les exceptions non capturées et non déclarées avec <code>@throws</code>.</td></tr>
 <tr><td style="text-align: left"><code>check-missing-override</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les attributs <code>#[Override]</code> manquants sur les méthodes redéfinissantes (PHP 8.3+).</td></tr>
 <tr><td style="text-align: left"><code>find-unused-parameters</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les paramètres qui ne sont jamais lus.</td></tr>
 <tr><td style="text-align: left"><code>strict-list-index-checks</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Exige que tout entier utilisé comme index de liste soit prouvé non négatif.</td></tr>
+<tr><td style="text-align: left"><code>strict-array-index-existence</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Traite les lectures de tableau ou de liste dont la clé n'est pas prouvée présente comme <code>T|null</code> et émet un avertissement <code>possibly-undefined-{int,string}-array-index</code>. Remplace <code>allow-possibly-undefined-array-keys = false</code>.</td></tr>
 <tr><td style="text-align: left"><code>no-boolean-literal-comparison</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Interdit les comparaisons directes aux littéraux booléens comme <code>$a === true</code>.</td></tr>
 <tr><td style="text-align: left"><code>check-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les indications de types manquantes sur les paramètres, propriétés et types de retour.</td></tr>
 <tr><td style="text-align: left"><code>check-closure-missing-type-hints</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Étend la vérification d'indications de types aux closures (nécessite <code>check-missing-type-hints</code>).</td></tr>
@@ -744,24 +745,20 @@ check-arrow-function-missing-type-hints = true
 enforce-class-finality = true
 require-api-or-internal = true
 check-experimental = true
-
 strict-list-index-checks = true
+strict-array-index-existence = true
 no-boolean-literal-comparison = true
-
-allow-possibly-undefined-array-keys = false
 trust-existence-checks = false
 </code></pre>
 <h3 id="lenient-mode">Mode indulgent</h3>
 <pre><code class="language-toml">[analyzer]
 check-missing-type-hints = false
 strict-list-index-checks = false
+strict-array-index-existence = false
 no-boolean-literal-comparison = false
 enforce-class-finality = false
 require-api-or-internal = false
-
-allow-possibly-undefined-array-keys = true
 trust-existence-checks = true
-
 check-throws = false
 </code></pre>
 <p>Lors de l'introduction de Mago dans une base de code existante, commencez en mode indulgent avec une <a href="../../../../../main/fr/fundamentals/baseline">baseline</a> et serrez les vis à mesure que le code s'améliore.</p>
@@ -778,6 +775,8 @@ check-throws = false
 </code></pre>
 <p>Désactivez-le et l'appel exige une garantie de type explicite à la place.</p>
 <p><code>allow-implicit-pipe-callable-types</code> ignore les vérifications d'indications de types des closures / fonctions fléchées lorsque le callable est l'opérande de droite de <code>|&gt;</code>. L'opérande de gauche du pipe porte assez d'informations de type pour dériver le paramètre, donc l'indication manquante est inoffensive là.</p>
+<p><code>strict-array-index-existence</code> aligne le système de types sur la sémantique d'exécution de PHP pour les clés manquantes. À l'exécution, PHP convertit une lecture absente en <code>null</code> et émet un avertissement <code>Undefined array key</code> ; lorsque ce drapeau est activé, l'analyseur émet <code>possibly-undefined-int-array-index</code> (ou <code>-string-array-index</code>) et élargit le résultat à <code>T|null</code>, de sorte que les vérifications <code>=== null</code> et <code>??</code> qui suivent se comportent comme attendu. Cela s'applique aux lectures de <code>list&lt;T&gt;</code> à des indices non nuls, aux entrées optionnelles des formes <code>array{...}</code> et aux recherches <code>array&lt;K, V&gt;</code> par clés arbitraires. Le drapeau est désactivé par défaut car en faire la valeur par défaut serait bruyant pour le PHP idiomatique qui déstructure ou indexe les listes sans d'abord vérifier l'existence.</p>
+<p><code>allow-possibly-undefined-array-keys = false</code> est déprécié. Il signalait uniquement les lectures de <code>array&lt;K, V&gt;</code> avec une clé littérale unique et n'élargissait jamais le type à <code>T|null</code>, donc une comparaison <code>=== null</code> après la lecture était signalée comme redondante. Remplacez-le par <code>strict-array-index-existence = true</code>, qui signale plus largement et reflète la sémantique d'exécution dans le type. Définir <code>allow-possibly-undefined-array-keys = false</code> émet un avertissement de dépréciation sur la CLI.</p>
 <h2 id="performance-tuning">Réglage des performances</h2>
 <p>L'analyseur utilise des seuils internes pour équilibrer profondeur et vitesse. Les paramètres se trouvent sous <code>[analyzer.performance]</code>.</p>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
