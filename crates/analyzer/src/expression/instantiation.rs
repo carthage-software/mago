@@ -1,3 +1,6 @@
+use std::borrow::Cow;
+use std::sync::Arc;
+
 use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
@@ -10,8 +13,10 @@ use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_object;
@@ -40,6 +45,7 @@ use crate::invocation::InvocationTarget;
 use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
 use crate::invocation::post_process::post_invocation_process;
+use crate::resolver::class_name::ResolutionOrigin;
 use crate::resolver::class_name::ResolvedClassname;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::utils::template::get_generic_parameter_for_offset;
@@ -482,16 +488,33 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         return Ok(get_never());
     }
 
-    let result_type = wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject {
+    let constraint_object = TAtomic::Object(TObject::Named(TNamedObject {
         name: metadata.original_name,
         type_parameters,
         is_static: classname.is_static() || (classname.is_self() && metadata.flags.is_final()),
         is_this: false,
         intersection_types: None,
         remapped_parameters: false,
-    })));
+    }));
 
-    Ok(result_type)
+    // `new $className()` where `$className: class-string<T>` produces a `T`, not the constraint.
+    // Preserve the template parameter so the function's `@return T` keeps narrowing on the call site.
+    let result_atomic = if let ResolutionOrigin::SpecificClassLikeString(TClassLikeString::Generic {
+        parameter_name,
+        defining_entity,
+        ..
+    }) = &classname.origin
+    {
+        TAtomic::GenericParameter(TGenericParameter::new(
+            *parameter_name,
+            Arc::new(TUnion::from_single(Cow::Owned(constraint_object))),
+            *defining_entity,
+        ))
+    } else {
+        constraint_object
+    };
+
+    Ok(wrap_atomic(result_atomic))
 }
 
 /// Analyzes the constructor invocation for an anonymous class.

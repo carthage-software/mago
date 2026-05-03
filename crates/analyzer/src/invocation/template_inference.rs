@@ -6,6 +6,7 @@ use foldhash::HashMap;
 
 use foldhash::HashSet;
 use mago_atom::Atom;
+use mago_atom::atom;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -743,11 +744,24 @@ fn infer_templates_from_input_and_container_types(
 
                 let mut input_objects = vec![];
                 for input_atomic in residual_input_type.types.iter() {
-                    let TAtomic::Scalar(TScalar::ClassLikeString(class_string)) = input_atomic else {
-                        continue;
-                    };
-
-                    input_objects.push(class_string.get_object_type(context.codebase));
+                    match input_atomic {
+                        TAtomic::Scalar(TScalar::ClassLikeString(class_string)) => {
+                            input_objects.push(class_string.get_object_type(context.codebase));
+                        }
+                        TAtomic::Scalar(TScalar::String(string)) => {
+                            // A literal `'Foo'` argument passed where `class-string<T>` is expected
+                            // should bind `T = Foo`, mirroring how Psalm/PHPStan coerce literal
+                            // strings that name a real class. Only do this when the literal really
+                            // names a class-like in the codebase, otherwise leave inference alone.
+                            if let Some(literal) = string.get_known_literal_value()
+                                && context.codebase.class_like_exists(literal)
+                            {
+                                input_objects
+                                    .push(TClassLikeString::literal(atom(literal)).get_object_type(context.codebase));
+                            }
+                        }
+                        _ => {}
+                    }
                 }
 
                 if input_objects.is_empty() || !should_add_bound {

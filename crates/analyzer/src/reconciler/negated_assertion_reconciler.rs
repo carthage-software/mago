@@ -467,11 +467,12 @@ const fn falsy_atomics_loose_equal(left: &TAtomic, right: &TAtomic) -> bool {
     }
 
     match (falsy_class(left), falsy_class(right)) {
-        (Some(left_class), Some(right_class)) => match (left_class, right_class) {
-            (FalsyClass::Numeric, FalsyClass::Numeric) => true,
-            (FalsyClass::EmptyString, FalsyClass::EmptyString) => true,
-            _ => false,
-        },
+        (Some(left_class), Some(right_class)) => {
+            matches!(
+                (left_class, right_class),
+                (FalsyClass::Numeric, FalsyClass::Numeric) | (FalsyClass::EmptyString, FalsyClass::EmptyString)
+            )
+        }
         _ => false,
     }
 }
