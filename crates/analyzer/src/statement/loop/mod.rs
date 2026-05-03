@@ -1078,24 +1078,20 @@ fn can_condition_be_initially_false(pre_condition: &Expression<'_>, artifacts: &
 
     match &binary.operator {
         BinaryOperator::LessThan(_) => match (left_ub, right_lb) {
-            (None, _) => true,
+            (None, _) | (_, None) => true,
             (Some(a), Some(b)) => a >= b,
-            _ => false,
         },
         BinaryOperator::LessThanOrEqual(_) => match (left_ub, right_lb) {
-            (None, _) => true,
+            (None, _) | (_, None) => true,
             (Some(a), Some(b)) => a > b,
-            _ => false,
         },
         BinaryOperator::GreaterThan(_) => match (left_lb, right_ub) {
-            (_, None) => true,
+            (None, _) | (_, None) => true,
             (Some(a), Some(b)) => a <= b,
-            _ => false,
         },
         BinaryOperator::GreaterThanOrEqual(_) => match (left_lb, right_ub) {
-            (_, None) => true,
+            (None, _) | (_, None) => true,
             (Some(a), Some(b)) => a < b,
-            _ => false,
         },
         _ => false,
     }
