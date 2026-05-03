@@ -634,6 +634,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
     block_context.locals.retain(|var_id, _| !var_references_dynamic(*var_id, variable_id));
 
     block_context.locals.insert(variable_id, assigned_type);
+    block_context.variables_possibly_in_scope.insert(variable_id);
 }
 
 fn analyze_destructuring<'ctx, 'ast, 'arena>(
