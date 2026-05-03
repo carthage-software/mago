@@ -43,7 +43,7 @@ fn int_or_string_in_int_or_string_or_float() {
 
 #[test]
 fn lit_int_in_int_or_string() {
-    for v in [-100_i64, 0, 1, 100] {
+    for v in [-100i64, 0, 1, 100] {
         assert_subtype(&u(t_lit_int(v)), &u_many(vec![t_int(), t_string()]));
     }
 }
@@ -148,7 +148,7 @@ fn ignore_false_flag_skips_false_in_input() {
 
 #[test]
 fn many_lits_in_int() {
-    let lits: Vec<_> = (0..20_i64).map(t_lit_int).collect();
+    let lits: Vec<_> = (0..20i64).map(t_lit_int).collect();
     let union = u_many(lits);
     assert_subtype(&union, &u(t_int()));
 }
@@ -156,7 +156,7 @@ fn many_lits_in_int() {
 #[test]
 fn many_lits_in_array_key() {
     let mut lits = vec![];
-    for i in 0..15_i64 {
+    for i in 0..15i64 {
         lits.push(t_lit_int(i));
     }
     for s in ["a", "b", "c", "d", "e"] {

@@ -14,11 +14,11 @@ use crate::formatter::FormatterConfig;
 use crate::formatter::utils::long_message;
 
 #[derive(Serialize)]
-struct CodeQualityIssue<'a> {
+struct CodeQualityIssue<'issue> {
     description: String,
-    check_name: &'a str,
+    check_name: &'issue str,
     fingerprint: String,
-    severity: &'a str,
+    severity: &'issue str,
     location: Location,
 }
 
@@ -59,26 +59,28 @@ impl Formatter for GitlabFormatter {
                     Level::Error => "major",
                 };
 
-                let (path, positions) = match issue.annotations.iter().find(|annotation| annotation.is_primary()) {
-                    Some(annotation) => {
-                        let file = database.get(&annotation.span.file_id()).unwrap();
-                        let begin = Position {
-                            line: file.line_number(annotation.span.start.offset) + 1,
-                            column: file.column_number(annotation.span.start.offset) + 1,
-                        };
+                let (path, positions) =
+                    match issue.annotations.iter().find(|annotation| annotation.is_primary()).and_then(|annotation| {
+                        database.get(&annotation.span.file_id()).ok().map(|file| (annotation, file))
+                    }) {
+                        Some((annotation, file)) => {
+                            let begin = Position {
+                                line: file.line_number(annotation.span.start.offset) + 1,
+                                column: file.column_number(annotation.span.start.offset) + 1,
+                            };
 
-                        let end = Position {
-                            line: file.line_number(annotation.span.end.offset) + 1,
-                            column: file.column_number(annotation.span.end.offset) + 1,
-                        };
+                            let end = Position {
+                                line: file.line_number(annotation.span.end.offset) + 1,
+                                column: file.column_number(annotation.span.end.offset) + 1,
+                            };
 
-                        (file.name.to_string(), Positions { begin, end })
-                    }
-                    None => (
-                        "<unknown>".to_string(),
-                        Positions { begin: Position { line: 0, column: 0 }, end: Position { line: 0, column: 0 } },
-                    ),
-                };
+                            (file.name.to_string(), Positions { begin, end })
+                        }
+                        None => (
+                            "<unknown>".to_string(),
+                            Positions { begin: Position { line: 0, column: 0 }, end: Position { line: 0, column: 0 } },
+                        ),
+                    };
 
                 let description = long_message(issue, true);
 
@@ -88,8 +90,14 @@ impl Formatter for GitlabFormatter {
                     let mut hasher = blake3::Hasher::new();
                     hasher.update(check_name.as_bytes());
                     hasher.update(path.as_bytes());
-                    hasher.update(positions.begin.line.to_le_bytes().as_slice());
-                    hasher.update(positions.begin.column.to_le_bytes().as_slice());
+                    // GitLab Code Quality fingerprints must be stable across machines, so we
+                    // deliberately serialize line/column as little-endian regardless of host.
+                    #[allow(clippy::little_endian_bytes)]
+                    let line_bytes = positions.begin.line.to_le_bytes();
+                    #[allow(clippy::little_endian_bytes)]
+                    let col_bytes = positions.begin.column.to_le_bytes();
+                    hasher.update(&line_bytes);
+                    hasher.update(&col_bytes);
                     hasher.update(description.as_bytes());
                     hasher.finalize().to_hex()[..32].to_string()
                 };

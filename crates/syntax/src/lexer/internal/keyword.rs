@@ -59,6 +59,8 @@ fn lookup_len3(bytes: &[u8]) -> Option<TokenKind> {
 
 #[inline]
 fn lookup_len4(bytes: &[u8]) -> Option<TokenKind> {
+    debug_assert!(bytes.len() >= 4, "lookup_len4 expects a 4-byte slice");
+
     match bytes[0] | 0x20 {
         b'c' if eq_ignore_case(bytes, b"case") => Some(TokenKind::Case),
         b'e' => match bytes[1] | 0x20 {
@@ -81,6 +83,8 @@ fn lookup_len4(bytes: &[u8]) -> Option<TokenKind> {
 
 #[inline]
 fn lookup_len5(bytes: &[u8]) -> Option<TokenKind> {
+    debug_assert!(bytes.len() >= 5, "lookup_len5 expects a 5-byte slice");
+
     match bytes[0] | 0x20 {
         b'a' if eq_ignore_case(bytes, b"array") => Some(TokenKind::Array),
         b'b' if eq_ignore_case(bytes, b"break") => Some(TokenKind::Break),

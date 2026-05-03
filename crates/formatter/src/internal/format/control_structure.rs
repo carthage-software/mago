@@ -261,8 +261,8 @@ impl<'arena> Format<'arena> for For<'arena> {
                 format_token(f, self.left_parenthesis, "("),
             ];
 
-            fn format_expressions<'a, 'arena>(
-                f: &mut FormatterState<'a, 'arena>,
+            fn format_expressions<'arena>(
+                f: &mut FormatterState<'_, 'arena>,
                 exprs: &'arena [&'arena Expression<'arena>],
             ) -> Document<'arena> {
                 let Some(first) = exprs.first() else {

@@ -7,6 +7,7 @@ use crate::metadata::property_hook::PropertyHookMetadata;
 use crate::reference::ReferenceSource;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct ScopeContext<'ctx> {
     pub(crate) function_like: Option<&'ctx FunctionLikeMetadata>,
     pub(crate) class_like: Option<&'ctx ClassLikeMetadata>,

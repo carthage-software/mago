@@ -88,7 +88,7 @@ fn int_to_positive_int_no_coerced_flag() {
 
 #[test]
 fn distinct_classes_no_coerced_flag() {
-    let cb = codebase_from_php(r"<?php class Foo {} class Bar {}");
+    let cb = codebase_from_php("<?php class Foo {} class Bar {}");
     let (v, r) = atomic_is_contained_capturing(&t_named("Foo"), &t_named("Bar"), &cb);
     assert!(!v);
     assert_eq!(r.type_coerced, None);
@@ -96,7 +96,7 @@ fn distinct_classes_no_coerced_flag() {
 
 #[test]
 fn parent_to_child_class_sets_coerced() {
-    let cb = codebase_from_php(r"<?php class Animal {} class Dog extends Animal {}");
+    let cb = codebase_from_php("<?php class Animal {} class Dog extends Animal {}");
     let (v, r) = atomic_is_contained_capturing(&t_named("Animal"), &t_named("Dog"), &cb);
     assert!(!v);
     assert_eq!(r.type_coerced, Some(true));
@@ -104,7 +104,7 @@ fn parent_to_child_class_sets_coerced() {
 
 #[test]
 fn child_to_parent_class_no_coerced_flag() {
-    let cb = codebase_from_php(r"<?php class Animal {} class Dog extends Animal {}");
+    let cb = codebase_from_php("<?php class Animal {} class Dog extends Animal {}");
     let (v, r) = atomic_is_contained_capturing(&t_named("Dog"), &t_named("Animal"), &cb);
     assert!(v);
     assert_eq!(r.type_coerced, None);

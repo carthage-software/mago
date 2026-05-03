@@ -74,6 +74,8 @@ pub fn analyze_spaceship_operation<'ctx, 'arena>(
             .with_note("PHP compares arrays as greater than other types (except other arrays and null). This might not be the intended comparison.")
             .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison."),
         );
+    } else {
+        // both sides are arrays, both non-arrays, or one side is null; no array/non-array mismatch
     }
 
     let result_type = if !block_context.flags.inside_loop_expressions() && is_always_greater_than(lhs_type, rhs_type) {
@@ -174,5 +176,7 @@ fn check_spaceship_operand<'arena>(
             .with_note("If this operand is `false` at runtime, PHP's specific comparison rules for `false` will apply.")
             .with_help("Ensure this operand is non-false or that comparison with `false` is intended."),
         );
+    } else {
+        // operand isn't null/mixed/false-bearing; no spaceship-operand diagnostic to emit
     }
 }

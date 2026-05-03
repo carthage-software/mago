@@ -6,6 +6,7 @@ use mago_syntax::ast::BinaryOperator;
 use std::hash::Hash;
 
 impl Fingerprintable for Binary<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -20,6 +21,7 @@ impl Fingerprintable for Binary<'_> {
 }
 
 impl Fingerprintable for BinaryOperator<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

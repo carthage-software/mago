@@ -107,6 +107,7 @@ pub struct PluginRegistry {
     method_throw_providers: Vec<Box<dyn MethodThrowTypeProvider>>,
 }
 
+#[allow(clippy::missing_fields_in_debug)]
 impl std::fmt::Debug for PluginRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PluginRegistry")
@@ -468,6 +469,11 @@ impl PluginRegistry {
         !self.method_throw_providers.is_empty()
     }
 
+    /// Run all registered program hooks before analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn before_program(
         &self,
         file: &File,
@@ -475,13 +481,18 @@ impl PluginRegistry {
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<HookAction> {
         for hook in &self.program_hooks {
-            if let HookAction::Skip = hook.before_program(file, program, context)? {
+            if hook.before_program(file, program, context)? == HookAction::Skip {
                 return Ok(HookAction::Skip);
             }
         }
         Ok(HookAction::Continue)
     }
 
+    /// Run all registered program hooks after analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn after_program(
         &self,
         file: &File,
@@ -494,19 +505,29 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered statement hooks before analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn before_statement(
         &self,
         stmt: &Statement<'_>,
         context: &mut HookContext<'_, '_>,
     ) -> PluginResult<HookAction> {
         for hook in &self.statement_hooks {
-            if let HookAction::Skip = hook.before_statement(stmt, context)? {
+            if hook.before_statement(stmt, context)? == HookAction::Skip {
                 return Ok(HookAction::Skip);
             }
         }
         Ok(HookAction::Continue)
     }
 
+    /// Run all registered statement hooks after analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn after_statement(&self, stmt: &Statement<'_>, context: &mut HookContext<'_, '_>) -> PluginResult<()> {
         for hook in &self.statement_hooks {
             hook.after_statement(stmt, context)?;
@@ -514,6 +535,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered expression hooks before analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn before_expression(
         &self,
         expr: &Expression<'_>,
@@ -528,6 +554,11 @@ impl PluginRegistry {
         Ok(ExpressionHookResult::Continue)
     }
 
+    /// Run all registered expression hooks after analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn after_expression(&self, expr: &Expression<'_>, context: &mut HookContext<'_, '_>) -> PluginResult<()> {
         for hook in &self.expression_hooks {
             hook.after_expression(expr, context)?;
@@ -535,6 +566,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered function call hooks before analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn before_function_call(
         &self,
         call: &FunctionCall<'_>,
@@ -549,6 +585,11 @@ impl PluginRegistry {
         Ok(ExpressionHookResult::Continue)
     }
 
+    /// Run all registered function call hooks after analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn after_function_call(&self, call: &FunctionCall<'_>, context: &mut HookContext<'_, '_>) -> PluginResult<()> {
         for hook in &self.function_call_hooks {
             hook.after_function_call(call, context)?;
@@ -556,6 +597,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered method call hooks before analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn before_method_call(
         &self,
         call: &MethodCall<'_>,
@@ -570,6 +616,11 @@ impl PluginRegistry {
         Ok(ExpressionHookResult::Continue)
     }
 
+    /// Run all registered method call hooks after analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn after_method_call(&self, call: &MethodCall<'_>, context: &mut HookContext<'_, '_>) -> PluginResult<()> {
         for hook in &self.method_call_hooks {
             hook.after_method_call(call, context)?;
@@ -577,6 +628,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered static method call hooks before analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn before_static_method_call(
         &self,
         call: &StaticMethodCall<'_>,
@@ -591,6 +647,11 @@ impl PluginRegistry {
         Ok(ExpressionHookResult::Continue)
     }
 
+    /// Run all registered static method call hooks after analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn after_static_method_call(
         &self,
         call: &StaticMethodCall<'_>,
@@ -602,6 +663,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered nullsafe method call hooks before analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn before_nullsafe_method_call(
         &self,
         call: &NullSafeMethodCall<'_>,
@@ -616,6 +682,11 @@ impl PluginRegistry {
         Ok(ExpressionHookResult::Continue)
     }
 
+    /// Run all registered nullsafe method call hooks after analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn after_nullsafe_method_call(
         &self,
         call: &NullSafeMethodCall<'_>,
@@ -627,6 +698,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered class declaration hooks on entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn on_enter_class(
         &self,
         class: &Class<'_>,
@@ -639,6 +715,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered class declaration hooks on exit.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn on_leave_class(
         &self,
         class: &Class<'_>,
@@ -651,6 +732,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered interface declaration hooks on entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn on_enter_interface(
         &self,
         interface: &Interface<'_>,
@@ -663,6 +749,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered interface declaration hooks on exit.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn on_leave_interface(
         &self,
         interface: &Interface<'_>,
@@ -675,6 +766,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered trait declaration hooks on entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn on_enter_trait(
         &self,
         trait_: &Trait<'_>,
@@ -687,6 +783,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered trait declaration hooks on exit.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn on_leave_trait(
         &self,
         trait_: &Trait<'_>,
@@ -699,6 +800,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered enum declaration hooks on entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn on_enter_enum(
         &self,
         enum_: &Enum<'_>,
@@ -711,6 +817,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered enum declaration hooks on exit.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn on_leave_enum(
         &self,
         enum_: &Enum<'_>,
@@ -723,6 +834,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered function declaration hooks on entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn on_enter_function(
         &self,
         function: &Function<'_>,
@@ -735,6 +851,11 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Run all registered function declaration hooks on exit.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PluginError`] if any registered hook propagates one.
     pub fn on_leave_function(
         &self,
         function: &Function<'_>,
@@ -1195,7 +1316,7 @@ impl PluginRegistry {
         for issue in issues {
             let mut keep = true;
             for hook in &self.issue_filter_hooks {
-                if let Ok(IssueFilterDecision::Remove) = hook.filter_issue(file, &issue) {
+                if hook.filter_issue(file, &issue) == Ok(IssueFilterDecision::Remove) {
                     keep = false;
                     break;
                 }

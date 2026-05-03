@@ -77,7 +77,7 @@ impl TTemplateType {
                     return Some(*name);
                 }
                 TAtomic::Object(TObject::Named(named)) => return Some(named.name),
-                _ => continue,
+                _ => {}
             }
         }
 

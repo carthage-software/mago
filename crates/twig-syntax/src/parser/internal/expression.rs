@@ -17,7 +17,7 @@ use crate::parser::stream::looks_like_identifier;
 use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse an expression with the lowest (zero) minimum precedence.
     #[inline]
     pub(crate) fn parse_expression(&mut self) -> Result<Expression<'arena>, ParseError> {

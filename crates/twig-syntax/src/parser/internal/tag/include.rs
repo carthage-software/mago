@@ -10,7 +10,7 @@ use crate::token::TwigToken;
 pub(super) type IncludeTail<'arena> =
     (Option<IgnoreMissingClause<'arena>>, Option<WithExpressionClause<'arena>>, Option<Keyword<'arena>>);
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_include(
         &mut self,
         open_tag_tok: TwigToken<'arena>,

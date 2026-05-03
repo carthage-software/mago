@@ -234,7 +234,7 @@ pub fn post_invocation_process<'ctx, 'arena>(
 fn apply_assertion_to_call_context<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     this_variable: Option<&str>,
     assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
@@ -661,7 +661,7 @@ fn is_superglobal_name(name: &str) -> bool {
 fn resolve_invocation_assertion<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     this_variable: Option<&str>,
     assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
@@ -820,6 +820,8 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                                 // ignore
                             }
                         }
+                    } else {
+                        // resolved type is never and there's no asserted type to compare against; nothing to report
                     }
                 }
 
@@ -950,7 +952,7 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                         &context.settings.algebra_thresholds(),
                     );
 
-                    let (truths, _) = find_satisfying_assignments(&clauses, None, &mut Default::default());
+                    let (truths, _) = find_satisfying_assignments(&clauses, None, &mut AtomSet::default());
                     for (variable, assertions) in truths {
                         type_assertions.entry(variable).or_default().extend(assertions);
                     }
@@ -988,8 +990,8 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
 /// * If a regular argument is found, it returns the result from `get_argument_for_parameter`.
 /// * If nothing is found, it returns `(None, None)`.
 fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    block_context: &mut BlockContext<'ctx>,
+    context: &Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     parameter_name: Atom,
     this_variable: Option<&str>,
@@ -1059,8 +1061,8 @@ fn resolve_special_assertion_target(
 /// * `Option<&'a Expression>`: The argument's expression AST node, if found.
 /// * `Option<Atom>`: The unique ID of the argument expression (e.g., a variable name), if it can be determined.
 fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    block_context: &mut BlockContext<'ctx>,
+    context: &Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     mut parameter_offset: Option<usize>,
     mut parameter_name: Option<Atom>,
@@ -1082,6 +1084,8 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
     {
         parameter_offset =
             parameter_refs.iter().position(|p| p.get_name().is_some_and(|name_variable| name_variable.0 == name));
+    } else {
+        // both name and offset already known; nothing to fill in
     }
 
     // After attempting to fill in missing info, if we still lack a name or an offset,
@@ -1153,7 +1157,7 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
 }
 
 fn collect_plugin_throw_types<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+    context: &Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,

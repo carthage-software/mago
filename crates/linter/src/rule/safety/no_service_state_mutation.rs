@@ -64,7 +64,7 @@ impl Config for NoServiceStateMutationConfig {
 
 /// Returns `true` if the given expression ultimately refers to `$this->property`,
 /// possibly through nested array access or array append operations.
-fn is_this_property_mutation<'arena>(expr: &Expression<'arena>) -> Option<Span> {
+fn is_this_property_mutation(expr: &Expression<'_>) -> Option<Span> {
     match expr {
         Expression::Access(Access::Property(prop)) => {
             if is_this(prop.object) {
@@ -81,7 +81,7 @@ fn is_this_property_mutation<'arena>(expr: &Expression<'arena>) -> Option<Span> 
 
 /// Returns `Some(span)` if the expression is `self::$prop` or `static::$prop`,
 /// possibly through nested array access or array append operations.
-fn is_static_property_mutation<'arena>(expr: &Expression<'arena>) -> Option<Span> {
+fn is_static_property_mutation(expr: &Expression<'_>) -> Option<Span> {
     match expr {
         Expression::Access(Access::StaticProperty(prop)) => match prop.class {
             Expression::Self_(_) | Expression::Static(_) => Some(expr.span()),
@@ -94,7 +94,7 @@ fn is_static_property_mutation<'arena>(expr: &Expression<'arena>) -> Option<Span
 }
 
 /// Checks both `$this->prop` and `self::$prop` / `static::$prop` mutations.
-fn is_property_mutation<'arena>(expr: &Expression<'arena>) -> Option<Span> {
+fn is_property_mutation(expr: &Expression<'_>) -> Option<Span> {
     is_this_property_mutation(expr).or_else(|| is_static_property_mutation(expr))
 }
 

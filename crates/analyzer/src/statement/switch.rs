@@ -170,9 +170,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 previously_matching_case,
             )?;
 
-            if let Some(true) = is_matching
-                && !case.is_default()
-            {
+            if is_matching == Some(true) && !case.is_default() {
                 previously_matching_case = Some(case.span());
             }
 
@@ -193,7 +191,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 reconcile_keyed_types(
                     self.context,
                     &reconcilable_types,
-                    Default::default(),
+                    IndexMap::default(),
                     &mut final_else_context,
                     &mut AtomSet::default(),
                     &final_else_referenced_ids,
@@ -218,7 +216,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         if let Some(redefined_vars) = self.redefined_variables {
             if is_exhaustive {
                 possibly_redefined_vars.retain(|k, _| !redefined_vars.contains_key(k));
-                self.block_context.locals.extend(redefined_vars.iter().map(|(k, v)| (*k, v.clone())));
+                self.block_context.locals.extend(redefined_vars.iter().map(|(k, v)| (*k, Rc::clone(v))));
             } else {
                 for (var_id, var_type) in redefined_vars {
                     possibly_redefined_vars.insert(var_id, var_type);
@@ -247,6 +245,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         Ok(())
     }
 
+    #[allow(clippy::unwrap_used)]
     pub(crate) fn analyze_case<'ast>(
         &mut self,
         switch: &Switch,
@@ -414,6 +413,8 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                                 "Remove this case or rearrange the switch cases to ensure that this case is last.",
                             ),
                     );
+                } else {
+                    // case condition can match without being unconditional; leave detection to runtime semantics
                 }
             }
 
@@ -435,6 +436,8 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             });
         } else if result.is_none() {
             result = Some(true);
+        } else {
+            // default case after a previously matching case; result already decided
         }
 
         let mut case_stmts = self.leftover_statements.clone();
@@ -527,7 +530,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             entry_clauses
         }
         .into_iter()
-        .map(|v| Rc::new(v.clone()))
+        .map(Rc::new)
         .collect();
 
         let (reconcilable_if_types, _) = mago_algebra::find_satisfying_assignments(
@@ -644,7 +647,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                                 self.context.codebase,
                                 CombinerOptions::default(),
                             )),
-                            None => var_type.clone(),
+                            None => Rc::clone(var_type),
                         },
                     );
                 }
@@ -653,7 +656,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     break_vars
                         .iter()
                         .filter(|(var_id, _)| self.block_context.locals.contains_key(*var_id))
-                        .map(|(k, v)| (*k, v.clone()))
+                        .map(|(k, v)| (*k, Rc::clone(v)))
                         .collect(),
                 );
             }
@@ -727,7 +730,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                             self.context.codebase,
                             CombinerOptions::default(),
                         )),
-                        None => var_type.clone(),
+                        None => Rc::clone(var_type),
                     },
                 );
             }
@@ -745,7 +748,9 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             let var_ids: Vec<_> = redefined_vars.keys().copied().collect();
             for var_id in var_ids {
                 if let Some(break_var_type) = case_redefined_vars.get(&var_id) {
-                    let var_type = redefined_vars.get(&var_id).unwrap();
+                    let Some(var_type) = redefined_vars.get(&var_id) else {
+                        panic!("invariant: redefined_vars must contain var_id collected from its own keys");
+                    };
                     let combined = Rc::new(combine_union_types(
                         break_var_type,
                         var_type,
@@ -765,7 +770,9 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             let var_ids: Vec<_> = new_locals.keys().copied().collect();
             for var_id in var_ids {
                 if let Some(existing_var_type) = case_block_context.locals.get(&var_id) {
-                    let var_type = new_locals.get(&var_id).unwrap();
+                    let Some(var_type) = new_locals.get(&var_id) else {
+                        panic!("invariant: new_locals must contain var_id collected from its own keys");
+                    };
                     let combined = Rc::new(combine_union_types(
                         existing_var_type,
                         var_type,
@@ -804,7 +811,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         } else {
             let subject_id =
                 Atom::from(&format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch.expression.span().start.offset));
-            self.block_context.locals.insert(subject_id, subject_type.clone());
+            self.block_context.locals.insert(subject_id, Rc::clone(subject_type));
             let subject_for_conditions =
                 new_synthetic_variable(self.context.arena, subject_id.as_str(), switch.expression.span());
 

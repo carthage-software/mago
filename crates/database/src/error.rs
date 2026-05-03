@@ -36,6 +36,7 @@ pub enum DatabaseError {
 }
 
 impl std::fmt::Display for DatabaseError {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::FileNotFound => write!(f, "file not found in database"),
@@ -65,6 +66,7 @@ impl std::fmt::Display for DatabaseError {
 }
 
 impl std::error::Error for DatabaseError {
+    #[inline]
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::IOError(err) => Some(err),
@@ -76,12 +78,14 @@ impl std::error::Error for DatabaseError {
 }
 
 impl From<std::io::Error> for DatabaseError {
+    #[inline]
     fn from(error: std::io::Error) -> Self {
         Self::IOError(error)
     }
 }
 
 impl From<GlobSetError> for DatabaseError {
+    #[inline]
     fn from(error: GlobSetError) -> Self {
         Self::InvalidGlobSet(error)
     }

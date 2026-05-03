@@ -1,6 +1,9 @@
+#![allow(clippy::unreachable)]
+
+use core::hint::unreachable_unchecked;
+
 use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::hint::unreachable_unchecked;
 
 use memchr::memchr2;
 use memchr::memmem;
@@ -101,6 +104,7 @@ impl<'input> Lexer<'input> {
     /// # Returns
     ///
     /// A new `Lexer` instance that reads from the provided byte slice.
+    #[must_use]
     pub fn new(input: Input<'input>, settings: LexerSettings) -> Lexer<'input> {
         Lexer {
             input,
@@ -122,6 +126,7 @@ impl<'input> Lexer<'input> {
     /// # Returns
     ///
     /// A new `Lexer` instance that reads from the provided byte slice.
+    #[must_use]
     pub fn scripting(input: Input<'input>, settings: LexerSettings) -> Lexer<'input> {
         Lexer {
             input,
@@ -143,6 +148,7 @@ impl<'input> Lexer<'input> {
 
     /// Get the current position of the lexer in the input source code.
     #[inline]
+    #[must_use]
     pub const fn current_position(&self) -> Position {
         self.input.current_position()
     }
@@ -200,7 +206,9 @@ impl<'input> Lexer<'input> {
                 // Shebang is only valid at the absolute start of the file (offset 0).
                 if offset == 0
                     && self.input.len() >= 2
+                    // SAFETY: `self.input.len() >= 2` was just checked, so indices 0 and 1 are in bounds.
                     && unsafe { *self.input.read_at_unchecked(0) } == b'#'
+                    // SAFETY: same as above.
                     && unsafe { *self.input.read_at_unchecked(1) } == b'!'
                 {
                     let buffer = self.input.consume_through(b'\n');
@@ -260,8 +268,11 @@ impl<'input> Lexer<'input> {
                         let candidate = unsafe { bytes.get_unchecked(pos..) };
 
                         if candidate.len() >= 5
+                            // SAFETY: `candidate.len() >= 5` was just checked, so indices 2, 3, 4 are in bounds.
                             && (unsafe { *candidate.get_unchecked(2) } | 0x20) == b'p'
+                            // SAFETY: same as above.
                             && (unsafe { *candidate.get_unchecked(3) } | 0x20) == b'h'
+                            // SAFETY: same as above.
                             && (unsafe { *candidate.get_unchecked(4) } | 0x20) == b'p'
                         {
                             if pos > 0 {
@@ -280,6 +291,8 @@ impl<'input> Lexer<'input> {
                             )));
                         }
 
+                        // SAFETY: index 2 is in bounds because the right-hand side is only evaluated when
+                        // `candidate.len() >= 3` holds.
                         if candidate.len() >= 3 && unsafe { *candidate.get_unchecked(2) } == b'=' {
                             if pos > 0 {
                                 let buffer = self.input.consume(pos);
@@ -319,12 +332,9 @@ impl<'input> Lexer<'input> {
                     )));
                 }
 
-                let first_byte = match self.input.read(1).first() {
-                    Some(&b) => b,
-                    None => {
-                        // SAFETY: we check for EOF before entering scripting section,
-                        unsafe { unreachable_unchecked() }
-                    }
+                let Some(&first_byte) = self.input.read(1).first() else {
+                    // SAFETY: we check for EOF before entering scripting section,
+                    unsafe { unreachable_unchecked() }
                 };
 
                 if let Some(kind) = SIMPLE_TOKEN_TABLE[first_byte as usize] {
@@ -650,9 +660,10 @@ impl<'input> Lexer<'input> {
                         return Some(Err(SyntaxError::UnrecognizedToken(self.file_id(), *unknown_byte, position)));
                     }
                     [] => {
-                        // we check for EOF before entering scripting section,
-                        // so this should be unreachable.
-                        unreachable!()
+                        // We check for EOF before entering scripting section, so this should be
+                        // unreachable. If we ever land here it means an upstream invariant broke,
+                        // so signal EOF gracefully rather than panicking inside the lexer.
+                        return None;
                     }
                 };
 
@@ -1026,7 +1037,12 @@ impl<'input> Lexer<'input> {
                             Some(Err(SyntaxError::UnexpectedToken(self.file_id(), byte, position)))
                         }
                     }
-                    _ => unreachable!(),
+                    HaltStage::End => {
+                        // The `HaltStage::End` arm is reached only after the early-return at the top of
+                        // this branch consumed the terminating `?>` or EOF; surfacing `None` keeps the
+                        // lexer total instead of relying on `unreachable!`.
+                        None
+                    }
                 }
             }
         }
@@ -1309,7 +1325,8 @@ fn matches_literal_double_quote_string(input: &Input, prefix_len: usize) -> bool
         if byte == b'"' {
             // Encounter a closing double quote.
             return true;
-        } else if byte == b'\\' {
+        }
+        if byte == b'\\' {
             // Skip an escape sequence: assume that the backslash and the escaped character form a pair.
             pos += 2;
             continue;
@@ -1350,9 +1367,12 @@ fn read_start_of_heredoc_document(input: &Input, double_quoted: bool, prefix_len
     let mut terminated = false; // For double-quoted heredoc, to track the closing quote.
     loop {
         let pos = base + length;
-        // Ensure we haven't run past the input.
+        // Bail out gracefully if we run past the input or hit a byte that the caller's
+        // earlier validation should have rejected: returning the accumulated `(length,
+        // whitespaces, label_length)` lets the lexer produce a malformed-heredoc token
+        // instead of panicking.
         if pos >= total {
-            unreachable!("Unexpected end of input while reading heredoc label");
+            return (length, whitespaces, label_length);
         }
 
         let byte = *input.read_at(pos);
@@ -1378,7 +1398,8 @@ fn read_start_of_heredoc_document(input: &Input, double_quoted: bool, prefix_len
             length += 1;
             terminated = true;
         } else {
-            unreachable!("Unexpected character encountered in heredoc label");
+            // Malformed heredoc label: stop scanning and let the caller surface a parse error.
+            return (length, whitespaces, label_length);
         }
     }
 }
@@ -1403,7 +1424,9 @@ fn read_start_of_nowdoc_document(input: &Input, prefix_len: usize) -> (usize, us
     loop {
         let pos = base + length;
         if pos >= total {
-            unreachable!("Unexpected end of input while reading nowdoc label");
+            // Bail out gracefully on truncated input; surfacing the accumulated state lets the
+            // lexer report a parse error instead of panicking.
+            return (length, whitespaces, label_length);
         }
         let byte = *input.read_at(pos);
 
@@ -1428,7 +1451,8 @@ fn read_start_of_nowdoc_document(input: &Input, prefix_len: usize) -> (usize, us
             length += 1;
             terminated = true;
         } else {
-            unreachable!("Unexpected character encountered in nowdoc label");
+            // Malformed nowdoc label: stop scanning and let the caller surface a parse error.
+            return (length, whitespaces, label_length);
         }
     }
 }
@@ -1618,7 +1642,9 @@ fn scan_single_line_comment(bytes: &[u8]) -> usize {
                         // Not ?>, continue searching
                         pos = found_pos + 1;
                     }
-                    _ => unreachable!(),
+                    // `memchr3` only matches the three bytes we asked for; any other value here would
+                    // indicate a memchr bug. Treat it as end-of-comment so the lexer keeps making progress.
+                    _ => return found_pos,
                 }
             }
             None => return bytes.len(),

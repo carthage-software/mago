@@ -1312,7 +1312,7 @@ fn cast_type_to_float<'arena>(
     TUnion::from_vec(combine(resulting_float_atomics, context.codebase, context.settings.combiner_options()))
 }
 
-fn cast_type_to_int(operand_type: &TUnion, context: &mut Context<'_, '_>) -> TUnion {
+fn cast_type_to_int(operand_type: &TUnion, context: &Context<'_, '_>) -> TUnion {
     let mut possibilities = vec![];
     for t in operand_type.types.as_ref() {
         let possible = match t {
@@ -1720,7 +1720,7 @@ pub fn cast_type_to_string<'ctx>(
 
             TAtomic::Null | TAtomic::Void => possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("")))),
             TAtomic::Resource(_) => possibilities.push(TAtomic::Scalar(TScalar::non_empty_string())),
-            TAtomic::Never => continue,
+            TAtomic::Never => {}
             _ => {
                 if let Some(result) = find_to_string_in_intersections(
                     t,
@@ -1795,7 +1795,7 @@ fn find_to_string_in_intersections<'ctx>(
                     expression_span,
                 ));
             }
-            _ => continue,
+            _ => {}
         }
     }
 
@@ -1810,7 +1810,7 @@ mod tests {
 
     test_analysis! {
         name = unary_increment_decrement_operators,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -1905,7 +1905,7 @@ mod tests {
 
     test_analysis! {
         name = negate_integer_ranges,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             final readonly class Duration
@@ -1938,7 +1938,7 @@ mod tests {
 
     test_analysis! {
         name = cast_stdclass_to_array,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class stdClass
@@ -1956,7 +1956,7 @@ mod tests {
 
     test_analysis! {
         name = negative_numeric_string_increment_decrement,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**

@@ -35,11 +35,12 @@ impl TReferenceMemberSelector {
     }
 }
 
-/// Selector variants usable for global-constant references. Unlike class members,
-/// a bare `*` already resolves to `Type::Wildcard` (an alias for `mixed`), so the
-/// global-reference form only expresses prefix or suffix matches. Bare identifiers
-/// in type positions remain class-like references — PHPDoc does not treat them as
-/// constant references.
+/// Selector variants usable for global-constant references.
+///
+/// Unlike class members, a bare `*` already resolves to `Type::Wildcard` (an alias
+/// for `mixed`), so the global-reference form only expresses prefix or suffix
+/// matches. Bare identifiers in type positions remain class-like references —
+/// PHPDoc does not treat them as constant references.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum TGlobalReferenceSelector {
     /// A global constant whose name starts with a given prefix, e.g. `FILTER_FLAG_*`.
@@ -61,6 +62,7 @@ impl TGlobalReferenceSelector {
 }
 
 /// Represents an unresolved reference to a symbol or a class-like member.
+///
 /// These require context (e.g., symbol tables, codebase analysis) to be resolved
 /// into a concrete type (`TObject`, `TEnum`, constant type, etc.).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]

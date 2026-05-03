@@ -35,18 +35,19 @@ pub struct ReportedIssue {
     pub issue: Issue,
 }
 
-pub struct ProviderContext<'a, 'b, 'c> {
-    pub(crate) codebase: &'a CodebaseMetadata,
-    pub(crate) artifacts: &'b AnalysisArtifacts,
-    pub(crate) block_context: &'c BlockContext<'a>,
+#[allow(clippy::field_scoped_visibility_modifiers)]
+pub struct ProviderContext<'codebase, 'artifacts, 'block> {
+    pub(crate) codebase: &'codebase CodebaseMetadata,
+    pub(crate) artifacts: &'artifacts AnalysisArtifacts,
+    pub(crate) block_context: &'block BlockContext<'codebase>,
     pub(crate) reported_issues: RefCell<Vec<ReportedIssue>>,
 }
 
-impl<'a, 'b, 'c> ProviderContext<'a, 'b, 'c> {
+impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'block> {
     pub(crate) fn new(
-        codebase: &'a CodebaseMetadata,
-        block_context: &'c BlockContext<'a>,
-        artifacts: &'b AnalysisArtifacts,
+        codebase: &'codebase CodebaseMetadata,
+        block_context: &'block BlockContext<'codebase>,
+        artifacts: &'artifacts AnalysisArtifacts,
     ) -> Self {
         Self { codebase, artifacts, block_context, reported_issues: RefCell::new(Vec::new()) }
     }
@@ -60,7 +61,7 @@ impl<'a, 'b, 'c> ProviderContext<'a, 'b, 'c> {
     }
 
     #[inline]
-    pub fn codebase(&self) -> &'a CodebaseMetadata {
+    pub fn codebase(&self) -> &'codebase CodebaseMetadata {
         self.codebase
     }
 
@@ -80,7 +81,7 @@ impl<'a, 'b, 'c> ProviderContext<'a, 'b, 'c> {
     }
 
     #[inline]
-    pub fn scope(&self) -> &ScopeContext<'a> {
+    pub fn scope(&self) -> &ScopeContext<'codebase> {
         &self.block_context.scope
     }
 
@@ -90,7 +91,7 @@ impl<'a, 'b, 'c> ProviderContext<'a, 'b, 'c> {
     }
 
     #[inline]
-    pub fn get_closure_metadata<'arena>(&self, expr: &Expression<'arena>) -> Option<&'a FunctionLikeMetadata> {
+    pub fn get_closure_metadata<'arena>(&self, expr: &Expression<'arena>) -> Option<&'codebase FunctionLikeMetadata> {
         match expr {
             Expression::ArrowFunction(arrow_fn) => {
                 let span = arrow_fn.span();
@@ -109,7 +110,7 @@ impl<'a, 'b, 'c> ProviderContext<'a, 'b, 'c> {
     /// This method extends `get_closure_metadata` to also handle first-class callables
     /// like `is_string(...)` or `SomeClass::method(...)`, as well as string literals representing callables.
     #[inline]
-    pub fn get_callable_metadata<'arena>(&self, expr: &Expression<'arena>) -> Option<&'a FunctionLikeMetadata> {
+    pub fn get_callable_metadata<'arena>(&self, expr: &Expression<'arena>) -> Option<&'codebase FunctionLikeMetadata> {
         match expr {
             Expression::ArrowFunction(arrow_fn) => {
                 let span = arrow_fn.span();
@@ -195,18 +196,19 @@ impl<'a, 'b, 'c> ProviderContext<'a, 'b, 'c> {
 ///
 /// Unlike `ProviderContext` which is read-only, `HookContext` allows hooks
 /// to modify the analysis state (expression types, variable types, assertions).
-pub struct HookContext<'ctx, 'a> {
+#[allow(clippy::field_scoped_visibility_modifiers)]
+pub struct HookContext<'ctx, 'block> {
     pub(crate) codebase: &'ctx CodebaseMetadata,
-    pub(crate) block_context: &'a mut BlockContext<'ctx>,
-    pub(crate) artifacts: &'a mut AnalysisArtifacts,
+    pub(crate) block_context: &'block mut BlockContext<'ctx>,
+    pub(crate) artifacts: &'block mut AnalysisArtifacts,
     pub(crate) reported_issues: RefCell<Vec<ReportedIssue>>,
 }
 
-impl<'ctx, 'a> HookContext<'ctx, 'a> {
+impl<'ctx, 'block> HookContext<'ctx, 'block> {
     pub(crate) fn new(
         codebase: &'ctx CodebaseMetadata,
-        block_context: &'a mut BlockContext<'ctx>,
-        artifacts: &'a mut AnalysisArtifacts,
+        block_context: &'block mut BlockContext<'ctx>,
+        artifacts: &'block mut AnalysisArtifacts,
     ) -> Self {
         Self { codebase, artifacts, block_context, reported_issues: RefCell::new(Vec::new()) }
     }
@@ -321,6 +323,7 @@ impl<'ctx, 'a> HookContext<'ctx, 'a> {
     }
 }
 
+#[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct InvocationInfo<'ctx, 'ast, 'arena> {
     pub(crate) invocation: &'ctx Invocation<'ctx, 'ast, 'arena>,
 }

@@ -20,6 +20,7 @@ impl CommentFlags {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(clippy::struct_field_names)]
 pub struct Comment {
     pub start: u32,
     pub end: u32,
@@ -56,7 +57,7 @@ impl Comment {
     }
 
     pub fn from_trivia<'arena>(file: &File, trivia: &'arena Trivia<'arena>) -> Self {
-        debug_assert!(trivia.kind.is_comment());
+        debug_assert!(trivia.kind.is_comment(), "Comment::from_trivia received non-comment trivia");
 
         let is_block = trivia.kind.is_block_comment();
         let is_single_line =

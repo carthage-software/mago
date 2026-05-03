@@ -411,7 +411,7 @@ fn should_add_new_line_or_space_after_stmt<'arena>(
 /// is not counted since the formatter removes it. If any other closing tags exist,
 /// the file is an inline PHP template.
 #[inline]
-#[allow(clippy::if_same_then_else)]
+#[allow(clippy::if_same_then_else, clippy::bool_to_int_with_if)]
 fn is_inline_php_template(stmts: &[&Statement<'_>]) -> bool {
     let trailing_close_tag_count = match stmts.len() {
         0 => 0,
@@ -439,7 +439,7 @@ fn is_inline_php_template(stmts: &[&Statement<'_>]) -> bool {
 fn count_closing_tags(stmts: &[&Statement<'_>]) -> usize {
     struct Counter(usize);
 
-    impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for Counter {
+    impl<'ast> MutWalker<'ast, '_, ()> for Counter {
         fn walk_in_closing_tag(&mut self, _: &'ast ClosingTag, _: &mut ()) {
             self.0 += 1;
         }

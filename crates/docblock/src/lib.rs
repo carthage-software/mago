@@ -44,6 +44,7 @@ pub fn parse_phpdoc_with_span<'arena>(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -275,7 +276,7 @@ mod tests {
     #[test]
     fn test_unclosed_code_block() {
         let arena = Bump::new();
-        let phpdoc = r"/**
+        let phpdoc = "/**
             * This is a doc block with unclosed code block
             * ```
             * Some code here
@@ -327,7 +328,7 @@ mod tests {
     #[test]
     fn test_malformed_code_block() {
         let arena = Bump::new();
-        let phpdoc = r"/**
+        let phpdoc = "/**
             * ```
             * Some code here
             * Incorrect closing
@@ -374,7 +375,7 @@ mod tests {
     fn test_inconsistent_indentation() {
         // Test case for ParseError::InconsistentIndentation
         let arena = Bump::new();
-        let phpdoc = r"/**
+        let phpdoc = "/**
     * This is a doc block
       * With inconsistent indentation
     */";
@@ -409,7 +410,7 @@ mod tests {
     #[test]
     fn test_missing_asterisk() {
         let arena = Bump::new();
-        let phpdoc = r"/**
+        let phpdoc = "/**
      This line is missing an asterisk
      * This line is fine
      */";
@@ -445,7 +446,7 @@ mod tests {
     #[test]
     fn test_missing_whitespace_after_asterisk() {
         let arena = Bump::new();
-        let phpdoc = r"/**
+        let phpdoc = "/**
      *This line is missing a space after asterisk
      */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
@@ -676,7 +677,7 @@ mod tests {
     #[test]
     fn test_long_description_with_missing_asterisk() {
         let arena = Bump::new();
-        let phpdoc = r"/** @var string[] this is a really long description
+        let phpdoc = "/** @var string[] this is a really long description
             that spans multiple lines, and demonstrates how the parser handles
             docblocks with multiple descriptions, and missing astricks*/";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
@@ -704,7 +705,7 @@ mod tests {
     #[test]
     fn test_code_indent_using_non_ascii_chars() {
         let arena = Bump::new();
-        let phpdoc = r"/**
+        let phpdoc = "/**
         *    └─ comment 2
         *       └─ comment 4
         *    └─ comment 3
@@ -903,13 +904,13 @@ mod tests {
     #[test]
     fn test_multiline_inline_tag() {
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = "/**
             * This method gets a count of the Foo.
             * {@internal Developers should note that it silently
             *            adds one extra Foo.}
             *
             * @return int
-            */"#;
+            */";
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
         let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");
@@ -929,10 +930,10 @@ mod tests {
     #[test]
     fn test_multiline_inline_tag_with_nested() {
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = "/**
             * {@internal Developers should note that it silently
             *            adds one extra Foo (see {@link http://example.com}).}
-            */"#;
+            */";
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
         let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse PHPDoc");
@@ -970,13 +971,13 @@ mod tests {
     #[test]
     fn test_multiline_inline_tag_chinese() {
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = "/**
             * 获取用户数量的方法。
             * {@internal 开发者请注意，此方法会静默地
             *            添加一个额外的用户。}
             *
             * @return int
-            */"#;
+            */";
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
         let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse Chinese PHPDoc");
@@ -1013,13 +1014,13 @@ mod tests {
     #[test]
     fn test_multiline_inline_tag_arabic() {
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = "/**
             * طريقة للحصول على عدد المستخدمين.
             * {@internal يجب على المطورين ملاحظة أن هذه الطريقة
             *            تضيف مستخدمًا إضافيًا بصمت.}
             *
             * @return int
-            */"#;
+            */";
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
         let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse Arabic PHPDoc");
@@ -1036,11 +1037,11 @@ mod tests {
     #[test]
     fn test_multiline_inline_tag_mixed_scripts() {
         let arena = Bump::new();
-        let phpdoc = r#"/**
+        let phpdoc = "/**
             * Documentation with mixed scripts.
             * {@internal 注意: This method は静かに adds один
             *            дополнительный элемент 요소를 추가합니다.}
-            */"#;
+            */";
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
         let document = parse_phpdoc_with_span(&arena, phpdoc, span).expect("Failed to parse mixed-script PHPDoc");

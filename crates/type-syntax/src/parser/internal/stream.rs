@@ -18,6 +18,7 @@ use crate::token::TypeTokenKind;
 /// A buffered token stream that wraps a `TypeLexer`, providing lookahead
 /// capabilities and automatically skipping trivia tokens (whitespace, comments).
 #[derive(Debug)]
+#[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct TypeTokenStream<'arena> {
     pub(crate) arena: &'arena Bump,
     pub(crate) lexer: TypeLexer<'arena>,

@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::cmp::max;
 use std::cmp::min;
 use std::ops::Add;
@@ -27,6 +28,7 @@ use crate::ttype::atomic::scalar::TScalar;
 /// Represents an integer type in a static analysis context, which can be either a
 /// specific known value or a range of possible values.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub enum TInteger {
     /// A specific, known integer value (e.g., `5`, `-100`).
     Literal(i64),
@@ -462,6 +464,7 @@ impl TInteger {
                             keep_container = false;
                         }
                     }
+                    #[allow(clippy::unreachable)]
                     TInteger::Unspecified | TInteger::UnspecifiedLiteral => {
                         unreachable!(
                             "Unspecified/UnspecifiedLiteral integers should have been filtered out before this point"
@@ -938,6 +941,7 @@ impl TInteger {
         let (mut curr_start, mut curr_end) = unsafe { *intervals.get_unchecked(0) };
 
         for i in 1..intervals.len() {
+            // SAFETY: `i` is bounded by the loop range `1..intervals.len()`, so the index is in bounds.
             let (next_start, next_end) = unsafe { *intervals.get_unchecked(i) };
 
             if next_start <= curr_end.saturating_add(1) {
@@ -1103,33 +1107,21 @@ impl Mul for TInteger {
             (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (Literal(l1), Literal(l2)) => Literal(l1.saturating_mul(l2)),
             (Literal(0), _) | (_, Literal(0)) => Literal(0),
-            (Literal(l), From(f)) | (From(f), Literal(l)) => {
-                if l > 0 {
-                    From(l.saturating_mul(f))
-                } else if l < 0 {
-                    To(l.saturating_mul(f))
-                } else {
-                    Literal(0)
-                }
-            }
-            (Literal(l), To(t)) | (To(t), Literal(l)) => {
-                if l > 0 {
-                    To(l.saturating_mul(t))
-                } else if l < 0 {
-                    From(l.saturating_mul(t))
-                } else {
-                    Literal(0)
-                }
-            }
-            (Literal(l), Range(f, t)) | (Range(f, t), Literal(l)) => {
-                if l > 0 {
-                    Range(l.saturating_mul(f), l.saturating_mul(t))
-                } else if l < 0 {
-                    Range(l.saturating_mul(t), l.saturating_mul(f))
-                } else {
-                    Literal(0)
-                }
-            }
+            (Literal(l), From(f)) | (From(f), Literal(l)) => match l.cmp(&0) {
+                Ordering::Greater => From(l.saturating_mul(f)),
+                Ordering::Less => To(l.saturating_mul(f)),
+                Ordering::Equal => Literal(0),
+            },
+            (Literal(l), To(t)) | (To(t), Literal(l)) => match l.cmp(&0) {
+                Ordering::Greater => To(l.saturating_mul(t)),
+                Ordering::Less => From(l.saturating_mul(t)),
+                Ordering::Equal => Literal(0),
+            },
+            (Literal(l), Range(f, t)) | (Range(f, t), Literal(l)) => match l.cmp(&0) {
+                Ordering::Greater => Range(l.saturating_mul(f), l.saturating_mul(t)),
+                Ordering::Less => Range(l.saturating_mul(t), l.saturating_mul(f)),
+                Ordering::Equal => Literal(0),
+            },
             (From(f1), From(f2)) => {
                 if f1 >= 0 && f2 >= 0 {
                     From(f1.saturating_mul(f2))
@@ -1202,33 +1194,21 @@ impl Div for TInteger {
                     Unspecified
                 }
             }
-            (From(f), Literal(l)) => {
-                if l > 0 {
-                    From(f / l)
-                } else if l < 0 {
-                    To(f / l)
-                } else {
-                    Unspecified
-                }
-            }
-            (To(t), Literal(l)) => {
-                if l > 0 {
-                    To(t / l)
-                } else if l < 0 {
-                    From(t / l)
-                } else {
-                    Unspecified
-                }
-            }
-            (Range(f, t), Literal(l)) => {
-                if l > 0 {
-                    Range(f / l, t / l)
-                } else if l < 0 {
-                    Range(t / l, f / l)
-                } else {
-                    Unspecified
-                }
-            }
+            (From(f), Literal(l)) => match l.cmp(&0) {
+                Ordering::Greater => From(f / l),
+                Ordering::Less => To(f / l),
+                Ordering::Equal => Unspecified,
+            },
+            (To(t), Literal(l)) => match l.cmp(&0) {
+                Ordering::Greater => To(t / l),
+                Ordering::Less => From(t / l),
+                Ordering::Equal => Unspecified,
+            },
+            (Range(f, t), Literal(l)) => match l.cmp(&0) {
+                Ordering::Greater => Range(f / l, t / l),
+                Ordering::Less => Range(t / l, f / l),
+                Ordering::Equal => Unspecified,
+            },
             (Literal(l), Range(f, t)) => {
                 if f > 0 || t < 0 {
                     let p1 = l / f;
@@ -1322,6 +1302,7 @@ impl Rem for TInteger {
                 if l1 == i64::MIN && l2 == -1 {
                     Unspecified
                 } else {
+                    #[allow(clippy::modulo_arithmetic)]
                     Literal(l1 % l2)
                 }
             }
@@ -1338,26 +1319,30 @@ impl Rem for TInteger {
                     Unspecified
                 }
             }
-            (From(f), Literal(l)) => {
-                if l > 0 {
-                    if f >= 0 { Range(0, l - 1) } else { Range(-(l - 1), l - 1) }
-                } else if l < 0 {
+            (From(f), Literal(l)) => match l.cmp(&0) {
+                Ordering::Greater => {
+                    if f >= 0 {
+                        Range(0, l - 1)
+                    } else {
+                        Range(-(l - 1), l - 1)
+                    }
+                }
+                Ordering::Less => {
                     if f >= 0 {
                         Range(0, l.saturating_neg().saturating_sub(1))
                     } else {
                         Range(l.saturating_add(1), l.saturating_neg().saturating_sub(1))
                     }
-                } else {
-                    Unspecified
                 }
-            }
+                Ordering::Equal => Unspecified,
+            },
             (To(t), Literal(l)) if l != 0 => {
                 let abs_l = l.abs();
 
                 if t <= 0 { Range(-(abs_l - 1), 0) } else { Range(-(abs_l - 1), abs_l - 1) }
             }
-            (Range(f, t), Literal(l)) => {
-                if l > 0 {
+            (Range(f, t), Literal(l)) => match l.cmp(&0) {
+                Ordering::Greater => {
                     if f >= 0 {
                         Range(0, (l - 1).min(t))
                     } else if t <= 0 {
@@ -1365,7 +1350,8 @@ impl Rem for TInteger {
                     } else {
                         Range(-(l - 1), l - 1)
                     }
-                } else if l < 0 {
+                }
+                Ordering::Less => {
                     let v = l.abs();
 
                     if f >= 0 {
@@ -1375,10 +1361,9 @@ impl Rem for TInteger {
                     } else {
                         Range(-(v - 1), v - 1)
                     }
-                } else {
-                    Unspecified
                 }
-            }
+                Ordering::Equal => Unspecified,
+            },
             _ => Unspecified,
         }
     }
@@ -1401,8 +1386,7 @@ impl Neg for TInteger {
 
 /// Smears all bits below the MSB.
 /// e.g., 0b1010 → 0b1111, 0b10000 → 0b11111
-fn bit_smear(v: i64) -> i64 {
-    let mut v = v;
+fn bit_smear(mut v: i64) -> i64 {
     v |= v >> 1;
     v |= v >> 2;
     v |= v >> 4;
@@ -1527,7 +1511,12 @@ impl Shl<TInteger> for TInteger {
 
     /// Performs a bitwise left shift (`<<`) operation.
     fn shl(self, rhs: TInteger) -> Self::Output {
-        use TInteger::*;
+        use TInteger::From;
+        use TInteger::Literal;
+        use TInteger::Range;
+        use TInteger::To;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
 
         match (self, rhs) {
             (Literal(0), _) => Literal(0),
@@ -1555,14 +1544,19 @@ impl Shl<TInteger> for TInteger {
                     UnspecifiedLiteral => UnspecifiedLiteral,
                 }
             }
-            (ref val, ref shift) => {
+            (val, shift) => {
                 let val_non_neg = val.get_minimum_value().is_some_and(|v| v >= 0);
                 let shift_non_neg = shift.get_minimum_value().is_some_and(|v| v >= 0);
                 let shift_bounded = shift.get_maximum_value().is_some_and(|v| v < 64);
 
-                if val_non_neg && shift_non_neg && shift_bounded {
-                    let s_min = shift.get_minimum_value().unwrap() as u32;
-                    let s_max = shift.get_maximum_value().unwrap() as u32;
+                if val_non_neg
+                    && shift_non_neg
+                    && shift_bounded
+                    && let Some(s_min) = shift.get_minimum_value()
+                    && let Some(s_max) = shift.get_maximum_value()
+                {
+                    let s_min = s_min as u32;
+                    let s_max = s_max as u32;
                     let lower = val.get_minimum_value().and_then(|v| v.checked_shl(s_min));
                     let upper = val.get_maximum_value().and_then(|v| v.checked_shl(s_max));
 
@@ -1584,7 +1578,12 @@ impl Shr for TInteger {
 
     /// Performs a bitwise arithmetic right shift (`>>`) operation.
     fn shr(self, rhs: TInteger) -> Self::Output {
-        use TInteger::*;
+        use TInteger::From;
+        use TInteger::Literal;
+        use TInteger::Range;
+        use TInteger::To;
+        use TInteger::Unspecified;
+        use TInteger::UnspecifiedLiteral;
 
         match (self, rhs) {
             (Literal(l), Literal(r)) => {
@@ -1596,7 +1595,7 @@ impl Shr for TInteger {
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
                 UnspecifiedLiteral
             }
-            (Literal(0), ref r) if r.get_minimum_value().is_some_and(|v| v >= 0) => Literal(0),
+            (Literal(0), r) if r.get_minimum_value().is_some_and(|v| v >= 0) => Literal(0),
             (val, Literal(0)) => val,
             (val, Literal(shift)) if (1..64).contains(&shift) => {
                 let s = shift as u32;
@@ -1613,12 +1612,15 @@ impl Shr for TInteger {
                     UnspecifiedLiteral => UnspecifiedLiteral,
                 }
             }
-            (ref val, ref shift) => {
+            (val, shift) => {
                 let val_non_neg = val.get_minimum_value().is_some_and(|v| v >= 0);
                 let shift_non_neg = shift.get_minimum_value().is_some_and(|v| v >= 0);
 
-                if val_non_neg && shift_non_neg {
-                    let s_min = (shift.get_minimum_value().unwrap() as u32).min(63);
+                if val_non_neg
+                    && shift_non_neg
+                    && let Some(s_min_raw) = shift.get_minimum_value()
+                {
+                    let s_min = (s_min_raw as u32).min(63);
                     let s_max = shift.get_maximum_value().map(|v| (v as u32).min(63));
                     let upper = val.get_maximum_value().map(|v| v >> s_min);
                     let lower = match s_max {

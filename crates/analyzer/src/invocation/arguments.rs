@@ -86,23 +86,17 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena>(
             .filter_map(|(parameter_index, parameter)| {
                 parameter.get_type_signature().map(|param_type| (parameter_index, param_type.clone()))
             })
-            .for_each(|(parameter_index, parameter_type)| {
-                match inferred_parameters.entry(parameter_index) {
-                    Entry::Occupied(occupied_entry) => {
-                        let existing_type: TUnion = occupied_entry.remove();
-                        let updated_type = add_union_type(
-                            existing_type,
-                            &parameter_type,
-                            context.codebase,
-                            CombinerOptions::default(),
-                        );
+            .for_each(|(parameter_index, parameter_type)| match inferred_parameters.entry(parameter_index) {
+                Entry::Occupied(occupied_entry) => {
+                    let existing_type: TUnion = occupied_entry.remove();
+                    let updated_type =
+                        add_union_type(existing_type, &parameter_type, context.codebase, CombinerOptions::default());
 
-                        inferred_parameters.insert(parameter_index, updated_type);
-                    }
-                    Entry::Vacant(vacant_entry) => {
-                        vacant_entry.insert(parameter_type);
-                    }
-                };
+                    inferred_parameters.insert(parameter_index, updated_type);
+                }
+                Entry::Vacant(vacant_entry) => {
+                    vacant_entry.insert(parameter_type);
+                }
             });
 
         inferred_parameters
@@ -330,9 +324,8 @@ pub fn verify_argument_type<'arena>(
             issue_kind = IssueCode::LessSpecificArgument;
             annotation_msg = format!("Provided type `{input_type_str}` is too general.");
             note_msg = format!(
-                    "The provided type `{input_type_str}` can be assigned to `{parameter_type_str}`, but is wider (less specific)."
-                )
-                .to_string();
+                "The provided type `{input_type_str}` can be assigned to `{parameter_type_str}`, but is wider (less specific)."
+            );
         }
 
         let mut issue = Issue::error(format!(
@@ -435,6 +428,8 @@ pub fn verify_argument_type<'arena>(
         }
 
         context.collector.report_with_code(kind, issue);
+    } else {
+        // type was coerced from mixed/empty container; already reported above, nothing more to do
     }
 }
 

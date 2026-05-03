@@ -381,11 +381,9 @@ pub fn check_property(
     }
 
     if let Some(var) = property.var()
-        && !modifiers.is_empty()
+        && let Some(first) = modifiers.first()
+        && let Some(last) = modifiers.last()
     {
-        let first = modifiers.first().unwrap();
-        let last = modifiers.last().unwrap();
-
         context.report(
             Issue::error(format!("Var property `{class_like_name}::{first_variable_name}` cannot have modifiers."))
                 .with_annotation(
@@ -691,10 +689,9 @@ pub fn check_property(
                 let invalid_modifiers: Vec<_> =
                     hook.modifiers.iter().filter(|m| !matches!(m, Modifier::Final(_))).collect();
 
-                if !invalid_modifiers.is_empty() {
-                    let first = invalid_modifiers.first().unwrap();
-                    let last = invalid_modifiers.last().unwrap();
-
+                if let Some(first) = invalid_modifiers.first()
+                    && let Some(last) = invalid_modifiers.last()
+                {
                     context.report(
                         Issue::error(format!(
                             "Hook `{name}` for property `{class_like_name}::{item_name}` can only have `final` modifier."
@@ -770,15 +767,12 @@ pub fn check_property(
 
                     match lowered_name.as_str() {
                         "set" => {
-                            if parameter_list.parameters.len() == 1 {
-                                let first_parameter = parameter_list.parameters.first().unwrap();
+                            if let [first_parameter] = parameter_list.parameters.as_slice() {
                                 let first_parameter_name = first_parameter.variable.name;
 
                                 let property_has_type = hooked_property.hint.is_some();
-                                let param_has_type = first_parameter.hint.is_some();
 
-                                if !property_has_type && param_has_type {
-                                    let param_hint = first_parameter.hint.as_ref().unwrap();
+                                if !property_has_type && let Some(param_hint) = first_parameter.hint.as_ref() {
                                     context.report(
                                         Issue::error(format!(
                                             "Type of parameter `{first_parameter_name}` of hook `{class_like_name}::{item_name}::{name}` must be compatible with property type."
@@ -803,8 +797,12 @@ pub fn check_property(
                                         )
                                         .with_help("Remove the type hint from the set hook parameter, or add a type to the property."),
                                     );
-                                } else if property_has_type && !param_has_type {
-                                    let property_hint = hooked_property.hint.as_ref().unwrap();
+                                }
+
+                                if property_has_type
+                                    && first_parameter.hint.is_none()
+                                    && let Some(property_hint) = hooked_property.hint.as_ref()
+                                {
                                     context.report(
                                         Issue::error(format!(
                                             "Type of parameter `{first_parameter_name}` of hook `{class_like_name}::{item_name}::{name}` must be compatible with property type."

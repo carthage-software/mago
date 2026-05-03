@@ -12,13 +12,13 @@ use crate::artifacts::AnalysisArtifacts;
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash, Debug)]
 #[repr(u8)]
 pub enum ControlAction {
-    End = 0b0000001,
-    Break = 0b0000010,
-    BreakImmediateLoop = 0b0000100,
-    Continue = 0b0001000,
-    LeaveSwitch = 0b0010000,
-    None = 0b0100000,
-    Return = 0b1000000,
+    End = 0b000_0001,
+    Break = 0b000_0010,
+    BreakImmediateLoop = 0b000_0100,
+    Continue = 0b000_1000,
+    LeaveSwitch = 0b001_0000,
+    None = 0b010_0000,
+    Return = 0b100_0000,
 }
 
 /// A compact bitfield set for ControlAction values.
@@ -122,6 +122,7 @@ impl ControlAction {
                             },
                             Some(while_loop.condition),
                         ),
+                        #[allow(clippy::unreachable)]
                         _ => unreachable!(),
                     };
 
@@ -398,6 +399,8 @@ impl ControlAction {
                         control_actions.extend(try_statement_actions);
 
                         return control_actions;
+                    } else {
+                        // try block falls through and there are no catches taking over; fall into finally handling
                     }
 
                     if let Some(finally_clause) = try_catch.finally_clause.as_ref()

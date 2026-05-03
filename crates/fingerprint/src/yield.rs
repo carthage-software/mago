@@ -9,6 +9,7 @@ use crate::Fingerprintable;
 use std::hash::Hash;
 
 impl Fingerprintable for Yield<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -28,6 +29,7 @@ impl Fingerprintable for Yield<'_> {
 }
 
 impl Fingerprintable for YieldValue<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -40,6 +42,7 @@ impl Fingerprintable for YieldValue<'_> {
 }
 
 impl Fingerprintable for YieldPair<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -53,6 +56,7 @@ impl Fingerprintable for YieldPair<'_> {
 }
 
 impl Fingerprintable for YieldFrom<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

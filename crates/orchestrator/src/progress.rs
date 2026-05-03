@@ -65,12 +65,11 @@ pub static GLOBAL_PROGRESS_MANAGER: LazyLock<MultiProgress> = LazyLock::new(Mult
 /// as templates are hardcoded constants.
 pub fn create_progress_bar(length: usize, prefix: &'static str, theme: ProgressBarTheme) -> ProgressBar {
     let pb = GLOBAL_PROGRESS_MANAGER.add(ProgressBar::new(length as u64));
-    pb.set_style(
-        ProgressStyle::with_template(theme.template())
-            .unwrap()
-            .progress_chars(theme.progress_chars())
-            .tick_chars(theme.tick_chars()),
-    );
+    let style = match ProgressStyle::with_template(theme.template()) {
+        Ok(style) => style,
+        Err(e) => panic!("invalid progress bar template (hardcoded constant): {e}"),
+    };
+    pb.set_style(style.progress_chars(theme.progress_chars()).tick_chars(theme.tick_chars()));
 
     pb.set_prefix(prefix);
     pb

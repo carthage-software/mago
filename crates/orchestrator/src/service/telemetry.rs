@@ -54,7 +54,9 @@ impl AnalysisPhaseTelemetry {
             return;
         }
 
+        #[allow(clippy::float_arithmetic)]
         let per_file_us = |counter: &AtomicU64| -> f64 { (counter.load(Relaxed) as f64 / files as f64) / 1_000.0 };
+        #[allow(clippy::float_arithmetic)]
         let total_ms = |counter: &AtomicU64| -> f64 { counter.load(Relaxed) as f64 / 1_000_000.0 };
 
         tracing::trace!("Analyzed {} files in the parallel phase.", files);
@@ -130,7 +132,7 @@ impl SlowestFiles {
     }
 }
 
-const HANG_INITIAL_THRESHOLD: Duration = Duration::from_millis(5000);
+const HANG_INITIAL_THRESHOLD: Duration = Duration::from_secs(5);
 const HANG_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
 struct InflightEntry {
@@ -147,7 +149,7 @@ struct InflightEntry {
 /// or infinite loop; without this, the only trace we emit for a file is after
 /// it finishes, which never happens for a hang.
 pub(crate) struct HangWatcher {
-    slots: Arc<Vec<Mutex<Option<InflightEntry>>>>,
+    slots: Arc<[Mutex<Option<InflightEntry>>]>,
     shutdown: Arc<AtomicBool>,
     cv: Arc<(Mutex<()>, Condvar)>,
     handle: Mutex<Option<JoinHandle<()>>>,
@@ -155,31 +157,40 @@ pub(crate) struct HangWatcher {
 
 impl HangWatcher {
     pub(crate) fn spawn(num_slots: usize) -> Arc<Self> {
-        let slots: Arc<Vec<Mutex<Option<InflightEntry>>>> =
-            Arc::new((0..num_slots.max(1)).map(|_| Mutex::new(None)).collect());
+        let slots: Arc<[Mutex<Option<InflightEntry>>]> =
+            std::iter::repeat_with(|| Mutex::new(None)).take(num_slots.max(1)).collect();
         let shutdown = Arc::new(AtomicBool::new(false));
         let cv = Arc::new((Mutex::new(()), Condvar::new()));
 
         let watcher_slots = Arc::clone(&slots);
         let watcher_shutdown = Arc::clone(&shutdown);
         let watcher_cv = Arc::clone(&cv);
-        let handle = std::thread::Builder::new()
+        let handle = match std::thread::Builder::new()
             .name("mago-hang-watcher".into())
             .spawn(move || Self::run(watcher_slots, watcher_shutdown, watcher_cv))
-            .expect("failed to spawn hang watcher thread");
+        {
+            Ok(handle) => handle,
+            Err(e) => panic!("failed to spawn hang watcher thread: {e}"),
+        };
 
         Arc::new(Self { slots, shutdown, cv, handle: Mutex::new(Some(handle)) })
     }
 
-    fn run(slots: Arc<Vec<Mutex<Option<InflightEntry>>>>, shutdown: Arc<AtomicBool>, cv: Arc<(Mutex<()>, Condvar)>) {
+    fn run(slots: Arc<[Mutex<Option<InflightEntry>>]>, shutdown: Arc<AtomicBool>, cv: Arc<(Mutex<()>, Condvar)>) {
         let (lock, cvar) = &*cv;
         loop {
             if shutdown.load(Relaxed) {
                 return;
             }
 
-            let guard = lock.lock().unwrap();
-            let (_guard, _) = cvar.wait_timeout(guard, HANG_POLL_INTERVAL).unwrap();
+            let guard = match lock.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            let (_guard, _) = match cvar.wait_timeout(guard, HANG_POLL_INTERVAL) {
+                Ok(pair) => pair,
+                Err(p) => p.into_inner(),
+            };
 
             if shutdown.load(Relaxed) {
                 return;
@@ -258,7 +269,7 @@ impl Drop for HangWatcher {
 }
 
 pub(crate) struct HangGuard {
-    slots: Arc<Vec<Mutex<Option<InflightEntry>>>>,
+    slots: Arc<[Mutex<Option<InflightEntry>>]>,
     idx: usize,
 }
 

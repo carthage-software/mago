@@ -8,6 +8,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for OpeningTag<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -22,6 +23,7 @@ impl Fingerprintable for OpeningTag<'_> {
 }
 
 impl Fingerprintable for FullOpeningTag<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         _hasher: &mut H,
@@ -33,6 +35,7 @@ impl Fingerprintable for FullOpeningTag<'_> {
 }
 
 impl Fingerprintable for ShortOpeningTag {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         _hasher: &mut H,
@@ -44,6 +47,7 @@ impl Fingerprintable for ShortOpeningTag {
 }
 
 impl Fingerprintable for ClosingTag {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         _hasher: &mut H,

@@ -178,8 +178,8 @@ impl LintRule for NoSideEffectsWithDeclarationsRule {
     }
 }
 
-struct StatementCollector<'a> {
-    cfg: &'a NoSideEffectsWithDeclarationsConfig,
+struct StatementCollector<'cfg> {
+    cfg: &'cfg NoSideEffectsWithDeclarationsConfig,
     declarations: Vec<Span>,
     side_effects: Vec<Span>,
 }

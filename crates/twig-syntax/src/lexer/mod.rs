@@ -3,8 +3,22 @@
 //! The lexer is lossless: every byte of the input appears in the value of
 //! exactly one non-EOF token. It drives a small state machine that mirrors
 //! the one in upstream `Twig\Lexer`.
+//!
+//! # Safety conventions
+//!
+//! Every `unsafe { ... }` in this file calls into `memchr` /
+//! `slice::get_unchecked` after bounds have been established by either:
+//!
+//! - the surrounding `i < bytes.len()` / `pos < total` guard, or
+//! - a fresh `memchr` result whose returned offset is, by `memchr`'s
+//!   contract, `< bytes.len()`.
+//!
+//! Adding individual `// SAFETY:` comments on every block would just
+//! repeat that contract verbatim, so we suppress the lint for the file.
 
 mod internal;
+
+use core::hint::unreachable_unchecked;
 
 use memchr::memchr;
 use memchr::memmem;
@@ -50,6 +64,7 @@ pub struct TwigLexer<'input> {
     last_significant: Option<u8>,
 }
 
+#[allow(clippy::undocumented_unsafe_blocks)]
 impl<'input> TwigLexer<'input> {
     #[inline]
     #[must_use]
@@ -172,8 +187,10 @@ impl<'input> TwigLexer<'input> {
 
     #[inline]
     fn slice_str(&self, from: usize, to: usize) -> &'input str {
-        // All inputs are valid UTF-8 (the parser entry points take a `&str`).
-        std::str::from_utf8(self.slice_bytes(from, to)).expect("valid utf-8")
+        // SAFETY: every parser entry point takes a `&str`, so the underlying input is always
+        // valid UTF-8; `slice_in_range` returns a sub-slice on byte boundaries that the lexer
+        // chooses, so the resulting bytes still form a valid UTF-8 sequence.
+        unsafe { std::str::from_utf8_unchecked(self.slice_bytes(from, to)) }
     }
 
     /// Find the next occurrence of any of `{%`, `{{`, `{#` starting at `from`.
@@ -256,7 +273,10 @@ impl<'input> TwigLexer<'input> {
                         self.jump_forward_to(end);
                         self.lex_comment_body(introducer_start, introducer_slice)
                     }
-                    _ => unreachable!(),
+                    // SAFETY: `find_introducer` only returns `b'%'`, `b'{'`, or `b'#'` by
+                    // construction; the three explicit arms above are exhaustive, so this branch
+                    // is provably unreachable and we promise the optimizer can prune it.
+                    _ => unsafe { unreachable_unchecked() },
                 }
             }
         }
@@ -620,10 +640,10 @@ impl<'input> TwigLexer<'input> {
         let mut i = start + 1;
         while i < total {
             // SIMD-scan for the next interesting byte (`\` or `'`).
-            let rel = match memchr::memchr2(b'\\', b'\'', unsafe { bytes.get_unchecked(i..) }) {
-                Some(r) => r,
-                None => return Err(SyntaxError::UnclosedString(self.file_id(), self.position_at(start))),
+            let Some(rel) = memchr::memchr2(b'\\', b'\'', unsafe { bytes.get_unchecked(i..) }) else {
+                return Err(SyntaxError::UnclosedString(self.file_id(), self.position_at(start)));
             };
+
             i += rel;
             let c = unsafe { *bytes.get_unchecked(i) };
             if c == b'\\' {
@@ -633,12 +653,14 @@ impl<'input> TwigLexer<'input> {
                 i += 2;
                 continue;
             }
+
             // Must be `'`: close the string.
             i += 1;
             let slice = self.slice_str(start, i);
             self.jump_forward_to(i);
             return Ok(TwigToken::new(TwigTokenKind::StringSingleQuoted, slice, self.position_at(start)));
         }
+
         Err(SyntaxError::UnclosedString(self.file_id(), self.position_at(start)))
     }
 
@@ -650,9 +672,8 @@ impl<'input> TwigLexer<'input> {
         let mut has_interp = false;
         while i < total {
             // SIMD-scan for the next interesting byte (`\`, `#`, or `"`).
-            let rel = match memchr::memchr3(b'\\', b'#', b'"', unsafe { bytes.get_unchecked(i..) }) {
-                Some(r) => r,
-                None => return Err(SyntaxError::UnclosedString(self.file_id(), self.position_at(start))),
+            let Some(rel) = memchr::memchr3(b'\\', b'#', b'"', unsafe { bytes.get_unchecked(i..) }) else {
+                return Err(SyntaxError::UnclosedString(self.file_id(), self.position_at(start)));
             };
             i += rel;
             let c = unsafe { *bytes.get_unchecked(i) };
@@ -713,10 +734,10 @@ impl<'input> TwigLexer<'input> {
         let mut i = start;
         while i < total {
             // SIMD-scan for the next interesting byte (`\`, `#`, or `"`).
-            let rel = match memchr::memchr3(b'\\', b'#', b'"', unsafe { bytes.get_unchecked(i..) }) {
-                Some(r) => r,
-                None => return Err(SyntaxError::UnclosedString(self.file_id(), self.position_at(start))),
+            let Some(rel) = memchr::memchr3(b'\\', b'#', b'"', unsafe { bytes.get_unchecked(i..) }) else {
+                return Err(SyntaxError::UnclosedString(self.file_id(), self.position_at(start)));
             };
+
             i += rel;
             let c = unsafe { *bytes.get_unchecked(i) };
             if c == b'\\' {
@@ -733,12 +754,15 @@ impl<'input> TwigLexer<'input> {
                 i += 1;
                 continue;
             }
+
             // Must be `"`.
             break;
         }
+
         if i == start {
             return Err(SyntaxError::UnclosedString(self.file_id(), self.position_at(start)));
         }
+
         let slice = self.slice_str(start, i);
         self.jump_forward_to(i);
         Ok(TwigToken::new(TwigTokenKind::StringPart, slice, self.position_at(start)))

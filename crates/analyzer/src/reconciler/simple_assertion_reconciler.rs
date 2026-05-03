@@ -623,7 +623,7 @@ fn intersect_array_list(
                         continue 'outer;
                     }
 
-                    value_parameter.clone()
+                    Arc::clone(value_parameter)
                 } else {
                     Arc::new(get_mixed())
                 };
@@ -1434,7 +1434,7 @@ fn reconcile_isset(
     let mut acceptable_types = vec![];
 
     for atomic in existing_var_types {
-        if let TAtomic::Null = atomic {
+        if atomic == TAtomic::Null {
             did_remove_type = true;
         } else if let TAtomic::Mixed(mixed) = atomic {
             if mixed.is_non_null() {
@@ -1565,7 +1565,7 @@ fn reconcile_exactly_countable(
                 existing_var_type.remove_type(atomic);
                 if !element_type.is_never() {
                     existing_var_type.types.to_mut().push(TAtomic::Array(TArray::List(TList {
-                        element_type: element_type.clone(),
+                        element_type: Arc::clone(element_type),
                         known_elements: known_elements.clone(),
                         known_count: Some(count),
                         non_empty: true,
@@ -1591,6 +1591,8 @@ fn reconcile_exactly_countable(
                     non_empty: true,
                 })));
             }
+        } else {
+            // atomic isn't a list or keyed array; countable assertion doesn't apply
         }
     }
 
@@ -1641,7 +1643,7 @@ fn reconcile_at_least_countable(
                     let new_known_count = if known_count.is_some() { Some(count) } else { *known_count };
 
                     existing_var_type.types.to_mut().push(TAtomic::Array(TArray::List(TList {
-                        element_type: element_type.clone(),
+                        element_type: Arc::clone(element_type),
                         known_elements: known_elements.clone(),
                         known_count: new_known_count,
                         non_empty: true,
@@ -1662,6 +1664,8 @@ fn reconcile_at_least_countable(
                     non_empty: true,
                 })));
             }
+        } else {
+            // atomic isn't a list or keyed array; countable assertion doesn't apply
         }
     }
 
@@ -1703,7 +1707,7 @@ fn reconcile_countable(
     for atomic in existing_var_type.types.as_ref() {
         if atomic.is_countable(context.codebase) {
             countable_types.push(atomic.clone());
-        } else if let TAtomic::Object(TObject::Any) = atomic {
+        } else if matches!(atomic, TAtomic::Object(TObject::Any)) {
             countable_types.push(TAtomic::Object(TObject::Named(TNamedObject::new(atom("Countable")))));
             redundant = false;
         } else if matches!(atomic, TAtomic::Object(_)) {
@@ -2013,7 +2017,7 @@ fn reconcile_has_array_key(
 
     for mut atomic in existing_var_types {
         match &mut atomic {
-            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, non_empty, .. })) => {
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, non_empty })) => {
                 did_remove_type = true;
                 if let Some(known_items) = known_items {
                     if let Some(known_item) = known_items.get_mut(key_name) {
@@ -2064,6 +2068,8 @@ fn reconcile_has_array_key(
                     } else if !element_type.is_never() {
                         *non_empty = true;
                         *known_elements = Some(BTreeMap::from([(*i as usize, (false, (**element_type).clone()))]));
+                    } else {
+                        // no known elements and element type is never; leave the list shape untouched
                     }
 
                     acceptable_types.push(atomic);
@@ -2153,6 +2159,8 @@ fn reconcile_has_nonnull_entry_for_key(
                             *known_item = (false, nonnull);
                         } else if known_item.1 != nonnull {
                             known_item.1 = nonnull;
+                        } else {
+                            // entry already non-optional and stripping null produced no change
                         }
                     } else if let Some((_, value_param)) = parameters {
                         let nonnull = subtract_null(context, assertion, value_param, None, negated, None);
@@ -2192,6 +2200,8 @@ fn reconcile_has_nonnull_entry_for_key(
                             *known_element = (false, nonnull);
                         } else if known_element.1 != nonnull {
                             known_element.1 = nonnull;
+                        } else {
+                            // entry already non-optional and stripping null produced no change
                         }
                     } else if !element_type.is_never() {
                         let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
@@ -2202,6 +2212,8 @@ fn reconcile_has_nonnull_entry_for_key(
                 } else if !element_type.is_never() {
                     let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
                     *known_elements = Some(BTreeMap::from([(*i as usize, (false, nonnull))]));
+                } else {
+                    // no known elements and the generic element type is never; leave the list shape untouched
                 }
 
                 acceptable_types.push(atomic);

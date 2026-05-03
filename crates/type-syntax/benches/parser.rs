@@ -70,7 +70,7 @@ fn benchmark_single_complex_type(c: &mut Criterion) {
     let mut group = c.benchmark_group("type-complex");
     let file_id = FileId::new("bench.php");
 
-    let complex_type = r#"array{users: list<object{id: positive-int, name: non-empty-string, email?: string, roles: list<string>}>, pagination: object{page: int, per_page: int, total: int}, filters?: array<string, mixed>}"#;
+    let complex_type = "array{users: list<object{id: positive-int, name: non-empty-string, email?: string, roles: list<string>}>, pagination: object{page: int, per_page: int, total: int}, filters?: array<string, mixed>}";
 
     group.throughput(Throughput::Bytes(complex_type.len() as u64));
     group.bench_function("nested_array_shape", |b| {
@@ -82,7 +82,7 @@ fn benchmark_single_complex_type(c: &mut Criterion) {
         })
     });
 
-    let closure_type = r#"Closure(array{id: int, name: string}, list<string>, ?object{active: bool}): array{success: bool, errors?: list<string>}"#;
+    let closure_type = "Closure(array{id: int, name: string}, list<string>, ?object{active: bool}): array{success: bool, errors?: list<string>}";
 
     group.throughput(Throughput::Bytes(closure_type.len() as u64));
     group.bench_function("complex_closure", |b| {

@@ -50,22 +50,24 @@ pub struct WatchOptions {
 }
 
 impl Default for WatchOptions {
+    #[inline]
     fn default() -> Self {
         Self { poll_interval: Some(Duration::from_millis(DEFAULT_POLL_INTERVAL_MS)), additional_excludes: vec![] }
     }
 }
 
 /// Database watcher service that monitors file changes and updates the database.
-pub struct DatabaseWatcher<'a> {
-    database: Database<'a>,
+pub struct DatabaseWatcher<'config> {
+    database: Database<'config>,
     watcher: Option<RecommendedWatcher>,
     watched_paths: Vec<PathBuf>,
     receiver: Option<Receiver<Vec<ChangedFile>>>,
 }
 
-impl<'a> DatabaseWatcher<'a> {
+impl<'config> DatabaseWatcher<'config> {
+    #[inline]
     #[must_use]
-    pub fn new(database: Database<'a>) -> Self {
+    pub fn new(database: Database<'config>) -> Self {
         Self { database, watcher: None, watched_paths: Vec::new(), receiver: None }
     }
 
@@ -77,6 +79,7 @@ impl<'a> DatabaseWatcher<'a> {
     /// - A glob pattern is invalid
     /// - The file system watcher cannot be created
     /// - Directories cannot be watched
+    #[inline]
     pub fn watch(&mut self, options: WatchOptions) -> Result<(), DatabaseError> {
         self.stop();
 
@@ -113,7 +116,7 @@ impl<'a> DatabaseWatcher<'a> {
             .iter()
             .filter_map(|ex| match ex {
                 Exclusion::Path(p) => Some(p.as_ref().to_path_buf()),
-                _ => None,
+                Exclusion::Pattern(_) => None,
             })
             .collect();
 
@@ -183,6 +186,7 @@ impl<'a> DatabaseWatcher<'a> {
     }
 
     /// Stops watching if currently active.
+    #[inline]
     pub fn stop(&mut self) {
         if let Some(mut watcher) = self.watcher.take() {
             for path in &self.watched_paths {
@@ -195,6 +199,7 @@ impl<'a> DatabaseWatcher<'a> {
     }
 
     /// Checks if the watcher is currently active.
+    #[inline]
     #[must_use]
     pub fn is_watching(&self) -> bool {
         self.watcher.is_some()
@@ -305,6 +310,7 @@ impl<'a> DatabaseWatcher<'a> {
     /// Returns a [`DatabaseError`] if:
     /// - The watcher is not currently active ([`DatabaseError::WatcherNotActive`])
     /// - Updating the database with changed files fails
+    #[inline]
     pub fn wait(&mut self) -> Result<Vec<FileId>, DatabaseError> {
         let Some(receiver) = &self.receiver else {
             return Err(DatabaseError::WatcherNotActive);
@@ -406,19 +412,22 @@ impl<'a> DatabaseWatcher<'a> {
     }
 
     /// Returns a reference to the database.
+    #[inline]
     #[must_use]
-    pub fn database(&self) -> &Database<'a> {
+    pub fn database(&self) -> &Database<'config> {
         &self.database
     }
 
     /// Returns a reference to the database.
+    #[inline]
     #[must_use]
     pub fn read_only_database(&self) -> ReadDatabase {
         self.database.read_only()
     }
 
     /// Returns a mutable reference to the database.
-    pub fn database_mut(&mut self) -> &mut Database<'a> {
+    #[inline]
+    pub fn database_mut(&mut self) -> &mut Database<'config> {
         &mut self.database
     }
 
@@ -430,23 +439,28 @@ impl<'a> DatabaseWatcher<'a> {
     ///
     /// The closure is bounded with for<'x> to explicitly show that the database
     /// reference lifetime is scoped to the closure execution only.
+    #[inline]
     pub fn with_database_mut<F, R>(&mut self, f: F) -> R
     where
-        F: for<'x> FnOnce(&'x mut Database<'a>) -> R,
+        F: for<'borrow> FnOnce(&'borrow mut Database<'config>) -> R,
     {
         f(&mut self.database)
     }
 
     /// Consumes the watcher and returns the database.
+    #[inline]
     #[must_use]
-    pub fn into_database(self) -> Database<'a> {
+    pub fn into_database(self) -> Database<'config> {
         let mut md = ManuallyDrop::new(self);
         md.stop();
+        // SAFETY: `md` is a `ManuallyDrop<Self>`, so its `Drop` impl will not run; reading the
+        // `database` field byte-for-byte is safe because we never read or drop it again.
         unsafe { std::ptr::read(&raw const md.database) }
     }
 }
 
 impl Drop for DatabaseWatcher<'_> {
+    #[inline]
     fn drop(&mut self) {
         self.stop();
     }

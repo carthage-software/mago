@@ -20,7 +20,7 @@ impl CommentLinePosition {
         for &byte in source_text.as_bytes()[..offset as usize].iter().rev() {
             match byte {
                 b'\n' | b'\r' => return Self::OwnLine,
-                b' ' | b'\t' => continue,
+                b' ' | b'\t' => {}
                 _ => return Self::EndOfLine,
             }
         }
@@ -113,9 +113,9 @@ impl Comments {
     }
 }
 
-pub fn place_comments<'ast, 'arena>(
+pub fn place_comments<'arena>(
     source_text: &str,
-    root: Node<'ast, 'arena>,
+    root: Node<'_, 'arena>,
     all_comments: &'arena [Trivia<'arena>],
 ) -> Comments {
     let total = all_comments.len();

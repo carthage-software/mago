@@ -279,12 +279,12 @@ impl TAtomic {
             }
 
             let parameters = named_object.get_type_parameters().unwrap_or_default();
-            match parameters.len() {
-                0 => Some((get_mixed(), get_mixed(), get_mixed(), get_mixed())),
-                1 => Some((get_mixed(), parameters[0].clone(), get_mixed(), get_mixed())),
-                2 => Some((parameters[0].clone(), parameters[1].clone(), get_mixed(), get_mixed())),
-                3 => Some((parameters[0].clone(), parameters[1].clone(), parameters[2].clone(), get_mixed())),
-                4 => Some((parameters[0].clone(), parameters[1].clone(), parameters[2].clone(), parameters[3].clone())),
+            match parameters {
+                [] => Some((get_mixed(), get_mixed(), get_mixed(), get_mixed())),
+                [a] => Some((get_mixed(), a.clone(), get_mixed(), get_mixed())),
+                [a, b] => Some((a.clone(), b.clone(), get_mixed(), get_mixed())),
+                [a, b, c] => Some((a.clone(), b.clone(), c.clone(), get_mixed())),
+                [a, b, c, d] => Some((a.clone(), b.clone(), c.clone(), d.clone())),
                 _ => None,
             }
         };
@@ -828,20 +828,20 @@ impl TAtomic {
                         let has_kv_pair = type_parameters.len() == 2;
 
                         if let Some(key_or_value_param) = type_parameters.get_mut(0)
-                            && let TAtomic::Placeholder = key_or_value_param.get_single()
+                            && matches!(key_or_value_param.get_single(), TAtomic::Placeholder)
                         {
                             *key_or_value_param = if has_kv_pair { get_arraykey() } else { get_mixed() };
                         }
 
                         if has_kv_pair
                             && let Some(value_param) = type_parameters.get_mut(1)
-                            && let TAtomic::Placeholder = value_param.get_single()
+                            && matches!(value_param.get_single(), TAtomic::Placeholder)
                         {
                             *value_param = get_mixed();
                         }
                     } else {
                         for type_param in type_parameters {
-                            if let TAtomic::Placeholder = type_param.get_single() {
+                            if matches!(type_param.get_single(), TAtomic::Placeholder) {
                                 *type_param = get_mixed();
                             }
                         }

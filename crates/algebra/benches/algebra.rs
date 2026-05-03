@@ -133,8 +133,8 @@ fn pathological_formula() -> Vec<Clause> {
             _ => vec![assertion_int()],
         };
 
-        if assertions.len() == 1 {
-            clauses.push(single_assertion_clause(var_index, i as u32, assertions.into_iter().next().unwrap()));
+        if let [single] = assertions.as_slice() {
+            clauses.push(single_assertion_clause(var_index, i as u32, single.clone()));
         } else {
             clauses.push(disjunctive_clause(var_index, i as u32, assertions));
         }

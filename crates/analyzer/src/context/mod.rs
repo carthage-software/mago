@@ -32,6 +32,8 @@ pub mod scope;
 pub mod utils;
 
 #[derive(Debug)]
+#[allow(clippy::field_scoped_visibility_modifiers)]
+#[allow(clippy::struct_field_names)]
 pub struct Context<'ctx, 'arena> {
     pub(super) arena: &'arena Bump,
     pub(super) codebase: &'ctx CodebaseMetadata,

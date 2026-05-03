@@ -208,9 +208,9 @@ impl LintRule for NoRedundantMathRule {
                 }
             }
             BinaryOperator::Addition(_) => {
-                let zero = if let Some(0) = get_expression_value(binary.lhs) {
+                let zero = if get_expression_value(binary.lhs) == Some(0) {
                     &binary.lhs
-                } else if let Some(0) = get_expression_value(binary.rhs) {
+                } else if get_expression_value(binary.rhs) == Some(0) {
                     &binary.rhs
                 } else {
                     return;
@@ -234,9 +234,9 @@ impl LintRule for NoRedundantMathRule {
                 issue
             }
             BinaryOperator::Subtraction(_) => {
-                let zero = if let Some(0) = get_expression_value(binary.lhs) {
+                let zero = if get_expression_value(binary.lhs) == Some(0) {
                     &binary.lhs
-                } else if let Some(0) = get_expression_value(binary.rhs) {
+                } else if get_expression_value(binary.rhs) == Some(0) {
                     &binary.rhs
                 } else {
                     return;
@@ -332,6 +332,7 @@ impl LintRule for NoRedundantMathRule {
                 let (operator_name, help_msg) = match binary.operator {
                     BinaryOperator::BitwiseOr(_) => ("OR", "bitwise OR with 0"),
                     BinaryOperator::BitwiseXor(_) => ("XOR", "bitwise XOR with 0"),
+                    #[allow(clippy::unreachable)]
                     _ => unreachable!(),
                 };
 
@@ -363,6 +364,7 @@ impl LintRule for NoRedundantMathRule {
                 let operator = match binary.operator {
                     BinaryOperator::LeftShift(_) => "<<",
                     BinaryOperator::RightShift(_) => ">>",
+                    #[allow(clippy::unreachable)]
                     _ => unreachable!(),
                 };
 
@@ -397,8 +399,8 @@ impl LintRule for NoRedundantMathRule {
 ///
 /// This function is used to evaluate the value of an expression, if possible.
 #[inline]
-fn get_expression_value(expression: &Expression<'_>) -> Option<isize> {
-    match expression {
+fn get_expression_value(expr: &Expression<'_>) -> Option<isize> {
+    match expr {
         Expression::Parenthesized(Parenthesized { expression, .. }) => get_expression_value(expression),
         Expression::Literal(Literal::Integer(LiteralInteger { value: Some(it), .. })) => Some(*it as isize),
         Expression::UnaryPrefix(UnaryPrefix { operator, operand }) => {
@@ -432,6 +434,7 @@ fn get_expression_value(expression: &Expression<'_>) -> Option<isize> {
                     if rhs_value == 0 {
                         None
                     } else {
+                        #[allow(clippy::modulo_arithmetic)]
                         Some(lhs_value % rhs_value)
                     }
                 }

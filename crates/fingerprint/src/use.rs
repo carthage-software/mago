@@ -15,6 +15,7 @@ use crate::Fingerprintable;
 use std::hash::Hash;
 
 impl Fingerprintable for Use<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -31,6 +32,7 @@ impl Fingerprintable for Use<'_> {
 }
 
 impl Fingerprintable for UseItems<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -47,6 +49,7 @@ impl Fingerprintable for UseItems<'_> {
 }
 
 impl Fingerprintable for UseType<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -61,6 +64,7 @@ impl Fingerprintable for UseType<'_> {
 }
 
 impl Fingerprintable for UseItemSequence<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -75,6 +79,7 @@ impl Fingerprintable for UseItemSequence<'_> {
 }
 
 impl Fingerprintable for TypedUseItemSequence<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -90,6 +95,7 @@ impl Fingerprintable for TypedUseItemSequence<'_> {
 }
 
 impl Fingerprintable for TypedUseItemList<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -106,6 +112,7 @@ impl Fingerprintable for TypedUseItemList<'_> {
 }
 
 impl Fingerprintable for MixedUseItemList<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -121,6 +128,7 @@ impl Fingerprintable for MixedUseItemList<'_> {
 }
 
 impl Fingerprintable for MaybeTypedUseItem<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -134,6 +142,7 @@ impl Fingerprintable for MaybeTypedUseItem<'_> {
 }
 
 impl Fingerprintable for UseItem<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -147,6 +156,7 @@ impl Fingerprintable for UseItem<'_> {
 }
 
 impl Fingerprintable for UseItemAlias<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

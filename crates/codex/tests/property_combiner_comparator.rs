@@ -137,7 +137,7 @@ fn arb_leaf_atomic() -> impl Strategy<Value = TAtomic> {
 
 fn arb_atomic() -> impl Strategy<Value = TAtomic> {
     arb_leaf_atomic().prop_recursive(3, 16, 4, |inner| {
-        let element_union = arb_union_with(inner.clone()).boxed();
+        let element_union = arb_union_with(inner).boxed();
         let _ = inner;
 
         prop_oneof![

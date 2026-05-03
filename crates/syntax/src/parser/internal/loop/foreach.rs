@@ -9,7 +9,7 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_foreach(&mut self) -> Result<Foreach<'arena>, ParseError> {
         Ok(Foreach {
             foreach: self.expect_keyword(T!["foreach"])?,

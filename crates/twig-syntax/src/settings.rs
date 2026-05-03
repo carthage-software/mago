@@ -2,7 +2,7 @@
 ///
 /// Reserved for future behavioural knobs.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct LexerSettings {}
+pub struct LexerSettings;
 
 /// Settings for the Twig parser.
 #[derive(Debug, Clone, Copy, Default)]

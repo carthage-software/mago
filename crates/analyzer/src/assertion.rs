@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::assertion_set::negate_assertion_set;
 use mago_atom::Atom;
@@ -122,12 +124,16 @@ pub fn scrape_assertions(
                             callables.push(Assertion::IsType(TAtomic::Callable(callable.into_owned())));
                         } else if let TAtomic::Scalar(TScalar::String(string)) = argument_type_atomic {
                             callables.push(Assertion::IsType(TAtomic::Scalar(TScalar::String(string.as_callable()))));
+                        } else {
+                            // not a callable-shaped type; skip without producing an assertion
                         }
                     }
 
                     if !callables.is_empty() {
                         if_types.insert(first_argument_expression_id, vec![callables]);
                     }
+                } else {
+                    // not a recognised intrinsic call; leave the assertion set untouched
                 }
             }
         }
@@ -1003,6 +1009,8 @@ fn get_null_inequality_assertions(
             )
         {
             if_types.insert(root_array_id, vec![vec![Assertion::IsEqualIsset], vec![Assertion::Truthy]]);
+        } else {
+            // coalesce LHS isn't a tracked variable or array access; no isset assertion to record
         }
     } else {
         let var_name = get_expression_id(
@@ -1090,15 +1098,19 @@ fn scrape_lesser_than_assertions(
                     number_on_right
                 };
 
-                if maximum_count < 0 {
-                    // This branch is logically unreachable, e.g. `count($arr) < 0`.
-                } else if maximum_count == 0 {
-                    if_types.insert(array_variable_id, vec![vec![Assertion::EmptyCountable]]);
-                } else {
-                    if_types.insert(
-                        array_variable_id,
-                        vec![vec![Assertion::DoesNotHasAtLeastCount(maximum_count as usize)]],
-                    );
+                match maximum_count.cmp(&0) {
+                    Ordering::Less => {
+                        // This branch is logically unreachable, e.g. `count($arr) < 0`.
+                    }
+                    Ordering::Equal => {
+                        if_types.insert(array_variable_id, vec![vec![Assertion::EmptyCountable]]);
+                    }
+                    Ordering::Greater => {
+                        if_types.insert(
+                            array_variable_id,
+                            vec![vec![Assertion::DoesNotHasAtLeastCount(maximum_count as usize)]],
+                        );
+                    }
                 }
             }
 
@@ -1118,6 +1130,8 @@ fn scrape_lesser_than_assertions(
                     if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
                 } else if minimum_count > 1 {
                     if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
+                } else {
+                    // count >= 0 is always true; no assertion needed
                 }
             }
 
@@ -1277,6 +1291,8 @@ fn scrape_greater_than_assertions(
                     if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
                 } else if minimum_count > 1 {
                     if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
+                } else {
+                    // count >= 0 is always true; no assertion needed
                 }
             }
 
@@ -1292,15 +1308,19 @@ fn scrape_greater_than_assertions(
                     number_on_left
                 };
 
-                if maximum_count < 0 {
-                    // This branch is logically unreachable, e.g. `-1 > count($arr)`.
-                } else if maximum_count == 0 {
-                    if_types.insert(array_variable_id, vec![vec![Assertion::EmptyCountable]]);
-                } else {
-                    if_types.insert(
-                        array_variable_id,
-                        vec![vec![Assertion::DoesNotHasAtLeastCount(maximum_count as usize)]],
-                    );
+                match maximum_count.cmp(&0) {
+                    Ordering::Less => {
+                        // This branch is logically unreachable, e.g. `-1 > count($arr)`.
+                    }
+                    Ordering::Equal => {
+                        if_types.insert(array_variable_id, vec![vec![Assertion::EmptyCountable]]);
+                    }
+                    Ordering::Greater => {
+                        if_types.insert(
+                            array_variable_id,
+                            vec![vec![Assertion::DoesNotHasAtLeastCount(maximum_count as usize)]],
+                        );
+                    }
                 }
             }
 
@@ -1577,7 +1597,7 @@ fn get_expression_integer_value(artifacts: &AnalysisArtifacts, expression: &Expr
 
     match expression {
         Expression::Literal(Literal::Integer(lit)) => lit.value.map(|v| TInteger::Literal(v as i64)),
-        Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Negation(_), operand, .. }) => {
+        Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Negation(_), operand }) => {
             if let Expression::Literal(Literal::Integer(lit)) = operand {
                 lit.value.map(|v| TInteger::Literal(-(v as i64)))
             } else {
@@ -1832,6 +1852,8 @@ fn get_typed_value_equality_assertions(
         };
 
         if_types.insert(other_value_var_name, vec![orred_types]);
+    } else {
+        // multi-atomic other value with no known single var type; no assertion to record
     }
 
     if if_types.is_empty() { vec![] } else { vec![if_types] }

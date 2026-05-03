@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 #[test]
 fn list_of_lists_reflexive() {
     let inner = u(t_list(u(t_int()), false));
-    let outer = t_list(inner.clone(), false);
+    let outer = t_list(inner, false);
     assert_atomic_subtype(&outer.clone(), &outer);
 }
 
@@ -22,7 +22,7 @@ fn deeply_nested_list_lit_in_general() {
 #[test]
 fn list_of_keyed_arrays() {
     let inner = u(t_keyed_unsealed(u(t_string()), u(t_int()), false));
-    let outer = t_list(inner.clone(), false);
+    let outer = t_list(inner, false);
     assert_atomic_subtype(&outer.clone(), &outer);
 }
 
@@ -145,9 +145,9 @@ fn deeply_nested_keyed_shape_three_levels() {
 
 #[test]
 fn list_with_known_elements_lit_in_general() {
-    let lit = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1))), (1, (false, ui(2))), (2, (false, ui(3)))]));
+    let lit = t_sealed_list(BTreeMap::from([(0usize, (false, ui(1))), (1, (false, ui(2))), (2, (false, ui(3)))]));
     let general = t_sealed_list(BTreeMap::from([
-        (0_usize, (false, u(t_int()))),
+        (0usize, (false, u(t_int()))),
         (1, (false, u(t_int()))),
         (2, (false, u(t_int()))),
     ]));
@@ -156,7 +156,7 @@ fn list_with_known_elements_lit_in_general() {
 
 #[test]
 fn list_with_known_elements_in_unsealed_list() {
-    let known = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1))), (1, (false, ui(2)))]));
+    let known = t_sealed_list(BTreeMap::from([(0usize, (false, ui(1))), (1, (false, ui(2)))]));
     assert_atomic_subtype(&known, &t_list(u(t_int()), false));
 }
 
@@ -171,7 +171,7 @@ fn shape_in_unsealed_keyed_array() {
 
 #[test]
 fn deep_object_with_generic_param() {
-    let cb = codebase_from_php(r"<?php /** @template-covariant T */ class Box {}");
+    let cb = codebase_from_php("<?php /** @template-covariant T */ class Box {}");
     let lit = t_generic_named("Box", vec![ui(42)]);
     let general = t_generic_named("Box", vec![u(t_int())]);
     assert!(atomic_is_contained(&lit, &general, &cb));
@@ -179,7 +179,7 @@ fn deep_object_with_generic_param() {
 
 #[test]
 fn deep_nested_object_in_box() {
-    let cb = codebase_from_php(r"<?php /** @template-covariant T */ class Box {}");
+    let cb = codebase_from_php("<?php /** @template-covariant T */ class Box {}");
     let inner = t_generic_named("Box", vec![ui(1)]);
     let outer = t_generic_named("Box", vec![u(inner)]);
     let inner_general = t_generic_named("Box", vec![u(t_int())]);
@@ -197,13 +197,13 @@ fn list_in_iterable_with_lit_values() {
 #[test]
 fn array_of_arrays_chain() {
     let inner = u(t_keyed_unsealed(u(t_string()), u(t_int()), false));
-    let outer = t_keyed_unsealed(u(t_string()), inner.clone(), false);
+    let outer = t_keyed_unsealed(u(t_string()), inner, false);
     assert_atomic_subtype(&outer.clone(), &outer);
 }
 
 #[test]
 fn many_shape_widths() {
-    for n_keys in 1..=5_usize {
+    for n_keys in 1..=5usize {
         let mut lit_map = BTreeMap::new();
         let mut general_map = BTreeMap::new();
         for i in 0..n_keys {
@@ -228,7 +228,7 @@ fn shape_with_string_in_string_lit() {
 
 #[test]
 fn list_of_generic_objects() {
-    let cb = codebase_from_php(r"<?php /** @template-covariant T */ class Box {}");
+    let cb = codebase_from_php("<?php /** @template-covariant T */ class Box {}");
     let inner_lit = t_generic_named("Box", vec![ui(1)]);
     let inner_int = t_generic_named("Box", vec![u(t_int())]);
     let outer_lit = t_list(u(inner_lit), false);
@@ -238,7 +238,7 @@ fn list_of_generic_objects() {
 
 #[test]
 fn keyed_with_object_values() {
-    let cb = codebase_from_php(r"<?php class User {} class Admin extends User {}");
+    let cb = codebase_from_php("<?php class User {} class Admin extends User {}");
     let admin_keyed = t_keyed_unsealed(u(t_string()), u(t_named("Admin")), false);
     let user_keyed = t_keyed_unsealed(u(t_string()), u(t_named("User")), false);
     assert!(atomic_is_contained(&admin_keyed, &user_keyed, &cb));
@@ -247,7 +247,7 @@ fn keyed_with_object_values() {
 
 #[test]
 fn list_with_class_hierarchy() {
-    let cb = codebase_from_php(r"<?php class A {} class B extends A {}");
+    let cb = codebase_from_php("<?php class A {} class B extends A {}");
     let list_b = t_list(u(t_named("B")), false);
     let list_a = t_list(u(t_named("A")), false);
     assert!(atomic_is_contained(&list_b, &list_a, &cb));

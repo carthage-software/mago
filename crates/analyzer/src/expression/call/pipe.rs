@@ -82,7 +82,7 @@ mod tests {
 
     test_analysis! {
         name = pipe_expression_exact_args,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function do_nothing(int $_a): void { return; }

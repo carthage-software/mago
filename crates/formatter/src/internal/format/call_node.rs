@@ -138,6 +138,7 @@ fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'ar
             "?->",
             &null_safe_method_call.method,
         ),
+        #[allow(clippy::unreachable)]
         _ => unreachable!(),
     };
 

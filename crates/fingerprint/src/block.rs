@@ -5,6 +5,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Block<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

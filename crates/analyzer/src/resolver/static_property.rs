@@ -2,9 +2,9 @@ use mago_atom::Atom;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 
+use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
-use mago_codex::ttype::expander::{self};
 use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;

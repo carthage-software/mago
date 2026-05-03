@@ -243,12 +243,14 @@ pub fn check_method<'ast, 'arena>(
                 }
             }
 
-            if *must_be_public && !is_public {
+            if *must_be_public
+                && !is_public
+                && let Some(last_visibility) = last_visibility
+            {
                 context.report(
                     Issue::error(format!("Magic method `{class_like_name}::{method_name}` must be public."))
                         .with_annotation(
-                            Annotation::primary(last_visibility.unwrap())
-                                .with_message("Non-Public visibility modifier."),
+                            Annotation::primary(last_visibility).with_message("Non-Public visibility modifier."),
                         )
                         .with_annotation(
                             Annotation::secondary(method.span())

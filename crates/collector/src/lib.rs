@@ -67,6 +67,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// - `file`: The source file associated with this collector.
     /// - `program`: The AST of the entire program, used to attach pragma scopes.
     /// - `categories`: The categories of pragmas to extract (e.g., "lint", "analysis").
+    #[inline]
     pub fn new<'ast>(
         arena: &'arena Bump,
         file: &'ctx File,
@@ -96,7 +97,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// This allows old issue codes used in pragmas to be mapped to their new,
     /// canonical counterparts. The map should be from `alias -> canonical_code`.
     #[inline]
-    pub fn set_aliases<'c>(&mut self, aliases: impl IntoIterator<Item = &'c (&'static str, &'static str)>) {
+    pub fn set_aliases<'aliases>(&mut self, aliases: impl IntoIterator<Item = &'aliases (&'static str, &'static str)>) {
         self.aliases = aliases.into_iter().copied().collect();
     }
 
@@ -136,20 +137,17 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// Pragmas for codes not in this list will not trigger "unfulfilled" warnings.
     /// This is useful when using filters like `--only` to check specific rules.
     ///
-    /// # Panics
-    ///
-    /// Panics if any string allocated in the arena is not valid UTF-8. This should never
-    /// happen with valid issue codes.
     #[inline]
     pub fn set_active_codes(&mut self, codes: &[String]) {
         self.active_codes = Some(
             codes
                 .iter()
                 .map(|s| {
-                    // Allocate the string in the arena
                     let bytes = self.arena.alloc_slice_copy(s.as_bytes());
 
-                    std::str::from_utf8(bytes).expect("String allocated in arena should always be valid UTF-8")
+                    // SAFETY: `bytes` was just copied from `s.as_bytes()`, so it carries the same
+                    // valid UTF-8 byte sequence as the source `&str`.
+                    unsafe { std::str::from_utf8_unchecked(bytes) }
                 })
                 .collect_in(self.arena),
         );
@@ -189,6 +187,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
                 // This code is disabled, do not report it.
                 return false;
             }
+            // Code is enabled; fall through to the suppression checks below.
         } else if cfg!(debug_assertions) {
             let mut missing_code_issue = Issue::error("Internal: Diagnostic is missing a code.")
                 .with_code("missing-code")
@@ -205,6 +204,8 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
             self.force_report(missing_code_issue);
 
             return false;
+        } else {
+            // Issue has no code and we're in release mode; allow it through to the suppression checks.
         }
 
         if let Some(span) = primary_span
@@ -471,7 +472,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
                 b',' => {
                     return TextEdit::delete(TextRange::new(scan as u32, code_end as u32));
                 }
-                b' ' | b'\t' => continue,
+                b' ' | b'\t' => {}
                 _ => break,
             }
         }
@@ -646,6 +647,8 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
                 } else if pragma.start_line > current_best.start_line {
                     // Both are same type, the one on a later line is better.
                     best_match_index = Some(i);
+                } else {
+                    // Same type and earlier line; keep the current best.
                 }
             } else {
                 best_match_index = Some(i);

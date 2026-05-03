@@ -108,7 +108,7 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
                 let mut result = TKeyedArray::new().with_known_items(new_items).with_non_empty(keyed.is_non_empty());
 
                 if let Some((key_type, value_type)) = keyed.parameters.as_ref() {
-                    result = result.with_parameters(key_type.clone(), Arc::new(resolve_for(value_type)));
+                    result = result.with_parameters(Arc::clone(key_type), Arc::new(resolve_for(value_type)));
                 }
 
                 Some(wrap_atomic(TAtomic::Array(TArray::Keyed(result))))
@@ -122,7 +122,7 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
 
                 let result = TList {
                     element_type: if list.element_type.is_never() {
-                        list.element_type.clone()
+                        Arc::clone(&list.element_type)
                     } else {
                         Arc::new(resolve_for(&list.element_type))
                     },

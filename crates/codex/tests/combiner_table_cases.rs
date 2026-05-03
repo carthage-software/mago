@@ -249,7 +249,7 @@ fn array_cases() {
         ),
         (
             "sealed_list ∨ unsealed_list<int>",
-            vec![t_sealed_list(BTreeMap::from([(0_usize, (false, u(t_int())))])), t_list(u(t_int()), false)],
+            vec![t_sealed_list(BTreeMap::from([(0usize, (false, u(t_int())))])), t_list(u(t_int()), false)],
             vec!["list<int>"],
         ),
     ]);

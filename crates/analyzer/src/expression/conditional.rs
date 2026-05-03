@@ -1,6 +1,8 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
+use indexmap::IndexMap;
+
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
@@ -121,7 +123,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
                     }
 
                     *clause = Clause::new(
-                        Default::default(),
+                        IndexMap::default(),
                         condition.span(),
                         condition.span(),
                         Some(true),
@@ -230,7 +232,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
         reconcile_keyed_types(
             context,
             &if_scope.negated_types,
-            Default::default(), // todo: this is sort of a hack, we should probably pass the active types here
+            IndexMap::default(), // todo: this is sort of a hack, we should probably pass the active types here
             &mut else_block_context,
             &mut changed_variable_ids,
             &conditionally_referenced_variable_ids,
@@ -369,6 +371,8 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
         );
 
         then_type = Some(Rc::new(if_return_type_reconciled));
+    } else {
+        // shorthand ternary with no inferred condition type; leave then_type as None
     }
 
     let mut is_condition_truthy = false;
@@ -476,6 +480,8 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
                         .with_safety(Safety::PotentiallyUnsafe),
                 );
             });
+        } else {
+            // condition can resolve to either truthy or falsy; no redundant-condition diagnostic
         }
     }
 

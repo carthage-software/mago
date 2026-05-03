@@ -15,6 +15,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for CompositeString<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -34,6 +35,7 @@ impl Fingerprintable for CompositeString<'_> {
 }
 
 impl Fingerprintable for ShellExecuteString<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -48,6 +50,7 @@ impl Fingerprintable for ShellExecuteString<'_> {
 }
 
 impl Fingerprintable for InterpolatedString<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -62,6 +65,7 @@ impl Fingerprintable for InterpolatedString<'_> {
 }
 
 impl Fingerprintable for DocumentString<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -81,6 +85,7 @@ impl Fingerprintable for DocumentString<'_> {
 }
 
 impl Fingerprintable for DocumentIndentation {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -114,6 +119,7 @@ impl Fingerprintable for DocumentIndentation {
 }
 
 impl Fingerprintable for StringPart<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -136,6 +142,7 @@ impl Fingerprintable for StringPart<'_> {
 }
 
 impl Fingerprintable for LiteralStringPart<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -148,6 +155,7 @@ impl Fingerprintable for LiteralStringPart<'_> {
 }
 
 impl Fingerprintable for BracedExpressionStringPart<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

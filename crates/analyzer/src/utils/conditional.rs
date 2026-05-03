@@ -119,8 +119,8 @@ pub(crate) fn analyze<'ctx, 'arena>(
         conditionally_referenced_variable_ids = if_conditional_context.conditionally_referenced_variable_ids.clone();
         assigned_in_conditional_variable_ids = if_conditional_context.assigned_variable_ids.clone();
     } else {
-        conditionally_referenced_variable_ids = first_cond_referenced_var_ids.clone();
-        assigned_in_conditional_variable_ids = first_cond_assigned_var_ids.clone();
+        conditionally_referenced_variable_ids = first_cond_referenced_var_ids;
+        assigned_in_conditional_variable_ids = first_cond_assigned_var_ids;
     }
 
     let newish_var_ids = if_conditional_context
@@ -140,10 +140,11 @@ pub(crate) fn analyze<'ctx, 'arena>(
     conditionally_referenced_variable_ids.retain(|k| !assigned_in_conditional_variable_ids.contains_key(k));
     conditionally_referenced_variable_ids.extend(newish_var_ids);
 
-    let mut if_body_context = unsafe {
-        // SAFETY: We know the Option is `Some` and the `Rc` has a strong count of 1.
-        let rc = if_conditional_context.if_body_context.unwrap_unchecked();
-        let ref_cell = Rc::try_unwrap(rc).unwrap_unchecked();
+    let mut if_body_context = {
+        // SAFETY: We know the Option is `Some`.
+        let rc = unsafe { if_conditional_context.if_body_context.unwrap_unchecked() };
+        // SAFETY: The `Rc` has a strong count of 1.
+        let ref_cell = unsafe { Rc::try_unwrap(rc).unwrap_unchecked() };
         ref_cell.into_inner()
     };
 
@@ -298,5 +299,7 @@ pub fn handle_paradoxical_condition<T: HasSpan>(
                 "Consider simplifying or removing the conditional check if the guarded code should always execute, or verify the expression's logic if a conditional check is truly needed.",
             ),
         );
+    } else {
+        // condition can be either truthy or falsy; no redundant-condition diagnostic to emit
     }
 }

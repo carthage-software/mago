@@ -112,6 +112,8 @@ pub fn reconcile(
                 }
             } else if refined_type.is_never() {
                 trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, false, negated, span);
+            } else {
+                // refinement narrowed the type without making it never; no impossibility to report
             }
         }
 
@@ -244,7 +246,7 @@ pub(crate) fn refine_atomic_with_union(
 
             acceptable_atomic_types.push(TAtomic::Array(TArray::List(TList {
                 known_elements: Some(new_known_elements),
-                element_type: existing_list.element_type.clone(),
+                element_type: Arc::clone(&existing_list.element_type),
                 non_empty: has_non_optional || existing_list.non_empty || *new_type_non_empty,
                 known_count: existing_list.known_count,
             })));
@@ -593,6 +595,8 @@ fn intersect_keyed_arrays(
                     );
                 } else if !second_value.0 {
                     return None;
+                } else {
+                    // optional key not present in the first array and no fallback parameters; drop it from the intersection
                 }
             }
 
@@ -610,6 +614,8 @@ fn intersect_keyed_arrays(
                     second_value.1 = intersect_union_with_union(context, &second_value.1, &first_parameters.1)?;
                 } else if second_keyed_array.parameters.is_none() && !second_value.0 {
                     return None;
+                } else {
+                    // first array has no fallback parameters and the entry is optional; leave the value type unchanged
                 }
             }
 
@@ -627,6 +633,8 @@ fn intersect_keyed_arrays(
                     first_value.1 = intersect_union_with_union(context, &first_value.1, &second_params.1)?;
                 } else if first_keyed_array.parameters.is_none() && !first_value.0 {
                     return None;
+                } else {
+                    // second array has no fallback parameters and the entry is optional; leave the value type unchanged
                 }
             }
 
@@ -834,7 +842,10 @@ fn handle_literal_equality(
             )
         }
         _ => {
-            unreachable!("unexpected assertion type for literal equality: {:?}", assertion_type);
+            #[allow(clippy::unreachable)]
+            {
+                unreachable!("unexpected assertion type for literal equality: {:?}", assertion_type);
+            }
         }
     }
 }
@@ -1198,7 +1209,7 @@ fn handle_literal_equality_with_float(
             {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
-            TAtomic::Scalar(TScalar::Bool(TBool { value: Some(b_val), .. })) if is_loose_equality => {
+            TAtomic::Scalar(TScalar::Bool(TBool { value: Some(b_val) })) if is_loose_equality => {
                 let bool_as_f64 = if *b_val { 1.0 } else { 0.0 };
                 if (bool_as_f64 - assertion_float_val).abs() < f64::EPSILON {
                     acceptable_types.push(existing_var_atomic_type.clone());
@@ -1215,7 +1226,7 @@ fn handle_literal_equality_with_float(
             TAtomic::Scalar(TScalar::String(TString { literal: None, .. })) if is_loose_equality => {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
-            TAtomic::Scalar(TScalar::Bool(TBool { value: None, .. })) if is_loose_equality => {
+            TAtomic::Scalar(TScalar::Bool(TBool { value: None })) if is_loose_equality => {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -1280,10 +1291,10 @@ fn handle_literal_equality_with_bool(
 
     for existing_var_atomic_type in existing_var_type.types.as_ref() {
         match existing_var_atomic_type {
-            TAtomic::Scalar(TScalar::Bool(TBool { value: None, .. })) => {
+            TAtomic::Scalar(TScalar::Bool(TBool { value: None })) => {
                 acceptable_types.push(literal_asserted_type.clone());
             }
-            TAtomic::Scalar(TScalar::Bool(TBool { value: Some(existing_bool_val), .. }))
+            TAtomic::Scalar(TScalar::Bool(TBool { value: Some(existing_bool_val) }))
                 if *existing_bool_val == assertion_bool_val =>
             {
                 if existing_var_type.is_single()

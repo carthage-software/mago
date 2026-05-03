@@ -68,7 +68,7 @@ impl SymbolKind {
 
 /// Stores a map of all known class-like symbol names (FQCNs) to their corresponding `SymbolKind`.
 /// Provides basic methods for adding symbols and querying.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Symbols {
     all: AtomMap<SymbolKind>,
     namespaces: AtomSet,
@@ -149,6 +149,7 @@ impl Symbols {
     /// # Returns
     ///
     /// `true` if the namespace is present, `false` otherwise.
+    #[must_use]
     pub fn contains_namespace(&self, namespace: Atom) -> bool {
         self.namespaces.contains(&namespace)
     }

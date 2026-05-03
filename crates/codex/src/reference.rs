@@ -32,6 +32,7 @@ pub enum ReferenceSource {
 /// Holds sets of symbols and members identified as invalid during analysis,
 /// often due to changes detected in `CodebaseDiff`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[allow(clippy::struct_field_names)]
 pub struct InvalidSymbols {
     /// Set of (Symbol, Member) pairs whose *signatures* are considered invalid.
     /// An empty member name usually indicates the symbol itself.
@@ -49,7 +50,8 @@ pub struct InvalidSymbols {
 ///
 /// This is primarily used for dependency analysis, understanding code structure,
 /// and potentially for tasks like dead code detection or impact analysis.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[allow(clippy::struct_field_names)]
 pub struct SymbolReferences {
     /// Maps a referencing symbol/member `(RefSymbol, RefMember)` to a set of referenced symbols/members `(Symbol, Member)`
     /// found within the *body* of the referencing context.
@@ -1006,6 +1008,7 @@ impl SymbolReferences {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use mago_atom::atom;

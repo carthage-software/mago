@@ -30,6 +30,7 @@ mod templates;
 /// - Calculate inheritance hierarchies (parent classes, interfaces, traits).
 /// - Determine method and property origins (declaring vs. appearing).
 /// - Build descendant maps for efficient lookup.
+#[allow(clippy::implicit_hasher)]
 pub fn populate_codebase(
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,
@@ -44,6 +45,7 @@ pub fn populate_codebase(
 /// When `dirty_symbols` is provided, function-like, class-type, and constant repopulation
 /// uses targeted `get_mut()` lookups instead of scanning the entire HashMap — O(dirty) instead of O(all).
 /// This is critical for incremental mode where only a few symbols change per cycle.
+#[allow(clippy::implicit_hasher)]
 pub fn populate_codebase_targeted(
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,

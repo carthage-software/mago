@@ -132,6 +132,7 @@ impl FunctionLikeParameterMetadata {
     }
 
     /// Returns a new instance with the attributes replaced.
+    #[must_use]
     pub fn with_attributes(mut self, attributes: impl IntoIterator<Item = AttributeMetadata>) -> Self {
         self.set_attributes(attributes);
         self

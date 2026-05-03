@@ -1,3 +1,11 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::needless_raw_strings,
+    clippy::needless_raw_string_hashes,
+    clippy::indexing_slicing
+)]
+
 //! Round-trip coverage over a broad corpus of Twig snippets.
 
 #[path = "common/mod.rs"]

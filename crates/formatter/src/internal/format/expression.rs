@@ -199,7 +199,9 @@ impl<'arena> Format<'arena> for Expression<'arena> {
                 Expression::MagicConstant(c) => c.format(f),
                 Expression::Pipe(p) => p.format(f),
                 Expression::Error(_) => Document::empty(),
+                #[allow(clippy::unreachable)]
                 Expression::Parenthesized(_) => unreachable!("Parenthesized expressions are handled separately"),
+                #[allow(clippy::unreachable)]
                 _ => unreachable!("An expression variant was not handled in formatter: {self:?}"),
             }
         })
@@ -638,6 +640,7 @@ impl<'arena> Format<'arena> for NamedArgument<'arena> {
             let padding = if let Some(padding) = f.argument_state.named_argument_padding {
                 let mut spaces = bumpalo::collections::Vec::with_capacity_in(padding, f.arena);
                 spaces.resize(padding, b' ');
+                // SAFETY: the buffer holds only ASCII space bytes, which is valid UTF-8.
                 Document::String(unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) })
             } else {
                 Document::empty()
@@ -1383,10 +1386,11 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
                     let lines = f.split_lines(content);
 
                     for line in &lines {
-                        let mut line = *line;
+                        let mut current = *line;
                         if own_line {
-                            line = FormatterState::skip_leading_whitespace_up_to(line, indent);
+                            current = FormatterState::skip_leading_whitespace_up_to(current, indent);
                         }
+                        let line = current;
 
                         let mut line_content = vec![in f.arena; Document::String(line)];
                         if !line.is_empty() {
@@ -1424,7 +1428,7 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
 
                         if tabs > 0 || spaces > 0 {
                             last_part_indentation = if tabs > 0 {
-                                Cow::Owned("\t".repeat(tabs) + &" ".repeat(spaces))
+                                Cow::Owned(format!("{}{}", "\t".repeat(tabs), " ".repeat(spaces)))
                             } else {
                                 Cow::Owned(" ".repeat(spaces))
                             };
@@ -1454,7 +1458,9 @@ impl<'arena> Format<'arena> for DocumentString<'arena> {
                             DocumentIndentation::None => Cow::Borrowed(""),
                             DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
                             DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
-                            DocumentIndentation::Mixed(t, w) => Cow::Owned("\t".repeat(t) + &" ".repeat(w)),
+                            DocumentIndentation::Mixed(t, w) => {
+                                Cow::Owned(format!("{}{}", "\t".repeat(t), " ".repeat(w)))
+                            }
                         };
 
                         (base, last_part_indentation.clone())
@@ -1517,7 +1523,7 @@ impl<'arena> Format<'arena> for InterpolatedString<'arena> {
                             }
                             if tabs > 0 || spaces > 0 {
                                 last_part_indentation = if tabs > 0 {
-                                    Cow::Owned("\t".repeat(tabs) + &" ".repeat(spaces))
+                                    Cow::Owned(format!("{}{}", "\t".repeat(tabs), " ".repeat(spaces)))
                                 } else {
                                     Cow::Owned(" ".repeat(spaces))
                                 };
@@ -1570,7 +1576,7 @@ impl<'arena> Format<'arena> for ShellExecuteString<'arena> {
                             }
                             if tabs > 0 || spaces > 0 {
                                 last_part_indentation = if tabs > 0 {
-                                    Cow::Owned("\t".repeat(tabs) + &" ".repeat(spaces))
+                                    Cow::Owned(format!("{}{}", "\t".repeat(tabs), " ".repeat(spaces)))
                                 } else {
                                     Cow::Owned(" ".repeat(spaces))
                                 };

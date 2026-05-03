@@ -70,7 +70,7 @@ pub struct StrictBaselineIssue {
 }
 
 /// Represents a collection of issues for a specific file path in the strict baseline.
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, JsonSchema)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, JsonSchema)]
 pub struct StrictBaselineEntry {
     pub issues: Vec<StrictBaselineIssue>,
 }
@@ -479,6 +479,7 @@ impl Baseline {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::get_unwrap)]
 mod tests {
     use super::*;
     use crate::Annotation;

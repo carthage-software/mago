@@ -6,7 +6,7 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_while(&mut self) -> Result<While<'arena>, ParseError> {
         Ok(While {
             r#while: self.expect_keyword(T!["while"])?,

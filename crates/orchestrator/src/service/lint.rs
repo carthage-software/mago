@@ -136,6 +136,10 @@ impl LintService {
     /// # Returns
     ///
     /// A `Result` containing the final `IssueCollection` or an `OrchestratorError`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when worker pipelines fail or rule loading rejects the input.
     pub fn lint(self, mode: LintMode, only: Option<&[String]>) -> Result<IssueCollection, OrchestratorError> {
         const PROGRESS_BAR_THEME: &str = "🧹 Linting";
 

@@ -170,7 +170,7 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
 
     if let Some(narrowed_rc) = narrowed_from_non_nullsafe {
         if let Some(property_access_id) = property_access_id {
-            block_context.locals.insert(property_access_id, narrowed_rc.clone());
+            block_context.locals.insert(property_access_id, Rc::clone(&narrowed_rc));
         }
 
         artifacts.set_rc_expression_type(&span, narrowed_rc);
@@ -201,7 +201,7 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
 
     let resulting_type = Rc::new(resulting_type);
     if let Some(property_access_id) = property_access_id {
-        block_context.locals.insert(property_access_id, resulting_type.clone());
+        block_context.locals.insert(property_access_id, Rc::clone(&resulting_type));
     }
 
     artifacts.set_rc_expression_type(&span, resulting_type);
@@ -214,8 +214,8 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
 /// When property access is memoized, we still need to track the symbol reference
 /// so that unused property detection works correctly.
 fn add_memoized_property_reference<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    block_context: &mut BlockContext<'ctx>,
+    context: &Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     object: &'ast Expression<'arena>,
     property_selector: &'ast ClassLikeMemberSelector<'arena>,
@@ -244,6 +244,8 @@ fn add_memoized_property_reference<'ctx, 'ast, 'arena>(
                 }
             }
         }
+    } else {
+        // object expression has no inferred type; no property reference to record
     }
 
     // Add references (after releasing the immutable borrow)
@@ -267,7 +269,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_generic_property,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -295,7 +297,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_string_enum_properties,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             enum Color: string {
@@ -336,7 +338,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_int_enum_properties,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             enum Color: int {
@@ -377,7 +379,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_enum_properties,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             enum Color {
@@ -404,7 +406,7 @@ mod tests {
 
     test_analysis! {
         name = redundant_nullsafe_property_access,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class Foo {
@@ -422,7 +424,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_null,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class Foo {
@@ -440,7 +442,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_null_inside_coalescing,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class Foo {
@@ -474,7 +476,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_nullsafe,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class Foo {
@@ -490,7 +492,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_mixed,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function test(mixed $value): void {
@@ -505,7 +507,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_non_object,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function test(int $value): void {
@@ -519,7 +521,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_non_existent_property,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class Foo {
@@ -540,7 +542,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_property_on_generic_object,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -566,7 +568,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_definite_null_error,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function test(): null {
@@ -634,7 +636,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_on_generic_object_type_error,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function get_prop(object $obj): mixed {
@@ -658,7 +660,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_on_interface_variable,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             interface MyInterface {}
@@ -675,7 +677,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_on_enum_variable,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             enum X {}
@@ -691,7 +693,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_on_final_class_variable,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             final class X {}
@@ -738,7 +740,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_on_void_function_result,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function returns_void(): void {}
@@ -753,7 +755,7 @@ mod tests {
 
     test_analysis! {
         name = property_access_multiple_selectors,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class a
@@ -795,7 +797,7 @@ mod tests {
 
     test_analysis! {
         name = accessing_non_existent_class_property,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function example($class): void {

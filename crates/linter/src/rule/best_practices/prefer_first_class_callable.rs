@@ -241,7 +241,7 @@ pub(super) fn is_call_forwarding<'ast, 'arena>(
     true
 }
 
-pub(super) fn is_convertible_to_first_class_callable<'ast, 'arena>(call: &'ast Call<'arena>) -> bool {
+pub(super) fn is_convertible_to_first_class_callable(call: &Call<'_>) -> bool {
     matches!(
         call,
         Call::Function(FunctionCall { function: Expression::Identifier(_) | Expression::Variable(_), .. })

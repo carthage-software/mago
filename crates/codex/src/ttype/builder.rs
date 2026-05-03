@@ -326,7 +326,7 @@ pub fn get_union_from_type_ast(
         Type::ClassString(class_string_type) => get_class_string_type_from_ast(
             class_string_type.span(),
             TClassLikeStringKind::Class,
-            &class_string_type.parameter,
+            class_string_type.parameter.as_ref(),
             scope,
             type_context,
             classname,
@@ -334,7 +334,7 @@ pub fn get_union_from_type_ast(
         Type::InterfaceString(interface_string_type) => get_class_string_type_from_ast(
             interface_string_type.span(),
             TClassLikeStringKind::Interface,
-            &interface_string_type.parameter,
+            interface_string_type.parameter.as_ref(),
             scope,
             type_context,
             classname,
@@ -342,7 +342,7 @@ pub fn get_union_from_type_ast(
         Type::EnumString(enum_string_type) => get_class_string_type_from_ast(
             enum_string_type.span(),
             TClassLikeStringKind::Enum,
-            &enum_string_type.parameter,
+            enum_string_type.parameter.as_ref(),
             scope,
             type_context,
             classname,
@@ -350,7 +350,7 @@ pub fn get_union_from_type_ast(
         Type::TraitString(trait_string_type) => get_class_string_type_from_ast(
             trait_string_type.span(),
             TClassLikeStringKind::Trait,
-            &trait_string_type.parameter,
+            trait_string_type.parameter.as_ref(),
             scope,
             type_context,
             classname,
@@ -604,12 +604,12 @@ pub fn get_union_from_type_ast(
             }
 
             let object = Arc::new(get_union_from_type_ast(&entries[0].inner, scope, type_context, classname)?);
-            let class_name = Arc::new(get_union_from_type_ast(&entries[1].inner, scope, type_context, classname)?);
+            let class_arg = Arc::new(get_union_from_type_ast(&entries[1].inner, scope, type_context, classname)?);
             let template_name = Arc::new(get_union_from_type_ast(&entries[2].inner, scope, type_context, classname)?);
 
             TUnion::from_atomic(TAtomic::Derived(TDerived::TemplateType(TTemplateType::new(
                 object,
-                class_name,
+                class_arg,
                 template_name,
             ))))
         }
@@ -675,7 +675,7 @@ fn get_object_from_ast(
         let key = match field_key.key {
             ShapeKey::String { value, .. } => atom(value),
             ShapeKey::Integer { value, .. } => i64_atom(value),
-            ShapeKey::ClassLikeConstant { ref class_name, ref constant_name, .. } => {
+            ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
                 concat_atom!(class_name.value, "::", constant_name.value)
             }
         };
@@ -719,7 +719,7 @@ fn get_shape_from_ast(
                     let array_key = match field_key.key {
                         ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
                         ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
-                        ShapeKey::ClassLikeConstant { ref class_name, ref constant_name, .. } => {
+                        ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
                             let class_like_name = if class_name.value.eq_ignore_ascii_case("self")
                                 || class_name.value.eq_ignore_ascii_case("static")
                                 || class_name.value.eq("this")
@@ -811,7 +811,7 @@ fn get_shape_from_ast(
                     let array_key = match field_key.key {
                         ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
                         ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
-                        ShapeKey::ClassLikeConstant { ref class_name, ref constant_name, .. } => {
+                        ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
                             let class_like_name = if class_name.value.eq_ignore_ascii_case("self")
                                 || class_name.value.eq_ignore_ascii_case("static")
                                 || class_name.value.eq("this")
@@ -905,9 +905,9 @@ fn get_callable_from_ast(
 }
 
 #[inline]
-fn get_reference_from_ast<'i>(
-    reference_identifier: &Identifier<'i>,
-    generics: Option<&GenericParameters<'i>>,
+fn get_reference_from_ast(
+    reference_identifier: &Identifier<'_>,
+    generics: Option<&GenericParameters<'_>>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
     classname: Option<Atom>,
@@ -1020,9 +1020,9 @@ fn get_reference_from_ast<'i>(
 }
 
 #[inline]
-fn get_array_type_from_ast<'i, 'p>(
-    mut key: Option<&'p Type<'i>>,
-    mut value: Option<&'p Type<'i>>,
+fn get_array_type_from_ast<'src>(
+    mut key: Option<&'src Type<'src>>,
+    mut value: Option<&'src Type<'src>>,
     non_empty: bool,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
@@ -1074,7 +1074,7 @@ fn get_list_type_from_ast(
 fn get_class_string_type_from_ast(
     span: Span,
     kind: TClassLikeStringKind,
-    parameter: &Option<SingleGenericParameter<'_>>,
+    parameter: Option<&SingleGenericParameter<'_>>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
     classname: Option<Atom>,
@@ -1093,10 +1093,10 @@ fn get_class_string_type_from_ast(
                     TAtomic::GenericParameter(TGenericParameter {
                         parameter_name,
                         defining_entity,
-                        constraint,
+                        constraint: nested_constraint,
                         ..
                     }) => {
-                        for constraint_atomic in Arc::unwrap_or_clone(constraint).types.into_owned() {
+                        for constraint_atomic in Arc::unwrap_or_clone(nested_constraint).types.into_owned() {
                             class_strings.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::generic(
                                 kind,
                                 parameter_name,

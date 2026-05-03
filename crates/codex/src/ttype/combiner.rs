@@ -547,7 +547,7 @@ fn scrape_type_properties(
     }
 
     if combination.flags.nonnull_mixed().unwrap_or(false) {
-        if let TAtomic::Null = atomic {
+        if atomic == TAtomic::Null {
             combination.flags.set_nonnull_mixed(Some(false));
             combination.flags.insert(CombinationFlags::GENERIC_MIXED);
         }
@@ -690,14 +690,14 @@ fn scrape_type_properties(
                         }
                     }
 
-                    combination.list_array_parameter = if let Some(ref existing_type) = combination.list_array_parameter
-                    {
-                        Some(combine_union_types(existing_type, &element_type, codebase, options))
-                    } else {
-                        Some((*element_type).clone())
-                    };
+                    combination.list_array_parameter =
+                        if let Some(existing_type) = combination.list_array_parameter.as_ref() {
+                            Some(combine_union_types(existing_type, &element_type, codebase, options))
+                        } else {
+                            Some((*element_type).clone())
+                        };
                 }
-                TArray::Keyed(TKeyedArray { parameters, known_items, non_empty, .. }) => {
+                TArray::Keyed(TKeyedArray { parameters, known_items, non_empty }) => {
                     let mut had_previous_keyed_array = combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY);
                     let sealed_budget_available = !combination.sealed_keyed_budget_exhausted
                         && combination.sealed_arrays.len() < options.array_combination_threshold as usize;
@@ -718,7 +718,7 @@ fn scrape_type_properties(
                         if incoming_is_sealed && !existing_is_sealed && known_items.is_some() {
                             let known_items = widen_known_items_with_params(
                                 known_items,
-                                &combination.keyed_array_parameters,
+                                combination.keyed_array_parameters.as_ref(),
                                 &combination.keyed_array_entries,
                                 codebase,
                                 options,
@@ -735,7 +735,7 @@ fn scrape_type_properties(
 
                         if !incoming_is_sealed && existing_is_sealed && !combination.keyed_array_entries.is_empty() {
                             let mut frozen_entries = std::mem::take(&mut combination.keyed_array_entries);
-                            if let Some((ref key_param, ref value_param)) = parameters {
+                            if let Some((key_param, value_param)) = parameters.as_ref() {
                                 for (key, (_, entry_type)) in frozen_entries.iter_mut() {
                                     // If the incoming unsealed array also declares this key as a
                                     // known item, the caller is saying this key is exactly the
@@ -920,7 +920,7 @@ fn scrape_type_properties(
 
     // this probably won't ever happen, but the object top type
     // can eliminate variants
-    if let TAtomic::Object(TObject::Any) = atomic {
+    if atomic == TAtomic::Object(TObject::Any) {
         combination.flags.insert(CombinationFlags::HAS_OBJECT_TOP_TYPE);
         combination.value_types.retain(|_, t| !matches!(t, TAtomic::Object(TObject::Named(_))));
         combination.value_types.insert(atomic.get_id(), atomic);
@@ -1069,7 +1069,7 @@ fn scrape_type_properties(
         return;
     }
 
-    if let TAtomic::Scalar(TScalar::Generic) = atomic {
+    if atomic == TAtomic::Scalar(TScalar::Generic) {
         combination.literal_strings.clear();
         combination.integers.clear();
         combination.literal_floats.clear();
@@ -1087,7 +1087,7 @@ fn scrape_type_properties(
         return;
     }
 
-    if let TAtomic::Scalar(TScalar::ArrayKey) = atomic {
+    if atomic == TAtomic::Scalar(TScalar::ArrayKey) {
         if combination.value_types.contains_key(&*ATOM_SCALAR) {
             return;
         }
@@ -1247,7 +1247,7 @@ fn scrape_type_properties(
 /// array's generic string keys could overwrite any of the sealed array's known keys.
 fn widen_known_items_with_params(
     known_items: Option<BTreeMap<ArrayKey, (bool, TUnion)>>,
-    params: &Option<(TUnion, TUnion)>,
+    params: Option<&(TUnion, TUnion)>,
     other_known_items: &BTreeMap<ArrayKey, (bool, TUnion)>,
     codebase: &CodebaseMetadata,
     options: CombinerOptions,

@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+
 mod runner {
     use std::borrow::Cow;
 

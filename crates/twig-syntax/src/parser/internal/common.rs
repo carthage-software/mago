@@ -8,7 +8,7 @@ use crate::parser::stream::is_keyword_usable_as_name;
 use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Convert a token into a [`Keyword`].
     #[inline]
     pub(crate) fn keyword_from(&self, token: &TwigToken<'arena>) -> Keyword<'arena> {

@@ -37,6 +37,7 @@ pub struct RedundantVarInfo {
 }
 
 #[derive(Default)]
+#[allow(clippy::partial_pub_fields)]
 pub struct RedundantRecorder<'arena> {
     pub info: HashMap<&'arena str, RedundantVarInfo>,
     pub bailed: bool,
@@ -132,6 +133,7 @@ pub struct DeadStoreVarInfo {
 }
 
 #[derive(Default)]
+#[allow(clippy::partial_pub_fields)]
 pub struct DeadStoreRecorder<'arena> {
     pub info: HashMap<&'arena str, DeadStoreVarInfo>,
     pub bailed: bool,
@@ -319,7 +321,7 @@ pub fn function_like_parts<'ast, 'arena>(
         Node::Function(f) => Some((&f.parameter_list, &f.body, None)),
         Node::Method(m) => match &m.body {
             MethodBody::Concrete(b) => Some((&m.parameter_list, b, None)),
-            _ => None,
+            MethodBody::Abstract(_) => None,
         },
         Node::Closure(c) => Some((&c.parameter_list, &c.body, c.use_clause.as_ref())),
         _ => None,
@@ -399,7 +401,8 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
     }
 
     fn walk_unary_prefix(&mut self, u: &'ast UnaryPrefix<'arena>, ctx: &mut ()) {
-        use UnaryPrefixOperator::*;
+        use UnaryPrefixOperator::PreDecrement;
+        use UnaryPrefixOperator::PreIncrement;
         if self.rec.is_bailed() {
             return;
         }
@@ -417,7 +420,8 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
     }
 
     fn walk_unary_postfix(&mut self, u: &'ast UnaryPostfix<'arena>, ctx: &mut ()) {
-        use UnaryPostfixOperator::*;
+        use UnaryPostfixOperator::PostDecrement;
+        use UnaryPostfixOperator::PostIncrement;
         if self.rec.is_bailed() {
             return;
         }

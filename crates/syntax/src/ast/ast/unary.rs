@@ -199,7 +199,7 @@ impl UnaryPostfixOperator {
 
     #[inline]
     #[must_use]
-    pub const fn as_str<'a>(&self) -> &'a str {
+    pub const fn as_str<'op>(&self) -> &'op str {
         match self {
             UnaryPostfixOperator::PostIncrement(_) => "++",
             UnaryPostfixOperator::PostDecrement(_) => "--",

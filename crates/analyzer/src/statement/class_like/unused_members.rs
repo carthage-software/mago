@@ -43,12 +43,12 @@ struct CheckableMember {
 ///
 /// Reports private members (and protected members in final classes) that are unused.
 /// Returns the set of unused member symbol IDs for use by other checks.
-pub fn check_unused_members_with_transitivity<'ctx, 'arena>(
+pub fn check_unused_members_with_transitivity(
     class_name: Atom,
     class_span: Span,
     class_like_metadata: &ClassLikeMetadata,
     symbol_references: &SymbolReferences,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, '_>,
 ) -> HashSet<SymbolIdentifier> {
     if class_like_metadata.kind.is_trait() {
         return HashSet::default();
@@ -242,13 +242,13 @@ fn all_references_from_unused(
 ///
 /// The `unused_members` set contains property symbols that were already reported
 /// as unused (via transitive analysis) and should be skipped.
-pub fn check_write_only_properties<'ctx, 'arena>(
+pub fn check_write_only_properties(
     class_name: Atom,
     class_span: Span,
     class_like_metadata: &ClassLikeMetadata,
     symbol_references: &SymbolReferences,
     unused_members: &HashSet<SymbolIdentifier>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'_, '_>,
 ) {
     if class_like_metadata.kind.is_trait() {
         return;
@@ -312,12 +312,7 @@ fn is_member_referenced(symbol_references: &SymbolReferences, symbol_id: &Symbol
 }
 
 /// Reports an unused property.
-fn report_unused_property<'arena>(
-    context: &mut Context<'_, 'arena>,
-    class_span: Span,
-    property_name: Atom,
-    property_span: Span,
-) {
+fn report_unused_property(context: &mut Context<'_, '_>, class_span: Span, property_name: Atom, property_span: Span) {
     let issue = Issue::help(format!("Property `{property_name}` is never used."))
         .with_code(IssueCode::UnusedProperty)
         .with_annotations([
@@ -335,8 +330,8 @@ fn report_unused_property<'arena>(
 }
 
 /// Reports a write-only property.
-fn report_write_only_property<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_write_only_property(
+    context: &mut Context<'_, '_>,
     class_span: Span,
     property_name: Atom,
     property_span: Span,
@@ -356,12 +351,7 @@ fn report_write_only_property<'arena>(
 }
 
 /// Reports an unused method.
-fn report_unused_method<'arena>(
-    context: &mut Context<'_, 'arena>,
-    class_span: Span,
-    method_name: Atom,
-    method_span: Span,
-) {
+fn report_unused_method(context: &mut Context<'_, '_>, class_span: Span, method_name: Atom, method_span: Span) {
     let issue = Issue::help(format!("Method `{method_name}()` is never used."))
         .with_code(IssueCode::UnusedMethod)
         .with_annotations([

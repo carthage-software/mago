@@ -142,7 +142,7 @@ pub fn get_docblock_variables<'ctx>(
             _ => None,
         })
         .filter_map(|tag| {
-            if allow_tracing && let TagKind::PsalmTrace = tag.kind {
+            if allow_tracing && tag.kind == TagKind::PsalmTrace {
                 let variable_name = tag.description.trim();
                 let variable_atom = mago_atom::atom(variable_name);
                 match block_context.locals.get(&variable_atom) {
@@ -373,6 +373,8 @@ pub fn insert_variable_from_docblock<'ctx>(
                     )))
                     .with_help("You can remove this redundant `@var` docblock tag."),
             );
+        } else {
+            // docblock narrows the previous type without contradiction or redundancy; accept silently
         }
     }
 

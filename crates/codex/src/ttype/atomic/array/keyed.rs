@@ -39,7 +39,7 @@ impl PartialEq for TKeyedArray {
             return false;
         }
 
-        if !params_eq(&self.parameters, &other.parameters) {
+        if !params_eq(self.parameters.as_ref(), other.parameters.as_ref()) {
             return false;
         }
 
@@ -48,7 +48,7 @@ impl PartialEq for TKeyedArray {
 }
 
 #[inline]
-fn params_eq(a: &Option<(Arc<TUnion>, Arc<TUnion>)>, b: &Option<(Arc<TUnion>, Arc<TUnion>)>) -> bool {
+fn params_eq(a: Option<&(Arc<TUnion>, Arc<TUnion>)>, b: Option<&(Arc<TUnion>, Arc<TUnion>)>) -> bool {
     match (a, b) {
         (None, None) => true,
         (Some((ak, av)), Some((bk, bv))) => {
@@ -171,6 +171,7 @@ impl TKeyedArray {
     ///
     /// Checks both generic parameters and known items. Returns `false` for
     /// arrays with no key information at all (empty untyped arrays).
+    #[must_use]
     pub fn has_exclusively_string_keys(&self) -> bool {
         let has_key_info = self.parameters.is_some() || self.known_items.as_ref().is_some_and(|i| !i.is_empty());
 

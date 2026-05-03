@@ -1,6 +1,8 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
+use indexmap::IndexMap;
+
 use mago_algebra::clause::Clause;
 use mago_algebra::saturate_clauses;
 use mago_atom::Atom;
@@ -168,7 +170,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             // `running_else_context.locals` in earlier iterations, and
             // reconcile_keyed_types intersects new assertions with whatever
             // is already there. The cumulative state is identical to running
-            // the full clause set every iteration — but the per-iteration
+            // the full clause set every iteration; but the per-iteration
             // cost stops being O(K) in arm count.
             if !new_else_clauses.is_empty() {
                 let mut else_referenced_ids = AtomSet::default();
@@ -179,7 +181,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
                     reconcile_keyed_types(
                         self.context,
                         &reconcilable_else_types,
-                        Default::default(),
+                        IndexMap::default(),
                         &mut running_else_context,
                         &mut changed_variables,
                         &else_referenced_ids,
@@ -201,7 +203,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         if let Some(default_arm) = first_default_arm {
             self.analyze_default_arm(
                 default_arm,
-                &mut running_else_context,
+                &running_else_context,
                 &mut arm_body_types,
                 &mut arm_exit_contexts,
                 previous_arms_executed,
@@ -256,7 +258,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             let subject_id_str =
                 format!("{}{}", Self::SYNTHETIC_MATCH_VAR_PREFIX, self.stmt.expression.span().start.offset);
             let subject_id = Atom::from(&subject_id_str);
-            self.block_context.locals.insert(subject_id, subject_type.clone());
+            self.block_context.locals.insert(subject_id, Rc::clone(subject_type));
             let subject_for_conditions =
                 new_synthetic_variable(self.context.arena, &subject_id_str, self.stmt.expression.span());
 
@@ -264,6 +266,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         }
     }
 
+    #[allow(clippy::unwrap_used)]
     fn analyze_expression_arm(
         &mut self,
         subject_expr: &Expression<'arena>,
@@ -394,10 +397,11 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         Ok((arm_status, negated_arm_clauses))
     }
 
+    #[allow(clippy::needless_pass_by_ref_mut)]
     fn analyze_default_arm(
         &mut self,
         default_arm: &'ast MatchDefaultArm<'arena>,
-        running_else_context: &mut BlockContext<'ctx>,
+        running_else_context: &BlockContext<'ctx>,
         arm_body_types: &mut Vec<Rc<TUnion>>,
         arm_exit_contexts: &mut Vec<BlockContext<'ctx>>,
         previous_arms_executed: ArmExecutionStatus,

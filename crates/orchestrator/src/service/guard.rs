@@ -75,6 +75,10 @@ impl GuardService {
     ///
     /// A `Result` containing the [`GuardResult`] with all issues found and
     /// information about which guards were skipped, or an [`OrchestratorError`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when guard pipelines fail or scanning encounters IO errors.
     pub fn run(self) -> Result<GuardResult, OrchestratorError> {
         const GUARD_PROGRESS_PREFIX: &str = "🛡️  Guarding";
 

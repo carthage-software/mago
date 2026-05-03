@@ -246,7 +246,7 @@ impl NamespaceScope {
     }
 
     /// non-generic version of `qualify_name` that takes a string slice.
-    fn qualify_name_str<'a>(&self, name_ref: &'a str) -> Cow<'a, str> {
+    fn qualify_name_str<'name>(&self, name_ref: &'name str) -> Cow<'name, str> {
         match &self.namespace_name {
             // If we have a non-empty namespace, prepend it.
             Some(ns) if !ns.is_empty() => Cow::Owned(format!("{ns}\\{name_ref}")),
@@ -276,7 +276,7 @@ impl NamespaceScope {
     /// non-generic version of `resolve` that takes a string slice.
     #[inline]
     #[must_use]
-    pub fn resolve_str<'a>(&self, kind: NameKind, name_ref: &'a str) -> (Cow<'a, str>, bool) {
+    pub fn resolve_str<'name>(&self, kind: NameKind, name_ref: &'name str) -> (Cow<'name, str>, bool) {
         // Try resolving using explicit aliases and constructs
         if let Some(resolved_name) = self.resolve_alias_str(kind, name_ref) {
             return (resolved_name, true); // Resolved via alias or explicit construct
@@ -305,7 +305,7 @@ impl NamespaceScope {
     }
 
     /// non-generic version of `resolve_alias` that takes a string slice.
-    fn resolve_alias_str<'a>(&self, kind: NameKind, name_ref: &'a str) -> Option<Cow<'a, str>> {
+    fn resolve_alias_str<'name>(&self, kind: NameKind, name_ref: &'name str) -> Option<Cow<'name, str>> {
         if name_ref.is_empty() {
             return None;
         }

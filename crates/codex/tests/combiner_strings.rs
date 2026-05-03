@@ -213,7 +213,7 @@ fn case_sensitive_literals_kept_apart() {
 
 #[test]
 fn n_distinct_literals_kept() {
-    for n in [3_usize, 5, 10, 50, 100] {
+    for n in [3usize, 5, 10, 50, 100] {
         let inputs: Vec<TAtomic> = (0..n).map(|i| t_lit_string(&format!("s{i}"))).collect();
         let result = combine_default(inputs);
         assert_eq!(result.len(), n);
@@ -222,7 +222,7 @@ fn n_distinct_literals_kept() {
 
 #[test]
 fn many_distinct_literals_exceed_threshold_generalise() {
-    let n = 200_usize;
+    let n = 200usize;
     let inputs: Vec<TAtomic> = (0..n).map(|i| t_lit_string(&format!("s{i}"))).collect();
     let result = combine_default(inputs);
     assert_eq!(result.len(), 1);
@@ -231,7 +231,7 @@ fn many_distinct_literals_exceed_threshold_generalise() {
 
 #[test]
 fn under_threshold_keeps_literals() {
-    let n = 100_usize;
+    let n = 100usize;
     let inputs: Vec<TAtomic> = (0..n).map(|i| t_lit_string(&format!("s{i}"))).collect();
     let result = combine_default(inputs);
     assert_eq!(result.len(), n);
@@ -239,7 +239,7 @@ fn under_threshold_keeps_literals() {
 
 #[test]
 fn custom_low_threshold_generalises_quickly() {
-    let inputs: Vec<TAtomic> = (0..20_usize).map(|i| t_lit_string(&format!("s{i}"))).collect();
+    let inputs: Vec<TAtomic> = (0..20usize).map(|i| t_lit_string(&format!("s{i}"))).collect();
     let result = combine_with_string_threshold(inputs, 5);
     assert_eq!(result.len(), 1);
     assert_eq!(atomic_id_string(&result[0]), "string");

@@ -183,7 +183,7 @@ fn create_closure_from_partial_application(
         if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
             Some(Arc::new(inferred_type_replacer::replace(ret_type, template_result, codebase)))
         } else {
-            Some(ret_type.clone())
+            Some(Arc::clone(ret_type))
         }
     } else {
         None

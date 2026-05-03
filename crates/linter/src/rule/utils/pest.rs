@@ -81,7 +81,7 @@ fn find_function_call_in_chain<'arena>(expr: &'arena Expression<'arena>) -> Opti
             Call::Function(func_call) => Some(func_call),
             Call::Method(inner_method) => find_function_call_in_chain(inner_method.object),
             Call::NullSafeMethod(inner_method) => find_function_call_in_chain(inner_method.object),
-            _ => None,
+            Call::StaticMethod(_) => None,
         },
         Expression::Access(access) => match access {
             Access::Property(property_access) => find_function_call_in_chain(property_access.object),
@@ -113,7 +113,7 @@ pub fn is_empty_string(expr: &Expression<'_>) -> bool {
 }
 
 /// Gets the first argument of a method call if it exists.
-pub fn get_first_argument<'a>(method_call: &'a MethodCall<'a>) -> Option<&'a Argument<'a>> {
+pub fn get_first_argument<'arena>(method_call: &'arena MethodCall<'arena>) -> Option<&'arena Argument<'arena>> {
     method_call.argument_list.arguments.first()
 }
 

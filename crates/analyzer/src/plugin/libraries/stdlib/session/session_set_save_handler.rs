@@ -68,7 +68,10 @@ impl FunctionCallHook for SessionSetSaveHandlerHook {
 
         if is_object_form {
             if arguments.len() > 2 {
-                let third_arg = arguments.get(2).unwrap();
+                let Some(third_arg) = arguments.get(2) else {
+                    return Ok(());
+                };
+
                 let span = match third_arg {
                     Argument::Positional(arg) => arg.value.span(),
                     Argument::Named(arg) => arg.span(),

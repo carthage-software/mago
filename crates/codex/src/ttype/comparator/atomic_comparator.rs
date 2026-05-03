@@ -231,7 +231,7 @@ pub fn is_contained_by(
         return false;
     }
 
-    if let TAtomic::Null = input_type_part {
+    if matches!(input_type_part, TAtomic::Null) {
         if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = container_type_part
             && (constraint.is_nullable() || constraint.is_mixed())
         {
@@ -280,7 +280,7 @@ pub fn is_contained_by(
         );
     }
 
-    if let TAtomic::Object(TObject::Any) = container_type_part
+    if matches!(container_type_part, TAtomic::Object(TObject::Any))
         && let TAtomic::Object(_) = input_type_part
     {
         return true;
@@ -398,7 +398,7 @@ pub fn is_contained_by(
         };
     }
 
-    if let TAtomic::Object(TObject::Any) = input_type_part
+    if matches!(input_type_part, TAtomic::Object(TObject::Any))
         && let TAtomic::Object(TObject::Named(_) | TObject::Enum(_)) = container_type_part
     {
         atomic_comparison_result.type_coerced = Some(true);
@@ -463,8 +463,8 @@ pub fn is_contained_by(
         return true;
     }
 
-    if let TAtomic::Object(TObject::Any) = input_type_part
-        && let TAtomic::Object(TObject::Any) = container_type_part
+    if matches!(input_type_part, TAtomic::Object(TObject::Any))
+        && matches!(container_type_part, TAtomic::Object(TObject::Any))
     {
         return true;
     }
@@ -545,10 +545,10 @@ pub fn is_contained_by(
     false
 }
 
-pub(crate) fn can_be_identical<'a>(
-    codebase: &'a CodebaseMetadata,
-    first_part: &'a TAtomic,
-    second_part: &'a TAtomic,
+pub(crate) fn can_be_identical(
+    codebase: &CodebaseMetadata,
+    first_part: &TAtomic,
+    second_part: &TAtomic,
     inside_assertion: bool,
     allow_type_coercion: bool,
 ) -> bool {
@@ -651,8 +651,11 @@ pub(crate) fn can_be_identical<'a>(
         let list_element_is_never = list.element_type.is_never();
 
         if let Some((_, keyed_val_type)) = keyed_array.parameters.as_ref() {
-            if list_has_known_elements && list_element_is_never {
-                for (_, list_elem_type) in list.known_elements.as_ref().unwrap().values() {
+            if list_has_known_elements
+                && list_element_is_never
+                && let Some(known_elements) = list.known_elements.as_ref()
+            {
+                for (_, list_elem_type) in known_elements.values() {
                     if union_comparator::can_expression_types_be_identical(
                         codebase,
                         keyed_val_type.as_ref(),
@@ -912,6 +915,7 @@ fn keyed_arrays_can_be_identical(
                             return false;
                         }
                     }
+                    #[allow(clippy::unreachable)]
                     (None, None) => {
                         unreachable!("key {key:?} should exist in at least one map, but found in neither");
                     }

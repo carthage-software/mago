@@ -16,7 +16,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::Precedence;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_array(&mut self) -> Result<Array<'arena>, ParseError> {
         let result = self.parse_comma_separated_sequence(T!["["], T!["]"], |p| p.parse_array_element())?;
 

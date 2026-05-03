@@ -21,6 +21,7 @@ use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
+#[allow(clippy::unwrap_used)]
 static TAGGED_FIXME_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"fixme\((#|@)?\S+").unwrap());
 
 #[derive(Debug, Clone)]

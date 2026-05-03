@@ -181,7 +181,7 @@ fn get_union_from_hint<'arena>(
 #[inline]
 fn get_union_from_identifier_hint<'arena>(
     identifier: &'arena Identifier<'arena>,
-    context: &mut Context<'_, 'arena>,
+    context: &Context<'_, 'arena>,
 ) -> TUnion {
     let name = context.resolved_names.get(identifier);
 

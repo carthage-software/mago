@@ -238,6 +238,8 @@ fn parameter_list_exceeds_print_width<'arena>(
         }
     }
 
+    // SAFETY: every byte pushed into `flattened` came from `char::encode_utf8`,
+    // so the buffer holds valid UTF-8.
     let flattened = unsafe { std::str::from_utf8_unchecked(flattened.into_bump_slice()) };
 
     string_width(flattened.trim()) > f.settings.print_width

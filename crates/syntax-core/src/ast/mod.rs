@@ -72,7 +72,7 @@ impl<'arena, T> Sequence<'arena, T> {
     }
 }
 
-impl<'arena, T: HasSpan> Sequence<'arena, T> {
+impl<T: HasSpan> Sequence<'_, T> {
     #[inline]
     #[must_use]
     pub fn first_span(&self) -> Option<Span> {
@@ -95,7 +95,7 @@ impl<'arena, T: HasSpan> Sequence<'arena, T> {
     }
 }
 
-impl<'arena, T> std::ops::Index<usize> for Sequence<'arena, T> {
+impl<T> std::ops::Index<usize> for Sequence<'_, T> {
     type Output = T;
 
     #[inline]
@@ -104,7 +104,7 @@ impl<'arena, T> std::ops::Index<usize> for Sequence<'arena, T> {
     }
 }
 
-impl<'arena, T, Tok> std::ops::Index<usize> for TokenSeparatedSequence<'arena, T, Tok> {
+impl<T, Tok> std::ops::Index<usize> for TokenSeparatedSequence<'_, T, Tok> {
     type Output = T;
 
     #[inline]
@@ -122,9 +122,9 @@ impl<'arena, T> IntoIterator for Sequence<'arena, T> {
     }
 }
 
-impl<'a, T> IntoIterator for &'a Sequence<'_, T> {
-    type Item = &'a T;
-    type IntoIter = Iter<'a, T>;
+impl<'seq, T> IntoIterator for &'seq Sequence<'_, T> {
+    type Item = &'seq T;
+    type IntoIter = Iter<'seq, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -210,7 +210,7 @@ impl<'arena, T, Tok> TokenSeparatedSequence<'arena, T, Tok> {
     }
 }
 
-impl<'arena, T, Tok> TokenSeparatedSequence<'arena, T, Tok>
+impl<T, Tok> TokenSeparatedSequence<'_, T, Tok>
 where
     T: HasSpan,
     Tok: HasPosition,
@@ -239,9 +239,9 @@ impl<'arena, T, Tok> IntoIterator for TokenSeparatedSequence<'arena, T, Tok> {
     }
 }
 
-impl<'a, T, Tok> IntoIterator for &'a TokenSeparatedSequence<'_, T, Tok> {
-    type Item = &'a T;
-    type IntoIter = Iter<'a, T>;
+impl<'seq, T, Tok> IntoIterator for &'seq TokenSeparatedSequence<'_, T, Tok> {
+    type Item = &'seq T;
+    type IntoIter = Iter<'seq, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()

@@ -196,8 +196,8 @@ fn build_ignore_regions(program: &Program<'_>) -> Vec<IgnoreRegion> {
 }
 
 /// Walker context that tracks which ignore regions are used.
-struct IgnoreRegionChecker<'a> {
-    regions: &'a mut [IgnoreRegion],
+struct IgnoreRegionChecker<'regions> {
+    regions: &'regions mut [IgnoreRegion],
 }
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for IgnoreRegionChecker<'_> {

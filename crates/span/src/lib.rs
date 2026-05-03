@@ -54,21 +54,25 @@ pub trait HasSpan {
     fn span(&self) -> Span;
 
     /// A convenience method to get the starting position of the span.
+    #[inline]
     fn start_position(&self) -> Position {
         self.span().start
     }
 
     /// A convenience method to get the starting byte offset of the span.
+    #[inline]
     fn start_offset(&self) -> u32 {
         self.start_position().offset
     }
 
     /// A convenience method to get the ending position of the span.
+    #[inline]
     fn end_position(&self) -> Position {
         self.span().end
     }
 
     /// A convenience method to get the ending byte offset of the span.
+    #[inline]
     fn end_offset(&self) -> u32 {
         self.end_position().offset
     }
@@ -76,18 +80,21 @@ pub trait HasSpan {
 
 impl Position {
     /// Creates a new `Position` from a byte offset.
+    #[inline]
     #[must_use]
     pub const fn new(offset: u32) -> Self {
         Self { offset }
     }
 
     /// Creates a new `Position` with an offset of zero.
+    #[inline]
     #[must_use]
     pub const fn zero() -> Self {
         Self { offset: 0 }
     }
 
     /// Checks if this position is at the start of a file.
+    #[inline]
     #[must_use]
     pub const fn is_zero(&self) -> bool {
         self.offset == 0
@@ -96,6 +103,7 @@ impl Position {
     /// Returns a new position moved forward by the given offset.
     ///
     /// Uses saturating arithmetic to prevent overflow.
+    #[inline]
     #[must_use]
     pub const fn forward(&self, offset: u32) -> Self {
         Self { offset: self.offset.saturating_add(offset) }
@@ -104,12 +112,14 @@ impl Position {
     /// Returns a new position moved backward by the given offset.
     ///
     /// Uses saturating arithmetic to prevent underflow.
+    #[inline]
     #[must_use]
     pub const fn backward(&self, offset: u32) -> Self {
         Self { offset: self.offset.saturating_sub(offset) }
     }
 
     /// Creates a `Range<u32>` starting at this position's offset with a given length.
+    #[inline]
     #[must_use]
     pub const fn range_for(&self, length: u32) -> Range<u32> {
         self.offset..self.offset.saturating_add(length)
@@ -123,18 +133,21 @@ impl Span {
     ///
     /// In debug builds, this will panic if the start and end positions are not
     /// from the same file (unless one is a dummy position).
+    #[inline]
     #[must_use]
     pub const fn new(file_id: FileId, start: Position, end: Position) -> Self {
         Self { file_id, start, end }
     }
 
     /// Creates a new `Span` with a zero-length, starting and ending at the same position.
+    #[inline]
     #[must_use]
     pub const fn zero() -> Self {
         Self { file_id: FileId::zero(), start: Position::zero(), end: Position::zero() }
     }
 
     /// Creates a "dummy" span with a null file ID.
+    #[inline]
     #[must_use]
     pub fn dummy(start_offset: u32, end_offset: u32) -> Self {
         Self::new(FileId::zero(), Position::new(start_offset), Position::new(end_offset))
@@ -142,12 +155,14 @@ impl Span {
 
     /// Creates a new span that starts at the beginning of the first span
     /// and ends at the conclusion of the second span.
+    #[inline]
     #[must_use]
     pub fn between(start: Span, end: Span) -> Self {
         start.join(end)
     }
 
     /// Checks if this span is a zero-length span, meaning it starts and ends at the same position.
+    #[inline]
     #[must_use]
     pub const fn is_zero(&self) -> bool {
         self.start.is_zero() && self.end.is_zero()
@@ -155,6 +170,7 @@ impl Span {
 
     /// Creates a new span that encompasses both `self` and `other`.
     /// The new span starts at `self.start` and ends at `other.end`.
+    #[inline]
     #[must_use]
     pub fn join(self, other: Span) -> Span {
         Span::new(self.file_id, self.start, other.end)
@@ -162,6 +178,7 @@ impl Span {
 
     /// Creates a new span that starts at the beginning of this span
     /// and ends at the specified position.
+    #[inline]
     #[must_use]
     pub fn to_end(&self, end: Position) -> Span {
         Span::new(self.file_id, self.start, end)
@@ -169,6 +186,7 @@ impl Span {
 
     /// Creates a new span that starts at the specified position
     /// and ends at the end of this span.
+    #[inline]
     #[must_use]
     pub fn from_start(&self, start: Position) -> Span {
         Span::new(self.file_id, start, self.end)
@@ -176,29 +194,34 @@ impl Span {
 
     /// Creates a new span that is a subspan of this span, defined by the given byte offsets.
     /// The `start` and `end` parameters are relative to the start of this span.
+    #[inline]
     #[must_use]
     pub fn subspan(&self, start: u32, end: u32) -> Span {
         Span::new(self.file_id, self.start.forward(start), self.start.forward(end))
     }
 
     /// Checks if a position is contained within this span's byte offsets.
+    #[inline]
     pub fn contains(&self, position: &impl HasPosition) -> bool {
         self.has_offset(position.offset())
     }
 
     /// Checks if a raw byte offset is contained within this span.
+    #[inline]
     #[must_use]
     pub fn has_offset(&self, offset: u32) -> bool {
         self.start.offset <= offset && offset <= self.end.offset
     }
 
     /// Converts the span to a `Range<u32>` of its byte offsets.
+    #[inline]
     #[must_use]
     pub fn to_range(&self) -> Range<u32> {
         self.start.offset..self.end.offset
     }
 
     /// Converts the span to a `Range<usize>` of its byte offsets.
+    #[inline]
     #[must_use]
     pub fn to_range_usize(&self) -> Range<usize> {
         let start = self.start.offset as usize;
@@ -208,43 +231,51 @@ impl Span {
     }
 
     /// Converts the span to a tuple of byte offsets.
+    #[inline]
     #[must_use]
     pub fn to_offset_tuple(&self) -> (u32, u32) {
         (self.start.offset, self.end.offset)
     }
 
     /// Returns the length of the span in bytes.
+    #[inline]
     #[must_use]
     pub fn length(&self) -> u32 {
         self.end.offset.saturating_sub(self.start.offset)
     }
 
+    #[inline]
     pub fn is_before(&self, other: &impl HasPosition) -> bool {
         self.end.offset <= other.position().offset
     }
 
+    #[inline]
     pub fn is_after(&self, other: &impl HasPosition) -> bool {
         self.start.offset >= other.position().offset
     }
 }
 
 impl HasPosition for Position {
+    #[inline]
     fn position(&self) -> Position {
         *self
     }
 }
 
 impl HasSpan for Span {
+    #[inline]
     fn span(&self) -> Span {
         *self
     }
 }
 
 impl RangeBounds<u32> for Span {
+    #[inline]
     fn start_bound(&self) -> Bound<&u32> {
         Bound::Included(&self.start.offset)
     }
 
+    #[inline]
     fn end_bound(&self) -> Bound<&u32> {
         Bound::Excluded(&self.end.offset)
     }
@@ -253,12 +284,14 @@ impl RangeBounds<u32> for Span {
 /// A blanket implementation that allows any `HasSpan` type to also be treated
 /// as a `HasPosition` type, using the span's start as its position.
 impl<T: HasSpan> HasPosition for T {
+    #[inline]
     fn position(&self) -> Position {
         self.start_position()
     }
 }
 
 impl HasFileId for Span {
+    #[inline]
     fn file_id(&self) -> FileId {
         self.file_id
     }
@@ -266,6 +299,7 @@ impl HasFileId for Span {
 
 /// Ergonomic blanket impl for references.
 impl<T: HasSpan> HasSpan for &T {
+    #[inline]
     fn span(&self) -> Span {
         (*self).span()
     }
@@ -273,24 +307,28 @@ impl<T: HasSpan> HasSpan for &T {
 
 /// Ergonomic blanket impl for boxed values.
 impl<T: HasSpan> HasSpan for Box<T> {
+    #[inline]
     fn span(&self) -> Span {
         self.as_ref().span()
     }
 }
 
 impl From<Span> for Range<u32> {
+    #[inline]
     fn from(span: Span) -> Range<u32> {
         span.to_range()
     }
 }
 
 impl From<&Span> for Range<u32> {
+    #[inline]
     fn from(span: &Span) -> Range<u32> {
         span.to_range()
     }
 }
 
 impl From<Span> for Range<usize> {
+    #[inline]
     fn from(span: Span) -> Range<usize> {
         let start = span.start.offset as usize;
         let end = span.end.offset as usize;
@@ -300,6 +338,7 @@ impl From<Span> for Range<usize> {
 }
 
 impl From<&Span> for Range<usize> {
+    #[inline]
     fn from(span: &Span) -> Range<usize> {
         let start = span.start.offset as usize;
         let end = span.end.offset as usize;
@@ -309,18 +348,21 @@ impl From<&Span> for Range<usize> {
 }
 
 impl From<Position> for u32 {
+    #[inline]
     fn from(position: Position) -> u32 {
         position.offset
     }
 }
 
 impl From<&Position> for u32 {
+    #[inline]
     fn from(position: &Position) -> u32 {
         position.offset
     }
 }
 
 impl From<u32> for Position {
+    #[inline]
     fn from(offset: u32) -> Self {
         Position { offset }
     }
@@ -329,6 +371,7 @@ impl From<u32> for Position {
 impl std::ops::Add<u32> for Position {
     type Output = Position;
 
+    #[inline]
     fn add(self, rhs: u32) -> Self::Output {
         self.forward(rhs)
     }
@@ -337,12 +380,14 @@ impl std::ops::Add<u32> for Position {
 impl std::ops::Sub<u32> for Position {
     type Output = Position;
 
+    #[inline]
     fn sub(self, rhs: u32) -> Self::Output {
         self.backward(rhs)
     }
 }
 
 impl std::ops::AddAssign<u32> for Position {
+    #[inline]
     fn add_assign(&mut self, rhs: u32) {
         self.offset = self.offset.saturating_add(rhs);
     }
@@ -350,18 +395,21 @@ impl std::ops::AddAssign<u32> for Position {
 
 impl std::ops::SubAssign<u32> for Position {
     /// Moves the position backward in-place.
+    #[inline]
     fn sub_assign(&mut self, rhs: u32) {
         self.offset = self.offset.saturating_sub(rhs);
     }
 }
 
 impl std::fmt::Display for Position {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.offset)
     }
 }
 
 impl std::fmt::Display for Span {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}..{}", self.start.offset, self.end.offset)
     }

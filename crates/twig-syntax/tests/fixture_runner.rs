@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::else_if_without_else)]
+
 //! Drives the crate's parser against the upstream Twig fixture corpus.
 //!
 //! Each fixture is a `.test` file with the format popularised by Twig's own

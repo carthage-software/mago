@@ -14,9 +14,9 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
-use mago_codex::ttype::expander::{self};
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
@@ -500,33 +500,33 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
             ) {
                 if has_magic_method {
                     return Some(resolved);
-                } else {
-                    let magic_method_name = if for_assignment { "__set" } else { "__get" };
-                    if declaring_class_metadata.flags.is_final() {
-                        report_non_existent_mixin_property(
-                            context,
-                            object_expr.span(),
-                            selector.span(),
-                            declaring_class_id,
-                            prop_name,
-                            resolved.declaring_class_id.unwrap_or(declaring_class_id),
-                            magic_method_name,
-                        );
-                        result.has_invalid_path = true;
-                    } else {
-                        report_possibly_non_existent_mixin_property(
-                            context,
-                            object_expr.span(),
-                            selector.span(),
-                            declaring_class_id,
-                            prop_name,
-                            resolved.declaring_class_id.unwrap_or(declaring_class_id),
-                            magic_method_name,
-                        );
-                    }
-
-                    return Some(resolved);
                 }
+
+                let magic_method_name = if for_assignment { "__set" } else { "__get" };
+                if declaring_class_metadata.flags.is_final() {
+                    report_non_existent_mixin_property(
+                        context,
+                        object_expr.span(),
+                        selector.span(),
+                        declaring_class_id,
+                        prop_name,
+                        resolved.declaring_class_id.unwrap_or(declaring_class_id),
+                        magic_method_name,
+                    );
+                    result.has_invalid_path = true;
+                } else {
+                    report_possibly_non_existent_mixin_property(
+                        context,
+                        object_expr.span(),
+                        selector.span(),
+                        declaring_class_id,
+                        prop_name,
+                        resolved.declaring_class_id.unwrap_or(declaring_class_id),
+                        magic_method_name,
+                    );
+                }
+
+                return Some(resolved);
             }
         }
 
@@ -708,7 +708,7 @@ pub fn localize_property_type(
 
     inferred_type_replacer::replace(
         class_property_type,
-        &TemplateResult::new(Default::default(), template_types),
+        &TemplateResult::new(IndexMap::default(), template_types),
         context.codebase,
     )
 }
@@ -1311,7 +1311,7 @@ fn find_property_in_intersection_types(
                     });
                 }
             }
-            _ => continue,
+            _ => {}
         }
     }
 

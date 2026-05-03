@@ -12,7 +12,7 @@ use crate::reference::SymbolReferences;
 /// Assumes the parent is already populated.
 pub fn merge_interface_metadata_from_parent_interface(
     metadata: &mut ClassLikeMetadata,
-    codebase: &mut CodebaseMetadata,
+    codebase: &CodebaseMetadata,
     parent_interface: Atom,
     symbol_references: &mut SymbolReferences,
 ) {
@@ -45,7 +45,7 @@ pub fn merge_interface_metadata_from_parent_interface(
 /// Assumes the parent is already populated.
 pub fn merge_metadata_from_parent_class_like(
     metadata: &mut ClassLikeMetadata,
-    codebase: &mut CodebaseMetadata,
+    codebase: &CodebaseMetadata,
     parent_class: Atom,
     symbol_references: &mut SymbolReferences,
 ) {
@@ -86,7 +86,7 @@ pub fn merge_metadata_from_parent_class_like(
 /// Assumes the parent is already populated.
 pub fn merge_metadata_from_required_class_like(
     metadata: &mut ClassLikeMetadata,
-    codebase: &mut CodebaseMetadata,
+    codebase: &CodebaseMetadata,
     parent_class: Atom,
     symbol_references: &mut SymbolReferences,
 ) {
@@ -105,7 +105,7 @@ pub fn merge_metadata_from_required_class_like(
 /// Assumes the trait is already populated.
 pub fn merge_metadata_from_trait(
     metadata: &mut ClassLikeMetadata,
-    codebase: &mut CodebaseMetadata,
+    codebase: &CodebaseMetadata,
     trait_name: Atom,
     symbol_references: &mut SymbolReferences,
 ) {

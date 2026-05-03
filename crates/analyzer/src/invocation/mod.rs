@@ -308,10 +308,10 @@ impl<'ctx> InvocationTarget<'ctx> {
     }
 }
 
-impl<'a> InvocationTargetParameter<'a> {
+impl<'ctx> InvocationTargetParameter<'ctx> {
     /// Gets the type (`TUnion`) of the parameter.
     #[inline]
-    pub fn get_out_type(&self) -> Option<&'a TUnion> {
+    pub fn get_out_type(&self) -> Option<&'ctx TUnion> {
         match self {
             InvocationTargetParameter::FunctionLike(metadata) => {
                 metadata.out_type.as_ref().map(|type_metadata| &type_metadata.type_union)
@@ -322,7 +322,7 @@ impl<'a> InvocationTargetParameter<'a> {
 
     /// Gets the type (`TUnion`) of the parameter.
     #[inline]
-    pub fn get_type(&self) -> Option<&'a TUnion> {
+    pub fn get_type(&self) -> Option<&'ctx TUnion> {
         match self {
             InvocationTargetParameter::FunctionLike(metadata) => {
                 metadata.get_type_metadata().map(|type_metadata| &type_metadata.type_union)
@@ -334,7 +334,7 @@ impl<'a> InvocationTargetParameter<'a> {
     /// Gets the name of the parameter as a `VariableIdentifier`, if available
     /// (primarily for `FunctionLike` parameters).
     #[inline]
-    pub fn get_name(&self) -> Option<&'a VariableIdentifier> {
+    pub fn get_name(&self) -> Option<&'ctx VariableIdentifier> {
         // Changed to &'a
         match self {
             InvocationTargetParameter::FunctionLike(metadata) => Some(metadata.get_name()),
@@ -372,7 +372,7 @@ impl<'a> InvocationTargetParameter<'a> {
 
     /// Get the default value type for the parameter
     #[inline]
-    pub fn get_default_type(&self) -> Option<&'a TUnion> {
+    pub fn get_default_type(&self) -> Option<&'ctx TUnion> {
         match self {
             InvocationTargetParameter::FunctionLike(metadata) => {
                 metadata.get_default_type().map(|type_metadata| &type_metadata.type_union)

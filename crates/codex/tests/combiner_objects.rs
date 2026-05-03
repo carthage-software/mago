@@ -128,7 +128,7 @@ fn generic_int_or_lit_int_absorbs() {
 #[test]
 fn generic_with_many_distinct_params_combine() {
     let inputs: Vec<_> =
-        (0..10_i64).map(|i| t_generic_named("Container", vec![TUnion::from_atomic(t_lit_int(i))])).collect();
+        (0..10i64).map(|i| t_generic_named("Container", vec![TUnion::from_atomic(t_lit_int(i))])).collect();
     let r = combine_default(inputs);
     assert_eq!(r.len(), 1);
 }

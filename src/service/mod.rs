@@ -579,6 +579,12 @@ impl IssueProcessor {
 
                             bugs += 1;
                         }
+                        _ => {
+                            tracing::error!("Unexpected edit application result for `{}` (issue: `{rule_code}`). This is a bug in Mago.", file.name.as_ref());
+                            tracing::error!("Please report this issue at {}", ISSUE_URL);
+
+                            bugs += 1;
+                        }
                     }
                 }
 

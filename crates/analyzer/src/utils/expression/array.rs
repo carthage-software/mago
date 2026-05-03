@@ -91,7 +91,7 @@ impl<'ast, 'arena> From<&'ast ArrayAppend<'arena>> for ArrayTarget<'ast, 'arena>
 
 pub(crate) fn get_array_target_type_given_index<'ctx>(
     context: &mut Context<'ctx, '_>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     access_span: Span,
     access_array_span: Span,
     access_index_span: Option<Span>,
@@ -119,7 +119,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
             Issue::error(format!(
                 "Cannot use `null` as an array index to access element{}.",
                 match extended_var_id {
-                    Some(var) => "of variable ".to_string() + var.as_str(),
+                    Some(var) => format!("of variable {var}"),
                     None => String::new(),
                 }
             ))
@@ -137,7 +137,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
             Issue::warning(format!(
                 "Possibly using `null` as an array index to access element{}.",
                 match extended_var_id {
-                    Some(var) => "of variable ".to_string() + var.as_str(),
+                    Some(var) => format!("of variable {var}"),
                     None => String::new(),
                 }
             ))
@@ -568,7 +568,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
 
 pub(crate) fn handle_array_access_on_list<'ctx>(
     context: &mut Context<'ctx, '_>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     span: Option<Span>,
     list: &TAtomic,
     dim_type: &TUnion,
@@ -596,7 +596,7 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
     );
 
     // Accept a wider index type (e.g., `array<1, T>` indexed by `int`) as long as the key type
-    // is contained by the index type — the access is type-valid, even if the specific key may
+    // is contained by the index type; the access is type-valid, even if the specific key may
     // not be present at runtime.
     let expected_contained_by_index = !index_type_contained_by_expected
         && !expected_key_type.is_never()
@@ -744,13 +744,14 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
             elem_type
         };
     }
+    // not a list shape; fall through to the mixed default
 
     get_mixed()
 }
 
 pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
     context: &mut Context<'ctx, '_>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     span: Span,
     keyed_array: &TAtomic,
     index_type: &TUnion,
@@ -801,7 +802,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
 
     // Also accept when the expected key type is contained by the provided index type, i.e., the
     // index is a wider superset of the possible keys (e.g., `array<1, T>` indexed by `int`).
-    // Such an access is not a type error — it may simply fail to find the key at runtime, which
+    // Such an access is not a type error; it may simply fail to find the key at runtime, which
     // is a separate concern (handled via the known-items / undefined-key path below).
     // Skip the lenient branch when the expected key type is `never` (empty array): `never` is
     // trivially contained by anything, so allowing it would silently accept indexing an empty
@@ -892,6 +893,8 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
                         *key_in_other_variant = true;
                         expression_type.set_possibly_undefined(true, None);
                     }
+                } else {
+                    // single-variant array with the key required and non-optional; no extra adjustment needed
                 }
 
                 return expression_type;
@@ -1335,7 +1338,7 @@ pub(crate) fn handle_array_access_on_named_object(
 }
 
 pub(crate) fn handle_array_access_on_string(
-    context: &mut Context<'_, '_>,
+    context: &Context<'_, '_>,
     string: TAtomic,
     index_type: &TUnion,
     has_valid_expected_index: &mut bool,
@@ -1383,13 +1386,13 @@ pub(crate) fn handle_array_access_on_string(
 
 pub(crate) fn handle_array_access_on_mixed<'ctx>(
     context: &mut Context<'ctx, '_>,
-    block_context: &mut BlockContext<'ctx>,
+    block_context: &BlockContext<'ctx>,
     span: Span,
     mixed: &TAtomic,
 ) -> TUnion {
     if !block_context.flags.inside_isset() {
         if block_context.flags.inside_assignment() {
-            if let TAtomic::Never = mixed {
+            if matches!(mixed, TAtomic::Never) {
                 context.collector.report_with_code(
                     IssueCode::ImpossibleArrayAssignment,
                     Issue::error(
@@ -1436,7 +1439,7 @@ pub(crate) fn handle_array_access_on_mixed<'ctx>(
         }
     }
 
-    if let TAtomic::Never = mixed {
+    if matches!(mixed, TAtomic::Never) {
         return get_mixed_maybe_from_loop(true);
     }
 

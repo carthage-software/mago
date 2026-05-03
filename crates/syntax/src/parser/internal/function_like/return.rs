@@ -3,7 +3,7 @@ use crate::ast::ast::FunctionLikeReturnTypeHint;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_optional_function_like_return_type_hint(
         &mut self,
     ) -> Result<Option<FunctionLikeReturnTypeHint<'arena>>, ParseError> {

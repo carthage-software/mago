@@ -226,6 +226,7 @@ pub fn statement_has_yield(statement: &Statement) -> bool {
 }
 
 #[inline]
+#[must_use]
 pub fn expression_has_yield(expression: &Expression) -> bool {
     match &expression {
         Expression::Parenthesized(parenthesized) => expression_has_yield(parenthesized.expression),
@@ -248,7 +249,7 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             }
             ArrayElement::Value(value_array_element) => expression_has_yield(value_array_element.value),
             ArrayElement::Variadic(variadic_array_element) => expression_has_yield(variadic_array_element.value),
-            _ => false,
+            ArrayElement::Missing(_) => false,
         }),
         Expression::LegacyArray(legacy_array) => legacy_array.elements.iter().any(|element| match element {
             ArrayElement::KeyValue(key_value_array_element) => {
@@ -256,7 +257,7 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             }
             ArrayElement::Value(value_array_element) => expression_has_yield(value_array_element.value),
             ArrayElement::Variadic(variadic_array_element) => expression_has_yield(variadic_array_element.value),
-            _ => false,
+            ArrayElement::Missing(_) => false,
         }),
         Expression::List(list) => list.elements.iter().any(|element| match element {
             ArrayElement::KeyValue(key_value_array_element) => {
@@ -264,7 +265,7 @@ pub fn expression_has_yield(expression: &Expression) -> bool {
             }
             ArrayElement::Value(value_array_element) => expression_has_yield(value_array_element.value),
             ArrayElement::Variadic(variadic_array_element) => expression_has_yield(variadic_array_element.value),
-            _ => false,
+            ArrayElement::Missing(_) => false,
         }),
         Expression::ArrayAccess(array_access) => {
             expression_has_yield(array_access.array) || expression_has_yield(array_access.index)

@@ -77,6 +77,7 @@ use crate::utils::str_is_numeric;
 /// These constants (`true`, `false`, `null`) are parsed as `Literal` nodes when bare,
 /// but become `ConstantAccess` nodes when accessed via FQN (e.g. `\true`).
 #[inline]
+#[must_use]
 pub fn get_literal_constant_type(name: &str) -> Option<TUnion> {
     let name = name.strip_prefix('\\').unwrap_or(name);
 
@@ -119,13 +120,13 @@ pub fn get_platform_constant_type(name: &str) -> Option<TUnion> {
     });
 
     const PHP_INT_MAX_SLICE: &[TAtomic] = &[
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(9_223_372_036_854_775_807))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(2_147_483_647))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(i64::MAX))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(i32::MAX as i64))),
     ];
 
     const PHP_INT_MIN_SLICE: &[TAtomic] = &[
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-9_223_372_036_854_775_808))),
-        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(-2_147_483_648))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(i64::MIN))),
+        TAtomic::Scalar(TScalar::Integer(TInteger::Literal(i32::MIN as i64))),
     ];
 
     const PHP_MAJOR_VERSION_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Integer(TInteger::Range(8, 9)));
@@ -337,14 +338,12 @@ pub(super) fn infer_with_constants<'arena>(
                 return Some(get_string());
             };
 
-            let lhs_string = match lhs_type.get_single_owned() {
-                TAtomic::Scalar(TScalar::String(s)) => s,
-                _ => return Some(get_string()),
+            let TAtomic::Scalar(TScalar::String(lhs_string)) = lhs_type.get_single_owned() else {
+                return Some(get_string());
             };
 
-            let rhs_string = match rhs_type.get_single_owned() {
-                TAtomic::Scalar(TScalar::String(s)) => s,
-                _ => return Some(get_string()),
+            let TAtomic::Scalar(TScalar::String(rhs_string)) = rhs_type.get_single_owned() else {
+                return Some(get_string());
             };
 
             if let (Some(left_val), Some(right_val)) =
@@ -409,6 +408,7 @@ pub(super) fn infer_with_constants<'arena>(
                                     }
                                 }
                             }
+                            #[allow(clippy::unreachable)]
                             _ => {
                                 unreachable!("unexpected bitwise operator: {:?}", operator);
                             }
@@ -433,6 +433,7 @@ pub(super) fn infer_with_constants<'arena>(
                         BinaryOperator::Addition(_) => lhs_val.checked_add(rhs_val),
                         BinaryOperator::Subtraction(_) => lhs_val.checked_sub(rhs_val),
                         BinaryOperator::Multiplication(_) => lhs_val.checked_mul(rhs_val),
+                        #[allow(clippy::modulo_arithmetic)]
                         BinaryOperator::Modulo(_) if rhs_val != 0 => Some(lhs_val % rhs_val),
                         BinaryOperator::Exponentiation(_) if rhs_val >= 0 => lhs_val.checked_pow(rhs_val as u32),
                         BinaryOperator::Division(_) if rhs_val != 0 && lhs_val % rhs_val == 0 => {

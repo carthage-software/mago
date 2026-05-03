@@ -31,6 +31,7 @@ use crate::ttype::union::TUnion;
 /// follows the chain through `lower_bounds` until either a concrete type is
 /// found or a cycle is hit (tracked via `visited_entities`).
 #[must_use]
+#[allow(clippy::implicit_hasher)]
 pub fn get_root_template_type(
     lower_bounds: &HashMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>>,
     parameter_name: Atom,
@@ -93,10 +94,11 @@ pub fn get_most_specific_type_from_bounds(lower_bounds: &[TemplateBound], codeba
     specific_type
 }
 
-/// Selects the bounds that should drive the template parameter's resolved
-/// type. Bounds at deeper appearance depths are usually overshadowed by
-/// shallower ones unless the parameter is invariant (in which case all
-/// bounds at the same argument offset are kept).
+/// Selects the bounds that should drive the template parameter's resolved type.
+///
+/// Bounds at deeper appearance depths are usually overshadowed by shallower ones
+/// unless the parameter is invariant (in which case all bounds at the same argument
+/// offset are kept).
 #[must_use]
 pub fn get_relevant_bounds(lower_bounds: &[TemplateBound]) -> Vec<&TemplateBound> {
     let mut lower_bounds = lower_bounds.iter().collect::<Vec<_>>();

@@ -7,7 +7,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_optional_terminator(&mut self) -> Result<Option<Terminator<'arena>>, ParseError> {
         let next = self.stream.lookahead(0)?;
         Ok(match next.map(|t| t.kind) {
@@ -30,9 +30,9 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             let next = self.stream.lookahead(0)?;
             if matches!(next.map(|t| t.kind), Some(T!["<?php" | "<?"])) {
                 return Ok(Terminator::TagPair(closing_tag, self.parse_opening_tag()?));
-            } else {
-                return Ok(Terminator::ClosingTag(closing_tag));
             }
+
+            return Ok(Terminator::ClosingTag(closing_tag));
         }
 
         let Some(next) = self.stream.lookahead(0)? else {

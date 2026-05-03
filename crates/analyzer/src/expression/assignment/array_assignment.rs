@@ -123,12 +123,12 @@ pub(crate) fn analyze<'ctx, 'arena>(
     }
 
     root_array_type = if !key_values.is_empty() {
-        update_type_with_key_values(context, root_array_type, &current_type, &key_values, &index_type)
+        update_type_with_key_values(context, root_array_type, &current_type, &key_values, index_type.as_ref())
     } else if !root_is_string {
         update_array_assignment_child_type(
             context,
             block_context,
-            &index_type,
+            index_type.as_ref(),
             &current_type,
             root_array_type,
             array_target.span(),
@@ -150,7 +150,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
 
     let root_array_type = Rc::new(root_array_type);
     if let Some(root_var_id) = &root_var_id {
-        block_context.locals.insert(*root_var_id, root_array_type.clone());
+        block_context.locals.insert(*root_var_id, Rc::clone(&root_array_type));
 
         if let Some(constraint) = block_context.by_reference_constraints.get(root_var_id)
             && let Some(constraint_type) = constraint.constraint_type.as_ref()
@@ -215,7 +215,7 @@ pub(crate) fn update_type_with_key_values(
     mut new_type: TUnion,
     current_type: &TUnion,
     key_values: &Vec<TAtomic>,
-    key_type: &Option<Rc<TUnion>>,
+    key_type: Option<&Rc<TUnion>>,
 ) -> TUnion {
     let mut has_matching_item = false;
 
@@ -235,7 +235,7 @@ fn update_atomic_given_key(
     context: &Context<'_, '_>,
     mut atomic_type: TAtomic,
     key_values: &Vec<TAtomic>,
-    key_type: &Option<Rc<TUnion>>,
+    key_type: Option<&Rc<TUnion>>,
     has_matching_item: &mut bool,
     current_type: &TUnion,
 ) -> TAtomic {
@@ -319,7 +319,7 @@ fn update_atomic_given_key(
                         keyed_array.parameters = Some((
                             Arc::new(add_union_type(
                                 array_key_type,
-                                &key_type.as_ref().map_or_else(get_int, |rc| (**rc).clone()),
+                                &key_type.map_or_else(get_int, |rc| (**rc).clone()),
                                 context.codebase,
                                 context.settings.combiner_options(),
                             )),
@@ -368,7 +368,7 @@ fn update_atomic_given_key(
                             let parameters = if list.element_type.is_never() {
                                 None
                             } else {
-                                Some((Arc::new(get_non_negative_int()), list.element_type.clone()))
+                                Some((Arc::new(get_non_negative_int()), Arc::clone(&list.element_type)))
                             };
 
                             let mut known_items = BTreeMap::new();
@@ -417,8 +417,8 @@ fn update_atomic_given_key(
 
 fn update_array_assignment_child_type<'ctx>(
     context: &mut Context<'ctx, '_>,
-    block_context: &mut BlockContext<'ctx>,
-    key_type: &Option<Rc<TUnion>>,
+    block_context: &BlockContext<'ctx>,
+    key_type: Option<&Rc<TUnion>>,
     value_type: &TUnion,
     mut root_type: TUnion,
     target_span: mago_span::Span,
@@ -426,7 +426,7 @@ fn update_array_assignment_child_type<'ctx>(
     let mut collection_types = Vec::new();
     let mut extended_shape = false;
 
-    if let Some(key_type) = &key_type {
+    if let Some(key_type) = key_type {
         // PHP coerces null to empty string '' when used as array key.
         // If the key type contains null, we need to:
         // 1. Remove null from the type
@@ -442,7 +442,7 @@ fn update_array_assignment_child_type<'ctx>(
 
             Rc::new(TUnion::from_vec(types))
         } else {
-            key_type.clone()
+            Rc::clone(key_type)
         };
 
         for original_type in root_type.types.as_ref() {
@@ -691,12 +691,14 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
 
             array_expression_type = Rc::new(atomic);
 
-            artifacts.set_rc_expression_type(array_target.get_array(), array_expression_type.clone());
+            artifacts.set_rc_expression_type(array_target.get_array(), Rc::clone(&array_expression_type));
         } else if let Some(parent_var_id) = parent_var_id
             && let Some(scoped_type) = block_context.locals.get(&parent_var_id).cloned()
         {
-            artifacts.set_rc_expression_type(array_target.get_array(), scoped_type.clone());
+            artifacts.set_rc_expression_type(array_target.get_array(), Rc::clone(&scoped_type));
             array_expression_type = scoped_type;
+        } else {
+            // expression already typed and no scoped parent type to override with; keep current type
         }
 
         let new_index_type = array_target_index_type.clone().unwrap_or(Rc::new(get_non_negative_int()));
@@ -799,8 +801,13 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
             Atom::from(&combined)
         });
 
-        array_expr_type =
-            update_type_with_key_values(context, array_expr_type, last_array_expr_type, &key_values, &index_type);
+        array_expr_type = update_type_with_key_values(
+            context,
+            array_expr_type,
+            last_array_expr_type,
+            &key_values,
+            index_type.as_ref(),
+        );
 
         *last_array_expr_type = array_expr_type.clone();
         last_array_expression_index = array_target.get_index();

@@ -19,6 +19,7 @@ fn get_fingerprint(code: &'static str) -> u64 {
     for statement in &program.statements {
         statement.fingerprint_with_hasher(&mut hasher, &resolved_names, &options);
     }
+
     hasher.finish()
 }
 
@@ -352,7 +353,7 @@ fn test_trailing_comma_in_parameters() {
 #[test]
 fn test_fingerprint_deterministic_multiple_runs() {
     let code = "<?php class Foo { public function bar() {} }";
-    let fingerprints: Vec<u64> = (0..10).map(|_| get_fingerprint(code)).collect();
+    let fingerprints: Vec<u64> = std::iter::repeat_with(|| get_fingerprint(code)).take(10).collect();
 
     for fp in &fingerprints[1..] {
         assert_eq!(*fp, fingerprints[0], "Fingerprints should be deterministic");

@@ -224,7 +224,7 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
         artifacts,
         &invocation,
         &template_result,
-        &Default::default(),
+        &AtomMap::default(),
     );
 
     post_invocation_process(
@@ -241,6 +241,7 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
     Ok(result)
 }
 
+#[allow(clippy::expect_used)]
 fn analyze_method_call<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
@@ -300,7 +301,7 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         Some(context.codebase),
     );
 
-    if is_null_safe && let Some(ref var_id) = this_variable {
+    if is_null_safe && let Some(var_id) = this_variable.as_ref() {
         artifacts
             .true_branch_only_assertions
             .entry((span.start.offset, span.end.offset))
@@ -492,7 +493,7 @@ mod tests {
 
     test_analysis! {
         name = method_call_on_undefined_variable,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             declare(strict_types=1);
@@ -510,7 +511,7 @@ mod tests {
 
     test_analysis! {
         name = method_call_on_non_object,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             declare(strict_types=1);
@@ -528,7 +529,7 @@ mod tests {
 
     test_analysis! {
         name = method_call_on_generic_parameter,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class A
@@ -561,7 +562,7 @@ mod tests {
 
     test_analysis! {
         name = ambiguous_object_method_call,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             declare(strict_types=1);
@@ -578,7 +579,7 @@ mod tests {
 
     test_analysis! {
         name = template_resolution,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -607,7 +608,7 @@ mod tests {
 
     test_analysis! {
         name = intersection_read_write_calls,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             interface ReadHandle {
@@ -638,7 +639,7 @@ mod tests {
 
     test_analysis! {
         name = intersection_template_resolution,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             interface MockObject
@@ -722,7 +723,7 @@ mod tests {
 
     test_analysis! {
         name = calling_method_on_parent_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -783,7 +784,7 @@ mod tests {
 
     test_analysis! {
         name = where_constraints,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             interface Stringable
@@ -889,7 +890,7 @@ mod tests {
 
     test_analysis! {
         name = where_constraints_violation,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**

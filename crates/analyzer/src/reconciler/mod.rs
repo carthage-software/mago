@@ -56,6 +56,7 @@ pub mod simple_negated_assertion_reconciler;
 
 mod macros;
 
+#[allow(clippy::similar_names)]
 pub fn reconcile_keyed_types<'ctx>(
     context: &mut Context<'ctx, '_>,
     new_types: &IndexMap<Atom, AssertionSet>,
@@ -82,7 +83,7 @@ pub fn reconcile_keyed_types<'ctx>(
         let mut cloned_references: AtomSet = AtomSet::default();
         for (reference, referenced) in &block_context.references_in_scope {
             if cloned_references.contains(referenced) {
-                block_context.locals.insert(*referenced, old_locals[referenced].clone());
+                block_context.locals.insert(*referenced, Rc::clone(&old_locals[referenced]));
                 cloned_references.insert(*reference);
             }
         }
@@ -236,6 +237,8 @@ pub fn reconcile_keyed_types<'ctx>(
                 adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
             } else if key_str.contains("->") && !is_equality {
                 adjust_object_property_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context);
+            } else {
+                // plain variable assertion; no parent array or object property to propagate into
             }
 
             if key_str != "$this" {
@@ -301,6 +304,8 @@ pub fn reconcile_keyed_types<'ctx>(
             }
         } else if !has_negation && !has_truthy_or_falsy_or_empty && !has_isset {
             changed_var_ids.insert(*key);
+        } else {
+            // type unchanged and the assertion is one that wouldn't mark the variable changed anyway
         }
 
         if !has_object_array_access {
@@ -317,7 +322,7 @@ pub fn reconcile_keyed_types<'ctx>(
             for reference in &reference_graph[&key_parts_0_atom] {
                 reference.as_str().clone_into(&mut reference_key_parts[0]);
                 let reference_key = atom(&reference_key_parts.join(""));
-                block_context.locals.insert(reference_key, existing_type.clone());
+                block_context.locals.insert(reference_key, Rc::clone(&existing_type));
             }
         }
     }
@@ -613,9 +618,7 @@ fn adjust_object_property_type(
                 Some(intersected) if !intersected.is_never() => {
                     compatible_types.push(base_atomic_type);
                 }
-                _ => {
-                    continue;
-                }
+                _ => {}
             }
         } else {
             compatible_types.push(base_atomic_type);
@@ -662,9 +665,11 @@ fn refine_array_key(key_type: &TUnion) -> TUnion {
 
 static INTEGER_REGEX: LazyLock<Regex> = LazyLock::new(|| unsafe {
     // SAFETY: `unwrap_unchecked` is safe here because the regex is valid and will not panic.
-    Regex::new(r"^[0-9]+$").unwrap_unchecked()
+    Regex::new("^[0-9]+$").unwrap_unchecked()
 });
 
+#[allow(clippy::multiple_unsafe_ops_per_block)]
+#[allow(clippy::semicolon_inside_block)]
 fn add_nested_assertions(
     new_types: &mut IndexMap<Atom, AssertionSet>,
     active_new_types: &mut IndexMap<Atom, HashSet<usize>>,
@@ -691,7 +696,7 @@ fn add_nested_assertions(
                     base_key += key_parts.pop().unwrap_unchecked().as_str();
                     base_key += key_parts.pop().unwrap_unchecked().as_str();
                 }
-            };
+            }
 
             let base_key_atom = atom(&base_key);
             let base_key_set = if let Some(base_key_type) = context.locals.get(&base_key_atom) {
@@ -721,7 +726,7 @@ fn add_nested_assertions(
 
                     key_parts.pop();
 
-                    let new_base_key = base_key.clone() + "[" + array_key.as_str() + "]";
+                    let new_base_key = format!("{base_key}[{array_key}]");
                     let base_key_atom = atom(&base_key);
 
                     let entry = new_types.entry(base_key_atom).or_default();
@@ -773,7 +778,7 @@ fn add_nested_assertions(
                         key_parts.pop().unwrap_unchecked()
                     };
 
-                    let new_base_key = base_key.clone() + "->" + property_name.as_str();
+                    let new_base_key = format!("{base_key}->{property_name}");
                     let base_key_atom = atom(&base_key);
 
                     if !new_types.contains_key(&base_key_atom) {
@@ -828,6 +833,8 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
                     if brackets == 0 {
                         token_found = Some("[");
                     } else {
+                        // SAFETY: `parts` is non-empty here because we always push an initial entry before
+                        // entering this loop, so `last_mut()` is guaranteed to return `Some`.
                         unsafe {
                             parts.last_mut().unwrap_unchecked().push(c);
                         }
@@ -839,6 +846,8 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
                     if brackets == 0 {
                         token_found = Some("]");
                     } else {
+                        // SAFETY: `parts` is non-empty here because we always push an initial entry before
+                        // entering this loop, so `last_mut()` is guaranteed to return `Some`.
                         unsafe {
                             parts.last_mut().unwrap_unchecked().push(c);
                         }
@@ -902,8 +911,10 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
     parts
 }
 
+#[allow(clippy::multiple_unsafe_ops_per_block)]
+#[allow(clippy::semicolon_inside_block)]
 fn get_value_for_key(
-    context: &mut Context<'_, '_>,
+    context: &Context<'_, '_>,
     key: Atom,
     block_context: &mut BlockContext<'_>,
     new_assertions: &IndexMap<Atom, AssertionSet>,
@@ -944,7 +955,7 @@ fn get_value_for_key(
             base_key += key_parts.pop().unwrap_unchecked().as_str();
             base_key += key_parts.pop().unwrap_unchecked().as_str();
         }
-    };
+    }
 
     let base_key_atom = atom(&base_key);
     if let std::collections::hash_map::Entry::Vacant(e) = block_context.locals.entry(base_key_atom) {
@@ -996,7 +1007,7 @@ fn get_value_for_key(
                 ArrayKey::String(atom(&array_key.replace('\'', "")))
             };
 
-            let new_base_key = base_key.clone() + "[" + array_key.as_str() + "]";
+            let new_base_key = format!("{base_key}[{array_key}]");
             let new_base_key_atom = atom(&new_base_key);
 
             if !block_context.locals.contains_key(&new_base_key_atom) {
@@ -1130,7 +1141,7 @@ fn get_value_for_key(
                         new_base_type_candidate.clone()
                     });
 
-                    new_base_type = Some(resulting_type.clone());
+                    new_base_type = Some(Rc::clone(&resulting_type));
                     block_context.locals.insert(new_base_key_atom, resulting_type);
                 }
             }
@@ -1139,7 +1150,7 @@ fn get_value_for_key(
             base_key_atom = new_base_key_atom;
         } else if divider == "->" || divider == "::$" {
             let property_name = key_parts.pop()?;
-            let new_base_key = base_key.clone() + "->" + property_name.as_str();
+            let new_base_key = format!("{base_key}->{property_name}");
             let new_base_key_atom = atom(&new_base_key);
 
             if !block_context.locals.contains_key(&new_base_key_atom) {
@@ -1154,7 +1165,7 @@ fn get_value_for_key(
 
                     let class_property_type: TUnion;
 
-                    if let TAtomic::Null = existing_key_type_part {
+                    if existing_key_type_part == TAtomic::Null {
                         class_property_type = get_null();
                         // TODO(azjezz): maybe we should exclude mixed from isset in loop?
                     } else if let TAtomic::Mixed(_) | TAtomic::GenericParameter(_) | TAtomic::Object(TObject::Any) =
@@ -1181,7 +1192,7 @@ fn get_value_for_key(
                         context.codebase,
                     ));
 
-                    new_base_type = Some(resulting_type.clone());
+                    new_base_type = Some(Rc::clone(&resulting_type));
                     block_context.locals.insert(new_base_key_atom, resulting_type);
                 }
             }
@@ -1253,6 +1264,8 @@ pub(crate) fn trigger_issue_for_impossible(
             } else if assertion_atom == "truthy" {
                 not_operator = false;
                 assertion_atom = atom("falsy");
+            } else {
+                // other assertion atoms don't have a complementary truthy/falsy form to swap into
             }
         }
 

@@ -1,3 +1,5 @@
+#![allow(clippy::pub_use)]
+
 pub use cruet::case::camel::is_camel_case;
 pub use cruet::case::camel::to_camel_case;
 pub use cruet::case::kebab::is_kebab_case;
@@ -42,6 +44,7 @@ pub use cruet::case::train::to_train_case;
 /// assert!(!is_class_case("Foo bar string that is really really long"));
 /// assert!(!is_class_case("Foo Bar Is A Really Really Long String"));
 /// ```
+#[inline]
 #[must_use]
 pub fn is_class_case(test_string: &str) -> bool {
     to_class_case(test_string) == test_string
@@ -70,6 +73,7 @@ pub fn is_class_case(test_string: &str) -> bool {
 /// assert_eq!(to_class_case("Foo_Bar"), "FooBar");
 /// assert_eq!(to_class_case("Foo bar"), "FooBar");
 /// ```
+#[inline]
 #[must_use]
 pub fn to_class_case(non_class_case_string: &str) -> String {
     // grab the prefix, which is the first N - 1 uppercase characters, leaving only one uppercase
@@ -151,6 +155,7 @@ pub fn to_class_case(non_class_case_string: &str) -> String {
 /// assert!(!is_snake_case("FooBarIsAReallyReallyLongStrings"));
 /// assert!(!is_snake_case("foo-bar-string-that-is-really-really-long"));
 /// ```
+#[inline]
 #[must_use]
 pub fn is_snake_case(test_string: &str) -> bool {
     test_string == to_snake_case(test_string)
@@ -176,11 +181,12 @@ pub fn is_snake_case(test_string: &str) -> bool {
 /// assert_eq!(to_snake_case("fooBar3"),  "foo_bar3");
 /// assert_eq!(to_snake_case("lower2upper"),  "lower2upper");
 /// ```
+#[inline]
 #[must_use]
 pub fn to_snake_case(non_snake_case_string: &str) -> String {
-    let mut first_character: bool = true;
-    let mut last_separator: bool = true;
-    let mut result: String = String::with_capacity(non_snake_case_string.len() * 2);
+    let mut first_character = true;
+    let mut last_separator = true;
+    let mut result = String::with_capacity(non_snake_case_string.len() * 2);
 
     for char_with_index in non_snake_case_string.trim_end_matches(|c: char| !c.is_alphanumeric()).char_indices() {
         if char_with_index.1.is_alphanumeric() {
@@ -202,7 +208,10 @@ pub fn to_snake_case(non_snake_case_string: &str) -> String {
             first_character = true;
             last_separator = true;
             result.push('_');
+        } else {
+            // Non-alphanumeric character at the start or after another separator: skip it.
         }
     }
+
     result
 }

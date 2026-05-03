@@ -1,3 +1,7 @@
+#![allow(clippy::unnecessary_struct_initialization)]
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::default_constructed_unit_structs)]
+
 use bumpalo::Bump;
 use std::borrow::Cow;
 use std::fs;

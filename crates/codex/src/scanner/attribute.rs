@@ -13,7 +13,7 @@ use crate::scanner::inference::infer;
 #[inline]
 pub fn scan_attribute_lists<'arena>(
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
-    context: &mut Context<'_, 'arena>,
+    context: &Context<'_, 'arena>,
 ) -> Vec<AttributeMetadata> {
     let mut metadata = vec![];
 
@@ -33,7 +33,7 @@ pub fn scan_attribute_lists<'arena>(
 pub fn get_attribute_flags<'arena>(
     class_like_name: Atom,
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
-    context: &mut Context<'_, 'arena>,
+    context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
     classname: Option<Atom>,
 ) -> Option<AttributeFlags> {

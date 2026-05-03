@@ -30,6 +30,7 @@ impl FunctionReturnTypeProvider for AbsProvider {
         FunctionTarget::ExactMultiple(&["abs", "psl\\math\\abs"])
     }
 
+    #[allow(clippy::similar_names)]
     fn get_return_type(
         &self,
         context: &ProviderContext<'_, '_, '_>,

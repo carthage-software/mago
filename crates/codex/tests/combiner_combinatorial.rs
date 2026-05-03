@@ -7,7 +7,7 @@ use mago_codex::ttype::union::TUnion;
 
 #[test]
 fn int_absorbs_every_literal_in_minus_500_to_500() {
-    for v in -500..=500_i64 {
+    for v in -500..=500i64 {
         assert_combines_to(vec![t_int(), t_lit_int(v)], vec![t_int()]);
         assert_combines_to(vec![t_lit_int(v), t_int()], vec![t_int()]);
     }
@@ -21,7 +21,7 @@ fn unspec_int_absorbs_lit_unspec_lit() {
 
 #[test]
 fn lit_int_self_dedup_for_many_values() {
-    for v in -50..=50_i64 {
+    for v in -50..=50i64 {
         for n in 2..=5 {
             let result = combine_default(vec![t_lit_int(v); n]);
             assert_eq!(result.len(), 1);
@@ -31,8 +31,8 @@ fn lit_int_self_dedup_for_many_values() {
 
 #[test]
 fn distinct_lit_pairs_kept_apart() {
-    for a in -10..=10_i64 {
-        for b in -10..=10_i64 {
+    for a in -10..=10i64 {
+        for b in -10..=10i64 {
             if a == b {
                 continue;
             }
@@ -45,7 +45,7 @@ fn distinct_lit_pairs_kept_apart() {
 #[test]
 fn ranges_with_overlaps_collapse() {
     let cases = [
-        ((0_i64, 10), (5, 15)),
+        ((0i64, 10), (5, 15)),
         ((0, 10), (10, 20)),
         ((0, 10), (11, 20)),
         ((0, 10), (12, 20)),
@@ -67,7 +67,7 @@ fn ranges_with_overlaps_collapse() {
 
 #[test]
 fn from_n_with_lit_n_minus_1_extends_for_many_n() {
-    for n in -50..=50_i64 {
+    for n in -50..=50i64 {
         let result = combine_default(vec![t_int_from(n), t_lit_int(n - 1)]);
         assert_eq!(result.len(), 1);
         assert_eq!(atomic_id_string(&result[0]), atomic_id_string(&t_int_from(n - 1)));
@@ -76,7 +76,7 @@ fn from_n_with_lit_n_minus_1_extends_for_many_n() {
 
 #[test]
 fn to_n_with_lit_n_plus_1_extends_for_many_n() {
-    for n in -50..=50_i64 {
+    for n in -50..=50i64 {
         let result = combine_default(vec![t_int_to(n), t_lit_int(n + 1)]);
         assert_eq!(result.len(), 1);
         assert_eq!(atomic_id_string(&result[0]), atomic_id_string(&t_int_to(n + 1)));
@@ -118,7 +118,7 @@ fn distinct_lit_string_pairs_kept_apart() {
 #[test]
 fn float_absorbs_many_literals() {
     for i in 0..200 {
-        let v = f64::from(i) * 0.5 - 50.0;
+        let v = f64::from(i).mul_add(0.5, -50.0);
         assert_combines_to(vec![t_float(), t_lit_float(v)], vec![t_float()]);
         assert_combines_to(vec![t_lit_float(v), t_float()], vec![t_float()]);
     }
@@ -151,7 +151,7 @@ fn all_bool_triples_collapse() {
 
 #[test]
 fn many_distinct_named_objects_kept_apart() {
-    for n in [3_usize, 5, 10, 20, 50] {
+    for n in [3usize, 5, 10, 20, 50] {
         let inputs: Vec<TAtomic> = (0..n).map(|i| t_named(&format!("Class{i}"))).collect();
         let result = combine_default(inputs);
         assert_eq!(result.len(), n);
@@ -200,7 +200,7 @@ fn n_i64(n: usize) -> i64 {
 
 #[test]
 fn many_distinct_enums_kept_apart() {
-    for n in [3_usize, 5, 10, 20] {
+    for n in [3usize, 5, 10, 20] {
         let inputs: Vec<TAtomic> = (0..n).map(|i| t_enum(&format!("E{i}"))).collect();
         let result = combine_default(inputs);
         assert_eq!(result.len(), n);
@@ -209,7 +209,7 @@ fn many_distinct_enums_kept_apart() {
 
 #[test]
 fn many_distinct_enum_cases_kept_apart() {
-    for n in [3_usize, 5, 10] {
+    for n in [3usize, 5, 10] {
         let inputs: Vec<TAtomic> = (0..n).map(|i| t_enum_case("E", &format!("Case{i}"))).collect();
         let result = combine_default(inputs);
         assert_eq!(result.len(), n);
@@ -237,7 +237,7 @@ fn many_copies_of_simple_atoms_collapse() {
         t_keyed_unsealed(u(t_string()), u(t_int()), false),
     ];
     for atom in &atoms {
-        for n in [2_usize, 5, 10, 20, 50, 100] {
+        for n in [2usize, 5, 10, 20, 50, 100] {
             let result = combine_default(vec![atom.clone(); n]);
             assert_eq!(result.len(), 1, "{n} copies of {atom:?}");
         }
@@ -372,8 +372,8 @@ fn alternating_named_collapses() {
 
 #[test]
 fn n_copies_plus_distinct_int_kept() {
-    for n in [1_usize, 5, 10, 50, 100] {
-        let mut inputs: Vec<TAtomic> = (0..n).map(|_| t_lit_int(0)).collect();
+    for n in [1usize, 5, 10, 50, 100] {
+        let mut inputs: Vec<TAtomic> = std::iter::repeat_with(|| t_lit_int(0)).take(n).collect();
         inputs.push(t_lit_int(1));
         let r = combine_default(inputs);
         assert_eq!(r.len(), 2, "n={n}");

@@ -126,7 +126,10 @@ impl LintRule for SortedIntegerKeysRule {
             keys.push((value, kv.key.span()));
         }
 
-        let is_sorted = keys.windows(2).all(|w| w[0].0 <= w[1].0);
+        let is_sorted = keys.windows(2).all(|w| {
+            let [a, b] = w else { return true };
+            a.0 <= b.0
+        });
         if is_sorted {
             return;
         }

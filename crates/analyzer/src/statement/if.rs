@@ -69,7 +69,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                 || (!final_actions.is_empty() && !final_actions.contains(ControlAction::None))
         };
 
-        let (mut if_conditional_scope, applied_block_context) =
+        let (if_conditional_scope, applied_block_context) =
             conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, self.condition, true)?;
         *block_context = applied_block_context;
 
@@ -139,7 +139,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                         }
 
                         *clause = Clause::new(
-                            Default::default(),
+                            IndexMap::default(),
                             self.condition.span(),
                             self.condition.span(),
                             Some(true),
@@ -233,7 +233,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         analyze_if_statement_block(
             context,
             &mut if_scope,
-            &mut if_conditional_scope,
+            &if_conditional_scope,
             if_block_context,
             block_context,
             artifacts,
@@ -246,7 +246,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         if let Some(redefined) = &if_scope.redefined_variables {
             for (k, v) in redefined {
                 if if_body_assigned_ids.contains_key(k) {
-                    if_body_redefined_snapshot.insert(*k, v.clone());
+                    if_body_redefined_snapshot.insert(*k, Rc::clone(v));
                 }
             }
         }
@@ -254,7 +254,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         if let Some(new_vars) = &if_scope.new_variables {
             for (k, v) in new_vars {
                 if if_body_assigned_ids.contains_key(k) {
-                    if_body_redefined_snapshot.insert(*k, v.clone());
+                    if_body_redefined_snapshot.insert(*k, Rc::clone(v));
                 }
             }
         }
@@ -434,7 +434,7 @@ const fn is_obvious_boolean_condition(condition: &Expression) -> bool {
 fn analyze_if_statement_block<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     if_scope: &mut IfScope<'ctx>,
-    if_conditional_scope: &mut IfConditionalScope<'ctx>,
+    if_conditional_scope: &IfConditionalScope<'ctx>,
     mut if_block_context: BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
@@ -592,6 +592,8 @@ fn analyze_if_statement_block<'ctx, 'arena>(
                 &if_conditional_scope.assigned_in_conditional_variable_ids,
             )?;
         }
+    } else {
+        // branch ends with a `break`; reasonable clauses stay as-is
     }
 
     if !if_scope.negated_types.is_empty() {
@@ -628,6 +630,8 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             loop_scope.variables_possibly_in_scope.extend(variables_possibly_in_scope);
         } else if !has_leaving_statements {
             if_scope.new_variables_possibly_in_scope = variables_possibly_in_scope;
+        } else {
+            // outside any loop scope and the branch leaves; variables don't propagate further
         }
     }
 
@@ -711,7 +715,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
                 }
 
                 *clause = Clause::new(
-                    Default::default(),
+                    IndexMap::default(),
                     else_if_clause.0.span(),
                     else_if_clause.0.span(),
                     Some(true),
@@ -733,7 +737,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
                 }
 
                 clause = Clause::new(
-                    Default::default(),
+                    IndexMap::default(),
                     else_if_clause.0.span(),
                     else_if_clause.0.span(),
                     Some(true),
@@ -978,6 +982,8 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         } else if !has_leaving_statements {
             if_scope.new_variables_possibly_in_scope.extend(variables_possibly_in_scope);
             if_scope.possibly_assigned_variable_ids.extend(possibly_assigned_variable_ids);
+        } else {
+            // outside any loop scope and the branch leaves; variables don't propagate further
         }
     }
 
@@ -1258,7 +1264,7 @@ fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
 
     for variable_id in assigned_in_conditional_variable_ids.keys() {
         if let Some(variable_type) = post_leaving_if_block_context.locals.get(variable_id) {
-            post_if_block_context.locals.insert(*variable_id, variable_type.clone());
+            post_if_block_context.locals.insert(*variable_id, Rc::clone(variable_type));
         }
     }
 
@@ -1266,7 +1272,7 @@ fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
 }
 
 fn update_if_scope<'ctx>(
-    context: &mut Context<'ctx, '_>,
+    context: &Context<'ctx, '_>,
     if_scope: &mut IfScope<'ctx>,
     if_block_context: &mut BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
@@ -1338,7 +1344,7 @@ fn update_if_scope<'ctx>(
                         .locals
                         .iter()
                         .filter(|(variable_id, _)| !outer_block_context.locals.contains_key(*variable_id))
-                        .map(|(variable_id, variable_type)| (*variable_id, variable_type.clone()))
+                        .map(|(variable_id, variable_type)| (*variable_id, Rc::clone(variable_type)))
                         .collect(),
                 );
             }
@@ -1350,7 +1356,7 @@ fn update_if_scope<'ctx>(
         if new_possibly_assigned_variable_ids.contains(variable_id)
             || !newly_reconciled_variable_ids.contains(variable_id)
         {
-            possibly_redefined_variables.insert(*variable_id, variable_type.clone());
+            possibly_redefined_variables.insert(*variable_id, Rc::clone(variable_type));
         }
     }
 
@@ -1516,7 +1522,7 @@ mod tests {
 
     test_analysis! {
         name = conditional_negation,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -1595,7 +1601,7 @@ mod tests {
 
     test_analysis! {
         name = if_narrowing_string_or_null_to_string,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             function takes_string(string $_s): void {}
 
@@ -1629,7 +1635,7 @@ mod tests {
 
     test_analysis! {
         name = if_var_becomes_never_due_to_impossible_condition,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             function takes_string(string $_s): void {}
 
@@ -1651,7 +1657,7 @@ mod tests {
 
     test_analysis! {
         name = if_var_narrowed_then_used_after_with_original_possibilities,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param 'a'|'b' $_ab */
             function expect_a_or_b(string $_ab): void {
@@ -1728,7 +1734,7 @@ mod tests {
 
     test_analysis! {
         name = if_array_is_not_empty_narrowing,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param non-empty-array<int, string> $_non_empty_arr */
             function expect_non_empty_arr(array $_non_empty_arr): void {}
@@ -1745,7 +1751,7 @@ mod tests {
 
     test_analysis! {
         name = if_array_is_empty_narrowing,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @param array{} $_empty_arr */
@@ -1762,7 +1768,7 @@ mod tests {
 
     test_analysis! {
         name = if_else_both_define_var_type_is_union,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             /** @param 1|2 $_one_or_two */
             function expect_one_or_two(int $_one_or_two): void {}
@@ -1822,7 +1828,7 @@ mod tests {
 
     test_analysis! {
         name = if_else_exhaustive_literal_union,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @param 'x'|'y' $_s */
@@ -1855,7 +1861,7 @@ mod tests {
 
     test_analysis! {
         name = if_or_condition_lhs,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @param 'text'|'other' $_s */
@@ -1912,7 +1918,7 @@ mod tests {
 
     test_analysis! {
         name = if_assignment_in_condition_nullable_string,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function get_string_or_null(): null|string
@@ -1978,7 +1984,7 @@ mod tests {
 
     test_analysis! {
         name = nested_if_deep_narrowing_nullable_union,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /** @param 'target' $_s */
@@ -2116,7 +2122,7 @@ mod tests {
 
     test_analysis! {
         name = formula_generated,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             final class Tokenizer
@@ -2150,7 +2156,7 @@ mod tests {
 
     test_analysis! {
         name = eliminate_null_from_variable,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function get_maybe_null(): ?string {
@@ -2291,7 +2297,7 @@ mod tests {
 
     test_analysis! {
         name = if_condition_is_too_complex,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function is_special_case(int $id, int $count, float $score, float $threshold, bool $is_active, bool $is_admin, string $name, string $role, string $permission, string $category): bool {
@@ -2326,7 +2332,7 @@ mod tests {
 
     test_analysis! {
         name = elseif_condition_is_too_complex,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function is_special_case(int $id, int $count, float $score, float $threshold, bool $is_active, bool $is_admin, string $name, string $role, string $permission, string $category): bool {

@@ -41,6 +41,7 @@ pub enum DisallowedTypeEntry {
 
 impl DisallowedTypeEntry {
     /// Returns the name of the disallowed type.
+    #[must_use]
     pub fn name(&self) -> &str {
         match self {
             DisallowedTypeEntry::Simple(name) => name,
@@ -49,6 +50,7 @@ impl DisallowedTypeEntry {
     }
 
     /// Returns the custom help message, if any.
+    #[must_use]
     pub fn help(&self) -> Option<&str> {
         match self {
             DisallowedTypeEntry::Simple(_) => None,

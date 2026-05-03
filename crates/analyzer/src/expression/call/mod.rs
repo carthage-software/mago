@@ -232,8 +232,8 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
 /// When inside a conditional like `if ($obj->isValid())` where `isValid` has method call
 /// assertions like `@phpstan-assert-if-true Statement $this->first()`, this function
 /// narrows the return type of `first()` from `Statement|null` to `Statement`.
-fn apply_method_call_assertions<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn apply_method_call_assertions<'ctx>(
+    context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     this_variable: Option<&str>,
     method_name: Option<Atom>,

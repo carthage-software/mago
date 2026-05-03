@@ -9,7 +9,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse a hash map literal: `{ a: 1, 'b': 2, ...rest }`.
     pub(crate) fn parse_hash_map(&mut self) -> Result<Expression<'arena>, ParseError> {
         let result = self.parse_comma_separated_sequence(

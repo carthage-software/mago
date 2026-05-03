@@ -72,16 +72,16 @@ impl HasSpan for Trivia<'_> {
 /// `Sequence` lives in [`mago_syntax_core`], so PHP-specific helpers are
 /// exposed as an extension trait. `use crate::ast::*;` imports it.
 pub trait TriviaSequenceExt<'arena> {
-    fn comments<'a>(&'a self) -> impl Iterator<Item = &'a Trivia<'arena>>
+    fn comments<'borrow>(&'borrow self) -> impl Iterator<Item = &'borrow Trivia<'arena>>
     where
-        'arena: 'a;
+        'arena: 'borrow;
 }
 
 impl<'arena> TriviaSequenceExt<'arena> for Sequence<'arena, Trivia<'arena>> {
     #[inline]
-    fn comments<'a>(&'a self) -> impl Iterator<Item = &'a Trivia<'arena>>
+    fn comments<'borrow>(&'borrow self) -> impl Iterator<Item = &'borrow Trivia<'arena>>
     where
-        'arena: 'a,
+        'arena: 'borrow,
     {
         self.iter().filter(|trivia| trivia.kind.is_comment())
     }

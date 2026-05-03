@@ -90,7 +90,7 @@ pub(super) fn unwrap_awaitable_array(array: &TArray, context: &ProviderContext<'
                 }
 
                 let parameters = if let Some((key_type, value_type)) = &keyed.parameters {
-                    Some((key_type.clone(), Arc::new(unwrap_awaitable_type(value_type)?)))
+                    Some((Arc::clone(key_type), Arc::new(unwrap_awaitable_type(value_type)?)))
                 } else {
                     None
                 };

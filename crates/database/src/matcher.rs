@@ -83,7 +83,10 @@ impl<S: Clone + AsRef<str>> ExclusionMatcher<S> {
     /// Builds a matcher from a list of patterns and the project's glob
     /// settings.
     ///
-    /// Returns an error if any glob pattern fails to compile.
+    /// # Errors
+    ///
+    /// Returns a [`DatabaseError::InvalidGlobSet`] if any glob pattern fails to compile.
+    #[inline]
     pub fn compile<I>(patterns: I, glob_settings: GlobSettings) -> Result<Self, DatabaseError>
     where
         I: IntoIterator<Item = S>,
@@ -103,6 +106,7 @@ impl<S: Clone + AsRef<str>> ExclusionMatcher<S> {
     }
 
     /// Returns `true` if there are no patterns at all.
+    #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.globs.is_empty() && self.prefixes.is_empty()
@@ -114,6 +118,7 @@ impl<S: Clone + AsRef<str>> ExclusionMatcher<S> {
     /// relative to whatever root the caller considers meaningful (typically
     /// the workspace root for source excludes, or the logical
     /// `File::name` for per-rule excludes).
+    #[inline]
     #[must_use]
     pub fn is_match(&self, file: &str) -> bool {
         if !self.globs.is_empty() && self.globs.is_match(file) {
@@ -143,10 +148,11 @@ fn prefix_matches(file: &str, pattern: &str) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use super::*;
 
-    fn matcher<'a>(patterns: &[&'a str]) -> ExclusionMatcher<&'a str> {
+    fn matcher<'pat>(patterns: &[&'pat str]) -> ExclusionMatcher<&'pat str> {
         ExclusionMatcher::compile(patterns.iter().copied(), GlobSettings::default()).expect("compile")
     }
 

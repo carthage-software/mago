@@ -26,6 +26,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Match<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -41,6 +42,7 @@ impl Fingerprintable for Match<'_> {
 }
 
 impl Fingerprintable for MatchArm<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -55,6 +57,7 @@ impl Fingerprintable for MatchArm<'_> {
 }
 
 impl Fingerprintable for MatchExpressionArm<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -70,6 +73,7 @@ impl Fingerprintable for MatchExpressionArm<'_> {
 }
 
 impl Fingerprintable for MatchDefaultArm<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -82,6 +86,7 @@ impl Fingerprintable for MatchDefaultArm<'_> {
 }
 
 impl Fingerprintable for If<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -95,6 +100,7 @@ impl Fingerprintable for If<'_> {
 }
 
 impl Fingerprintable for IfBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -109,6 +115,7 @@ impl Fingerprintable for IfBody<'_> {
 }
 
 impl Fingerprintable for IfStatementBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -125,6 +132,7 @@ impl Fingerprintable for IfStatementBody<'_> {
 }
 
 impl Fingerprintable for IfStatementBodyElseIfClause<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -138,6 +146,7 @@ impl Fingerprintable for IfStatementBodyElseIfClause<'_> {
 }
 
 impl Fingerprintable for IfStatementBodyElseClause<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -150,6 +159,7 @@ impl Fingerprintable for IfStatementBodyElseClause<'_> {
 }
 
 impl Fingerprintable for IfColonDelimitedBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -169,6 +179,7 @@ impl Fingerprintable for IfColonDelimitedBody<'_> {
 }
 
 impl Fingerprintable for IfColonDelimitedBodyElseIfClause<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -184,6 +195,7 @@ impl Fingerprintable for IfColonDelimitedBodyElseIfClause<'_> {
 }
 
 impl Fingerprintable for IfColonDelimitedBodyElseClause<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -198,6 +210,7 @@ impl Fingerprintable for IfColonDelimitedBodyElseClause<'_> {
 }
 
 impl Fingerprintable for Switch<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -211,6 +224,7 @@ impl Fingerprintable for Switch<'_> {
 }
 
 impl Fingerprintable for SwitchBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -225,6 +239,7 @@ impl Fingerprintable for SwitchBody<'_> {
 }
 
 impl Fingerprintable for SwitchBraceDelimitedBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -240,6 +255,7 @@ impl Fingerprintable for SwitchBraceDelimitedBody<'_> {
 }
 
 impl Fingerprintable for SwitchColonDelimitedBody<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -256,6 +272,7 @@ impl Fingerprintable for SwitchColonDelimitedBody<'_> {
 }
 
 impl Fingerprintable for SwitchCase<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -270,6 +287,7 @@ impl Fingerprintable for SwitchCase<'_> {
 }
 
 impl Fingerprintable for SwitchExpressionCase<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -286,6 +304,7 @@ impl Fingerprintable for SwitchExpressionCase<'_> {
 }
 
 impl Fingerprintable for SwitchDefaultCase<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -301,6 +320,7 @@ impl Fingerprintable for SwitchDefaultCase<'_> {
 }
 
 impl Fingerprintable for SwitchCaseSeparator {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

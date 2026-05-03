@@ -169,20 +169,20 @@ impl StringStyleRule {
             match parts.first() {
                 Some(ConcatPart::Interpolable { span }) => edits.push(TextEdit::insert(span.start_offset(), "\"{")),
                 Some(ConcatPart::Literal { span, .. }) => {
-                    edits.push(TextEdit::replace(span.start_offset()..span.start_offset() + 1, "\""))
+                    edits.push(TextEdit::replace(span.start_offset()..span.start_offset() + 1, "\""));
                 }
                 _ => {}
-            };
+            }
 
             // Handle the end boundary: Make sure we have a double quoted string. If the last part
             // is an expression, it needs a closing `}"`.
             match parts.last() {
                 Some(ConcatPart::Interpolable { span }) => edits.push(TextEdit::insert(span.end_offset(), "}\"")),
                 Some(ConcatPart::Literal { span, .. }) => {
-                    edits.push(TextEdit::replace(span.end_offset() - 1..span.end_offset(), "\""))
+                    edits.push(TextEdit::replace(span.end_offset() - 1..span.end_offset(), "\""));
                 }
                 _ => {}
-            };
+            }
 
             // Handle each boundary between two consecutive parts. The "gap" between them in
             // source code covers the closing quote (if the left side is a literal), the ` . `
@@ -190,7 +190,7 @@ impl StringStyleRule {
             // (if the right side is a literal). We replace the entire gap with the appropriate
             // interpolation glue.
             for pair in parts.windows(2) {
-                let (curr, next) = (&pair[0], &pair[1]);
+                let [curr, next] = pair else { continue };
 
                 let (gap_start, gap_end, glue) = match (curr, next) {
                     (ConcatPart::Literal { span: lhs, .. }, ConcatPart::Literal { span: rhs, .. }) => {
@@ -213,7 +213,11 @@ impl StringStyleRule {
                         // next one back-to-back.
                         (lhs.end_offset(), rhs.start_offset(), "}{")
                     }
-                    _ => unreachable!("`all_fixable` excludes `ConcatPart::Other` branches"),
+                    _ => {
+                        // SAFETY: `all_fixable` excludes `ConcatPart::Other`, so the remaining
+                        // arms above cover every (lhs, rhs) pairing of `Literal` and `Interpolable`.
+                        unsafe { core::hint::unreachable_unchecked() }
+                    }
                 };
 
                 edits.push(TextEdit::replace(gap_start..gap_end, glue));
@@ -269,7 +273,7 @@ impl StringStyleRule {
             }
 
             for pair in parts.windows(2) {
-                let (curr, next) = (&pair[0], &pair[1]);
+                let [curr, next] = pair else { continue };
                 edits.push(boundary_edit_for_to_concat(curr, next));
             }
         });
@@ -289,7 +293,7 @@ fn collect_concat_parts<'arena>(lhs: &Expression<'arena>, rhs: &Expression<'aren
     parts
 }
 
-fn collect_concat_side<'arena>(expr: &Expression<'arena>, parts: &mut Vec<ConcatPart>) {
+fn collect_concat_side(expr: &Expression<'_>, parts: &mut Vec<ConcatPart>) {
     match expr {
         Expression::Binary(binary) if binary.operator.is_concatenation() => {
             collect_concat_side(binary.lhs, parts);
@@ -300,8 +304,8 @@ fn collect_concat_side<'arena>(expr: &Expression<'arena>, parts: &mut Vec<Concat
                 matches!(literal.kind, LiteralStringKind::DoubleQuoted) || !literal.raw.contains(['\\', '$', '"']);
             parts.push(ConcatPart::Literal { span: literal.span, safe_to_double_quote });
         }
-        expr if is_interpolable(expr) => {
-            parts.push(ConcatPart::Interpolable { span: expr.span() });
+        other if is_interpolable(other) => {
+            parts.push(ConcatPart::Interpolable { span: other.span() });
         }
         _ => {
             parts.push(ConcatPart::Other);

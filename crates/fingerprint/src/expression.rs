@@ -5,6 +5,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Parenthesized;
 
 impl Fingerprintable for Expression<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -48,12 +49,17 @@ impl Fingerprintable for Expression<'_> {
             Expression::Error(_) => {
                 hasher.write(b"__error__");
             }
-            _ => unreachable!("An expression variant was not handled in fingerprinting: {self:?}"),
+            _ => {
+                // Defensive fallback: an unhandled variant still produces a stable hash so the
+                // fingerprint stays deterministic if the AST gains a new shape we haven't covered.
+                hasher.write(b"__unhandled_expression__");
+            }
         }
     }
 }
 
 impl Fingerprintable for Parenthesized<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

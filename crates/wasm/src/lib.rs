@@ -43,6 +43,7 @@ use crate::types::WasmSettings;
 mod types;
 
 /// Embedded prelude containing PHP built-in symbols.
+#[allow(clippy::large_include_file)]
 const PRELUDE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/prelude.bin"));
 
 /// Parses a PHP version string into a `PHPVersion`.
@@ -74,7 +75,10 @@ fn parse_php_version(version: &str) -> PHPVersion {
 
 /// Load and decode the embedded prelude.
 fn load_prelude() -> Prelude {
-    Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
+    match Prelude::decode(PRELUDE_BYTES) {
+        Ok(prelude) => prelude,
+        Err(e) => panic!("failed to decode embedded prelude (build artifact corrupted): {e}"),
+    }
 }
 
 fn issue_key(issue: &WasmIssue) -> Option<(String, u32, u32)> {
@@ -83,6 +87,18 @@ fn issue_key(issue: &WasmIssue) -> Option<(String, u32, u32)> {
     Some((code.clone(), ann.start_line, ann.start_column))
 }
 
+/// Runs both the linter and analyzer over `code` using the supplied settings and
+/// returns a deduplicated list of issues to JavaScript.
+///
+/// # Errors
+///
+/// Returns a `JsValue` error string when serializing the issue list back to JavaScript fails,
+/// or when the input file unexpectedly cannot be retrieved from the in-memory database.
+///
+/// # Panics
+///
+/// Panics if the embedded prelude artifact cannot be decoded — that would mean the WASM bundle
+/// was built incorrectly.
 #[wasm_bindgen]
 pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
     let settings: WasmSettings = serde_wasm_bindgen::from_value(settings_js).unwrap_or_default();
@@ -178,7 +194,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
     let file = prelude
         .database
         .get_ref(&file_id)
-        .expect("File should exist in prelude database after being added prior to analysis");
+        .map_err(|e| JsValue::from_str(&format!("internal error: input file missing from prelude database: {e}")))?;
 
     for issue in &analyzer_issues {
         let wasm_issue = WasmIssue::from_issue(issue, file, IssueSource::Analyzer);
@@ -211,6 +227,10 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
 /// # Returns
 ///
 /// A JavaScript array of linter issue objects.
+///
+/// # Errors
+///
+/// Returns a `JsValue` error string when serializing the issue list back to JavaScript fails.
 #[wasm_bindgen]
 pub fn lint(code: String, php_version: &str) -> Result<JsValue, JsValue> {
     let version = parse_php_version(php_version);
@@ -240,6 +260,16 @@ pub fn lint(code: String, php_version: &str) -> Result<JsValue, JsValue> {
 /// # Returns
 ///
 /// A JavaScript array of analyzer issue objects.
+///
+/// # Errors
+///
+/// Returns a `JsValue` error string when serializing the issue list back to JavaScript fails,
+/// or when the input file unexpectedly cannot be retrieved from the in-memory database.
+///
+/// # Panics
+///
+/// Panics if the embedded prelude artifact cannot be decoded — that would mean the WASM bundle
+/// was built incorrectly.
 #[wasm_bindgen]
 pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
     let version = parse_php_version(php_version);
@@ -283,7 +313,7 @@ pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
     let file = prelude
         .database
         .get_ref(&file_id)
-        .expect("File should exist in prelude database after being added prior to analysis");
+        .map_err(|e| JsValue::from_str(&format!("internal error: input file missing from prelude database: {e}")))?;
 
     let wasm_issues: Vec<WasmIssue> =
         issues.iter().map(|i| WasmIssue::from_issue(i, file, IssueSource::Analyzer)).collect();
@@ -301,6 +331,10 @@ pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
 /// # Returns
 ///
 /// The formatted PHP code as a string, or an error if parsing fails.
+///
+/// # Errors
+///
+/// Returns a `JsValue` error string when the input cannot be parsed.
 #[wasm_bindgen]
 pub fn format(code: String, php_version: &str) -> Result<String, JsValue> {
     let version = parse_php_version(php_version);
@@ -321,6 +355,10 @@ pub fn format(code: String, php_version: &str) -> Result<String, JsValue> {
 /// # Returns
 ///
 /// A JavaScript array of rule metadata objects.
+///
+/// # Errors
+///
+/// Returns a `JsValue` error string when serializing the rule list back to JavaScript fails.
 #[wasm_bindgen(js_name = getRules)]
 pub fn get_rules() -> Result<JsValue, JsValue> {
     let settings = LinterSettings::default();
@@ -350,6 +388,10 @@ pub fn get_rules() -> Result<JsValue, JsValue> {
 /// # Returns
 ///
 /// A JavaScript array of plugin metadata objects.
+///
+/// # Errors
+///
+/// Returns a `JsValue` error string when serializing the plugin list back to JavaScript fails.
 #[wasm_bindgen(js_name = getPlugins)]
 pub fn get_plugins() -> Result<JsValue, JsValue> {
     let plugins: Vec<WasmPluginInfo> = available_plugins()
@@ -367,6 +409,10 @@ pub fn get_plugins() -> Result<JsValue, JsValue> {
 }
 
 /// Returns metadata for all linter integrations the playground can toggle.
+///
+/// # Errors
+///
+/// Returns a `JsValue` error string when serializing the integration list back to JavaScript fails.
 #[wasm_bindgen(js_name = getIntegrations)]
 pub fn get_integrations() -> Result<JsValue, JsValue> {
     let integrations: Vec<WasmIntegrationInfo> = [

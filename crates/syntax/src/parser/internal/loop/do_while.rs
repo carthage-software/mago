@@ -3,7 +3,7 @@ use crate::ast::ast::DoWhile;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_do_while(&mut self) -> Result<DoWhile<'arena>, ParseError> {
         Ok(DoWhile {
             r#do: self.expect_keyword(T!["do"])?,

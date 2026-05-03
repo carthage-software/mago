@@ -328,6 +328,7 @@ pub enum IssueCode {
 }
 
 impl IssueCode {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::AbstractClassUsedAsAttribute => "abstract-class-used-as-attribute",
@@ -648,10 +649,12 @@ impl IssueCode {
         }
     }
 
+    #[must_use]
     pub fn as_u16(&self) -> u16 {
         *self as u16
     }
 
+    #[must_use]
     pub fn all() -> &'static [IssueCode] {
         &[
             Self::AbstractClassUsedAsAttribute,
@@ -1330,8 +1333,8 @@ impl std::borrow::Borrow<str> for IssueCode {
     }
 }
 
-impl<'a> std::borrow::Borrow<str> for &'a IssueCode {
-    fn borrow(&self) -> &'a str {
+impl<'code> std::borrow::Borrow<str> for &'code IssueCode {
+    fn borrow(&self) -> &'code str {
         self.as_str()
     }
 }

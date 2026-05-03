@@ -13,7 +13,7 @@ use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_trait_use(&mut self) -> Result<TraitUse<'arena>, ParseError> {
         Ok(TraitUse {
             r#use: self.expect_keyword(T!["use"])?,

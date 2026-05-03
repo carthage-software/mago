@@ -4,7 +4,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::Precedence;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_instantiation(&mut self) -> Result<Instantiation<'arena>, ParseError> {
         Ok(Instantiation {
             new: self.expect_keyword(T!["new"])?,

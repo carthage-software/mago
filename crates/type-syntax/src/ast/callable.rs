@@ -114,7 +114,7 @@ impl HasSpan for CallableTypeParameter<'_> {
                 .or(self.ellipsis)
                 .or(self.variable.as_ref().map(mago_span::HasSpan::span))
                 .or(self.comma)
-                .unwrap(),
+                .unwrap_or_else(Span::zero),
         };
 
         let end = self
@@ -150,6 +150,8 @@ impl std::fmt::Display for CallableTypeParameter<'_> {
             write!(f, "=")?;
         } else if self.ellipsis.is_some() {
             write!(f, "...")?;
+        } else {
+            // No default marker: parameter is required and not variadic.
         }
 
         if let Some(variable) = &self.variable {

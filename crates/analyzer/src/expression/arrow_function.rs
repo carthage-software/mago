@@ -187,6 +187,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
                 } else {
                     signature.return_type = Some(Arc::new(get_void()));
                 }
+            } else {
+                // generator-yielding closure; return type already set above
             }
         }
 
@@ -215,7 +217,7 @@ mod tests {
 
     test_analysis! {
         name = concat_operator_test,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function i_take_float(float $_f): void {}
@@ -256,7 +258,7 @@ mod tests {
 
     test_analysis! {
         name = returns_typed_closure_arrow,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -273,7 +275,7 @@ mod tests {
 
     test_analysis! {
         name = inferred_arrow_function_return_type,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**
@@ -291,7 +293,7 @@ mod tests {
 
     test_analysis! {
         name = arrow_function_returns_never,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function i_never_return(): never {
@@ -314,7 +316,7 @@ mod tests {
 
     test_analysis! {
         name = arrow_function_templates,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             function i_take_int(int $_i): void {}

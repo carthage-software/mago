@@ -19,6 +19,7 @@ use crate::resolver::static_method::resolve_static_method_targets;
 use crate::utils::expression::expression_is_nullsafe;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
+    #[allow(clippy::expect_used)]
     fn analyze<'ctx>(
         &'ast self,
         context: &mut Context<'ctx, 'arena>,
@@ -130,7 +131,7 @@ mod tests {
 
     test_analysis! {
         name = calling_non_static_method_statically_is_ok,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class Example {
@@ -203,7 +204,7 @@ mod tests {
 
     test_analysis! {
         name = calling_static_method_on_interface_string,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             interface Example {
@@ -237,7 +238,7 @@ mod tests {
 
     test_analysis! {
         name = calling_static_method_on_interface_name,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             interface Example {

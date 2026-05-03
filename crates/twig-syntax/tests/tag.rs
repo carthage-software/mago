@@ -1,3 +1,13 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::needless_raw_strings,
+    clippy::needless_raw_string_hashes,
+    clippy::wildcard_in_or_patterns,
+    clippy::match_wildcard_for_single_variants,
+    clippy::unnecessary_semicolon
+)]
+
 //! Focused tests for every Twig tag the parser recognises.
 
 #[path = "common/mod.rs"]

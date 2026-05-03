@@ -136,6 +136,7 @@ pub fn get_formula(
                         } else {
                             match type_assertion {
                                 Assertion::IsType(t) => Assertion::IsNotType(t),
+                                #[allow(clippy::unreachable)]
                                 _ => unreachable!(),
                             }
                         };
@@ -186,6 +187,7 @@ pub fn get_formula(
                         } else {
                             match type_assertion {
                                 Assertion::IsType(t) => Assertion::IsNotType(t),
+                                #[allow(clippy::unreachable)]
                                 _ => unreachable!(),
                             }
                         };
@@ -469,7 +471,7 @@ pub fn get_disjunctive_equality_formula(
     subject: &Expression,
     conditions: Vec<&Expression>,
     assertion_context: AssertionContext<'_, '_>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
     is_identity: bool,
     algebra_thresholds: &AlgebraThresholds,
     formula_size_threshold: u16,
@@ -566,7 +568,7 @@ pub fn negate_or_synthesize(
     clauses: Vec<Clause>,
     conditional: &Expression,
     assertion_context: AssertionContext<'_, '_>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
     algebra_thresholds: &AlgebraThresholds,
     formula_size_threshold: u16,
 ) -> Vec<Clause> {

@@ -183,6 +183,7 @@ impl<'arena> Printer<'arena> {
         doc: Document<'arena>,
         mut should_remeasure: bool,
     ) -> bool {
+        #[allow(clippy::unreachable)]
         let Document::Group(group) = doc else {
             unreachable!();
         };
@@ -210,11 +211,13 @@ impl<'arena> Printer<'arena> {
         if !should_break && self.fits(&cmd, remaining_width) {
             self.commands.push(Command::new(indentation.clone(), Mode::Flat, cmd.document));
         } else {
+            #[allow(clippy::unreachable)]
             let Document::Group(group) = cmd.document else {
                 unreachable!();
             };
 
             if let Some(mut expanded_states) = group.expanded_states {
+                #[allow(clippy::unwrap_used)]
                 let most_expanded = expanded_states.pop().unwrap();
                 if should_break {
                     self.commands.push(Command::new(indentation.clone(), Mode::Break, most_expanded));
@@ -352,8 +355,7 @@ impl<'arena> Printer<'arena> {
         }
     }
 
-    fn handle_fill(&mut self, indentation: Indentation<'arena>, mode: Mode, fill: Fill<'arena>) {
-        let mut fill = fill;
+    fn handle_fill(&mut self, indentation: Indentation<'arena>, mode: Mode, mut fill: Fill<'arena>) {
         let remaining_width = self.remaining_width();
         let original_parts_len = fill.parts().len();
         let (content, whitespace) = fill.drain_out_pair();

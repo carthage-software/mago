@@ -71,7 +71,10 @@ pub fn str_increment(input: &str) -> Option<String> {
                 b'Z' => b'A',
                 b'9' => b'1',
                 _ => {
-                    unreachable!("unexpected character for carry-over: {first_char_of_original_input}");
+                    #[allow(clippy::unreachable)]
+                    {
+                        unreachable!("unexpected character for carry-over: {first_char_of_original_input}");
+                    }
                 }
             };
 
@@ -103,7 +106,10 @@ pub fn str_increment(input: &str) -> Option<String> {
                 bytes[current_idx] = b'0';
             }
             _ => {
-                unreachable!("non-alphanumeric character found post-validation");
+                #[allow(clippy::unreachable)]
+                {
+                    unreachable!("non-alphanumeric character found post-validation");
+                }
             }
         }
     }
@@ -163,12 +169,16 @@ pub fn str_decrement(input: &str) -> Option<String> {
                 bytes[i] = b'z';
 
                 if i == 0 {
+                    // SAFETY: `bytes` is derived from a validated alphanumeric ASCII string,
+                    // so any sub-slice remains valid UTF-8.
                     return Some(unsafe { String::from_utf8_unchecked(bytes[1..].to_vec()) });
                 }
             }
             b'A' => {
                 bytes[i] = b'Z';
                 if i == 0 {
+                    // SAFETY: `bytes` is derived from a validated alphanumeric ASCII string,
+                    // so any sub-slice remains valid UTF-8.
                     return Some(unsafe { String::from_utf8_unchecked(bytes[1..].to_vec()) });
                 }
             }
@@ -176,7 +186,10 @@ pub fn str_decrement(input: &str) -> Option<String> {
                 bytes[i] = b'9';
             }
             _ => {
-                unreachable!("non-alphanumeric character found post-validation during decrement");
+                #[allow(clippy::unreachable)]
+                {
+                    unreachable!("non-alphanumeric character found post-validation during decrement");
+                }
             }
         }
     }

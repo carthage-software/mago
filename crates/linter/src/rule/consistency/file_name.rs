@@ -154,9 +154,9 @@ impl LintRule for FileNameRule {
     }
 }
 
-struct DefinitionCollector<'a> {
-    class_likes: Vec<(&'static str, &'a str, Span)>,
-    functions: Vec<(&'a str, Span)>,
+struct DefinitionCollector<'ast> {
+    class_likes: Vec<(&'static str, &'ast str, Span)>,
+    functions: Vec<(&'ast str, Span)>,
 }
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for DefinitionCollector<'ast> {

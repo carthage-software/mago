@@ -1078,7 +1078,7 @@ pub struct PackageRepository {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum PackageRepositoryPackage {
-    One(InlinePackage),
+    One(Box<InlinePackage>),
     Many(Vec<InlinePackage>),
 }
 
@@ -1142,12 +1142,12 @@ pub enum PearRepositoryType {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum Repository {
-    Composer(ComposerRepository),
-    Vcs(VcsRepository),
-    Path(PathRepository),
-    Artifact(ArtifactRepository),
-    Pear(PearRepository),
-    Package(PackageRepository),
+    Composer(Box<ComposerRepository>),
+    Vcs(Box<VcsRepository>),
+    Path(Box<PathRepository>),
+    Artifact(Box<ArtifactRepository>),
+    Pear(Box<PearRepository>),
+    Package(Box<PackageRepository>),
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]

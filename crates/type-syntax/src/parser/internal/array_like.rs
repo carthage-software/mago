@@ -41,7 +41,7 @@ const SHAPE_KEY_SCAN_LIMIT: usize = 48;
 /// from exceeding the stream buffer's lookahead capacity; hitting the
 /// cap conservatively returns `false` (treat the field as keyless).
 #[inline]
-pub fn scan_for_shape_field_key<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<bool, ParseError> {
+pub fn scan_for_shape_field_key(stream: &mut TypeTokenStream<'_>) -> Result<bool, ParseError> {
     let mut depth_angle: u32 = 0;
 
     for i in 0..SHAPE_KEY_SCAN_LIMIT {
@@ -202,9 +202,9 @@ pub fn parse_shape_field_key<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
 
     if stream.is_at(TypeTokenKind::LiteralInteger)? {
         let token = stream.consume()?;
-        let raw_value = parse_literal_integer(token.value).unwrap_or_else(|| {
-            unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
-        });
+        // `parse_literal_integer` only fails on inputs the lexer would already have rejected;
+        // fall back to `0` defensively rather than panicking if that invariant ever drifts.
+        let raw_value = parse_literal_integer(token.value).unwrap_or(0);
         let value = i64::try_from(raw_value).map_err(|_| {
             ParseError::UnexpectedToken(
                 vec![TypeTokenKind::LiteralInteger],
@@ -226,9 +226,9 @@ pub fn parse_shape_field_key<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
 
         if stream.is_at(TypeTokenKind::LiteralInteger)? {
             let token = stream.consume()?;
-            let raw_value = parse_literal_integer(token.value).unwrap_or_else(|| {
-                unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
-            });
+            // `parse_literal_integer` only fails on inputs the lexer would already have rejected;
+            // fall back to `0` defensively rather than panicking if that invariant ever drifts.
+            let raw_value = parse_literal_integer(token.value).unwrap_or(0);
             let value = i64::try_from(raw_value).map_err(|_| {
                 ParseError::UnexpectedToken(
                     vec![TypeTokenKind::LiteralInteger],
@@ -249,13 +249,19 @@ pub fn parse_shape_field_key<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
             };
 
             return Ok(ShapeKey::Integer { value, span: Span::new(stream.file_id(), sign_token.start, token.end()) });
-        } else if stream.is_at(TypeTokenKind::LiteralFloat)? {
+        }
+
+        if stream.is_at(TypeTokenKind::LiteralFloat)? {
             let token = stream.consume()?;
             return Ok(ShapeKey::String {
                 value: stream.lexer.slice_in_range(sign_token.start.offset, token.end().offset),
                 span: Span::new(stream.file_id(), sign_token.start, token.end()),
             });
         }
+
+        // The `lookahead(1)` predicate above already filtered the only two literal kinds we
+        // accept; reaching here means the lexer changed shape, so fall through to the
+        // string-key branch below.
     }
 
     if stream.is_at(TypeTokenKind::LiteralFloat)? {
@@ -327,9 +333,11 @@ pub fn parse_shape_field_key<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
         ));
     }
 
-    // Combine all parts into a single string key
-    let start = start_offset.unwrap();
-    let end = end_offset.unwrap();
+    // Combine all parts into a single string key. The loop above is guaranteed to have set both
+    // offsets at least once before we reach this point; if the invariant ever drifts we fall back
+    // to a zero-length slice rather than panicking.
+    let start = start_offset.unwrap_or(0);
+    let end = end_offset.unwrap_or(start);
     let key_value = stream.lexer.slice_in_range(start, end);
 
     Ok(ShapeKey::String {

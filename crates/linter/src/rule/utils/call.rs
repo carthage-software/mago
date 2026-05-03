@@ -75,7 +75,7 @@ fn function_name_matches_any<'arena, 'name>(
 }
 
 /// Gets the method name from a method call.
-pub fn get_method_name<'a>(method_call: &'a MethodCall<'a>) -> Option<&'a str> {
+pub fn get_method_name<'arena>(method_call: &MethodCall<'arena>) -> Option<&'arena str> {
     match &method_call.method {
         ClassLikeMemberSelector::Identifier(identifier) => Some(identifier.value),
         _ => None,
@@ -89,7 +89,7 @@ pub fn method_name_equals(method_call: &MethodCall<'_>, name: &str) -> bool {
 
 /// Case-insensitive check against multiple method names.
 /// Returns the matched name from the list if found.
-pub fn method_name_matches_any<'a>(method_call: &MethodCall<'_>, names: &[&'a str]) -> Option<&'a str> {
+pub fn method_name_matches_any<'name>(method_call: &MethodCall<'_>, names: &[&'name str]) -> Option<&'name str> {
     let method_name = get_method_name(method_call)?;
     names.iter().find(|&n| method_name.eq_ignore_ascii_case(n)).copied()
 }

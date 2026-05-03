@@ -82,8 +82,11 @@ pub fn parse_literal_string_in<'arena>(
                 let mut hex_len = 0;
                 // Peek up to 2 hex digits
                 while let Some(peeked) = chars.peek() {
-                    if hex_len < 2 && peeked.is_ascii_hexdigit() {
-                        hex_val = hex_val * 16 + peeked.to_digit(16).unwrap() as u8;
+                    if hex_len < 2
+                        && peeked.is_ascii_hexdigit()
+                        && let Some(digit) = peeked.to_digit(16)
+                    {
+                        hex_val = hex_val * 16 + digit as u8;
                         hex_len += 1;
                         chars.next(); // Consume the digit
                     } else {
@@ -105,8 +108,12 @@ pub fn parse_literal_string_in<'arena>(
                 let mut octal_len = 0;
 
                 while let Some(peeked) = chars.peek() {
-                    if octal_len < 3 && peeked.is_ascii_digit() && *peeked <= '7' {
-                        octal_val = octal_val * 8 + peeked.to_digit(8).unwrap() as u16;
+                    if octal_len < 3
+                        && peeked.is_ascii_digit()
+                        && *peeked <= '7'
+                        && let Some(digit) = peeked.to_digit(8)
+                    {
+                        octal_val = octal_val * 8 + digit as u16;
                         octal_len += 1;
                         chars.next(); // Consume the digit
                     } else {
@@ -233,7 +240,9 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
                 for _ in 0..2 {
                     if let Some(&next) = chars.peek() {
                         if next.is_ascii_hexdigit() {
-                            hex_chars.push(chars.next().unwrap());
+                            if let Some(c) = chars.next() {
+                                hex_chars.push(c);
+                            }
                         } else {
                             break;
                         }
@@ -252,12 +261,16 @@ pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) 
             }
             c if quote_char == Some('"') && c.is_ascii_digit() => {
                 let mut octal = String::new();
-                octal.push(chars.next().unwrap());
+                if let Some(first) = chars.next() {
+                    octal.push(first);
+                }
 
                 for _ in 0..2 {
                     if let Some(&next) = chars.peek() {
                         if next.is_ascii_digit() && next <= '7' {
-                            octal.push(chars.next().unwrap());
+                            if let Some(c) = chars.next() {
+                                octal.push(c);
+                            }
                         } else {
                             break;
                         }
@@ -423,9 +436,9 @@ pub const fn is_part_of_identifier(byte: &u8) -> bool {
 }
 
 /// Scans an identifier starting at `offset` in the byte slice and returns the length.
+///
 /// Assumes the first byte is already validated as a start of identifier.
 /// Returns the total length of the identifier (including the first byte).
-///
 /// Stops at the first byte that is not a valid identifier character.
 #[inline(always)]
 #[must_use]

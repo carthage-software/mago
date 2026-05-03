@@ -10,7 +10,11 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::settings::*;
+use crate::settings::BraceStyle;
+use crate::settings::EndOfLine;
+use crate::settings::FormatSettings;
+use crate::settings::MethodChainBreakingStyle;
+use crate::settings::NullTypeHint;
 
 /// Available formatter presets.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -58,6 +62,7 @@ impl FormatterPreset {
         }
     }
 
+    #[must_use]
     pub const fn description(self) -> &'static str {
         match self {
             Self::Default => "Default preset (PER-CS compatible)",

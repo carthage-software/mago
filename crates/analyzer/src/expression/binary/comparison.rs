@@ -157,6 +157,8 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
             );
 
             reported_general_invalid_operand = true;
+        } else {
+            // both sides are arrays, both non-arrays, or one side is null; no array/non-array mismatch
         }
     }
 
@@ -477,13 +479,15 @@ fn check_comparison_operand<'ast, 'arena>(
             .with_note(format!("If this operand is `false` at runtime, PHP's specific comparison rules for `false` with `{op_str}` will apply."))
             .with_help("Ensure this operand is non-false or that comparison with `false` is intended and handled safely."),
         );
+    } else {
+        // operand isn't null/mixed/false-bearing; no comparison-operand diagnostic to emit
     }
 }
 
 /// Helper to report redundant comparison issues.
 fn report_redundant_comparison<'arena>(
     context: &mut Context<'_, 'arena>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
     binary: &Binary<'arena>,
     comparison_description: &str,
     result_value_str: &str,

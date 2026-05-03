@@ -220,8 +220,8 @@ fn involves_references(expr: &Expression<'_>, var_name: &str) -> bool {
         return true;
     }
 
-    struct RefCaptureChecker<'a> {
-        var_name: &'a str,
+    struct RefCaptureChecker<'name> {
+        var_name: &'name str,
         found: bool,
     }
 

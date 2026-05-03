@@ -6,7 +6,7 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_namespace(&mut self) -> Result<Namespace<'arena>, ParseError> {
         let namespace = self.expect_keyword(T!["namespace"])?;
         let name = match self.stream.peek_kind(0)? {
@@ -39,7 +39,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
                 Ok(statement) => statements.push(statement),
                 Err(err) => self.errors.push(err),
             }
-            // Safety: prevent infinite loop
+            // Forward-progress guard: prevent an infinite loop.
             if self.stream.current_position() == position_before {
                 if let Ok(Some(token)) = self.stream.lookahead(0) {
                     if token.kind == T!["namespace"] {

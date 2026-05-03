@@ -10,6 +10,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Identifier<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -25,6 +26,7 @@ impl Fingerprintable for Identifier<'_> {
 }
 
 impl Fingerprintable for LocalIdentifier<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -40,6 +42,7 @@ impl Fingerprintable for LocalIdentifier<'_> {
 }
 
 impl Fingerprintable for QualifiedIdentifier<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -55,6 +58,7 @@ impl Fingerprintable for QualifiedIdentifier<'_> {
 }
 
 impl Fingerprintable for FullyQualifiedIdentifier<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

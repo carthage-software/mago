@@ -262,6 +262,7 @@ impl<'arena> MemberAccessChain<'arena> {
                         }
                         Expression::Identifier(_) | Expression::ConstantAccess(_) => 6,
                         Expression::Instantiation(_) => 6,
+                        #[allow(clippy::unreachable)]
                         _ => unreachable!(), // We already matched these variants
                     }
                 }

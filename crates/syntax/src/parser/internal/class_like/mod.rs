@@ -19,7 +19,7 @@ pub mod method;
 pub mod property;
 pub mod trait_use;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_interface_with_attributes(
         &mut self,
         attributes: Sequence<'arena, AttributeList<'arena>>,

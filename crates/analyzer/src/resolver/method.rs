@@ -467,6 +467,8 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
                         false,
                     );
                 }
+            } else {
+                // call is on an inherited or interface member with magic call available; no extra diagnostic needed
             }
         }
 
@@ -531,6 +533,8 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
                 ids.push((mixin_metadata, mixin_method_id, mixin_object.clone(), mixin_class_name, mixin_info));
             }
         }
+    } else {
+        // method already resolved on the class itself, or no required-extends/mixins to search
     }
 
     if let Some(intersection_types) = object_type.get_intersection_types() {

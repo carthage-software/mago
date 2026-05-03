@@ -127,11 +127,13 @@ impl<'arena> PartialArgumentList<'arena> {
 
         let mut arguments = Vec::new_in(arena);
         for arg in self.arguments.nodes {
-            arguments.push(match arg {
-                PartialArgument::Positional(p) => Argument::Positional(p),
-                PartialArgument::Named(n) => Argument::Named(n),
-                _ => unreachable!("has_placeholders should have caught this"),
-            });
+            match arg {
+                PartialArgument::Positional(p) => arguments.push(Argument::Positional(p)),
+                PartialArgument::Named(n) => arguments.push(Argument::Named(n)),
+                PartialArgument::Placeholder(_)
+                | PartialArgument::NamedPlaceholder(_)
+                | PartialArgument::VariadicPlaceholder(_) => {}
+            }
         }
 
         ArgumentList {

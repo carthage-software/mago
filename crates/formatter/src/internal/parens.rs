@@ -647,7 +647,7 @@ fn binary_has_explicit_wrapping_parens<'arena>(
         Expression::Parenthesized(parenthesized) => {
             let inner = unwrap_parenthesized(parenthesized.expression);
             match inner {
-                Expression::Binary(binary) if std::ptr::eq(binary as *const _, target as *const _) => true,
+                Expression::Binary(binary) if std::ptr::eq::<Binary<'_>>(binary, target) => true,
                 Expression::Binary(binary) => {
                     binary_has_explicit_wrapping_parens(target, binary.lhs)
                         || binary_has_explicit_wrapping_parens(target, binary.rhs)
@@ -655,7 +655,7 @@ fn binary_has_explicit_wrapping_parens<'arena>(
                 _ => false,
             }
         }
-        Expression::Binary(binary) if std::ptr::eq(binary as *const _, target as *const _) => false,
+        Expression::Binary(binary) if std::ptr::eq::<Binary<'_>>(binary, target) => false,
         Expression::Binary(binary) => {
             binary_has_explicit_wrapping_parens(target, binary.lhs)
                 || binary_has_explicit_wrapping_parens(target, binary.rhs)

@@ -172,7 +172,7 @@ impl<'arena> Format<'arena> for Program<'arena> {
                 Document::Array(arr) => {
                     parts.extend(arr);
                 }
-                doc => parts.push(doc),
+                other => parts.push(other),
             }
         }
 
@@ -241,6 +241,7 @@ impl<'arena> Format<'arena> for Statement<'arena> {
                 Statement::HaltCompiler(h) => h.format(f),
                 Statement::Unset(u) => u.format(f),
                 Statement::Noop(_) => Document::String(";"),
+                #[allow(clippy::unreachable)]
                 _ => unreachable!("A statement variant was not handled in formatter: {self:?}"),
             }
         });
@@ -1022,6 +1023,7 @@ impl<'arena> Format<'arena> for Terminator<'arena> {
                 Terminator::ClosingTag(t) => {
                     Document::Array(vec![in f.arena; Document::Space(Space::soft()), t.format(f)])
                 }
+                #[allow(clippy::unreachable)]
                 Terminator::Missing(span) => {
                     unreachable!("Syntax error: a terminator was expected but missing at {:#?}", span)
                 }
@@ -1776,6 +1778,7 @@ impl<'arena> Format<'arena> for FunctionLikeParameter<'arena> {
             {
                 let mut spaces = Vec::with_capacity_in(padding, f.arena);
                 spaces.resize(padding, b' ');
+                // SAFETY: the buffer holds only ASCII space bytes, which is valid UTF-8.
                 let spaces = Document::String(unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) });
                 contents.push(Document::IfBreak(IfBreak::new(f.arena, spaces, Document::empty()).with_id(list_id)));
             }

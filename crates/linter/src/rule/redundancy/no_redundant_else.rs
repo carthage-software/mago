@@ -49,6 +49,7 @@ impl Config for NoRedundantElseConfig {
     }
 }
 
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 impl LintRule for NoRedundantElseRule {
     type Config = NoRedundantElseConfig;
 
@@ -144,6 +145,7 @@ impl LintRule for NoRedundantElseRule {
     }
 }
 
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 impl NoRedundantElseRule {
     fn make_issue(&self, if_kw_span: Span, trailing_kw_span: Span) -> Issue {
         Issue::new(self.cfg.level(), "The `if` branch always terminates; the trailing branches can be extracted.")

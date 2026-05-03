@@ -27,18 +27,21 @@ pub struct Clause {
 }
 
 impl PartialEq for Clause {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.hash == other.hash
     }
 }
 
 impl Hash for Clause {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.hash.hash(state);
     }
 }
 
 impl Clause {
+    #[inline]
     #[must_use]
     pub fn new(
         possibilities: IndexMap<Atom, IndexMap<u64, Assertion>>,
@@ -59,6 +62,7 @@ impl Clause {
         }
     }
 
+    #[inline]
     #[must_use]
     pub fn remove_possibilities(&self, var_id: Atom) -> Option<Clause> {
         let mut possibilities = self.possibilities.clone();
@@ -79,6 +83,7 @@ impl Clause {
         ))
     }
 
+    #[inline]
     #[must_use]
     pub fn add_possibility(&self, var_id: Atom, new_possibility: IndexMap<u64, Assertion>) -> Clause {
         let mut possibilities = self.possibilities.clone();
@@ -95,6 +100,7 @@ impl Clause {
         )
     }
 
+    #[inline]
     #[must_use]
     pub fn contains(&self, other_clause: &Self) -> bool {
         if other_clause.possibilities.len() > self.possibilities.len() {
@@ -108,6 +114,7 @@ impl Clause {
         })
     }
 
+    #[inline]
     #[must_use]
     pub fn get_impossibilities(&self) -> BTreeMap<Atom, Vec<Assertion>> {
         self.possibilities
@@ -120,6 +127,7 @@ impl Clause {
             .collect()
     }
 
+    #[inline]
     #[must_use]
     pub fn to_atom(&self) -> Atom {
         if self.possibilities.is_empty() {
@@ -202,6 +210,7 @@ fn get_hash(
 }
 
 impl std::fmt::Display for Clause {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_atom())
     }

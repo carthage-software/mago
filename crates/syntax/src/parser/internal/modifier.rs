@@ -4,7 +4,7 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_modifier_sequence(&mut self) -> Result<Sequence<'arena, Modifier<'arena>>, ParseError> {
         let mut modifiers = self.new_vec();
         while let Some(modifier) = self.parse_optional_modifier()? {

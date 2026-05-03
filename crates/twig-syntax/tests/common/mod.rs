@@ -1,3 +1,13 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::needless_raw_strings,
+    clippy::needless_raw_string_hashes,
+    clippy::single_char_lifetime_names,
+    clippy::default_constructed_unit_structs,
+    clippy::indexing_slicing
+)]
+
 //! Shared helpers for the Twig syntax integration tests.
 //!
 //! Included via `#[path = "common/mod.rs"] mod common;` at the top of each

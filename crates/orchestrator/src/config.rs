@@ -25,7 +25,7 @@ use mago_syntax::settings::ParserSettings;
 /// 2. **File Discovery**: Paths, includes, excludes, extensions
 /// 3. **Tool Settings**: Linter, analyzer, guard, formatter configurations
 #[derive(Debug)]
-pub struct OrchestratorConfiguration<'a> {
+pub struct OrchestratorConfiguration<'cfg> {
     /// The PHP version to use for parsing and analysis.
     ///
     /// This determines which language features are recognized and how code is parsed.
@@ -71,13 +71,13 @@ pub struct OrchestratorConfiguration<'a> {
     /// - `"build/*"` - Exclude everything in the build directory
     /// - `"vendor/**"` - Exclude all vendor directories recursively
     /// - `"./cache"` - Exclude a specific directory relative to the workspace root
-    pub excludes: Vec<&'a str>,
+    pub excludes: Vec<&'cfg str>,
 
     /// File extensions to treat as PHP files.
     ///
     /// Only files with these extensions will be processed. The default is typically
     /// just `["php"]`, but you can add others like `"phtml"`, `"php8"`, etc.
-    pub extensions: Vec<&'a str>,
+    pub extensions: Vec<&'cfg str>,
 
     /// Settings for glob pattern matching behavior.
     pub glob: GlobSettings,

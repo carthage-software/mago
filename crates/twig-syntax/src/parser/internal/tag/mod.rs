@@ -30,7 +30,7 @@ pub mod r#use;
 pub mod verbatim;
 pub mod with;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Dispatch a `{% keyword ...` tag to the matching per-tag parser.
     pub(crate) fn parse_tag(
         &mut self,

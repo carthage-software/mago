@@ -8,7 +8,7 @@ use crate::ast::ast::Variable;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_variable(&mut self) -> Result<Variable<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 

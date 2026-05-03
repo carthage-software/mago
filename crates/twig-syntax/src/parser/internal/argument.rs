@@ -1,3 +1,5 @@
+use core::hint::unreachable_unchecked;
+
 use crate::ast::Argument;
 use crate::ast::ArgumentList;
 use crate::ast::NamedArgument;
@@ -7,7 +9,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse an optional `(arg, ...)` list - returns `None` when the next
     /// token is not `(`.
     pub(crate) fn parse_optional_argument_list(&mut self) -> Result<Option<ArgumentList<'arena>>, ParseError> {
@@ -36,7 +38,10 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             let separator = match separator_tok.kind {
                 TwigTokenKind::Equal => NamedArgumentSeparator::Equal(self.stream.span_of(&separator_tok)),
                 TwigTokenKind::Colon => NamedArgumentSeparator::Colon(self.stream.span_of(&separator_tok)),
-                _ => unreachable!(),
+                // SAFETY: `is_named` above guarantees the just-consumed separator is either
+                // `=` or `:`; the two arms above are exhaustive for that contract, so this
+                // branch is provably unreachable and we promise the optimizer can prune it.
+                _ => unsafe { unreachable_unchecked() },
             };
             let value = self.parse_expression()?;
             return Ok(Argument::Named(NamedArgument {

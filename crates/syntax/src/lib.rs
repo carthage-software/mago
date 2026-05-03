@@ -1,3 +1,5 @@
+#![allow(clippy::pub_use, clippy::exhaustive_enums, clippy::semicolon_outside_block, clippy::equatable_if_let)]
+
 pub mod ast;
 pub mod comments;
 pub mod error;

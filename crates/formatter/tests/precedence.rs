@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used, clippy::string_add)]
+
 mod runner {
     use std::borrow::Cow;
 

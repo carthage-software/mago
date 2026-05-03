@@ -8,6 +8,7 @@
 //! `lookahead`, `peek_kind`, `is_at`, `consume`, ...) via `Result`. There is
 //! no deferred-error slot: the parser sees a lex failure the moment it
 //! reaches for a token that cannot be produced.
+#![allow(clippy::missing_errors_doc)]
 
 use mago_syntax_core::parser::LookaheadBuf;
 use std::fmt::Debug;
@@ -185,10 +186,10 @@ impl<'arena> TokenStream<'arena> {
 
         match self.peek_kind(0)? {
             Some(k) if k == kind => self.consume(),
-            Some(_) => {
-                let token = self.lookahead(0)?.unwrap();
-                Err(self.unexpected(Some(token), &[kind]))
-            }
+            Some(_) => match self.lookahead(0)? {
+                Some(token) => Err(self.unexpected(Some(token), &[kind])),
+                None => Err(self.unexpected(None, &[kind])),
+            },
             None => Err(self.unexpected(None, &[kind])),
         }
     }
@@ -260,6 +261,7 @@ impl<'arena> TokenStream<'arena> {
 
     /// Build a `ParseError` describing an unexpected token / EOF.
     #[inline]
+    #[must_use]
     pub fn unexpected(&self, found: Option<TwigToken<'_>>, expected: &[TwigTokenKind]) -> ParseError {
         let msg =
             if expected.is_empty() { "unexpected token".to_string() } else { format!("expected one of {expected:?}") };
@@ -406,6 +408,7 @@ impl HasFileId for TokenStream<'_> {
 }
 
 #[inline]
+#[must_use]
 pub fn looks_like_identifier(s: &str) -> bool {
     let mut chars = s.chars();
     let Some(c) = chars.next() else { return false };
@@ -418,6 +421,7 @@ pub fn looks_like_identifier(s: &str) -> bool {
 /// Keyword token kinds that can also appear in identifier positions
 /// inside Twig templates (e.g. `is`, `in`, `and`, `divisible by`).
 #[inline]
+#[must_use]
 pub fn is_keyword_usable_as_name(kind: TwigTokenKind) -> bool {
     matches!(
         kind,

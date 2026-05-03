@@ -4,7 +4,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigToken;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_types(
         &mut self,
         open_tag_tok: TwigToken<'arena>,

@@ -1,3 +1,4 @@
+use foldhash::HashMap;
 use foldhash::HashSet;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
@@ -157,12 +158,14 @@ impl PropertyConflict {
                 (Some(type1), Some(type2)) => format!("type declaration differs ({type1} vs {type2})"),
                 (Some(type1), None) => format!("type declaration differs ({type1} vs untyped)"),
                 (None, Some(type2)) => format!("type declaration differs (untyped vs {type2})"),
+                #[allow(clippy::unreachable)]
                 (None, None) => unreachable!(),
             },
             PropertyConflict::Default(d1, d2) => match (d1, d2) {
                 (Some(def1), Some(def2)) => format!("default value differs ({def1} vs {def2})"),
                 (Some(def1), None) => format!("default value differs ({def1} vs no default)"),
                 (None, Some(def2)) => format!("default value differs (no default vs {def2})"),
+                #[allow(clippy::unreachable)]
                 (None, None) => unreachable!(),
             },
             PropertyConflict::HookedProperty => {
@@ -1108,6 +1111,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
+#[allow(clippy::unwrap_used)]
 fn check_class_like_extends<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     class_like_metadata: &'ctx ClassLikeMetadata,
@@ -1254,6 +1258,8 @@ fn check_class_like_extends<'ctx, 'arena>(
                         .with_note("A non-`readonly` class can only be extended by another non-`readonly` class.")
                         .with_help(format!("To resolve this, either make the `{using_name}` class non-`readonly`, or extend a different, readonly class.")),
                 );
+            } else {
+                // readonly status matches between parent and child; no inheritance error
             }
 
             if let Some(required_interface) =
@@ -1298,6 +1304,7 @@ fn check_class_like_extends<'ctx, 'arena>(
     }
 }
 
+#[allow(clippy::unwrap_used)]
 fn check_class_like_implements<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     class_like_metadata: &'ctx ClassLikeMetadata,
@@ -1415,6 +1422,7 @@ fn check_class_like_implements<'ctx, 'arena>(
     }
 }
 
+#[allow(clippy::unwrap_used)]
 fn check_class_like_use<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     class_like_metadata: &'ctx ClassLikeMetadata,
@@ -1638,6 +1646,8 @@ fn check_template_parameters<'ctx>(
         .with_help(format!("Remove the extra arguments from the `{inheritance_tag}` tag for `{class_name}`."));
 
         context.collector.report_with_code(IssueCode::ExcessTemplateParameter, issue);
+    } else {
+        // template argument count matches expectation; nothing to report
     }
 
     let own_template_parameters_len = class_like_metadata.template_types.len();
@@ -1754,6 +1764,8 @@ fn check_template_parameters<'ctx>(
                                 .with_note(format!("Because `{parent_name}` is marked `@consistent-templates`, the constraints of its template parameters must be identical in child classes."))
                                 .with_help("Adjust the constraint on the child template parameter to match the parent's."),
                         );
+                    } else {
+                        // child template name resolves to a matching constraint; no inconsistency to report
                     }
                 }
             }
@@ -1764,7 +1776,7 @@ fn check_template_parameters<'ctx>(
                     .or_default()
                     .push(GenericTemplate::new(GenericParent::ClassLike(parent_metadata.name), extended_type));
             } else {
-                let mut template_result = TemplateResult::new(previous_extended_types.clone(), Default::default());
+                let mut template_result = TemplateResult::new(previous_extended_types.clone(), HashMap::default());
                 let mut replaced_template_type = definition_type_replacer::replace(
                     &template_type,
                     &mut template_result,
@@ -2711,6 +2723,7 @@ fn report_signature_compatibility_issue<'ctx>(
     }
 }
 
+#[allow(clippy::similar_names)]
 fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like_metadata: &'ctx ClassLikeMetadata) {
     if class_like_metadata.kind.is_enum() {
         return;
@@ -3502,20 +3515,20 @@ mod tests {
 
     test_analysis! {
         name = direct_interface_incompatible_parameter_name,
-        code = r#"<?php
+        code = "<?php
             interface Sizer {
                 public function getSize(string $document): int;
             }
             class SizerImpl implements Sizer {
                 public function getSize(string $file): int { return 100; }
             }
-        "#,
+        ",
         issues = [IssueCode::IncompatibleParameterName],
     }
 
     test_analysis! {
         name = diamond_inheritance_incompatible_parameter_name,
-        code = r#"<?php
+        code = "<?php
             interface Logger {
                 public function log(string $message): void;
             }
@@ -3524,13 +3537,13 @@ mod tests {
             class CompositeLogger implements FileLogger, DatabaseLogger {
                 public function log(string $entry): void {}
             }
-        "#,
+        ",
         issues = [IssueCode::IncompatibleParameterName],
     }
 
     test_analysis! {
         name = indirect_interface_incompatible_parameter_name,
-        code = r#"<?php
+        code = "<?php
             interface Serializer {
                 public function serialize(mixed $data): string;
             }
@@ -3538,7 +3551,7 @@ mod tests {
             class DefaultJsonSerializer implements JsonSerializer {
                 public function serialize(mixed $payload): string { return ''; }
             }
-        "#,
+        ",
         issues = [IssueCode::IncompatibleParameterName],
     }
 }

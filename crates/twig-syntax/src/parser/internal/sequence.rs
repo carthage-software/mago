@@ -17,7 +17,7 @@ pub(crate) struct DelimitedSequenceResult<'arena, T> {
     pub close: Span,
 }
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse a comma-separated, bracketed sequence - the shape used by
     /// every `[ ... ]`, `( ... )`, and `{ ... }` list in Twig (array literals,
     /// argument lists, macro parameters, arrow parameters, ...).

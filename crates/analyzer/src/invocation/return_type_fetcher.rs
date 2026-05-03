@@ -12,7 +12,7 @@ use crate::invocation::resolver::resolve_invocation_type;
 pub fn fetch_invocation_return_type<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
-    artifacts: &mut AnalysisArtifacts,
+    artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &AtomMap<TUnion>,

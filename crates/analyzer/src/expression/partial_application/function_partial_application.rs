@@ -275,7 +275,7 @@ mod tests {
 
     test_analysis! {
         name = closure_creation_carries_templates,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             /**

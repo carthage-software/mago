@@ -112,8 +112,10 @@ impl FunctionReturnTypeProvider for SelectKeysProvider {
         for key in &selected_keys {
             if let Some(item) = known_items.get(key) {
                 result_items.insert(*key, item.clone());
-            } else if let Some(ref value_type) = generic_value_type {
+            } else if let Some(value_type) = generic_value_type.as_ref() {
                 result_items.insert(*key, (true, value_type.clone()));
+            } else {
+                // key isn't known and there's no fallback value type; drop it from the result
             }
         }
 

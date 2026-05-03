@@ -63,6 +63,7 @@ pub struct AlgebraThresholds {
 }
 
 impl Default for AlgebraThresholds {
+    #[inline]
     fn default() -> Self {
         Self {
             saturation_complexity: DEFAULT_SATURATION_COMPLEXITY,
@@ -107,8 +108,8 @@ impl Default for AlgebraThresholds {
 ///
 /// A new `Vec<Clause>` containing the simplified, owned clauses.
 #[inline]
-pub fn saturate_clauses<'a>(
-    clauses: impl IntoIterator<Item = &'a Clause>,
+pub fn saturate_clauses<'clause>(
+    clauses: impl IntoIterator<Item = &'clause Clause>,
     thresholds: &AlgebraThresholds,
 ) -> Vec<Clause> {
     fn saturate_clauses_inner(
@@ -156,8 +157,14 @@ pub fn saturate_clauses<'a>(
             if is_clause_a_simple {
                 // This is unit propagation: (A) & (!A | B) => (B)
                 // `clause_a` is the unit clause (A).
-                let (&clause_var, var_possibilities) = clause_a.possibilities.iter().next().unwrap();
-                let only_type = var_possibilities.values().next().unwrap();
+                let Some((&clause_var, var_possibilities)) = clause_a.possibilities.iter().next() else {
+                    continue;
+                };
+
+                let Some(only_type) = var_possibilities.values().next() else {
+                    continue;
+                };
+
                 let negated_clause_type = only_type.get_negation();
                 let negated_hash = negated_clause_type.to_hash();
 
@@ -372,14 +379,15 @@ pub fn saturate_clauses<'a>(
 
                     let mut common_negated_keys: HashSet<Atom> = HashSet::default();
                     for common_key in common_keys {
-                        let clause_a_possibilities = &clause_a.possibilities[&common_key];
-                        let clause_b_possibilities = &clause_b.possibilities[&common_key];
+                        let a_possibilities = &clause_a.possibilities[&common_key];
+                        let b_possibilities = &clause_b.possibilities[&common_key];
 
-                        if clause_a_possibilities.len() == 1
-                            && clause_b_possibilities.len() == 1
-                            && clause_a_possibilities.values().next().is_some_and(|a| {
-                                clause_b_possibilities.values().next().is_some_and(|b| a.is_negation_of(b))
-                            })
+                        if a_possibilities.len() == 1
+                            && b_possibilities.len() == 1
+                            && a_possibilities
+                                .values()
+                                .next()
+                                .is_some_and(|a| b_possibilities.values().next().is_some_and(|b| a.is_negation_of(b)))
                         {
                             common_negated_keys.insert(common_key);
                         }
@@ -487,7 +495,10 @@ pub fn find_satisfying_assignments(
         }
 
         // Extract the single variable and its possible assertions.
-        let (variable_id, possible_types) = clause.possibilities.iter().next().unwrap();
+        let Some((variable_id, possible_types)) = clause.possibilities.iter().next() else {
+            continue;
+        };
+
         if variable_id.as_str().starts_with('*') {
             continue;
         }

@@ -46,7 +46,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Use<'arena> {
                 let prefix = mixed_list.namespace.value().trim_start_matches('\\');
                 for maybe_typed_item in mixed_list.items.iter() {
                     let fqn = concat_atom!(prefix, "\\", maybe_typed_item.item.name.value());
-                    check_maybe_typed_import(context, &maybe_typed_item.item.name, &fqn, &maybe_typed_item.r#type);
+                    check_maybe_typed_import(
+                        context,
+                        &maybe_typed_item.item.name,
+                        &fqn,
+                        maybe_typed_item.r#type.as_ref(),
+                    );
                 }
             }
         }
@@ -80,7 +85,7 @@ fn check_maybe_typed_import(
     context: &mut Context<'_, '_>,
     name: &Identifier<'_>,
     fqn: &str,
-    use_type: &Option<UseType<'_>>,
+    use_type: Option<&UseType<'_>>,
 ) {
     match use_type {
         Some(UseType::Function(_)) => {

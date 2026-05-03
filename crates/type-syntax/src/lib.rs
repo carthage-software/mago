@@ -1,4 +1,6 @@
-#![doc = include_str!("./../README.md")]
+#![cfg_attr(doc, doc = include_str!("./../README.md"))]
+#![allow(clippy::pub_use)]
+#![allow(clippy::exhaustive_enums)]
 
 use bumpalo::Bump;
 
@@ -72,6 +74,7 @@ pub fn parse_prefix<'arena>(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use bumpalo::Bump;
 
@@ -1787,7 +1790,7 @@ mod tests {
             Ok(Type::IntRange(range)) => {
                 assert!(matches!(range.min, IntOrKeyword::Int(LiteralIntType { value: 0, .. })));
                 match range.max {
-                    IntOrKeyword::Keyword(ref keyword) => assert!(keyword.value.eq_ignore_ascii_case("int")),
+                    IntOrKeyword::Keyword(keyword) => assert!(keyword.value.eq_ignore_ascii_case("int")),
                     other => panic!("Expected IntOrKeyword::Keyword, got: {other:?}"),
                 }
             }
@@ -1800,7 +1803,7 @@ mod tests {
         match do_parse("int<int, 0>") {
             Ok(Type::IntRange(range)) => {
                 match range.min {
-                    IntOrKeyword::Keyword(ref keyword) => assert!(keyword.value.eq_ignore_ascii_case("int")),
+                    IntOrKeyword::Keyword(keyword) => assert!(keyword.value.eq_ignore_ascii_case("int")),
                     other => panic!("Expected IntOrKeyword::Keyword, got: {other:?}"),
                 }
                 assert!(matches!(range.max, IntOrKeyword::Int(LiteralIntType { value: 0, .. })));
@@ -1928,7 +1931,9 @@ mod tests {
                 GlobalWildcardSelector::StartsWith(identifier, _) => {
                     assert_eq!(identifier.value, "FILTER_FLAG_");
                 }
-                other => panic!("Expected StartsWith selector, got {other:?}"),
+                other @ GlobalWildcardSelector::EndsWith(..) => {
+                    panic!("Expected StartsWith selector, got {other:?}")
+                }
             },
             other => panic!("Expected Type::GlobalWildcardReference, got: {other:?}"),
         }
@@ -1941,7 +1946,9 @@ mod tests {
                 GlobalWildcardSelector::EndsWith(_, identifier) => {
                     assert_eq!(identifier.value, "_SUFFIX");
                 }
-                other => panic!("Expected EndsWith selector, got {other:?}"),
+                other @ GlobalWildcardSelector::StartsWith(..) => {
+                    panic!("Expected EndsWith selector, got {other:?}")
+                }
             },
             other => panic!("Expected Type::GlobalWildcardReference, got: {other:?}"),
         }

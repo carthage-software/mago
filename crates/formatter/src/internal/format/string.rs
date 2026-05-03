@@ -18,7 +18,9 @@ pub(super) fn print_lowercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, ke
         }
     }
 
-    (unsafe { std::str::from_utf8_unchecked(lowercase_bytes.into_bump_slice()) }) as _
+    // SAFETY: every byte pushed into `lowercase_bytes` came from `char::encode_utf8`,
+    // so the buffer holds valid UTF-8.
+    unsafe { std::str::from_utf8_unchecked(lowercase_bytes.into_bump_slice()) }
 }
 
 pub(super) fn print_uppercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, keyword: &'arena str) -> &'arena str {
@@ -34,7 +36,9 @@ pub(super) fn print_uppercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, ke
         }
     }
 
-    (unsafe { std::str::from_utf8_unchecked(uppercase_bytes.into_bump_slice()) }) as _
+    // SAFETY: every byte pushed into `uppercase_bytes` came from `char::encode_utf8`,
+    // so the buffer holds valid UTF-8.
+    unsafe { std::str::from_utf8_unchecked(uppercase_bytes.into_bump_slice()) }
 }
 
 pub(super) fn print_string<'arena>(
@@ -46,6 +50,8 @@ pub(super) fn print_string<'arena>(
     let (prefix, text_without_prefix) =
         if text.starts_with('b') || text.starts_with('B') { (&text[..1], &text[1..]) } else { ("", text) };
 
+    // SAFETY: callers always pass a non-empty string-literal token starting with a quote,
+    // so the iterator yields at least one character.
     let quote = unsafe { text_without_prefix.chars().next().unwrap_unchecked() };
     let raw_text = &text_without_prefix[1..text_without_prefix.len() - 1];
     let enclosing_quote = get_preferred_quote(raw_text, quote, f.settings.single_quote);
@@ -59,6 +65,8 @@ pub(super) fn print_string<'arena>(
             let mut result = Vec::with_capacity_in(inner.len() + 1, f.arena);
             result.extend_from_slice(prefix.as_bytes());
             result.extend_from_slice(inner.as_bytes());
+            // SAFETY: `prefix` is ASCII (`b`/`B`) and `inner` is UTF-8 from `make_string_in`,
+            // so the concatenated bytes remain valid UTF-8.
             unsafe { std::str::from_utf8_unchecked(result.into_bump_slice()) }
         }
     }

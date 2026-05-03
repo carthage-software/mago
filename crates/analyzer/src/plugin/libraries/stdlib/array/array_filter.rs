@@ -1,6 +1,6 @@
 //! `array_filter()` return type provider.
 //!
-//! Narrows the value type(s) of the input array based on the callback — or, with
+//! Narrows the value type(s) of the input array based on the callback; or, with
 //! no callback, PHP's default truthy filter. When the input array has a known
 //! shape (`array{key: T, ...}`), the shape is preserved in the result but each
 //! entry is marked optional (since any entry may be dropped by the filter).
@@ -130,7 +130,7 @@ where
         let mut new_known_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
         for (key, (original_optional, value_type)) in items {
             match filter(value_type.clone()) {
-                FilterOutcome::Removed => continue,
+                FilterOutcome::Removed => {}
                 FilterOutcome::KeptAsRequired(filtered) => {
                     new_known_items.insert(*key, (*original_optional, filtered));
                 }

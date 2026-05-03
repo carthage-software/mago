@@ -5,15 +5,15 @@ use mago_codex::ttype::atomic::TAtomic;
 
 #[test]
 fn every_lit_int_in_int() {
-    for v in -500..=500_i64 {
+    for v in -500..=500i64 {
         assert_atomic_subtype(&t_lit_int(v), &t_int());
     }
 }
 
 #[test]
 fn no_distinct_lit_ints_subtype() {
-    for a in -20..=20_i64 {
-        for b in -20..=20_i64 {
+    for a in -20..=20i64 {
+        for b in -20..=20i64 {
             if a == b {
                 continue;
             }
@@ -24,35 +24,35 @@ fn no_distinct_lit_ints_subtype() {
 
 #[test]
 fn every_positive_lit_in_positive() {
-    for v in 1..=200_i64 {
+    for v in 1..=200i64 {
         assert_atomic_subtype(&t_lit_int(v), &t_positive_int());
     }
 }
 
 #[test]
 fn every_zero_or_positive_in_non_negative() {
-    for v in 0..=200_i64 {
+    for v in 0..=200i64 {
         assert_atomic_subtype(&t_lit_int(v), &t_non_negative_int());
     }
 }
 
 #[test]
 fn every_negative_lit_in_negative() {
-    for v in -200..=-1_i64 {
+    for v in -200..=-1i64 {
         assert_atomic_subtype(&t_lit_int(v), &t_negative_int());
     }
 }
 
 #[test]
 fn every_zero_or_negative_in_non_positive() {
-    for v in -200..=0_i64 {
+    for v in -200..=0i64 {
         assert_atomic_subtype(&t_lit_int(v), &t_non_positive_int());
     }
 }
 
 #[test]
 fn lit_in_range_inclusive() {
-    for lo in [-50_i64, 0, 50] {
+    for lo in [-50i64, 0, 50] {
         for v in (lo + 1)..(lo + 30) {
             assert_atomic_subtype(&t_lit_int(v), &t_int_range(lo, lo + 29));
         }
@@ -61,7 +61,7 @@ fn lit_in_range_inclusive() {
 
 #[test]
 fn lit_in_from() {
-    for n in [-10_i64, 0, 5, 100] {
+    for n in [-10i64, 0, 5, 100] {
         for v in n..(n + 50) {
             assert_atomic_subtype(&t_lit_int(v), &t_int_from(n));
         }
@@ -70,7 +70,7 @@ fn lit_in_from() {
 
 #[test]
 fn lit_below_from_not_subtype() {
-    for n in [0_i64, 5, 100] {
+    for n in [0i64, 5, 100] {
         for v in (n - 50)..n {
             assert_atomic_not_subtype(&t_lit_int(v), &t_int_from(n));
         }
@@ -79,7 +79,7 @@ fn lit_below_from_not_subtype() {
 
 #[test]
 fn lit_in_to() {
-    for n in [-50_i64, 0, 50] {
+    for n in [-50i64, 0, 50] {
         for v in (n - 30)..=n {
             assert_atomic_subtype(&t_lit_int(v), &t_int_to(n));
         }
@@ -118,7 +118,7 @@ fn no_distinct_lit_strs_subtype() {
 #[test]
 fn every_lit_float_in_float() {
     for i in 0..200 {
-        let v = f64::from(i) * 0.5 - 50.0;
+        let v = f64::from(i).mul_add(0.5, -50.0);
         assert_atomic_subtype(&t_lit_float(v), &t_float());
     }
 }
@@ -147,7 +147,7 @@ fn every_atom_eq_self() {
 
 #[test]
 fn list_lit_int_in_list_int_for_many_values() {
-    for v in -50..=50_i64 {
+    for v in -50..=50i64 {
         assert_atomic_subtype(&t_list(u(t_lit_int(v)), false), &t_list(u(t_int()), false));
     }
 }
@@ -163,7 +163,7 @@ fn list_lit_string_in_list_string_for_many_values() {
 #[test]
 fn nullable_int_contains_every_lit() {
     let nullable = u_many(vec![t_int(), null()]);
-    for v in -50..=50_i64 {
+    for v in -50..=50i64 {
         assert_subtype(&u(t_lit_int(v)), &nullable);
     }
 }
@@ -171,7 +171,7 @@ fn nullable_int_contains_every_lit() {
 #[test]
 fn int_or_str_contains_every_lit() {
     let union = u_many(vec![t_int(), t_string()]);
-    for v in -20..=20_i64 {
+    for v in -20..=20i64 {
         assert_subtype(&u(t_lit_int(v)), &union);
     }
     for s in ["a", "b", "c", "hi", "hello"] {

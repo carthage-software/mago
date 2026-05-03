@@ -340,6 +340,7 @@ pub(super) fn print_argument_list<'arena>(
             first_arguments.push(Document::Line(Line::default()));
         }
 
+        #[allow(clippy::unwrap_used)]
         let last_argument = clone_in_arena(f.arena, formatted_arguments.last().unwrap());
 
         return Document::Group(Group::new(vec![
@@ -674,9 +675,9 @@ pub fn should_expand_first_arg<'arena>(
         return false;
     }
 
-    let arguments = argument_list.arguments.as_slice();
-    let first_argument = &arguments[0];
-    let second_argument = &arguments[1];
+    let [first_argument, second_argument] = argument_list.arguments.as_slice() else {
+        return false;
+    };
 
     if f.has_comment(first_argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
         || f.has_comment(second_argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)

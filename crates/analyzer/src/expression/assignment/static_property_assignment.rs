@@ -149,7 +149,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
     if context.settings.memoize_properties
         && let Some(property_access_id) = property_access_id
     {
-        block_context.locals.insert(property_access_id, resulting_type.clone());
+        block_context.locals.insert(property_access_id, Rc::clone(&resulting_type));
     }
 
     artifacts.set_rc_expression_type(property_access, resulting_type);
@@ -180,7 +180,7 @@ mod tests {
 
     test_analysis! {
         name = write_protected_static_property_from_child,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class ParentClass { protected static int $prop = 1; }
             class ChildClass extends ParentClass {
@@ -194,7 +194,7 @@ mod tests {
 
     test_analysis! {
         name = write_private_static_property_from_same_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class PrivateWriteTest {
                 private static int $value = 0;
@@ -222,7 +222,7 @@ mod tests {
 
     test_analysis! {
         name = write_to_undefined_static_property,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class MyClass {}
             MyClass::$undefined = 'new';
@@ -234,7 +234,7 @@ mod tests {
 
     test_analysis! {
         name = write_private_static_property_from_outside,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class PrivateWrite { private static int $value = 0; }
             PrivateWrite::$value = 1;
@@ -247,7 +247,7 @@ mod tests {
 
     test_analysis! {
         name = write_protected_static_property_from_outside,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class MyClass { protected static int $prop = 1; }
             MyClass::$prop = 500;

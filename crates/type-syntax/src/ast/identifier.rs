@@ -21,6 +21,7 @@ impl HasSpan for Identifier<'_> {
 impl<'arena> Identifier<'arena> {
     /// Creates an Identifier from a TypeToken and file_id.
     #[inline]
+    #[must_use]
     pub fn from_token(token: TypeToken<'arena>, file_id: FileId) -> Self {
         Identifier { span: token.span_for(file_id), value: token.value }
     }

@@ -10,6 +10,7 @@ use mago_syntax::comments::comment_lines;
 /// Represents the kind of collector pragma.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[repr(u8)]
+#[allow(clippy::exhaustive_enums)]
 pub enum PragmaKind {
     /// A pragma that instructs the collector to ignore a specific code.
     Ignore,
@@ -19,7 +20,7 @@ pub enum PragmaKind {
 
 /// Represents a single pragma extracted from a comment.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct Pragma<'a> {
+pub struct Pragma<'arena> {
     /// The kind of the pragma.
     pub kind: PragmaKind,
     /// The source span of the pragma.
@@ -35,9 +36,9 @@ pub struct Pragma<'a> {
     /// Indicates whether the comment appears on its own line (i.e., only whitespace precedes it).
     pub own_line: bool,
     /// The category of the pragma, e.g., "lint" or "analysis".
-    pub category: &'a str,
+    pub category: &'arena str,
     /// The code specification.
-    pub code: &'a str,
+    pub code: &'arena str,
     /// The span of the code (including any `(N)` count suffix) within the pragma.
     pub code_span: Span,
     /// The span of the parenthesized count suffix, if present (e.g., `(3)`).
@@ -47,10 +48,10 @@ pub struct Pragma<'a> {
     /// The number of issues this pragma has actually matched.
     pub matches: u16,
     /// An optional description explaining why this pragma is present.
-    pub description: &'a str,
+    pub description: &'arena str,
 }
 
-impl<'a> Pragma<'a> {
+impl Pragma<'_> {
     /// Returns `true` if this pragma has matched at least as many issues as it expected.
     #[inline]
     #[must_use]
@@ -91,6 +92,7 @@ impl PragmaKind {
     }
 
     /// Returns the string representation of the pragma kind.
+    #[inline]
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -115,6 +117,7 @@ impl<'arena> Pragma<'arena> {
     /// # Returns
     ///
     /// A vector of `Pragma` structs, each containing a parsed pragma and its precise location.
+    #[inline]
     pub fn extract(
         arena: &'arena Bump,
         file: &File,

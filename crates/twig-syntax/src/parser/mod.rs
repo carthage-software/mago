@@ -48,6 +48,7 @@ pub struct State {
 /// Stateful Twig parser.
 #[derive(Debug)]
 #[allow(dead_code)]
+#[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct Parser<'input, 'arena> {
     pub(crate) arena: &'arena Bump,
     pub(crate) settings: ParserSettings,
@@ -57,9 +58,10 @@ pub struct Parser<'input, 'arena> {
     _input: std::marker::PhantomData<&'input ()>,
 }
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Build a parser for `content`, which must already live in the arena.
     #[inline]
+    #[must_use]
     pub fn new(arena: &'arena Bump, file_id: FileId, content: &'arena str, settings: ParserSettings) -> Self {
         let input = Input::new(file_id, content.as_bytes());
         let lexer = TwigLexer::new(input, settings.lexer);
@@ -81,6 +83,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     /// `source_text` must be the same `&str` that backs the lexer's
     /// [`Input`].
     #[inline]
+    #[must_use]
     pub fn from_lexer(
         arena: &'arena Bump,
         _source_text: &'arena str,
@@ -99,6 +102,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     /// Consume the parser and produce an arena-allocated [`Template`].
+    #[must_use]
     pub fn parse(mut self, source_text: &'arena str, file_id: FileId) -> &'arena Template<'arena> {
         let statements = match self.parse_statements(&internal::NoTerminator) {
             Ok(sequence) => sequence,
@@ -124,6 +128,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     #[inline]
+    #[must_use]
     pub fn settings(&self) -> &ParserSettings {
         &self.settings
     }

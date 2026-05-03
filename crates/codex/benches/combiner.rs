@@ -58,14 +58,14 @@ fn bench_combiner(c: &mut Criterion) {
     // Tests sealed array deferred processing (Phase 3 optimization)
     c.bench_function("sealed_lists_20", |b| {
         b.iter(|| {
-            let types: Vec<TAtomic> = (0..20)
-                .map(|_| {
-                    TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
-                        (0, (false, get_int())),
-                        (1, (false, get_string())),
-                    ]))))
-                })
-                .collect();
+            let types: Vec<TAtomic> = std::iter::repeat_with(|| {
+                TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([
+                    (0, (false, get_int())),
+                    (1, (false, get_string())),
+                ]))))
+            })
+            .take(20)
+            .collect();
             std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
     });

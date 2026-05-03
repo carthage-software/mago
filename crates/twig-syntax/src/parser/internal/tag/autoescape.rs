@@ -5,7 +5,7 @@ use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;
 use crate::token::TwigToken;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_autoescape(
         &mut self,
         open_tag_tok: TwigToken<'arena>,

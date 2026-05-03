@@ -251,10 +251,12 @@ impl<'ctx> BlockContext<'ctx> {
             if let Some(this_type) = self.locals.get(var_id) {
                 if let Some(new_type) = new_locals.get(var_id) {
                     if new_type != this_type {
-                        redefined_vars.insert(*var_id, this_type.clone());
+                        redefined_vars.insert(*var_id, Rc::clone(this_type));
                     }
                 } else if include_new_vars {
-                    redefined_vars.insert(*var_id, this_type.clone());
+                    redefined_vars.insert(*var_id, Rc::clone(this_type));
+                } else {
+                    // variable is missing from new_locals and we aren't tracking newly-introduced ones
                 }
             } else {
                 removed_vars.insert(*var_id);
@@ -292,20 +294,20 @@ impl<'ctx> BlockContext<'ctx> {
 
         'outer: for c in clauses {
             if c.wedge {
-                included_clauses.push(c.clone());
+                included_clauses.push(Rc::clone(c));
                 continue;
             }
 
             for key in c.possibilities.keys() {
                 for changed_var_id in changed_var_ids {
                     if changed_var_id == key || var_has_root(*key, *changed_var_id) {
-                        rejected_clauses.push(c.clone());
+                        rejected_clauses.push(Rc::clone(c));
                         continue 'outer;
                     }
                 }
             }
 
-            included_clauses.push(c.clone());
+            included_clauses.push(Rc::clone(c));
         }
 
         (included_clauses, rejected_clauses)
@@ -353,7 +355,7 @@ impl<'ctx> BlockContext<'ctx> {
             let keep_clause = should_keep_clause(&clause, remove_var_id, new_type);
 
             if keep_clause {
-                clauses_to_keep.push(clause.clone());
+                clauses_to_keep.push(Rc::clone(&clause));
             } else {
                 other_clauses.push(clause);
             }
@@ -365,7 +367,7 @@ impl<'ctx> BlockContext<'ctx> {
             for clause in other_clauses {
                 let mut type_changed = false;
                 let Some(possibilities) = clause.possibilities.get(&remove_var_id) else {
-                    clauses_to_keep.push(clause.clone());
+                    clauses_to_keep.push(Rc::clone(&clause));
 
                     continue;
                 };
@@ -394,7 +396,7 @@ impl<'ctx> BlockContext<'ctx> {
                 }
 
                 if !type_changed {
-                    clauses_to_keep.push(clause.clone());
+                    clauses_to_keep.push(Rc::clone(&clause));
                 }
             }
         }

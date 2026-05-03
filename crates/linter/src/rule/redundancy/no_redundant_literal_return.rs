@@ -256,7 +256,9 @@ impl LintRule for NoRedundantLiteralReturnRule {
 }
 
 /// Extract variable name and literal from a condition like `$var === literal` or `literal === $var`.
-fn extract_var_literal_check<'a>(condition: &'a Expression<'a>) -> Option<(&'a str, &'a Expression<'a>)> {
+fn extract_var_literal_check<'arena>(
+    condition: &'arena Expression<'arena>,
+) -> Option<(&'arena str, &'arena Expression<'arena>)> {
     let Expression::Binary(binary) = condition else {
         return None;
     };
@@ -273,7 +275,7 @@ fn extract_var_literal_check<'a>(condition: &'a Expression<'a>) -> Option<(&'a s
 }
 
 /// Get the inner statements, unwrapping a Block if present.
-fn get_inner_statements<'a>(statements: &'a [Statement<'a>]) -> &'a [Statement<'a>] {
+fn get_inner_statements<'arena>(statements: &'arena [Statement<'arena>]) -> &'arena [Statement<'arena>] {
     if statements.len() == 1
         && let Statement::Block(block) = &statements[0]
     {
@@ -283,7 +285,7 @@ fn get_inner_statements<'a>(statements: &'a [Statement<'a>]) -> &'a [Statement<'
 }
 
 /// Check if statements consist of only `return <expr>;` where expr matches the given expression.
-fn is_return_expression<'a>(statements: &[Statement<'a>], expected: &Expression<'a>) -> bool {
+fn is_return_expression<'arena>(statements: &[Statement<'arena>], expected: &Expression<'arena>) -> bool {
     if statements.len() != 1 {
         return false;
     }

@@ -186,6 +186,6 @@ fn is_http_url_in_args(function_call: &FunctionCall) -> bool {
 }
 
 /// Extract string value from a literal string
-fn extract_string_value<'a>(string_literal: &'a LiteralString<'a>) -> Option<&'a str> {
+fn extract_string_value<'arena>(string_literal: &LiteralString<'arena>) -> Option<&'arena str> {
     string_literal.value
 }

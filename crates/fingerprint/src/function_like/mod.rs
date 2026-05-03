@@ -17,6 +17,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Closure<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -37,6 +38,7 @@ impl Fingerprintable for Closure<'_> {
 }
 
 impl Fingerprintable for ClosureUseClause<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -52,6 +54,7 @@ impl Fingerprintable for ClosureUseClause<'_> {
 }
 
 impl Fingerprintable for ClosureUseClauseVariable<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -65,6 +68,7 @@ impl Fingerprintable for ClosureUseClauseVariable<'_> {
 }
 
 impl Fingerprintable for Function<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -94,6 +98,7 @@ impl Fingerprintable for Function<'_> {
 }
 
 impl Fingerprintable for ArrowFunction<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -113,6 +118,7 @@ impl Fingerprintable for ArrowFunction<'_> {
 }
 
 impl Fingerprintable for FunctionLikeParameterList<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -128,6 +134,7 @@ impl Fingerprintable for FunctionLikeParameterList<'_> {
 }
 
 impl Fingerprintable for FunctionLikeParameter<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -151,6 +158,7 @@ impl Fingerprintable for FunctionLikeParameter<'_> {
 }
 
 impl Fingerprintable for FunctionLikeParameterDefaultValue<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -163,6 +171,7 @@ impl Fingerprintable for FunctionLikeParameterDefaultValue<'_> {
 }
 
 impl Fingerprintable for FunctionLikeReturnTypeHint<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

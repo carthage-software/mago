@@ -8,7 +8,7 @@ use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_declare(&mut self) -> Result<Declare<'arena>, ParseError> {
         Ok(Declare {
             declare: self.expect_keyword(T!["declare"])?,

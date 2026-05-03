@@ -154,10 +154,10 @@ fn extract_scalar_for_key(value_type: &TUnion) -> Option<&TScalar> {
     }
 }
 
-fn resolve_index_type_from_property<'a>(
+fn resolve_index_type_from_property<'meta>(
     index_key_type: Option<&TUnion>,
-    class_like: &'a ClassLikeMetadata,
-) -> Option<&'a TScalar> {
+    class_like: &'meta ClassLikeMetadata,
+) -> Option<&'meta TScalar> {
     let index_key_type = index_key_type?;
     if index_key_type.is_null() {
         return None;

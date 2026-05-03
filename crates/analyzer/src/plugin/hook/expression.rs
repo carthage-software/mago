@@ -18,6 +18,10 @@ pub trait ExpressionHook: Provider {
     /// Return `ExpressionHookResult::Continue` to proceed with normal analysis,
     /// `ExpressionHookResult::Skip` to skip analysis (type will be `mixed`), or
     /// `ExpressionHookResult::SkipWithType(ty)` to skip with a custom type.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn before_expression(
         &self,
         _expr: &Expression<'_>,
@@ -27,6 +31,10 @@ pub trait ExpressionHook: Provider {
     }
 
     /// Called after an expression has been analyzed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`HookError`] if the underlying plugin implementation propagates one.
     fn after_expression(&self, _expr: &Expression<'_>, _context: &mut HookContext<'_, '_>) -> HookResult<()> {
         Ok(())
     }

@@ -165,7 +165,7 @@ fn resolve_union<'ctx, 'arena>(
             }
         }
     } else {
-        static_class_type = Default::default();
+        static_class_type = StaticClassType::default();
         parent_class = None;
         self_class = None;
         function_is_final = false;

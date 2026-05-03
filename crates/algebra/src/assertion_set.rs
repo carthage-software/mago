@@ -33,6 +33,7 @@ pub type AssertionSet = Conjunction<Disjunction<Assertion>>;
 /// results in `(A OR C) AND (B OR C)`.
 ///
 /// See: [Distributive property](https://en.wikipedia.org/wiki/Distributive_property)
+#[inline]
 pub fn add_or_assertion(possibilities: &mut AssertionSet, assertion: Assertion) {
     if possibilities.is_empty() {
         // If the formula was empty (representing `true`), the result
@@ -51,6 +52,7 @@ pub fn add_or_assertion(possibilities: &mut AssertionSet, assertion: Assertion) 
 /// This function takes a single `Assertion` and adds it as a new, separate `AND`
 /// clause to the formula. For example, applying `C` to `(A OR B)`
 /// results in `(A OR B) AND (C)`.
+#[inline]
 pub fn add_and_assertion(possibilities: &mut AssertionSet, assertion: Assertion) {
     // Add a new clause containing only the new assertion.
     possibilities.push(vec![assertion]);
@@ -61,6 +63,7 @@ pub fn add_and_assertion(possibilities: &mut AssertionSet, assertion: Assertion)
 /// This function adds a new clause, which is itself a disjunction of the
 /// provided assertions. For example, applying `(C OR D)` to `(A OR B)`
 /// results in `(A OR B) AND (C OR D)`.
+#[inline]
 pub fn add_and_clause(assertion_set: &mut AssertionSet, or_assertions: &[Assertion]) {
     if or_assertions.is_empty() {
         // An empty OR clause is equivalent to `false`. ANDing with `false`
@@ -77,6 +80,7 @@ pub fn add_and_clause(assertion_set: &mut AssertionSet, or_assertions: &[Asserti
 /// This function applies De Morgan's laws to the formula. The process involves:
 /// 1. Converting the CNF formula `(A OR B) AND C` to its negated DNF form: `(NOT A AND NOT B) OR (NOT C)`.
 /// 2. Converting the resulting DNF back to CNF using the distributive property.
+#[inline]
 #[must_use]
 pub fn negate_assertion_set(assertion_set: AssertionSet) -> AssertionSet {
     // 1. Apply De Morgan's laws to get the DNF representation.
@@ -121,6 +125,7 @@ pub fn negate_assertion_set(assertion_set: AssertionSet) -> AssertionSet {
 ///
 /// This function merges two sets of clauses, using a `HashSet` to efficiently
 /// filter out any clauses from the second set that are already present in the first.
+#[inline]
 pub fn and_assertion_sets(set_a: AssertionSet, set_b: AssertionSet) -> AssertionSet {
     if (set_a.len() == 1 && set_a[0].is_empty()) || (set_b.len() == 1 && set_b[0].is_empty()) {
         // If either formula is `false`, the result is `false`.

@@ -3,7 +3,7 @@ use crate::ast::Filter;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     /// Parse a filter suffix: `operand | name ( args? )`.  The leading
     /// `|` must already have been consumed by the caller.
     pub(crate) fn parse_filter(

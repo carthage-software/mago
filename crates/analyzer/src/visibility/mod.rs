@@ -279,6 +279,8 @@ pub fn check_property_write_visibility<'ctx>(
             member_span,
             property_metadata.span.or(property_metadata.name_span),
         );
+    } else {
+        // write target is visible and either not readonly or being initialized in an allowed context
     }
 
     is_visible

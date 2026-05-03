@@ -79,7 +79,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
 
         let resulting_type = Rc::new(resulting_expression_type.unwrap_or_else(get_never));
         if let Some(property_access_id) = property_access_id {
-            block_context.locals.insert(property_access_id, resulting_type.clone());
+            block_context.locals.insert(property_access_id, Rc::clone(&resulting_type));
         }
 
         artifacts.set_rc_expression_type(self, resulting_type);
@@ -90,8 +90,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
 
 /// Adds symbol reference for a memoized static property access.
 fn add_memoized_static_property_reference<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
-    block_context: &mut BlockContext<'ctx>,
+    context: &Context<'ctx, 'arena>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class: &'ast Expression<'arena>,
     property: &'ast Variable<'arena>,
@@ -155,7 +155,7 @@ mod tests {
 
     test_analysis! {
         name = read_protected_static_property_from_child,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class ParentClass { protected static int $prop = 1; }
             class ChildClass extends ParentClass {
@@ -171,7 +171,7 @@ mod tests {
 
     test_analysis! {
         name = read_private_static_property_from_same_class,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class PrivateTest {
                 private static int $secret = 42;
@@ -208,7 +208,7 @@ mod tests {
 
     test_analysis! {
         name = read_undefined_static_property,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class MyClass {}
             echo MyClass::$non_existent;
@@ -220,7 +220,7 @@ mod tests {
 
     test_analysis! {
         name = read_private_static_property_from_outside,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class MyClass { private static int $secret = 1; }
             echo MyClass::$secret;
@@ -234,7 +234,7 @@ mod tests {
 
     test_analysis! {
         name = read_private_static_property_from_parent_in_child,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class P { private static int $secret = 1; }
             class C extends P {
@@ -251,7 +251,7 @@ mod tests {
 
     test_analysis! {
         name = read_protected_static_property_from_outside,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class MyClass { protected static int $prop = 1; }
             echo MyClass::$prop;
@@ -264,7 +264,7 @@ mod tests {
 
     test_analysis! {
         name = read_instance_property_statically,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             class HasInstanceProp { public int $instance_prop = 1; }
             echo HasInstanceProp::$instance_prop;
@@ -277,7 +277,7 @@ mod tests {
 
     test_analysis! {
         name = read_static_property_on_interface,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             interface MyInterface {}
             echo MyInterface::$some_prop;
@@ -289,7 +289,7 @@ mod tests {
 
     test_analysis! {
         name = read_static_property_on_enum,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
             enum MyEnum {}
             echo MyEnum::$some_prop;
@@ -323,7 +323,7 @@ mod tests {
 
     test_analysis! {
         name = static_property_reconciliation,
-        code = indoc! {r"
+        code = indoc! {"
             <?php
 
             class A

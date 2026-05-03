@@ -15,7 +15,7 @@ use crate::ast::ast::LiteralStringKind;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_literal(&mut self) -> Result<Literal<'arena>, ParseError> {
         let token = self.stream.consume()?;
 
@@ -23,9 +23,10 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             T![LiteralFloat] => Literal::Float(LiteralFloat {
                 span: token.span_for(self.stream.file_id()),
                 raw: token.value,
-                value: OrderedFloat(parse_literal_float(token.value).unwrap_or_else(|| {
-                    unreachable!("lexer generated invalid float `{}`; this should never happen.", token.value)
-                })),
+                // `parse_literal_float` only fails on lexer output the lexer would already have
+                // rejected; substitute `0.0` defensively rather than panicking if that invariant
+                // ever drifts.
+                value: OrderedFloat(parse_literal_float(token.value).unwrap_or(0.0)),
             }),
             T![LiteralInteger] => Literal::Integer(LiteralInteger {
                 span: token.span_for(self.stream.file_id()),

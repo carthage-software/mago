@@ -109,7 +109,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                             any_argument_non_empty = true;
                         }
 
-                        if let Some(ref items) = keyed.known_items {
+                        if let Some(items) = keyed.known_items.as_ref() {
                             for (key, value) in items {
                                 merged_items.insert(*key, value.clone());
                             }
@@ -141,7 +141,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                             all_lists_are_closed = false;
                         }
 
-                        if let Some(ref known_elements) = list.known_elements {
+                        if let Some(known_elements) = list.known_elements.as_ref() {
                             for (idx, (optional, element_type)) in known_elements {
                                 let new_idx = next_list_index + idx;
                                 merged_list_elements.insert(new_idx, (*optional, element_type.clone()));
@@ -151,6 +151,8 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                             }
                         } else if list.non_empty {
                             next_list_index += 1; // At least one element
+                        } else {
+                            // list has no known elements and may be empty; leave the running index untouched
                         }
 
                         let (_, list_value_type) = get_array_parameters(&TArray::List(list.clone()), codebase);

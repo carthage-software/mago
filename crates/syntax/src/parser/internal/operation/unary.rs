@@ -7,7 +7,7 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::GetPrecedence;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_unary_prefix_operation(&mut self) -> Result<UnaryPrefix<'arena>, ParseError> {
         let token = self.stream.consume()?;
 

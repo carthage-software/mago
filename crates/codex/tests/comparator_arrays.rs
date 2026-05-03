@@ -133,36 +133,36 @@ fn array_with_int_keys_not_in_list() {
 
 #[test]
 fn sealed_list_reflexive() {
-    let s = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1))), (1, (false, ui(2)))]));
+    let s = t_sealed_list(BTreeMap::from([(0usize, (false, ui(1))), (1, (false, ui(2)))]));
     assert_atomic_subtype(&s.clone(), &s);
 }
 
 #[test]
 fn sealed_list_distinct_disjoint() {
-    let a = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1)))]));
-    let b = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(2)))]));
+    let a = t_sealed_list(BTreeMap::from([(0usize, (false, ui(1)))]));
+    let b = t_sealed_list(BTreeMap::from([(0usize, (false, ui(2)))]));
     assert_atomic_not_subtype(&a, &b);
     assert_atomic_not_subtype(&b, &a);
 }
 
 #[test]
 fn sealed_list_in_widened_sealed() {
-    let lit = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1)))]));
-    let int = t_sealed_list(BTreeMap::from([(0_usize, (false, u(t_int())))]));
+    let lit = t_sealed_list(BTreeMap::from([(0usize, (false, ui(1)))]));
+    let int = t_sealed_list(BTreeMap::from([(0usize, (false, u(t_int())))]));
     assert_atomic_subtype(&lit, &int);
     assert_atomic_not_subtype(&int, &lit);
 }
 
 #[test]
 fn sealed_list_in_unsealed_list() {
-    let s = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1)))]));
+    let s = t_sealed_list(BTreeMap::from([(0usize, (false, ui(1)))]));
     assert_atomic_subtype(&s, &t_list(u(t_int()), false));
     assert_atomic_subtype(&s, &t_list(u(t_int()), true));
 }
 
 #[test]
 fn unsealed_list_not_in_sealed_list() {
-    let s = t_sealed_list(BTreeMap::from([(0_usize, (false, ui(1)))]));
+    let s = t_sealed_list(BTreeMap::from([(0usize, (false, ui(1)))]));
     assert_atomic_not_subtype(&t_list(u(t_int()), false), &s);
 }
 
@@ -242,11 +242,11 @@ fn iterable_not_in_keyed() {
 #[test]
 fn deep_list_of_lists() {
     let inner = u(t_list(u(t_int()), false));
-    let outer = t_list(inner.clone(), false);
+    let outer = t_list(inner, false);
     assert_atomic_subtype(&outer.clone(), &outer);
 
     let lit_inner = u(t_list(u(t_lit_int(5)), false));
-    let lit_outer = t_list(lit_inner.clone(), false);
+    let lit_outer = t_list(lit_inner, false);
     let int_outer = t_list(u(t_list(u(t_int()), false)), false);
     assert_atomic_subtype(&lit_outer, &int_outer);
     assert_atomic_not_subtype(&int_outer, &lit_outer);
@@ -256,8 +256,8 @@ fn deep_list_of_lists() {
 fn deep_keyed_of_lists() {
     let inner_int_list = u(t_list(u(t_int()), false));
     let inner_string_list = u(t_list(u(t_string()), false));
-    let a = t_keyed_unsealed(u(t_string()), inner_int_list.clone(), false);
-    let b = t_keyed_unsealed(u(t_string()), inner_string_list.clone(), false);
+    let a = t_keyed_unsealed(u(t_string()), inner_int_list, false);
+    let b = t_keyed_unsealed(u(t_string()), inner_string_list, false);
     assert_atomic_subtype(&a.clone(), &a);
     assert_atomic_not_subtype(&a, &b);
 }
@@ -265,7 +265,7 @@ fn deep_keyed_of_lists() {
 #[test]
 fn deep_list_of_keyed() {
     let inner = u(t_keyed_unsealed(u(t_string()), u(t_int()), false));
-    let outer = t_list(inner.clone(), false);
+    let outer = t_list(inner, false);
     assert_atomic_subtype(&outer.clone(), &outer);
 }
 
@@ -362,7 +362,7 @@ fn list_int_in_list_float() {
 
 #[test]
 fn list_int_lits_in_list_int() {
-    for v in [-100_i64, 0, 1, 100] {
+    for v in [-100i64, 0, 1, 100] {
         assert_atomic_subtype(&t_list(u(t_lit_int(v)), false), &t_list(u(t_int()), false));
     }
 }

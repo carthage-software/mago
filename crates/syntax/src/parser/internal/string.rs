@@ -22,7 +22,7 @@ use crate::parser::Parser;
 use crate::token::DocumentKind;
 use crate::token::TokenKind;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_string(&mut self) -> Result<CompositeString<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 

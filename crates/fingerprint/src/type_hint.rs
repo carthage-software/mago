@@ -11,6 +11,7 @@ use crate::FingerprintOptions;
 use crate::Fingerprintable;
 
 impl Fingerprintable for Hint<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -47,6 +48,7 @@ impl Fingerprintable for Hint<'_> {
 }
 
 impl Fingerprintable for ParenthesizedHint<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -58,6 +60,7 @@ impl Fingerprintable for ParenthesizedHint<'_> {
 }
 
 impl Fingerprintable for NullableHint<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -70,6 +73,7 @@ impl Fingerprintable for NullableHint<'_> {
 }
 
 impl Fingerprintable for UnionHint<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,
@@ -83,6 +87,7 @@ impl Fingerprintable for UnionHint<'_> {
 }
 
 impl Fingerprintable for IntersectionHint<'_> {
+    #[inline]
     fn fingerprint_with_hasher<H: std::hash::Hasher>(
         &self,
         hasher: &mut H,

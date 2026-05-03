@@ -7,7 +7,7 @@ use crate::ast::ast::UnionHint;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn is_at_type_hint(&mut self) -> Result<bool, ParseError> {
         Ok(matches!(
             self.stream.peek_kind(0)?,

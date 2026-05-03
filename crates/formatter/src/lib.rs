@@ -4,6 +4,12 @@
 //! of parsing source code, converting it into an intermediate document model, and
 //! printing it as a well-formatted string according to customizable settings.
 
+#![allow(clippy::exhaustive_enums)]
+#![allow(clippy::else_if_without_else)]
+#![allow(clippy::match_wildcard_for_single_variants)]
+#![allow(clippy::needless_pass_by_ref_mut)]
+#![allow(clippy::float_arithmetic)]
+
 use std::borrow::Cow;
 
 use bumpalo::Bump;
@@ -61,6 +67,7 @@ impl<'arena> Formatter<'arena> {
     ///
     /// This allows customization of parsing behavior, such as enabling or disabling
     /// certain PHP syntax features.
+    #[must_use]
     pub fn with_parser_settings(mut self, parser_settings: ParserSettings) -> Self {
         self.parser_settings = parser_settings;
         self

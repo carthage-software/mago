@@ -5,22 +5,22 @@ use crate::IssueCollection;
 use crate::Level;
 use crate::formatter::FormatterConfig;
 
-pub struct LazyFilteredIssues<'a> {
-    iter: std::slice::Iter<'a, Issue>,
+pub struct LazyFilteredIssues<'issues> {
+    iter: std::slice::Iter<'issues, Issue>,
     min_level: Option<Level>,
     filter_fixable: bool,
 }
 
-pub enum FilteredIssues<'a> {
-    Lazy(LazyFilteredIssues<'a>),
-    Sorted(std::vec::IntoIter<&'a Issue>),
+pub enum FilteredIssues<'issues> {
+    Lazy(LazyFilteredIssues<'issues>),
+    Sorted(std::vec::IntoIter<&'issues Issue>),
 }
 
-impl<'a> Iterator for LazyFilteredIssues<'a> {
-    type Item = &'a Issue;
+impl<'issues> Iterator for LazyFilteredIssues<'issues> {
+    type Item = &'issues Issue;
 
     #[inline]
-    fn next(&mut self) -> Option<&'a Issue> {
+    fn next(&mut self) -> Option<&'issues Issue> {
         for issue in self.iter.by_ref() {
             if let Some(min) = self.min_level
                 && issue.level < min
@@ -39,11 +39,11 @@ impl<'a> Iterator for LazyFilteredIssues<'a> {
     }
 }
 
-impl<'a> Iterator for FilteredIssues<'a> {
-    type Item = &'a Issue;
+impl<'issues> Iterator for FilteredIssues<'issues> {
+    type Item = &'issues Issue;
 
     #[inline]
-    fn next(&mut self) -> Option<&'a Issue> {
+    fn next(&mut self) -> Option<&'issues Issue> {
         match self {
             Self::Lazy(it) => it.next(),
             Self::Sorted(it) => it.next(),
@@ -64,7 +64,11 @@ impl<'a> Iterator for FilteredIssues<'a> {
 ///   `checkstyle`, `emacs`). For these, even if the user passed `--sort`,
 ///   sorting is wasted work.
 #[inline]
-pub fn filter_issues<'a>(issues: &'a IssueCollection, config: &FormatterConfig, sortable: bool) -> FilteredIssues<'a> {
+pub fn filter_issues<'issues>(
+    issues: &'issues IssueCollection,
+    config: &FormatterConfig,
+    sortable: bool,
+) -> FilteredIssues<'issues> {
     let min_level = config.minimum_level;
     let filter_fixable = config.filter_fixable;
 

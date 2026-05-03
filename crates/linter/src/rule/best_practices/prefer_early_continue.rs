@@ -54,6 +54,7 @@ impl Config for PreferEarlyContinueConfig {
     }
 }
 
+#[allow(clippy::unwrap_used)]
 impl LintRule for PreferEarlyContinueRule {
     type Config = PreferEarlyContinueConfig;
 
