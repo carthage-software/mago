@@ -82,6 +82,7 @@ Ces indicateurs activent ou désactivent des analyses individuelles. Les valeurs
 | `find-unused-parameters` | `false` | Signale les paramètres qui ne sont jamais lus. |
 | `strict-list-index-checks` | `false` | Exige que tout entier utilisé comme index de liste soit prouvé non négatif. |
 | `strict-array-index-existence` | `false` | Traite les lectures de tableau ou de liste dont la clé n'est pas prouvée présente comme `T\|null` et émet un avertissement `possibly-undefined-{int,string}-array-index`. Remplace `allow-possibly-undefined-array-keys = false`. |
+| `allow-array-truthy-operand` | `false` | Accepte les tableaux comme opérandes de `&&`, `\|\|` et `xor` sans déclencher `invalid-operand`. Un `if ($array)` autonome n'est pas affecté et n'émet jamais d'avertissement. |
 | `no-boolean-literal-comparison` | `false` | Interdit les comparaisons directes aux littéraux booléens comme `$a === true`. |
 | `check-missing-type-hints` | `false` | Signale les indications de types manquantes sur les paramètres, propriétés et types de retour. |
 | `check-closure-missing-type-hints` | `false` | Étend la vérification d'indications de types aux closures (nécessite `check-missing-type-hints`). |
@@ -309,6 +310,8 @@ Désactivez-le et l'appel exige une garantie de type explicite à la place.
 `strict-array-index-existence` aligne le système de types sur la sémantique d'exécution de PHP pour les clés manquantes. À l'exécution, PHP convertit une lecture absente en `null` et émet un avertissement `Undefined array key` ; lorsque ce drapeau est activé, l'analyseur émet `possibly-undefined-int-array-index` (ou `-string-array-index`) et élargit le résultat à `T|null`, de sorte que les vérifications `=== null` et `??` qui suivent se comportent comme attendu. Cela s'applique aux lectures de `list<T>` à des indices non nuls, aux entrées optionnelles des formes `array{...}` et aux recherches `array<K, V>` par clés arbitraires. Le drapeau est désactivé par défaut car en faire la valeur par défaut serait bruyant pour le PHP idiomatique qui déstructure ou indexe les listes sans d'abord vérifier l'existence.
 
 `allow-possibly-undefined-array-keys = false` est déprécié. Il signalait uniquement les lectures de `array<K, V>` avec une clé littérale unique et n'élargissait jamais le type à `T|null`, donc une comparaison `=== null` après la lecture était signalée comme redondante. Remplacez-le par `strict-array-index-existence = true`, qui signale plus largement et reflète la sémantique d'exécution dans le type. Définir `allow-possibly-undefined-array-keys = false` émet un avertissement de dépréciation sur la CLI.
+
+`allow-array-truthy-operand` contrôle si les tableaux sont acceptés comme opérandes de `&&`, `||` et `xor`. PHP convertit les tableaux vides en `false` et les tableaux non vides en `true`, exactement la même véracité utilisée par un `if ($array)` autonome. Par défaut, l'analyseur signale les opérandes de type tableau dans les opérateurs logiques avec `invalid-operand` pour mettre en évidence la coercition implicite vers `bool` ; activer l'option supprime cet avertissement, ce qui permet aux bases de code qui s'appuient sur cette coercition de conserver leur style. Un `if ($array)` autonome n'est jamais affecté.
 
 ## Réglage des performances
 

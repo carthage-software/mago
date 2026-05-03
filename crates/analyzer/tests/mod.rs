@@ -2436,6 +2436,17 @@ test_case!(issue_1759);
 test_case!(issue_1760);
 test_case!(issue_1762);
 test_case!(issue_1764);
+test_case!(issue_1765, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_throws = false;
+    s
+});
+test_case!(issue_1765_allow, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_throws = false;
+    s.allow_array_truthy_operand = true;
+    s
+});
 test_case!(issue_1766, {
     let mut s = crate::framework::default_test_settings();
     s.allow_possibly_undefined_array_keys = true;

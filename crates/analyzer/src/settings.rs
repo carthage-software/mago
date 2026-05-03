@@ -111,6 +111,17 @@ pub struct Settings {
     /// reads from arrays/lists by index without first asserting existence.
     pub strict_array_index_existence: bool,
 
+    /// Allow arrays as operands of logical operators (`&&`, `||`, `xor`).
+    ///
+    /// When `true`, the analyzer accepts an array on either side of a logical operator
+    /// without emitting `invalid-operand`. PHP coerces empty arrays to `false` and
+    /// non-empty arrays to `true`, mirroring the truthiness used by `if ($array)`.
+    ///
+    /// When `false` (the default), the analyzer flags array operands of `&&`/`||`/`xor`
+    /// to call out the implicit `bool` coercion. This matches the long-standing default
+    /// behavior; standalone `if ($array)` is still accepted and never produces this warning.
+    pub allow_array_truthy_operand: bool,
+
     /// Disable comparisons to boolean literals (`true`/`false`).
     ///
     /// When enabled, comparisons to boolean literals will not be reported as issues.
@@ -389,6 +400,7 @@ impl Settings {
             find_unused_parameters: false,
             strict_list_index_checks: false,
             strict_array_index_existence: false,
+            allow_array_truthy_operand: false,
             no_boolean_literal_comparison: false,
             enforce_class_finality: false,
             require_api_or_internal: false,

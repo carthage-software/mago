@@ -670,15 +670,17 @@ fn check_logical_operand<'arena>(
             .with_help("Explicitly check for `null` or cast to `bool` if this coercion is not intended."),
         );
     } else if operand_type.is_array() {
-        context.collector.report_with_code(
-            IssueCode::InvalidOperand,
-            Issue::warning(format!("{side} operand in `{operator_name}` operation is an `array`."))
-                .with_annotation(Annotation::primary(operand.span()).with_message("This is an `array`"))
-                .with_note(
-                    "Arrays coerce to `false` if empty, `true` if non-empty. This implicit conversion can be unclear.",
-                )
-                .with_help("Consider using `empty()` or `count()` for explicit checks, or cast to `bool`."),
-        );
+        if !context.settings.allow_array_truthy_operand {
+            context.collector.report_with_code(
+                IssueCode::InvalidOperand,
+                Issue::warning(format!("{side} operand in `{operator_name}` operation is an `array`."))
+                    .with_annotation(Annotation::primary(operand.span()).with_message("This is an `array`"))
+                    .with_note(
+                        "Arrays coerce to `false` if empty, `true` if non-empty. This implicit conversion can be unclear.",
+                    )
+                    .with_help("Consider using `empty()` or `count()` for explicit checks, or cast to `bool`."),
+            );
+        }
     } else if operand_type.is_objecty() {
         context.collector.report_with_code(
             IssueCode::InvalidOperand,

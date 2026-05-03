@@ -149,6 +149,14 @@ pub struct AnalyzerConfiguration {
     /// merely tracked internally as possibly-undefined without emitting a warning.
     pub strict_array_index_existence: bool,
 
+    /// Allow arrays as operands of logical operators (`&&`, `||`, `xor`).
+    ///
+    /// When `true`, the analyzer accepts arrays on either side of a logical operator
+    /// without emitting `invalid-operand`. Defaults to `false`, which mirrors the
+    /// long-standing behavior of flagging implicit `bool` coercion of arrays. Standalone
+    /// `if ($array)` is unaffected and never warns.
+    pub allow_array_truthy_operand: bool,
+
     /// Disallow comparisons where a boolean literal is used as an operand.
     ///
     /// Defaults to `false`.
@@ -457,6 +465,7 @@ impl AnalyzerConfiguration {
             find_unused_parameters,
             strict_list_index_checks: self.strict_list_index_checks,
             strict_array_index_existence: self.strict_array_index_existence,
+            allow_array_truthy_operand: self.allow_array_truthy_operand,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
             enforce_class_finality: self.enforce_class_finality,
             require_api_or_internal: self.require_api_or_internal,
@@ -512,6 +521,7 @@ impl Default for AnalyzerConfiguration {
             find_unused_parameters: defaults.find_unused_parameters,
             strict_list_index_checks: defaults.strict_list_index_checks,
             strict_array_index_existence: defaults.strict_array_index_existence,
+            allow_array_truthy_operand: defaults.allow_array_truthy_operand,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
             enforce_class_finality: defaults.enforce_class_finality,
             require_api_or_internal: defaults.require_api_or_internal,

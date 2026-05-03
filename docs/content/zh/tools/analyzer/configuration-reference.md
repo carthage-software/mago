@@ -82,6 +82,7 @@ glob 匹配会遵循 `[source.glob]` 下的项目级设置,因此像 `literal-se
 | `find-unused-parameters` | `false` | 报告从未被读取的参数。 |
 | `strict-list-index-checks` | `false` | 要求作为列表下标使用的整数必须可被证明非负。 |
 | `strict-array-index-existence` | `false` | 当数组或列表读取的键无法证明存在时,将结果视为 `T\|null` 并发出 `possibly-undefined-{int,string}-array-index` 警告。用于替代 `allow-possibly-undefined-array-keys = false`。 |
+| `allow-array-truthy-operand` | `false` | 允许将数组用作 `&&`、`\|\|` 与 `xor` 的操作数,而不触发 `invalid-operand`。独立的 `if ($array)` 不受影响,也不会发出警告。 |
 | `no-boolean-literal-comparison` | `false` | 禁止与布尔字面量进行直接比较,例如 `$a === true`。 |
 | `check-missing-type-hints` | `false` | 报告参数、属性和返回值缺失的类型提示。 |
 | `check-closure-missing-type-hints` | `false` | 把类型提示检查扩展到闭包(需要 `check-missing-type-hints`)。 |
@@ -311,6 +312,8 @@ function process(object $obj): mixed
 `strict-array-index-existence` 让类型系统与 PHP 的运行时语义保持一致。在运行时,PHP 会把缺失的读取结果视为 `null`,并发出 `Undefined array key` 警告;开启该开关后,分析器会发出 `possibly-undefined-int-array-index`(或 `-string-array-index`)并把结果类型扩展为 `T|null`,这样后续的 `=== null` 与 `??` 检查就能按预期工作。它适用于 `list<T>` 中非零下标的读取、`array{...}` 形状中的可选条目,以及通过任意键访问 `array<K, V>` 的情况。该选项默认关闭,因为对于不显式断言键存在便对列表进行解构或下标访问的 PHP 代码来说,把它设为默认值会过于嘈杂。
 
 `allow-possibly-undefined-array-keys = false` 已弃用。它仅对带有单个字面量键的 `array<K, V>` 读取发出警告,且不会把类型扩展为 `T|null`,因此读取后的 `=== null` 检查会被报告为冗余。请改用 `strict-array-index-existence = true`,它的覆盖更全面,并将运行时语义体现到类型上。设置 `allow-possibly-undefined-array-keys = false` 时,CLI 会输出弃用警告。
+
+`allow-array-truthy-operand` 控制是否接受数组作为 `&&`、`||` 与 `xor` 的操作数。PHP 会将空数组转换为 `false`,非空数组转换为 `true`,这与独立的 `if ($array)` 所使用的真值判定一致。默认情况下,分析器会对逻辑运算符的数组操作数发出 `invalid-operand`,以提醒这种隐式的 `bool` 转换;开启该选项会抑制该警告,从而允许依赖此转换风格的代码库保留其写法。独立的 `if ($array)` 始终不受影响。
 
 ## 性能调优
 
