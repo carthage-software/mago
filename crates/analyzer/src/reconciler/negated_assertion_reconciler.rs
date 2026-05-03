@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combiner;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -320,11 +321,21 @@ fn handle_literal_negated_equality(
         return get_never();
     };
 
+    let assertion_is_falsy = matches!(assertion, Assertion::IsNotEqual(_)) && assertion_type.is_falsy();
+
     let mut did_remove_type = false;
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
 
     for existing_atomic_type in new_var_type.types.to_mut().drain(..) {
+        if assertion_is_falsy
+            && existing_atomic_type.is_falsy()
+            && falsy_atomics_loose_equal(assertion_type, &existing_atomic_type)
+        {
+            did_remove_type = true;
+            continue;
+        }
+
         match &existing_atomic_type {
             TAtomic::Scalar(TScalar::String(existing_string)) => {
                 let existing_literal_string = existing_atomic_type.get_literal_string_value();
@@ -442,4 +453,43 @@ fn handle_literal_negated_equality(
 
     new_var_type.types = Cow::Owned(acceptable_types);
     new_var_type
+}
+
+/// Returns `true` when two PHP-falsy atomics are equal under PHP 8's loose `==` semantics.
+///
+/// Both inputs must already satisfy [`TAtomic::is_falsy`]. `null` and `false` are loose-equal to
+/// every other falsy value. Numeric falsies (`0`, `0.0`) loose-equal each other but not `""`;
+/// the empty string falsy class doesn't loose-equal numeric falsies. Other falsy shapes (empty
+/// arrays, closed resources, …) only loose-equal `null`/`false`.
+const fn falsy_atomics_loose_equal(left: &TAtomic, right: &TAtomic) -> bool {
+    if is_null_or_literal_false(left) || is_null_or_literal_false(right) {
+        return true;
+    }
+
+    match (falsy_class(left), falsy_class(right)) {
+        (Some(left_class), Some(right_class)) => match (left_class, right_class) {
+            (FalsyClass::Numeric, FalsyClass::Numeric) => true,
+            (FalsyClass::EmptyString, FalsyClass::EmptyString) => true,
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+const fn is_null_or_literal_false(atomic: &TAtomic) -> bool {
+    matches!(atomic, TAtomic::Null) || matches!(atomic, TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FalsyClass {
+    Numeric,
+    EmptyString,
+}
+
+const fn falsy_class(atomic: &TAtomic) -> Option<FalsyClass> {
+    match atomic {
+        TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_)) => Some(FalsyClass::Numeric),
+        TAtomic::Scalar(TScalar::String(_)) => Some(FalsyClass::EmptyString),
+        _ => None,
+    }
 }
