@@ -41,6 +41,7 @@ pub struct CallableTypeParameters<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct CallableTypeParameter<'arena> {
     pub parameter_type: Option<Type<'arena>>,
+    pub ampersand: Option<Span>,
     pub equals: Option<Span>,
     pub ellipsis: Option<Span>,
     pub variable: Option<VariableType<'arena>>,
@@ -79,6 +80,12 @@ impl CallableTypeParameter<'_> {
     pub const fn is_optional(&self) -> bool {
         self.equals.is_some()
     }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_by_reference(&self) -> bool {
+        self.ampersand.is_some()
+    }
 }
 
 impl HasSpan for CallableType<'_> {
@@ -110,7 +117,8 @@ impl HasSpan for CallableTypeParameter<'_> {
         let start = match &self.parameter_type {
             Some(parameter_type) => parameter_type.span(),
             None => self
-                .equals
+                .ampersand
+                .or(self.equals)
                 .or(self.ellipsis)
                 .or(self.variable.as_ref().map(mago_span::HasSpan::span))
                 .or(self.comma)
@@ -122,6 +130,7 @@ impl HasSpan for CallableTypeParameter<'_> {
             .or(self.variable.as_ref().map(mago_span::HasSpan::span))
             .or(self.ellipsis)
             .or(self.equals)
+            .or(self.ampersand)
             .unwrap_or(start);
 
         start.join(end)
@@ -144,6 +153,10 @@ impl std::fmt::Display for CallableTypeParameter<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(parameter_type) = &self.parameter_type {
             write!(f, "{parameter_type}")?;
+        }
+
+        if self.ampersand.is_some() {
+            write!(f, " &")?;
         }
 
         if self.equals.is_some() {

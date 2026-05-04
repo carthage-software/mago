@@ -169,7 +169,13 @@ pub fn parse_type_with_precedence<'arena>(
                 Type::Union(UnionType { left: stream.alloc(inner), pipe, right: stream.alloc(right) })
             }
             // Intersection types: T&U
-            Some(TypeTokenKind::Ampersand) if !is_inner_nullable && min_precedence <= TypePrecedence::Intersection => {
+            Some(TypeTokenKind::Ampersand)
+                if !is_inner_nullable
+                    && min_precedence <= TypePrecedence::Intersection
+                    && !stream
+                        .lookahead(1)?
+                        .is_some_and(|t| matches!(t.kind, TypeTokenKind::Variable | TypeTokenKind::Ellipsis)) =>
+            {
                 let left = stream.alloc(inner);
                 let ampersand = stream.consume_span()?;
                 let rhs = parse_type_with_precedence(stream, TypePrecedence::Intersection)?;

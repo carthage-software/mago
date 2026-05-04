@@ -976,6 +976,50 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_callable_by_reference_parameter() {
+        match do_parse("callable(bool &$ret): void") {
+            Ok(Type::Callable(c)) => {
+                let spec = c.specification.expect("Expected callable specification");
+                assert_eq!(spec.parameters.entries.len(), 1);
+
+                let param = &spec.parameters.entries[0];
+                assert!(matches!(param.parameter_type, Some(Type::Bool(_))));
+                assert!(param.is_by_reference(), "expected `&` to be parsed as by-reference marker");
+                assert!(!param.is_variadic());
+                assert!(!param.is_optional());
+                assert!(param.variable.is_some());
+            }
+            res => panic!("Expected Ok(Type::Callable), got {res:?}"),
+        }
+
+        match do_parse("callable(string &...$rest): int") {
+            Ok(Type::Callable(c)) => {
+                let spec = c.specification.expect("Expected callable specification");
+                assert_eq!(spec.parameters.entries.len(), 1);
+
+                let param = &spec.parameters.entries[0];
+                assert!(matches!(param.parameter_type, Some(Type::String(_))));
+                assert!(param.is_by_reference());
+                assert!(param.is_variadic());
+            }
+            res => panic!("Expected Ok(Type::Callable), got {res:?}"),
+        }
+
+        match do_parse("callable(Foo&Bar $x): void") {
+            Ok(Type::Callable(c)) => {
+                let spec = c.specification.expect("Expected callable specification");
+                assert_eq!(spec.parameters.entries.len(), 1);
+
+                let param = &spec.parameters.entries[0];
+                assert!(matches!(param.parameter_type, Some(Type::Intersection(_))));
+                assert!(!param.is_by_reference());
+                assert!(param.variable.is_some());
+            }
+            res => panic!("Expected Ok(Type::Callable), got {res:?}"),
+        }
+    }
+
+    #[test]
     fn test_parse_conditional_type() {
         match do_parse("int is not string ? array : int") {
             Ok(Type::Conditional(c)) => {

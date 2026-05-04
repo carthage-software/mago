@@ -958,9 +958,9 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
                     break;
                 }
             }
-            let next_non_ws = peek_iter.peek().map(|&(_, c)| c);
 
-            if matches!(next_non_ws, None | Some('$')) {
+            let next_non_ws = peek_iter.peek().map(|&(_, c)| c);
+            if bracket_stack.is_empty() && matches!(next_non_ws, None | Some('$')) {
                 split_point_rel = Some(i + char.len_utf8());
                 break;
             }

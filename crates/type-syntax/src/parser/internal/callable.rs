@@ -27,6 +27,11 @@ pub fn parse_callable_type_specifications<'arena>(
                         parameter_type: {
                             if stream.is_at(TypeTokenKind::Ellipsis)? { None } else { Some(parse_type(stream)?) }
                         },
+                        ampersand: if stream.is_at(TypeTokenKind::Ampersand)? {
+                            Some(stream.consume_span()?)
+                        } else {
+                            None
+                        },
                         equals: if stream.is_at(TypeTokenKind::Equals)? { Some(stream.consume_span()?) } else { None },
                         ellipsis: if stream.is_at(TypeTokenKind::Ellipsis)? {
                             Some(stream.consume_span()?)

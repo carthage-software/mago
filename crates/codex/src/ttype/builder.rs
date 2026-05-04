@@ -881,7 +881,7 @@ fn get_callable_from_ast(
 
             parameters.push(TCallableParameter::new(
                 Some(Arc::new(parameter_type)),
-                false,
+                parameter_ast.is_by_reference(),
                 parameter_ast.is_variadic(),
                 parameter_ast.is_optional(),
             ));

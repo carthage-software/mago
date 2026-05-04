@@ -2464,6 +2464,7 @@ test_case!(issue_1770, {
     s.check_property_initialization = false;
     s
 });
+test_case!(issue_1772);
 
 #[test]
 fn test_all_test_cases_are_ran() {
