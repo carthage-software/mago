@@ -267,7 +267,11 @@ pub fn starts_with_ignore_case(haystack: &str, prefix: &str) -> bool {
 
             let mut i = 0;
             while i + 32 <= len {
+                // SAFETY: `_mm256_loadu_si256` performs an unaligned load, so the pointer
+                // need not satisfy `__m256i`'s 32-byte alignment requirement.
+                #[allow(clippy::cast_ptr_alignment)]
                 let h = _mm256_loadu_si256(haystack_bytes.as_ptr().add(i).cast::<__m256i>());
+                #[allow(clippy::cast_ptr_alignment)]
                 let p = _mm256_loadu_si256(prefix_bytes.as_ptr().add(i).cast::<__m256i>());
 
                 // Convert haystack chunk to lowercase
