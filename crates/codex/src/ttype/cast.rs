@@ -65,6 +65,10 @@ pub fn cast_atomic_to_callable<'atomic>(
     }
 
     if let TAtomic::Object(TObject::Named(named_object)) = atomic {
+        if named_object.get_name().as_str().eq_ignore_ascii_case("Closure") {
+            return Some(Cow::Owned(TCallable::Signature(TCallableSignature::mixed(true))));
+        }
+
         let method_identifier = MethodIdentifier::new(named_object.get_name(), atom("__invoke"));
         let method_identifier = codebase.get_declaring_method_identifier(&method_identifier);
         if codebase.method_exists(&method_identifier.get_class_name(), &method_identifier.get_method_name()) {
