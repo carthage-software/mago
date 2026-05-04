@@ -591,34 +591,34 @@ php-version: "8.3"
 }
 </code></pre>
 <p>Pour TOML, le commentaire est lu par le serveur de langage <a href="https://taplo.tamasfe.dev/">Taplo</a>, qui alimente l'extension VS Code « Even Better TOML » et le support TOML de JetBrains. Pour YAML, le commentaire est lu par le <a href="https://github.com/redhat-developer/yaml-language-server">serveur de langage YAML de Red Hat</a>. Pour JSON, tout éditeur moderne lit <code>$schema</code> nativement. Mago lui-même ignore la clé <code>$schema</code> et les commentaires magiques, ils n'existent que pour l'outillage des éditeurs.</p>
-<p>Si vous régénérez le schéma en CI (par exemple, pour valider des fichiers de configuration de manière programmée), <code>mago config --schema</code> l'imprime sur stdout.</p>
+<p>Si vous régénérez le schéma en CI (par exemple, pour valider des fichiers de configuration de manière programmatique), <code>mago config --schema</code> l'imprime sur stdout.</p>
 <h2 id="sharing-configuration-with-extends">Partager une configuration avec <code>extends</code></h2>
 <blockquote>
 <p>Disponible depuis Mago 1.25. Les versions antérieures ignorent silencieusement la directive.</p>
 </blockquote>
 <p>La directive <code>extends</code> permet à une configuration de s'appuyer sur d'autres sans copier-coller. Pratique quand plusieurs projets partagent un standard commun.</p>
-<pre><code class="language-toml"># Single parent
+<pre><code class="language-toml"># Parent unique
 extends = "vendor/some-org/mago-config/mago.toml"
 
-# Or a list, applied left-to-right; each later layer overrides earlier ones
+# Ou une liste, appliquée de gauche à droite ; chaque couche postérieure remplace les précédentes
 extends = [
-  "vendor/some-org/mago-config",     # directory: mago.{toml,yaml,yml,json} inside
-  "configs/strict.json",              # mixing formats is fine
+  "vendor/some-org/mago-config",     # répertoire : mago.{toml,yaml,yml,json} à l'intérieur
+  "configs/strict.json",              # mélanger les formats est autorisé
   "../shared/team-defaults.toml",
 ]
 
-# This file's own keys override anything from the layers above
+# Les clés propres à ce fichier remplacent tout ce qui vient des couches précédentes
 php-version = "8.3"
 </code></pre>
 <h3 id="resolution">Résolution</h3>
 <p>Les chemins absolus sont utilisés tels quels. Les chemins relatifs sont résolus par rapport au répertoire du fichier qui déclare <code>extends</code>, et non par rapport au répertoire de travail courant. Ainsi, <code>mago --config some/dir/config.toml</code> avec <code>extends = "base.toml"</code> cherche <code>some/dir/base.toml</code>.</p>
 <p>Les entrées de fichier doivent exister et utiliser une extension reconnue (<code>.toml</code>, <code>.yaml</code>, <code>.yml</code>, <code>.json</code>). Les entrées de répertoire sont parcourues à la recherche de <code>mago.{toml,yaml,yml,json}</code> selon cette précédence ; un répertoire sans fichier reconnu est ignoré avec un avertissement plutôt que de faire échouer la construction.</p>
 <h3 id="effective-precedence">Précédence effective</h3>
-<p>Les couches sont fusionnées de la plus profonde à la plus superficielle, la dernière l'emportant :</p>
+<p>Les couches sont fusionnées en partant de la plus profonde, et la dernière l'emporte :</p>
 <ol>
 <li>Valeurs par défaut intégrées.</li>
 <li>Chaque couche <code>extends</code>, récursivement. Le <code>extends</code> propre à un parent est résolu avant que ses clés ne s'appliquent.</li>
-<li>Les clés du fichier propriétaire.</li>
+<li>Les clés du fichier hôte.</li>
 <li>Les variables d'environnement <code>MAGO_*</code> pour les <a href="../../../../main/fr/guide/environment-variables">scalaires pris en charge</a>.</li>
 <li>Les drapeaux CLI tels que <code>--php-version</code>, <code>--threads</code>.</li>
 </ol>
@@ -634,13 +634,13 @@ threads = 4
 [source]
 excludes = ["vendor", "node_modules"]
 </code></pre>
-<pre><code class="language-toml"># project mago.toml
+<pre><code class="language-toml"># mago.toml du projet
 extends = "base.toml"
 threads = 8
 [source]
-excludes = ["build"]   # appended -&gt; ["vendor", "node_modules", "build"]
+excludes = ["build"]   # concaténé -&gt; ["vendor", "node_modules", "build"]
 </code></pre>
-<p>Les cycles sont détectés via le suivi des chemins canoniques et déclenchent une erreur claire au lieu de récurer indéfiniment. L'héritage en losange (A étend B et C, qui étendent tous deux D) traite D une seule fois et fonctionne sans souci. Les couches peuvent mélanger les formats librement ; chacune est analysée par son propre driver et fusionnée à un niveau de valeur générique avant que le document final ne soit validé contre le schéma.</p>
+<p>Les cycles sont détectés via le suivi des chemins canoniques et déclenchent une erreur claire au lieu de boucler indéfiniment. L'héritage en losange (A étend B et C, qui étendent tous deux D) traite D une seule fois et fonctionne sans souci. Les couches peuvent mélanger les formats librement ; chacune est analysée par son propre driver et fusionnée à un niveau de valeur générique avant que le document final ne soit validé selon le schéma.</p>
 <h2 id="global-options">Options globales</h2>
 <p>Ces clés se trouvent à la racine de <code>mago.toml</code>.</p>
 <pre><code class="language-toml">version = "1"
@@ -653,8 +653,8 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <tr><td style="text-align: left"><code>version</code></td><td style="text-align: left">string</td><td style="text-align: left">aucun</td><td style="text-align: left">Fixe la version de Mago contre laquelle ce projet est testé. Accepte un majeur (<code>"1"</code>), mineur (<code>"1.25"</code>) ou exact (<code>"1.25.2"</code>). Voir <a href="#version-pinning">épinglage de version</a>.</td></tr>
 <tr><td style="text-align: left"><code>php-version</code></td><td style="text-align: left">string</td><td style="text-align: left">dernière stable</td><td style="text-align: left">La version PHP que Mago doit cibler pour l'analyse syntaxique et l'analyse. <code>mago init</code> la détecte automatiquement depuis <code>composer.json</code> quand c'est possible.</td></tr>
 <tr><td style="text-align: left"><code>allow-unsupported-php-version</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Autoriser Mago à s'exécuter sur une version PHP qu'il ne prend pas officiellement en charge. Non recommandé.</td></tr>
-<tr><td style="text-align: left"><code>no-version-check</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Réduit au silence l'avertissement émis quand le binaire installé diverge de la version épinglée. Une divergence de version majeure est toujours fatale.</td></tr>
-<tr><td style="text-align: left"><code>threads</code></td><td style="text-align: left">integer</td><td style="text-align: left">CPUs logiques</td><td style="text-align: left">Nombre de threads pour le travail en parallèle.</td></tr>
+<tr><td style="text-align: left"><code>no-version-check</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Désactive l'avertissement émis quand le binaire installé diverge de la version épinglée. Une divergence de version majeure est toujours fatale.</td></tr>
+<tr><td style="text-align: left"><code>threads</code></td><td style="text-align: left">integer</td><td style="text-align: left">CPU logiques</td><td style="text-align: left">Nombre de threads pour le travail en parallèle.</td></tr>
 <tr><td style="text-align: left"><code>stack-size</code></td><td style="text-align: left">integer</td><td style="text-align: left">2 MiB</td><td style="text-align: left">Taille de pile par thread en octets. Minimum 2 MiB, maximum 8 MiB.</td></tr>
 <tr><td style="text-align: left"><code>editor-url</code></td><td style="text-align: left">string</td><td style="text-align: left">aucun</td><td style="text-align: left">Modèle d'URL pour les chemins de fichiers cliquables dans la sortie du terminal. Voir <a href="#editor-integration">intégration éditeur</a>.</td></tr>
 </tbody></table>
@@ -666,7 +666,7 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <li><strong>Épinglage mineur</strong> (<code>version = "1.25"</code>) : tout <code>1.25.y</code> satisfait l'épinglage. Une divergence vers un mineur différent émet un avertissement ; une divergence majeure reste fatale.</li>
 <li><strong>Épinglage exact</strong> (<code>version = "1.25.2"</code>) : toute divergence émet un avertissement ; une divergence majeure reste fatale.</li>
 </ul>
-<p>L'avertissement peut être réduit au silence avec <code>--no-version-check</code>, la variable d'environnement <code>MAGO_NO_VERSION_CHECK</code>, ou <code>no-version-check = true</code> dans la configuration. Aucun de ces moyens n'affecte la divergence de version majeure, qui est tout l'intérêt de l'épinglage.</p>
+<p>L'avertissement peut être désactivé avec <code>--no-version-check</code>, la variable d'environnement <code>MAGO_NO_VERSION_CHECK</code>, ou <code>no-version-check = true</code> dans la configuration. Aucun de ces moyens n'affecte la divergence de version majeure, qui est tout l'intérêt de l'épinglage.</p>
 <p>Pour synchroniser le binaire installé avec l'épinglage du projet :</p>
 <pre><code class="language-sh">mago self-update --to-project-version
 </code></pre>

@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   
   <title>Supprimer les problèmes · Mago</title>
-  <meta name="description" content="Comment utiliser les pragmas @mago-expect et @mago-ignore pour réduire au silence des problèmes spécifiques dans votre code.">
+  <meta name="description" content="Comment utiliser les pragmas @mago-expect et @mago-ignore pour supprimer des problèmes spécifiques dans votre code.">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Supprimer les problèmes · Mago">
-  <meta property="og:description" content="Comment utiliser les pragmas @mago-expect et @mago-ignore pour réduire au silence des problèmes spécifiques dans votre code.">
+  <meta property="og:description" content="Comment utiliser les pragmas @mago-expect et @mago-ignore pour supprimer des problèmes spécifiques dans votre code.">
   <meta property="og:url" content="https://mago.carthage.software/main/fr/fundamentals&#x2F;suppressing-issues/">
   <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/banner.png">
   <meta property="og:image:width" content="1200">
@@ -16,7 +16,7 @@
   <meta property="og:locale" content="fr">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Supprimer les problèmes · Mago">
-  <meta name="twitter:description" content="Comment utiliser les pragmas @mago-expect et @mago-ignore pour réduire au silence des problèmes spécifiques dans votre code.">
+  <meta name="twitter:description" content="Comment utiliser les pragmas @mago-expect et @mago-ignore pour supprimer des problèmes spécifiques dans votre code.">
   <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/banner.png">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
@@ -581,7 +581,7 @@ $result = $value ?: 'default';
 <p>Plusieurs codes fonctionnent de la même manière :</p>
 <pre><code class="language-php">// @mago-ignore lint:no-shorthand-ternary,no-assign-in-condition
 if ($result = $value ?: 'default') {
-    // Do something with $result
+    // Faire quelque chose avec $result
 }
 </code></pre>
 <h2 id="block-level-suppression">Suppression au niveau du bloc</h2>
@@ -591,7 +591,7 @@ function foo(): string {
     if (rand(0, 1)) {
         return 'foo';
     }
-    // No return statement here.
+    // Pas d'instruction return ici.
 }
 </code></pre>
 <p>Idem pour les listes multi-codes :</p>
@@ -618,11 +618,11 @@ return $a . $b . $c;
 </code></pre>
 <h3 id="unfulfilled-counts">Comptes non satisfaits</h3>
 <p>Si moins de problèmes correspondent qu'attendu, Mago signale <code>unfulfilled-expect</code> et la correction automatique réduit le compte plutôt que de supprimer la directive (ce qui réactiverait les problèmes qui correspondaient) :</p>
-<pre><code class="language-php">// Before: 3 matches expected, only 2 happened.
+<pre><code class="language-php">// Avant : 3 correspondances attendues, seulement 2 se sont produites.
 // @mago-expect analysis:mixed-operand(3)
 return $a . $b;
 
-// After auto-fix: count drops so the 2 real matches stay suppressed.
+// Après correction automatique : le compte est réduit, les 2 correspondances réelles restent supprimées.
 // @mago-expect analysis:mixed-operand(2)
 return $a . $b;
 </code></pre>
@@ -651,7 +651,7 @@ $result = eval($value) ?: 'default';
  * @mago-ignore all
  */
 function legacy_code(): string {
-    // Every linter, analyzer, and guard issue is suppressed here.
+    // Tous les problèmes du linter, de l'analyseur et du guard sont supprimés ici.
 }
 </code></pre>
 <p>Préférez des codes spécifiques quand vous le pouvez. <code>all</code> est un instrument grossier qui masque les nouveaux problèmes que vous voudriez voir.</p>
@@ -661,15 +661,15 @@ function legacy_code(): string {
 <li><code>@mago-ignore</code> est l'option plus légère pour les suppressions moins critiques ou quand vous acceptez que le pragma puisse survivre silencieusement au problème.</li>
 </ul>
 <h2 id="examples">Exemples</h2>
-<pre><code class="language-php">// Suppress a guard issue
+<pre><code class="language-php">// Supprimer un problème du guard
 // @mago-expect guard:disallowed-use
 use App\Infrastructure\SomeForbiddenClass;
 
-// Suppress one lint issue
+// Supprimer un problème du linter
 // @mago-expect lint:no-shorthand-ternary
 $result = $condition ?: 'default';
 
-// Suppress issues for an entire function
+// Supprimer les problèmes pour toute une fonction
 // @mago-expect analysis:missing-return-statement,impossible-condition
 function complexFunction(): string {
     if (false) {
@@ -677,18 +677,18 @@ function complexFunction(): string {
     }
 }
 
-// Three occurrences of one code on the next line
+// Trois occurrences d'un même code sur la ligne suivante
 // @mago-expect analysis:mixed-operand(3)
 return $a . $b . $c;
 
-// All lint issues on one line
+// Tous les problèmes du linter sur une ligne
 // @mago-ignore lint:all
 $result = $value ?: ($x == true ? 'yes' : 'no');
 
-// Everything, for a legacy function
+// Tout supprimer, pour une fonction legacy
 // @mago-ignore all
 function legacyFunction(): string {
-    // Everything suppressed here.
+    // Tout est supprimé ici.
 }
 </code></pre>
 

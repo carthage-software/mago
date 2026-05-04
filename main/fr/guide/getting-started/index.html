@@ -555,19 +555,19 @@
   <main id="content" class="doc-content">
     <article class="doc-page">
       <h1 id="getting-started">Premiers pas</h1>
-<p>Mago est une chaîne d'outils PHP écrite en Rust. Un seul binaire couvre les parties d'un workflow qui prennent habituellement trois ou quatre outils séparés.</p>
+<p>Mago est une chaîne d'outils PHP écrite en Rust. Un seul binaire couvre ce qui demande habituellement trois ou quatre outils distincts.</p>
 <p>Il inclut :</p>
 <ul>
 <li>Un <a href="../../../../main/fr/tools/formatter/overview">formateur</a> qui produit une sortie déterministe et suit PER-CS par défaut.</li>
 <li>Un <a href="../../../../main/fr/tools/linter/overview">linter</a> avec un catalogue soigné de règles réparties en neuf catégories. Beaucoup de corrections s'appliquent automatiquement.</li>
-<li>Un <a href="../../../../main/fr/tools/analyzer/overview">analyseur statique</a> qui attrape les erreurs de type et les bugs de logique avant l'exécution, avec prise en charge des annotations Psalm et PHPStan.</li>
+<li>Un <a href="../../../../main/fr/tools/analyzer/overview">analyseur statique</a> qui détecte les erreurs de type et les bugs de logique avant l'exécution, avec prise en charge des annotations Psalm et PHPStan.</li>
 <li>Un <a href="../../../../main/fr/tools/guard/overview">guard architectural</a> qui applique les règles de dépendance et les conventions structurelles.</li>
 </ul>
 <p>Le tout fonctionne avec un binaire unique, sans runtime PHP, sans dépendance Composer, sans installation Java. Un workflow typique ressemble à :</p>
-<pre><code class="language-sh">mago init           # write a starter mago.toml
-mago lint           # surface stylistic and correctness issues
-mago format         # rewrite files to match the formatter
-mago analyze        # type-check and find logic bugs
+<pre><code class="language-sh">mago init           # génère un mago.toml de départ
+mago lint           # signale les problèmes de style et de justesse
+mago format         # réécrit les fichiers selon les règles du formateur
+mago analyze        # vérifie les types et détecte les bugs de logique
 </code></pre>
 <h2 id="where-to-go-next">Où aller ensuite</h2>
 <ul>

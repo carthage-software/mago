@@ -555,7 +555,7 @@
   <main id="content" class="doc-content">
     <article class="doc-page">
       <h1 id="github-actions-recipe">Recette GitHub Actions</h1>
-<p>Un workflow simple qui lance le formateur, le linter et l'analyseur à chaque push et chaque pull request, avec des annotations natives sur les PRs.</p>
+<p>Un workflow simple qui lance le formateur, le linter et l'analyseur à chaque push et chaque pull request, avec des annotations natives sur les PR.</p>
 <h2 id="quick-setup">Configuration rapide</h2>
 <p>Créez <code>.github/workflows/mago.yml</code> :</p>
 <pre><code class="language-yaml">name: Mago Code Quality
@@ -603,7 +603,7 @@ jobs:
 <li>Séparer <code>format</code>, <code>lint</code> et <code>analyze</code> en étapes distinctes fait remonter les résultats des trois, même quand une étape antérieure échoue. Un seul <code>run:</code> combiné ferait court-circuit au premier échec et masquerait le reste.</li>
 <li><code>if: success() || failure()</code> lance l'étape quand le job n'a pas été annulé, ce qui est ce que vous voulez ici. <code>always()</code> la lancerait aussi après des échecs de setup.</li>
 <li>Utilisez <code>mago format --check</code>, pas <code>--dry-run</code>. <code>--check</code> quitte avec un code non nul quand des fichiers ont besoin d'être formatés ; <code>--dry-run</code> n'affiche qu'un diff et quitte toujours zéro.</li>
-<li>Mago détecte GitHub Actions via la variable d'environnement <code>GITHUB_ACTIONS</code> et bascule automatiquement sur <code>--reporting-format=github</code>, produisant des annotations natives sur les PRs. Aucune configuration supplémentaire requise. Sur 1.17.0 et antérieur, vous devez passer <code>--reporting-format=github</code> à <code>mago lint</code> et <code>mago analyze</code> manuellement.</li>
+<li>Mago détecte GitHub Actions via la variable d'environnement <code>GITHUB_ACTIONS</code> et bascule automatiquement sur <code>--reporting-format=github</code>, produisant des annotations natives sur les PR. Aucune configuration supplémentaire requise. Sur 1.17.0 et antérieur, vous devez passer <code>--reporting-format=github</code> à <code>mago lint</code> et <code>mago analyze</code> manuellement.</li>
 </ul>
 <h2 id="using-the-docker-image">Utiliser l'image Docker</h2>
 <p>Si vous préférez ne pas installer Mago sur le runner, lancez l'<a href="../../../../main/fr/recipes/docker">image Docker officielle</a> en tant que job conteneur :</p>

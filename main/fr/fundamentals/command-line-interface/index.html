@@ -557,7 +557,7 @@
       <h1 id="command-line-interface">Interface en ligne de commande</h1>
 <p>Chaque invocation de Mago suit le schéma <code>mago [GLOBAL OPTIONS] &lt;SUBCOMMAND&gt;</code>. Les options globales doivent venir avant la sous-commande.</p>
 <pre><code class="language-sh">mago --colors=never lint        # correct
-mago lint --colors=never        # wrong, --colors is a global option
+mago lint --colors=never        # incorrect, --colors est une option globale
 </code></pre>
 <h2 id="global-options">Options globales</h2>
 <p>Ces options s'appliquent à chaque sous-commande et contrôlent le runtime, la découverte de configuration et la sortie.</p>
@@ -565,9 +565,9 @@ mago lint --colors=never        # wrong, --colors is a global option
 <tr><td style="text-align: left"><code>--workspace &lt;PATH&gt;</code></td><td style="text-align: left">Racine du workspace. Par défaut le répertoire courant.</td></tr>
 <tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left">Chemin du fichier de configuration. Sans cela, Mago cherche dans le workspace, <code>$XDG_CONFIG_HOME</code>, <code>~/.config</code> et <code>~</code>. Voir <a href="../../../../main/fr/guide/configuration#discovery">découverte</a>.</td></tr>
 <tr><td style="text-align: left"><code>--php-version &lt;VERSION&gt;</code></td><td style="text-align: left">Surcharge la version PHP configurée, par exemple <code>8.2</code>.</td></tr>
-<tr><td style="text-align: left"><code>--threads &lt;NUMBER&gt;</code></td><td style="text-align: left">Surcharge le nombre de threads. Par défaut le nombre de CPUs logiques.</td></tr>
-<tr><td style="text-align: left"><code>--allow-unsupported-php-version</code></td><td style="text-align: left">Exécute contre une version PHP que Mago ne prend pas officiellement en charge. À utiliser avec précaution.</td></tr>
-<tr><td style="text-align: left"><code>--no-version-check</code></td><td style="text-align: left">Réduit au silence l'avertissement émis sur une divergence mineure ou patch par rapport à la version épinglée du projet. La divergence majeure reste fatale. Voir <a href="../../../../main/fr/guide/configuration#version-pinning">épinglage de version</a>.</td></tr>
+<tr><td style="text-align: left"><code>--threads &lt;NUMBER&gt;</code></td><td style="text-align: left">Surcharge le nombre de threads. Par défaut, le nombre de CPU logiques.</td></tr>
+<tr><td style="text-align: left"><code>--allow-unsupported-php-version</code></td><td style="text-align: left">Permet à Mago de s'exécuter sur une version PHP qu'il ne prend pas officiellement en charge. À utiliser avec précaution.</td></tr>
+<tr><td style="text-align: left"><code>--no-version-check</code></td><td style="text-align: left">Désactive l'avertissement émis lorsque la version installée diverge de la version épinglée du projet par un changement mineur ou patch. Une divergence majeure reste fatale. Voir <a href="../../../../main/fr/guide/configuration#version-pinning">épinglage de version</a>.</td></tr>
 <tr><td style="text-align: left"><code>--colors &lt;WHEN&gt;</code></td><td style="text-align: left">Quand colorer la sortie : <code>always</code>, <code>never</code> ou <code>auto</code> (par défaut).</td></tr>
 <tr><td style="text-align: left"><code>-h</code>, <code>--help</code></td><td style="text-align: left">Affiche l'aide et quitte.</td></tr>
 <tr><td style="text-align: left"><code>-V</code>, <code>--version</code></td><td style="text-align: left">Affiche la version installée et quitte.</td></tr>

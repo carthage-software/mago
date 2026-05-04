@@ -608,7 +608,7 @@
 <pre><code class="language-sh">MAGO_ALLOW_UNSUPPORTED_PHP_VERSION=true mago lint
 </code></pre>
 <h3 id="mago-no-version-check"><code>MAGO_NO_VERSION_CHECK</code></h3>
-<p>Surcharge <code>no-version-check</code>. Mettez à <code>true</code> pour réduire au silence l'avertissement émis quand le binaire installé diverge de la version épinglée dans <code>mago.toml</code>. Une divergence de version majeure reste fatale quelle que soit cette variable : tout l'intérêt d'un épinglage majeur est de bloquer les exécutions à travers des schémas de configuration incompatibles.</p>
+<p>Surcharge <code>no-version-check</code>. Mettez à <code>true</code> pour désactiver l'avertissement émis quand le binaire installé diverge de la version épinglée dans <code>mago.toml</code>. Une divergence de version majeure reste fatale quelle que soit cette variable : tout l'intérêt d'un épinglage majeur est de bloquer les exécutions à travers des schémas de configuration incompatibles.</p>
 <pre><code class="language-sh">MAGO_NO_VERSION_CHECK=true mago lint
 </code></pre>
 

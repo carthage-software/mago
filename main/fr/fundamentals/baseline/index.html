@@ -555,7 +555,7 @@
   <main id="content" class="doc-content">
     <article class="doc-page">
       <h1 id="baseline">Baseline</h1>
-<p>Un fichier baseline enregistre les problèmes qui existent dans votre base de code à l'instant présent et indique à Mago de les ignorer lors des exécutions futures. Les nouveaux problèmes introduits après la baseline restent signalés. Utile lors de l'adoption de Mago dans un projet qui compte déjà des centaines ou milliers de problèmes, ou lorsque vous étalez un durcissement de règles sur plusieurs PRs.</p>
+<p>Un fichier baseline enregistre les problèmes qui existent dans votre base de code à l'instant présent et indique à Mago de les ignorer lors des exécutions futures. Les nouveaux problèmes introduits après la baseline restent signalés. Utile lors de l'adoption de Mago dans un projet qui compte déjà des centaines ou milliers de problèmes, ou lorsque vous étalez un durcissement de règles sur plusieurs PR.</p>
 <h2 id="one-file-per-tool">Un fichier par outil</h2>
 <p>Le linter et l'analyseur portent chacun leur propre baseline car les problèmes qu'ils signalent sont différents. Noms conventionnels :</p>
 <ul>
@@ -567,7 +567,7 @@
 <pre><code class="language-sh">mago lint --generate-baseline --baseline lint-baseline.toml
 mago analyze --generate-baseline --baseline analysis-baseline.toml
 </code></pre>
-<p>La commande exécute l'outil, collecte chaque problème trouvé et les sérialise dans le fichier TOML spécifié.</p>
+<p>La commande exécute l'outil, collecte tous les problèmes trouvés et les sérialise dans le fichier TOML spécifié.</p>
 <h2 id="using-a-baseline">Utiliser une baseline</h2>
 <pre><code class="language-sh">mago lint --baseline lint-baseline.toml
 mago analyze --baseline analysis-baseline.toml
@@ -620,7 +620,7 @@ end_line   = 90
 <p>Définissez la variante pour les nouveaux fichiers de baseline dans <code>mago.toml</code> :</p>
 <pre><code class="language-toml">[linter]
 baseline = "lint-baseline.toml"
-baseline-variant = "loose"   # or "strict"
+baseline-variant = "loose"   # ou "strict"
 
 [analyzer]
 baseline = "analysis-baseline.toml"
@@ -635,7 +635,7 @@ mago analyze --ignore-baseline
 </code></pre>
 <p>Utile quand vous voulez voir les problèmes actuellement supprimés par la baseline, par exemple pour en nettoyer une partie.</p>
 <h2 id="keeping-the-baseline-tidy">Garder la baseline propre</h2>
-<p>Quand vous corrigez un problème faisant partie de la baseline, son entrée devient morte. Mago détecte cela et avertit pour les entrées obsolètes. Régénérez pour nettoyer :</p>
+<p>Quand vous corrigez un problème faisant partie de la baseline, son entrée devient obsolète. Mago détecte cela et signale les entrées obsolètes. Régénérez pour nettoyer :</p>
 <pre><code class="language-sh">mago lint --generate-baseline --baseline lint-baseline.toml
 </code></pre>
 <p>Passez <code>--backup-baseline</code> pour conserver le fichier précédent sous <code>lint-baseline.toml.bkp</code> avant écrasement.</p>
