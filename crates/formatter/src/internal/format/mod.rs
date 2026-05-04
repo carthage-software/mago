@@ -473,7 +473,7 @@ impl<'arena> Format<'arena> for UseItemSequence<'arena> {
                     in f.arena;
                     Document::Indent(Document::join(
                         f.arena,
-                        statement::sort_use_items(self.items.iter()).into_iter().map(|i| i.format(f)),
+                        statement::sort_use_items(f, self.items.iter()).into_iter().map(|i| i.format(f)),
                         Separator::CommaLine,
                     )),
                     Document::Line(Line::soft()),
@@ -509,7 +509,7 @@ impl<'arena> Format<'arena> for TypedUseItemList<'arena> {
                 let mut items: Vec<_> = if f.settings.sort_uses {
                     Document::join(
                         f.arena,
-                        statement::sort_use_items(self.items.iter()).into_iter().map(|i| i.format(f)),
+                        statement::sort_use_items(f, self.items.iter()).into_iter().map(|i| i.format(f)),
                         Separator::CommaLine,
                     )
                 } else {
@@ -544,7 +544,7 @@ impl<'arena> Format<'arena> for MixedUseItemList<'arena> {
                 let mut items = if f.settings.sort_uses {
                     Document::join(
                         f.arena,
-                        statement::sort_maybe_typed_use_items(self.items.iter()).into_iter().map(|i| i.format(f)),
+                        statement::sort_maybe_typed_use_items(f, self.items.iter()).into_iter().map(|i| i.format(f)),
                         Separator::CommaLine,
                     )
                 } else {
@@ -592,7 +592,7 @@ impl<'arena> Format<'arena> for TypedUseItemSequence<'arena> {
                 if f.settings.sort_uses {
                     Document::Indent(Document::join(
                         f.arena,
-                        statement::sort_use_items(self.items.iter()).into_iter().map(|i| i.format(f)),
+                        statement::sort_use_items(f, self.items.iter()).into_iter().map(|i| i.format(f)),
                         Separator::CommaLine,
                     ))
                 } else {
