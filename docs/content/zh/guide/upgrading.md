@@ -23,8 +23,8 @@ mago self-update --check
 更新到最新版:
 
 ```sh
-mago self-update                  # interactive confirmation
-mago self-update --no-confirm     # skip the prompt
+mago self-update                  # 交互式确认
+mago self-update --no-confirm     # 跳过确认提示
 ```
 
 锁定到指定版本:

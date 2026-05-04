@@ -43,10 +43,10 @@ prefer-static-closure = { exclude = ["tests/"] }
 
 ```toml
 [source]
-excludes = ["cache/**"]              # excluded from every tool
+excludes = ["cache/**"]              # 对所有工具排除
 
 [linter]
-excludes = ["database/migrations/**"]  # additionally excluded from the linter only
+excludes = ["database/migrations/**"]  # 额外对 linter 排除
 ```
 
 ## `[linter.rules]`

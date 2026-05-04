@@ -10,9 +10,9 @@ nav_section = ""
 
 <div class="home-hero__plate"><span>Mago</span><span class="home-hero__plate-divider">/</span><span>PHP 工具链</span><span class="home-hero__plate-divider">/</span><span>Carthage Software</span></div>
 
-<h1 class="home-hero__title">一款 <em>氧化</em> 的 PHP 工具链。</h1>
+<h1 class="home-hero__title">一款<em>氧化</em>的 PHP 工具链。</h1>
 
-<p class="home-hero__lede">Mago 是一款用 Rust 编写的 PHP 静态分析器、linter 和格式化器。专为那些已经超出现有工具链耐心的项目而打造。</p>
+<p class="home-hero__lede">Mago 是一款用 Rust 编写的 PHP 静态分析器、linter 和格式化器。专为那些现有工具链已不堪重负的项目而打造。</p>
 
 <div class="home-hero__cta">
 <a class="button button--solid" href="/guide/getting-started/"><span>快速开始</span><span class="button__arrow">→</span></a>
@@ -22,7 +22,7 @@ nav_section = ""
 </div>
 
 <div class="home-hero__art">
-<img class="home-hero__logo" src="/assets/logo.webp" alt="Mago,头戴巫师帽的耳廓狐" width="416" height="500" loading="eager" decoding="async">
+<img class="home-hero__logo" src="/assets/logo.webp" alt="Mago, 头戴巫师帽的耳廓狐" width="416" height="500" loading="eager" decoding="async">
 </div>
 
 </section>
@@ -43,14 +43,14 @@ nav_section = ""
 <article class="feature">
 <span class="feature__num">02 / Lint</span>
 <h3 class="feature__name">有主张的 lint 检查</h3>
-<p class="feature__body">面向正确性、一致性与清晰度的精选规则集合。在安全的地方保存即修。该静默时静默。</p>
+<p class="feature__body">面向正确性、一致性与清晰度的精选规则集合。安全时保存即修复。无需时保持安静。</p>
 <div class="feature__stat"><strong>{{BENCH_LINTER_MAGO_TIME}}</strong> · 同一项目</div>
 </article>
 
 <article class="feature">
 <span class="feature__num">03 / Format</span>
 <h3 class="feature__name">格式化器</h3>
-<p class="feature__body">一款确定性的格式化器,产出稳定且符合惯例的输出。无配置赌局,无争论。装上即用,无需多想。</p>
+<p class="feature__body">一款确定性的格式化器,产出稳定且符合惯例的输出。无需纠结配置,没有无谓争论。开箱即用,无需多虑。</p>
 <div class="feature__stat"><strong>{{BENCH_FORMATTER_MAGO_TIME}}</strong> · 同一项目</div>
 </article>
 
@@ -111,7 +111,7 @@ nav_section = ""
 
 <section class="home-section">
 
-<header class="home-section__head"><span class="home-section__num">§ 04</span><h2 class="home-section__title">三步开跑</h2></header>
+<header class="home-section__head"><span class="home-section__num">§ 04</span><h2 class="home-section__title">三步上手</h2></header>
 
 <ol class="home-steps">
 <li><strong>安装。</strong>一条命令。无需 PHP 运行时。单一静态二进制。</li>

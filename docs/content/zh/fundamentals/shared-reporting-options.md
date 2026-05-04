@@ -6,7 +6,7 @@ nav_section = "基础"
 +++
 # 报告与修复选项
 
-`mago lint`、`mago analyze` 和 `mago ast` 共用一组参数,用来控制问题如何被报告、修复如何被应用。本页是这些参数的中心参考,这样我们就不必在每个命令页里重复它们。
+`mago lint`、`mago analyze` 和 `mago ast` 共用一组参数,用来控制问题如何被报告、修复如何被应用。本页是这些参数的集中参考,这样我们就不必在每个命令页里重复它们。
 
 ## 自动修复
 
@@ -40,9 +40,9 @@ Mago 如何呈现它发现的问题。
 - `mago lint --retain-code <CODE>` 运行所有规则,然后把输出过滤到你列出的 code。
 
 ```sh
-mago lint --only no-unused-variable                                  # only run that rule
-mago lint --retain-code no-unused-variable                           # run everything, show only this code
-mago lint --retain-code no-unused-variable --retain-code semantics   # multiple codes
+mago lint --only no-unused-variable                                  # 仅运行该规则
+mago lint --retain-code no-unused-variable                           # 运行所有规则,仅显示此 code
+mago lint --retain-code no-unused-variable --retain-code semantics   # 多个 code
 mago analyze --retain-code invalid-argument --retain-code type-mismatch
 ```
 

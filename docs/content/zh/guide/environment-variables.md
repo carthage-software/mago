@@ -52,7 +52,7 @@ XDG_CONFIG_HOME=/path/to/config mago lint
 
 ## 保留前缀 `MAGO_`
 
-Mago 为自身保留 `MAGO_` 前缀。只有本页文档化的变量才被官方识别。其他以 `MAGO_` 为前缀的变量被保留作内部用途,可能会在未来的版本中被静默忽略或重新使用。
+Mago 为自身保留 `MAGO_` 前缀。只有本页文档化的变量才被官方识别。其他以 `MAGO_` 为前缀的变量被保留作内部用途,可能会在未来的版本中被默默忽略或重新使用。
 
 > 早期版本会自动把每个 `MAGO_*` 变量映射到配置树中,因此像 `MAGO_LINT=1` 这样的设置会因 "unknown field" 错误而崩溃。Mago 1.25 把它收窄为下面这个明确的列表。
 
@@ -78,7 +78,7 @@ MAGO_THREADS=4 mago lint
 
 ### `MAGO_STACK_SIZE`
 
-覆盖 `stack-size`,以字节为单位。超出范围的值会被夹到受支持的区间(最小 2 MiB,最大 8 MiB)。
+覆盖 `stack-size`,以字节为单位。超出范围的值会被限制到受支持的区间 (最小 2 MiB,最大 8 MiB)。
 
 ```sh
 MAGO_STACK_SIZE=8388608 mago lint
@@ -102,7 +102,7 @@ MAGO_ALLOW_UNSUPPORTED_PHP_VERSION=true mago lint
 
 ### `MAGO_NO_VERSION_CHECK`
 
-覆盖 `no-version-check`。设为 `true` 可静默"已安装二进制偏离 `mago.toml` 中锁定版本"的警告。无论该变量如何设置,主版本漂移仍然是致命错误:主版本锁定的全部意义就是阻止跨不兼容配置 schema 的运行。
+覆盖 `no-version-check`。设为 `true` 可关闭"已安装二进制偏离 `mago.toml` 中锁定版本"的警告。无论该变量如何设置,主版本漂移仍然是致命错误:主版本锁定的全部意义在于阻止跨不兼容配置 schema 的运行。
 
 ```sh
 MAGO_NO_VERSION_CHECK=true mago lint

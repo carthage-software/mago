@@ -10,8 +10,8 @@ nav_section = "指南"
 
 ```sh
 mago generate-completions fish
-mago generate-completions fish | source              # fish, ad-hoc
-mago generate-completions zsh > ~/.zfunc/_mago      # zsh, persisted
+mago generate-completions fish | source              # fish, 临时使用
+mago generate-completions zsh > ~/.zfunc/_mago      # zsh, 持久保存
 mago generate-completions bash > /etc/bash_completion.d/mago
 ```
 

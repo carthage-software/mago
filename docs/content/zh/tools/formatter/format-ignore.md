@@ -223,7 +223,7 @@ linter 提供了两条规则,用于捕获无效的标记位置:
 ```php
 <?php
 
-// The marker is inside an array literal, has no effect.
+// 标记位于数组字面量内部,没有效果。
 $arr = [ // @mago-format-ignore-next
     1,
     2,

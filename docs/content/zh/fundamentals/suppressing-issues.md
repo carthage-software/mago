@@ -1,6 +1,6 @@
 +++
 title = "抑制问题"
-description = "如何使用 @mago-expect 和 @mago-ignore 这两条指令来在代码中静默特定问题。"
+description = "如何使用 @mago-expect 和 @mago-ignore 这两条指令来在代码中抑制特定问题。"
 nav_order = 30
 nav_section = "基础"
 +++
@@ -14,7 +14,7 @@ nav_section = "基础"
 - `analysis`(别名 `analyzer`、`analyser`)用于分析器问题。
 - `guard` 用于架构 guard 问题。
 
-可以用逗号分隔的列表一次抑制多个 code,`(N)` 计数简写则用来处理同一个 code 在一行内出现 N 次的情况。
+可以用逗号分隔的列表一次抑制多个 code,`(N)` 计数简写用于处理同一个 code 在一行内出现 N 次的情况。
 
 ## `@mago-expect`
 
@@ -36,7 +36,7 @@ $result = $value ?: 'default';
 
 ## `@mago-ignore`
 
-抑制下一行或下一个块中列出的 code,但在这些 code 不再触发时不会大声警告。Mago 仍会报告一条 `unused-pragma` 提示,以便你清理,只是级别是提示而不是警告。
+抑制下一行或下一个块中列出的 code,但在这些 code 不再触发时不会发出警告。Mago 仍会报告一条 `unused-pragma` 提示,以便你清理,只是级别是提示而不是警告。
 
 ```php
 // @mago-ignore lint:no-shorthand-ternary
@@ -48,7 +48,7 @@ $result = $value ?: 'default';
 ```php
 // @mago-ignore lint:no-shorthand-ternary,no-assign-in-condition
 if ($result = $value ?: 'default') {
-    // Do something with $result
+    // 对 $result 进行某些操作
 }
 ```
 
@@ -62,7 +62,7 @@ function foo(): string {
     if (rand(0, 1)) {
         return 'foo';
     }
-    // No return statement here.
+    // 此处缺少 return 语句。
 }
 ```
 
@@ -80,7 +80,7 @@ function foo(): string {
 
 ## 抑制 N 次出现
 
-当一行(或被作用域指令覆盖的一个块)多次触发同一个 code 时,反复重复这个 code 很冗长:
+当一行(或被作用域指令覆盖的一个块)多次触发同一个 code 时,反复重复这个 code 很繁琐:
 
 ```php
 // @mago-expect analysis:mixed-operand,mixed-operand,mixed-operand
@@ -94,7 +94,7 @@ return $a . $b . $c;
 return $a . $b . $c;
 ```
 
-`N` 必须是正整数。`code(1)` 等价于直接写 `code`。形如 `(0)`、`(abc)` 或括号不匹配的格式异常后缀会被当作 code 名的一部分,无法匹配。
+`N` 必须是正整数。`code(1)` 等价于直接写 `code`。形如 `(0)`、`(abc)` 或括号不匹配的格式错误后缀会被当作 code 名的一部分,无法匹配。
 
 计数可以与正常的逗号列表混用:
 
@@ -104,23 +104,23 @@ return $a . $b . $c;
 
 ### 未达成的计数
 
-如果实际匹配到的问题比预期少,Mago 会报告 `unfulfilled-expect`,并且自动修复会下调计数,而不是直接移除指令(那会让原本被匹配上的问题重新冒出来):
+如果实际匹配到的问题比预期少,Mago 会报告 `unfulfilled-expect`,并且自动修复会下调计数,而不是直接移除指令(那会让原本被匹配上的问题重新出现):
 
 ```php
-// Before: 3 matches expected, only 2 happened.
+// 之前:预期 3 次匹配,实际只有 2 次。
 // @mago-expect analysis:mixed-operand(3)
 return $a . $b;
 
-// After auto-fix: count drops so the 2 real matches stay suppressed.
+// 修复后:计数下调,保留 2 次真实匹配继续被抑制。
 // @mago-expect analysis:mixed-operand(2)
 return $a . $b;
 ```
 
 ### 行级与块级语义
 
-对于行级指令,裸写一个 code 最多抑制一次出现;`(N)` 把上限提升到 `N`。
+对于行级指令,直接使用一个 code 最多抑制一次出现;`(N)` 把上限提升到 `N`。
 
-对于块级(作用域)指令,裸写一个 code 会抑制块内所有匹配的出现。加上 `(N)` 会把抑制上限封到 `N` 次,因此第 `N+1` 次匹配的问题仍会被报告。这在你想确保不要冒出超过预期数量的新问题时很有用。
+对于块级(作用域)指令,直接使用一个 code 会抑制块内所有匹配的出现。加上 `(N)` 会把抑制上限限制为 `N` 次,因此第 `N+1` 次匹配的问题仍会被报告。这在你想确保不要冒出超过预期数量的新问题时很有用。
 
 ## 抑制所有问题:`all`
 
@@ -154,7 +154,7 @@ $result = eval($value) ?: 'default';
  * @mago-ignore all
  */
 function legacy_code(): string {
-    // Every linter, analyzer, and guard issue is suppressed here.
+    // 此处所有 linter、analyzer 和 guard 问题均被抑制。
 }
 ```
 
@@ -168,15 +168,15 @@ function legacy_code(): string {
 ## 示例
 
 ```php
-// Suppress a guard issue
+// 抑制一个 guard 问题
 // @mago-expect guard:disallowed-use
 use App\Infrastructure\SomeForbiddenClass;
 
-// Suppress one lint issue
+// 抑制一个 lint 问题
 // @mago-expect lint:no-shorthand-ternary
 $result = $condition ?: 'default';
 
-// Suppress issues for an entire function
+// 抑制整个函数的若干问题
 // @mago-expect analysis:missing-return-statement,impossible-condition
 function complexFunction(): string {
     if (false) {
@@ -184,17 +184,17 @@ function complexFunction(): string {
     }
 }
 
-// Three occurrences of one code on the next line
+// 下一行同一 code 出现三次
 // @mago-expect analysis:mixed-operand(3)
 return $a . $b . $c;
 
-// All lint issues on one line
+// 单行上所有 lint 问题
 // @mago-ignore lint:all
 $result = $value ?: ($x == true ? 'yes' : 'no');
 
-// Everything, for a legacy function
+// 针对一个遗留函数,抑制所有问题
 // @mago-ignore all
 function legacyFunction(): string {
-    // Everything suppressed here.
+    // 此处所有问题均被抑制。
 }
 ```

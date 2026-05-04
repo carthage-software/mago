@@ -10,7 +10,7 @@ Mago 以单一静态二进制的形式发布。挑一种适合你环境的安装
 
 ## Shell 安装脚本(macOS、Linux)
 
-macOS 和 Linux 上的推荐方式。脚本会探测你的平台、获取匹配的发行归档,并把二进制放到你的 PATH 上。
+macOS 和 Linux 上的推荐方式。脚本会检测你的平台、获取匹配的发行归档,并把二进制放到你的 PATH 上。
 
 使用 `curl`:
 
@@ -36,7 +36,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s
 
 如果 [GitHub CLI](https://cli.github.com/) 在你的 PATH 上,安装脚本会在解压前根据 Mago 的 GitHub 构建证明(build attestation)校验归档。无需任何参数。如果 `gh` 缺失或版本太旧,脚本会打印提示并继续运行而不进行校验。
 
-要让校验成为强制项,请传 `--always-verify`。如果 `gh` 不可用、版本太旧,或证明不匹配,安装脚本会在动到 PATH 之前中止。
+要让校验成为强制项,请传 `--always-verify`。如果 `gh` 不可用、版本太旧,或证明不匹配,安装脚本会在修改 PATH 之前中止。
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --always-verify
@@ -49,14 +49,14 @@ curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s
 Windows 上的推荐方式,也是任何没有 `bash` 的系统上的不错备选。
 
 1. 打开 [发布页面](https://github.com/carthage-software/mago/releases)。
-2. 下载对应你操作系统的归档。命名遵循 `mago-<version>-<target>.tar.gz`(Windows 上是 `.zip`)。
+2. 下载对应你操作系统的归档。命名遵循 `mago-<version>-<target>.tar.gz` (Windows 上是 `.zip`)。
 3. 解压归档,把二进制放到 PATH 上的某个位置。
 
 如果你保留了归档文件,可以在解压前自行校验。
 
 ```sh
 VERSION=1.25.2
-TARGET=x86_64-unknown-linux-gnu  # adjust for your platform
+TARGET=x86_64-unknown-linux-gnu  # 请根据你的平台调整
 ASSET=mago-${VERSION}-${TARGET}.tar.gz
 
 gh release download "$VERSION" --repo carthage-software/mago --pattern "$ASSET"
@@ -124,7 +124,7 @@ mago self-update
 
 ## 校验发布的细节
 
-每一份发行归档(各平台的 tarball、源码 tarball、源码 zip,以及 WASM 包)都在构建时通过 [`actions/attest-build-provenance`](https://github.com/actions/attest-build-provenance) 进行签名。签名是一份存储在 GitHub 上的 [in-toto](https://in-toto.io/) 证明,绑定到生成该工件的工作流运行,因此校验通过的下载,可证明与 Mago 发布流水线产出的字节完全一致。
+每一份发行归档 (各平台的 tarball、源码 tarball、源码 zip,以及 WASM 包) 都在构建时通过 [`actions/attest-build-provenance`](https://github.com/actions/attest-build-provenance) 进行签名。签名是一份存储在 GitHub 上的 [in-toto](https://in-toto.io/) 证明,绑定到生成该工件的工作流运行,因此校验通过的下载,可证明与 Mago 发布流水线产出的字节完全一致。
 
 shell 安装脚本会根据你传入的参数,在三种模式之间选择。
 
@@ -144,7 +144,7 @@ gh attestation verify <archive> \
 
 `--signer-workflow` 这一项很关键。它把证明绑定到具体的发布工作流文件。即便有人通过泄露的 GitHub Actions token 在同一仓库内触发了另一个工作流,校验也会失败。
 
-如果校验失败,脚本会把未经校验的归档复制到当前工作目录,命名为 `<file>.unverified.tar.gz`(这样它能在临时目录清理后留存,便于你做事后取证),打印一条红色错误信息,然后在解压之前退出。任何东西都不会进入你的 PATH。
+如果校验失败,脚本会把未经校验的归档复制到当前工作目录,命名为 `<file>.unverified.tar.gz` (这样它能在临时目录清理后留存,便于你做事后取证),打印一条红色错误信息,然后在解压之前退出。任何东西都不会进入你的 PATH。
 
 校验调用读取的是公开的证明 API,因此无需 `gh auth`。你只需要一个包含 `gh attestation` 子命令的较新版本 `gh`。
 
@@ -152,10 +152,10 @@ gh attestation verify <archive> \
 
 `https://carthage.software/mago.sh` 会重定向到 `main` 分支上的 [`scripts/install.sh`](https://github.com/carthage-software/mago/blob/main/scripts/install.sh)。未来的修订会被自动采用,这很方便,但也意味着将来对安装脚本的改动会在没有预警的情况下生效。
 
-为了更严格的供应链卫生,可以把脚本锁定到你审阅过的某个提交:
+为了更严格的供应链安全,可以把脚本锁定到你审阅过的某个提交:
 
 ```sh
-COMMIT=cd4cf4dfdbc72bd028ad26d11bcc815a49e27e9a  # replace with a commit you have read
+COMMIT=cd4cf4dfdbc72bd028ad26d11bcc815a49e27e9a  # 替换为你已审阅过的提交哈希
 curl --proto '=https' --tlsv1.2 -sSf \
   "https://raw.githubusercontent.com/carthage-software/mago/${COMMIT}/scripts/install.sh" \
   | bash -s -- --always-verify

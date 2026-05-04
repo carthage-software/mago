@@ -9,8 +9,8 @@ nav_section = "基础"
 每次调用 Mago 都遵循 `mago [GLOBAL OPTIONS] <SUBCOMMAND>` 的形式。全局选项必须放在子命令之前。
 
 ```sh
-mago --colors=never lint        # correct
-mago lint --colors=never        # wrong, --colors is a global option
+mago --colors=never lint        # 正确
+mago lint --colors=never        # 错误, --colors 是全局选项
 ```
 
 ## 全局选项
@@ -19,12 +19,12 @@ mago lint --colors=never        # wrong, --colors is a global option
 
 | 参数 | 说明 |
 | :--- | :--- |
-| `--workspace <PATH>` | 工作区根目录。默认是当前目录。 |
-| `--config <PATH>` | 配置文件路径。未指定时,Mago 会在工作区、`$XDG_CONFIG_HOME`、`~/.config` 和 `~` 中查找。参见 [发现](/guide/configuration/#discovery)。 |
+| `--workspace <PATH>` | 工作空间根目录。默认为当前目录。 |
+| `--config <PATH>` | 配置文件路径。未指定时,Mago 会在工作空间、`$XDG_CONFIG_HOME`、`~/.config` 和 `~` 中查找。参见 [发现](/guide/configuration/#discovery)。 |
 | `--php-version <VERSION>` | 覆盖配置中的 PHP 版本,例如 `8.2`。 |
 | `--threads <NUMBER>` | 覆盖线程数。默认是逻辑 CPU 数。 |
 | `--allow-unsupported-php-version` | 允许在 Mago 官方不支持的 PHP 版本上运行。请谨慎使用。 |
-| `--no-version-check` | 静默项目锁定版本与已安装二进制之间次版本或补丁版本漂移的警告。主版本漂移仍是致命错误。参见 [版本锁定](/guide/configuration/#version-pinning)。 |
+| `--no-version-check` | 关闭因已安装二进制与项目锁定版本之间次版本或补丁版本漂移所发出的警告。主版本漂移仍是致命错误。参见 [版本锁定](/guide/configuration/#version-pinning)。 |
 | `--colors <WHEN>` | 何时为输出着色:`always`、`never` 或 `auto`(默认)。 |
 | `-h`, `--help` | 打印帮助并退出。 |
 | `-V`, `--version` | 打印已安装版本并退出。 |
