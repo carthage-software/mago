@@ -138,13 +138,13 @@ pub enum InvocationArgument<'ast, 'arena> {
     VariadicPlaceholder(&'ast VariadicPlaceholderArgument),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct InvocationArgumentsIter<'ast, 'arena> {
     source: InvocationArgumentsSource<'ast, 'arena>,
     index: usize,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct InvocationTargetParametersIter<'target, 'ctx> {
     target: &'target InvocationTarget<'ctx>,
     index: usize,
