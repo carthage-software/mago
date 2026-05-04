@@ -102,7 +102,7 @@ MAGO_ALLOW_UNSUPPORTED_PHP_VERSION=true mago lint
 
 ### `MAGO_NO_VERSION_CHECK`
 
-Surcharge `no-version-check`. Mettez à `true` pour réduire au silence l'avertissement émis quand le binaire installé diverge de la version épinglée dans `mago.toml`. Une divergence de version majeure reste fatale quelle que soit cette variable : tout l'intérêt d'un épinglage majeur est de bloquer les exécutions à travers des schémas de configuration incompatibles.
+Surcharge `no-version-check`. Mettez à `true` pour désactiver l'avertissement émis quand le binaire installé diverge de la version épinglée dans `mago.toml`. Une divergence de version majeure reste fatale quelle que soit cette variable : tout l'intérêt d'un épinglage majeur est de bloquer les exécutions à travers des schémas de configuration incompatibles.
 
 ```sh
 MAGO_NO_VERSION_CHECK=true mago lint

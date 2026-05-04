@@ -6,7 +6,7 @@ nav_section = "Recettes"
 +++
 # Recette GitHub Actions
 
-Un workflow simple qui lance le formateur, le linter et l'analyseur à chaque push et chaque pull request, avec des annotations natives sur les PRs.
+Un workflow simple qui lance le formateur, le linter et l'analyseur à chaque push et chaque pull request, avec des annotations natives sur les PR.
 
 ## Configuration rapide
 
@@ -59,7 +59,7 @@ Quelques notes sur la structure :
 - Séparer `format`, `lint` et `analyze` en étapes distinctes fait remonter les résultats des trois, même quand une étape antérieure échoue. Un seul `run:` combiné ferait court-circuit au premier échec et masquerait le reste.
 - `if: success() || failure()` lance l'étape quand le job n'a pas été annulé, ce qui est ce que vous voulez ici. `always()` la lancerait aussi après des échecs de setup.
 - Utilisez `mago format --check`, pas `--dry-run`. `--check` quitte avec un code non nul quand des fichiers ont besoin d'être formatés ; `--dry-run` n'affiche qu'un diff et quitte toujours zéro.
-- Mago détecte GitHub Actions via la variable d'environnement `GITHUB_ACTIONS` et bascule automatiquement sur `--reporting-format=github`, produisant des annotations natives sur les PRs. Aucune configuration supplémentaire requise. Sur 1.17.0 et antérieur, vous devez passer `--reporting-format=github` à `mago lint` et `mago analyze` manuellement.
+- Mago détecte GitHub Actions via la variable d'environnement `GITHUB_ACTIONS` et bascule automatiquement sur `--reporting-format=github`, produisant des annotations natives sur les PR. Aucune configuration supplémentaire requise. Sur 1.17.0 et antérieur, vous devez passer `--reporting-format=github` à `mago lint` et `mago analyze` manuellement.
 
 ## Utiliser l'image Docker
 

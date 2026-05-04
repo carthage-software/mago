@@ -1,6 +1,6 @@
 +++
 title = "Supprimer les problèmes"
-description = "Comment utiliser les pragmas @mago-expect et @mago-ignore pour réduire au silence des problèmes spécifiques dans votre code."
+description = "Comment utiliser les pragmas @mago-expect et @mago-ignore pour supprimer des problèmes spécifiques dans votre code."
 nav_order = 30
 nav_section = "Fondamentaux"
 +++
@@ -48,7 +48,7 @@ Plusieurs codes fonctionnent de la même manière :
 ```php
 // @mago-ignore lint:no-shorthand-ternary,no-assign-in-condition
 if ($result = $value ?: 'default') {
-    // Do something with $result
+    // Faire quelque chose avec $result
 }
 ```
 
@@ -62,7 +62,7 @@ function foo(): string {
     if (rand(0, 1)) {
         return 'foo';
     }
-    // No return statement here.
+    // Pas d'instruction return ici.
 }
 ```
 
@@ -107,11 +107,11 @@ Le comptage se mélange aux listes virgule normales :
 Si moins de problèmes correspondent qu'attendu, Mago signale `unfulfilled-expect` et la correction automatique réduit le compte plutôt que de supprimer la directive (ce qui réactiverait les problèmes qui correspondaient) :
 
 ```php
-// Before: 3 matches expected, only 2 happened.
+// Avant : 3 correspondances attendues, seulement 2 se sont produites.
 // @mago-expect analysis:mixed-operand(3)
 return $a . $b;
 
-// After auto-fix: count drops so the 2 real matches stay suppressed.
+// Après correction automatique : le compte est réduit, les 2 correspondances réelles restent supprimées.
 // @mago-expect analysis:mixed-operand(2)
 return $a . $b;
 ```
@@ -154,7 +154,7 @@ Dans un docblock au-dessus d'un bloc, cela couvre tout le bloc :
  * @mago-ignore all
  */
 function legacy_code(): string {
-    // Every linter, analyzer, and guard issue is suppressed here.
+    // Tous les problèmes du linter, de l'analyseur et du guard sont supprimés ici.
 }
 ```
 
@@ -168,15 +168,15 @@ Préférez des codes spécifiques quand vous le pouvez. `all` est un instrument 
 ## Exemples
 
 ```php
-// Suppress a guard issue
+// Supprimer un problème du guard
 // @mago-expect guard:disallowed-use
 use App\Infrastructure\SomeForbiddenClass;
 
-// Suppress one lint issue
+// Supprimer un problème du linter
 // @mago-expect lint:no-shorthand-ternary
 $result = $condition ?: 'default';
 
-// Suppress issues for an entire function
+// Supprimer les problèmes pour toute une fonction
 // @mago-expect analysis:missing-return-statement,impossible-condition
 function complexFunction(): string {
     if (false) {
@@ -184,17 +184,17 @@ function complexFunction(): string {
     }
 }
 
-// Three occurrences of one code on the next line
+// Trois occurrences d'un même code sur la ligne suivante
 // @mago-expect analysis:mixed-operand(3)
 return $a . $b . $c;
 
-// All lint issues on one line
+// Tous les problèmes du linter sur une ligne
 // @mago-ignore lint:all
 $result = $value ?: ($x == true ? 'yes' : 'no');
 
-// Everything, for a legacy function
+// Tout supprimer, pour une fonction legacy
 // @mago-ignore all
 function legacyFunction(): string {
-    // Everything suppressed here.
+    // Tout est supprimé ici.
 }
 ```

@@ -6,7 +6,7 @@ nav_section = "Fondamentaux"
 +++
 # Baseline
 
-Un fichier baseline enregistre les problèmes qui existent dans votre base de code à l'instant présent et indique à Mago de les ignorer lors des exécutions futures. Les nouveaux problèmes introduits après la baseline restent signalés. Utile lors de l'adoption de Mago dans un projet qui compte déjà des centaines ou milliers de problèmes, ou lorsque vous étalez un durcissement de règles sur plusieurs PRs.
+Un fichier baseline enregistre les problèmes qui existent dans votre base de code à l'instant présent et indique à Mago de les ignorer lors des exécutions futures. Les nouveaux problèmes introduits après la baseline restent signalés. Utile lors de l'adoption de Mago dans un projet qui compte déjà des centaines ou milliers de problèmes, ou lorsque vous étalez un durcissement de règles sur plusieurs PR.
 
 ## Un fichier par outil
 
@@ -24,7 +24,7 @@ mago lint --generate-baseline --baseline lint-baseline.toml
 mago analyze --generate-baseline --baseline analysis-baseline.toml
 ```
 
-La commande exécute l'outil, collecte chaque problème trouvé et les sérialise dans le fichier TOML spécifié.
+La commande exécute l'outil, collecte tous les problèmes trouvés et les sérialise dans le fichier TOML spécifié.
 
 ## Utiliser une baseline
 
@@ -98,7 +98,7 @@ Définissez la variante pour les nouveaux fichiers de baseline dans `mago.toml` 
 ```toml
 [linter]
 baseline = "lint-baseline.toml"
-baseline-variant = "loose"   # or "strict"
+baseline-variant = "loose"   # ou "strict"
 
 [analyzer]
 baseline = "analysis-baseline.toml"
@@ -122,7 +122,7 @@ Utile quand vous voulez voir les problèmes actuellement supprimés par la basel
 
 ## Garder la baseline propre
 
-Quand vous corrigez un problème faisant partie de la baseline, son entrée devient morte. Mago détecte cela et avertit pour les entrées obsolètes. Régénérez pour nettoyer :
+Quand vous corrigez un problème faisant partie de la baseline, son entrée devient obsolète. Mago détecte cela et signale les entrées obsolètes. Régénérez pour nettoyer :
 
 ```sh
 mago lint --generate-baseline --baseline lint-baseline.toml

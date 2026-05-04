@@ -223,7 +223,7 @@ Le mauvais cas ressemble à ceci :
 ```php
 <?php
 
-// The marker is inside an array literal, has no effect.
+// Le marqueur est à l'intérieur d'un littéral de tableau, sans effet.
 $arr = [ // @mago-format-ignore-next
     1,
     2,

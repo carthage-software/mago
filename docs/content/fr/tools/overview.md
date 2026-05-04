@@ -10,7 +10,7 @@ Mago est un seul binaire qui regroupe quatre outils. Ils partagent la configurat
 
 ## [Formateur](/tools/formatter/overview/)
 
-Un formateur de code déterministe. Il produit une sortie stable et conventionnelle qui suit [PER-CS](https://www.php-fig.org/per/coding-style/) par défaut et prend en charge des préréglages pour les styles PSR-12, Laravel et Drupal. Pas de roulette de configuration, pas de débat.
+Un formateur de code déterministe. Il produit une sortie stable et conventionnelle qui suit [PER-CS](https://www.php-fig.org/per/coding-style/) par défaut et prend en charge des préréglages pour les styles PSR-12, Laravel et Drupal. Aucune option à régler à l'aveuglette, aucun débat.
 
 ## [Linter](/tools/linter/overview/)
 

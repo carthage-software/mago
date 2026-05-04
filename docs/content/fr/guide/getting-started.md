@@ -6,22 +6,22 @@ nav_section = "Guide"
 +++
 # Premiers pas
 
-Mago est une chaîne d'outils PHP écrite en Rust. Un seul binaire couvre les parties d'un workflow qui prennent habituellement trois ou quatre outils séparés.
+Mago est une chaîne d'outils PHP écrite en Rust. Un seul binaire couvre ce qui demande habituellement trois ou quatre outils distincts.
 
 Il inclut :
 
 - Un [formateur](/tools/formatter/overview/) qui produit une sortie déterministe et suit PER-CS par défaut.
 - Un [linter](/tools/linter/overview/) avec un catalogue soigné de règles réparties en neuf catégories. Beaucoup de corrections s'appliquent automatiquement.
-- Un [analyseur statique](/tools/analyzer/overview/) qui attrape les erreurs de type et les bugs de logique avant l'exécution, avec prise en charge des annotations Psalm et PHPStan.
+- Un [analyseur statique](/tools/analyzer/overview/) qui détecte les erreurs de type et les bugs de logique avant l'exécution, avec prise en charge des annotations Psalm et PHPStan.
 - Un [guard architectural](/tools/guard/overview/) qui applique les règles de dépendance et les conventions structurelles.
 
 Le tout fonctionne avec un binaire unique, sans runtime PHP, sans dépendance Composer, sans installation Java. Un workflow typique ressemble à :
 
 ```sh
-mago init           # write a starter mago.toml
-mago lint           # surface stylistic and correctness issues
-mago format         # rewrite files to match the formatter
-mago analyze        # type-check and find logic bugs
+mago init           # génère un mago.toml de départ
+mago lint           # signale les problèmes de style et de justesse
+mago format         # réécrit les fichiers selon les règles du formateur
+mago analyze        # vérifie les types et détecte les bugs de logique
 ```
 
 ## Où aller ensuite

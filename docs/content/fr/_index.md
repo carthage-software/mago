@@ -12,7 +12,7 @@ nav_section = ""
 
 <h1 class="home-hero__title">Une chaîne d'outils PHP, <em>oxydée</em>.</h1>
 
-<p class="home-hero__lede">Mago est un analyseur statique, un linter et un formateur pour PHP, écrits en Rust. Conçu pour les projets qui ont dépassé la patience de leur outillage.</p>
+<p class="home-hero__lede">Mago est un analyseur statique, un linter et un formateur pour PHP, écrits en Rust. Conçu pour les projets que leur outillage actuel n'arrive plus à suivre.</p>
 
 <div class="home-hero__cta">
 <a class="button button--solid" href="/guide/getting-started/"><span>Commencer</span><span class="button__arrow">→</span></a>
@@ -42,7 +42,7 @@ nav_section = ""
 
 <article class="feature">
 <span class="feature__num">02 / Linter</span>
-<h3 class="feature__name">Linting opinié</h3>
+<h3 class="feature__name">Linting avec parti pris</h3>
 <p class="feature__body">Un catalogue soigné de règles pour la justesse, la cohérence et la clarté. Correction à la sauvegarde quand c'est sûr. Discret quand il le faut.</p>
 <div class="feature__stat"><strong>{{BENCH_LINTER_MAGO_TIME}}</strong> · même projet</div>
 </article>
@@ -50,7 +50,7 @@ nav_section = ""
 <article class="feature">
 <span class="feature__num">03 / Formater</span>
 <h3 class="feature__name">Formateur</h3>
-<p class="feature__body">Un formateur déterministe qui produit une sortie stable et conventionnelle. Pas de roulette de configuration, pas de débat. Vous l'installez et vous passez à autre chose.</p>
+<p class="feature__body">Un formateur déterministe qui produit une sortie stable et conventionnelle. Aucune option à régler à l'aveuglette, aucun débat. Vous l'installez et vous passez à autre chose.</p>
 <div class="feature__stat"><strong>{{BENCH_FORMATTER_MAGO_TIME}}</strong> · même projet</div>
 </article>
 
@@ -62,11 +62,11 @@ nav_section = ""
 
 <header class="home-section__head"><span class="home-section__num">§ 02</span><h2 class="home-section__title">Benchmarks</h2></header>
 
-<p>Mesuré contre {{BENCH_PROJECT_LABEL}} sur la dernière version stable de chaque outil. Plus bas est meilleur ; la colonne « × » indique combien de fois le pair le plus lent l'est par rapport à Mago. Les chiffres proviennent du tableau de bord <a href="https://carthage-software.github.io/php-toolchain-benchmarks/?project=wordpress&kind=Analyzers">php-toolchain-benchmarks</a> (détails complets : moyenne, écart-type, max, mémoire), dernière mise à jour le {{BENCH_AGGREGATION_DATE}}.</p>
+<p>Mesuré sur {{BENCH_PROJECT_LABEL}} avec la dernière version stable de chaque outil. Plus la valeur est basse, mieux c'est ; la colonne « × » indique combien de fois le concurrent le plus lent est plus lent que Mago. Les chiffres proviennent du tableau de bord <a href="https://carthage-software.github.io/php-toolchain-benchmarks/?project=wordpress&kind=Analyzers">php-toolchain-benchmarks</a> (détails complets : moyenne, écart-type, max, mémoire), dernière mise à jour le {{BENCH_AGGREGATION_DATE}}.</p>
 
 <table class="bench-table">
 <thead>
-<tr><th>Opération</th><th>Mago</th><th>Pair A</th><th>Pair B</th><th class="bench-table__factor">×</th></tr>
+<tr><th>Opération</th><th>Mago</th><th>Concurrent A</th><th>Concurrent B</th><th class="bench-table__factor">×</th></tr>
 </thead>
 <tbody>
 <tr>
@@ -111,7 +111,7 @@ nav_section = ""
 
 <section class="home-section">
 
-<header class="home-section__head"><span class="home-section__num">§ 04</span><h2 class="home-section__title">Trois étapes pour la première exécution</h2></header>
+<header class="home-section__head"><span class="home-section__num">§ 04</span><h2 class="home-section__title">Démarrer en trois étapes</h2></header>
 
 <ol class="home-steps">
 <li><strong>Installer.</strong> Une seule commande. Aucun runtime PHP requis. Un seul binaire statique.</li>
@@ -125,7 +125,7 @@ nav_section = ""
 
 <header class="home-section__head"><span class="home-section__num">§ 05</span><h2 class="home-section__title">Sponsors</h2></header>
 
-<p>Mago est libre et open source, construit et maintenu par <a href="https://github.com/azjezz">Seifeddine Gmati</a> avec le soutien de ces entreprises et particuliers.</p>
+<p>Mago est libre et open source, développé et maintenu par <a href="https://github.com/azjezz">Seifeddine Gmati</a> avec le soutien de ces entreprises et particuliers.</p>
 
 <div id="home-sponsors" aria-live="polite"></div>
 

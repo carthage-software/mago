@@ -10,7 +10,7 @@ Merci d'envisager une contribution. Les étapes ci-dessous vous mènent d'une co
 
 ## Pour commencer
 
-1. Ouvrez une issue ou commentez une issue existante avant de commencer un travail non trivial. C'est le moyen le plus simple de vous assurer que votre travail s'aligne avec la direction du projet.
+1. Ouvrez une issue ou commentez une issue existante avant de vous lancer dans un travail conséquent. C'est le moyen le plus simple de vous assurer que votre travail correspond à la direction du projet.
 
 2. Forkez le dépôt sur GitHub et clonez votre fork :
 

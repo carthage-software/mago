@@ -10,7 +10,7 @@ Chaque invocation de Mago suit le schéma `mago [GLOBAL OPTIONS] <SUBCOMMAND>`. 
 
 ```sh
 mago --colors=never lint        # correct
-mago lint --colors=never        # wrong, --colors is a global option
+mago lint --colors=never        # incorrect, --colors est une option globale
 ```
 
 ## Options globales
@@ -22,9 +22,9 @@ Ces options s'appliquent à chaque sous-commande et contrôlent le runtime, la d
 | `--workspace <PATH>` | Racine du workspace. Par défaut le répertoire courant. |
 | `--config <PATH>` | Chemin du fichier de configuration. Sans cela, Mago cherche dans le workspace, `$XDG_CONFIG_HOME`, `~/.config` et `~`. Voir [découverte](/guide/configuration/#discovery). |
 | `--php-version <VERSION>` | Surcharge la version PHP configurée, par exemple `8.2`. |
-| `--threads <NUMBER>` | Surcharge le nombre de threads. Par défaut le nombre de CPUs logiques. |
-| `--allow-unsupported-php-version` | Exécute contre une version PHP que Mago ne prend pas officiellement en charge. À utiliser avec précaution. |
-| `--no-version-check` | Réduit au silence l'avertissement émis sur une divergence mineure ou patch par rapport à la version épinglée du projet. La divergence majeure reste fatale. Voir [épinglage de version](/guide/configuration/#version-pinning). |
+| `--threads <NUMBER>` | Surcharge le nombre de threads. Par défaut, le nombre de CPU logiques. |
+| `--allow-unsupported-php-version` | Permet à Mago de s'exécuter sur une version PHP qu'il ne prend pas officiellement en charge. À utiliser avec précaution. |
+| `--no-version-check` | Désactive l'avertissement émis lorsque la version installée diverge de la version épinglée du projet par un changement mineur ou patch. Une divergence majeure reste fatale. Voir [épinglage de version](/guide/configuration/#version-pinning). |
 | `--colors <WHEN>` | Quand colorer la sortie : `always`, `never` ou `auto` (par défaut). |
 | `-h`, `--help` | Affiche l'aide et quitte. |
 | `-V`, `--version` | Affiche la version installée et quitte. |

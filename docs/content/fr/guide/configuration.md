@@ -57,7 +57,7 @@ php-version: "8.3"
 
 Pour TOML, le commentaire est lu par le serveur de langage [Taplo](https://taplo.tamasfe.dev/), qui alimente l'extension VS Code « Even Better TOML » et le support TOML de JetBrains. Pour YAML, le commentaire est lu par le [serveur de langage YAML de Red Hat](https://github.com/redhat-developer/yaml-language-server). Pour JSON, tout éditeur moderne lit `$schema` nativement. Mago lui-même ignore la clé `$schema` et les commentaires magiques, ils n'existent que pour l'outillage des éditeurs.
 
-Si vous régénérez le schéma en CI (par exemple, pour valider des fichiers de configuration de manière programmée), `mago config --schema` l'imprime sur stdout.
+Si vous régénérez le schéma en CI (par exemple, pour valider des fichiers de configuration de manière programmatique), `mago config --schema` l'imprime sur stdout.
 
 ## Partager une configuration avec `extends`
 
@@ -66,17 +66,17 @@ Si vous régénérez le schéma en CI (par exemple, pour valider des fichiers de
 La directive `extends` permet à une configuration de s'appuyer sur d'autres sans copier-coller. Pratique quand plusieurs projets partagent un standard commun.
 
 ```toml
-# Single parent
+# Parent unique
 extends = "vendor/some-org/mago-config/mago.toml"
 
-# Or a list, applied left-to-right; each later layer overrides earlier ones
+# Ou une liste, appliquée de gauche à droite ; chaque couche postérieure remplace les précédentes
 extends = [
-  "vendor/some-org/mago-config",     # directory: mago.{toml,yaml,yml,json} inside
-  "configs/strict.json",              # mixing formats is fine
+  "vendor/some-org/mago-config",     # répertoire : mago.{toml,yaml,yml,json} à l'intérieur
+  "configs/strict.json",              # mélanger les formats est autorisé
   "../shared/team-defaults.toml",
 ]
 
-# This file's own keys override anything from the layers above
+# Les clés propres à ce fichier remplacent tout ce qui vient des couches précédentes
 php-version = "8.3"
 ```
 
@@ -88,11 +88,11 @@ Les entrées de fichier doivent exister et utiliser une extension reconnue (`.to
 
 ### Précédence effective
 
-Les couches sont fusionnées de la plus profonde à la plus superficielle, la dernière l'emportant :
+Les couches sont fusionnées en partant de la plus profonde, et la dernière l'emporte :
 
 1. Valeurs par défaut intégrées.
 2. Chaque couche `extends`, récursivement. Le `extends` propre à un parent est résolu avant que ses clés ne s'appliquent.
-3. Les clés du fichier propriétaire.
+3. Les clés du fichier hôte.
 4. Les variables d'environnement `MAGO_*` pour les [scalaires pris en charge](/guide/environment-variables/).
 5. Les drapeaux CLI tels que `--php-version`, `--threads`.
 
@@ -112,14 +112,14 @@ excludes = ["vendor", "node_modules"]
 ```
 
 ```toml
-# project mago.toml
+# mago.toml du projet
 extends = "base.toml"
 threads = 8
 [source]
-excludes = ["build"]   # appended -> ["vendor", "node_modules", "build"]
+excludes = ["build"]   # concaténé -> ["vendor", "node_modules", "build"]
 ```
 
-Les cycles sont détectés via le suivi des chemins canoniques et déclenchent une erreur claire au lieu de récurer indéfiniment. L'héritage en losange (A étend B et C, qui étendent tous deux D) traite D une seule fois et fonctionne sans souci. Les couches peuvent mélanger les formats librement ; chacune est analysée par son propre driver et fusionnée à un niveau de valeur générique avant que le document final ne soit validé contre le schéma.
+Les cycles sont détectés via le suivi des chemins canoniques et déclenchent une erreur claire au lieu de boucler indéfiniment. L'héritage en losange (A étend B et C, qui étendent tous deux D) traite D une seule fois et fonctionne sans souci. Les couches peuvent mélanger les formats librement ; chacune est analysée par son propre driver et fusionnée à un niveau de valeur générique avant que le document final ne soit validé selon le schéma.
 
 ## Options globales
 
@@ -138,8 +138,8 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 | `version` | string | aucun | Fixe la version de Mago contre laquelle ce projet est testé. Accepte un majeur (`"1"`), mineur (`"1.25"`) ou exact (`"1.25.2"`). Voir [épinglage de version](#version-pinning). |
 | `php-version` | string | dernière stable | La version PHP que Mago doit cibler pour l'analyse syntaxique et l'analyse. `mago init` la détecte automatiquement depuis `composer.json` quand c'est possible. |
 | `allow-unsupported-php-version` | boolean | `false` | Autoriser Mago à s'exécuter sur une version PHP qu'il ne prend pas officiellement en charge. Non recommandé. |
-| `no-version-check` | boolean | `false` | Réduit au silence l'avertissement émis quand le binaire installé diverge de la version épinglée. Une divergence de version majeure est toujours fatale. |
-| `threads` | integer | CPUs logiques | Nombre de threads pour le travail en parallèle. |
+| `no-version-check` | boolean | `false` | Désactive l'avertissement émis quand le binaire installé diverge de la version épinglée. Une divergence de version majeure est toujours fatale. |
+| `threads` | integer | CPU logiques | Nombre de threads pour le travail en parallèle. |
 | `stack-size` | integer | 2 MiB | Taille de pile par thread en octets. Minimum 2 MiB, maximum 8 MiB. |
 | `editor-url` | string | aucun | Modèle d'URL pour les chemins de fichiers cliquables dans la sortie du terminal. Voir [intégration éditeur](#editor-integration). |
 
@@ -153,7 +153,7 @@ Trois niveaux d'épinglage :
 - **Épinglage mineur** (`version = "1.25"`) : tout `1.25.y` satisfait l'épinglage. Une divergence vers un mineur différent émet un avertissement ; une divergence majeure reste fatale.
 - **Épinglage exact** (`version = "1.25.2"`) : toute divergence émet un avertissement ; une divergence majeure reste fatale.
 
-L'avertissement peut être réduit au silence avec `--no-version-check`, la variable d'environnement `MAGO_NO_VERSION_CHECK`, ou `no-version-check = true` dans la configuration. Aucun de ces moyens n'affecte la divergence de version majeure, qui est tout l'intérêt de l'épinglage.
+L'avertissement peut être désactivé avec `--no-version-check`, la variable d'environnement `MAGO_NO_VERSION_CHECK`, ou `no-version-check = true` dans la configuration. Aucun de ces moyens n'affecte la divergence de version majeure, qui est tout l'intérêt de l'épinglage.
 
 Pour synchroniser le binaire installé avec l'épinglage du projet :
 
