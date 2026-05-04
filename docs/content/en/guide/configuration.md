@@ -21,6 +21,44 @@ When you do not pass `--config`, Mago looks for a config file in this order:
 
 In each location it looks for `mago.{toml,yaml,yml,json}` first, then `mago.dist.{toml,yaml,yml,json}`. Format precedence within a single directory is `toml > yaml > yml > json`. The first file found wins, which lets you keep a global config in `~/.config/mago.toml` for projects that have no local one.
 
+## Editor schema
+
+Every release publishes a JSON schema describing the full configuration tree. Editors that understand the schema give you autocomplete, hover documentation, and inline validation for `mago.{toml,yaml,yml,json}`.
+
+The schema is hosted at:
+
+- `https://mago.carthage.software/<version>/schema.json` — pinned to a specific release such as `1.25.3`.
+- `https://mago.carthage.software/latest/schema.json` — the most recent stable release.
+- `https://mago.carthage.software/main/schema.json` — the development build from `main`.
+
+Pin the URL to the version of Mago you have installed so the schema and your binary stay in sync. `mago init` writes the pinned URL into the file it scaffolds.
+
+How you reference it depends on the format:
+
+```toml
+#:schema https://mago.carthage.software/1.25.3/schema.json
+version = "1"
+php-version = "8.3"
+```
+
+```yaml
+# yaml-language-server: $schema=https://mago.carthage.software/1.25.3/schema.json
+version: "1"
+php-version: "8.3"
+```
+
+```json
+{
+  "$schema": "https://mago.carthage.software/1.25.3/schema.json",
+  "version": "1",
+  "php-version": "8.3"
+}
+```
+
+For TOML the comment is read by the [Taplo](https://taplo.tamasfe.dev/) language server, which powers the "Even Better TOML" VS Code extension and the JetBrains TOML support. For YAML the comment is read by the [Red Hat YAML language server](https://github.com/redhat-developer/yaml-language-server). For JSON every modern editor reads `$schema` natively. Mago itself ignores the `$schema` key and the magic comments — they exist purely for editor tooling.
+
+If you regenerate the schema in CI (for example, to validate config files programmatically), `mago config --schema` prints it to stdout.
+
 ## Sharing configuration with `extends`
 
 > Available since Mago 1.25. Earlier versions silently ignore the directive.

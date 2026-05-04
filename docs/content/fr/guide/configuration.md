@@ -21,6 +21,44 @@ Lorsque vous ne passez pas `--config`, Mago cherche un fichier de configuration 
 
 Dans chaque emplacement, il cherche d'abord `mago.{toml,yaml,yml,json}`, puis `mago.dist.{toml,yaml,yml,json}`. La précédence des formats au sein d'un même répertoire est `toml > yaml > yml > json`. Le premier fichier trouvé l'emporte, ce qui vous permet de garder une configuration globale dans `~/.config/mago.toml` pour les projets qui n'en ont pas localement.
 
+## Schéma pour l'éditeur
+
+Chaque version publie un schéma JSON décrivant l'intégralité de l'arbre de configuration. Les éditeurs qui comprennent ce schéma offrent l'auto-complétion, la documentation au survol et la validation en ligne pour `mago.{toml,yaml,yml,json}`.
+
+Le schéma est hébergé à :
+
+- `https://mago.carthage.software/<version>/schema.json`, épinglé à une release précise comme `1.25.3`.
+- `https://mago.carthage.software/latest/schema.json`, la dernière release stable.
+- `https://mago.carthage.software/main/schema.json`, la build de développement depuis `main`.
+
+Épinglez l'URL à la version de Mago installée pour que le schéma et votre binaire restent synchronisés. `mago init` écrit l'URL épinglée dans le fichier qu'il génère.
+
+La façon de référencer le schéma dépend du format :
+
+```toml
+#:schema https://mago.carthage.software/1.25.3/schema.json
+version = "1"
+php-version = "8.3"
+```
+
+```yaml
+# yaml-language-server: $schema=https://mago.carthage.software/1.25.3/schema.json
+version: "1"
+php-version: "8.3"
+```
+
+```json
+{
+  "$schema": "https://mago.carthage.software/1.25.3/schema.json",
+  "version": "1",
+  "php-version": "8.3"
+}
+```
+
+Pour TOML, le commentaire est lu par le serveur de langage [Taplo](https://taplo.tamasfe.dev/), qui alimente l'extension VS Code « Even Better TOML » et le support TOML de JetBrains. Pour YAML, le commentaire est lu par le [serveur de langage YAML de Red Hat](https://github.com/redhat-developer/yaml-language-server). Pour JSON, tout éditeur moderne lit `$schema` nativement. Mago lui-même ignore la clé `$schema` et les commentaires magiques, ils n'existent que pour l'outillage des éditeurs.
+
+Si vous régénérez le schéma en CI (par exemple, pour valider des fichiers de configuration de manière programmée), `mago config --schema` l'imprime sur stdout.
+
 ## Partager une configuration avec `extends`
 
 > Disponible depuis Mago 1.25. Les versions antérieures ignorent silencieusement la directive.

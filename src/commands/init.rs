@@ -207,7 +207,8 @@ impl AnalyzerStrictnessPreset {
 /// - Formatter style settings (PER-CS compatible by default)
 /// - Linter rules and integrations
 /// - Analyzer features and options
-const CONFIGURATION_TEMPLATE: &str = r#"# Welcome to Mago!
+const CONFIGURATION_TEMPLATE: &str = r#"#:schema https://mago.carthage.software/{mago_version}/schema.json
+# Welcome to Mago!
 # For full documentation, see https://mago.carthage.software/tools/overview
 version = "1"
 php-version = "{php_version}"
@@ -340,6 +341,7 @@ impl InitCommand {
 
         print_step_header(5, "Review & Confirm");
         let config_content = CONFIGURATION_TEMPLATE
+            .replace("{mago_version}", env!("CARGO_PKG_VERSION"))
             .replace("{php_version}", &php_version)
             .replace("{paths}", &quote_format_strings(&paths))
             .replace("{includes}", &quote_format_strings(&includes))
@@ -1005,6 +1007,7 @@ mod tests {
         analyzer_settings: &InitializationAnalyzerSettings,
     ) -> String {
         CONFIGURATION_TEMPLATE
+            .replace("{mago_version}", env!("CARGO_PKG_VERSION"))
             .replace("{php_version}", php_version)
             .replace("{paths}", &quote_format_strings(paths))
             .replace("{includes}", &quote_format_strings(includes))

@@ -87,6 +87,13 @@ jobs:
         run: |
           cargo run -p mago-documentation
 
+      - name: Generate configuration schema
+        env:
+          MAGO_DOCS_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          mkdir -p "docs/dist/${MAGO_DOCS_VERSION}"
+          cargo run --quiet -p mago -- config --schema > "docs/dist/${MAGO_DOCS_VERSION}/schema.json"
+
       - name: Check out existing gh-pages branch
         uses: actions/checkout@v4
         with:
