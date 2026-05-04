@@ -43,11 +43,7 @@ pub fn scan_class_like_constants<'arena>(
         constant.hint.as_ref().map(|h| get_type_metadata_from_hint(h, Some(class_like_metadata.name), context));
 
     let mut flags = if is_final { MetadataFlags::FINAL } else { MetadataFlags::empty() };
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    flags |= MetadataFlags::origin_flags(context.file.file_type);
 
     let docblock = match ConstantDocblockComment::create(context, constant) {
         Ok(docblock) => docblock,

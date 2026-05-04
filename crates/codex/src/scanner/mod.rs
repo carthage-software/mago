@@ -683,11 +683,7 @@ fn finalize_class_like(scanner: &mut Scanner, context: &Context<'_, '_>) {
         class_like_metadata.inheritable_method_ids.insert(constructor_name, constructor_method_id);
 
         let mut flags = MetadataFlags::PURE;
-        if context.file.file_type.is_host() {
-            flags |= MetadataFlags::USER_DEFINED;
-        } else if context.file.file_type.is_builtin() {
-            flags |= MetadataFlags::BUILTIN;
-        }
+        flags |= MetadataFlags::origin_flags(context.file.file_type);
 
         scanner.codebase.function_likes.insert(
             (class_like_metadata.name, constructor_name),

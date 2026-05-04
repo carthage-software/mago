@@ -26,11 +26,7 @@ pub fn scan_enum_case<'arena>(
     match &case.item {
         EnumCaseItem::Unit(item) => {
             let mut flags = MetadataFlags::UNIT_ENUM_CASE;
-            if context.file.file_type.is_host() {
-                flags |= MetadataFlags::USER_DEFINED;
-            } else if context.file.file_type.is_builtin() {
-                flags |= MetadataFlags::BUILTIN;
-            }
+            flags |= MetadataFlags::origin_flags(context.file.file_type);
 
             let mut meta = EnumCaseMetadata::new(atom(item.name.value), item.name.span, span, flags);
 
@@ -40,11 +36,7 @@ pub fn scan_enum_case<'arena>(
         }
         EnumCaseItem::Backed(item) => {
             let mut flags = MetadataFlags::BACKED_ENUM_CASE;
-            if context.file.file_type.is_host() {
-                flags |= MetadataFlags::USER_DEFINED;
-            } else if context.file.file_type.is_builtin() {
-                flags |= MetadataFlags::BUILTIN;
-            }
+            flags |= MetadataFlags::origin_flags(context.file.file_type);
 
             let mut meta = EnumCaseMetadata::new(atom(item.name.value), item.name.span, span, flags);
 

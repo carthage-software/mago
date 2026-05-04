@@ -315,12 +315,7 @@ fn scan_class_like<'arena>(
         return None;
     }
 
-    let mut flags = MetadataFlags::empty();
-    if context.file.file_type.is_host() {
-        flags |= MetadataFlags::USER_DEFINED;
-    } else if context.file.file_type.is_builtin() {
-        flags |= MetadataFlags::BUILTIN;
-    }
+    let flags = MetadataFlags::origin_flags(context.file.file_type);
 
     let mut class_like_metadata = ClassLikeMetadata::new(name, original_name, span, name_span, flags);
 
