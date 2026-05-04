@@ -773,8 +773,13 @@ fn scrape_type_properties(
                             && existing_is_sealed
                             && !combination.keyed_array_entries.is_empty()
                             && let Some(known_items_inner) = known_items.as_ref()
-                            && !known_items_inner.keys().any(|k| combination.keyed_array_entries.contains_key(k))
                             && combination.sealed_arrays.len() + 1 < options.array_combination_threshold as usize
+                            && (!known_items_inner.keys().any(|k| combination.keyed_array_entries.contains_key(k))
+                                || shapes_are_discriminated(
+                                    known_items_inner,
+                                    &combination.keyed_array_entries,
+                                    codebase,
+                                ))
                         {
                             let frozen = TArray::Keyed(TKeyedArray {
                                 known_items: Some(std::mem::take(&mut combination.keyed_array_entries)),
@@ -1240,6 +1245,53 @@ fn scrape_type_properties(
     }
 
     combination.value_types.insert(atomic.get_id(), atomic);
+}
+
+fn shapes_are_discriminated(
+    incoming: &BTreeMap<ArrayKey, (bool, TUnion)>,
+    existing: &BTreeMap<ArrayKey, (bool, TUnion)>,
+    codebase: &CodebaseMetadata,
+) -> bool {
+    let mut has_asymmetric_keys = false;
+    for key in incoming.keys() {
+        if !existing.contains_key(key) {
+            has_asymmetric_keys = true;
+            break;
+        }
+    }
+
+    if !has_asymmetric_keys {
+        for key in existing.keys() {
+            if !incoming.contains_key(key) {
+                has_asymmetric_keys = true;
+                break;
+            }
+        }
+    }
+
+    if !has_asymmetric_keys {
+        return false;
+    }
+
+    for (key, (incoming_optional, incoming_type)) in incoming {
+        if *incoming_optional {
+            continue;
+        }
+
+        let Some((existing_optional, existing_type)) = existing.get(key) else {
+            continue;
+        };
+
+        if *existing_optional {
+            continue;
+        }
+
+        if !union_comparator::can_expression_types_be_identical(codebase, incoming_type, existing_type, false, false) {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// Widens known items in a sealed array with the generic value type from parameters.
