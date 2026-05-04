@@ -684,6 +684,7 @@ public function bar(
 <h2 id="preserving-author-breaks">保留作者的换行</h2>
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>preserve-breaking-argument-list</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">保留参数列表(实参)中已有的换行。</td></tr>
+<tr><td style="text-align: left"><code>inline-single-breaking-value-argument</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">当调用的唯一实参是一个值(字面量、变量、标识符、类常量)时,即使整行超过 <code>print-width</code> 也保持在同一行。对这种实参拆开括号只会多出一个换行、一层缩进和一行单独的右括号,而不会让长值变短。对多实参调用,或本身就是调用、数组、闭包的实参没有效果。在 <code>tempest</code> 预设中默认开启,其他预设默认关闭。</td></tr>
 <tr><td style="text-align: left"><code>preserve-breaking-array-like</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">保留数组类结构中已有的换行。</td></tr>
 <tr><td style="text-align: left"><code>preserve-breaking-parameter-list</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">保留形参列表中已有的换行。</td></tr>
 <tr><td style="text-align: left"><code>preserve-breaking-attribute-list</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">保留 attribute 列表中已有的换行。</td></tr>

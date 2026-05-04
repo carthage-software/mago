@@ -7286,6 +7286,11 @@
           "type": "boolean",
           "default": false
         },
+        "inline-single-breaking-value-argument": {
+          "description": "Keep a call's single value-shaped argument inline even when the line\noverflows `print-width`.\n\nWhen the only argument of a call is a \"value\" (literal, variable,\nidentifier, class constant, etc.), breaking the parentheses around it\nadds an indented newline and a closing-paren line without making the\nargument itself any shorter. The result occupies more lines for no\nreadability gain. Enabling this option suppresses that break:\n\nDisabled (default):\n```php\n$foo->description(\n    'Filter notices affecting flights departing or arriving between the specified dates...',\n);\n```\n\nEnabled:\n```php\n$foo->description('Filter notices affecting flights departing or arriving between the specified dates...');\n```\n\nOnly applies when the argument is positional, has no surrounding\ncomments, and is shaped like a value (no internal calls, arrays, or\nclosures). Multi-argument calls and complex expressions still follow\nthe normal break-on-overflow logic.\n\nDefault: false",
+          "type": "boolean",
+          "default": false
+        },
         "preserve-breaking-array-like": {
           "description": "Whether to preserve line breaks in array-like structures, even if they could fit on a single line.\n\nDefault: true",
           "type": "boolean",
