@@ -323,6 +323,7 @@ define_rules! {
     VariableName(variable_name @ VariableNameRule),
     ConstantCondition(constant_condition @ ConstantConditionRule),
     NoArrayAccumulationInLoop(no_array_accumulation_in_loop @ NoArrayAccumulationInLoopRule),
+    PreferArraySpread(prefer_array_spread @ PreferArraySpreadRule),
     NoIniSet(no_ini_set @ NoIniSetRule),
     NoParameterShadowing(no_parameter_shadowing @ NoParameterShadowingRule),
     NoInline(no_inline @ NoInlineRule),
