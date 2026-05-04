@@ -1429,8 +1429,8 @@
   }
 
   .rule-examples {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: var(--s-3);
     margin-block: var(--s-3);
   }
