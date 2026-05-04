@@ -172,7 +172,7 @@ fn replace_atomic(
         TAtomic::Array(array_type) => match array_type {
             TArray::Keyed(keyed_data) => {
                 if let Some(known_items) = &mut keyed_data.known_items {
-                    for (_, (_, item_union)) in known_items.iter_mut() {
+                    for (_, item_union) in known_items.values_mut() {
                         *item_union = self::replace(item_union, template_result, codebase, next_opts);
                     }
                 } else if let Some(parameters) = &mut keyed_data.parameters {
@@ -184,7 +184,7 @@ fn replace_atomic(
             }
             TArray::List(list_data) => {
                 if let Some(known_elements) = &mut list_data.known_elements {
-                    for (_, (_, element_union_arc)) in known_elements.iter_mut() {
+                    for (_, element_union_arc) in known_elements.values_mut() {
                         *element_union_arc = self::replace(element_union_arc, template_result, codebase, next_opts);
                     }
                 } else {

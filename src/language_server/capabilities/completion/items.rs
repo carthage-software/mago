@@ -208,7 +208,7 @@ fn collect_class_members(
     let mut out = Vec::new();
 
     if static_access {
-        for (name, _) in meta.constants.iter() {
+        for name in meta.constants.keys() {
             let s = name.as_str();
             if !s.to_ascii_lowercase().starts_with(&needle) {
                 continue;
@@ -219,7 +219,7 @@ fn collect_class_members(
                 ..CompletionItem::default()
             });
         }
-        for (name, _) in meta.enum_cases.iter() {
+        for name in meta.enum_cases.keys() {
             let s = name.as_str();
             if !s.to_ascii_lowercase().starts_with(&needle) {
                 continue;

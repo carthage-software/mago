@@ -148,7 +148,7 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
     );
 
     if always_enters_loop && !infinite_loop {
-        for (_, variable_type) in block_context.locals.iter_mut() {
+        for variable_type in block_context.locals.values_mut() {
             let mut union = (**variable_type).clone();
             if mark_array_keys_definite(&mut union) {
                 *variable_type = Rc::new(union);

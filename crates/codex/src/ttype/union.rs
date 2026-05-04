@@ -1538,7 +1538,7 @@ fn widen_atomic_scalars(atomic: &mut TAtomic) {
             TArray::List(list) => {
                 widen_arc_union_scalars(&mut list.element_type);
                 if let Some(known) = list.known_elements.as_mut() {
-                    for (_, (_, ty)) in known.iter_mut() {
+                    for (_, ty) in known.values_mut() {
                         ty.widen_scalars();
                     }
                 }
@@ -1549,7 +1549,7 @@ fn widen_atomic_scalars(atomic: &mut TAtomic) {
                     widen_arc_union_scalars(value);
                 }
                 if let Some(known) = keyed.known_items.as_mut() {
-                    for (_, (_, ty)) in known.iter_mut() {
+                    for (_, ty) in known.values_mut() {
                         ty.widen_scalars();
                     }
                 }
@@ -1572,7 +1572,7 @@ fn widen_atomic_scalars(atomic: &mut TAtomic) {
             }
         }
         TAtomic::Object(TObject::WithProperties(with_props)) => {
-            for (_, (_, ty)) in with_props.known_properties.iter_mut() {
+            for (_, ty) in with_props.known_properties.values_mut() {
                 ty.widen_scalars();
             }
         }
@@ -1641,7 +1641,7 @@ fn widen_atomic_literals(atomic: &mut TAtomic) {
             TArray::List(list) => {
                 widen_arc_union_literals(&mut list.element_type);
                 if let Some(known) = list.known_elements.as_mut() {
-                    for (_, (_, ty)) in known.iter_mut() {
+                    for (_, ty) in known.values_mut() {
                         ty.widen_literals();
                     }
                 }
@@ -1652,7 +1652,7 @@ fn widen_atomic_literals(atomic: &mut TAtomic) {
                     widen_arc_union_literals(value);
                 }
                 if let Some(known) = keyed.known_items.as_mut() {
-                    for (_, (_, ty)) in known.iter_mut() {
+                    for (_, ty) in known.values_mut() {
                         ty.widen_literals();
                     }
                 }
@@ -1675,7 +1675,7 @@ fn widen_atomic_literals(atomic: &mut TAtomic) {
             }
         }
         TAtomic::Object(TObject::WithProperties(with_props)) => {
-            for (_, (_, ty)) in with_props.known_properties.iter_mut() {
+            for (_, ty) in with_props.known_properties.values_mut() {
                 ty.widen_literals();
             }
         }

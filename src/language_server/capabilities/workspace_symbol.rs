@@ -25,7 +25,7 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str
     let needle = query.to_ascii_lowercase();
     let mut out = Vec::new();
 
-    for (_, meta) in codebase.class_likes.iter() {
+    for meta in codebase.class_likes.values() {
         if !matches(&meta.name, &needle) {
             continue;
         }
@@ -74,7 +74,7 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str
         }
     }
 
-    for (_, meta) in codebase.constants.iter() {
+    for meta in codebase.constants.values() {
         if !matches(&meta.name, &needle) {
             continue;
         }
