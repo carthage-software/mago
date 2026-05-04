@@ -149,6 +149,7 @@ partial_pub_fields = "allow"
 else_if_without_else = "allow"
 exhaustive_enums = "allow"
 semicolon_inside_block = "allow"
+inline_modules = "allow"
 
 [workspace.dependencies]
 mago-syntax-core = { path = "crates/syntax-core", version = "1.25.2" }
