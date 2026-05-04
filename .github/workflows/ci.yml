@@ -25,17 +25,27 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
+      - name: resolve toolchain version
+        id: toolchain
+        shell: bash
+        run: |
+          if [ "${{ matrix.rust }}" = "nightly" ]; then
+            echo "version=$(cat nightly-version)" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ matrix.rust }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: install rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: ${{ steps.toolchain.outputs.version }}
           components: rustfmt, clippy
 
       - name: cache rust toolchain
         uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ runner.os }}-rust-${{ matrix.rust }}
-          shared-key: ${{ runner.os }}-rust-${{ matrix.rust }}
+          key: ${{ runner.os }}-rust-${{ steps.toolchain.outputs.version }}
+          shared-key: ${{ runner.os }}-rust-${{ steps.toolchain.outputs.version }}
           cache-on-failure: true
 
       - name: cache cargo registry
@@ -44,9 +54,9 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.rust }}-
+            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.version }}-
 
       - name: cargo check
         if: matrix.os == 'macos-latest'
