@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::collections::hash_map::Entry;
 use std::ffi::OsString;
 use std::path::Path;
+use std::path::PathBuf;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
@@ -273,7 +274,7 @@ impl<'config> DatabaseLoader<'config> {
             }
         };
 
-        let mut paths_to_process: Vec<(std::path::PathBuf, usize)> = Vec::new();
+        let mut paths_to_process: Vec<(PathBuf, usize)> = Vec::new();
 
         for root in roots {
             // Check if this is a glob pattern (contains glob metacharacters).
@@ -394,11 +395,8 @@ impl<'config> DatabaseLoader<'config> {
 
                 let workspace = canonical_workspace.as_path();
                 #[cfg(windows)]
-                let logical_name = path
-                    .strip_prefix(workspace)
-                    .unwrap_or_else(|_| path.as_path())
-                    .to_string_lossy()
-                    .replace('\\', "/");
+                let logical_name =
+                    path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().replace('\\', "/");
                 #[cfg(not(windows))]
                 let logical_name =
                     path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
