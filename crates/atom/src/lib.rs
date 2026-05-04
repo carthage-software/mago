@@ -44,7 +44,25 @@ use std::arch::aarch64::vminvq_u8;
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::vorrq_u8;
 #[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
+use std::arch::x86_64::__m256i;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::_mm256_add_epi8;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::_mm256_and_si256;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::_mm256_cmpeq_epi8;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::_mm256_cmpgt_epi8;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::_mm256_loadu_si256;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::_mm256_movemask_epi8;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::_mm256_or_si256;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::_mm256_set1_epi8;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::_mm256_sub_epi8;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::BuildHasherDefault;
@@ -249,8 +267,8 @@ pub fn starts_with_ignore_case(haystack: &str, prefix: &str) -> bool {
 
             let mut i = 0;
             while i + 32 <= len {
-                let h = _mm256_loadu_si256(haystack_bytes.as_ptr().add(i) as *const __m256i);
-                let p = _mm256_loadu_si256(prefix_bytes.as_ptr().add(i) as *const __m256i);
+                let h = _mm256_loadu_si256(haystack_bytes.as_ptr().add(i).cast::<__m256i>());
+                let p = _mm256_loadu_si256(prefix_bytes.as_ptr().add(i).cast::<__m256i>());
 
                 // Convert haystack chunk to lowercase
                 let h_is_upper = _mm256_and_si256(
