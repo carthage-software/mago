@@ -583,18 +583,18 @@
     <article class="doc-page">
       <h1 id="command-line-interface">命令行接口</h1>
 <p>每次调用 Mago 都遵循 <code>mago [GLOBAL OPTIONS] &lt;SUBCOMMAND&gt;</code> 的形式。全局选项必须放在子命令之前。</p>
-<pre><code class="language-sh">mago --colors=never lint        # correct
-mago lint --colors=never        # wrong, --colors is a global option
+<pre><code class="language-sh">mago --colors=never lint        # 正确
+mago lint --colors=never        # 错误, --colors 是全局选项
 </code></pre>
 <h2 id="global-options">全局选项</h2>
 <p>下列选项对每个子命令都生效,用于控制运行时、配置发现和输出。</p>
 <table><thead><tr><th style="text-align: left">参数</th><th style="text-align: left">说明</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>--workspace &lt;PATH&gt;</code></td><td style="text-align: left">工作区根目录。默认是当前目录。</td></tr>
-<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left">配置文件路径。未指定时,Mago 会在工作区、<code>$XDG_CONFIG_HOME</code>、<code>~/.config</code> 和 <code>~</code> 中查找。参见 <a href="../../../../main/zh/guide/configuration#discovery">发现</a>。</td></tr>
+<tr><td style="text-align: left"><code>--workspace &lt;PATH&gt;</code></td><td style="text-align: left">工作空间根目录。默认为当前目录。</td></tr>
+<tr><td style="text-align: left"><code>--config &lt;PATH&gt;</code></td><td style="text-align: left">配置文件路径。未指定时,Mago 会在工作空间、<code>$XDG_CONFIG_HOME</code>、<code>~/.config</code> 和 <code>~</code> 中查找。参见 <a href="../../../../main/zh/guide/configuration#discovery">发现</a>。</td></tr>
 <tr><td style="text-align: left"><code>--php-version &lt;VERSION&gt;</code></td><td style="text-align: left">覆盖配置中的 PHP 版本,例如 <code>8.2</code>。</td></tr>
 <tr><td style="text-align: left"><code>--threads &lt;NUMBER&gt;</code></td><td style="text-align: left">覆盖线程数。默认是逻辑 CPU 数。</td></tr>
 <tr><td style="text-align: left"><code>--allow-unsupported-php-version</code></td><td style="text-align: left">允许在 Mago 官方不支持的 PHP 版本上运行。请谨慎使用。</td></tr>
-<tr><td style="text-align: left"><code>--no-version-check</code></td><td style="text-align: left">静默项目锁定版本与已安装二进制之间次版本或补丁版本漂移的警告。主版本漂移仍是致命错误。参见 <a href="../../../../main/zh/guide/configuration#version-pinning">版本锁定</a>。</td></tr>
+<tr><td style="text-align: left"><code>--no-version-check</code></td><td style="text-align: left">关闭因已安装二进制与项目锁定版本之间次版本或补丁版本漂移所发出的警告。主版本漂移仍是致命错误。参见 <a href="../../../../main/zh/guide/configuration#version-pinning">版本锁定</a>。</td></tr>
 <tr><td style="text-align: left"><code>--colors &lt;WHEN&gt;</code></td><td style="text-align: left">何时为输出着色:<code>always</code>、<code>never</code> 或 <code>auto</code>(默认)。</td></tr>
 <tr><td style="text-align: left"><code>-h</code>, <code>--help</code></td><td style="text-align: left">打印帮助并退出。</td></tr>
 <tr><td style="text-align: left"><code>-V</code>, <code>--version</code></td><td style="text-align: left">打印已安装版本并退出。</td></tr>

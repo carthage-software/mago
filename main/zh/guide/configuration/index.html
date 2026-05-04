@@ -621,20 +621,20 @@ php-version: "8.3"
 <p>如果你需要在 CI 中重新生成 Schema(例如,以编程方式校验配置文件),<code>mago config --schema</code> 会把它打印到 stdout。</p>
 <h2 id="sharing-configuration-with-extends">用 <code>extends</code> 共享配置</h2>
 <blockquote>
-<p>自 Mago 1.25 起可用。更早的版本会静默忽略该指令。</p>
+<p>自 Mago 1.25 起可用。更早的版本会默默忽略该指令。</p>
 </blockquote>
 <p><code>extends</code> 指令让一份配置可以叠加在其他配置之上,而不必复制粘贴。在多个项目共享同一份基线规范时很有用。</p>
-<pre><code class="language-toml"># Single parent
+<pre><code class="language-toml"># 单个父配置
 extends = "vendor/some-org/mago-config/mago.toml"
 
-# Or a list, applied left-to-right; each later layer overrides earlier ones
+# 或使用列表,从左到右应用;后面的层覆盖前面的层
 extends = [
-  "vendor/some-org/mago-config",     # directory: mago.{toml,yaml,yml,json} inside
-  "configs/strict.json",              # mixing formats is fine
+  "vendor/some-org/mago-config",     # 目录:在其中查找 mago.{toml,yaml,yml,json}
+  "configs/strict.json",              # 可以混合使用不同格式
   "../shared/team-defaults.toml",
 ]
 
-# This file's own keys override anything from the layers above
+# 本文件自身的键会覆盖以上各层中的任何内容
 php-version = "8.3"
 </code></pre>
 <h3 id="resolution">路径解析</h3>
@@ -665,7 +665,7 @@ excludes = ["vendor", "node_modules"]
 extends = "base.toml"
 threads = 8
 [source]
-excludes = ["build"]   # appended -&gt; ["vendor", "node_modules", "build"]
+excludes = ["build"]   # 追加后 -&gt; ["vendor", "node_modules", "build"]
 </code></pre>
 <p>通过追踪规范化路径来检测环路,并以清晰的错误提示中断,而不是无限递归。菱形继承(A 继承 B 和 C,两者都继承 D)会只处理 D 一次,完全没有问题。各层可以自由混用格式;每一层由其对应的解析驱动负责解析,在通用值层面合并,最终文档再依据 schema 进行校验。</p>
 <h2 id="global-options">全局选项</h2>
@@ -680,7 +680,7 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <tr><td style="text-align: left"><code>version</code></td><td style="text-align: left">string</td><td style="text-align: left">无</td><td style="text-align: left">锁定本项目所基于的 Mago 版本。接受主版本(<code>"1"</code>)、次版本(<code>"1.25"</code>)或精确版本(<code>"1.25.2"</code>)的锁定。参见 <a href="#version-pinning">版本锁定</a>。</td></tr>
 <tr><td style="text-align: left"><code>php-version</code></td><td style="text-align: left">string</td><td style="text-align: left">最新稳定版</td><td style="text-align: left">Mago 在解析与分析时应针对的 PHP 版本。<code>mago init</code> 会尽可能从 <code>composer.json</code> 自动检测。</td></tr>
 <tr><td style="text-align: left"><code>allow-unsupported-php-version</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">允许 Mago 运行在它官方不支持的 PHP 版本上。不建议使用。</td></tr>
-<tr><td style="text-align: left"><code>no-version-check</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">在已安装二进制与锁定版本不一致时静默警告。主版本不一致始终是致命错误。</td></tr>
+<tr><td style="text-align: left"><code>no-version-check</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">在已安装二进制与锁定版本不一致时关闭警告。主版本不一致始终是致命错误。</td></tr>
 <tr><td style="text-align: left"><code>threads</code></td><td style="text-align: left">integer</td><td style="text-align: left">逻辑 CPU 数</td><td style="text-align: left">用于并行工作的线程数。</td></tr>
 <tr><td style="text-align: left"><code>stack-size</code></td><td style="text-align: left">integer</td><td style="text-align: left">2 MiB</td><td style="text-align: left">每线程栈大小,以字节为单位。最小 2 MiB,最大 8 MiB。</td></tr>
 <tr><td style="text-align: left"><code>editor-url</code></td><td style="text-align: left">string</td><td style="text-align: left">无</td><td style="text-align: left">终端输出中可点击文件路径的 URL 模板。参见 <a href="#editor-integration">编辑器集成</a>。</td></tr>
@@ -693,7 +693,7 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <li><strong>次版本锁定</strong>(<code>version = "1.25"</code>):任何 <code>1.25.y</code> 都满足。漂移到不同的次版本会发出警告;跨主版本仍然是致命错误。</li>
 <li><strong>精确锁定</strong>(<code>version = "1.25.2"</code>):任何漂移都会发出警告;跨主版本仍然是致命错误。</li>
 </ul>
-<p>警告可通过 <code>--no-version-check</code>、<code>MAGO_NO_VERSION_CHECK</code> 环境变量,或配置中的 <code>no-version-check = true</code> 静默。这些都不会影响主版本漂移,而后者正是版本锁定的全部意义所在。</p>
+<p>警告可通过 <code>--no-version-check</code>、<code>MAGO_NO_VERSION_CHECK</code> 环境变量,或配置中的 <code>no-version-check = true</code> 关闭。这些都不会影响主版本漂移,而后者正是版本锁定的全部意义所在。</p>
 <p>把已安装二进制同步到项目的锁定版本:</p>
 <pre><code class="language-sh">mago self-update --to-project-version
 </code></pre>
@@ -718,7 +718,7 @@ extensions = ["php"]
 <p>三种列表都支持 glob 模式:</p>
 <pre><code class="language-toml">[source]
 paths    = ["src/**/*.php"]
-includes = ["vendor/symfony/**/*.php"]   # only Symfony from vendor
+includes = ["vendor/symfony/**/*.php"]   # 仅包含 vendor 中的 Symfony
 excludes = [
   "**/*_generated.php",
   "**/tests/**",
@@ -735,10 +735,10 @@ excludes = [
 <h3 id="glob-settings">Glob 设置</h3>
 <p><code>[source.glob]</code> 用于调整 glob 的匹配方式。自 1.19 起可用。</p>
 <pre><code class="language-toml">[source.glob]
-literal-separator = true     # `*` does not match `/`; use `**` for recursion
+literal-separator = true     # `*` 不匹配 `/`;用 `**` 进行递归匹配
 case-insensitive  = false
-backslash-escape  = true     # `\` escapes special characters
-empty-alternates  = false    # `{,a}` matches "" and "a" when true
+backslash-escape  = true     # `\` 用于转义特殊字符
+empty-alternates  = false    # 为 true 时,`{,a}` 匹配 "" 和 "a"
 </code></pre>
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>case-insensitive</code></td><td style="text-align: left">bool</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">模式匹配是否大小写不敏感。</td></tr>
@@ -753,10 +753,10 @@ empty-alternates  = false    # `{,a}` matches "" and "a" when true
 <p>每个工具都有自己的可选 <code>excludes</code>。它们是叠加的:文件只要匹配全局列表或工具特定列表中的任意一项,就会被排除。</p>
 <pre><code class="language-toml">[source]
 paths    = ["src", "tests"]
-excludes = ["cache/**"]            # all tools
+excludes = ["cache/**"]            # 对所有工具生效
 
 [analyzer]
-excludes = ["tests/**/*.php"]      # only the analyzer
+excludes = ["tests/**/*.php"]      # 仅对分析器生效
 
 [formatter]
 excludes = ["src/**/AutoGenerated/**/*.php"]
@@ -830,11 +830,11 @@ enable-short-tags = false
 </ul>
 <h2 id="inspecting-the-merged-configuration">检视合并后的配置</h2>
 <p><code>mago config</code> 打印 Mago 实际使用的配置,即把默认值、每一层 <code>extends</code>、环境变量和 CLI 参数合并之后的结果。当某些行为不符合预期时很有用。</p>
-<pre><code class="language-sh">mago config                       # full config as pretty-printed JSON
-mago config --show linter         # only the [linter] section
+<pre><code class="language-sh">mago config                       # 以美化 JSON 格式输出完整配置
+mago config --show linter         # 仅输出 [linter] 小节
 mago config --show formatter
-mago config --default             # the built-in defaults
-mago config --schema              # JSON Schema for the whole config
+mago config --default             # 输出内置默认值
+mago config --schema              # 输出完整配置的 JSON Schema
 mago config --schema --show linter
 </code></pre>
 <table><thead><tr><th style="text-align: left">参数</th><th style="text-align: left">说明</th></tr></thead><tbody>

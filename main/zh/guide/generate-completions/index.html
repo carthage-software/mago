@@ -584,8 +584,8 @@
       <h1 id="shell-completions">Shell 补全</h1>
 <p><code>mago generate-completions &lt;shell&gt;</code> 会为你指定的 shell 打印一份补全脚本。把它保存到你的 shell 期望的位置,或者直接管道执行,这样它总是与已安装的 Mago 版本一致。</p>
 <pre><code class="language-sh">mago generate-completions fish
-mago generate-completions fish | source              # fish, ad-hoc
-mago generate-completions zsh &gt; ~/.zfunc/_mago      # zsh, persisted
+mago generate-completions fish | source              # fish, 临时使用
+mago generate-completions zsh &gt; ~/.zfunc/_mago      # zsh, 持久保存
 mago generate-completions bash &gt; /etc/bash_completion.d/mago
 </code></pre>
 <p>受支持的 shell:<code>bash</code>、<code>zsh</code>、<code>fish</code>、<code>elvish</code>、<code>powershell</code>。</p>

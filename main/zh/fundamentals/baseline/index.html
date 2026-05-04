@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   
   <title>Baseline · Mago</title>
-  <meta name="description" content="为已存在的问题打快照,让 Mago 只标记新出现的问题。提供两种变体,在精度与韧性之间提供不同的取舍。">
+  <meta name="description" content="为已存在的问题保存快照,让 Mago 只标记新出现的问题。提供两种变体,在精度与韧性之间提供不同的取舍。">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Baseline · Mago">
-  <meta property="og:description" content="为已存在的问题打快照,让 Mago 只标记新出现的问题。提供两种变体,在精度与韧性之间提供不同的取舍。">
+  <meta property="og:description" content="为已存在的问题保存快照,让 Mago 只标记新出现的问题。提供两种变体,在精度与韧性之间提供不同的取舍。">
   <meta property="og:url" content="https://mago.carthage.software/main/zh/fundamentals&#x2F;baseline/">
   <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/banner.png">
   <meta property="og:image:width" content="1200">
@@ -16,7 +16,7 @@
   <meta property="og:locale" content="zh">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Baseline · Mago">
-  <meta name="twitter:description" content="为已存在的问题打快照,让 Mago 只标记新出现的问题。提供两种变体,在精度与韧性之间提供不同的取舍。">
+  <meta name="twitter:description" content="为已存在的问题保存快照,让 Mago 只标记新出现的问题。提供两种变体,在精度与韧性之间提供不同的取舍。">
   <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/banner.png">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
@@ -586,8 +586,8 @@
 <h2 id="one-file-per-tool">每个工具一份文件</h2>
 <p>linter 和分析器各自维护自己的 baseline,因为它们报告的问题不同。常见命名:</p>
 <ul>
-<li>Linter:<code>lint-baseline.toml</code></li>
-<li>分析器:<code>analysis-baseline.toml</code></li>
+<li>Linter: <code>lint-baseline.toml</code></li>
+<li>分析器: <code>analysis-baseline.toml</code></li>
 </ul>
 <p><code>mago ast</code> 命令报告的是解析错误,不支持 baseline。</p>
 <h2 id="generating-a-baseline">生成 baseline</h2>
@@ -647,7 +647,7 @@ end_line   = 90
 <p>在 <code>mago.toml</code> 中为新生成的 baseline 文件指定变体:</p>
 <pre><code class="language-toml">[linter]
 baseline = "lint-baseline.toml"
-baseline-variant = "loose"   # or "strict"
+baseline-variant = "loose"   # 或 "strict"
 
 [analyzer]
 baseline = "analysis-baseline.toml"
@@ -655,7 +655,7 @@ baseline-variant = "loose"
 </code></pre>
 <p>该设置只影响生成。读取已有 baseline 时,Mago 会从文件的 <code>variant</code> 头信息中检测变体。</p>
 <h3 id="backwards-compatibility">向后兼容</h3>
-<p>由更早的 Mago 版本(在引入 variant 支持之前)生成的 baseline 文件没有 <code>variant</code> 头。Mago 会把这类文件视为 strict,并打印一条警告,建议你重新生成以获得该头信息。</p>
+<p>由更早的 Mago 版本(在引入 variant 支持之前)生成的 baseline 文件没有 <code>variant</code> 头部信息。Mago 会把这类文件视为 strict,并打印一条警告,建议你重新生成以获得该头部信息。</p>
 <h2 id="skipping-the-baseline-temporarily">临时跳过 baseline</h2>
 <pre><code class="language-sh">mago lint --ignore-baseline
 mago analyze --ignore-baseline
@@ -670,7 +670,7 @@ mago analyze --ignore-baseline
 <p>如果你正在构建需要解析或生成 baseline 文件的工具或 IDE 集成,可以获取 schema:</p>
 <pre><code class="language-sh">mago config --schema --show baseline
 </code></pre>
-<p>输出是一份覆盖两种变体的 JSON Schema(draft 2020-12)。</p>
+<p>输出是一份覆盖两种变体的 JSON Schema (draft 2020-12)。</p>
 
     </article>
 

@@ -611,10 +611,10 @@ prefer-static-closure = { exclude = ["tests/"] }
 </tbody></table>
 <p>这里的 <code>excludes</code> 是在全局列表之上叠加。被全局匹配到的文件总是会被排除;此选项只能让你额外为 linter 排除一些文件。</p>
 <pre><code class="language-toml">[source]
-excludes = ["cache/**"]              # excluded from every tool
+excludes = ["cache/**"]              # 对所有工具排除
 
 [linter]
-excludes = ["database/migrations/**"]  # additionally excluded from the linter only
+excludes = ["database/migrations/**"]  # 额外对 linter 排除
 </code></pre>
 <h2 id="linter-rules"><code>[linter.rules]</code></h2>
 <p>此表下的每个键都是一条规则的代码,以 <code>kebab-case</code> 书写。每条规则都接受下面的通用选项;部分规则还接受自身的选项。</p>

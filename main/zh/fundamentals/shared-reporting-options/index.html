@@ -582,7 +582,7 @@
   <main id="content" class="doc-content">
     <article class="doc-page">
       <h1 id="reporting-and-fixing-options">报告与修复选项</h1>
-<p><code>mago lint</code>、<code>mago analyze</code> 和 <code>mago ast</code> 共用一组参数,用来控制问题如何被报告、修复如何被应用。本页是这些参数的中心参考,这样我们就不必在每个命令页里重复它们。</p>
+<p><code>mago lint</code>、<code>mago analyze</code> 和 <code>mago ast</code> 共用一组参数,用来控制问题如何被报告、修复如何被应用。本页是这些参数的集中参考,这样我们就不必在每个命令页里重复它们。</p>
 <h2 id="auto-fixing">自动修复</h2>
 <p>大多数 linter 规则以及若干分析器检查都附带了自动修复。下列参数控制如何应用修复,以及哪些类别可被修复。</p>
 <table><thead><tr><th style="text-align: left">参数</th><th style="text-align: left">说明</th></tr></thead><tbody>
@@ -608,9 +608,9 @@
 <li><code>mago lint --only &lt;RULE&gt;</code> 仅运行指定的规则。其他规则被完全跳过,因此更快。</li>
 <li><code>mago lint --retain-code &lt;CODE&gt;</code> 运行所有规则,然后把输出过滤到你列出的 code。</li>
 </ul>
-<pre><code class="language-sh">mago lint --only no-unused-variable                                  # only run that rule
-mago lint --retain-code no-unused-variable                           # run everything, show only this code
-mago lint --retain-code no-unused-variable --retain-code semantics   # multiple codes
+<pre><code class="language-sh">mago lint --only no-unused-variable                                  # 仅运行该规则
+mago lint --retain-code no-unused-variable                           # 运行所有规则,仅显示此 code
+mago lint --retain-code no-unused-variable --retain-code semantics   # 多个 code
 mago analyze --retain-code invalid-argument --retain-code type-mismatch
 </code></pre>
 <p>当你想对某条具体规则做快速反馈时,使用 <code>--only</code>。当你想全面覆盖但聚焦报告时,使用 <code>--retain-code</code>。</p>

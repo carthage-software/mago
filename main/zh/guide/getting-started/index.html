@@ -582,7 +582,7 @@
   <main id="content" class="doc-content">
     <article class="doc-page">
       <h1 id="getting-started">快速开始</h1>
-<p>Mago 是一款用 Rust 编写的 PHP 工具链。一个二进制涵盖了通常需要三四个独立工具才能完成的工作流。</p>
+<p>Mago 是一款用 Rust 编写的 PHP 工具链。一个二进制文件即可覆盖通常需要三四个独立工具才能完成的工作流环节。</p>
 <p>它包含:</p>
 <ul>
 <li>一个 <a href="../../../../main/zh/tools/formatter/overview">格式化器</a>,产出确定性的输出,默认遵循 PER-CS。</li>
@@ -591,10 +591,10 @@
 <li>一个 <a href="../../../../main/zh/tools/guard/overview">架构 guard</a>,用于强制执行依赖规则与结构约定。</li>
 </ul>
 <p>整套工具以单一二进制运行,无需 PHP 运行时,无需 Composer 依赖,也无需安装 Java。典型的工作流是这样的:</p>
-<pre><code class="language-sh">mago init           # write a starter mago.toml
-mago lint           # surface stylistic and correctness issues
-mago format         # rewrite files to match the formatter
-mago analyze        # type-check and find logic bugs
+<pre><code class="language-sh">mago init           # 生成一份起步用的 mago.toml
+mago lint           # 检查风格与正确性问题
+mago format         # 按格式化器规则重写文件
+mago analyze        # 进行类型检查并发现逻辑 bug
 </code></pre>
 <h2 id="where-to-go-next">接下来去哪里</h2>
 <ul>

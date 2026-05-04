@@ -584,7 +584,7 @@
       <h1 id="installation">安装</h1>
 <p>Mago 以单一静态二进制的形式发布。挑一种适合你环境的安装方式即可。</p>
 <h2 id="shell-installer-macos-linux">Shell 安装脚本(macOS、Linux)</h2>
-<p>macOS 和 Linux 上的推荐方式。脚本会探测你的平台、获取匹配的发行归档,并把二进制放到你的 PATH 上。</p>
+<p>macOS 和 Linux 上的推荐方式。脚本会检测你的平台、获取匹配的发行归档,并把二进制放到你的 PATH 上。</p>
 <p>使用 <code>curl</code>:</p>
 <pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash
 </code></pre>
@@ -597,7 +597,7 @@
 <p><code>wget</code> 也支持同样的语法。</p>
 <h3 id="verify-the-download">校验下载</h3>
 <p>如果 <a href="https://cli.github.com/">GitHub CLI</a> 在你的 PATH 上,安装脚本会在解压前根据 Mago 的 GitHub 构建证明(build attestation)校验归档。无需任何参数。如果 <code>gh</code> 缺失或版本太旧,脚本会打印提示并继续运行而不进行校验。</p>
-<p>要让校验成为强制项,请传 <code>--always-verify</code>。如果 <code>gh</code> 不可用、版本太旧,或证明不匹配,安装脚本会在动到 PATH 之前中止。</p>
+<p>要让校验成为强制项,请传 <code>--always-verify</code>。如果 <code>gh</code> 不可用、版本太旧,或证明不匹配,安装脚本会在修改 PATH 之前中止。</p>
 <pre><code class="language-sh">curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --always-verify
 </code></pre>
 <p>要完全跳过校验,请传 <code>--no-verify</code>。这两个参数互斥。</p>
@@ -605,12 +605,12 @@
 <p>Windows 上的推荐方式,也是任何没有 <code>bash</code> 的系统上的不错备选。</p>
 <ol>
 <li>打开 <a href="https://github.com/carthage-software/mago/releases">发布页面</a>。</li>
-<li>下载对应你操作系统的归档。命名遵循 <code>mago-&lt;version&gt;-&lt;target&gt;.tar.gz</code>(Windows 上是 <code>.zip</code>)。</li>
+<li>下载对应你操作系统的归档。命名遵循 <code>mago-&lt;version&gt;-&lt;target&gt;.tar.gz</code> (Windows 上是 <code>.zip</code>)。</li>
 <li>解压归档,把二进制放到 PATH 上的某个位置。</li>
 </ol>
 <p>如果你保留了归档文件,可以在解压前自行校验。</p>
 <pre><code class="language-sh">VERSION=1.25.2
-TARGET=x86_64-unknown-linux-gnu  # adjust for your platform
+TARGET=x86_64-unknown-linux-gnu  # 请根据你的平台调整
 ASSET=mago-${VERSION}-${TARGET}.tar.gz
 
 gh release download "$VERSION" --repo carthage-software/mago --pattern "$ASSET"
@@ -651,7 +651,7 @@ mago self-update
 mago self-update
 </code></pre>
 <h2 id="verifying-releases-in-detail">校验发布的细节</h2>
-<p>每一份发行归档(各平台的 tarball、源码 tarball、源码 zip,以及 WASM 包)都在构建时通过 <a href="https://github.com/actions/attest-build-provenance"><code>actions/attest-build-provenance</code></a> 进行签名。签名是一份存储在 GitHub 上的 <a href="https://in-toto.io/">in-toto</a> 证明,绑定到生成该工件的工作流运行,因此校验通过的下载,可证明与 Mago 发布流水线产出的字节完全一致。</p>
+<p>每一份发行归档 (各平台的 tarball、源码 tarball、源码 zip,以及 WASM 包) 都在构建时通过 <a href="https://github.com/actions/attest-build-provenance"><code>actions/attest-build-provenance</code></a> 进行签名。签名是一份存储在 GitHub 上的 <a href="https://in-toto.io/">in-toto</a> 证明,绑定到生成该工件的工作流运行,因此校验通过的下载,可证明与 Mago 发布流水线产出的字节完全一致。</p>
 <p>shell 安装脚本会根据你传入的参数,在三种模式之间选择。</p>
 <table><thead><tr><th style="text-align: left">模式</th><th style="text-align: left">参数</th><th style="text-align: left">行为</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>auto</code></td><td style="text-align: left">无</td><td style="text-align: left">如果 <code>gh</code> 可用就校验;否则跳过校验直接安装。</td></tr>
@@ -664,12 +664,12 @@ mago self-update
   --signer-workflow carthage-software/mago/.github/workflows/cd.yml
 </code></pre>
 <p><code>--signer-workflow</code> 这一项很关键。它把证明绑定到具体的发布工作流文件。即便有人通过泄露的 GitHub Actions token 在同一仓库内触发了另一个工作流,校验也会失败。</p>
-<p>如果校验失败,脚本会把未经校验的归档复制到当前工作目录,命名为 <code>&lt;file&gt;.unverified.tar.gz</code>(这样它能在临时目录清理后留存,便于你做事后取证),打印一条红色错误信息,然后在解压之前退出。任何东西都不会进入你的 PATH。</p>
+<p>如果校验失败,脚本会把未经校验的归档复制到当前工作目录,命名为 <code>&lt;file&gt;.unverified.tar.gz</code> (这样它能在临时目录清理后留存,便于你做事后取证),打印一条红色错误信息,然后在解压之前退出。任何东西都不会进入你的 PATH。</p>
 <p>校验调用读取的是公开的证明 API,因此无需 <code>gh auth</code>。你只需要一个包含 <code>gh attestation</code> 子命令的较新版本 <code>gh</code>。</p>
 <h3 id="pinning-the-install-script">锁定安装脚本</h3>
 <p><code>https://carthage.software/mago.sh</code> 会重定向到 <code>main</code> 分支上的 <a href="https://github.com/carthage-software/mago/blob/main/scripts/install.sh"><code>scripts/install.sh</code></a>。未来的修订会被自动采用,这很方便,但也意味着将来对安装脚本的改动会在没有预警的情况下生效。</p>
-<p>为了更严格的供应链卫生,可以把脚本锁定到你审阅过的某个提交:</p>
-<pre><code class="language-sh">COMMIT=cd4cf4dfdbc72bd028ad26d11bcc815a49e27e9a  # replace with a commit you have read
+<p>为了更严格的供应链安全,可以把脚本锁定到你审阅过的某个提交:</p>
+<pre><code class="language-sh">COMMIT=cd4cf4dfdbc72bd028ad26d11bcc815a49e27e9a  # 替换为你已审阅过的提交哈希
 curl --proto '=https' --tlsv1.2 -sSf \
   "https://raw.githubusercontent.com/carthage-software/mago/${COMMIT}/scripts/install.sh" \
   | bash -s -- --always-verify
