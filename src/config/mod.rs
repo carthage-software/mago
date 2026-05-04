@@ -93,6 +93,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use mago_php_version::PHPVersion;
+use serde::de::IgnoredAny;
 use serde_json::Value;
 
 use crate::config::analyzer::AnalyzerConfiguration;
@@ -160,6 +161,9 @@ const _: () = {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct Configuration {
+    #[serde(rename = "$schema", skip_serializing)]
+    #[schemars(rename = "$schema", with = "Option<String>", !skip_serializing)]
+    _schema: Option<IgnoredAny>,
     /// The mago version this project is pinned to.
     ///
     /// Accepts three pin levels:
@@ -571,6 +575,7 @@ impl Configuration {
     /// A new `Configuration` instance with default values and the specified workspace.
     pub fn from_workspace(workspace: PathBuf) -> Self {
         Self {
+            _schema: None,
             version: None,
             threads: *LOGICAL_CPUS,
             stack_size: DEFAULT_STACK_SIZE,
@@ -1026,6 +1031,22 @@ mod tests {
         assert_eq!(config.php_version.to_string(), "8.3.0");
         // Set in layer-yaml.yaml.
         assert!(config.allow_unsupported_php_version);
+    }
+
+    #[test]
+    fn test_supports_schema_in_config() {
+        let dir = temp_dir().join("supports-schema-in-config");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let config_path = dir.join("mago.toml");
+
+        write_file(&config_path, "\"$schema\" = \"mago_json_schema.json\"\n");
+
+        let config = load_isolated(&config_path);
+
+        // Really we don't care about this we just want to make sure
+        // that `load_isolated` doesn't panic.
+        assert!(config._schema.is_some());
     }
 }
 
