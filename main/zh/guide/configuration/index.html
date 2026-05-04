@@ -593,6 +593,32 @@
 <li><code>$HOME</code>,例如 <code>~/mago.toml</code>。</li>
 </ol>
 <p>在每个位置,会先查找 <code>mago.{toml,yaml,yml,json}</code>,再查找 <code>mago.dist.{toml,yaml,yml,json}</code>。同一目录内的格式优先级是 <code>toml &gt; yaml &gt; yml &gt; json</code>。第一个被找到的文件胜出,这让你可以为没有本地配置的项目在 <code>~/.config/mago.toml</code> 中保留一份全局配置。</p>
+<h2 id="editor-schema">编辑器 Schema</h2>
+<p>每个发布都会发布一个描述完整配置树的 JSON Schema。能识别该 Schema 的编辑器可以为 <code>mago.{toml,yaml,yml,json}</code> 提供自动补全、悬停文档与内联校验。</p>
+<p>Schema 托管在:</p>
+<ul>
+<li><code>https://mago.carthage.software/&lt;version&gt;/schema.json</code>,对应某个具体版本(如 <code>1.25.3</code>)。</li>
+<li><code>https://mago.carthage.software/latest/schema.json</code>,最新的稳定版本。</li>
+<li><code>https://mago.carthage.software/main/schema.json</code>,来自 <code>main</code> 分支的开发构建。</li>
+</ul>
+<p>请将 URL 固定到你已安装的 Mago 版本,这样 Schema 与二进制就能保持同步。<code>mago init</code> 会把固定版本的 URL 写入它生成的配置文件中。</p>
+<p>引用方式因格式而异:</p>
+<pre><code class="language-toml">#:schema https://mago.carthage.software/1.25.3/schema.json
+version = "1"
+php-version = "8.3"
+</code></pre>
+<pre><code class="language-yaml"># yaml-language-server: $schema=https://mago.carthage.software/1.25.3/schema.json
+version: "1"
+php-version: "8.3"
+</code></pre>
+<pre><code class="language-json">{
+  "$schema": "https://mago.carthage.software/1.25.3/schema.json",
+  "version": "1",
+  "php-version": "8.3"
+}
+</code></pre>
+<p>对于 TOML,该注释会被 <a href="https://taplo.tamasfe.dev/">Taplo</a> 语言服务器读取,VS Code 的「Even Better TOML」扩展和 JetBrains 的 TOML 支持均基于它。对于 YAML,该注释会被 <a href="https://github.com/redhat-developer/yaml-language-server">Red Hat YAML 语言服务器</a> 读取。对于 JSON,所有现代编辑器都原生识别 <code>$schema</code>。Mago 本身会忽略 <code>$schema</code> 键以及这些魔法注释,它们仅用于编辑器工具。</p>
+<p>如果你需要在 CI 中重新生成 Schema(例如,以编程方式校验配置文件),<code>mago config --schema</code> 会把它打印到 stdout。</p>
 <h2 id="sharing-configuration-with-extends">用 <code>extends</code> 共享配置</h2>
 <blockquote>
 <p>自 Mago 1.25 起可用。更早的版本会静默忽略该指令。</p>
@@ -831,6 +857,10 @@ mago config --schema --show linter
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#discovery">发现</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#editor-schema">编辑器 Schema</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">

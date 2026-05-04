@@ -564,6 +564,32 @@
 <li><code>$HOME</code>, for example <code>~/mago.toml</code>.</li>
 </ol>
 <p>In each location it looks for <code>mago.{toml,yaml,yml,json}</code> first, then <code>mago.dist.{toml,yaml,yml,json}</code>. Format precedence within a single directory is <code>toml &gt; yaml &gt; yml &gt; json</code>. The first file found wins, which lets you keep a global config in <code>~/.config/mago.toml</code> for projects that have no local one.</p>
+<h2 id="editor-schema">Editor schema</h2>
+<p>Every release publishes a JSON schema describing the full configuration tree. Editors that understand the schema give you autocomplete, hover documentation, and inline validation for <code>mago.{toml,yaml,yml,json}</code>.</p>
+<p>The schema is hosted at:</p>
+<ul>
+<li><code>https://mago.carthage.software/&lt;version&gt;/schema.json</code> — pinned to a specific release such as <code>1.25.3</code>.</li>
+<li><code>https://mago.carthage.software/latest/schema.json</code> — the most recent stable release.</li>
+<li><code>https://mago.carthage.software/main/schema.json</code> — the development build from <code>main</code>.</li>
+</ul>
+<p>Pin the URL to the version of Mago you have installed so the schema and your binary stay in sync. <code>mago init</code> writes the pinned URL into the file it scaffolds.</p>
+<p>How you reference it depends on the format:</p>
+<pre><code class="language-toml">#:schema https://mago.carthage.software/1.25.3/schema.json
+version = "1"
+php-version = "8.3"
+</code></pre>
+<pre><code class="language-yaml"># yaml-language-server: $schema=https://mago.carthage.software/1.25.3/schema.json
+version: "1"
+php-version: "8.3"
+</code></pre>
+<pre><code class="language-json">{
+  "$schema": "https://mago.carthage.software/1.25.3/schema.json",
+  "version": "1",
+  "php-version": "8.3"
+}
+</code></pre>
+<p>For TOML the comment is read by the <a href="https://taplo.tamasfe.dev/">Taplo</a> language server, which powers the "Even Better TOML" VS Code extension and the JetBrains TOML support. For YAML the comment is read by the <a href="https://github.com/redhat-developer/yaml-language-server">Red Hat YAML language server</a>. For JSON every modern editor reads <code>$schema</code> natively. Mago itself ignores the <code>$schema</code> key and the magic comments — they exist purely for editor tooling.</p>
+<p>If you regenerate the schema in CI (for example, to validate config files programmatically), <code>mago config --schema</code> prints it to stdout.</p>
 <h2 id="sharing-configuration-with-extends">Sharing configuration with <code>extends</code></h2>
 <blockquote>
 <p>Available since Mago 1.25. Earlier versions silently ignore the directive.</p>
@@ -802,6 +828,10 @@ mago config --schema --show linter
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#discovery">Discovery</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#editor-schema">Editor schema</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
