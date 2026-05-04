@@ -117,6 +117,17 @@ pub(super) fn print_argument_list<'arena>(
         }
     }
 
+    if !force_break
+        && f.settings.inline_single_breaking_value_argument
+        && should_inline_single_value_argument(f, argument_list)
+    {
+        let argument = &argument_list.arguments.as_slice()[0];
+        let argument_doc = argument.format(f);
+        let right_parenthesis = format_token(f, argument_list.right_parenthesis, ")");
+
+        return Document::Array(vec![in f.arena; left_parenthesis, argument_doc, right_parenthesis]);
+    }
+
     let mut contents = vec![in f.arena; clone_in_arena(f.arena, &left_parenthesis)];
 
     // First, run all the decision functions with unformatted arguments
@@ -578,6 +589,33 @@ fn is_single_late_breaking_argument<'arena>(
     };
 
     call.get_argument_list().arguments.iter().all(|a| a.is_positional() && is_simple_expression(a.value()))
+}
+
+/// Detects single value-shaped positional arguments whose call should stay
+/// inline regardless of `print-width`. Breaking the parens around such an
+/// argument adds an indent + a closing-paren line without making the long
+/// value any shorter, so the standard break-on-overflow path produces a
+/// pure-noise diff. Gated by `inline_single_breaking_value_argument`.
+#[inline]
+fn should_inline_single_value_argument<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    argument_list: &'arena ArgumentList<'arena>,
+) -> bool {
+    let arguments = argument_list.arguments.as_slice();
+    if arguments.len() != 1 {
+        return false;
+    }
+
+    let argument = &arguments[0];
+    if !argument.is_positional() {
+        return false;
+    }
+
+    if argument_has_surrounding_comments(f, argument) {
+        return false;
+    }
+
+    is_simple_expression(argument.value())
 }
 
 #[inline]

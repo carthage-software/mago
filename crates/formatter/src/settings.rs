@@ -442,6 +442,35 @@ generate_formatter_settings! {
     /// Default: false
     preserve_breaking_argument_list: bool => "default_false",
 
+    /// Keep a call's single value-shaped argument inline even when the line
+    /// overflows `print-width`.
+    ///
+    /// When the only argument of a call is a "value" (literal, variable,
+    /// identifier, class constant, etc.), breaking the parentheses around it
+    /// adds an indented newline and a closing-paren line without making the
+    /// argument itself any shorter. The result occupies more lines for no
+    /// readability gain. Enabling this option suppresses that break:
+    ///
+    /// Disabled (default):
+    /// ```php
+    /// $foo->description(
+    ///     'Filter notices affecting flights departing or arriving between the specified dates...',
+    /// );
+    /// ```
+    ///
+    /// Enabled:
+    /// ```php
+    /// $foo->description('Filter notices affecting flights departing or arriving between the specified dates...');
+    /// ```
+    ///
+    /// Only applies when the argument is positional, has no surrounding
+    /// comments, and is shaped like a value (no internal calls, arrays, or
+    /// closures). Multi-argument calls and complex expressions still follow
+    /// the normal break-on-overflow logic.
+    ///
+    /// Default: false
+    inline_single_breaking_value_argument: bool => "default_false",
+
     /// Whether to preserve line breaks in array-like structures, even if they could fit on a single line.
     ///
     /// Default: true

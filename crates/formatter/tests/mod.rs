@@ -44,6 +44,8 @@ macro_rules! test_case {
 // Test cases
 test_case!(leading_comment_with_missing_prefix);
 test_case!(docblock_before_function_declaration);
+test_case!(inline_single_breaking_value_argument);
+test_case!(inline_single_breaking_value_argument_default_off);
 test_case!(dangling_block_comments);
 test_case!(opening_tag_trailing_comments);
 test_case!(opening_tag_on_own_line);

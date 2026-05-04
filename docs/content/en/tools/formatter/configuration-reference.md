@@ -145,6 +145,7 @@ public function bar(
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `preserve-breaking-argument-list` | boolean | `false` | Preserve existing line breaks in argument lists. |
+| `inline-single-breaking-value-argument` | boolean | `false` | Keep a call's single value-shaped argument (literal, variable, identifier, class constant) inline even when the line overflows `print-width`. Breaking the parens around such an argument adds a newline + indent + closing-paren line without making the long value any shorter. Has no effect on multi-arg calls or arguments that are themselves calls / arrays / closures. Enabled by default in the `tempest` preset, off everywhere else. |
 | `preserve-breaking-array-like` | boolean | `true` | Preserve existing line breaks in array-likes. |
 | `preserve-breaking-parameter-list` | boolean | `false` | Preserve existing line breaks in parameter lists. |
 | `preserve-breaking-attribute-list` | boolean | `false` | Preserve existing line breaks in attribute lists. |

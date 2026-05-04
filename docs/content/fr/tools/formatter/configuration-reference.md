@@ -145,6 +145,7 @@ public function bar(
 | Option | Type | Défaut | Description |
 | :--- | :--- | :--- | :--- |
 | `preserve-breaking-argument-list` | booléen | `false` | Préserver les sauts de ligne existants dans les listes d'arguments. |
+| `inline-single-breaking-value-argument` | booléen | `false` | Conserver sur la même ligne un appel dont l'unique argument est une valeur (littéral, variable, identifiant, constante de classe), même si la ligne dépasse `print-width`. Casser les parenthèses autour d'un tel argument n'ajoute qu'un saut de ligne, une indentation et une parenthèse fermante sur sa propre ligne, sans raccourcir la valeur. Sans effet sur les appels à plusieurs arguments ou les arguments qui sont eux-mêmes des appels, des tableaux ou des fermetures. Activé par défaut dans le préréglage `tempest`, désactivé ailleurs. |
 | `preserve-breaking-array-like` | booléen | `true` | Préserver les sauts de ligne existants dans les types tableau. |
 | `preserve-breaking-parameter-list` | booléen | `false` | Préserver les sauts de ligne existants dans les listes de paramètres. |
 | `preserve-breaking-attribute-list` | booléen | `false` | Préserver les sauts de ligne existants dans les listes d'attributs. |
