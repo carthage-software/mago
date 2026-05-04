@@ -286,7 +286,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
 ) -> Result<(), AnalysisError> {
     let constraint_type = invocation.target.is_method_call();
 
-    for (parameter_offset, parameter_ref) in invocation.target.get_parameters().into_iter().enumerate() {
+    for (parameter_offset, parameter_ref) in invocation.target.iter_parameters().enumerate() {
         if !parameter_ref.is_by_reference() {
             continue;
         }
@@ -539,23 +539,22 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
     // passed any arguments. Reset each superglobal variable in locals back to its
     // declared type (wiping the caller's narrowed known-items), and drop any clauses
     // or separately-keyed index entries that refer to them.
-    let superglobal_vars_to_reset: Vec<Atom> =
-        block_context.locals.keys().copied().filter(|var_id| is_superglobal_name(var_id.as_str())).collect();
-
-    for var_id in &superglobal_vars_to_reset {
-        if let Some(declared) = crate::common::global::get_global_variable_type(var_id.as_str()) {
-            block_context.locals.insert(*var_id, declared);
-        } else {
-            block_context.locals.remove(var_id);
+    block_context.locals.retain(|var_id, current_type| {
+        if is_superglobal_index_key(*var_id) {
+            return false;
         }
-    }
 
-    let superglobal_index_keys_to_remove: Vec<_> =
-        block_context.locals.keys().copied().filter(|var_id| is_superglobal_index_key(*var_id)).collect();
+        if is_superglobal_name(var_id.as_str()) {
+            if let Some(declared) = crate::common::global::get_global_variable_type(var_id.as_str()) {
+                *current_type = declared;
+                return true;
+            }
 
-    for key in &superglobal_index_keys_to_remove {
-        block_context.locals.remove(key);
-    }
+            return false;
+        }
+
+        true
+    });
 
     let touches_superglobal = |var: Atom| {
         let s = var.as_str();
@@ -595,9 +594,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
     }
 
     // When an object is passed as an argument, properties on any object could be modified.
-    let arguments = invocation.arguments_source.get_arguments();
-
-    let has_object_argument = arguments.iter().any(|argument| {
+    let has_object_argument = invocation.arguments_source.iter_arguments().any(|argument| {
         let Some(expression) = argument.value() else {
             return false;
         };
@@ -619,12 +616,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
     }
 
     // Clear ALL property and index narrowings when objects are passed as arguments.
-    let keys_to_remove: Vec<_> =
-        block_context.locals.keys().copied().filter(|var_id| is_property_or_index_key(*var_id)).collect();
-
-    for key in &keys_to_remove {
-        block_context.locals.remove(key);
-    }
+    block_context.locals.retain(|var_id, _| !is_property_or_index_key(*var_id));
 
     block_context
         .clauses
@@ -1072,18 +1064,18 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
         return (None, None);
     }
 
-    let parameter_refs = invocation.target.get_parameters();
-
     // Step 1: Ensure we have both the name and offset for the parameter.
     if parameter_name.is_none() {
-        if let Some(parameter_ref) = parameter_offset.and_then(|offset| parameter_refs.get(offset)) {
+        if let Some(parameter_ref) = parameter_offset.and_then(|offset| invocation.target.get_parameter(offset)) {
             parameter_name = parameter_ref.get_name().map(|name| name.0);
         }
     } else if parameter_offset.is_none()
         && let Some(name) = parameter_name
     {
-        parameter_offset =
-            parameter_refs.iter().position(|p| p.get_name().is_some_and(|name_variable| name_variable.0 == name));
+        parameter_offset = invocation
+            .target
+            .iter_parameters()
+            .position(|parameter| parameter.get_name().is_some_and(|name_variable| name_variable.0 == name));
     } else {
         // both name and offset already known; nothing to fill in
     }
@@ -1095,14 +1087,14 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
     };
 
     // Step 2: Resolve the argument with the correct precedence.
-    let arguments = invocation.arguments_source.get_arguments();
+    let arguments = invocation.arguments_source;
 
     // a. Look for a named argument first.
     let find_by_name = || {
         let variable = parameter_name?;
         let variable_name = if let Some(variable) = variable.strip_prefix('$') { variable } else { variable.as_str() };
 
-        arguments.iter().find(|argument| {
+        arguments.iter_arguments().find(|argument| {
             if let Some(named_argument) = argument.get_named_argument() {
                 named_argument.name.value == variable_name
             } else {
@@ -1112,7 +1104,7 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
     };
 
     // b. If not found by name, look for a positional argument at the correct offset.
-    let find_by_position = || arguments.get(offset).filter(|argument| argument.is_positional());
+    let find_by_position = || arguments.get_argument(offset).filter(|argument| argument.is_positional());
 
     let argument = find_by_name().or_else(find_by_position);
 

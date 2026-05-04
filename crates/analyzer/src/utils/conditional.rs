@@ -106,7 +106,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
     let assigned_in_conditional_variable_ids;
     if internally_applied_if_cond_expr != condition || externally_applied_if_cond_expr != condition {
         if_conditional_context.assigned_variable_ids = AtomMap::default();
-        if_conditional_context.conditionally_referenced_variable_ids = AtomSet::default();
+        if_conditional_context.conditionally_referenced_variable_ids.clear();
 
         let was_inside_conditional = if_conditional_context.flags.inside_conditional();
         if_conditional_context.flags.set_inside_conditional(true);

@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
 use foldhash::HashSet;
-use mago_atom::AtomMap;
 
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
@@ -278,12 +277,12 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
 
     if is_logical_or_operation(binary.lhs, 3) {
         let pre_referenced_var_ids = block_context.conditionally_referenced_variable_ids.clone();
-        block_context.conditionally_referenced_variable_ids = AtomSet::default();
+        block_context.conditionally_referenced_variable_ids.clear();
 
         let pre_assigned_var_ids = block_context.assigned_variable_ids.clone();
 
         left_block_context = block_context.clone();
-        left_block_context.assigned_variable_ids = AtomMap::default();
+        left_block_context.assigned_variable_ids.clear();
 
         let tmp_if_body_block_context = left_block_context.if_body_context;
         left_block_context.if_body_context = None;
@@ -423,10 +422,10 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         }
 
         let pre_referenced_var_ids = right_block_context.conditionally_referenced_variable_ids.clone();
-        right_block_context.conditionally_referenced_variable_ids = AtomSet::default();
+        right_block_context.conditionally_referenced_variable_ids.clear();
 
         let pre_assigned_var_ids = right_block_context.assigned_variable_ids.clone();
-        right_block_context.assigned_variable_ids = AtomMap::default();
+        right_block_context.assigned_variable_ids.clear();
 
         let tmp_if_body_context = right_block_context.if_body_context;
         right_block_context.if_body_context = None;

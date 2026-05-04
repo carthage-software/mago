@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use foldhash::HashMap;
-use itertools::Itertools;
 
 use mago_atom::Atom;
 use mago_atom::AtomMap;
@@ -50,37 +49,45 @@ use crate::invocation::template_result::populate_template_result_from_invocation
 use crate::invocation::template_result::refine_template_result_for_function_like;
 
 /// Finds the parameter that corresponds to a given argument.
-fn get_parameter_of_argument<'invocation>(
-    parameters: &[InvocationTargetParameter<'invocation>],
+fn get_parameter_of_argument<'target, 'ctx>(
+    target: &'target InvocationTarget<'ctx>,
     argument: &InvocationArgument<'_, '_>,
     mut argument_offset: usize,
-) -> Option<(usize, InvocationTargetParameter<'invocation>)> {
+) -> Option<(usize, InvocationTargetParameter<'target>)>
+where
+    'ctx: 'target,
+{
     // Handle both named arguments and named placeholders
     if let Some(parameter_name) = argument.get_parameter_name() {
-        argument_offset = find_named_parameter_offset(parameters, parameter_name.into())?;
+        argument_offset = find_named_parameter_offset(target, parameter_name.into())?;
     }
 
-    argument_offset = adjust_offset_for_variadic(parameters, argument_offset);
-    parameters.get(argument_offset).copied().map(|parameter| (argument_offset, parameter))
+    argument_offset = adjust_offset_for_variadic(target, argument_offset);
+    target.get_parameter(argument_offset).map(|parameter| (argument_offset, parameter))
 }
 
 /// Finds the offset of a named parameter in the parameter list.
-fn find_named_parameter_offset(
-    parameters: &[InvocationTargetParameter<'_>],
+fn find_named_parameter_offset<'target, 'ctx>(
+    target: &'target InvocationTarget<'ctx>,
     argument_name: mago_atom::Atom,
-) -> Option<usize> {
+) -> Option<usize>
+where
+    'ctx: 'target,
+{
     let argument_variable_name = concat_atom!("$", argument_name);
-    parameters
-        .iter()
+    target
+        .iter_parameters()
         .position(|parameter| parameter.get_name().is_some_and(|param_name| argument_variable_name == param_name.0))
 }
 
 /// Adjusts argument offset for variadic parameters.
-fn adjust_offset_for_variadic(parameters: &[InvocationTargetParameter<'_>], argument_offset: usize) -> usize {
-    if argument_offset >= parameters.len()
-        && parameters.last().is_some_and(super::InvocationTargetParameter::is_variadic)
+fn adjust_offset_for_variadic(target: &InvocationTarget<'_>, argument_offset: usize) -> usize {
+    let parameter_count = target.parameter_count();
+    if parameter_count > 0
+        && argument_offset >= parameter_count
+        && target.get_parameter(parameter_count - 1).is_some_and(|parameter| parameter.is_variadic())
     {
-        parameters.len() - 1
+        parameter_count - 1
     } else {
         argument_offset
     }
@@ -117,16 +124,14 @@ pub fn analyze_invocation<'ctx, 'arena>(
 
     populate_template_result_from_invocation(context, invocation, template_result);
 
-    let parameter_refs = invocation.target.get_parameters();
-    let arguments = invocation.arguments_source.get_arguments();
-    let arg_count = arguments.len();
+    let arg_count = invocation.arguments_source.argument_count();
     let mut analyzed_argument_types = HashMap::default();
 
     let mut non_closure_arguments = Vec::with_capacity(arg_count);
     let mut closure_arguments = Vec::with_capacity(arg_count);
     let mut unpacked_arguments = Vec::new();
 
-    for (offset, argument) in arguments.into_iter().enumerate() {
+    for (offset, argument) in invocation.arguments_source.iter_arguments().enumerate() {
         if argument.is_unpacked() {
             unpacked_arguments.push(argument);
         } else if argument.is_placeholder() {
@@ -149,7 +154,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
             continue;
         };
 
-        let parameter = get_parameter_of_argument(&parameter_refs, argument, *argument_offset);
+        let parameter = get_parameter_of_argument(&invocation.target, argument, *argument_offset);
 
         analyze_and_store_argument_type(
             context,
@@ -198,7 +203,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
             continue;
         };
 
-        let parameter = get_parameter_of_argument(&parameter_refs, argument, *argument_offset);
+        let parameter = get_parameter_of_argument(&invocation.target, argument, *argument_offset);
         let mut parameter_type_had_template_types = false;
         // Store the original unreplaced type for template inference, so closure return types
         // can contribute bounds even after other arguments have already inferred some bounds.
@@ -299,10 +304,31 @@ pub fn analyze_invocation<'ctx, 'arena>(
     let target_name_str = invocation.target.guess_name(context);
     let mut has_too_many_arguments = false;
     let mut last_argument_offset: isize = -1;
-    let all_arguments =
-        non_closure_arguments.iter().chain(closure_arguments.iter()).sorted_by(|(a, _), (b, _)| a.cmp(b));
+    let mut non_closure_index = 0;
+    let mut closure_index = 0;
 
-    for (argument_offset, argument) in all_arguments {
+    while non_closure_index < non_closure_arguments.len() || closure_index < closure_arguments.len() {
+        let (argument_offset, argument) =
+            match (non_closure_arguments.get(non_closure_index), closure_arguments.get(closure_index)) {
+                (Some(non_closure), Some(closure)) if non_closure.0 <= closure.0 => {
+                    non_closure_index += 1;
+                    non_closure
+                }
+                (Some(_), Some(closure)) => {
+                    closure_index += 1;
+                    closure
+                }
+                (Some(non_closure), None) => {
+                    non_closure_index += 1;
+                    non_closure
+                }
+                (None, Some(closure)) => {
+                    closure_index += 1;
+                    closure
+                }
+                (None, None) => break,
+            };
+
         let Some(argument_expression) = argument.value() else {
             continue;
         };
@@ -312,7 +338,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
             .cloned()
             .unwrap_or_else(|| (get_mixed(), argument_expression.span()));
 
-        let parameter_ref = get_parameter_of_argument(&parameter_refs, argument, *argument_offset);
+        let parameter_ref = get_parameter_of_argument(&invocation.target, argument, *argument_offset);
         if let Some((parameter_offset, parameter_ref)) = parameter_ref {
             if let Some(named_argument) = argument.get_named_argument() {
                 if let Some(previous_span) = assigned_parameters_by_name.get(&named_argument.name.value) {
@@ -413,8 +439,12 @@ pub fn analyze_invocation<'ctx, 'arena>(
             let argument_name = named_argument.name.value;
 
             // For variadic functions, allow extra named arguments
-            let has_variadic_parameter =
-                parameter_refs.last().is_some_and(super::InvocationTargetParameter::is_variadic);
+            let has_variadic_parameter = invocation
+                .target
+                .parameter_count()
+                .checked_sub(1)
+                .and_then(|idx| invocation.target.get_parameter(idx))
+                .is_some_and(|parameter| parameter.is_variadic());
 
             if !has_variadic_parameter {
                 context.collector.report_with_code(
@@ -433,12 +463,13 @@ pub fn analyze_invocation<'ctx, 'arena>(
                     .with_help({
                         if !invocation.target.allows_named_arguments() {
                             format!("The {target_kind_str} `{target_name_str}` does not support named arguments.")
-                        } else if parameter_refs.is_empty() {
+                        } else if invocation.target.parameter_count() == 0 {
                             format!("The {target_kind_str} `{target_name_str}` has no parameters.")
                         } else {
-                            let available_params: Vec<_> = parameter_refs
-                                .iter()
-                                .filter_map(super::InvocationTargetParameter::get_name)
+                            let available_params: Vec<_> = invocation
+                                .target
+                                .iter_parameters()
+                                .filter_map(|parameter| parameter.get_name())
                                 .map(|n| n.0.trim_start_matches('$'))
                                 .collect();
                             format!("Available parameters are: `{}`.", available_params.join("`, `"))
@@ -448,7 +479,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
             }
 
             break;
-        } else if *argument_offset >= parameter_refs.len() {
+        } else if *argument_offset >= invocation.target.parameter_count() {
             has_too_many_arguments = true;
             continue;
         } else {
@@ -461,11 +492,11 @@ pub fn analyze_invocation<'ctx, 'arena>(
     if !has_too_many_arguments {
         loop {
             last_argument_offset += 1;
-            if last_argument_offset as usize >= parameter_refs.len() {
+            if last_argument_offset as usize >= invocation.target.parameter_count() {
                 break;
             }
 
-            let Some(unused_parameter) = parameter_refs.get(last_argument_offset as usize).copied() else {
+            let Some(unused_parameter) = invocation.target.get_parameter(last_argument_offset as usize) else {
                 break;
             };
 
@@ -500,7 +531,8 @@ pub fn analyze_invocation<'ctx, 'arena>(
     }
 
     if !unpacked_arguments.is_empty()
-        && let Some(last_parameter_ref) = parameter_refs.last().copied()
+        && let Some(last_parameter_offset) = invocation.target.parameter_count().checked_sub(1)
+        && let Some(last_parameter_ref) = invocation.target.get_parameter(last_parameter_offset)
         && last_parameter_ref.is_variadic()
     {
         let base_variadic_parameter_type = get_parameter_type(
@@ -543,7 +575,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                     &base_variadic_parameter_type,
                     &unpacked_element_type,
                     template_result,
-                    parameter_refs.len() - 1,
+                    last_parameter_offset,
                     argument_expression.span(),
                     false,
                 );
@@ -561,12 +593,18 @@ pub fn analyze_invocation<'ctx, 'arena>(
         }
     }
 
-    let max_params = parameter_refs.len();
-    let number_of_required_parameters = parameter_refs.iter().filter(|p| !p.has_default() && !p.is_variadic()).count();
+    let max_params = invocation.target.parameter_count();
+    let number_of_required_parameters = invocation
+        .target
+        .iter_parameters()
+        .filter(|parameter| !parameter.has_default() && !parameter.is_variadic())
+        .count();
     let mut number_of_provided_parameters = non_closure_arguments.len() + closure_arguments.len();
 
     if !unpacked_arguments.is_empty() {
-        if let Some(last_parameter_ref) = parameter_refs.last().copied() {
+        if let Some(last_parameter_offset) = invocation.target.parameter_count().checked_sub(1)
+            && let Some(last_parameter_ref) = invocation.target.get_parameter(last_parameter_offset)
+        {
             if last_parameter_ref.is_variadic() {
                 let base_variadic_parameter_type = get_parameter_type(
                     context,
@@ -623,31 +661,30 @@ pub fn analyze_invocation<'ctx, 'arena>(
                     let argument_value_type =
                         artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed); // Get type of the iterable
 
-                    let (sizes, has_keyed_array_with_named_args) = argument_value_type.types.as_ref().iter().fold(
-                        (Vec::new(), false),
-                        |(mut sizes, mut has_named_args), argument_atomic| {
-                            let TAtomic::Array(array) = argument_atomic else {
-                                sizes.push(0);
-                                return (sizes, has_named_args);
+                    let (minimum_unpacked_size, has_keyed_array_with_named_args) = argument_value_type
+                        .types
+                        .as_ref()
+                        .iter()
+                        .fold((None::<usize>, false), |(minimum_size, mut has_named_args), argument_atomic| {
+                            let size = if let TAtomic::Array(array) = argument_atomic {
+                                if !has_named_args
+                                    && let mago_codex::ttype::atomic::array::TArray::Keyed(keyed_array) = array
+                                    && let Some(known_items) = &keyed_array.known_items
+                                {
+                                    has_named_args = known_items.iter().any(|(array_key, _)| {
+                                        matches!(array_key, mago_codex::ttype::atomic::array::key::ArrayKey::String(_))
+                                    });
+                                }
+
+                                array.get_minimum_size()
+                            } else {
+                                0
                             };
 
-                            sizes.push(array.get_minimum_size());
+                            (Some(minimum_size.map_or(size, |current| current.min(size))), has_named_args)
+                        });
 
-                            // Check if this is a keyed array with named arguments
-                            if !has_named_args
-                                && let mago_codex::ttype::atomic::array::TArray::Keyed(keyed_array) = array
-                                && let Some(known_items) = &keyed_array.known_items
-                            {
-                                has_named_args = known_items.iter().any(|(array_key, _)| {
-                                    matches!(array_key, mago_codex::ttype::atomic::array::key::ArrayKey::String(_))
-                                });
-                            }
-
-                            (sizes, has_named_args)
-                        },
-                    );
-
-                    number_of_provided_parameters += sizes.into_iter().min().unwrap_or(0);
+                    number_of_provided_parameters += minimum_unpacked_size.unwrap_or(0);
 
                     // Skip union-based validation for keyed arrays with named arguments.
                     // Individual elements are properly validated in validate_keyed_array_elements.
@@ -659,17 +696,16 @@ pub fn analyze_invocation<'ctx, 'arena>(
                             context,
                             &unpacked_element_type,
                             &final_variadic_parameter_type,
-                            parameter_refs.len() - 1,
+                            last_parameter_offset,
                             argument_expression,
                             &invocation.target,
                         );
                     }
                 }
             } else {
-                let all_arguments = invocation.arguments_source.get_arguments();
                 let mut current_parameter_position = 0;
 
-                for argument in all_arguments {
+                for argument in invocation.arguments_source.iter_arguments() {
                     if argument.is_unpacked() {
                         let Some(argument_expression) = argument.value() else {
                             continue;
@@ -693,23 +729,26 @@ pub fn analyze_invocation<'ctx, 'arena>(
                             artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed);
 
                         // Count the number of elements that would be unpacked
-                        let mut sizes = vec![];
-                        for argument_atomic in argument_value_type.types.as_ref() {
-                            let TAtomic::Array(array) = argument_atomic else {
-                                sizes.push(0);
-                                continue;
-                            };
-                            sizes.push(array.get_minimum_size());
-                        }
+                        let unpacked_count = argument_value_type
+                            .types
+                            .as_ref()
+                            .iter()
+                            .fold(None::<usize>, |minimum_size, argument_atomic| {
+                                let size = if let TAtomic::Array(array) = argument_atomic {
+                                    array.get_minimum_size()
+                                } else {
+                                    0
+                                };
 
-                        let unpacked_count = sizes.into_iter().min().unwrap_or(0);
+                                Some(minimum_size.map_or(size, |current| current.min(size)))
+                            })
+                            .unwrap_or(0);
                         number_of_provided_parameters += unpacked_count;
 
                         validate_unpacked_argument_elements(
                             context,
                             &argument_value_type,
                             argument_expression,
-                            &parameter_refs,
                             base_class_metadata,
                             calling_class_like_metadata,
                             calling_instance_type,
@@ -796,15 +835,19 @@ pub fn analyze_invocation<'ctx, 'arena>(
         issue = issue.with_help("Provide all required arguments.");
         context.collector.report_with_code(IssueCode::TooFewArguments, issue);
     } else if has_too_many_arguments
-        || (!parameter_refs.last().is_some_and(super::InvocationTargetParameter::is_variadic)
+        || (!invocation
+            .target
+            .parameter_count()
+            .checked_sub(1)
+            .and_then(|idx| invocation.target.get_parameter(idx))
+            .is_some_and(|parameter| parameter.is_variadic())
             && number_of_provided_parameters > max_params
             && max_params > 0)
     {
         let first_extra_arg_span = invocation
             .arguments_source
-            .get_arguments()
-            .get(max_params)
-            .map_or_else(|| invocation.arguments_source.span(), mago_span::HasSpan::span);
+            .get_argument(max_params)
+            .map_or_else(|| invocation.arguments_source.span(), |argument| argument.span());
 
         let main_message = match invocation.arguments_source {
             InvocationArgumentsSource::PipeInput(_) => format!(
@@ -898,7 +941,6 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     argument_value_type: &TUnion,
     argument_expression: &Expression<'arena>,
-    parameter_refs: &[InvocationTargetParameter<'_>],
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
@@ -922,14 +964,14 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                 if let Some(known_elements) = &list.known_elements {
                     for (array_index, (_, element_type)) in known_elements {
                         let parameter_position = starting_parameter_position + array_index;
-                        if parameter_position >= parameter_refs.len() {
+                        if parameter_position >= invocation_target.parameter_count() {
                             break;
                         }
 
-                        if let Some(parameter_ref) = parameter_refs.get(parameter_position) {
+                        if let Some(parameter_ref) = invocation_target.get_parameter(parameter_position) {
                             let base_parameter_type = get_parameter_type(
                                 context,
-                                Some(*parameter_ref),
+                                Some(parameter_ref),
                                 base_class_metadata,
                                 calling_class_like_metadata,
                                 calling_instance_type,
@@ -972,15 +1014,17 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                 } else {
                     let element_type = list.get_element_type();
                     let min_size = list.known_count.unwrap_or(0);
-                    let max_parameters_to_check =
-                        std::cmp::min(min_size, parameter_refs.len().saturating_sub(starting_parameter_position));
+                    let max_parameters_to_check = std::cmp::min(
+                        min_size,
+                        invocation_target.parameter_count().saturating_sub(starting_parameter_position),
+                    );
 
                     for i in 0..max_parameters_to_check {
                         let parameter_position = starting_parameter_position + i;
-                        if let Some(parameter_ref) = parameter_refs.get(parameter_position) {
+                        if let Some(parameter_ref) = invocation_target.get_parameter(parameter_position) {
                             let base_parameter_type = get_parameter_type(
                                 context,
-                                Some(*parameter_ref),
+                                Some(parameter_ref),
                                 base_class_metadata,
                                 calling_class_like_metadata,
                                 calling_instance_type,
@@ -1027,7 +1071,6 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
                     context,
                     keyed_array,
                     argument_expression,
-                    parameter_refs,
                     base_class_metadata,
                     calling_class_like_metadata,
                     calling_instance_type,
@@ -1046,7 +1089,6 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     keyed_array: &mago_codex::ttype::atomic::array::keyed::TKeyedArray,
     argument_expression: &Expression<'arena>,
-    parameter_refs: &[InvocationTargetParameter<'_>],
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
@@ -1068,7 +1110,7 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
         let parameter_name = match array_key {
             ArrayKey::String(key_str) => concat_atom!("$", key_str),
             ArrayKey::Integer(key_int) => {
-                if let Some(parameter_ref) = parameter_refs.get(*key_int as usize) {
+                if let Some(parameter_ref) = invocation_target.get_parameter(*key_int as usize) {
                     if let Some(param_name) = parameter_ref.get_name() {
                         param_name.0
                     } else {
@@ -1083,12 +1125,14 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
             }
         };
 
-        if let Some(parameter_ref) =
-            parameter_refs.iter().find(|p| p.get_name().is_some_and(|param_name| param_name.0 == parameter_name))
+        if let Some((parameter_position, parameter_ref)) = invocation_target
+            .iter_parameters()
+            .enumerate()
+            .find(|(_, p)| p.get_name().is_some_and(|param_name| param_name.0 == parameter_name))
         {
             let base_parameter_type = get_parameter_type(
                 context,
-                Some(*parameter_ref),
+                Some(parameter_ref),
                 base_class_metadata,
                 calling_class_like_metadata,
                 calling_instance_type,
@@ -1116,11 +1160,6 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                     base_parameter_type
                 };
 
-            let parameter_position = parameter_refs
-                .iter()
-                .position(|p| if let Some(param_name) = p.get_name() { param_name.0 == parameter_name } else { false })
-                .unwrap_or(0);
-
             verify_argument_type(
                 context,
                 element_type,
@@ -1133,8 +1172,11 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
             let argument_name = key_str.as_str();
 
             // For variadic functions, allow extra named arguments
-            let has_variadic_parameter =
-                parameter_refs.last().is_some_and(super::InvocationTargetParameter::is_variadic);
+            let has_variadic_parameter = invocation_target
+                .parameter_count()
+                .checked_sub(1)
+                .and_then(|idx| invocation_target.get_parameter(idx))
+                .is_some_and(|parameter| parameter.is_variadic());
 
             if !has_variadic_parameter {
                 context.collector.report_with_code(
@@ -1152,9 +1194,9 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                     )
                     .with_help(if !invocation_target.allows_named_arguments() {
                         format!("The {target_kind_str} `{target_name_str}` does not support named arguments.")
-                    } else if !parameter_refs.is_empty() {
-                        let available_params: Vec<String> = parameter_refs
-                            .iter()
+                    } else if invocation_target.parameter_count() > 0 {
+                        let available_params: Vec<String> = invocation_target
+                            .iter_parameters()
                             .filter_map(|p| {
                                 p.get_name().map(|name| format!("${}", name.0.as_str().trim_start_matches('$')))
                             })

@@ -437,7 +437,7 @@ fn inspect_arguments<'ctx, 'arena>(
     }
 
     let mut argument_annotations = vec![];
-    for (idx, argument) in invocation_arguments.get_arguments().iter().enumerate() {
+    for (idx, argument) in invocation_arguments.iter_arguments().enumerate() {
         let Some(argument_expression) = argument.value() else {
             continue;
         };
@@ -494,18 +494,18 @@ fn confirm_argument_type<'ctx, 'arena>(
         _ => {}
     }
 
-    let arguments = invocation_arguments.get_arguments();
+    let argument_count = invocation_arguments.argument_count();
 
-    if arguments.len() != 2 {
+    if argument_count != 2 {
         context.collector.report_with_code(
             IssueCode::TypeConfirmation,
             Issue::error(format!(
                 "`Mago\\confirm()` expects exactly 2 arguments (a value and an expected type string), but {} {} provided.",
-                arguments.len(),
-                if arguments.len() == 1 { "was" } else { "were" }
+                argument_count,
+                if argument_count == 1 { "was" } else { "were" }
             ))
             .with_annotation(Annotation::primary(target.span())
-                .with_message(if arguments.len() < 2 {
+                .with_message(if argument_count < 2 {
                     "Too few arguments provided: expected a value and a type string."
                 } else {
                     "Too many arguments provided: expected only a value and a type string."
@@ -517,8 +517,12 @@ fn confirm_argument_type<'ctx, 'arena>(
         return Ok(());
     }
 
-    let value_to_check_argument = &arguments[0];
-    let expected_type_string_argument = &arguments[1];
+    let Some(value_to_check_argument) = invocation_arguments.get_argument(0) else {
+        return Ok(());
+    };
+    let Some(expected_type_string_argument) = invocation_arguments.get_argument(1) else {
+        return Ok(());
+    };
 
     let Some(value_expression) = value_to_check_argument.value() else {
         return Ok(());

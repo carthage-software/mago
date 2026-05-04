@@ -348,13 +348,13 @@ impl<'ctx, 'ast, 'arena> InvocationInfo<'ctx, 'ast, 'arena> {
     #[inline]
     #[must_use]
     pub fn argument_count(&self) -> usize {
-        self.invocation.arguments_source.get_arguments().len()
+        self.invocation.arguments_source.argument_count()
     }
 
     #[inline]
     #[must_use]
     pub fn has_no_arguments(&self) -> bool {
-        self.invocation.arguments_source.get_arguments().is_empty()
+        self.invocation.arguments_source.is_empty()
     }
 
     #[inline]

@@ -138,6 +138,18 @@ pub enum InvocationArgument<'ast, 'arena> {
     VariadicPlaceholder(&'ast VariadicPlaceholderArgument),
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct InvocationArgumentsIter<'ast, 'arena> {
+    source: InvocationArgumentsSource<'ast, 'arena>,
+    index: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct InvocationTargetParametersIter<'target, 'ctx> {
+    target: &'target InvocationTarget<'ctx>,
+    index: usize,
+}
+
 impl<'ctx, 'ast, 'arena> Invocation<'ctx, 'ast, 'arena> {
     pub fn new(target: InvocationTarget<'ctx>, arguments: InvocationArgumentsSource<'ast, 'arena>, span: Span) -> Self {
         Self { target, arguments_source: arguments, span }
@@ -277,6 +289,40 @@ impl<'ctx> InvocationTarget<'ctx> {
         }
     }
 
+    #[inline]
+    #[must_use]
+    pub fn parameter_count(&self) -> usize {
+        match self {
+            InvocationTarget::Callable { signature, .. } => signature.parameters.len(),
+            InvocationTarget::FunctionLike { metadata, .. } => metadata.parameters.len(),
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn get_parameter<'target>(&'target self, index: usize) -> Option<InvocationTargetParameter<'target>>
+    where
+        'ctx: 'target,
+    {
+        match self {
+            InvocationTarget::Callable { signature, .. } => {
+                signature.parameters.get(index).map(InvocationTargetParameter::Callable)
+            }
+            InvocationTarget::FunctionLike { metadata, .. } => {
+                metadata.parameters.get(index).map(InvocationTargetParameter::FunctionLike)
+            }
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn iter_parameters<'target>(&'target self) -> InvocationTargetParametersIter<'target, 'ctx>
+    where
+        'ctx: 'target,
+    {
+        InvocationTargetParametersIter { target: self, index: 0 }
+    }
+
     /// Retrieves a list of parameters for the invocation target.
     ///
     /// Parameters are wrapped in `InvocationTargetParameter` to abstract over
@@ -286,14 +332,7 @@ impl<'ctx> InvocationTarget<'ctx> {
     where
         'ctx: 'target,
     {
-        match self {
-            InvocationTarget::Callable { signature, .. } => {
-                signature.parameters.iter().map(InvocationTargetParameter::Callable).collect()
-            }
-            InvocationTarget::FunctionLike { metadata, .. } => {
-                metadata.parameters.iter().map(InvocationTargetParameter::FunctionLike).collect()
-            }
-        }
+        self.iter_parameters().collect()
     }
 
     /// Retrieves the return type of the invocation target, if known.
@@ -383,31 +422,49 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
 }
 
 impl<'ast, 'arena> InvocationArgumentsSource<'ast, 'arena> {
-    /// Returns a `Vec` of `InvocationArgument` which abstracts over standard arguments
-    /// and piped input. For pipe input, it's a single `PipedValue`.
     #[inline]
-    pub fn get_arguments(&self) -> Vec<InvocationArgument<'ast, 'arena>> {
+    #[must_use]
+    pub fn argument_count(&self) -> usize {
         match self {
-            InvocationArgumentsSource::ArgumentList(arg_list) => arg_list
-                .arguments
-                .iter()
-                .map(|arg| match arg {
-                    Argument::Positional(pos_arg) => InvocationArgument::Positional(pos_arg),
-                    Argument::Named(named_arg) => InvocationArgument::Named(named_arg),
+            InvocationArgumentsSource::ArgumentList(argument_list) => argument_list.arguments.len(),
+            InvocationArgumentsSource::PipeInput(_) => 1,
+            InvocationArgumentsSource::None(_) => 0,
+            InvocationArgumentsSource::PartialArgumentList(partial_argument_list) => {
+                partial_argument_list.arguments.len()
+            }
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.argument_count() == 0
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn get_argument(&self, index: usize) -> Option<InvocationArgument<'ast, 'arena>> {
+        match self {
+            InvocationArgumentsSource::ArgumentList(argument_list) => {
+                argument_list.arguments.get(index).map(|argument| match argument {
+                    Argument::Positional(positional_argument) => InvocationArgument::Positional(positional_argument),
+                    Argument::Named(named_argument) => InvocationArgument::Named(named_argument),
                 })
-                .collect(),
+            }
             InvocationArgumentsSource::PipeInput(pipe) => {
-                vec![InvocationArgument::PipedValue(pipe.input)]
+                if index == 0 {
+                    Some(InvocationArgument::PipedValue(pipe.input))
+                } else {
+                    None
+                }
             }
-            InvocationArgumentsSource::None(_) => {
-                vec![]
-            }
-            InvocationArgumentsSource::PartialArgumentList(partial_arg_list) => partial_arg_list
-                .arguments
-                .iter()
-                .map(|partial_arg| match partial_arg {
-                    PartialArgument::Positional(pos_arg) => InvocationArgument::Positional(pos_arg),
-                    PartialArgument::Named(named_arg) => InvocationArgument::Named(named_arg),
+            InvocationArgumentsSource::None(_) => None,
+            InvocationArgumentsSource::PartialArgumentList(partial_argument_list) => {
+                partial_argument_list.arguments.get(index).map(|partial_argument| match partial_argument {
+                    PartialArgument::Positional(positional_argument) => {
+                        InvocationArgument::Positional(positional_argument)
+                    }
+                    PartialArgument::Named(named_argument) => InvocationArgument::Named(named_argument),
                     PartialArgument::Placeholder(placeholder) => InvocationArgument::Placeholder(placeholder),
                     PartialArgument::NamedPlaceholder(named_placeholder) => {
                         InvocationArgument::NamedPlaceholder(named_placeholder)
@@ -416,10 +473,70 @@ impl<'ast, 'arena> InvocationArgumentsSource<'ast, 'arena> {
                         InvocationArgument::VariadicPlaceholder(variadic_placeholder)
                     }
                 })
-                .collect(),
+            }
         }
     }
+
+    #[inline]
+    #[must_use]
+    pub fn iter_arguments(&self) -> InvocationArgumentsIter<'ast, 'arena> {
+        InvocationArgumentsIter { source: *self, index: 0 }
+    }
+
+    /// Returns a `Vec` of `InvocationArgument` which abstracts over standard arguments
+    /// and piped input. For pipe input, it's a single `PipedValue`.
+    #[inline]
+    pub fn get_arguments(&self) -> Vec<InvocationArgument<'ast, 'arena>> {
+        self.iter_arguments().collect()
+    }
 }
+
+impl<'ast, 'arena> Iterator for InvocationArgumentsIter<'ast, 'arena> {
+    type Item = InvocationArgument<'ast, 'arena>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let argument = self.source.get_argument(self.index);
+        if argument.is_some() {
+            self.index += 1;
+        }
+
+        argument
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.source.argument_count().saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for InvocationArgumentsIter<'_, '_> {}
+
+impl<'target, 'ctx> Iterator for InvocationTargetParametersIter<'target, 'ctx>
+where
+    'ctx: 'target,
+{
+    type Item = InvocationTargetParameter<'target>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let parameter = self.target.get_parameter(self.index);
+        if parameter.is_some() {
+            self.index += 1;
+        }
+
+        parameter
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.target.parameter_count().saturating_sub(self.index);
+        (remaining, Some(remaining))
+    }
+}
+
+impl<'target, 'ctx> ExactSizeIterator for InvocationTargetParametersIter<'target, 'ctx> where 'ctx: 'target {}
 
 impl<'ast, 'arena> InvocationArgument<'ast, 'arena> {
     /// Checks if this argument is a placeholder (any placeholder variant).

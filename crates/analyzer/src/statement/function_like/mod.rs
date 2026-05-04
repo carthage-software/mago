@@ -4,7 +4,6 @@ use std::sync::Arc;
 use foldhash::HashMap;
 
 use mago_atom::Atom;
-use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_atom::concat_atom;
 
@@ -203,7 +202,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
                 block_context.flags.set_inside_return(true);
                 value.analyze(context, block_context, &mut artifacts)?;
                 block_context.flags.set_inside_return(false);
-                block_context.conditionally_referenced_variable_ids = AtomSet::default();
+                block_context.conditionally_referenced_variable_ids.clear();
 
                 let value_type =
                     artifacts.get_rc_expression_type(value).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
