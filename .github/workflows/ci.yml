@@ -57,7 +57,6 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: cargo clippy
-        if: matrix.os == 'macos-latest'
         run: cargo clippy --workspace --all-features -- -D warnings
 
       - name: cargo test
