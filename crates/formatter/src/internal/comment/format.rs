@@ -4,6 +4,7 @@ use bumpalo::vec;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Node;
+use mago_syntax::ast::Statement;
 use mago_syntax::ast::Trivia;
 
 use crate::document::BreakMode;
@@ -175,6 +176,30 @@ impl<'arena> FormatterState<'_, 'arena> {
 
     #[must_use]
     pub(crate) fn print_leading_comments(&mut self, range: Span) -> Option<Document<'arena>> {
+        self.print_leading_comments_with(range, false)
+    }
+
+    /// Like [`print_leading_comments`] but forces a hard line break after any
+    /// multi-line block comment (i.e. a docblock). Use this at declaration call
+    /// sites — function-like, class-like, property, constant — so docblocks
+    /// always end up on their own line, regardless of how the user wrote them.
+    pub(crate) fn print_leading_comments_for_declaration(&mut self, range: Span) -> Option<Document<'arena>> {
+        self.print_leading_comments_with(range, true)
+    }
+
+    /// Print leading comments for a node, picking the declaration-aware variant
+    /// when the node is a declaration so that attached docblocks always end up
+    /// on their own line. Other node kinds preserve the user's spacing as-is.
+    #[must_use]
+    pub(crate) fn print_leading_comments_for_node(&mut self, node: Node<'_, '_>) -> Option<Document<'arena>> {
+        if is_declaration_node(node) {
+            self.print_leading_comments_for_declaration(node.span())
+        } else {
+            self.print_leading_comments(node.span())
+        }
+    }
+
+    fn print_leading_comments_with(&mut self, range: Span, force_docblock_break: bool) -> Option<Document<'arena>> {
         let mut parts = vec![in self.arena];
 
         while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
@@ -196,8 +221,9 @@ impl<'arena> FormatterState<'_, 'arena> {
                 if self.get_ignore_region_for(comment.start).is_some() {
                     self.print_preserved_leading_comment(&mut parts, comment);
                 } else {
-                    self.print_leading_comment(&mut parts, comment);
+                    self.print_leading_comment(&mut parts, comment, force_docblock_break);
                 }
+
                 self.placed_comments.mark_consumed(self.next_comment_index);
                 self.next_comment_index += 1;
             } else {
@@ -251,7 +277,12 @@ impl<'arena> FormatterState<'_, 'arena> {
         if parts.is_empty() { None } else { Some(Document::Array(parts)) }
     }
 
-    fn print_leading_comment(&mut self, parts: &mut Vec<'arena, Document<'arena>>, comment: Comment) {
+    fn print_leading_comment(
+        &mut self,
+        parts: &mut Vec<'arena, Document<'arena>>,
+        comment: Comment,
+        force_docblock_break: bool,
+    ) {
         let comment_document = if comment.is_block {
             if self.has_newline(comment.end, /* backwards */ false) {
                 if self.has_newline(comment.start, /* backwards */ true) {
@@ -264,6 +295,13 @@ impl<'arena> FormatterState<'_, 'arena> {
                 } else {
                     Document::Array(vec![in self.arena; self.print_comment(comment), Document::Line(Line::default())])
                 }
+            } else if force_docblock_break && !comment.is_single_line {
+                Document::Array(vec![
+                    in self.arena;
+                    self.print_comment(comment),
+                    Document::BreakParent,
+                    Document::Line(Line::hard()),
+                ])
             } else {
                 Document::Array(vec![in self.arena; self.print_comment(comment), Document::Space(Space::soft())])
             }
@@ -904,4 +942,48 @@ impl<'arena> FormatterState<'_, 'arena> {
             None => document,
         }
     }
+}
+
+/// Returns `true` for AST nodes that represent declarations whose attached
+/// docblocks should always live on their own line. Listed conservatively:
+/// expression-shaped wrappers around declarations (closures, anonymous
+/// classes) are deliberately excluded because they appear in expression
+/// contexts where forcing a line break would split arguments or operands.
+///
+/// `Statement` and `ClassLikeMember` are the wrapper enums that actually
+/// consume leading comments via `wrap!` at the top level and inside class
+/// bodies respectively, so we look through them to their declaration variants.
+#[inline]
+const fn is_declaration_node(node: Node<'_, '_>) -> bool {
+    if let Node::Statement(stmt) = node {
+        return matches!(
+            stmt,
+            Statement::Class(_)
+                | Statement::Interface(_)
+                | Statement::Trait(_)
+                | Statement::Enum(_)
+                | Statement::Function(_)
+                | Statement::Constant(_)
+        );
+    }
+
+    if let Node::ClassLikeMember(_) = node {
+        return true;
+    }
+
+    matches!(
+        node,
+        Node::Function(_)
+            | Node::Method(_)
+            | Node::Class(_)
+            | Node::Interface(_)
+            | Node::Trait(_)
+            | Node::Enum(_)
+            | Node::Property(_)
+            | Node::PlainProperty(_)
+            | Node::HookedProperty(_)
+            | Node::ClassLikeConstant(_)
+            | Node::Constant(_)
+            | Node::EnumCase(_)
+    )
 }
