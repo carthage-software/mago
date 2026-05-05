@@ -8,6 +8,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::ast::Access;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Call;
 use mago_syntax::ast::Expression;
@@ -154,9 +155,15 @@ const fn is_constant_like(expr: &Expression) -> bool {
             | Expression::Array(_)
             | Expression::LegacyArray(_)
             | Expression::Call(Call::Function(_))
+            | Expression::Access(Access::ClassConstant(_))
     )
 }
 
 const fn is_writable_variable(expr: &Expression) -> bool {
-    matches!(expr, Expression::Variable(_) | Expression::Access(_) | Expression::ArrayAccess(_))
+    matches!(
+        expr,
+        Expression::Variable(_)
+            | Expression::Access(Access::Property(_) | Access::NullSafeProperty(_) | Access::StaticProperty(_))
+            | Expression::ArrayAccess(_)
+    )
 }
