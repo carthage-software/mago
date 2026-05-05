@@ -312,10 +312,30 @@ impl IssueProcessor {
         &self,
         orchestrator: &Orchestrator<'_>,
         database: &mut Database<'_>,
-        issues: IssueCollection,
+        mut issues: IssueCollection,
         baseline: Option<Baseline>,
         fail_on_out_of_sync_baseline: bool,
     ) -> Result<(ExitCode, Vec<FileId>), Error> {
+        if !self.retain_code.is_empty() {
+            let total_before_filter = issues.len();
+            issues.filter_retain_codes(&self.retain_code);
+            let total_after_filter = issues.len();
+            let filtered_count = total_before_filter - total_after_filter;
+
+            let codes_list = self.retain_code.join(", ");
+
+            if total_after_filter == 0 && total_before_filter > 0 {
+                tracing::warn!("No issues found matching code(s): {}", codes_list);
+            } else if filtered_count > 0 {
+                tracing::info!(
+                    "Retaining {} of {} issues with code(s): {}",
+                    total_after_filter,
+                    total_before_filter,
+                    codes_list
+                );
+            }
+        }
+
         if self.fix {
             self.handle_fix_mode(orchestrator, database, issues, baseline)
         } else {
@@ -415,32 +435,11 @@ impl IssueProcessor {
     fn handle_report_mode<'d>(
         &self,
         database: &'d Database<'d>,
-        mut issues: IssueCollection,
+        issues: IssueCollection,
         baseline: Option<Baseline>,
         fail_on_out_of_sync_baseline: bool,
     ) -> Result<ExitCode, Error> {
         let read_database = database.read_only();
-
-        // Filter to only show issues with the specified codes, if provided
-        if !self.retain_code.is_empty() {
-            let total_before_filter = issues.len();
-            issues.filter_retain_codes(&self.retain_code);
-            let total_after_filter = issues.len();
-            let filtered_count = total_before_filter - total_after_filter;
-
-            let codes_list = self.retain_code.join(", ");
-
-            if total_after_filter == 0 && total_before_filter > 0 {
-                tracing::warn!("No issues found matching code(s): {}", codes_list);
-            } else if filtered_count > 0 {
-                tracing::info!(
-                    "Retaining {} of {} issues with code(s): {}",
-                    total_after_filter,
-                    total_before_filter,
-                    codes_list
-                );
-            }
-        }
 
         let issues_to_report = issues;
 
