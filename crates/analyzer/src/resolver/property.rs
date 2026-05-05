@@ -642,7 +642,7 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
         && property_metadata.type_declaration_metadata.is_some()
         && !property_metadata.flags.has_default()
         && !property_metadata.flags.is_promoted_property()
-        && !property_metadata.flags.is_virtual_property()
+        && (!property_metadata.flags.is_virtual_property() || declaring_class_metadata.kind.is_interface())
     {
         property_type.set_possibly_undefined(true, None);
     }
