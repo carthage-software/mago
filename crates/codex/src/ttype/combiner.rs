@@ -195,7 +195,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
         return combination.value_types.into_values().collect();
     }
 
-    if combination.value_types.remove(&*ATOM_VOID).is_some() && combination.value_types.contains_key(&*ATOM_NULL) {
+    if combination.value_types.remove(&*ATOM_VOID).is_some() {
         combination.value_types.insert(*ATOM_NULL, TAtomic::Null);
     }
 

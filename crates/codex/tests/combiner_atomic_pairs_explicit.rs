@@ -353,7 +353,6 @@ fn p_lit_lit_float_distinct() {
     check(vec![t_lit_float(1.0), t_lit_float(2.0)], &["float(1.0)", "float(2.0)"]);
 }
 
-// ---- Cross-family ----
 #[test]
 fn p_int_string() {
     check(vec![t_int(), t_string()], &["int", "string"]);
@@ -414,7 +413,6 @@ fn p_lit_int_numeric() {
     check(vec![t_lit_int(5), t_numeric()], &["int(5)", "numeric"]);
 }
 
-// ---- array-key (symmetric for int+string) ----
 #[test]
 fn p_ak_int() {
     check(vec![t_array_key(), t_int()], &["array-key"]);
@@ -450,7 +448,6 @@ fn p_ak_null() {
     check(vec![t_array_key(), null()], &["array-key", "null"]);
 }
 
-// ---- scalar (symmetric for int/string/float/numeric/array-key, asymmetric for bool) ----
 #[test]
 fn p_scalar_int() {
     check(vec![t_scalar(), t_int()], &["scalar"]);
@@ -568,12 +565,12 @@ fn p_never_null() {
 
 #[test]
 fn p_void_never() {
-    check(vec![void(), never()], &["never"]);
+    check(vec![void(), never()], &["null"]);
 }
 
 #[test]
 fn p_never_void() {
-    check(vec![never(), void()], &["never"]);
+    check(vec![never(), void()], &["null"]);
 }
 
 #[test]
@@ -583,7 +580,7 @@ fn p_null_int() {
 
 #[test]
 fn p_void_int() {
-    check(vec![void(), t_int()], &["int"]);
+    check(vec![void(), t_int()], &["int", "null"]);
 }
 
 #[test]
@@ -598,7 +595,7 @@ fn p_null_object() {
 
 #[test]
 fn p_void_object() {
-    check(vec![void(), t_object_any()], &["object"]);
+    check(vec![void(), t_object_any()], &["null", "object"]);
 }
 
 #[test]
@@ -613,7 +610,7 @@ fn p_null_resource() {
 
 #[test]
 fn p_void_resource() {
-    check(vec![void(), t_resource()], &["resource"]);
+    check(vec![void(), t_resource()], &["null", "resource"]);
 }
 
 #[test]
@@ -671,7 +668,6 @@ fn p_mixed_mixed() {
     check(vec![mixed(), mixed()], &["mixed"]);
 }
 
-// ---- Class-like-string family ----
 #[test]
 fn p_cs_cs() {
     check(vec![t_class_string(), t_class_string()], &["class-string"]);

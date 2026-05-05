@@ -94,13 +94,15 @@ fn never_triples_absorbed() {
 
 #[test]
 fn void_triples() {
-    check("void,int,string", vec![void(), t_int(), t_string()], &["int", "string"]);
+    // `void` mixed with concrete types materializes as `null`. Pure-void unions
+    // (no other types) stay as `void` to preserve the declared-return-type form.
+    check("void,int,string", vec![void(), t_int(), t_string()], &["int", "null", "string"]);
     check("void,null,int", vec![void(), null(), t_int()], &["int", "null"]);
-    check("void,never,int", vec![void(), never(), t_int()], &["int"]);
-    check("void,never,never", vec![void(), never(), never()], &["never"]);
-    check("void,void,int", vec![void(), void(), t_int()], &["int"]);
+    check("void,never,int", vec![void(), never(), t_int()], &["int", "null"]);
+    check("void,never,never", vec![void(), never(), never()], &["null"]);
+    check("void,void,int", vec![void(), void(), t_int()], &["int", "null"]);
     check("void,void,void", vec![void(), void(), void()], &["void"]);
-    check("void,Foo,Bar", vec![void(), t_named("Foo"), t_named("Bar")], &["Bar", "Foo"]);
+    check("void,Foo,Bar", vec![void(), t_named("Foo"), t_named("Bar")], &["Bar", "Foo", "null"]);
 }
 
 #[test]
