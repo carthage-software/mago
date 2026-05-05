@@ -174,6 +174,12 @@ fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
 
     let class_string = match class_resolution.fqcn {
         Some(fq_class_id) => {
+            if matches!(class_resolution.origin, ResolutionOrigin::Named { is_self: false, is_parent: false })
+                && context.codebase.get_class_like(&fq_class_id).is_none()
+            {
+                report_non_existent_class(context, fq_class_id, class_expr.span());
+            }
+
             artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, fq_class_id, false);
 
             if class_resolution.is_final
