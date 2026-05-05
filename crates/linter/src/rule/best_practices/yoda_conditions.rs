@@ -29,15 +29,26 @@ pub struct YodaConditionsRule {
     cfg: YodaConditionsConfig,
 }
 
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum YodaConditionsMode {
+    /// Require Yoda style: constant/literal on the left, variable on the right.
+    #[default]
+    Require,
+    /// Deny Yoda style: variable on the left, constant/literal on the right.
+    Deny,
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct YodaConditionsConfig {
     pub level: Level,
+    pub mode: YodaConditionsMode,
 }
 
 impl Default for YodaConditionsConfig {
     fn default() -> Self {
-        Self { level: Level::Help }
+        Self { level: Level::Help, mode: YodaConditionsMode::Require }
     }
 }
 
@@ -59,23 +70,30 @@ impl LintRule for YodaConditionsRule {
             name: "Yoda Conditions",
             code: "yoda-conditions",
             description: indoc! {"
-                This rule enforces the use of \"Yoda\" conditions for comparisons. The variable should always be
-                on the right side of the comparison, while the constant, literal, or function call is on the left.
-                This prevents the common bug of accidentally using an assignment (`=`) instead of a comparison (`==`),
-                which would cause a fatal error in a Yoda condition instead of a silent logical bug.
+                This rule controls the use of \"Yoda\" conditions for comparisons, where the constant, literal,
+                or function call appears on the left side and the variable on the right.
+
+                In `require` mode (default), Yoda style is enforced. Placing the constant on the left prevents
+                the accidental-assignment bug (`=` instead of `==`), which causes a fatal error rather than a
+                silent logical bug in a Yoda condition.
+
+                In `deny` mode, Yoda style is forbidden. The variable must appear on the left for readability.
+                When using `deny` mode, consider enabling the `no-assign-in-condition` rule to guard against
+                accidental assignments (`=` instead of `==`) that Yoda conditions would otherwise catch.
             "},
-            good_example: indoc! {r"
+            good_example: indoc! {r#"
                 <?php
 
+                // configured mode: "require"
                 if ( true === $is_active ) { /* ... */ }
                 if ( 5 === $count ) { /* ... */ }
-            "},
-            bad_example: indoc! {r"
+            "#},
+            bad_example: indoc! {r#"
                 <?php
 
-                // Vulnerable to the accidental assignment bug, e.g., if ($is_active = true).
+                // configured mode: "require"
                 if ( $is_active === true ) { /* ... */ }
-            "},
+            "#},
             category: Category::BestPractices,
             requirements: RuleRequirements::None,
         };
@@ -112,36 +130,44 @@ impl LintRule for YodaConditionsRule {
             return;
         }
 
-        let left_is_variable = is_writable_variable(binary.lhs);
-        let right_is_constant = is_constant_like(binary.rhs);
+        let (message, annotation, reason, help) = match self.cfg.mode {
+            YodaConditionsMode::Require if is_writable_variable(binary.lhs) && is_constant_like(binary.rhs) => (
+                "Use Yoda condition style for safer comparisons",
+                "Variable should be on the right side",
+                "Yoda conditions help prevent accidental assignment bugs where `=` is used instead of `==`",
+                "Move constant/literal to left: `5 === $count`",
+            ),
+            YodaConditionsMode::Deny if is_constant_like(binary.lhs) && is_writable_variable(binary.rhs) => (
+                "Avoid Yoda condition style",
+                "Constant should be on the right side",
+                "Yoda conditions are harder to read; prefer `$count === 5`.",
+                "Move variable to left: `$count === 5`",
+            ),
+            _ => return,
+        };
 
-        // If variable is on the left and constant is on the right, suggest Yoda condition
-        if left_is_variable && right_is_constant {
-            let issue = Issue::new(self.cfg.level(), "Use Yoda condition style for safer comparisons")
-                .with_code(self.meta.code)
-                .with_annotation(
-                    Annotation::primary(binary.operator.span()).with_message("Variable should be on the right side"),
-                )
-                .with_note("Yoda conditions help prevent accidental assignment bugs where `=` is used instead of `==`")
-                .with_help("Move constant/literal to left: `5 === $count`");
+        let issue = Issue::new(self.cfg.level(), message)
+            .with_code(self.meta.code)
+            .with_annotation(Annotation::primary(binary.operator.span()).with_message(annotation))
+            .with_note(reason)
+            .with_help(help);
 
-            ctx.collector.propose(issue, |edits| {
-                let source_code = ctx.source_file.contents.as_ref();
+        ctx.collector.propose(issue, |edits| {
+            let source_code = ctx.source_file.contents.as_ref();
 
-                let right_side_span = binary.rhs.span();
-                let right_side_start = right_side_span.start_offset() as usize;
-                let right_side_end = right_side_span.end_offset() as usize;
-                let right_side = &source_code[right_side_start..right_side_end];
+            let right_side_span = binary.rhs.span();
+            let right_side_start = right_side_span.start_offset() as usize;
+            let right_side_end = right_side_span.end_offset() as usize;
+            let right_side = &source_code[right_side_start..right_side_end];
 
-                let left_side_span = binary.lhs.span();
-                let left_side_start = left_side_span.start_offset() as usize;
-                let left_side_end = left_side_span.end_offset() as usize;
-                let left_side = &source_code[left_side_start..left_side_end];
+            let left_side_span = binary.lhs.span();
+            let left_side_start = left_side_span.start_offset() as usize;
+            let left_side_end = left_side_span.end_offset() as usize;
+            let left_side = &source_code[left_side_start..left_side_end];
 
-                edits.push(TextEdit::replace(right_side_span, left_side));
-                edits.push(TextEdit::replace(left_side_span, right_side));
-            });
-        }
+            edits.push(TextEdit::replace(right_side_span, left_side));
+            edits.push(TextEdit::replace(left_side_span, right_side));
+        });
     }
 }
 
