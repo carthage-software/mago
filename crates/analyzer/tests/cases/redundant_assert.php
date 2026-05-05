@@ -13,6 +13,8 @@ function create_some_instance(): SomeClass
  * @psalm-assert !null $value
  *
  * @throws InvalidArgumentException
+ *
+ * @pure
  */
 function assert_not_null(mixed $value): void
 {

@@ -2466,6 +2466,11 @@ test_case!(issue_1770, {
 });
 test_case!(issue_1772);
 test_case!(issue_1775);
+test_case!(issue_1781, {
+    let mut s = crate::framework::default_test_settings();
+    s.check_throws = false;
+    s
+});
 
 #[test]
 fn test_all_test_cases_are_ran() {
