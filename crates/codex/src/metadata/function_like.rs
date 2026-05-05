@@ -6,10 +6,12 @@ use serde::Serialize;
 use mago_atom::Atom;
 use mago_atom::AtomMap;
 use mago_atom::AtomSet;
+use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
 
 use crate::assertion::Assertion;
+use crate::issue::ScanningIssueKind;
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::class_like::TemplateTypes;
 use crate::metadata::flags::MetadataFlags;
@@ -291,5 +293,105 @@ impl FunctionLikeMetadata {
     #[inline]
     pub fn add_template_type(&mut self, name: Atom, constraint: GenericTemplate) {
         self.template_types.insert(name, constraint);
+    }
+
+    /// Applies a patch to this entry in place, refining type information.
+    ///
+    /// Patches may only refine type annotations on an existing function-like; they cannot
+    /// replace structural identity (span, file, kind, parameter count, visibility, etc.)
+    /// — that belongs to whichever non-patch source originally declared the symbol.
+    ///
+    /// Refined fields: return type (declaration and docblock), per-parameter type
+    /// declaration / docblock type / `@param-out` / default-value type, `@throws`,
+    /// templates, and `@psalm-assert`-style assertions. Each is only copied when the
+    /// patch actually specifies it, so a sparsely-typed patch does not erase richer
+    /// information already on the entry.
+    ///
+    /// Diagnostics about the patch itself (e.g. parameter count mismatch) are returned to
+    /// the caller rather than pushed onto `self.issues`, mirroring
+    /// [`ClassLikeMetadata::apply_patch`](crate::metadata::class_like::ClassLikeMetadata::apply_patch).
+    /// On a parameter count mismatch the patch is skipped entirely — the patch is so far
+    /// out of sync that partial application would be misleading.
+    #[must_use = "patch diagnostics must be routed to CodebaseMetadata::patch_diagnostics"]
+    pub fn apply_patch(&mut self, patch: FunctionLikeMetadata) -> Vec<Issue> {
+        let mut diagnostics: Vec<Issue> = Vec::new();
+
+        if patch.parameters.len() != self.parameters.len() {
+            let name = patch.original_name.as_deref().or(patch.name.as_deref()).unwrap_or("<anonymous>");
+            diagnostics.push(
+                Issue::warning(format!(
+                    "Patch for `{}` declares {} parameter(s) but the original has {}; \
+                     patches cannot change the number of parameters.",
+                    name,
+                    patch.parameters.len(),
+                    self.parameters.len(),
+                ))
+                .with_code(ScanningIssueKind::PatchFunctionParameterMismatch)
+                .with_annotation(Annotation::primary(patch.span)),
+            );
+            return diagnostics;
+        }
+
+        // For methods, validate structural attributes: visibility, abstract, static, and
+        // removing final are all structural changes. Adding final is allowed.
+        if let (Some(patch_m), Some(self_m)) = (&patch.method_metadata, &self.method_metadata) {
+            let visibility_mismatch = patch_m.visibility != self_m.visibility;
+            let abstract_mismatch = patch_m.is_abstract != self_m.is_abstract;
+            let static_mismatch = patch_m.is_static != self_m.is_static;
+            let final_removed = self_m.is_final && !patch_m.is_final;
+
+            if visibility_mismatch || abstract_mismatch || static_mismatch || final_removed {
+                let name = patch.original_name.as_deref().or(patch.name.as_deref()).unwrap_or("<anonymous>");
+                diagnostics.push(
+                    Issue::warning(format!(
+                        "Patch for `{}` declares structural attributes (visibility, abstract, static, or \
+                         removing final) that differ from the original; only type annotations are applied.",
+                        name,
+                    ))
+                    .with_code(ScanningIssueKind::PatchMethodStructuralMismatch)
+                    .with_annotation(Annotation::primary(patch.span)),
+                );
+            }
+        }
+
+        if patch.return_type_declaration_metadata.is_some() {
+            self.return_type_declaration_metadata = patch.return_type_declaration_metadata;
+        }
+        if patch.return_type_metadata.is_some() {
+            self.return_type_metadata = patch.return_type_metadata;
+        }
+
+        for (slot, replacement) in self.parameters.iter_mut().zip(patch.parameters) {
+            if replacement.type_declaration_metadata.is_some() {
+                slot.type_declaration_metadata = replacement.type_declaration_metadata;
+            }
+            if replacement.type_metadata.is_some() {
+                slot.type_metadata = replacement.type_metadata;
+            }
+            if replacement.out_type.is_some() {
+                slot.out_type = replacement.out_type;
+            }
+            if replacement.default_type.is_some() {
+                slot.default_type = replacement.default_type;
+            }
+        }
+
+        if !patch.template_types.is_empty() {
+            self.template_types.extend(patch.template_types);
+        }
+        if !patch.thrown_types.is_empty() {
+            self.thrown_types = patch.thrown_types;
+        }
+        if !patch.assertions.is_empty() {
+            self.assertions = patch.assertions;
+        }
+        if !patch.if_true_assertions.is_empty() {
+            self.if_true_assertions = patch.if_true_assertions;
+        }
+        if !patch.if_false_assertions.is_empty() {
+            self.if_false_assertions = patch.if_false_assertions;
+        }
+
+        diagnostics
     }
 }

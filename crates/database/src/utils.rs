@@ -49,7 +49,7 @@ pub(crate) fn read_file(workspace: &Path, path: &Path, file_type: FileType) -> R
 
         match file_type {
             FileType::Host => tracing::warn!("{}", warning_message),
-            FileType::Vendored | FileType::Builtin => tracing::info!("{}", warning_message),
+            FileType::Vendored | FileType::Builtin | FileType::Patch => tracing::info!("{}", warning_message),
         }
 
         String::from_utf8_lossy(&bytes).into_owned()

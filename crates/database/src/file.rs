@@ -36,6 +36,12 @@ pub enum FileType {
     /// These "files" do not exist on the filesystem and their content is typically
     /// provided as pre-defined stubs for analysis.
     Builtin,
+
+    /// The file is a user-provided patch that overrides type information for vendored or
+    /// built-in code with corrected PHPDoc / type declarations.
+    /// Like vendored files, patches are not actively analyzed, linted, or formatted,
+    /// but their metadata takes precedence over both vendored and built-in definitions.
+    Patch,
 }
 
 /// A file that's either stored on the host system's file system or in the vendored file system.
@@ -213,6 +219,12 @@ impl FileType {
     #[must_use]
     pub const fn is_builtin(self) -> bool {
         matches!(self, FileType::Builtin)
+    }
+
+    /// Returns `true` if the file is a patch, meaning it overrides type information for vendored or built-in code.
+    #[must_use]
+    pub const fn is_patch(self) -> bool {
+        matches!(self, FileType::Patch)
     }
 }
 

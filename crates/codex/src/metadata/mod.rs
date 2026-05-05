@@ -16,12 +16,15 @@ use mago_atom::empty_atom;
 use mago_atom::u32_atom;
 use mago_atom::u64_atom;
 use mago_database::file::FileId;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_span::Position;
 use mago_span::Span;
 
 use crate::diff::CodebaseDiff;
 use crate::identifier::method::MethodIdentifier;
+use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::constant::ConstantMetadata;
@@ -99,6 +102,13 @@ pub struct CodebaseMetadata {
     /// Each `FileSignature` contains a hierarchical tree of `DefSignatureNode` representing
     /// top-level symbols (classes, functions, constants) and their nested members (methods, properties).
     pub file_signatures: HashMap<FileId, FileSignature>,
+    /// Diagnostics produced while applying patch files to vendor/built-in metadata.
+    ///
+    /// Patch-vs-original mismatches and attempts by a patch to introduce members that do
+    /// not exist in the original belong to the patch, not to the patched class. Storing
+    /// them here keeps vendor/built-in metadata's own `issues` list untouched, so the
+    /// `take_issues` filter can continue to skip non-user-defined entries by definition.
+    pub patch_diagnostics: Vec<Issue>,
 }
 
 impl CodebaseMetadata {
@@ -939,10 +949,38 @@ impl CodebaseMetadata {
         Some(invalid_symbols.contains(&(empty_atom(), empty_atom())))
     }
 
-    /// Merges information from another `CodebaseMetadata` into this one.
+    /// Collects the names of methods that the `patch` declares but the *existing*
+    /// class does not, provided those methods are actually inherited from an
+    /// ancestor. Used by `apply_patch` to recognise patch-declared overrides
+    /// of inherited methods as intentional.
+    ///
+    /// Returns an empty set unless `patch` is a patch updating a non-user-defined
+    /// entry that is already present.
+    fn compute_inherited_methods_for_patch(&self, k: &Atom, patch: &ClassLikeMetadata) -> AtomSet {
+        let Some(existing) = self.class_likes.get(k) else {
+            return AtomSet::default();
+        };
+        if existing.flags.is_user_defined() {
+            return AtomSet::default();
+        }
+        patch
+            .methods
+            .iter()
+            .filter(|m| {
+                !existing.methods.contains(*m) && class_like::method_exists_in_ancestors(existing, m, &self.class_likes)
+            })
+            .copied()
+            .collect()
+    }
+
+    /// Merges non-patch information from another `CodebaseMetadata` into this one.
     ///
     /// When both metadata have the same priority, the one with the smaller span is kept
     /// for deterministic results regardless of scan order.
+    ///
+    /// Only call this with non-patch partials. Use [`apply_patches`](Self::apply_patches)
+    /// for patch partials, and always call it after all non-patch partials have been merged
+    /// so that patches find an occupied slot to update.
     pub fn extend(&mut self, other: CodebaseMetadata) {
         for (k, v) in other.class_likes {
             match self.class_likes.entry(k) {
@@ -997,13 +1035,18 @@ impl CodebaseMetadata {
         self.safe_symbols.extend(other.safe_symbols);
         self.safe_symbol_members.extend(other.safe_symbol_members);
         self.infer_types_from_usage |= other.infer_types_from_usage;
+        self.patch_diagnostics.extend(other.patch_diagnostics);
     }
 
-    /// Extends this codebase with another by reference, cloning only individual entries.
+    /// Merges non-patch information from another `CodebaseMetadata` by reference, cloning
+    /// only individual entries that need insertion.
     ///
     /// This is more efficient than `extend(other.clone())` because it avoids allocating
-    /// a full clone of the source metadata's outer HashMap/AtomMap structures. Only
-    /// individual entries that need insertion are cloned.
+    /// a full clone of the source metadata's outer HashMap/AtomMap structures.
+    ///
+    /// Only call this with non-patch partials. Use [`apply_patches_ref`](Self::apply_patches_ref)
+    /// for patch partials, and always call it after all non-patch partials have been merged
+    /// so that patches find an occupied slot to update.
     pub fn extend_ref(&mut self, other: &CodebaseMetadata) {
         for (k, v) in &other.class_likes {
             match self.class_likes.entry(*k) {
@@ -1060,6 +1103,174 @@ impl CodebaseMetadata {
         self.safe_symbols.extend(other.safe_symbols.iter().copied());
         self.safe_symbol_members.extend(other.safe_symbol_members.iter().copied());
         self.infer_types_from_usage |= other.infer_types_from_usage;
+        self.patch_diagnostics.extend(other.patch_diagnostics.iter().cloned());
+    }
+
+    /// Applies patch overrides from another `CodebaseMetadata` into this one.
+    ///
+    /// Patch entries refine individual members of existing symbols rather than replacing them.
+    /// Entries in `other` that have no matching slot in `self` are reported as orphan diagnostics.
+    ///
+    /// Must be called after all non-patch partials have been merged via [`extend`](Self::extend)
+    /// so that the slots patches target are already present.
+    pub fn apply_patches(&mut self, other: CodebaseMetadata) {
+        let mut orphan_patch_classes: AtomSet = AtomSet::default();
+
+        for (k, v) in other.class_likes {
+            // Pre-compute inherited methods before taking the entry borrow (borrow-checker
+            // does not allow &self.class_likes while entry holds a mutable borrow of the same map).
+            let inherited_methods = self.compute_inherited_methods_for_patch(&k, &v);
+
+            match self.class_likes.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    if !entry.get().flags.is_user_defined() {
+                        let patch_issues = entry.get_mut().apply_patch(v, &inherited_methods);
+                        self.patch_diagnostics.extend(patch_issues);
+                    }
+                }
+                Entry::Vacant(_) => {
+                    self.patch_diagnostics.push(orphan_patch_class_diagnostic(&v));
+                    orphan_patch_classes.insert(k);
+                }
+            }
+        }
+
+        for (k, v) in other.function_likes {
+            match self.function_likes.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    // Patches only refine type information on an existing entry; they never
+                    // own slots in `function_likes`. The non-patch source remains the slot
+                    // owner so its span/file are what `extract_owned_keys` records, and
+                    // removing the patch leaves the original entry intact.
+                    if !entry.get().flags.is_user_defined() {
+                        let patch_issues = entry.get_mut().apply_patch(v);
+                        self.patch_diagnostics.extend(patch_issues);
+                    }
+                }
+                Entry::Vacant(_) => {
+                    // Patches should never hit vacant slots, as they may not introduce new
+                    // symbols. Class methods are reported when handling classes; only free
+                    // functions need reporting here.
+                    if is_free_function_id(&k) {
+                        self.patch_diagnostics.push(orphan_patch_function_diagnostic(&v));
+                    }
+                }
+            }
+        }
+
+        for (k, v) in other.constants {
+            match self.constants.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    if !entry.get().flags.is_user_defined() {
+                        entry.get_mut().apply_patch(v);
+                    }
+                }
+                Entry::Vacant(_) => {
+                    self.patch_diagnostics.push(orphan_patch_constant_diagnostic(&v));
+                }
+            }
+        }
+
+        self.symbols.extend(other.symbols);
+        for orphan in &orphan_patch_classes {
+            self.symbols.remove(*orphan);
+        }
+
+        for (k, v) in other.all_class_like_descendants {
+            self.all_class_like_descendants.entry(k).or_default().extend(v);
+        }
+
+        for (k, v) in other.direct_classlike_descendants {
+            self.direct_classlike_descendants.entry(k).or_default().extend(v);
+        }
+
+        self.file_signatures.extend(other.file_signatures);
+        self.safe_symbols.extend(other.safe_symbols);
+        self.safe_symbol_members.extend(other.safe_symbol_members);
+        self.infer_types_from_usage |= other.infer_types_from_usage;
+        self.patch_diagnostics.extend(other.patch_diagnostics);
+    }
+
+    /// Applies patch overrides from another `CodebaseMetadata` by reference, cloning only
+    /// individual entries that are consumed during application.
+    ///
+    /// This is more efficient than `apply_patches(other.clone())` because it avoids allocating
+    /// a full clone of the source metadata's outer HashMap/AtomMap structures.
+    ///
+    /// Must be called after all non-patch partials have been merged via [`extend_ref`](Self::extend_ref)
+    /// so that the slots patches target are already present.
+    pub fn apply_patches_ref(&mut self, other: &CodebaseMetadata) {
+        let mut orphan_patch_classes: AtomSet = AtomSet::default();
+
+        for (k, v) in &other.class_likes {
+            let inherited_methods = self.compute_inherited_methods_for_patch(k, v);
+
+            match self.class_likes.entry(*k) {
+                Entry::Occupied(mut entry) => {
+                    if !entry.get().flags.is_user_defined() {
+                        let patch_issues = entry.get_mut().apply_patch(v.clone(), &inherited_methods);
+                        self.patch_diagnostics.extend(patch_issues);
+                    }
+                }
+                Entry::Vacant(_) => {
+                    self.patch_diagnostics.push(orphan_patch_class_diagnostic(v));
+                    orphan_patch_classes.insert(*k);
+                }
+            }
+        }
+
+        for (k, v) in &other.function_likes {
+            match self.function_likes.entry(*k) {
+                Entry::Occupied(mut entry) => {
+                    if !entry.get().flags.is_user_defined() {
+                        let patch_issues = entry.get_mut().apply_patch(v.clone());
+                        self.patch_diagnostics.extend(patch_issues);
+                    }
+                }
+                Entry::Vacant(_) => {
+                    if is_free_function_id(k) {
+                        self.patch_diagnostics.push(orphan_patch_function_diagnostic(v));
+                    }
+                    // Methods of an orphan patch class are covered by the class-level
+                    // diagnostic; methods of a present class are caught by
+                    // `apply_patch` on the class — both fall out as silent drops here.
+                }
+            }
+        }
+
+        for (k, v) in &other.constants {
+            match self.constants.entry(*k) {
+                Entry::Occupied(mut entry) => {
+                    if !entry.get().flags.is_user_defined() {
+                        entry.get_mut().apply_patch(v.clone());
+                    }
+                }
+                Entry::Vacant(_) => {
+                    self.patch_diagnostics.push(orphan_patch_constant_diagnostic(v));
+                }
+            }
+        }
+
+        self.symbols.extend_ref(&other.symbols);
+        for orphan in &orphan_patch_classes {
+            self.symbols.remove(*orphan);
+        }
+
+        for (k, v) in &other.all_class_like_descendants {
+            self.all_class_like_descendants.entry(*k).or_default().extend(v.iter().copied());
+        }
+
+        for (k, v) in &other.direct_classlike_descendants {
+            self.direct_classlike_descendants.entry(*k).or_default().extend(v.iter().copied());
+        }
+
+        for (k, v) in &other.file_signatures {
+            self.file_signatures.insert(*k, v.clone());
+        }
+        self.safe_symbols.extend(other.safe_symbols.iter().copied());
+        self.safe_symbol_members.extend(other.safe_symbol_members.iter().copied());
+        self.infer_types_from_usage |= other.infer_types_from_usage;
+        self.patch_diagnostics.extend(other.patch_diagnostics.iter().cloned());
     }
 
     /// Removes all entries that were contributed by the given per-file scan metadata.
@@ -1202,6 +1413,10 @@ impl CodebaseMetadata {
             issues.extend(meta.take_issues());
         }
 
+        // Patch diagnostics belong to the patch, not to the patched vendor entry, and
+        // are always reported regardless of `user_defined` — patches are user-authored.
+        issues.extend(self.patch_diagnostics.drain(..));
+
         issues
     }
 
@@ -1228,20 +1443,66 @@ impl Default for CodebaseMetadata {
             safe_symbols: AtomSet::default(),
             safe_symbol_members: HashSet::default(),
             file_signatures: HashMap::default(),
+            patch_diagnostics: Vec::new(),
         }
     }
+}
+
+/// Free function ids in `function_likes` have an empty class-name prefix
+/// (the tuple is `(class_fqcn, function_name)`); methods carry their owning
+/// class name in the first element.
+#[inline]
+fn is_free_function_id(k: &(Atom, Atom)) -> bool {
+    k.0.is_empty()
+}
+
+fn orphan_patch_class_diagnostic(meta: &ClassLikeMetadata) -> Issue {
+    Issue::warning(format!(
+        "Patch declares `{}` but no vendored or built-in definition exists to patch.",
+        meta.original_name,
+    ))
+    .with_code(ScanningIssueKind::PatchIntroducesNewSymbol)
+    .with_annotation(Annotation::primary(meta.span))
+    .with_help(
+        "The patch may be misnamed or out-of-date relative to the vendored or built-in definition; \
+         check the symbol name and verify the patch still matches the upstream source.",
+    )
+}
+
+fn orphan_patch_function_diagnostic(meta: &FunctionLikeMetadata) -> Issue {
+    Issue::warning(format!(
+        "Patch declares function `{}` but no vendored or built-in definition exists to patch.",
+        meta.name.as_deref().unwrap_or("<anonymous>"),
+    ))
+    .with_code(ScanningIssueKind::PatchIntroducesNewSymbol)
+    .with_annotation(Annotation::primary(meta.span))
+    .with_help(
+        "The patch may be misnamed or out-of-date relative to the vendored or built-in definition; \
+         check the function name and verify the patch still matches the upstream source.",
+    )
+}
+
+fn orphan_patch_constant_diagnostic(meta: &ConstantMetadata) -> Issue {
+    Issue::warning(format!(
+        "Patch declares constant `{}` but no vendored or built-in definition exists to patch.",
+        meta.name,
+    ))
+    .with_code(ScanningIssueKind::PatchIntroducesNewSymbol)
+    .with_annotation(Annotation::primary(meta.span))
+    .with_help(
+        "The patch may be misnamed or out-of-date relative to the vendored or built-in definition; \
+         check the constant name and verify the patch still matches the upstream source.",
+    )
 }
 
 /// Determines which metadata value to keep when merging duplicates.
 ///
 /// Priority:
-///   1. user-defined > built-in > other.
+///   1. user-defined > patch > built-in > other.
 ///   2. non-polyfill > polyfill — tools like rector/phpstan/psalm ship
 ///      skeleton stubs gated by `if (!class_exists('X'))` that should never
 ///      shadow a concrete definition.
 ///   3. smaller span wins as a deterministic tie-breaker.
-///
-/// Returns `true` if the new value should replace the existing one.
 fn should_replace_metadata(
     existing_flags: MetadataFlags,
     existing_span: Span,
@@ -1253,6 +1514,13 @@ fn should_replace_metadata(
 
     if new_is_user_defined != existing_is_user_defined {
         return new_is_user_defined;
+    }
+
+    let new_is_patch = new_flags.is_patch();
+    let existing_is_patch = existing_flags.is_patch();
+
+    if new_is_patch != existing_is_patch {
+        return new_is_patch;
     }
 
     let new_is_built_in = new_flags.is_built_in();
@@ -1313,5 +1581,139 @@ mod should_replace_metadata_tests {
         let builtin = MetadataFlags::BUILTIN;
         assert!(!should_replace_metadata(user, Span::dummy(0, 10), builtin, Span::dummy(0, 10)));
         assert!(should_replace_metadata(builtin, Span::dummy(0, 10), user, Span::dummy(0, 10)));
+    }
+
+    #[test]
+    fn patch_beats_vendored() {
+        let vendored = MetadataFlags::empty();
+        let patch = MetadataFlags::PATCH;
+        assert!(should_replace_metadata(vendored, Span::dummy(0, 100), patch, Span::dummy(0, 100)));
+        assert!(!should_replace_metadata(patch, Span::dummy(0, 100), vendored, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn patch_beats_builtin() {
+        let builtin = MetadataFlags::BUILTIN;
+        let patch = MetadataFlags::PATCH;
+        assert!(should_replace_metadata(builtin, Span::dummy(0, 100), patch, Span::dummy(0, 100)));
+        assert!(!should_replace_metadata(patch, Span::dummy(0, 100), builtin, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn user_defined_beats_patch() {
+        let user = MetadataFlags::USER_DEFINED;
+        let patch = MetadataFlags::PATCH;
+        assert!(!should_replace_metadata(user, Span::dummy(0, 100), patch, Span::dummy(0, 100)));
+        assert!(should_replace_metadata(patch, Span::dummy(0, 100), user, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn patch_does_not_beat_user_defined_even_with_smaller_span() {
+        let user = MetadataFlags::USER_DEFINED;
+        let patch = MetadataFlags::PATCH;
+        assert!(!should_replace_metadata(user, Span::dummy(500, 600), patch, Span::dummy(0, 10)));
+    }
+
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn patch_function_like_leaves_vendor_owning_slot() {
+        // Patches may only refine type information on an existing function-like; they must
+        // never become the slot owner. The non-patch source's span/file id stay put so that
+        // `extract_owned_keys` records vendor-as-owner — otherwise the patch's entry would
+        // outlive a vendor deletion in incremental mode (orphan function-like bug).
+        use mago_atom::ascii_lowercase_atom;
+        use mago_atom::empty_atom;
+        use mago_span::Span;
+
+        use crate::metadata::function_like::FunctionLikeKind;
+        use crate::metadata::function_like::FunctionLikeMetadata;
+
+        let key = (empty_atom(), ascii_lowercase_atom("foo"));
+        let vendor_span = Span::dummy(0, 100);
+        let patch_span = Span::dummy(500, 600);
+
+        let vendor = FunctionLikeMetadata::new(FunctionLikeKind::Function, vendor_span, MetadataFlags::empty());
+        let mut codebase = CodebaseMetadata::new();
+        codebase.function_likes.insert(key, vendor);
+
+        let patch = FunctionLikeMetadata::new(FunctionLikeKind::Function, patch_span, MetadataFlags::PATCH);
+        let mut patch_codebase = CodebaseMetadata::new();
+        patch_codebase.function_likes.insert(key, patch);
+
+        codebase.apply_patches(patch_codebase);
+
+        let merged = codebase.function_likes.get(&key).expect("function-like must remain after patch");
+        assert_eq!(merged.span, vendor_span, "patch must not move the slot's span");
+        assert!(!merged.flags.is_patch(), "patch must not flip the slot's flags");
+    }
+
+    #[test]
+    fn patch_function_like_owns_no_keys_after_apply() {
+        // After a vendor + patch merge, `extract_owned_keys` on the patch partial must not
+        // claim ownership of the patched function-like — otherwise removing the patch from
+        // the codebase would also evict the vendor's entry.
+        use mago_atom::ascii_lowercase_atom;
+        use mago_atom::empty_atom;
+        use mago_span::Span;
+
+        use crate::metadata::function_like::FunctionLikeKind;
+        use crate::metadata::function_like::FunctionLikeMetadata;
+
+        let key = (empty_atom(), ascii_lowercase_atom("foo"));
+        let vendor = FunctionLikeMetadata::new(FunctionLikeKind::Function, Span::dummy(0, 100), MetadataFlags::empty());
+        let mut merged = CodebaseMetadata::new();
+        merged.function_likes.insert(key, vendor);
+
+        let mut patch_partial = CodebaseMetadata::new();
+        patch_partial.function_likes.insert(
+            key,
+            FunctionLikeMetadata::new(FunctionLikeKind::Function, Span::dummy(500, 600), MetadataFlags::PATCH),
+        );
+
+        merged.apply_patches(patch_partial.clone());
+
+        let owned = patch_partial.extract_owned_keys(&merged);
+        assert!(
+            owned.function_like_keys.is_empty(),
+            "patch partial must not own any function-like keys; owns: {:?}",
+            owned.function_like_keys,
+        );
+    }
+
+    #[test]
+    fn patch_does_not_apply_to_user_defined_class() {
+        use mago_atom::atom;
+        use mago_span::Span;
+
+        use crate::metadata::class_like::ClassLikeMetadata;
+
+        let class_name = atom("MyClass");
+        let method_existing = atom("doIt");
+
+        let mut user_class =
+            ClassLikeMetadata::new(class_name, class_name, Span::dummy(0, 100), None, MetadataFlags::USER_DEFINED);
+        user_class.methods.insert(method_existing);
+
+        let mut codebase = CodebaseMetadata::new();
+        codebase.class_likes.insert(class_name, user_class);
+
+        let mut patch_class =
+            ClassLikeMetadata::new(class_name, class_name, Span::dummy(0, 50), None, MetadataFlags::PATCH);
+        let method_new = atom("patchedMethod");
+        patch_class.methods.insert(method_new);
+
+        let mut patch_codebase = CodebaseMetadata::new();
+        patch_codebase.class_likes.insert(class_name, patch_class);
+
+        codebase.apply_patches(patch_codebase);
+
+        let class = &codebase.class_likes[&class_name];
+        // Patch must not apply to a user-defined class.
+        assert!(!class.methods.contains(&method_new));
+        // User-defined class must be preserved intact.
+        assert!(class.methods.contains(&method_existing));
+        assert!(class.flags.is_user_defined());
+        // No issues should be emitted.
+        assert!(class.issues.is_empty());
     }
 }

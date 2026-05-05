@@ -141,6 +141,15 @@ impl<'config> DatabaseLoader<'config> {
             &path_excludes,
         )?;
 
+        let patch_files_with_spec = self.load_paths(
+            &self.configuration.patches,
+            FileType::Patch,
+            &extensions_set,
+            &glob_excludes,
+            &dir_prune_globs,
+            &path_excludes,
+        )?;
+
         let mut all_files: HashMap<FileId, File> = HashMap::default();
         let mut file_decisions: HashMap<FileId, (FileType, usize)> = HashMap::default();
 
@@ -201,6 +210,25 @@ impl<'config> DatabaseLoader<'config> {
                 }
                 _ => {
                     file_decisions.insert(file_id, (FileType::Vendored, vendored_specificity));
+                }
+            }
+        }
+
+        // Patches beat vendored at equal specificity; host beats patches unless patch is strictly more specific.
+        for file_with_spec in patch_files_with_spec {
+            let file_id = file_with_spec.file.id;
+            let patch_specificity = file_with_spec.specificity;
+
+            all_files.entry(file_id).or_insert(file_with_spec.file);
+
+            match file_decisions.get(&file_id) {
+                Some((FileType::Host | FileType::Patch, existing_specificity))
+                    if patch_specificity <= *existing_specificity =>
+                {
+                    // Keep existing: it is equally or more specific than the patch.
+                }
+                _ => {
+                    file_decisions.insert(file_id, (FileType::Patch, patch_specificity));
                 }
             }
         }
@@ -467,6 +495,15 @@ mod tests {
     use tempfile::TempDir;
 
     fn create_test_config(temp_dir: &TempDir, paths: Vec<&str>, includes: Vec<&str>) -> DatabaseConfiguration<'static> {
+        create_test_config_with_patches(temp_dir, paths, includes, vec![])
+    }
+
+    fn create_test_config_with_patches(
+        temp_dir: &TempDir,
+        paths: Vec<&str>,
+        includes: Vec<&str>,
+        patches: Vec<&str>,
+    ) -> DatabaseConfiguration<'static> {
         // Normalize path separators to platform-specific separators
         let normalize = |s: &str| s.replace('/', std::path::MAIN_SEPARATOR_STR);
 
@@ -474,6 +511,7 @@ mod tests {
             workspace: Cow::Owned(temp_dir.path().to_path_buf()),
             paths: paths.into_iter().map(|s| Cow::Owned(normalize(s))).collect(),
             includes: includes.into_iter().map(|s| Cow::Owned(normalize(s))).collect(),
+            patches: patches.into_iter().map(|s| Cow::Owned(normalize(s))).collect(),
             excludes: vec![],
             extensions: vec![Cow::Borrowed("php")],
             glob: GlobSettings::default(),
@@ -726,5 +764,71 @@ mod tests {
         let file = db.files().find(|f| f.name.contains("unsaved.php")).unwrap();
         assert_eq!(file.file_type, FileType::Host);
         assert_eq!(file.contents.as_ref(), "<?php\n// unsaved buffer");
+    }
+
+    #[test]
+    fn test_patch_beats_vendored_at_equal_specificity() {
+        // A file covered by both patches and includes at the same directory-level specificity
+        // should be classified as Patch, not Vendored.
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "lib/Foo.php", "<?php");
+
+        let config = create_test_config_with_patches(&temp_dir, vec![], vec!["lib/"], vec!["lib/"]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let file = db.files().find(|f| f.name.contains("Foo.php")).unwrap();
+        assert_eq!(file.file_type, FileType::Patch, "patch should beat vendored at equal specificity");
+    }
+
+    #[test]
+    fn test_patch_beats_vendored_even_when_less_specific() {
+        // Patches always shadow vendored files regardless of pattern specificity, because patches
+        // are explicitly authored to override type information for included libraries.
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "lib/sub/Foo.php", "<?php");
+
+        // includes uses a deeper (more specific) pattern; patches uses a shallower one
+        let config = create_test_config_with_patches(&temp_dir, vec![], vec!["lib/sub/"], vec!["lib/"]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let file = db.files().find(|f| f.name.contains("Foo.php")).unwrap();
+        assert_eq!(
+            file.file_type,
+            FileType::Patch,
+            "patch should beat vendored even when patch pattern is less specific"
+        );
+    }
+
+    #[test]
+    fn test_host_beats_patch_at_equal_specificity() {
+        // When a file is covered by both paths and patches at the same directory-level specificity,
+        // the host (paths) classification wins.  Patches only override host when strictly more specific.
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "src/Foo.php", "<?php");
+
+        let config = create_test_config_with_patches(&temp_dir, vec!["src/"], vec![], vec!["src/"]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let file = db.files().find(|f| f.name.contains("Foo.php")).unwrap();
+        assert_eq!(file.file_type, FileType::Host, "host should beat patch at equal specificity");
+    }
+
+    #[test]
+    fn test_patch_beats_host_when_strictly_more_specific() {
+        // An exact-file patch pattern has higher specificity than a directory paths pattern,
+        // so the patch wins and the file is treated as Patch rather than Host.
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "src/Foo.php", "<?php");
+        create_test_file(&temp_dir, "src/Bar.php", "<?php");
+
+        // Patch covers only Foo.php exactly; paths covers the whole directory.
+        let config = create_test_config_with_patches(&temp_dir, vec!["src/"], vec![], vec!["src/Foo.php"]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let foo = db.files().find(|f| f.name.contains("Foo.php")).unwrap();
+        assert_eq!(foo.file_type, FileType::Patch, "exact-file patch should beat directory-level host pattern");
+
+        let bar = db.files().find(|f| f.name.contains("Bar.php")).unwrap();
+        assert_eq!(bar.file_type, FileType::Host, "file not covered by patch should remain Host");
     }
 }

@@ -2474,6 +2474,52 @@ test_case!(issue_1781, {
     s
 });
 
+// Patch diagnostic tests — each fixture is a single `.php` file split by
+// `//=== vendor ===` and `//=== patch ===` marker lines into vendor and patch
+// sections; expectations live as `@mago-expect` pragmas in the patch section.
+test_case!(patch_orphan_class);
+test_case!(patch_method_merged_after_vendor);
+test_case!(patch_new_method_ignored);
+test_case!(patch_new_property_ignored);
+test_case!(patch_property_visibility_mismatch);
+test_case!(patch_property_flag_mismatch);
+test_case!(patch_new_constant_ignored);
+test_case!(patch_constant_visibility_mismatch);
+test_case!(patch_enum_cases_ignored);
+test_case!(patch_kind_mismatch);
+test_case!(patch_parent_class_mismatch);
+test_case!(patch_parent_class_match_ok);
+test_case!(patch_omitted_parent_class_ok);
+test_case!(patch_interface_mismatch);
+test_case!(patch_interface_omitted_ok);
+test_case!(patch_declared_traits_error);
+test_case!(patch_trait_require_extends_omitted_ok);
+test_case!(patch_trait_require_extends_mismatch);
+test_case!(patch_trait_require_implements_omitted_ok);
+test_case!(patch_trait_require_implements_mismatch);
+test_case!(patch_interface_extends_omitted_ok);
+test_case!(patch_interface_extends_mismatch);
+test_case!(patch_readonly_class_mismatch);
+test_case!(patch_new_pseudo_method_ok);
+test_case!(patch_method_parameter_type_ok);
+test_case!(patch_method_parameter_count_mismatch);
+test_case!(patch_method_visibility_mismatch);
+test_case!(patch_method_abstract_mismatch);
+test_case!(patch_method_static_mismatch);
+test_case!(patch_method_final_added_ok);
+test_case!(patch_method_final_removed_error);
+test_case!(patch_new_pseudo_property_ok);
+test_case!(patch_property_type_ok);
+test_case!(patch_property_static_mismatch);
+test_case!(patch_property_hooks_mismatch);
+test_case!(patch_property_final_added_ok);
+test_case!(patch_property_final_removed_error);
+test_case!(patch_constant_type_ok);
+test_case!(patch_constant_final_added_ok);
+test_case!(patch_constant_final_removed_error);
+test_case!(patch_template_parameters_ok);
+test_case!(patch_type_alias_ok);
+
 #[test]
 fn test_all_test_cases_are_ran() {
     let test_case_file = include_str!("mod.rs");
