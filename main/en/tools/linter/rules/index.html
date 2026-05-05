@@ -2955,17 +2955,21 @@ $message .= ' Hello';
 <details class="rule" name="rule" id="yoda-conditions">
 <summary><code class="rule__code">yoda-conditions</code><a class="rule__anchor" href="#yoda-conditions" aria-label="Permalink to yoda-conditions">¶</a><span class="rule__level rule__level--help">help</span></summary>
 <div class="rule__body">
-<p>This rule enforces the use of "Yoda" conditions for comparisons. The variable should always be
-on the right side of the comparison, while the constant, literal, or function call is on the left.
-This prevents the common bug of accidentally using an assignment (<code>=</code>) instead of a comparison (<code>==</code>),
-which would cause a fatal error in a Yoda condition instead of a silent logical bug.</p>
+<p>This rule controls the use of "Yoda" conditions for comparisons, where the constant, literal,
+or function call appears on the left side and the variable on the right.</p>
+<p>In <code>require</code> mode (default), Yoda style is enforced. Placing the constant on the left prevents
+the accidental-assignment bug (<code>=</code> instead of <code>==</code>), which causes a fatal error rather than a
+silent logical bug in a Yoda condition.</p>
+<p>In <code>deny</code> mode, Yoda style is forbidden. The variable must appear on the left for readability.
+When using <code>deny</code> mode, consider enabling the <code>no-assign-in-condition</code> rule to guard against
+accidental assignments (<code>=</code> instead of <code>==</code>) that Yoda conditions would otherwise catch.</p>
 <hr class="rule__separator">
 <div class="rule-examples">
 <div class="rule-example rule-example--bad">
 <div class="rule-example__label">Avoid</div>
 <pre><code class="language-php">&lt;?php
 
-// Vulnerable to the accidental assignment bug, e.g., if ($is_active = true).
+// configured mode: "require"
 if ( $is_active === true ) { /* ... */ }
 </code></pre>
 </div>
@@ -2973,6 +2977,7 @@ if ( $is_active === true ) { /* ... */ }
 <div class="rule-example__label">Prefer</div>
 <pre><code class="language-php">&lt;?php
 
+// configured mode: "require"
 if ( true === $is_active ) { /* ... */ }
 if ( 5 === $count ) { /* ... */ }
 </code></pre>
@@ -2982,6 +2987,7 @@ if ( 5 === $count ) { /* ... */ }
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>enabled</code></td><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>false</code></td></tr>
 <tr><td style="text-align: left"><code>level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"help"</code></td></tr>
+<tr><td style="text-align: left"><code>mode</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"require"</code></td></tr>
 </tbody></table>
 </div>
 </details>

@@ -790,7 +790,8 @@
           },
           "yoda-conditions": {
             "enabled": false,
-            "level": "Help"
+            "level": "Help",
+            "mode": "require"
           },
           "no-short-bool-cast": {
             "enabled": false,
@@ -1784,7 +1785,8 @@
             },
             "yoda-conditions": {
               "enabled": false,
-              "level": "Help"
+              "level": "Help",
+              "mode": "require"
             },
             "no-short-bool-cast": {
               "enabled": false,
@@ -3079,7 +3081,8 @@
           "$ref": "#/$defs/RuleSettings163",
           "default": {
             "enabled": false,
-            "level": "Help"
+            "level": "Help",
+            "mode": "require"
           }
         },
         "no-short-bool-cast": {
@@ -6851,9 +6854,27 @@
         "level": {
           "$ref": "#/$defs/Level",
           "default": "Help"
+        },
+        "mode": {
+          "$ref": "#/$defs/YodaConditionsMode",
+          "default": "require"
         }
       },
       "additionalProperties": false
+    },
+    "YodaConditionsMode": {
+      "oneOf": [
+        {
+          "description": "Require Yoda style: constant/literal on the left, variable on the right.",
+          "type": "string",
+          "const": "require"
+        },
+        {
+          "description": "Deny Yoda style: variable on the left, constant/literal on the right.",
+          "type": "string",
+          "const": "deny"
+        }
+      ]
     },
     "RuleSettings164": {
       "type": "object",
