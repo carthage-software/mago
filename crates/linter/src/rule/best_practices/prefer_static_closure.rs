@@ -120,8 +120,8 @@ impl LintRule for PreferStaticClosureRule {
                     return;
                 }
 
-                // Check if body contains $this
-                if contains_this_reference(Node::Block(&closure.body)) {
+                // Check if body needs $this binding (uses `$this` or `parent::`)
+                if requires_this_binding(Node::Block(&closure.body)) {
                     return;
                 }
 
@@ -133,8 +133,8 @@ impl LintRule for PreferStaticClosureRule {
                     return;
                 }
 
-                // Check if expression contains $this
-                if contains_this_reference(Node::Expression(arrow.expression)) {
+                // Check if expression needs $this binding (uses `$this` or `parent::`)
+                if requires_this_binding(Node::Expression(arrow.expression)) {
                     return;
                 }
 
@@ -167,7 +167,9 @@ impl PreferStaticClosureRule {
     }
 }
 
-fn contains_this_reference(root: Node<'_, '_>) -> bool {
+/// Returns `true` when the closure body needs `$this` to be bound, either because
+/// it directly references `$this` or because it uses `parent::`.
+fn requires_this_binding(root: Node<'_, '_>) -> bool {
     // Iterative traversal to avoid stack overflows on deeply nested ASTs.
     let mut stack = vec![root];
 
@@ -175,6 +177,10 @@ fn contains_this_reference(root: Node<'_, '_>) -> bool {
         if let Node::Expression(Expression::Variable(Variable::Direct(var))) = node
             && var.name == "$this"
         {
+            return true;
+        }
+
+        if matches!(node, Node::Expression(Expression::Parent(_))) {
             return true;
         }
 
@@ -352,6 +358,50 @@ mod tests {
 
             function foo() {
                 $fn = fn($x) => $x * 2;
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = closure_calls_parent_method,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r"
+            <?php
+
+            abstract class Bar {
+                public function something(): void {}
+            }
+
+            final class Foo extends Bar {
+                public function something(): void {
+                    $this->wrapInTransaction(function (): void {
+                        parent::something();
+                    });
+                }
+
+                public function wrapInTransaction(callable $func): void {
+                    $func();
+                }
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = arrow_function_calls_parent_method,
+        rule = PreferStaticClosureRule,
+        code = indoc! {r"
+            <?php
+
+            abstract class Bar {
+                public function something(): int { return 1; }
+            }
+
+            final class Foo extends Bar {
+                public function something(): int {
+                    $fn = fn(): int => parent::something();
+
+                    return $fn();
+                }
             }
         "}
     }
