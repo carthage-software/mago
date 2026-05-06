@@ -9,8 +9,6 @@ function t(): array
 }
 
 /**
- * @mago-expect analysis:list-destructure-string-key
- * @mago-expect analysis:list-destructure-negative-key
  * @mago-expect analysis:undefined-int-array-index
  */
 [$a, $b] = t();

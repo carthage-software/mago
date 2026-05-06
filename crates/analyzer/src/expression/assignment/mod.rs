@@ -901,28 +901,38 @@ fn check_list_destructure_keys<'arena>(
             continue;
         };
 
+        let mut local_string_signal = false;
+        let mut local_negative_signal = false;
+        let mut has_non_negative_int_known_item = false;
+
         if let Some(known_items) = &keyed.known_items {
             for key in known_items.keys() {
                 match key {
-                    ArrayKey::String(_) => has_string_signal = true,
-                    ArrayKey::Integer(i) if *i < 0 => has_negative_signal = true,
-                    _ => {}
+                    ArrayKey::String(_) => local_string_signal = true,
+                    ArrayKey::Integer(i) if *i < 0 => local_negative_signal = true,
+                    ArrayKey::Integer(_) => has_non_negative_int_known_item = true,
+                    ArrayKey::ClassLikeConstant { .. } => {}
                 }
             }
         }
 
         if let Some((key_type, _)) = &keyed.parameters {
             if key_type.has_string() {
-                has_string_signal = true;
+                local_string_signal = true;
             }
 
             for key_atomic in key_type.types.iter() {
                 if let TAtomic::Scalar(TScalar::Integer(int)) = key_atomic
                     && int.is_negative()
                 {
-                    has_negative_signal = true;
+                    local_negative_signal = true;
                 }
             }
+        }
+
+        if !has_non_negative_int_known_item {
+            has_string_signal |= local_string_signal;
+            has_negative_signal |= local_negative_signal;
         }
     }
 
@@ -1483,9 +1493,7 @@ mod tests {
             i_take_string($a);
             i_take_string($b);
         "},
-        issues = [
-            IssueCode::ListDestructureStringKey,
-        ]
+        issues = []
     }
 
     test_analysis! {

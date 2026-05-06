@@ -8,7 +8,6 @@ function t(): array
     return [-1 => 'a', 0 => 'b', 1 => 'c'];
 }
 
-/** @mago-expect analysis:list-destructure-negative-key */
 [$a, $b] = t();
 echo $a;
 echo $b;
