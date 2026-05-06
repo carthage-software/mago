@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "inline-variable-return"
+start_line = 48
+end_line = 48
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

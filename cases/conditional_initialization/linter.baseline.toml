@@ -1,0 +1,86 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 10
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 38
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 42
+end_line = 45
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 60
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 63
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 105
+end_line = 107
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 70
+end_line = 70
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 84
+end_line = 84
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 111
+end_line = 111
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 125
+end_line = 125
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 138
+end_line = 138
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 153
+end_line = 153
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

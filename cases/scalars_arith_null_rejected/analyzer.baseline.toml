@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "mixed-assignment"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "null-operand"
+start_line = 5
+end_line = 5

@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 54
+end_line = 54

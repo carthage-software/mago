@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-property-read"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "mixed-property-access"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "undefined-variable"
+start_line = 17
+end_line = 17

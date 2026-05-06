@@ -1,0 +1,56 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 41
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 71
+end_line = 71

@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 9
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 25
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 31
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

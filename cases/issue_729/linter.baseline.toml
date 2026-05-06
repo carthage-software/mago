@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 13
+end_line = 13

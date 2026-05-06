@@ -1,0 +1,61 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 28
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 39
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 45
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 20
+end_line = 20
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 43
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 53
+end_line = 53
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

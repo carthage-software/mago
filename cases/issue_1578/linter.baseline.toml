@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 32
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 34
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "no-redundant-block"
+start_line = 49
+end_line = 51

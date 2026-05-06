@@ -1,0 +1,56 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "redundant-comparison"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "redundant-comparison"
+start_line = 40
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "redundant-comparison"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "redundant-comparison"
+start_line = 75
+end_line = 75
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 40
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 75
+end_line = 75
+
+[[entries."source.php".issues]]
+code = "unreachable-else-clause"
+start_line = 24
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "unreachable-else-clause"
+start_line = 42
+end_line = 44
+
+[[entries."source.php".issues]]
+code = "unreachable-else-clause"
+start_line = 60
+end_line = 62

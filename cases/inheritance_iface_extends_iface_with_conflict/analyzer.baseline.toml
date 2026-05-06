@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-return-type"
+start_line = 11
+end_line = 11

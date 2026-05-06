@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "match-expression-only-default-arm"
+start_line = 8
+end_line = 8

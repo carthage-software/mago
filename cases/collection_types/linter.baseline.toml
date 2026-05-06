@@ -1,0 +1,56 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "prefer-first-class-callable"
+start_line = 402
+end_line = 402
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 78
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 103
+end_line = 103
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 139
+end_line = 139
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 173
+end_line = 173
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 213
+end_line = 213
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 253
+end_line = 253
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 289
+end_line = 289
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 323
+end_line = 323
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 413
+end_line = 413
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

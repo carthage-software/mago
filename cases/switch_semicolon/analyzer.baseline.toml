@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "deprecated-feature"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "deprecated-feature"
+start_line = 8
+end_line = 8

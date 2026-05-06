@@ -1,0 +1,51 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "imprecise-type"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "imprecise-type"
+start_line = 9
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "imprecise-type"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "imprecise-type"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "imprecise-type"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "imprecise-type"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "imprecise-type"
+start_line = 40
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "imprecise-type"
+start_line = 45
+end_line = 45
+
+[[entries."source.php".issues]]
+code = "imprecise-type"
+start_line = 56
+end_line = 56
+
+[[entries."source.php".issues]]
+code = "imprecise-type"
+start_line = 62
+end_line = 62

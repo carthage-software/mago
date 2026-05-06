@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 2
+end_line = 2
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

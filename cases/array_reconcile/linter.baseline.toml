@@ -1,0 +1,56 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 85
+end_line = 85
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 90
+end_line = 90
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 108
+end_line = 108
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 95
+end_line = 105
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 98
+end_line = 104
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 101
+end_line = 103
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 113
+end_line = 127
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 118
+end_line = 126
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 123
+end_line = 125
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 135
+end_line = 137
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

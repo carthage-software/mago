@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "combine-consecutive-issets"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 9
+end_line = 9

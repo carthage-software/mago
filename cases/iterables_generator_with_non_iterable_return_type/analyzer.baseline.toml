@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-generator-return-type"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "invalid-generator-return-type"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "invalid-generator-return-type"
+start_line = 21
+end_line = 21

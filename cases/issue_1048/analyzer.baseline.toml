@@ -1,0 +1,71 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incorrect-class-like-casing"
+start_line = 10
+end_line = 10
+
+[[entries."source.php".issues]]
+code = "incorrect-class-like-casing"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "incorrect-class-like-casing"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "incorrect-class-like-casing"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "incorrect-class-like-casing"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "incorrect-class-like-casing"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "incorrect-class-like-casing"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "incorrect-function-casing"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "incorrect-function-casing"
+start_line = 18
+end_line = 18
+
+[[entries."source.php".issues]]
+code = "incorrect-function-casing"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "incorrect-function-casing"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "incorrect-function-casing"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "incorrect-function-casing"
+start_line = 43
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 23
+end_line = 23

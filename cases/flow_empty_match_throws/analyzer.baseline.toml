@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "empty-match-expression"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "unhandled-thrown-type"
+start_line = 8
+end_line = 8

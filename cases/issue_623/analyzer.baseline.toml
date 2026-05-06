@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 21
+end_line = 21

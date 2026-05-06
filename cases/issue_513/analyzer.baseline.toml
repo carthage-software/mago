@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "mixed-argument"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "mixed-assignment"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "mixed-assignment"
+start_line = 22
+end_line = 22

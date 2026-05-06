@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "assert-description"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

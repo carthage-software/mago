@@ -1,0 +1,71 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 209
+end_line = 209
+
+[[entries."source.php".issues]]
+code = "non-existent-method"
+start_line = 167
+end_line = 167
+
+[[entries."source.php".issues]]
+code = "non-existent-method"
+start_line = 191
+end_line = 191
+
+[[entries."source.php".issues]]
+code = "non-existent-property"
+start_line = 181
+end_line = 181
+
+[[entries."source.php".issues]]
+code = "possibly-non-existent-method"
+start_line = 130
+end_line = 130
+
+[[entries."source.php".issues]]
+code = "possibly-non-existent-method"
+start_line = 156
+end_line = 156
+
+[[entries."source.php".issues]]
+code = "possibly-non-existent-property"
+start_line = 146
+end_line = 146
+
+[[entries."source.php".issues]]
+code = "string-member-selector"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "string-member-selector"
+start_line = 51
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "string-member-selector"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "string-member-selector"
+start_line = 70
+end_line = 70
+
+[[entries."source.php".issues]]
+code = "string-member-selector"
+start_line = 115
+end_line = 115
+
+[[entries."source.php".issues]]
+code = "string-member-selector"
+start_line = 139
+end_line = 139
+
+[[entries."source.php".issues]]
+code = "string-member-selector"
+start_line = 176
+end_line = 176

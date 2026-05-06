@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-constant-value"
+start_line = 12
+end_line = 21

@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "unused-template-parameter"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "unused-template-parameter"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "unused-template-parameter"
+start_line = 45
+end_line = 45

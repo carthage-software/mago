@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "redundant-type-comparison"
+start_line = 17
+end_line = 17

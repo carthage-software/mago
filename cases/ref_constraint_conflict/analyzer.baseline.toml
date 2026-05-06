@@ -1,0 +1,76 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "conflicting-reference-constraint"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "conflicting-reference-constraint"
+start_line = 59
+end_line = 59
+
+[[entries."source.php".issues]]
+code = "conflicting-reference-constraint"
+start_line = 75
+end_line = 75
+
+[[entries."source.php".issues]]
+code = "conflicting-reference-constraint"
+start_line = 89
+end_line = 89
+
+[[entries."source.php".issues]]
+code = "reference-constraint-violation"
+start_line = 45
+end_line = 45
+
+[[entries."source.php".issues]]
+code = "reference-constraint-violation"
+start_line = 63
+end_line = 63
+
+[[entries."source.php".issues]]
+code = "reference-constraint-violation"
+start_line = 78
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "reference-constraint-violation"
+start_line = 88
+end_line = 88
+
+[[entries."source.php".issues]]
+code = "reference-constraint-violation"
+start_line = 89
+end_line = 89
+
+[[entries."source.php".issues]]
+code = "reference-constraint-violation"
+start_line = 92
+end_line = 92
+
+[[entries."source.php".issues]]
+code = "reference-constraint-violation"
+start_line = 101
+end_line = 101
+
+[[entries."source.php".issues]]
+code = "reference-constraint-violation"
+start_line = 108
+end_line = 108
+
+[[entries."source.php".issues]]
+code = "reference-constraint-violation"
+start_line = 118
+end_line = 118
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 20
+end_line = 20

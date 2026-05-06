@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "duplicate-enum-case-value"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "duplicate-enum-case-value"
+start_line = 15
+end_line = 15

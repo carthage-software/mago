@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 53
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 26
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 39
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 52
+end_line = 56
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 11
+end_line = 11

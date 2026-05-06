@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-type-cast"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "invalid-type-cast"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "less-specific-nested-argument-type"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "mixed-assignment"
+start_line = 17
+end_line = 17

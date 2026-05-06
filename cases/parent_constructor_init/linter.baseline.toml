@@ -1,0 +1,166 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 194
+end_line = 196
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 15
+end_line = 18
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 33
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 41
+end_line = 44
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 84
+end_line = 87
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 107
+end_line = 110
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 148
+end_line = 153
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 170
+end_line = 175
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 213
+end_line = 216
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 68
+end_line = 68
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 82
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 90
+end_line = 90
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 105
+end_line = 105
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 113
+end_line = 113
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 123
+end_line = 123
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 134
+end_line = 134
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 144
+end_line = 144
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 156
+end_line = 156
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 166
+end_line = 166
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 178
+end_line = 178
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 188
+end_line = 188
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 201
+end_line = 201
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 211
+end_line = 211
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 219
+end_line = 219
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 229
+end_line = 229
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 240
+end_line = 240
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

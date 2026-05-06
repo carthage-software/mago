@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "mixed-assignment"
+start_line = 24
+end_line = 24

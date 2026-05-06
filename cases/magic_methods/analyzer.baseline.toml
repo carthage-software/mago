@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "dynamic-static-method-call"
+start_line = 78
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "dynamic-static-method-call"
+start_line = 79
+end_line = 79
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 86
+end_line = 86
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 87
+end_line = 87
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 84
+end_line = 84
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 85
+end_line = 85
+
+[[entries."source.php".issues]]
+code = "non-existent-method"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "non-existent-method"
+start_line = 77
+end_line = 77

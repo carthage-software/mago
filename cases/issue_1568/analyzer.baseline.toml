@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "invalid-operand"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "invalid-operand"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "invalid-operand"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "mixed-assignment"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "mixed-assignment"
+start_line = 5
+end_line = 5

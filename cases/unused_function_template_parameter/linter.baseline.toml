@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

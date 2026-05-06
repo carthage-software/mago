@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "array-to-string-conversion"
+start_line = 15
+end_line = 15

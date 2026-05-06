@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "named-argument-overrides-positional"
+start_line = 14
+end_line = 14

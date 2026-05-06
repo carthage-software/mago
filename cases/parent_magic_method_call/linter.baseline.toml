@@ -1,0 +1,111 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 112
+end_line = 112
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 137
+end_line = 137
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 44
+end_line = 48
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 53
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 87
+end_line = 91
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 101
+end_line = 104
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 20
+end_line = 20
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 37
+end_line = 37
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 51
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 61
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 69
+end_line = 69
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 78
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 85
+end_line = 85
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 99
+end_line = 99
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 110
+end_line = 110
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 117
+end_line = 117
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 119
+end_line = 119
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 130
+end_line = 130

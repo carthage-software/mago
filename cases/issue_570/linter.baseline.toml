@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 9
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 19
+end_line = 19

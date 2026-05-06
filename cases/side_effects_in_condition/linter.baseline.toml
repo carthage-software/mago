@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "loop-does-not-iterate"
+start_line = 44
+end_line = 46

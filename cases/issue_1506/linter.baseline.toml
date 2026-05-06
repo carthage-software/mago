@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 10
+end_line = 12

@@ -1,0 +1,76 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "deprecated-class"
+start_line = 98
+end_line = 98
+
+[[entries."source.php".issues]]
+code = "excess-template-parameter"
+start_line = 132
+end_line = 132
+
+[[entries."source.php".issues]]
+code = "extend-final-class"
+start_line = 82
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "invalid-extend"
+start_line = 50
+end_line = 50
+
+[[entries."source.php".issues]]
+code = "invalid-extend"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "invalid-extend"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "invalid-extend"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "invalid-extend"
+start_line = 90
+end_line = 90
+
+[[entries."source.php".issues]]
+code = "invalid-extend"
+start_line = 114
+end_line = 114
+
+[[entries."source.php".issues]]
+code = "invalid-template-parameter"
+start_line = 142
+end_line = 142
+
+[[entries."source.php".issues]]
+code = "missing-required-interface"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "missing-template-parameter"
+start_line = 123
+end_line = 123
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "unused-template-parameter"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "unused-template-parameter"
+start_line = 36
+end_line = 36

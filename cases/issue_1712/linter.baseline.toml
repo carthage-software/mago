@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-global"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 13
+end_line = 13

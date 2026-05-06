@@ -1,0 +1,81 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 89
+end_line = 89
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 95
+end_line = 95
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 101
+end_line = 101
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 107
+end_line = 107
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 167
+end_line = 167
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 171
+end_line = 171
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 186
+end_line = 186
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 114
+end_line = 114
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 142
+end_line = 142
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 148
+end_line = 148
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 155
+end_line = 155
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 175
+end_line = 175
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 124
+end_line = 124
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 130
+end_line = 130
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 134
+end_line = 134
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 186
+end_line = 186

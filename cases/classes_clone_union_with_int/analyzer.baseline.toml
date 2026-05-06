@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "possibly-invalid-clone"
+start_line = 8
+end_line = 8

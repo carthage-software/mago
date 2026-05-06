@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "string-member-selector"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "string-member-selector"
+start_line = 37
+end_line = 37

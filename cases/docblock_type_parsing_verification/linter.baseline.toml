@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "readable-literal"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

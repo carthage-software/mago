@@ -1,0 +1,71 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "possibly-false-array-access"
+start_line = 48
+end_line = 48
+
+[[entries."source.php".issues]]
+code = "possibly-null-argument"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "possibly-null-argument"
+start_line = 48
+end_line = 48
+
+[[entries."source.php".issues]]
+code = "possibly-null-argument"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "possibly-null-array-access"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "possibly-null-array-index"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 48
+end_line = 48
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 54
+end_line = 54

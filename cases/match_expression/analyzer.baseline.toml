@@ -1,0 +1,91 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "empty-match-expression"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "match-arm-always-true"
+start_line = 52
+end_line = 52
+
+[[entries."source.php".issues]]
+code = "match-arm-always-true"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "match-arm-always-true"
+start_line = 87
+end_line = 87
+
+[[entries."source.php".issues]]
+code = "match-default-arm-always-executed"
+start_line = 99
+end_line = 99
+
+[[entries."source.php".issues]]
+code = "match-expression-only-default-arm"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "match-not-exhaustive"
+start_line = 61
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "match-not-exhaustive"
+start_line = 107
+end_line = 107
+
+[[entries."source.php".issues]]
+code = "match-subject-type-is-never"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "unhandled-thrown-type"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "unhandled-thrown-type"
+start_line = 61
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "unhandled-thrown-type"
+start_line = 107
+end_line = 110
+
+[[entries."source.php".issues]]
+code = "unreachable-match-arm"
+start_line = 53
+end_line = 53
+
+[[entries."source.php".issues]]
+code = "unreachable-match-arm"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "unreachable-match-arm"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "unreachable-match-arm"
+start_line = 98
+end_line = 98
+
+[[entries."source.php".issues]]
+code = "unreachable-match-default-arm"
+start_line = 77
+end_line = 77
+
+[[entries."source.php".issues]]
+code = "unreachable-match-default-arm"
+start_line = 88
+end_line = 88

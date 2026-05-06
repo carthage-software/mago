@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-return-type"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "incompatible-return-type"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "incompatible-return-type"
+start_line = 77
+end_line = 77
+
+[[entries."source.php".issues]]
+code = "incompatible-return-type"
+start_line = 108
+end_line = 108
+
+[[entries."source.php".issues]]
+code = "incompatible-return-type"
+start_line = 123
+end_line = 123
+
+[[entries."source.php".issues]]
+code = "incompatible-return-type"
+start_line = 138
+end_line = 138

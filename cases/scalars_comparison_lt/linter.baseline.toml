@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 4
+end_line = 4

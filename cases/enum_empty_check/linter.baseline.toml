@@ -1,0 +1,46 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 59
+end_line = 59
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 80
+end_line = 80
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 83
+end_line = 83
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 86
+end_line = 86
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 42
+end_line = 44
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 65
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 11
+end_line = 11

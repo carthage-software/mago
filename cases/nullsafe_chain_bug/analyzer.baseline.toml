@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "possible-method-access-on-null"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "possible-method-access-on-null"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "possible-method-access-on-null"
+start_line = 60
+end_line = 60
+
+[[entries."source.php".issues]]
+code = "possible-method-access-on-null"
+start_line = 61
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "possible-method-access-on-null"
+start_line = 68
+end_line = 68
+
+[[entries."source.php".issues]]
+code = "possible-method-access-on-null"
+start_line = 75
+end_line = 75

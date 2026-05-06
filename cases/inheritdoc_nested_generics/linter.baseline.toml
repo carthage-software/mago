@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 33
+end_line = 33

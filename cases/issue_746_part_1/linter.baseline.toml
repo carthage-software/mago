@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-redundant-final"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 18
+end_line = 18

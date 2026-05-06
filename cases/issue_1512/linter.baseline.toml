@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "halstead"
+start_line = 20
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "no-assign-in-condition"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "no-empty"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "no-empty"
+start_line = 40
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "no-empty"
+start_line = 41
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "no-empty"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "readable-literal"
+start_line = 15
+end_line = 15

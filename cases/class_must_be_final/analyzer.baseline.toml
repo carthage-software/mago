@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "class-must-be-final"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "class-must-be-final"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "class-must-be-final"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "class-must-be-final"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "class-must-be-final"
+start_line = 51
+end_line = 51

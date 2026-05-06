@@ -1,0 +1,191 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 39
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 45
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 53
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 61
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 69
+end_line = 70
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 77
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 85
+end_line = 86
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 93
+end_line = 94
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 101
+end_line = 102
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 109
+end_line = 110
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 117
+end_line = 118
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 126
+end_line = 127
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 135
+end_line = 136
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 10
+end_line = 10
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 19
+end_line = 19
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 50
+end_line = 50
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 82
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 90
+end_line = 90
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 98
+end_line = 98
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 114
+end_line = 114
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 123
+end_line = 123
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 132
+end_line = 132
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 142
+end_line = 142
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

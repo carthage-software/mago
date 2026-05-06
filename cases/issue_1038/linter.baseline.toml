@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 119
+end_line = 119
+
+[[entries."source.php".issues]]
+code = "no-nested-ternary"
+start_line = 97
+end_line = 97

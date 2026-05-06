@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 77
+end_line = 77
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 80
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

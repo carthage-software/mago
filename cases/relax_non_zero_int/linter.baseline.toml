@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

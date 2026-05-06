@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "possibly-null-property-access"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "possibly-null-property-access"
+start_line = 56
+end_line = 56
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 51
+end_line = 51

@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "interface-instantiation"
+start_line = 11
+end_line = 11

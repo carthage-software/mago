@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 8
+end_line = 10
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 20
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 29
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

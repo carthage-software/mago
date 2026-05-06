@@ -1,0 +1,71 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 2
+end_line = 2
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 19
+end_line = 19
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 46
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 93
+end_line = 93
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 98
+end_line = 98
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 108
+end_line = 108
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 132
+end_line = 132
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 147
+end_line = 147
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 155
+end_line = 155

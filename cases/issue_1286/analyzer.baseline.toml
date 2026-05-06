@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "redundant-null-coalesce"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "redundant-null-coalesce"
+start_line = 43
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "redundant-null-coalesce"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "redundant-null-coalesce"
+start_line = 67
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "redundant-null-coalesce"
+start_line = 68
+end_line = 68

@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "trait-instantiation"
+start_line = 6
+end_line = 6

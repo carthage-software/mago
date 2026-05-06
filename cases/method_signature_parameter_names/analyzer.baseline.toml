@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-name"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-name"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-name"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-name"
+start_line = 69
+end_line = 69
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-name"
+start_line = 87
+end_line = 87
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-name"
+start_line = 100
+end_line = 100

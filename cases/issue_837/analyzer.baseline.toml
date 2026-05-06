@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 37
+end_line = 37
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 38
+end_line = 38
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 2
+end_line = 2

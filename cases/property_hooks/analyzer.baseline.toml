@@ -1,0 +1,141 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "docblock-type-mismatch"
+start_line = 347
+end_line = 347
+
+[[entries."source.php".issues]]
+code = "docblock-type-mismatch"
+start_line = 356
+end_line = 356
+
+[[entries."source.php".issues]]
+code = "incompatible-property-hook-parameter-type"
+start_line = 275
+end_line = 275
+
+[[entries."source.php".issues]]
+code = "incompatible-property-hook-parameter-type"
+start_line = 283
+end_line = 283
+
+[[entries."source.php".issues]]
+code = "incompatible-property-hook-parameter-type"
+start_line = 291
+end_line = 291
+
+[[entries."source.php".issues]]
+code = "incompatible-property-hook-parameter-type"
+start_line = 299
+end_line = 299
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 101
+end_line = 101
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 156
+end_line = 156
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 179
+end_line = 179
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 195
+end_line = 195
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 207
+end_line = 207
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 225
+end_line = 225
+
+[[entries."source.php".issues]]
+code = "invalid-return-statement"
+start_line = 109
+end_line = 109
+
+[[entries."source.php".issues]]
+code = "invalid-return-statement"
+start_line = 113
+end_line = 113
+
+[[entries."source.php".issues]]
+code = "invalid-return-statement"
+start_line = 127
+end_line = 127
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 2
+end_line = 2
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 46
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 151
+end_line = 151
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 182
+end_line = 182
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 198
+end_line = 198
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 212
+end_line = 212
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 232
+end_line = 232
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 270
+end_line = 270
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 305
+end_line = 305
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 326
+end_line = 326
+
+[[entries."source.php".issues]]
+code = "nullable-return-statement"
+start_line = 143
+end_line = 143
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 68
+end_line = 68

@@ -1,0 +1,211 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "mixed-operand"
+start_line = 908
+end_line = 908
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 85
+end_line = 85
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 90
+end_line = 90
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 95
+end_line = 95
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 102
+end_line = 102
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 104
+end_line = 104
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 109
+end_line = 109
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 111
+end_line = 111
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 116
+end_line = 116
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 118
+end_line = 118
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 123
+end_line = 123
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 125
+end_line = 125
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 132
+end_line = 132
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 350
+end_line = 350
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 357
+end_line = 357
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 364
+end_line = 364
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 381
+end_line = 381
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 386
+end_line = 386
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 396
+end_line = 396
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 409
+end_line = 409
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 414
+end_line = 414
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 419
+end_line = 419
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 944
+end_line = 944
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 949
+end_line = 949
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 954
+end_line = 954
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 959
+end_line = 959
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 969
+end_line = 969
+
+[[entries."source.php".issues]]
+code = "unused-property"
+start_line = 355
+end_line = 355
+
+[[entries."source.php".issues]]
+code = "unused-property"
+start_line = 362
+end_line = 362
+
+[[entries."source.php".issues]]
+code = "unused-property"
+start_line = 379
+end_line = 379
+
+[[entries."source.php".issues]]
+code = "unused-property"
+start_line = 942
+end_line = 942
+
+[[entries."source.php".issues]]
+code = "unused-property"
+start_line = 1039
+end_line = 1039
+
+[[entries."source.php".issues]]
+code = "unused-property"
+start_line = 1185
+end_line = 1185
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 294
+end_line = 294
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 369
+end_line = 369
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 444
+end_line = 444
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 606
+end_line = 606
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 757
+end_line = 757
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 1040
+end_line = 1040
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 1190
+end_line = 1190
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 1353
+end_line = 1353

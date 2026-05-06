@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-property-default"
+start_line = 67
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "incompatible-property-static"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "incompatible-property-static"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "incompatible-property-visibility"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "incompatible-property-visibility"
+start_line = 106
+end_line = 106

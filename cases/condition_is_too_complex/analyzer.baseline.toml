@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "condition-is-too-complex"
+start_line = 16
+end_line = 55

@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 19
+end_line = 19
+
+[[entries."source.php".issues]]
+code = "docblock-type-mismatch"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "docblock-type-mismatch"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "docblock-type-mismatch"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "docblock-type-mismatch"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "docblock-type-mismatch"
+start_line = 63
+end_line = 63
+
+[[entries."source.php".issues]]
+code = "docblock-type-mismatch"
+start_line = 69
+end_line = 69
+
+[[entries."source.php".issues]]
+code = "docblock-type-mismatch"
+start_line = 75
+end_line = 75

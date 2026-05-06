@@ -1,0 +1,36 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 3
+end_line = 3
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 18
+end_line = 18
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

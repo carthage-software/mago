@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 7
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

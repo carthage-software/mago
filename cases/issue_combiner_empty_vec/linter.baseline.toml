@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 18
+end_line = 20
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

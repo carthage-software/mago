@@ -1,0 +1,71 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "no-redundant-final"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "no-shorthand-ternary"
+start_line = 124
+end_line = 124
+
+[[entries."source.php".issues]]
+code = "no-shorthand-ternary"
+start_line = 125
+end_line = 125
+
+[[entries."source.php".issues]]
+code = "no-shorthand-ternary"
+start_line = 126
+end_line = 126
+
+[[entries."source.php".issues]]
+code = "no-shorthand-ternary"
+start_line = 160
+end_line = 160
+
+[[entries."source.php".issues]]
+code = "no-shorthand-ternary"
+start_line = 161
+end_line = 161
+
+[[entries."source.php".issues]]
+code = "no-shorthand-ternary"
+start_line = 162
+end_line = 162
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 138
+end_line = 138
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 146
+end_line = 146
+
+[[entries."source.php".issues]]
+code = "prefer-static-closure"
+start_line = 51
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

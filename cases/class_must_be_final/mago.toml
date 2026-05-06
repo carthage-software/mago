@@ -1,0 +1,4 @@
+extends = "../defaults.toml"
+
+[analyzer]
+enforce-class-finality = true

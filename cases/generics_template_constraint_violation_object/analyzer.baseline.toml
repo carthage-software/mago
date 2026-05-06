@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "possibly-invalid-argument"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "template-constraint-violation"
+start_line = 25
+end_line = 25

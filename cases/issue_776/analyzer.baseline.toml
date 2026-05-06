@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 38
+end_line = 38
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 57
+end_line = 57

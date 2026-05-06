@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 9
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 17
+end_line = 17

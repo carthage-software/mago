@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 13
+end_line = 13

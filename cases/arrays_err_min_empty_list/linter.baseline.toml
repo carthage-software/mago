@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-redundant-file"
+start_line = 0
+end_line = 2

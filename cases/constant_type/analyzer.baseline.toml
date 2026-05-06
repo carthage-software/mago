@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "mixed-argument"
+start_line = 40
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "mixed-argument"
+start_line = 44
+end_line = 44
+
+[[entries."source.php".issues]]
+code = "non-documented-constant"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 32
+end_line = 32

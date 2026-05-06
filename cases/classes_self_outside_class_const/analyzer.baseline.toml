@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "never-return"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "self-outside-class-scope"
+start_line = 8
+end_line = 8

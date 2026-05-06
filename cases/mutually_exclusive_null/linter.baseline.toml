@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 38
+end_line = 38
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 48
+end_line = 52
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 10
+end_line = 10

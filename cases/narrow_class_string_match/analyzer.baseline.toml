@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "missing-return-statement"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "missing-return-statement"
+start_line = 86
+end_line = 86

@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "never-return"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "no-value"
+start_line = 16
+end_line = 16

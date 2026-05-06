@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 31
+end_line = 31

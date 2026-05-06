@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 2
+end_line = 3
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

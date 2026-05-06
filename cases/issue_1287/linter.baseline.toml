@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 40
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 48
+end_line = 48
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 64
+end_line = 64
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 73
+end_line = 73

@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "yield-from-non-iterable"
+start_line = 12
+end_line = 12

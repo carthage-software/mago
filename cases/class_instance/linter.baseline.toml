@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 52
+end_line = 52
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 62
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 69
+end_line = 69
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

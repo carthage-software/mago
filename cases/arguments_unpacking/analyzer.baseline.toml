@@ -1,0 +1,351 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 37
+end_line = 37
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 38
+end_line = 38
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 52
+end_line = 52
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 53
+end_line = 53
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 56
+end_line = 56
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 59
+end_line = 59
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 60
+end_line = 60
+
+[[entries."source.php".issues]]
+code = "false-argument"
+start_line = 61
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 19
+end_line = 19
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 20
+end_line = 20
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 77
+end_line = 77
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 78
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 81
+end_line = 81
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 82
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 83
+end_line = 83
+
+[[entries."source.php".issues]]
+code = "named-argument-overrides-positional"
+start_line = 80
+end_line = 80
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 41
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 43
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 44
+end_line = 44
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 45
+end_line = 45
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 46
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 48
+end_line = 48
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 50
+end_line = 50
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 63
+end_line = 63
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 64
+end_line = 64
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 67
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 68
+end_line = 68
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 69
+end_line = 69
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 70
+end_line = 70
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 71
+end_line = 71
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 72
+end_line = 72
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 85
+end_line = 85
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 86
+end_line = 86
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 87
+end_line = 87
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 88
+end_line = 88
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 75
+end_line = 75
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 77
+end_line = 77
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 78
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 79
+end_line = 79
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 80
+end_line = 80
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 81
+end_line = 81
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 82
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 83
+end_line = 83

@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 14
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "no-literal-password"
+start_line = 6
+end_line = 6

@@ -1,0 +1,156 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-constant-value"
+start_line = 156
+end_line = 156
+
+[[entries."source.php".issues]]
+code = "invalid-constant-value"
+start_line = 158
+end_line = 158
+
+[[entries."source.php".issues]]
+code = "invalid-constant-value"
+start_line = 160
+end_line = 160
+
+[[entries."source.php".issues]]
+code = "invalid-constant-value"
+start_line = 162
+end_line = 162
+
+[[entries."source.php".issues]]
+code = "invalid-constant-value"
+start_line = 164
+end_line = 164
+
+[[entries."source.php".issues]]
+code = "invalid-constant-value"
+start_line = 170
+end_line = 170
+
+[[entries."source.php".issues]]
+code = "invalid-constant-value"
+start_line = 173
+end_line = 173
+
+[[entries."source.php".issues]]
+code = "invalid-constant-value"
+start_line = 176
+end_line = 176
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 18
+end_line = 18
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 38
+end_line = 38
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 43
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 51
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 63
+end_line = 63
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 69
+end_line = 69
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 252
+end_line = 252
+
+[[entries."source.php".issues]]
+code = "invalid-parameter-default-value"
+start_line = 260
+end_line = 260
+
+[[entries."source.php".issues]]
+code = "invalid-property-default-value"
+start_line = 197
+end_line = 197
+
+[[entries."source.php".issues]]
+code = "invalid-property-default-value"
+start_line = 199
+end_line = 199
+
+[[entries."source.php".issues]]
+code = "invalid-property-default-value"
+start_line = 201
+end_line = 201
+
+[[entries."source.php".issues]]
+code = "invalid-property-default-value"
+start_line = 203
+end_line = 203
+
+[[entries."source.php".issues]]
+code = "invalid-property-default-value"
+start_line = 205
+end_line = 205
+
+[[entries."source.php".issues]]
+code = "invalid-property-default-value"
+start_line = 207
+end_line = 207
+
+[[entries."source.php".issues]]
+code = "invalid-property-default-value"
+start_line = 213
+end_line = 213
+
+[[entries."source.php".issues]]
+code = "invalid-property-default-value"
+start_line = 216
+end_line = 216
+
+[[entries."source.php".issues]]
+code = "invalid-property-default-value"
+start_line = 219
+end_line = 219

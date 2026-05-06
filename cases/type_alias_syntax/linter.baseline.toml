@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 81
+end_line = 81
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 91
+end_line = 91
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 101
+end_line = 101
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 111
+end_line = 111
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 63
+end_line = 63
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

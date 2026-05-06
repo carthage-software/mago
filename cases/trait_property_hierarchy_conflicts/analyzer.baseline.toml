@@ -1,0 +1,51 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-property-default"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "incompatible-property-default"
+start_line = 48
+end_line = 48
+
+[[entries."source.php".issues]]
+code = "incompatible-property-default"
+start_line = 62
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "incompatible-property-default"
+start_line = 86
+end_line = 86
+
+[[entries."source.php".issues]]
+code = "incompatible-property-default"
+start_line = 91
+end_line = 91
+
+[[entries."source.php".issues]]
+code = "incompatible-property-default"
+start_line = 151
+end_line = 151
+
+[[entries."source.php".issues]]
+code = "incompatible-property-default"
+start_line = 161
+end_line = 161
+
+[[entries."source.php".issues]]
+code = "incompatible-property-default"
+start_line = 180
+end_line = 180
+
+[[entries."source.php".issues]]
+code = "incompatible-property-visibility"
+start_line = 132
+end_line = 132
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 53
+end_line = 53

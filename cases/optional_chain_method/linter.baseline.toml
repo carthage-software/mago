@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 71
+end_line = 71
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 86
+end_line = 86
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 103
+end_line = 103
+
+[[entries."source.php".issues]]
+code = "no-empty"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "no-empty"
+start_line = 41
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 20
+end_line = 20
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 61
+end_line = 61

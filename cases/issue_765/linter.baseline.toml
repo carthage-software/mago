@@ -1,0 +1,51 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 83
+end_line = 83
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 101
+end_line = 101
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 119
+end_line = 119
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 137
+end_line = 137
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 155
+end_line = 155
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 173
+end_line = 173

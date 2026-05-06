@@ -1,0 +1,296 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "cyclomatic-complexity"
+start_line = 196
+end_line = 196
+
+[[entries."source.php".issues]]
+code = "halstead"
+start_line = 201
+end_line = 457
+
+[[entries."source.php".issues]]
+code = "kan-defect"
+start_line = 196
+end_line = 196
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 215
+end_line = 215
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 348
+end_line = 348
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 217
+end_line = 217
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 276
+end_line = 276
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 289
+end_line = 289
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 305
+end_line = 305
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 312
+end_line = 312
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 318
+end_line = 318
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 332
+end_line = 332
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 337
+end_line = 337
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 340
+end_line = 340
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 344
+end_line = 344
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 362
+end_line = 362
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 377
+end_line = 377
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 381
+end_line = 381
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 388
+end_line = 388
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 393
+end_line = 393
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 412
+end_line = 412
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 417
+end_line = 417
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 425
+end_line = 425
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 430
+end_line = 430
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 214
+end_line = 218
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 235
+end_line = 237
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 241
+end_line = 243
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 243
+end_line = 257
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 249
+end_line = 256
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 266
+end_line = 268
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 284
+end_line = 300
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 328
+end_line = 330
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 370
+end_line = 372
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 405
+end_line = 407
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 205
+end_line = 205
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 326
+end_line = 326
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 328
+end_line = 328
+
+[[entries."source.php".issues]]
+code = "no-redundant-math"
+start_line = 328
+end_line = 328
+
+[[entries."source.php".issues]]
+code = "no-redundant-math"
+start_line = 329
+end_line = 329
+
+[[entries."source.php".issues]]
+code = "no-redundant-math"
+start_line = 441
+end_line = 441
+
+[[entries."source.php".issues]]
+code = "no-shorthand-ternary"
+start_line = 215
+end_line = 215
+
+[[entries."source.php".issues]]
+code = "no-shorthand-ternary"
+start_line = 279
+end_line = 282
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 41
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 82
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 90
+end_line = 90
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 100
+end_line = 100
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 108
+end_line = 108
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 121
+end_line = 121
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 127
+end_line = 127
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 134
+end_line = 134
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 196
+end_line = 196
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0
+
+[[entries."source.php".issues]]
+code = "too-many-properties"
+start_line = 134
+end_line = 134

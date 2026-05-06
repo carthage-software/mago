@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "match-arm-always-true"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "unreachable-match-default-arm"
+start_line = 17
+end_line = 17

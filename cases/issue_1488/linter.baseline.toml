@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 15
+end_line = 15

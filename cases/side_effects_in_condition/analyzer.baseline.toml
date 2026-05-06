@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "side-effects-in-condition"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "side-effects-in-condition"
+start_line = 44
+end_line = 44
+
+[[entries."source.php".issues]]
+code = "side-effects-in-condition"
+start_line = 51
+end_line = 51

@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 46
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 56
+end_line = 56
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 62
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 68
+end_line = 68
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 74
+end_line = 74

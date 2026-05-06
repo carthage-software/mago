@@ -1,0 +1,96 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 83
+end_line = 83
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 148
+end_line = 148
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 203
+end_line = 203
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 227
+end_line = 227
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 255
+end_line = 255
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 324
+end_line = 324
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 404
+end_line = 404
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 500
+end_line = 500
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 562
+end_line = 562
+
+[[entries."source.php".issues]]
+code = "no-empty-catch-clause"
+start_line = 636
+end_line = 638
+
+[[entries."source.php".issues]]
+code = "no-redundant-use"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "no-redundant-use"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 53
+end_line = 53
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 89
+end_line = 89
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 212
+end_line = 212
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 243
+end_line = 243
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 294
+end_line = 294
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 355
+end_line = 355
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 520
+end_line = 520

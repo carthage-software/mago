@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-static-modifier"
+start_line = 9
+end_line = 9

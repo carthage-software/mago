@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-error-control-operator"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 20
+end_line = 20

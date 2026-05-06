@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "mixed-assignment"
+start_line = 46
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "mixed-assignment"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "unhandled-thrown-type"
+start_line = 52
+end_line = 52

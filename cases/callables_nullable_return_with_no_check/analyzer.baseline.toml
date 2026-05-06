@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "possibly-null-argument"
+start_line = 14
+end_line = 14

@@ -1,0 +1,56 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "loop-does-not-iterate"
+start_line = 25
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "loop-does-not-iterate"
+start_line = 43
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "loop-does-not-iterate"
+start_line = 66
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "loop-does-not-iterate"
+start_line = 89
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 14
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 32
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 55
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 78
+end_line = 80
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 101
+end_line = 103
+
+[[entries."source.php".issues]]
+code = "prefer-while-loop"
+start_line = 43
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

@@ -1,0 +1,5 @@
+extends = "../defaults.toml"
+
+[analyzer]
+plugins = ["psl"]
+

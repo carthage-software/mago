@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

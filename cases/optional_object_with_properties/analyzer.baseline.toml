@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "ambiguous-object-property-access"
+start_line = 51
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 60
+end_line = 60
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "non-existent-property"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "possibly-invalid-argument"
+start_line = 53
+end_line = 53
+
+[[entries."source.php".issues]]
+code = "possibly-non-existent-property"
+start_line = 38
+end_line = 38

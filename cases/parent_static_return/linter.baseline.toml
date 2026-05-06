@@ -1,0 +1,46 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 28
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 37
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "no-redundant-method-override"
+start_line = 54
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 18
+end_line = 18
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 44
+end_line = 44
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 52
+end_line = 52
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

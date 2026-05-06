@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-alias-function"
+start_line = 16
+end_line = 16

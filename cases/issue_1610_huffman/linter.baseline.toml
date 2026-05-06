@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "halstead"
+start_line = 7
+end_line = 68
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 44
+end_line = 44
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

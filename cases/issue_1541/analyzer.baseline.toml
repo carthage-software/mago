@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "deprecated-class"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "deprecated-constant"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "deprecated-function"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "deprecated-method"
+start_line = 23
+end_line = 23

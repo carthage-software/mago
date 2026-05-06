@@ -1,0 +1,61 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 45
+end_line = 45
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 46
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

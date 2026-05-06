@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 23
+end_line = 23

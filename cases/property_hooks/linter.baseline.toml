@@ -1,0 +1,126 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 272
+end_line = 273
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 280
+end_line = 281
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 288
+end_line = 289
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 296
+end_line = 297
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 344
+end_line = 345
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 353
+end_line = 354
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 68
+end_line = 68
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 46
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 61
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 71
+end_line = 71
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 121
+end_line = 121
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 138
+end_line = 138
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 151
+end_line = 151
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 182
+end_line = 182
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 198
+end_line = 198
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 212
+end_line = 212
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 232
+end_line = 232
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 270
+end_line = 270
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 305
+end_line = 305
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 326
+end_line = 326
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

@@ -1,0 +1,10 @@
+<?php
+
+declare(strict_types=1);
+
+function callables_int_param(int $count): int
+{
+    return $count;
+}
+
+callables_int_param(count: 'wrong');

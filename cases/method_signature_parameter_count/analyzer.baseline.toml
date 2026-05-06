@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-count"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-count"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-count"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-count"
+start_line = 79
+end_line = 79
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-count"
+start_line = 91
+end_line = 91
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-count"
+start_line = 116
+end_line = 116

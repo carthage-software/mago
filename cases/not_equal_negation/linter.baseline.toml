@@ -1,0 +1,36 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 19
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 28
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 30
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

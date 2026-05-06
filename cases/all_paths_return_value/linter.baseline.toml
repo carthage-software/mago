@@ -1,0 +1,111 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 20
+end_line = 20
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 38
+end_line = 38
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 67
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 85
+end_line = 85
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 98
+end_line = 98
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 111
+end_line = 111
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 49
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 87
+end_line = 89
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 100
+end_line = 102
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 113
+end_line = 115
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 4
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 13
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 93
+end_line = 94
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 106
+end_line = 107
+
+[[entries."source.php".issues]]
+code = "prefer-while-loop"
+start_line = 37
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "prefer-while-loop"
+start_line = 75
+end_line = 79

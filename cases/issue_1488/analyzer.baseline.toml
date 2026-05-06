@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "no-value"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "redundant-comparison"
+start_line = 11
+end_line = 11

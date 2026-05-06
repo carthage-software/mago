@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 10
+end_line = 10
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "impossible-nonnull-entry-check"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "impossible-nonnull-entry-check"
+start_line = 10
+end_line = 10

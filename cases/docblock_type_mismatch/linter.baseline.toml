@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 42
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 69
+end_line = 69
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

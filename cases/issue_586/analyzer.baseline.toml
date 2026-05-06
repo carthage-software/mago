@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "possibly-null-array-index"
+start_line = 8
+end_line = 8

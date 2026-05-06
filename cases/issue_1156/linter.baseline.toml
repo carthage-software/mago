@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 68
+end_line = 70
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 77
+end_line = 79
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 20
+end_line = 20
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 35
+end_line = 35

@@ -1,0 +1,71 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-array-element-key"
+start_line = 86
+end_line = 86
+
+[[entries."source.php".issues]]
+code = "invalid-array-element-key"
+start_line = 100
+end_line = 100
+
+[[entries."source.php".issues]]
+code = "invalid-array-element-key"
+start_line = 114
+end_line = 114
+
+[[entries."source.php".issues]]
+code = "invalid-array-element-key"
+start_line = 128
+end_line = 128
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 19
+end_line = 19
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 43
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 67
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 81
+end_line = 81
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 95
+end_line = 95
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 109
+end_line = 109
+
+[[entries."source.php".issues]]
+code = "write-only-property"
+start_line = 123
+end_line = 123

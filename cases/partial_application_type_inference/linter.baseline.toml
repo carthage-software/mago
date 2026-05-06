@@ -1,0 +1,226 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 80
+end_line = 80
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 169
+end_line = 169
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 273
+end_line = 273
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 278
+end_line = 278
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 50
+end_line = 50
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 75
+end_line = 75
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 79
+end_line = 79
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 98
+end_line = 98
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 120
+end_line = 120
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 124
+end_line = 124
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 139
+end_line = 139
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 155
+end_line = 155
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 168
+end_line = 168
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 181
+end_line = 181
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 194
+end_line = 194
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 209
+end_line = 209
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 229
+end_line = 229
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 249
+end_line = 249
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 264
+end_line = 264
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 265
+end_line = 265
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 272
+end_line = 272
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 273
+end_line = 273
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 274
+end_line = 274
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 275
+end_line = 275
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 276
+end_line = 276
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 277
+end_line = 277
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 278
+end_line = 278
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 62
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 83
+end_line = 83
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 130
+end_line = 130
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 146
+end_line = 146
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 159
+end_line = 159
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 172
+end_line = 172
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 185
+end_line = 185
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 197
+end_line = 197
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 216
+end_line = 216
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 235
+end_line = 235
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 255
+end_line = 255
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

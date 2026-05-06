@@ -1,0 +1,56 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "deprecated-trait"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "deprecated-trait"
+start_line = 87
+end_line = 87
+
+[[entries."source.php".issues]]
+code = "excess-template-parameter"
+start_line = 145
+end_line = 145
+
+[[entries."source.php".issues]]
+code = "invalid-trait-use"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "invalid-trait-use"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "invalid-trait-use"
+start_line = 120
+end_line = 120
+
+[[entries."source.php".issues]]
+code = "missing-required-interface"
+start_line = 96
+end_line = 96
+
+[[entries."source.php".issues]]
+code = "missing-required-parent"
+start_line = 107
+end_line = 107
+
+[[entries."source.php".issues]]
+code = "missing-template-parameter"
+start_line = 131
+end_line = 131
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 43
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "unused-template-parameter"
+start_line = 35
+end_line = 35

@@ -1,0 +1,271 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 105
+end_line = 105
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 107
+end_line = 107
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 108
+end_line = 108
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 109
+end_line = 109
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 110
+end_line = 110
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 111
+end_line = 111
+
+[[entries."source.php".issues]]
+code = "impossible-assignment"
+start_line = 112
+end_line = 112
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 124
+end_line = 124
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 125
+end_line = 125
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 126
+end_line = 126
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 127
+end_line = 127
+
+[[entries."source.php".issues]]
+code = "invalid-property-read"
+start_line = 105
+end_line = 105
+
+[[entries."source.php".issues]]
+code = "invalid-property-read"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "invalid-property-read"
+start_line = 107
+end_line = 107
+
+[[entries."source.php".issues]]
+code = "invalid-property-read"
+start_line = 108
+end_line = 108
+
+[[entries."source.php".issues]]
+code = "invalid-property-read"
+start_line = 109
+end_line = 109
+
+[[entries."source.php".issues]]
+code = "invalid-property-read"
+start_line = 110
+end_line = 110
+
+[[entries."source.php".issues]]
+code = "invalid-property-read"
+start_line = 111
+end_line = 111
+
+[[entries."source.php".issues]]
+code = "invalid-property-read"
+start_line = 112
+end_line = 112
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 114
+end_line = 114
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 115
+end_line = 115
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 116
+end_line = 116
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 117
+end_line = 117
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 118
+end_line = 118
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 119
+end_line = 119
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 120
+end_line = 120
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 121
+end_line = 121
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 114
+end_line = 114
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 115
+end_line = 115
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 116
+end_line = 116
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 117
+end_line = 117
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 140
+end_line = 140
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 141
+end_line = 141
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 142
+end_line = 142
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 143
+end_line = 143
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 144
+end_line = 144
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 145
+end_line = 145
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 146
+end_line = 146
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 147
+end_line = 147
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 148
+end_line = 148
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 149
+end_line = 149
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 150
+end_line = 150
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 151
+end_line = 151
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 152
+end_line = 152
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 153
+end_line = 153
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 154
+end_line = 154
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 155
+end_line = 155
+
+[[entries."source.php".issues]]
+code = "non-documented-property"
+start_line = 167
+end_line = 167
+
+[[entries."source.php".issues]]
+code = "non-documented-property"
+start_line = 168
+end_line = 168
+
+[[entries."source.php".issues]]
+code = "non-documented-property"
+start_line = 169
+end_line = 169
+
+[[entries."source.php".issues]]
+code = "non-documented-property"
+start_line = 170
+end_line = 170
+
+[[entries."source.php".issues]]
+code = "non-existent-property"
+start_line = 130
+end_line = 130
+
+[[entries."source.php".issues]]
+code = "non-existent-property"
+start_line = 131
+end_line = 131

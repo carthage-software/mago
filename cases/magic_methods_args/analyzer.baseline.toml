@@ -1,0 +1,121 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 68
+end_line = 68
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 80
+end_line = 80
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 83
+end_line = 83
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 84
+end_line = 84
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 92
+end_line = 92
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 99
+end_line = 99
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 102
+end_line = 102
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 105
+end_line = 105
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 71
+end_line = 71
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 72
+end_line = 72
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 73
+end_line = 73
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 94
+end_line = 94
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 95
+end_line = 95
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 96
+end_line = 96
+
+[[entries."source.php".issues]]
+code = "non-documented-method"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 81
+end_line = 81
+
+[[entries."source.php".issues]]
+code = "null-argument"
+start_line = 103
+end_line = 103
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 67
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 91
+end_line = 91
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 90
+end_line = 90

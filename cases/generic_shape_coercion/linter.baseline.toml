@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 84
+end_line = 84
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 54
+end_line = 56
+
+[[entries."source.php".issues]]
+code = "prefer-early-continue"
+start_line = 84
+end_line = 86
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

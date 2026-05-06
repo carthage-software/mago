@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 112
+end_line = 112
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 239
+end_line = 239
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 137
+end_line = 137

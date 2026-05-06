@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 34
+end_line = 34

@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 18
+end_line = 18

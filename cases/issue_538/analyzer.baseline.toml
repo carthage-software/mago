@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-yield-value-type"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "undefined-variable"
+start_line = 55
+end_line = 55

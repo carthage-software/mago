@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "unhandled-thrown-type"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "unhandled-thrown-type"
+start_line = 41
+end_line = 41

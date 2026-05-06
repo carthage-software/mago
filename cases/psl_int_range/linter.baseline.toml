@@ -1,0 +1,46 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 78
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 80
+end_line = 80
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 82
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 84
+end_line = 84
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 94
+end_line = 94
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 96
+end_line = 96

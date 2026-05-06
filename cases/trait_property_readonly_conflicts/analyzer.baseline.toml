@@ -1,0 +1,71 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-property-type"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "incompatible-property-visibility"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "incompatible-property-visibility"
+start_line = 67
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "incompatible-property-visibility"
+start_line = 141
+end_line = 141
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 48
+end_line = 48
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 78
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 90
+end_line = 90
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 117
+end_line = 117
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 144
+end_line = 144
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 100
+end_line = 100
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 127
+end_line = 127

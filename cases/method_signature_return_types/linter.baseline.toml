@@ -1,0 +1,106 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 9
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 20
+end_line = 20
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 40
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 50
+end_line = 50
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 68
+end_line = 68
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 73
+end_line = 73
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 85
+end_line = 85
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 90
+end_line = 90
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 101
+end_line = 101
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 116
+end_line = 116
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 121
+end_line = 121
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 131
+end_line = 131
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 136
+end_line = 136
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 143
+end_line = 143
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 148
+end_line = 148
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 158
+end_line = 158
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

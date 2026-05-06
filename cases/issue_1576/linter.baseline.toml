@@ -1,0 +1,51 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 53
+end_line = 53
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 62
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 65
+end_line = 65

@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 20
+end_line = 20
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 40
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

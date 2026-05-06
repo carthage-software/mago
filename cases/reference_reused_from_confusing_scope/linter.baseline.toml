@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "inline-variable-return"
+start_line = 9
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "inline-variable-return"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0
+
+[[entries."source.php".issues]]
+code = "use-compound-assignment"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "use-compound-assignment"
+start_line = 18
+end_line = 18

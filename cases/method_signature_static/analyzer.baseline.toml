@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-static-modifier"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "incompatible-static-modifier"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "incompatible-static-modifier"
+start_line = 72
+end_line = 72
+
+[[entries."source.php".issues]]
+code = "incompatible-static-modifier"
+start_line = 89
+end_line = 89

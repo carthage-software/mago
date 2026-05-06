@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 11
+end_line = 11

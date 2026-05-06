@@ -1,0 +1,51 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "experimental-usage"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "experimental-usage"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "experimental-usage"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "experimental-usage"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "experimental-usage"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "experimental-usage"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "experimental-usage"
+start_line = 37
+end_line = 37
+
+[[entries."source.php".issues]]
+code = "experimental-usage"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 28
+end_line = 28

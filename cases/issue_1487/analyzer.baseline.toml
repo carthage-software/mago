@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "docblock-parameter-narrowing"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "no-value"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "redundant-type-comparison"
+start_line = 14
+end_line = 14

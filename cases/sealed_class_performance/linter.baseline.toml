@@ -1,0 +1,111 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "cyclomatic-complexity"
+start_line = 272
+end_line = 351
+
+[[entries."source.php".issues]]
+code = "halstead"
+start_line = 272
+end_line = 351
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 38
+end_line = 38
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 51
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 64
+end_line = 64
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 77
+end_line = 77
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 90
+end_line = 90
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 103
+end_line = 103
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 116
+end_line = 116
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 129
+end_line = 129
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 142
+end_line = 142
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 155
+end_line = 155
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 168
+end_line = 168
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 181
+end_line = 181
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 194
+end_line = 194
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 207
+end_line = 207
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 220
+end_line = 220
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 233
+end_line = 233
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 246
+end_line = 246
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 259
+end_line = 259

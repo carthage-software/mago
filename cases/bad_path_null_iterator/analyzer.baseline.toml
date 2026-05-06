@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "mixed-argument"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "mixed-assignment"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "null-iterator"
+start_line = 7
+end_line = 7

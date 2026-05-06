@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 42
+end_line = 42

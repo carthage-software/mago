@@ -1,0 +1,181 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 56
+end_line = 56
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 71
+end_line = 71
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 72
+end_line = 72
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 73
+end_line = 73
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 95
+end_line = 95
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 96
+end_line = 96
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 119
+end_line = 119
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 120
+end_line = 120
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 121
+end_line = 121
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 134
+end_line = 134
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 135
+end_line = 135
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 184
+end_line = 184
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 187
+end_line = 187
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 260
+end_line = 260
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 261
+end_line = 261
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 286
+end_line = 286
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 294
+end_line = 294
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 61
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 77
+end_line = 77
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 101
+end_line = 101
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 113
+end_line = 113
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 125
+end_line = 125
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 139
+end_line = 139
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 147
+end_line = 147
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 158
+end_line = 158
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 166
+end_line = 166
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 174
+end_line = 174
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 191
+end_line = 191
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 234
+end_line = 234
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 248
+end_line = 248
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 265
+end_line = 265
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 280
+end_line = 280

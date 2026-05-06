@@ -1,0 +1,51 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-extend"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "invalid-implement"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "invalid-trait-use"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "invalid-trait-use"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "invalid-trait-use"
+start_line = 38
+end_line = 38
+
+[[entries."source.php".issues]]
+code = "invalid-trait-use"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "trait-instantiation"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "unimplemented-abstract-method"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "unimplemented-abstract-method"
+start_line = 47
+end_line = 47

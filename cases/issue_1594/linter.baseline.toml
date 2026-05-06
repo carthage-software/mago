@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "no-assign-in-condition"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 27
+end_line = 27

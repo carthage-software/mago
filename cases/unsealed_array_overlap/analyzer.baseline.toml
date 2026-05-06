@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "less-specific-nested-return-statement"
+start_line = 26
+end_line = 26

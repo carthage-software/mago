@@ -1,0 +1,76 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "invalid-named-argument"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 26
+end_line = 26

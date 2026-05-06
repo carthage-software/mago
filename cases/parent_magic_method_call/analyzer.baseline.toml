@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 114
+end_line = 114
+
+[[entries."source.php".issues]]
+code = "missing-magic-method"
+start_line = 139
+end_line = 139
+
+[[entries."source.php".issues]]
+code = "non-existent-method"
+start_line = 123
+end_line = 123
+
+[[entries."source.php".issues]]
+code = "possibly-non-existent-method"
+start_line = 103
+end_line = 103

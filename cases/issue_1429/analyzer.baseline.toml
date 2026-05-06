@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "less-specific-return-statement"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "less-specific-return-statement"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "less-specific-return-statement"
+start_line = 38
+end_line = 38

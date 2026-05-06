@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 2
+end_line = 2
+
+[[entries."source.php".issues]]
+code = "inline-variable-return"
+start_line = 9
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

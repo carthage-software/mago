@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "excess-template-parameter"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "unused-template-parameter"
+start_line = 8
+end_line = 8

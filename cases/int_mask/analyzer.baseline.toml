@@ -1,0 +1,61 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 120
+end_line = 120
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 121
+end_line = 121
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 122
+end_line = 122
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 123
+end_line = 123
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 124
+end_line = 124
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 129
+end_line = 129
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 130
+end_line = 130
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 131
+end_line = 131
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 132
+end_line = 132
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 137
+end_line = 137
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 138
+end_line = 138
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 139
+end_line = 139

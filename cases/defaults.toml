@@ -11,3 +11,9 @@ baseline-variant = "strict"
 [analyzer]
 baseline = "analyzer.baseline.toml"
 baseline-variant = "strict"
+find-unused-expressions = true
+find-unused-definitions = true
+check-throws = true
+allow-possibly-undefined-array-keys = false
+strict-list-index-checks = true
+check-property-initialization = true

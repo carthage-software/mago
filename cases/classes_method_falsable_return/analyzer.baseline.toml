@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "falsable-return-statement"
+start_line = 10
+end_line = 10
+
+[[entries."source.php".issues]]
+code = "invalid-return-statement"
+start_line = 10
+end_line = 10

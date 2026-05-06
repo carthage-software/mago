@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 8
+end_line = 10
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 27
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

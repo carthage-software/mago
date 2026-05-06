@@ -1,0 +1,36 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "unhandled-thrown-type"
+start_line = 132
+end_line = 132
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 18
+end_line = 18
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 52
+end_line = 52
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 91
+end_line = 91
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 146
+end_line = 146
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 162
+end_line = 162

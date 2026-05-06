@@ -1,0 +1,36 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 75
+end_line = 75
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 40
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 56
+end_line = 56
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 84
+end_line = 84
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

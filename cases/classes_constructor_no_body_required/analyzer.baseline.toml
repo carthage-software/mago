@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "uninitialized-property"
+start_line = 6
+end_line = 6

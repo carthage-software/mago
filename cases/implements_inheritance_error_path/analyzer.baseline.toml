@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "excess-template-parameter"
+start_line = 75
+end_line = 75
+
+[[entries."source.php".issues]]
+code = "invalid-implement"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "invalid-implement"
+start_line = 41
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "invalid-implement"
+start_line = 49
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "invalid-implement"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "missing-template-parameter"
+start_line = 66
+end_line = 66
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "unused-template-parameter"
+start_line = 19
+end_line = 19

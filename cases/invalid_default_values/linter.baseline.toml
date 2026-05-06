@@ -1,0 +1,66 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 104
+end_line = 104
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 154
+end_line = 154
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 167
+end_line = 167
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 179
+end_line = 179
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 195
+end_line = 195
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 210
+end_line = 210
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 222
+end_line = 222
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 249
+end_line = 249
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 256
+end_line = 256
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 264
+end_line = 264
+
+[[entries."source.php".issues]]
+code = "too-many-properties"
+start_line = 222
+end_line = 222

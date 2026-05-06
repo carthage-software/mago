@@ -74,7 +74,7 @@ fn analyze_file(path: &Path, content: &str) {
 const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_"];
 
 fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
-    let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases");
+    let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../cases");
     let mut buckets: Vec<(&'static str, Vec<(PathBuf, String)>)> =
         BENCHMARKED_PREFIXES.iter().map(|p| (*p, Vec::new())).collect();
 

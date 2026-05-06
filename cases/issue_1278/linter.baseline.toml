@@ -1,0 +1,46 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 43
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 45
+end_line = 45
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 25
+end_line = 27
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 44
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 9
+end_line = 9

@@ -1,0 +1,8 @@
+extends = "../defaults.toml"
+
+[analyzer]
+find-unused-parameters = true
+analyze-dead-code = true
+allow-possibly-undefined-array-keys = true
+strict-list-index-checks = false
+check-property-initialization = false

@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 68
+end_line = 68
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 80
+end_line = 80
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 83
+end_line = 83
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

@@ -1,0 +1,71 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-count"
+start_line = 51
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-count"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 94
+end_line = 94
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 120
+end_line = 120
+
+[[entries."source.php".issues]]
+code = "incompatible-return-type"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "incompatible-visibility"
+start_line = 173
+end_line = 173
+
+[[entries."source.php".issues]]
+code = "unimplemented-abstract-method"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "unimplemented-abstract-method"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "unimplemented-abstract-method"
+start_line = 118
+end_line = 118
+
+[[entries."source.php".issues]]
+code = "unimplemented-abstract-method"
+start_line = 130
+end_line = 130
+
+[[entries."source.php".issues]]
+code = "unimplemented-abstract-method"
+start_line = 171
+end_line = 171
+
+[[entries."source.php".issues]]
+code = "unimplemented-abstract-method"
+start_line = 188
+end_line = 188

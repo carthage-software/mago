@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "list-destructure-negative-key"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "undefined-int-array-index"
+start_line = 12
+end_line = 12

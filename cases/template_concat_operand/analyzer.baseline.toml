@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "mixed-operand"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "mixed-operand"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "mixed-operand"
+start_line = 63
+end_line = 63

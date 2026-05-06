@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "unused-method"
+start_line = 68
+end_line = 68

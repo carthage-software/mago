@@ -1,0 +1,4 @@
+extends = "../defaults.toml"
+
+[analyzer]
+no-boolean-literal-comparison = true

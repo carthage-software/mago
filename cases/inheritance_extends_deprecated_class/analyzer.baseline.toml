@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "deprecated-class"
+start_line = 7
+end_line = 7

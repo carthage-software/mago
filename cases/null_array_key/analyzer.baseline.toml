@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "null-array-index"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "possibly-null-array-index"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "possibly-null-array-index"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "possibly-null-array-index"
+start_line = 45
+end_line = 45

@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "always-matching-switch-case"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "redundant-type-comparison"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "unreachable-switch-case"
+start_line = 7
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "unreachable-switch-default"
+start_line = 9
+end_line = 10

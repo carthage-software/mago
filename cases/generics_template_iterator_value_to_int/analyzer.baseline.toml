@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 49
+end_line = 49

@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 90
+end_line = 90
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 102
+end_line = 102
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 134
+end_line = 134

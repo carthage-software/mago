@@ -1,0 +1,51 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "constant-name"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "constant-name"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "constant-name"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "inline-variable-return"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "redundant-docblock-type"
+start_line = 29
+end_line = 29

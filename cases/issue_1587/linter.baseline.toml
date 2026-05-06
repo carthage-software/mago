@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "class-name"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "class-name"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "class-name"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 98
+end_line = 98
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 82
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 13
+end_line = 13
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 64
+end_line = 64

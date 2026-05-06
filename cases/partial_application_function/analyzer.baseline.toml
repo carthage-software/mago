@@ -1,0 +1,91 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 51
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 29
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 51
+end_line = 51
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 52
+end_line = 52
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 53
+end_line = 53
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 56
+end_line = 56
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 53
+end_line = 53
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 54
+end_line = 54
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 56
+end_line = 56
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 52
+end_line = 52
+
+[[entries."source.php".issues]]
+code = "too-many-arguments"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 57
+end_line = 57

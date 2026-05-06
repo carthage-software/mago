@@ -1,0 +1,5 @@
+extends = "../defaults.toml"
+
+[analyzer]
+check-throws = false
+allow-array-truthy-operand = true

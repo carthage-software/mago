@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "mixed-argument"
+start_line = 43
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "mixed-argument"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "mixed-method-access"
+start_line = 45
+end_line = 45
+
+[[entries."source.php".issues]]
+code = "mixed-method-access"
+start_line = 49
+end_line = 49

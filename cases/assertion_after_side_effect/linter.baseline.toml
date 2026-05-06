@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 60
+end_line = 60
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 61
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 62
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 72
+end_line = 72
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

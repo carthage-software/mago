@@ -1,0 +1,61 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 83
+end_line = 83
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 21
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 28
+end_line = 29
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 35
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 45
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 57
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 69
+end_line = 70
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 81
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 92
+end_line = 93
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 103
+end_line = 104
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 9
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

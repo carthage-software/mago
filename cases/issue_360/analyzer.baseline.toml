@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "less-specific-nested-return-statement"
+start_line = 116
+end_line = 116
+
+[[entries."source.php".issues]]
+code = "mixed-array-assignment"
+start_line = 108
+end_line = 108
+
+[[entries."source.php".issues]]
+code = "possibly-undefined-string-array-index"
+start_line = 41
+end_line = 41

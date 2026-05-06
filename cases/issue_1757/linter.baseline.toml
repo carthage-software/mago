@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "identity-comparison"
+start_line = 44
+end_line = 44
+
+[[entries."source.php".issues]]
+code = "no-nested-ternary"
+start_line = 39
+end_line = 39

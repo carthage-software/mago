@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "mixed-method-access"
+start_line = 18
+end_line = 18
+
+[[entries."source.php".issues]]
+code = "mixed-property-access"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 15
+end_line = 15

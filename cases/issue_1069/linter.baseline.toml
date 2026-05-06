@@ -1,0 +1,46 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 66
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "no-protected-in-final"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "no-protected-in-final"
+start_line = 64
+end_line = 64
+
+[[entries."source.php".issues]]
+code = "no-protected-in-final"
+start_line = 68
+end_line = 68
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 35
+end_line = 35
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 60
+end_line = 60
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

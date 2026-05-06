@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "unhandled-thrown-type"
+start_line = 56
+end_line = 56

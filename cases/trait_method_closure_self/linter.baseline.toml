@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 19
+end_line = 19
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "prefer-static-closure"
+start_line = 19
+end_line = 19
+
+[[entries."source.php".issues]]
+code = "prefer-static-closure"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 12
+end_line = 12

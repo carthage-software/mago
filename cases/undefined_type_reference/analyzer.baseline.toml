@@ -1,0 +1,66 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "missing-return-statement"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "missing-return-statement"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "missing-return-statement"
+start_line = 41
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 2
+end_line = 2
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 37
+end_line = 37
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 41
+end_line = 41
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 44
+end_line = 44
+
+[[entries."source.php".issues]]
+code = "non-existent-class-like"
+start_line = 49
+end_line = 49

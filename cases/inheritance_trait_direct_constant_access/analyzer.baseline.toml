@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "direct-trait-constant-access"
+start_line = 14
+end_line = 14

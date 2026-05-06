@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "less-specific-nested-argument-type"
+start_line = 136
+end_line = 136
+
+[[entries."source.php".issues]]
+code = "less-specific-nested-argument-type"
+start_line = 170
+end_line = 170
+
+[[entries."source.php".issues]]
+code = "redundant-comparison"
+start_line = 148
+end_line = 148
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 143
+end_line = 143
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 148
+end_line = 148

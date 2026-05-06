@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-array-access-assignment-value"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "invalid-array-index"
+start_line = 29
+end_line = 29

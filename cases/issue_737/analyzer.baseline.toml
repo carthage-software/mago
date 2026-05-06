@@ -1,0 +1,101 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 38
+end_line = 38
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 62
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 78
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 118
+end_line = 118
+
+[[entries."source.php".issues]]
+code = "impossible-type-comparison"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "impossible-type-comparison"
+start_line = 38
+end_line = 38
+
+[[entries."source.php".issues]]
+code = "impossible-type-comparison"
+start_line = 62
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "impossible-type-comparison"
+start_line = 78
+end_line = 78
+
+[[entries."source.php".issues]]
+code = "impossible-type-comparison"
+start_line = 118
+end_line = 118
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 86
+end_line = 86
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 94
+end_line = 94
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 102
+end_line = 102
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 110
+end_line = 110
+
+[[entries."source.php".issues]]
+code = "redundant-type-comparison"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "redundant-type-comparison"
+start_line = 86
+end_line = 86
+
+[[entries."source.php".issues]]
+code = "redundant-type-comparison"
+start_line = 94
+end_line = 94
+
+[[entries."source.php".issues]]
+code = "redundant-type-comparison"
+start_line = 102
+end_line = 102
+
+[[entries."source.php".issues]]
+code = "redundant-type-comparison"
+start_line = 110
+end_line = 110

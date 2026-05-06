@@ -1,0 +1,26 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 11
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 21
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 29
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 19
+end_line = 19
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

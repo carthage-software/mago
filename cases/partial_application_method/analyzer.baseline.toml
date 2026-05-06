@@ -1,0 +1,66 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 61
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 36
+end_line = 36
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 40
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 59
+end_line = 59
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 60
+end_line = 60
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 61
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 57
+end_line = 57
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 59
+end_line = 59
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 60
+end_line = 60

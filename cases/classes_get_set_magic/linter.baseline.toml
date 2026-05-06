@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 24
+end_line = 24

@@ -1,0 +1,36 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 7
+end_line = 7
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "no-redundant-final"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 89
+end_line = 89
+
+[[entries."source.php".issues]]
+code = "prefer-arrow-function"
+start_line = 97
+end_line = 97
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

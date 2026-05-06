@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-operand"
+start_line = 272
+end_line = 272
+
+[[entries."source.php".issues]]
+code = "invalid-operand"
+start_line = 336
+end_line = 336
+
+[[entries."source.php".issues]]
+code = "invalid-operand"
+start_line = 339
+end_line = 339

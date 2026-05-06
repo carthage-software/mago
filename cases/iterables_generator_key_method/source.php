@@ -1,0 +1,16 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * @return Generator<string, int>
+ */
+function gen(): Generator
+{
+    yield 'a' => 1;
+}
+
+function take_string_or_null(?string $_s): void {}
+
+$g = gen();
+take_string_or_null($g->key());

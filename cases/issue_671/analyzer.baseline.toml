@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "possibly-invalid-argument"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "possibly-invalid-argument"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "possibly-invalid-argument"
+start_line = 18
+end_line = 18
+
+[[entries."source.php".issues]]
+code = "possibly-invalid-argument"
+start_line = 19
+end_line = 19

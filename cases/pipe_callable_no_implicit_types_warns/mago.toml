@@ -1,0 +1,5 @@
+extends = "../defaults.toml"
+
+[analyzer]
+check-missing-type-hints = true
+check-arrow-function-missing-type-hints = true

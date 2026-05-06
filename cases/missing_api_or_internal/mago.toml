@@ -1,0 +1,4 @@
+extends = "../defaults.toml"
+
+[analyzer]
+require-api-or-internal = true

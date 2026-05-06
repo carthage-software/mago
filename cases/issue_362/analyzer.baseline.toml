@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-property-assignment-value"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "possibly-null-array-index"
+start_line = 55
+end_line = 55

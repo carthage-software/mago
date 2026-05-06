@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "overly-wide-return-type"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "overly-wide-return-type"
+start_line = 17
+end_line = 17
+
+[[entries."source.php".issues]]
+code = "overly-wide-return-type"
+start_line = 23
+end_line = 23
+
+[[entries."source.php".issues]]
+code = "overly-wide-return-type"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "overly-wide-return-type"
+start_line = 43
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "overly-wide-return-type"
+start_line = 49
+end_line = 49

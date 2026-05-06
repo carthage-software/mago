@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 35
+end_line = 35

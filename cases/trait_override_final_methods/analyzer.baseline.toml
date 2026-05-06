@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "override-final-method"
+start_line = 19
+end_line = 19
+
+[[entries."source.php".issues]]
+code = "override-final-method"
+start_line = 64
+end_line = 64
+
+[[entries."source.php".issues]]
+code = "override-final-method"
+start_line = 132
+end_line = 132
+
+[[entries."source.php".issues]]
+code = "override-final-method"
+start_line = 154
+end_line = 154

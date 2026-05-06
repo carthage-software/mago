@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "method-access-on-null"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "mixed-return-statement"
+start_line = 15
+end_line = 15

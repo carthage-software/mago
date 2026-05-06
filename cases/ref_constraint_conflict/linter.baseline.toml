@@ -1,0 +1,51 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 40
+end_line = 43
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 33
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 48
+end_line = 49
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 66
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 81
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 95
+end_line = 96
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 104
+end_line = 105
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 111
+end_line = 112
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

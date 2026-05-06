@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "invalid-argument"
+start_line = 13
+end_line = 13

@@ -1,0 +1,5 @@
+extends = "../defaults.toml"
+
+[analyzer]
+allow-possibly-undefined-array-keys = true
+strict-array-index-existence = true

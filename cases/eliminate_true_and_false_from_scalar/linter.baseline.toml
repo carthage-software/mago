@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 10
+end_line = 10
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

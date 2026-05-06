@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "invalid-template-parameter"
+start_line = 21
+end_line = 21

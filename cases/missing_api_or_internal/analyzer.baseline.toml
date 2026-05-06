@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "missing-api-or-internal"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "missing-api-or-internal"
+start_line = 20
+end_line = 20
+
+[[entries."source.php".issues]]
+code = "missing-api-or-internal"
+start_line = 31
+end_line = 31

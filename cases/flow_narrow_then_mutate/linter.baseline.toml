@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "inline-variable-return"
+start_line = 10
+end_line = 10
+
+[[entries."source.php".issues]]
+code = "use-compound-assignment"
+start_line = 10
+end_line = 10

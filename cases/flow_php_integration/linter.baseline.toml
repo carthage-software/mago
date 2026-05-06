@@ -1,0 +1,36 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 63
+end_line = 63
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 6
+end_line = 6
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 87
+end_line = 87
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 98
+end_line = 98
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

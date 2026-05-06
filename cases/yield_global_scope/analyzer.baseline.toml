@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "yield-outside-function"
+start_line = 2
+end_line = 2

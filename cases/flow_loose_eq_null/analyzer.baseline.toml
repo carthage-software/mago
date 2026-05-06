@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "null-operand"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "possibly-null-operand"
+start_line = 8
+end_line = 8

@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 15
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 25
+end_line = 25

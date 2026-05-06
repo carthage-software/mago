@@ -1,0 +1,9 @@
+extends = "../defaults.toml"
+
+php-version = "9.0"
+allow-unsupported-php-version = true
+[analyzer]
+check-throws = false
+allow-possibly-undefined-array-keys = true
+strict-list-index-checks = false
+check-property-initialization = false

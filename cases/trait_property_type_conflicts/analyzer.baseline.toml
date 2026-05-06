@@ -1,0 +1,91 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-property-type"
+start_line = 16
+end_line = 16
+
+[[entries."source.php".issues]]
+code = "incompatible-property-type"
+start_line = 33
+end_line = 33
+
+[[entries."source.php".issues]]
+code = "incompatible-property-type"
+start_line = 67
+end_line = 67
+
+[[entries."source.php".issues]]
+code = "incompatible-property-type"
+start_line = 84
+end_line = 84
+
+[[entries."source.php".issues]]
+code = "incompatible-property-type"
+start_line = 135
+end_line = 135
+
+[[entries."source.php".issues]]
+code = "incompatible-property-type"
+start_line = 152
+end_line = 152
+
+[[entries."source.php".issues]]
+code = "incompatible-property-type"
+start_line = 186
+end_line = 186
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 14
+end_line = 14
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 31
+end_line = 31
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 48
+end_line = 48
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 65
+end_line = 65
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 82
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 99
+end_line = 99
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 116
+end_line = 116
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 133
+end_line = 133
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 150
+end_line = 150
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 167
+end_line = 167
+
+[[entries."source.php".issues]]
+code = "missing-constructor"
+start_line = 184
+end_line = 184

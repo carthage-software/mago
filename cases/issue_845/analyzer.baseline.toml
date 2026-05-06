@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 38
+end_line = 38

@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "no-debug-symbols"
+start_line = 22
+end_line = 22
+
+[[entries."source.php".issues]]
+code = "no-isset"
+start_line = 21
+end_line = 21

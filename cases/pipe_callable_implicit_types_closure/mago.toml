@@ -1,0 +1,6 @@
+extends = "../defaults.toml"
+
+[analyzer]
+check-missing-type-hints = true
+check-closure-missing-type-hints = true
+allow-implicit-pipe-callable-types = true

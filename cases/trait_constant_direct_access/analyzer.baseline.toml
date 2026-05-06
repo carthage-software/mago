@@ -1,0 +1,71 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "direct-trait-constant-access"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "direct-trait-constant-access"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "direct-trait-constant-access"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "direct-trait-constant-access"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "direct-trait-constant-access"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "direct-trait-constant-access"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "direct-trait-constant-access"
+start_line = 82
+end_line = 82
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 26
+end_line = 26
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 28
+end_line = 28
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 30
+end_line = 30
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 58
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 74
+end_line = 74
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 82
+end_line = 82

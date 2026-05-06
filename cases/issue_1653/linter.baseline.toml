@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-empty"
+start_line = 27
+end_line = 27

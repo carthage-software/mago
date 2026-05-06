@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "impossible-condition"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "redundant-comparison"
+start_line = 11
+end_line = 11
+
+[[entries."source.php".issues]]
+code = "redundant-comparison"
+start_line = 25
+end_line = 25
+
+[[entries."source.php".issues]]
+code = "redundant-comparison"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "redundant-comparison"
+start_line = 53
+end_line = 53
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "redundant-condition"
+start_line = 53
+end_line = 53

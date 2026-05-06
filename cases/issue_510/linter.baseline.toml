@@ -1,0 +1,66 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "file-name"
+start_line = 2
+end_line = 2
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 24
+end_line = 24
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 34
+end_line = 34
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 47
+end_line = 47
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 55
+end_line = 55
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 64
+end_line = 64
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 70
+end_line = 70
+
+[[entries."source.php".issues]]
+code = "function-name"
+start_line = 75
+end_line = 75
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 38
+end_line = 40
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 40
+end_line = 42
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 59
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 45
+end_line = 46
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

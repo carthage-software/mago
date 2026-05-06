@@ -1,0 +1,31 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "cyclomatic-complexity"
+start_line = 4
+end_line = 58
+
+[[entries."source.php".issues]]
+code = "excessive-parameter-list"
+start_line = 4
+end_line = 15
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 9
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "no-boolean-flag-parameter"
+start_line = 10
+end_line = 10
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 2
+end_line = 3
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0

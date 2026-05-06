@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "too-few-arguments"
+start_line = 6
+end_line = 6

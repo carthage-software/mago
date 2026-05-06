@@ -1,0 +1,98 @@
+<?php
+
+/**
+ * @template TKey of array-key
+ * @template TValue
+ *
+ * @implements ArrayAccess<TKey, TValue>
+ * @implements IteratorAggregate<TKey, TValue>
+ */
+class ArrayCollection implements ArrayAccess, Countable, IteratorAggregate
+{
+    /** @var array<TKey, TValue> */
+    private array $elements = [];
+
+    public function __construct()
+    {
+        $this->elements = [];
+    }
+
+    /**
+     * @template K of array-key
+     * @template V
+     *
+     * @param array<K, V> $elements
+     *
+     * @return self<K, V>
+     */
+    public static function fromArray(array $elements): self
+    {
+        $collection = new self();
+        foreach ($elements as $key => $value) {
+            $collection[$key] = $value;
+        }
+        return $collection;
+    }
+
+    /** @param TKey $offset */
+    public function offsetExists(mixed $offset): bool
+    {
+        return isset($this->elements[$offset]);
+    }
+
+    /** @param TKey $offset */
+    public function offsetGet(mixed $offset): mixed
+    {
+        return $this->elements[$offset] ?? null;
+    }
+
+    /**
+     * @param TKey|null $offset
+     * @param TValue $value
+     *
+     */
+    public function offsetSet(mixed $offset, mixed $value): void
+    {
+        $this->elements[$offset] = $value;
+    }
+
+    /** @param TKey $offset */
+    public function offsetUnset(mixed $offset): void
+    {
+        unset($this->elements[$offset]);
+    }
+
+    /** @return int<0, max> */
+    public function count(): int
+    {
+        return count($this->elements);
+    }
+
+    /** @return Traversable<TKey, TValue> */
+    public function getIterator(): Traversable
+    {
+        return new ArrayIterator($this->elements);
+    }
+}
+
+/**
+ * @param ArrayCollection<non-negative-int, string> $collection
+ */
+function appendToCollection(ArrayCollection $collection, string $value): void
+{
+    $collection[] = $value;
+}
+
+// `@var` acts as a runtime widening cast: PHP doesn't enforce template
+// parameters at runtime, so the user's narrower `non-negative-int` slot is
+// honoured even though invariance prevents it from being a strict subtype of
+// the inferred `ArrayCollection<int, string>`. PHPStan/Psalm accept the same
+// idiom.
+/** @var ArrayCollection<non-negative-int, string> $collection */
+$collection = ArrayCollection::fromArray([
+    0 => 'a',
+    1 => 'b',
+    2 => 'c',
+]);
+
+appendToCollection($collection, 'd');

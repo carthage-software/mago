@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "trait-constant-override"
+start_line = 12
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "trait-constant-override"
+start_line = 39
+end_line = 39
+
+[[entries."source.php".issues]]
+code = "trait-constant-override"
+start_line = 58
+end_line = 58

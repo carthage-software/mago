@@ -1,0 +1,36 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 81
+end_line = 81
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 133
+end_line = 133
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 152
+end_line = 152
+
+[[entries."source.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 177
+end_line = 177
+
+[[entries."source.php".issues]]
+code = "incompatible-static-modifier"
+start_line = 118
+end_line = 118
+
+[[entries."source.php".issues]]
+code = "incompatible-visibility"
+start_line = 13
+end_line = 13

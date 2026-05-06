@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-assign-in-condition"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "no-else-clause"
+start_line = 128
+end_line = 130
+
+[[entries."source.php".issues]]
+code = "no-empty-comment"
+start_line = 14
+end_line = 15

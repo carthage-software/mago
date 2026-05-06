@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "incompatible-constant-access"
+start_line = 21
+end_line = 21
+
+[[entries."source.php".issues]]
+code = "incompatible-constant-access"
+start_line = 32
+end_line = 32
+
+[[entries."source.php".issues]]
+code = "override-final-constant"
+start_line = 10
+end_line = 10

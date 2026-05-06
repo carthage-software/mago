@@ -1,0 +1,16 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "semantics"
+start_line = 9
+end_line = 9
+
+[[entries."source.php".issues]]
+code = "unresolvable-class-constant"
+start_line = 4
+end_line = 4
+
+[[entries."source.php".issues]]
+code = "unresolvable-class-constant"
+start_line = 9
+end_line = 9

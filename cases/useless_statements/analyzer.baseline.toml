@@ -1,0 +1,66 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "unused-function-call"
+start_line = 141
+end_line = 141
+
+[[entries."source.php".issues]]
+code = "unused-function-call"
+start_line = 148
+end_line = 148
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 62
+end_line = 62
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 69
+end_line = 69
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 76
+end_line = 76
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 84
+end_line = 84
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 91
+end_line = 91
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 99
+end_line = 99
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 106
+end_line = 106
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 113
+end_line = 113
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 120
+end_line = 120
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 127
+end_line = 127
+
+[[entries."source.php".issues]]
+code = "unused-statement"
+start_line = 134
+end_line = 134

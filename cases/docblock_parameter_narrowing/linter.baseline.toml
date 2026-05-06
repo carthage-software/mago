@@ -1,0 +1,41 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 101
+end_line = 101
+
+[[entries."source.php".issues]]
+code = "braced-string-interpolation"
+start_line = 202
+end_line = 202
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 61
+end_line = 61
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 184
+end_line = 184
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 186
+end_line = 186
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 194
+end_line = 194
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 209
+end_line = 209
+
+[[entries."source.php".issues]]
+code = "single-class-per-file"
+start_line = 218
+end_line = 218

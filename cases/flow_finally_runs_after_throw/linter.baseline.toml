@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "no-empty-catch-clause"
+start_line = 14
+end_line = 15

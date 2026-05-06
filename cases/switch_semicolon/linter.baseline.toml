@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."source.php".issues]]
+code = "deprecated-switch-semicolon"
+start_line = 5
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "deprecated-switch-semicolon"
+start_line = 8
+end_line = 8
+
+[[entries."source.php".issues]]
+code = "literal-named-argument"
+start_line = 2
+end_line = 2
+
+[[entries."source.php".issues]]
+code = "strict-types"
+start_line = 0
+end_line = 0
