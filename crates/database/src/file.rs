@@ -186,10 +186,9 @@ impl File {
     #[inline]
     #[must_use]
     pub fn column_number(&self, offset: u32) -> u32 {
-        let line_start =
-            self.lines.binary_search(&offset).unwrap_or_else(|next_line| self.lines[next_line - 1] as usize);
+        let line = self.line_number(offset) as usize;
 
-        offset - line_start as u32
+        offset - self.lines[line]
     }
 }
 
