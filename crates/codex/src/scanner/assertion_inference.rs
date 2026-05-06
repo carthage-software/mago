@@ -157,7 +157,7 @@ fn build_assertions(var: Atom, atomic: TAtomic, negated: bool) -> (AssertionMap,
     (if_true, if_false)
 }
 
-fn unwrap_parens<'a, 'arena>(mut expression: &'a Expression<'arena>) -> &'a Expression<'arena> {
+fn unwrap_parens<'expr, 'arena>(mut expression: &'expr Expression<'arena>) -> &'expr Expression<'arena> {
     while let Expression::Parenthesized(p) = expression {
         expression = p.expression;
     }
