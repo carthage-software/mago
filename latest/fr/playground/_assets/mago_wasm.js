@@ -14,6 +14,16 @@
  * # Returns
  *
  * A JavaScript array of analyzer issue objects.
+ *
+ * # Errors
+ *
+ * Returns a `JsValue` error string when serializing the issue list back to JavaScript fails,
+ * or when the input file unexpectedly cannot be retrieved from the in-memory database.
+ *
+ * # Panics
+ *
+ * Panics if the embedded prelude artifact cannot be decoded — that would mean the WASM bundle
+ * was built incorrectly.
  * @param {string} code
  * @param {string} php_version
  * @returns {any}
@@ -49,6 +59,10 @@ export function analyze(code, php_version) {
  * # Returns
  *
  * The formatted PHP code as a string, or an error if parsing fails.
+ *
+ * # Errors
+ *
+ * Returns a `JsValue` error string when the input cannot be parsed.
  * @param {string} code
  * @param {string} php_version
  * @returns {string}
@@ -84,6 +98,10 @@ export function format(code, php_version) {
 
 /**
  * Returns metadata for all linter integrations the playground can toggle.
+ *
+ * # Errors
+ *
+ * Returns a `JsValue` error string when serializing the integration list back to JavaScript fails.
  * @returns {any}
  */
 export function getIntegrations() {
@@ -108,6 +126,10 @@ export function getIntegrations() {
  * # Returns
  *
  * A JavaScript array of plugin metadata objects.
+ *
+ * # Errors
+ *
+ * Returns a `JsValue` error string when serializing the plugin list back to JavaScript fails.
  * @returns {any}
  */
 export function getPlugins() {
@@ -132,6 +154,10 @@ export function getPlugins() {
  * # Returns
  *
  * A JavaScript array of rule metadata objects.
+ *
+ * # Errors
+ *
+ * Returns a `JsValue` error string when serializing the rule list back to JavaScript fails.
  * @returns {any}
  */
 export function getRules() {
@@ -163,6 +189,10 @@ export function getRules() {
  * # Returns
  *
  * A JavaScript array of linter issue objects.
+ *
+ * # Errors
+ *
+ * Returns a `JsValue` error string when serializing the issue list back to JavaScript fails.
  * @param {string} code
  * @param {string} php_version
  * @returns {any}
@@ -188,6 +218,18 @@ export function lint(code, php_version) {
 }
 
 /**
+ * Runs both the linter and analyzer over `code` using the supplied settings and
+ * returns a deduplicated list of issues to JavaScript.
+ *
+ * # Errors
+ *
+ * Returns a `JsValue` error string when serializing the issue list back to JavaScript fails,
+ * or when the input file unexpectedly cannot be retrieved from the in-memory database.
+ *
+ * # Panics
+ *
+ * Panics if the embedded prelude artifact cannot be decoded — that would mean the WASM bundle
+ * was built incorrectly.
  * @param {string} code
  * @param {any} settings_js
  * @returns {any}

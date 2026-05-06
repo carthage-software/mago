@@ -11,6 +11,12 @@
             "label": "1.25.2",
             "stable": true,
             "paths": []
+        },
+        {
+            "id": "1.26.0",
+            "label": "1.26.0",
+            "stable": true,
+            "paths": []
         }
     ]
 }

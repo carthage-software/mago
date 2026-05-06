@@ -1,0 +1,266 @@
+@layer reset, base, typography, layout, components, code, rtl;
+
+@layer base {
+  @font-face {
+    font-family: "IBM Plex Serif";
+    src: url("../fonts/IBMPlexSerif-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "IBM Plex Serif";
+    src: url("../fonts/IBMPlexSerif-Italic.woff2") format("woff2");
+    font-weight: 400;
+    font-style: italic;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "IBM Plex Sans";
+    src: url("../fonts/IBMPlexSans-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "IBM Plex Sans";
+    src: url("../fonts/IBMPlexSans-Medium.woff2") format("woff2");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "IBM Plex Sans";
+    src: url("../fonts/IBMPlexSans-SemiBold.woff2") format("woff2");
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "IBM Plex Mono";
+    src: url("../fonts/IBMPlexMono-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "IBM Plex Mono";
+    src: url("../fonts/IBMPlexMono-Medium.woff2") format("woff2");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "IBM Plex Sans Arabic";
+    src: url("../fonts/IBMPlexSansArabic-Regular.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f5f5f5;
+    --bg-inset: #ebebeb;
+    --ink: #000000;
+    --ink-soft: #1a1a1a;
+    --ink-quiet: #666666;
+    --ink-faint: #8c8c8c;
+    --rule: #000000;
+    --rule-hair: rgba(0, 0, 0, 0.18);
+    --rule-faint: rgba(0, 0, 0, 0.08);
+
+    --accent: #3c8d58;
+    --accent-deep: #2a6640;
+    --accent-text: var(--accent-deep);
+    --accent-soft: rgba(60, 141, 88, 0.12);
+    --accent-vivid: #4ea670;
+    --warn-bg: rgba(60, 141, 88, 0.10);
+    --info-bg: rgba(0, 0, 0, 0.04);
+    --inline-code-bg: rgba(0, 0, 0, 0.05);
+
+    --syn-comment: #6a737d;
+    --syn-keyword: #b91d3a;
+    --syn-entity: #5a2ca0;
+    --syn-string: #0a3069;
+    --syn-number: #044289;
+    --syn-variable: #8a3a00;
+    --syn-support: #5a2ca0;
+    --syn-punctuation: var(--ink-quiet);
+
+    --serif: "IBM Plex Serif", "Iowan Old Style", Georgia, "Times New Roman", serif;
+    --sans: "IBM Plex Sans", -apple-system, "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+    --arabic: "IBM Plex Sans Arabic", "IBM Plex Sans", "Segoe UI", sans-serif;
+
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 12px;
+    --s-4: 16px;
+    --s-5: 24px;
+    --s-6: 32px;
+    --s-7: 48px;
+    --s-8: 64px;
+    --s-9: 96px;
+    --s-10: 128px;
+
+    --header-h: 56px;
+    --grid-max: 1320px;
+    --measure: 68ch;
+
+    --ctrl-h: 30px;
+    --ctrl-y: 5px;
+
+    --hair: 1px solid var(--rule-hair);
+    --hairline: 1px solid var(--rule-faint);
+    --rule-thick: 1.5px solid var(--rule);
+    --rule-fat: 2px solid var(--rule);
+    --rule-thin: 1px solid var(--rule);
+
+    --t-snap: 60ms cubic-bezier(0.2, 0, 0.1, 1);
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0a0a0a;
+    --bg-soft: #161616;
+    --bg-inset: #1f1f1f;
+    --ink: #fafafa;
+    --ink-soft: #d4d4d4;
+    --ink-quiet: #a0a0a0;
+    --ink-faint: #777777;
+    --rule: #ffffff;
+    --rule-hair: rgba(255, 255, 255, 0.18);
+    --rule-faint: rgba(255, 255, 255, 0.08);
+    --accent: #5fb677;
+    --accent-deep: #7dc890;
+    --accent-text: var(--accent-deep);
+    --accent-soft: rgba(95, 182, 119, 0.18);
+    --accent-vivid: #7cd092;
+    --warn-bg: rgba(95, 182, 119, 0.12);
+    --info-bg: rgba(255, 255, 255, 0.05);
+    --inline-code-bg: rgba(255, 255, 255, 0.10);
+
+    --syn-comment: #8b949e;
+    --syn-keyword: #ff8a82;
+    --syn-entity: #d2a8ff;
+    --syn-string: #b8d9ff;
+    --syn-number: #88c8ff;
+    --syn-variable: #ffb27a;
+    --syn-support: #d2a8ff;
+    --syn-punctuation: var(--ink-quiet);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a0a0a;
+      --bg-soft: #161616;
+      --bg-inset: #1f1f1f;
+      --ink: #fafafa;
+      --ink-soft: #d4d4d4;
+      --ink-quiet: #a0a0a0;
+      --ink-faint: #777777;
+      --rule: #ffffff;
+      --rule-hair: rgba(255, 255, 255, 0.18);
+      --rule-faint: rgba(255, 255, 255, 0.08);
+      --accent: #5fb677;
+      --accent-deep: #7dc890;
+      --accent-text: var(--accent-deep);
+      --accent-soft: rgba(95, 182, 119, 0.18);
+      --accent-vivid: #7cd092;
+      --warn-bg: rgba(95, 182, 119, 0.12);
+      --info-bg: rgba(255, 255, 255, 0.05);
+      --inline-code-bg: rgba(255, 255, 255, 0.10);
+
+      --syn-comment: #8b949e;
+      --syn-keyword: #ff8a82;
+      --syn-entity: #d2a8ff;
+      --syn-string: #b8d9ff;
+      --syn-number: #88c8ff;
+      --syn-variable: #ffb27a;
+      --syn-support: #d2a8ff;
+      --syn-punctuation: var(--ink-quiet);
+    }
+  }
+
+  html {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 16px;
+    line-height: 1.45;
+  }
+
+  html[dir="rtl"] {
+    font-family: var(--arabic);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--rule-hair);
+    text-underline-offset: 3px;
+    transition: text-decoration-thickness var(--t-snap), text-decoration-color var(--t-snap);
+  }
+
+  a:hover {
+    text-decoration-thickness: 2px;
+    text-decoration-color: var(--accent-text);
+  }
+
+  ::selection {
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+  }
+
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--rule-hair) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    inline-size: 10px;
+    block-size: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--rule-hair);
+    border-inline: 3px solid var(--bg);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--rule);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
