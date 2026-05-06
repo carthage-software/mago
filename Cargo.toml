@@ -200,6 +200,7 @@ termtree = "1.0.0"
 wasm-bindgen = "0.2.97"
 serde-wasm-bindgen = "0.6"
 diffy = "0.4.0"
+libtest-mimic = "0.7"
 termcolor = "1.4.1"
 indoc = "2"
 proptest = "1.5"
@@ -294,7 +295,13 @@ xxhash-rust = { workspace = true, optional = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-util", "sync", "time", "signal"], optional = true }
 tower-lsp = { version = "0.20", optional = true }
 
+[[test]]
+name = "suite"
+harness = false
+
 [dev-dependencies]
+libtest-mimic = { workspace = true }
+serde = { workspace = true }
 temp-env = "0.3.6"
 pretty_assertions = { workspace = true }
 serde_json = { workspace = true }
