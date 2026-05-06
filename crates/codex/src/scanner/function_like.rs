@@ -37,6 +37,8 @@ use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::metadata::function_like::MethodMetadata;
 use crate::misc::GenericParent;
 use crate::scanner::Context;
+use crate::scanner::assertion_inference::infer_assertions_from_block_body;
+use crate::scanner::assertion_inference::infer_assertions_from_expression_body;
 use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::docblock::FunctionLikeDocblockComment;
 use crate::scanner::parameter::scan_function_like_parameter;
@@ -122,6 +124,10 @@ pub fn scan_method<'arena>(
 
     scan_function_like_docblock(span, functionlike_id, &mut metadata, Some(class_like_metadata.name), context, scope);
 
+    if let MethodBody::Concrete(block) = &method.body {
+        infer_assertions_from_block_body(block, &mut metadata, context.resolved_names);
+    }
+
     if metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
         metadata.flags |= MetadataFlags::DEPRECATED;
     }
@@ -189,6 +195,8 @@ pub fn scan_function<'arena>(
 
     scan_function_like_docblock(function.span(), functionlike_id, &mut metadata, classname, context, scope);
 
+    infer_assertions_from_block_body(&function.body, &mut metadata, context.resolved_names);
+
     if metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
         metadata.flags |= MetadataFlags::DEPRECATED;
     }
@@ -240,6 +248,8 @@ pub fn scan_closure<'arena>(
 
     scan_function_like_docblock(span, functionlike_id, &mut metadata, classname, context, scope);
 
+    infer_assertions_from_block_body(&closure.body, &mut metadata, context.resolved_names);
+
     metadata
 }
 
@@ -289,6 +299,8 @@ pub fn scan_arrow_function<'arena>(
     }
 
     scan_function_like_docblock(span, functionlike_id, &mut metadata, classname, context, scope);
+
+    infer_assertions_from_expression_body(arrow_function.expression, &mut metadata, context.resolved_names);
 
     metadata
 }

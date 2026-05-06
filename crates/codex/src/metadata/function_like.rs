@@ -134,6 +134,12 @@ pub struct FunctionLikeMetadata {
     /// function/method returns `false`. From `@psalm-assert-if-false`, etc.
     pub if_false_assertions: BTreeMap<Atom, Vec<Assertion>>,
 
+    /// Set when the assertions in `if_true_assertions` / `if_false_assertions` were
+    /// auto-inferred from the body rather than declared explicitly via docblock. The
+    /// populator uses this to know it can safely override them with assertions
+    /// inherited from a parent method, so explicit contracts on a parent always win.
+    pub assertions_inferred: bool,
+
     /// Names of variables this function/method imports from the global scope via a
     /// `global $x;` statement anywhere in its body. Used by the invocation post-processor
     /// to invalidate caller-side narrowings of those globals on every call, since the
@@ -202,6 +208,7 @@ impl FunctionLikeMetadata {
             assertions: BTreeMap::new(),
             if_true_assertions: BTreeMap::new(),
             if_false_assertions: BTreeMap::new(),
+            assertions_inferred: false,
             globals_accessed: AtomSet::default(),
             has_docblock: false,
             issues: vec![],

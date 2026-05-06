@@ -61,6 +61,7 @@ use crate::scanner::property::scan_promoted_property;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::template::GenericTemplate;
 
+mod assertion_inference;
 mod attribute;
 mod class_like;
 mod class_like_constant;

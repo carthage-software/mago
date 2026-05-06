@@ -149,7 +149,21 @@ impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'bloc
                         None
                     }
                 }
-                PartialApplication::Method(_) => None,
+                PartialApplication::Method(method_partial) => {
+                    if !method_partial.argument_list.is_first_class_callable() {
+                        return None;
+                    }
+
+                    let ClassLikeMemberSelector::Identifier(method_id) = &method_partial.method else {
+                        return None;
+                    };
+
+                    let object_type = self.get_rc_expression_type(method_partial.object)?;
+                    let single_object = object_type.get_single_named_object()?;
+                    let class_name = single_object.get_name();
+
+                    self.codebase.get_method(&class_name, method_id.value)
+                }
             },
             _ => {
                 let expr_type = self.get_rc_expression_type(expr)?;

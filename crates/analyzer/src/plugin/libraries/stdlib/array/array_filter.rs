@@ -199,6 +199,14 @@ fn apply_assertion_to_narrow_type(original_type: TUnion, assertion: &Assertion, 
 
             if result.types.is_empty() { original_type } else { result }
         }
+        Assertion::IsNotType(atomic) => {
+            let mut result = original_type.clone();
+            result.types.to_mut().retain(|t| {
+                !atomic_comparator::is_contained_by(codebase, t, atomic, false, &mut ComparisonResult::default())
+            });
+
+            if result.types.is_empty() { original_type } else { result }
+        }
         _ => original_type,
     }
 }

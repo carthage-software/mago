@@ -2468,6 +2468,7 @@ test_case!(issue_1772);
 test_case!(issue_1775);
 test_case!(issue_1786);
 test_case!(issue_1787);
+test_case!(issue_1794);
 test_case!(issue_1781, {
     let mut s = crate::framework::default_test_settings();
     s.check_throws = false;

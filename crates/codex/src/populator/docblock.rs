@@ -377,6 +377,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             should_inherit_assertions,
             should_inherit_if_true_assertions,
             should_inherit_if_false_assertions,
+            should_clear_inferred_assertions,
         ) = {
             let Some(child_method) = codebase.function_likes.get(&child_method_id) else {
                 continue;
@@ -415,11 +416,23 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
 
             let should_inherit_templates = child_method.template_types.is_empty() && !parent_template_types.is_empty();
             let should_inherit_thrown = child_method.thrown_types.is_empty() && !substituted_thrown_types.is_empty();
-            let should_inherit_assertions = child_method.assertions.is_empty() && !parent_assertions.is_empty();
+
+            let parent_has_any_assertions = !parent_assertions.is_empty()
+                || !parent_if_true_assertions.is_empty()
+                || !parent_if_false_assertions.is_empty();
+            let child_assertions_are_inferred = child_method.assertions_inferred;
+
+            let child_assertions_overridable =
+                |child: &BTreeMap<Atom, Vec<Assertion>>| -> bool { child.is_empty() || child_assertions_are_inferred };
+
+            let should_inherit_assertions =
+                child_assertions_overridable(&child_method.assertions) && !parent_assertions.is_empty();
             let should_inherit_if_true_assertions =
-                child_method.if_true_assertions.is_empty() && !parent_if_true_assertions.is_empty();
-            let should_inherit_if_false_assertions =
-                child_method.if_false_assertions.is_empty() && !parent_if_false_assertions.is_empty();
+                child_assertions_overridable(&child_method.if_true_assertions) && !parent_if_true_assertions.is_empty();
+            let should_inherit_if_false_assertions = child_assertions_overridable(&child_method.if_false_assertions)
+                && !parent_if_false_assertions.is_empty();
+
+            let should_clear_inferred_assertions = parent_has_any_assertions && child_assertions_are_inferred;
 
             (
                 should_inherit_return,
@@ -429,6 +442,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
                 should_inherit_assertions,
                 should_inherit_if_true_assertions,
                 should_inherit_if_false_assertions,
+                should_clear_inferred_assertions,
             )
         };
 
@@ -517,6 +531,13 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
 
         if let Some(parent_thrown) = parent_thrown_to_apply {
             child_method.thrown_types = parent_thrown;
+        }
+
+        if should_clear_inferred_assertions {
+            child_method.assertions.clear();
+            child_method.if_true_assertions.clear();
+            child_method.if_false_assertions.clear();
+            child_method.assertions_inferred = false;
         }
 
         if let Some(parent_asserts) = parent_assertions_to_apply {
