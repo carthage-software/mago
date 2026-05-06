@@ -11,6 +11,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_text_edit::TextEdit;
+use mago_text_edit::TextRange;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -129,24 +130,20 @@ impl LintRule for NoRedundantYieldFromRule {
         .with_help("Replace with direct `yield` for better performance.");
 
         ctx.collector.propose(issue, |edits| {
-            // `yield from [...]` -> `yield [...]`
-            edits.push(TextEdit::delete(yield_from.from.span));
+            let yield_end = yield_from.r#yield.span.end.offset;
+            let element_start = element.span().start.offset;
+            let element_end = element.span().end.offset;
 
-            match yield_from.iterator {
-                // `yield [expr]` -> `yield expr`
-                Expression::Array(array) => {
-                    edits.push(TextEdit::delete(array.left_bracket));
-                    edits.push(TextEdit::delete(array.right_bracket));
-                }
-                // `yield array(expr)` -> `yield expr`
-                Expression::LegacyArray(legacy_array) => {
-                    edits.push(TextEdit::delete(legacy_array.array.span));
-                    edits.push(TextEdit::delete(legacy_array.left_parenthesis));
-                    edits.push(TextEdit::delete(legacy_array.right_parenthesis));
-                }
+            edits.push(TextEdit::replace(TextRange::new(yield_end, element_start), " "));
+
+            let close_end = match yield_from.iterator {
+                Expression::Array(array) => array.right_bracket.end.offset,
+                Expression::LegacyArray(legacy_array) => legacy_array.right_parenthesis.end.offset,
                 #[allow(clippy::unreachable)]
                 _ => unreachable!("Already filtered out non-array literals"),
-            }
+            };
+
+            edits.push(TextEdit::delete(TextRange::new(element_end, close_end)));
         });
     }
 }
@@ -157,6 +154,7 @@ mod tests {
 
     use super::NoRedundantYieldFromRule;
     use crate::test_lint_failure;
+    use crate::test_lint_fix;
     use crate::test_lint_success;
 
     test_lint_success! {
@@ -319,6 +317,131 @@ mod tests {
 
             function gen() {
                 yield from [0 => 'value'];
+            }
+        "}
+    }
+
+    test_lint_fix! {
+        name = fix_yield_from_single_value_with_trailing_comma,
+        rule = NoRedundantYieldFromRule,
+        code = indoc! {r"
+            <?php
+
+            function gen() {
+                yield from [
+                    'a',
+                ];
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            function gen() {
+                yield 'a';
+            }
+        "}
+    }
+
+    test_lint_fix! {
+        name = fix_yield_from_single_value_no_trailing_comma,
+        rule = NoRedundantYieldFromRule,
+        code = indoc! {r"
+            <?php
+
+            function gen() {
+                yield from [1];
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            function gen() {
+                yield 1;
+            }
+        "}
+    }
+
+    test_lint_fix! {
+        name = fix_yield_from_single_value_legacy_array_with_trailing_comma,
+        rule = NoRedundantYieldFromRule,
+        code = indoc! {r"
+            <?php
+
+            function gen() {
+                yield from array(
+                    'a',
+                );
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            function gen() {
+                yield 'a';
+            }
+        "}
+    }
+
+    test_lint_fix! {
+        name = fix_yield_from_keyed_single_element,
+        rule = NoRedundantYieldFromRule,
+        code = indoc! {r"
+            <?php
+
+            function gen() {
+                yield from ['foo' => 'bar'];
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            function gen() {
+                yield 'foo' => 'bar';
+            }
+        "}
+    }
+
+    test_lint_fix! {
+        name = fix_issue_1797_repro,
+        rule = NoRedundantYieldFromRule,
+        code = indoc! {r"
+            <?php
+
+            declare(strict_types=1);
+
+            class Trigger
+            {
+                public static function trailingComma(): iterable
+                {
+                    yield from [
+                        'a',
+                    ];
+                }
+
+                public static function noTrailingComma(): iterable
+                {
+                    yield from [
+                        'b'
+                    ];
+                }
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            declare(strict_types=1);
+
+            class Trigger
+            {
+                public static function trailingComma(): iterable
+                {
+                    yield 'a';
+                }
+
+                public static function noTrailingComma(): iterable
+                {
+                    yield 'b';
+                }
             }
         "}
     }
