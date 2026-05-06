@@ -47,11 +47,11 @@ To install a specific version:
 curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/mago.sh | bash -s -- --version=1.25.2
 ```
 
-For all other installation methods, including Homebrew, Composer, and Cargo, please refer to our official **[Installation Guide](https://mago.carthage.software/guide/installation)**.
+For all other installation methods, including Homebrew, Composer, and Cargo, please refer to our official **[Installation Guide](https://mago.carthage.software/latest/en/guide/installation/)**.
 
 ## Getting Started
 
-To get started with Mago and learn how to configure your project, please visit our **[Getting Started Guide](https://mago.carthage.software/guide/getting-started)** in the official documentation.
+To get started with Mago and learn how to configure your project, please visit our **[Getting Started Guide](https://mago.carthage.software/latest/en/guide/getting-started/)** in the official documentation.
 
 ## Features
 
