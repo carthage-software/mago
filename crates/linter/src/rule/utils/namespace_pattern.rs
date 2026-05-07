@@ -109,13 +109,13 @@ fn segment_matches(fqcn_part: &str, pattern_part: &str, case_sensitive: bool) ->
         remainder = &remainder[p_chunks[0].len()..];
     }
 
-    let last_chunk = p_chunks.last().unwrap();
+    let last_chunk: &str = p_chunks.last().copied().unwrap_or("");
     if !last_chunk.is_empty() {
         if remainder.len() < last_chunk.len() {
             return false;
         }
         let suffix = &remainder[remainder.len() - last_chunk.len()..];
-        if !(if case_sensitive { suffix == *last_chunk } else { suffix.eq_ignore_ascii_case(last_chunk) }) {
+        if !(if case_sensitive { suffix == last_chunk } else { suffix.eq_ignore_ascii_case(last_chunk) }) {
             return false;
         }
         remainder = &remainder[..remainder.len() - last_chunk.len()];
