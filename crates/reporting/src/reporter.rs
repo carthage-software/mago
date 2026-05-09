@@ -126,7 +126,7 @@ impl Reporter {
             let filtered_issues = baseline.filter_issues(issues, &self.database);
 
             baseline_filtered_issues = original_count - filtered_issues.len();
-            baseline_dead_issues = comparison.removed_issues_count;
+            baseline_dead_issues = comparison.removed_issues.len();
             issues = filtered_issues;
         }
 
@@ -206,7 +206,7 @@ impl Reporter {
             let filtered_issues = baseline.filter_issues(issues, &self.database);
 
             baseline_filtered_issues = original_count - filtered_issues.len();
-            baseline_dead_issues = comparison.removed_issues_count;
+            baseline_dead_issues = comparison.removed_issues.len();
             issues = filtered_issues;
         }
 
