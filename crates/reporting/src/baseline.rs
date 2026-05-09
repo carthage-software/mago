@@ -123,15 +123,24 @@ pub enum Baseline {
     Loose(LooseBaseline),
 }
 
+/// A specific issue that appeared or disappeared during a baseline comparison.
+#[derive(Debug, Clone, Serialize)]
+pub struct BaselineChangeEntry {
+    pub file: String,
+    pub code: String,
+    pub start_line: u32,
+    pub end_line: u32,
+}
+
 /// The result of comparing a baseline with current issues.
 #[derive(Debug, Clone)]
 pub struct BaselineComparisonResult {
     /// Whether the baseline is up to date with current issues
     pub is_up_to_date: bool,
-    /// Number of new issues not in the baseline
-    pub new_issues_count: usize,
-    /// Number of issues in baseline that no longer exist
-    pub removed_issues_count: usize,
+    /// Issues present in the current run but absent from the baseline
+    pub new_issues: Vec<BaselineChangeEntry>,
+    /// Issues recorded in the baseline that no longer appear
+    pub removed_issues: Vec<BaselineChangeEntry>,
     /// Number of files with changes (new, removed, or modified issues)
     pub files_with_changes_count: usize,
 }
@@ -250,15 +259,15 @@ impl StrictBaseline {
         if self.entries == current_baseline.entries {
             return BaselineComparisonResult {
                 is_up_to_date: true,
-                new_issues_count: 0,
-                removed_issues_count: 0,
+                new_issues: vec![],
+                removed_issues: vec![],
                 files_with_changes_count: 0,
             };
         }
 
         // Analyze what's different
-        let mut new_issues = 0;
-        let mut removed_issues = 0;
+        let mut new_issues: Vec<BaselineChangeEntry> = vec![];
+        let mut removed_issues: Vec<BaselineChangeEntry> = vec![];
         let mut files_with_changes = HashSet::default();
 
         // Check for new issues (in current but not in baseline)
@@ -267,17 +276,34 @@ impl StrictBaseline {
                 let baseline_issues: HashSet<_> = baseline_entry.issues.iter().collect();
                 let current_issues: HashSet<_> = current_entry.issues.iter().collect();
 
-                let new_in_file = current_issues.difference(&baseline_issues).count();
-                let removed_in_file = baseline_issues.difference(&current_issues).count();
-
-                if new_in_file > 0 || removed_in_file > 0 {
+                for issue in current_issues.difference(&baseline_issues) {
+                    new_issues.push(BaselineChangeEntry {
+                        file: file_path.to_string(),
+                        code: issue.code.clone(),
+                        start_line: issue.start_line,
+                        end_line: issue.end_line,
+                    });
                     files_with_changes.insert(file_path.as_ref());
-                    new_issues += new_in_file;
-                    removed_issues += removed_in_file;
+                }
+                for issue in baseline_issues.difference(&current_issues) {
+                    removed_issues.push(BaselineChangeEntry {
+                        file: file_path.to_string(),
+                        code: issue.code.clone(),
+                        start_line: issue.start_line,
+                        end_line: issue.end_line,
+                    });
+                    files_with_changes.insert(file_path.as_ref());
                 }
             } else {
                 // Entire file is new
-                new_issues += current_entry.issues.len();
+                for issue in &current_entry.issues {
+                    new_issues.push(BaselineChangeEntry {
+                        file: file_path.to_string(),
+                        code: issue.code.clone(),
+                        start_line: issue.start_line,
+                        end_line: issue.end_line,
+                    });
+                }
                 files_with_changes.insert(file_path.as_ref());
             }
         }
@@ -285,15 +311,22 @@ impl StrictBaseline {
         // Check for files that were removed entirely
         for (file_path, baseline_entry) in &self.entries {
             if !current_baseline.entries.contains_key(file_path) {
-                removed_issues += baseline_entry.issues.len();
+                for issue in &baseline_entry.issues {
+                    removed_issues.push(BaselineChangeEntry {
+                        file: file_path.to_string(),
+                        code: issue.code.clone(),
+                        start_line: issue.start_line,
+                        end_line: issue.end_line,
+                    });
+                }
                 files_with_changes.insert(file_path.as_ref());
             }
         }
 
         BaselineComparisonResult {
             is_up_to_date: false,
-            new_issues_count: new_issues,
-            removed_issues_count: removed_issues,
+            new_issues,
+            removed_issues,
             files_with_changes_count: files_with_changes.len(),
         }
     }
@@ -398,14 +431,22 @@ impl LooseBaseline {
         let baseline_map: HashMap<_, _> =
             self.issues.iter().map(|i| ((i.file.clone(), i.code.clone(), i.message.clone()), i.count)).collect();
 
-        let mut new_issues = 0usize;
-        let mut removed_issues = 0usize;
+        let mut new_issues: Vec<BaselineChangeEntry> = vec![];
+        let mut removed_issues: Vec<BaselineChangeEntry> = vec![];
         let mut files_with_changes: HashSet<&str> = HashSet::default();
 
         for (key, &current_count) in &current_map {
             let baseline_count = baseline_map.get(key).copied().unwrap_or(0);
             if current_count > baseline_count {
-                new_issues += (current_count - baseline_count) as usize;
+                let delta = (current_count - baseline_count) as usize;
+                for _ in 0..delta {
+                    new_issues.push(BaselineChangeEntry {
+                        file: key.0.clone(),
+                        code: key.1.clone(),
+                        start_line: 0,
+                        end_line: 0,
+                    });
+                }
                 files_with_changes.insert(key.0.as_str());
             }
         }
@@ -413,15 +454,23 @@ impl LooseBaseline {
         for (key, &baseline_count) in &baseline_map {
             let current_count = current_map.get(key).copied().unwrap_or(0);
             if baseline_count > current_count {
-                removed_issues += (baseline_count - current_count) as usize;
+                let delta = (baseline_count - current_count) as usize;
+                for _ in 0..delta {
+                    removed_issues.push(BaselineChangeEntry {
+                        file: key.0.clone(),
+                        code: key.1.clone(),
+                        start_line: 0,
+                        end_line: 0,
+                    });
+                }
                 files_with_changes.insert(key.0.as_str());
             }
         }
 
         BaselineComparisonResult {
-            is_up_to_date: new_issues == 0 && removed_issues == 0,
-            new_issues_count: new_issues,
-            removed_issues_count: removed_issues,
+            is_up_to_date: new_issues.is_empty() && removed_issues.is_empty(),
+            new_issues,
+            removed_issues,
             files_with_changes_count: files_with_changes.len(),
         }
     }
@@ -585,8 +634,8 @@ mod tests {
         let result = baseline.compare_with_issues(&issues, &read_db);
 
         assert!(!result.is_up_to_date);
-        assert_eq!(result.removed_issues_count, 1);
-        assert_eq!(result.new_issues_count, 1);
+        assert_eq!(result.removed_issues.len(), 1);
+        assert_eq!(result.new_issues.len(), 1);
         assert_eq!(result.files_with_changes_count, 1);
     }
 
@@ -667,8 +716,8 @@ mod tests {
         let result = baseline.compare_with_issues(&issues, &read_db);
 
         assert!(!result.is_up_to_date);
-        assert_eq!(result.new_issues_count, 1);
-        assert_eq!(result.removed_issues_count, 2);
+        assert_eq!(result.new_issues.len(), 1);
+        assert_eq!(result.removed_issues.len(), 2);
         assert_eq!(result.files_with_changes_count, 1);
     }
 

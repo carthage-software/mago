@@ -55,6 +55,8 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use serde::Serialize;
+
 use bumpalo::Bump;
 use clap::ColorChoice;
 use mago_database::file::FileId;
@@ -205,6 +207,12 @@ pub struct IssueProcessor {
     /// When set, file paths in diagnostic output become clickable links in
     /// terminals that support OSC 8 hyperlinks.
     pub editor_url: Option<String>,
+}
+
+#[derive(Serialize)]
+struct VerifyBaselineOutput<'a> {
+    new_issues: &'a [mago_reporting::baseline::BaselineChangeEntry],
+    removed_issues: &'a [mago_reporting::baseline::BaselineChangeEntry],
 }
 
 /// Baseline-aware issue processor for incremental issue adoption.
@@ -838,21 +846,40 @@ impl BaselineIssueProcessor {
         if comparison.is_up_to_date {
             tracing::info!("Baseline is up to date.");
 
-            Ok(true)
-        } else {
-            if comparison.new_issues_count > 0 {
-                tracing::warn!("Found {} new issues not in the baseline.", comparison.new_issues_count);
+            if self.issue_processor.reporting_format == ReportingFormat::Json {
+                let output = VerifyBaselineOutput { new_issues: &[], removed_issues: &[] };
+                println!(
+                    "{}",
+                    serde_json::to_string(&output).expect("failed to serialize baseline verification output")
+                );
             }
 
-            if comparison.removed_issues_count > 0 {
+            Ok(true)
+        } else {
+            if !comparison.new_issues.is_empty() {
+                tracing::warn!("Found {} new issues not in the baseline.", comparison.new_issues.len());
+            }
+
+            if !comparison.removed_issues.is_empty() {
                 tracing::warn!(
                     "Found {} issues in the baseline that no longer exist.",
-                    comparison.removed_issues_count
+                    comparison.removed_issues.len()
                 );
             }
 
             tracing::error!("Baseline is outdated. {} files have changes.", comparison.files_with_changes_count);
             tracing::error!("Run with `--generate-baseline` to update the baseline file.");
+
+            if self.issue_processor.reporting_format == ReportingFormat::Json {
+                let output = VerifyBaselineOutput {
+                    new_issues: &comparison.new_issues,
+                    removed_issues: &comparison.removed_issues,
+                };
+                println!(
+                    "{}",
+                    serde_json::to_string(&output).expect("failed to serialize baseline verification output")
+                );
+            }
 
             Ok(false)
         }
