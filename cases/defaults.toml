@@ -1,0 +1,13 @@
+# Default analyzer settings for integration test cases.
+
+[source]
+paths = ["source.php"]
+includes = ["vendor.php"]
+
+[linter]
+baseline = "linter.baseline.toml"
+baseline-variant = "strict"
+
+[analyzer]
+baseline = "analyzer.baseline.toml"
+baseline-variant = "strict"
