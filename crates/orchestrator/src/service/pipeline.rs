@@ -116,6 +116,7 @@ where
             .field("symbol_references", &self.symbol_references)
             .field("shared_context", &self.shared_context)
             .field("parser_settings", &self.parser_settings)
+            .field("php_version", &self.php_version)
             .field("reducer", &"<reducer>")
             .field("should_use_progress_bar", &self.should_use_progress_bar)
             .finish()
