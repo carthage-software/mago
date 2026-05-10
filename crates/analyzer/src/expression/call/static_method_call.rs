@@ -74,6 +74,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                 .get_method_by_id(&resolved_method.method_identifier)
                 .expect("method metadata should exist for resolved method");
 
+            let method_display = format!(
+                "{}::{}",
+                resolved_method.method_identifier.get_class_name(),
+                resolved_method.method_identifier.get_method_name(),
+            );
+            crate::utils::availability::check_method_availability(
+                context,
+                method_metadata,
+                &method_display,
+                self.span(),
+            );
+
             let method_target_context = MethodTargetContext {
                 declaring_method_id: Some(resolved_method.method_identifier),
                 class_like_metadata: metadata,

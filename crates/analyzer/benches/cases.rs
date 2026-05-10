@@ -50,9 +50,6 @@ fn analyze_file(path: &Path, content: &str) {
     let resolver = NameResolver::new(&arena);
     let resolved_names = resolver.resolve(program);
 
-    metadata.extend(scan_program(&arena, source_file, program, &resolved_names));
-    populate_codebase(&mut metadata, &mut symbol_references, AtomSet::default(), HashSet::default());
-
     let settings = Settings {
         find_unused_expressions: true,
         find_unused_definitions: true,
@@ -62,6 +59,9 @@ fn analyze_file(path: &Path, content: &str) {
         check_property_initialization: true,
         ..Default::default()
     };
+
+    metadata.extend(scan_program(&arena, source_file, program, &resolved_names, settings.version));
+    populate_codebase(&mut metadata, &mut symbol_references, AtomSet::default(), HashSet::default());
 
     let mut analysis_result = AnalysisResult::new(symbol_references);
     let analyzer = Analyzer::new(&arena, source_file, &resolved_names, &metadata, &PLUGIN_REGISTRY, settings);

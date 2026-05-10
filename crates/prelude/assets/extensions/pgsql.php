@@ -347,6 +347,7 @@ namespace {
     /**
      * @var int
      */
+    #[Mago\AvailableSince(80000)]
     const PGSQL_DIAG_SEVERITY_NONLOCALIZED = UNKNOWN;
 
     /* pg_convert options */
@@ -396,6 +397,7 @@ namespace {
     /**
      * @var int
      */
+    #[Mago\AvailableSince(80300)]
     const PGSQL_TRACE_SUPPRESS_TIMESTAMPS = UNKNOWN;
 
     /**
@@ -807,9 +809,21 @@ namespace {
      */
     function pg_socket(PgSql\Connection $connection) {}
 
+    #[Mago\AvailableSince(80100)]
+    function pg_socket_poll($socket, int $read, int $write, int $timeout = -1): int {}
+
     function pg_consume_input(PgSql\Connection $connection): bool {}
 
     function pg_flush(PgSql\Connection $connection): int|bool {}
+
+    #[Mago\AvailableSince(80200)]
+    function pg_result_memory_size(PgSql\Result $result): int {}
+
+    #[Mago\AvailableSince(80300)]
+    function pg_change_password(PgSql\Connection $connection, string $user, string $password): bool {}
+
+    #[Mago\AvailableSince(80300)]
+    function pg_jit(PgSql\Connection $connection): array|false {}
 
     /**
      * @return array<string, array>|false
@@ -856,12 +870,15 @@ namespace {
 
     function pg_set_error_context_visibility(PgSql\Connection $connection, int $visibility): int {}
 
+    #[Mago\AvailableSince(80200)]
     function pg_result_memory_size(PgSql\Result $result): int {}
 
+    #[Mago\AvailableSince(80300)]
     function pg_change_password(
         PgSql\Connection $connection,
         string $user,
-        #[\SensitiveParameter] string $password,
+        #[SensitiveParameter]
+        string $password,
     ): bool {}
 
     function pg_put_copy_data(PgSql\Connection $connection, string $cmd): int {}
@@ -871,6 +888,7 @@ namespace {
     /**
      * @param resource $socket
      */
+    #[Mago\AvailableSince(80100)]
     function pg_socket_poll($socket, int $read, int $write, int $timeout = -1): int {}
 
     function pg_set_chunked_rows_size(PgSql\Connection $connection, int $size): bool {}

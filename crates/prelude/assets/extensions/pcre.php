@@ -28,6 +28,7 @@ const PREG_BAD_UTF8_ERROR = 4;
 
 const PREG_BAD_UTF8_OFFSET_ERROR = 5;
 
+#[Mago\AvailableSince(80000)]
 const PREG_UNMATCHED_AS_NULL = 512;
 
 const PCRE_VERSION = '8.31 2012-07-06';
@@ -149,4 +150,5 @@ function preg_grep(string $pattern, array $array, int $flags = 0): array|false {
 
 function preg_last_error(): int {}
 
+#[Mago\AvailableSince(80000)]
 function preg_last_error_msg(): string {}

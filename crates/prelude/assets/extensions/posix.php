@@ -124,6 +124,7 @@ function posix_strerror(int $error_code): string {}
 
 function posix_initgroups(string $username, int $group_id): bool {}
 
+#[Mago\AvailableSince(80300)]
 function posix_sysconf(int $conf_id): int {}
 
 function posix_eaccess(string $filename, int $flags = 0): bool {}
@@ -133,6 +134,7 @@ function posix_eaccess(string $filename, int $flags = 0): bool {}
  */
 function posix_fpathconf($file_descriptor, int $name): int|false {}
 
+#[Mago\AvailableSince(80300)]
 function posix_pathconf(string $path, int $name): int|false {}
 
 const POSIX_F_OK = 0;
@@ -187,34 +189,49 @@ const POSIX_RLIMIT_STACK = 3;
 
 const POSIX_RLIMIT_INFINITY = 9223372036854775807;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_SC_ARG_MAX = 0;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_SC_PAGESIZE = 30;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_SC_NPROCESSORS_CONF = 83;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_SC_NPROCESSORS_ONLN = 84;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_PC_LINK_MAX = 0;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_PC_MAX_CANON = 1;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_PC_MAX_INPUT = 2;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_PC_NAME_MAX = 3;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_PC_PATH_MAX = 4;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_PC_PIPE_BUF = 5;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_PC_CHOWN_RESTRICTED = 6;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_PC_NO_TRUNC = 7;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_PC_ALLOC_SIZE_MIN = 18;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_PC_SYMLINK_MAX = 19;
 
+#[Mago\AvailableSince(80300)]
 const POSIX_SC_CHILD_MAX = 1;
 
 const POSIX_SC_CLK_TCK = 2;

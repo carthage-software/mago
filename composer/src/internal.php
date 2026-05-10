@@ -74,6 +74,8 @@ const STATUS_CHECK_INTERVAL = 10_000;
  * @throws RuntimeException If the lock file cannot be opened.
  *
  * @return T
+ *
+ * @internal
  */
 function locked(string $lockFile, \Closure $callback): mixed
 {
@@ -98,6 +100,8 @@ function locked(string $lockFile, \Closure $callback): mixed
  * @throws RuntimeException If the version cannot be determined.
  *
  * @return string The package version (e.g., "1.10.0").
+ *
+ * @internal
  */
 function get_version(): string
 {
@@ -120,6 +124,8 @@ function get_version(): string
  * @throws RuntimeException If the architecture is not supported.
  *
  * @return string Normalized architecture (e.g., "x86_64", "aarch64", "armv7", "arm").
+ *
+ * @internal
  */
 function detect_architecture(): string
 {
@@ -144,6 +150,8 @@ function detect_architecture(): string
  * Falls back to musl if `ldd` is not found (common in minimal containers).
  *
  * @return string "musl" or "gnu".
+ *
+ * @internal
  */
 function detect_linux_libc(): string
 {
@@ -163,6 +171,8 @@ function detect_linux_libc(): string
  * Checks whether the CPU supports hardware floating point (hard float).
  *
  * @return bool True if the system uses hard float ABI.
+ *
+ * @internal
  */
 function detect_arm_hard_float(): bool
 {
@@ -187,6 +197,8 @@ function detect_arm_hard_float(): bool
  * @throws RuntimeException If the architecture/libc combination has no pre-built binary.
  *
  * @return string The OS suffix (e.g., "gnu", "musl", "gnueabihf", "musleabi").
+ *
+ * @internal
  */
 function build_linux_suffix(string $architecture, string $libc): string
 {
@@ -234,6 +246,8 @@ function build_linux_suffix(string $architecture, string $libc): string
  *   - vendor: Target vendor (e.g., "unknown", "apple", "pc")
  *   - suffix: OS/ABI suffix for the target triple (e.g., "gnu", "musl", "msvc")
  *   - extension: Executable file extension (e.g., "", ".exe")
+ *
+ * @internal
  */
 function detect_platform(string $architecture): array
 {
@@ -295,6 +309,8 @@ function detect_platform(string $architecture): array
  * @param string $suffix ABI suffix (e.g., "gnu", "musl", "msvc", or "").
  *
  * @return string The target triple (e.g., "x86_64-unknown-linux-gnu", "aarch64-apple-darwin").
+ *
+ * @internal
  */
 function build_target_triple(string $arch, string $vendor, string $os, string $suffix): string
 {
@@ -311,6 +327,8 @@ function build_target_triple(string $arch, string $vendor, string $os, string $s
  * Windows MSVC builds are packaged as `.zip`, all other platforms use `.tar.gz`.
  *
  * @return string ".zip" or ".tar.gz".
+ *
+ * @internal
  */
 function get_archive_extension(string $os, string $suffix): string
 {
@@ -325,6 +343,8 @@ function get_archive_extension(string $os, string $suffix): string
  * @param string $archiveExtension Archive extension (".zip" or ".tar.gz").
  *
  * @return string Full download URL.
+ *
+ * @internal
  */
 function build_download_url(string $version, string $storageDir, string $archiveExtension): string
 {
@@ -339,6 +359,8 @@ function build_download_url(string $version, string $storageDir, string $archive
  * rate limits in CI or developer environments that are already authenticated.
  *
  * @return null|non-empty-string The token, or null when neither variable is set.
+ *
+ * @internal
  */
 function get_github_token(): ?string
 {
@@ -359,6 +381,8 @@ function get_github_token(): ?string
  * `file_get_contents` when `allow_url_fopen` is enabled.
  *
  * @throws RuntimeException If the download fails or no download method is available.
+ *
+ * @internal
  */
 function download(string $url, string $destination): void
 {
@@ -383,6 +407,8 @@ function download(string $url, string $destination): void
  * Download a file using the curl extension with a progress bar.
  *
  * @throws RuntimeException If the download fails or the server returns an error status.
+ *
+ * @internal
  */
 function download_with_curl(string $url, string $destination): void
 {
@@ -428,6 +454,8 @@ function download_with_curl(string $url, string $destination): void
  * Download a file using `file_get_contents` (requires `allow_url_fopen`).
  *
  * @throws RuntimeException If the download fails.
+ *
+ * @internal
  */
 function download_with_fopen(string $url, string $destination): void
 {
@@ -461,6 +489,8 @@ function download_with_fopen(string $url, string $destination): void
  * Supports `.zip` (via ZipArchive) and `.tar.gz` (via PharData).
  *
  * @throws RuntimeException If the archive cannot be opened or extracted.
+ *
+ * @internal
  */
 function extract_archive(string $archiveFile, string $destination, string $archiveExtension): void
 {
@@ -499,6 +529,8 @@ function extract_archive(string $archiveFile, string $destination, string $archi
  * @throws RuntimeException If the download, extraction, or binary verification fails.
  *
  * @return string Path to the mago executable.
+ *
+ * @internal
  */
 function ensure_binary(
     string $version,
@@ -569,6 +601,8 @@ function ensure_binary(
  * @return never
  *
  * @mago-expect lint:no-error-control-operator
+ *
+ * @internal
  */
 function execute(string $executablePath, array $args): never
 {

@@ -1,3 +1,5 @@
+use mago_php_version::PHPVersion;
+use mago_php_version::PHPVersionRange;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -8,6 +10,7 @@ use mago_span::Span;
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::ttype::TypeMetadata;
+use crate::metadata::version_constraint::VersionConstraint;
 use crate::ttype::atomic::TAtomic;
 use crate::visibility::Visibility;
 
@@ -22,6 +25,7 @@ pub struct ClassLikeConstantMetadata {
     pub type_metadata: Option<TypeMetadata>,
     pub inferred_type: Option<TAtomic>,
     pub flags: MetadataFlags,
+    pub version_constraint: VersionConstraint,
 }
 
 impl ClassLikeConstantMetadata {
@@ -36,6 +40,7 @@ impl ClassLikeConstantMetadata {
             type_metadata: None,
             inferred_type: None,
             flags,
+            version_constraint: VersionConstraint::unconstrained(),
         }
     }
 
@@ -45,6 +50,22 @@ impl ClassLikeConstantMetadata {
         }
 
         self.type_declaration = Some(type_declaration);
+    }
+
+    /// Returns `true` when this class constant is available in the given PHP
+    /// version.
+    #[inline]
+    #[must_use]
+    pub fn is_available_in_version(&self, version: PHPVersion) -> bool {
+        self.version_constraint.allows_version(version)
+    }
+
+    /// Returns `true` when this class constant is available across the entire
+    /// supplied [`PHPVersionRange`].
+    #[inline]
+    #[must_use]
+    pub fn is_available_in_version_range(&self, range: PHPVersionRange) -> bool {
+        self.version_constraint.allows_version_range(range)
     }
 }
 

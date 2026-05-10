@@ -19,6 +19,7 @@ use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::docblock::ConstantDocblockComment;
 use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
+use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::resolution::TypeResolutionContext;
 
 #[inline]
@@ -28,6 +29,8 @@ pub fn scan_constant<'arena>(
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
 ) -> Vec<ConstantMetadata> {
+    let verdict = evaluate_version_attributes(&constant.attribute_lists, context, context.php_version);
+
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
     let docblock = ConstantDocblockComment::create(context, constant);
 
@@ -40,6 +43,7 @@ pub fn scan_constant<'arena>(
             let name = ascii_lowercase_constant_name_atom(context.resolved_names.get(&item.name));
 
             let mut metadata = ConstantMetadata::new(name, item.span(), flags);
+            metadata.version_constraint = verdict.constraint.clone();
             metadata.attributes.clone_from(&attributes);
             metadata.inferred_type = infer(context, scope, item.value, None);
 

@@ -1132,6 +1132,7 @@ namespace Dom {
     use Countable;
     use Iterator;
     use IteratorAggregate;
+    use Mago;
 
     /**
      * @var int
@@ -1411,6 +1412,7 @@ namespace Dom {
     /**
      * @implements IteratorAggregate<array-key, Attr>
      */
+    #[Mago\AvailableSince(80400)]
     class NamedNodeMap implements IteratorAggregate, Countable
     {
         /**
@@ -1459,6 +1461,7 @@ namespace Dom {
     /**
      * @implements IteratorAggregate<array-key, Element>
      */
+    #[Mago\AvailableSince(80400)]
     class HTMLCollection implements IteratorAggregate, Countable
     {
         /**
@@ -1627,6 +1630,7 @@ namespace Dom {
         public function rename(?string $namespaceURI, string $qualifiedName): void {}
     }
 
+    #[Mago\AvailableSince(80400)]
     class HTMLElement extends Element {}
 
     class Attr extends Node
@@ -1928,16 +1932,20 @@ namespace Dom {
         public string $title;
     }
 
+    #[Mago\AvailableSince(80400)]
     final class HTMLDocument extends Document
     {
+        #[Mago\AvailableSince(80400)]
         public static function createEmpty(string $encoding = 'UTF-8'): HTMLDocument {}
 
+        #[Mago\AvailableSince(80400)]
         public static function createFromFile(
             string $path,
             int $options = 0,
             ?string $overrideEncoding = null,
         ): HTMLDocument {}
 
+        #[Mago\AvailableSince(80400)]
         public static function createFromString(
             string $source,
             int $options = 0,
@@ -1948,21 +1956,26 @@ namespace Dom {
 
         public function saveXmlFile(string $filename, int $options = 0): int|false {}
 
+        #[Mago\AvailableSince(80400)]
         public function saveHtml(?Node $node = null): string {}
 
         public function saveHtmlFile(string $filename): int|false {}
     }
 
+    #[Mago\AvailableSince(80400)]
     final class XMLDocument extends Document
     {
+        #[Mago\AvailableSince(80400)]
         public static function createEmpty(string $version = '1.0', string $encoding = 'UTF-8'): XMLDocument {}
 
+        #[Mago\AvailableSince(80400)]
         public static function createFromFile(
             string $path,
             int $options = 0,
             ?string $overrideEncoding = null,
         ): XMLDocument {}
 
+        #[Mago\AvailableSince(80400)]
         public static function createFromString(
             string $source,
             int $options = 0,
@@ -1991,6 +2004,7 @@ namespace Dom {
         public function saveXmlFile(string $filename, int $options = 0): int|false {}
     }
 
+    #[Mago\AvailableSince(80400)]
     final class TokenList implements IteratorAggregate, Countable
     {
         private function __construct() {}

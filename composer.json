@@ -16,9 +16,12 @@
     "composer/bin/mago"
   ],
   "autoload": {
+    "psr-4": {
+      "Mago\\": "composer/src/"
+    },
     "files": [
-      "composer/functions.php",
-      "composer/internal.php"
+      "composer/src/functions.php",
+      "composer/src/internal.php"
     ]
   },
   "suggest": {

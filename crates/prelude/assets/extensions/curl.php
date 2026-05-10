@@ -64,6 +64,9 @@ function curl_share_close(CurlShareHandle $share_handle): void {}
 
 function curl_share_init(): CurlShareHandle {}
 
+#[Mago\AvailableSince(80500)]
+function curl_share_init_persistent(): CurlShareHandle {}
+
 function curl_share_setopt(CurlShareHandle $share_handle, int $option, mixed $value): bool {}
 
 function curl_strerror(int $error_code): ?string {}
@@ -128,8 +131,10 @@ function curl_multi_errno(CurlMultiHandle $multi_handle): int {}
 
 function curl_share_errno(CurlShareHandle $share_handle): int {}
 
+#[Mago\AvailableSince(80100)]
 function curl_share_strerror(int $error_code): ?string {}
 
+#[Mago\AvailableSince(80200)]
 function curl_upkeep(CurlHandle $handle): bool {}
 
 final class CurlHandle
@@ -347,6 +352,7 @@ const CURLOPT_CONNECTTIMEOUT_MS = 156;
 
 const CURLOPT_SSL_VERIFYPEER = 64;
 
+#[Mago\AvailableSince(80200)]
 const CURLOPT_CAINFO = 10065;
 
 const CURLOPT_CAPATH = 10097;
@@ -495,8 +501,10 @@ const CURLINFO_HEADER_OUT = 2;
 
 const CURLINFO_PRIVATE = 1048597;
 
+#[Mago\AvailableSince(80100)]
 const CURLINFO_CAPATH = 1048638;
 
+#[Mago\AvailableSince(80100)]
 const CURLINFO_CAINFO = 1048637;
 
 const CURL_VERSION_IPV6 = 1;
@@ -767,6 +775,7 @@ const CURL_HTTP_VERSION_2 = 3;
 
 const CURL_HTTP_VERSION_2TLS = 4;
 
+#[Mago\AvailableSince(80100)]
 const CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE = 5;
 
 const CURLOPT_SASL_IR = 218;
@@ -913,38 +922,50 @@ const CURL_LOCK_DATA_CONNECT = 5;
 
 const CURLSSH_AUTH_GSSAPI = 32;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_FILETIME_T = 6291470;
 
 const CURLOPT_HAPPY_EYEBALLS_TIMEOUT_MS = 271;
 
 const CURLOPT_TIMEVALUE_LARGE = 30270;
 
+#[Mago\AvailableSince(80000)]
 const CURLOPT_DNS_SHUFFLE_ADDRESSES = 275;
 
+#[Mago\AvailableSince(80000)]
 const CURLOPT_HAPROXYPROTOCOL = 274;
 
 const CURL_LOCK_DATA_PSL = 6;
 
 const CURLAUTH_BEARER = 64;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_APPCONNECT_TIME_T = 6291512;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_CONNECT_TIME_T = 6291508;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_NAMELOOKUP_TIME_T = 6291507;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_PRETRANSFER_TIME_T = 6291509;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_REDIRECT_TIME_T = 6291511;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_STARTTRANSFER_TIME_T = 6291510;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_TOTAL_TIME_T = 6291506;
 
 const CURLOPT_DISALLOW_USERNAME_IN_URL = 278;
 
+#[Mago\AvailableSince(80400)]
 const CURLOPT_PROXY_TLS13_CIPHERS = 10277;
 
+#[Mago\AvailableSince(80400)]
 const CURLOPT_TLS13_CIPHERS = 10276;
 
 const CURLOPT_FTP_RESPONSE_TIMEOUT = 112;
@@ -1227,6 +1248,7 @@ const CURL_SSLVERSION_TLSv1_3 = 7;
 
 const CURL_VERSION_HTTPS_PROXY = 2097152;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_PROTOCOL = 2097200;
 
 const CURL_VERSION_ASYNCHDNS = 128;
@@ -1261,6 +1283,7 @@ const CURL_VERSION_KERBEROS5 = 262144;
 
 const CURLOPT_PROXY_CAINFO = 10246;
 
+#[Mago\AvailableSince(80000)]
 const CURLOPT_PROXY_CAPATH = 10247;
 
 const CURLOPT_PROXY_CRLFILE = 10260;
@@ -1295,38 +1318,49 @@ const CURLOPT_PROXY_SSL_VERIFYPEER = 248;
 
 const CURLOPT_PROXY_SSLCERT = 10254;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_SCHEME = 1048625;
 
 const CURL_VERSION_UNIX_SOCKETS = 524288;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_HTTP_VERSION = 2097198;
 
 const CURLOPT_PRE_PROXY = 10262;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_PROXY_SSL_VERIFYRESULT = 2097199;
 
 const CURLOPT_HTTP09_ALLOWED = 285;
 
 const CURL_VERSION_ALTSVC = 16777216;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_DOH_URL = 10279;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_ISSUERCERT_BLOB = 40295;
 
 const CURLOPT_PROXY_ISSUERCERT = 10296;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_PROXY_ISSUERCERT_BLOB = 40297;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_PROXY_SSLCERT_BLOB = 40293;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_PROXY_SSLKEY_BLOB = 40294;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_SSLCERT_BLOB = 40291;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_SSLKEY_BLOB = 40292;
 
 const CURLOPT_XFERINFOFUNCTION = 20219;
 
+#[Mago\AvailableSince(80100)]
 const CURLINFO_EFFECTIVE_METHOD = 1048634;
 
 const CURLOPT_MAXFILESIZE_LARGE = 30117;
@@ -1345,16 +1379,20 @@ const CURLALTSVC_H3 = 32;
 
 const CURLALTSVC_READONLYFILE = 4;
 
+#[Mago\AvailableSince(80000)]
 const CURLOPT_ALTSVC = 10287;
 
+#[Mago\AvailableSince(80000)]
 const CURLOPT_ALTSVC_CTRL = 286;
 
+#[Mago\AvailableSince(80200)]
 const CURLOPT_MAXAGE_CONN = 288;
 
 const CURLOPT_SASL_AUTHZID = 10289;
 
 const CURL_VERSION_HTTP3 = 33554432;
 
+#[Mago\AvailableSince(80000)]
 const CURLINFO_RETRY_AFTER = 6291513;
 
 const CURLMOPT_MAX_CONCURRENT_STREAMS = 16;
@@ -1377,6 +1415,7 @@ const CURLE_PROXY = 97;
 
 const CURLINFO_PROXY_ERROR = 2097211;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_SSL_EC_CURVES = 10298;
 
 const CURLPX_BAD_ADDRESS_TYPE = 1;
@@ -1451,50 +1490,65 @@ const CURLHSTS_ENABLE = 1;
 
 const CURLHSTS_READONLYFILE = 2;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_HSTS = 10300;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_HSTS_CTRL = 299;
 
 const CURL_VERSION_HSTS = 268435456;
 
 const CURLAUTH_AWS_SIGV4 = 128;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_AWS_SIGV4 = 10305;
 
 const CURLINFO_REFERER = 1048636;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_DOH_SSL_VERIFYHOST = 307;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_DOH_SSL_VERIFYPEER = 306;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_DOH_SSL_VERIFYSTATUS = 308;
 
 const CURL_VERSION_GSASL = 536870912;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_CAINFO_BLOB = 40309;
 
+#[Mago\AvailableSince(80100)]
 const CURLOPT_PROXY_CAINFO_BLOB = 40310;
 
 const CURLSSLOPT_AUTO_CLIENT_CERT = 32;
 
+#[Mago\AvailableSince(80200)]
 const CURLOPT_MAXLIFETIME_CONN = 314;
 
 const CURLOPT_SSH_HOST_PUBLIC_KEY_SHA256 = 10311;
 
+#[Mago\AvailableSince(80400)]
 const CURL_HTTP_VERSION_3 = 30;
 
+#[Mago\AvailableSince(80400)]
 const CURL_HTTP_VERSION_3ONLY = 31;
 
+#[Mago\AvailableSince(80200)]
 const CURLOPT_PREREQFUNCTION = 20312;
 
 const CURL_PREREQFUNC_OK = 0;
 
 const CURL_PREREQFUNC_ABORT = 1;
 
+#[Mago\AvailableSince(80400)]
 const CURLOPT_TCP_KEEPCNT = 326;
 
+#[Mago\AvailableSince(80400)]
 const CURLOPT_SERVER_RESPONSE_TIMEOUT = 112;
 
+#[Mago\AvailableSince(80200)]
 const CURLOPT_DEBUGFUNCTION = 1;
 
 const CURLINFO_TEXT = 0;

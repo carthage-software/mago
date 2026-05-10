@@ -56,6 +56,7 @@ use crate::scanner::docblock::TraitUseDocblockComment;
 use crate::scanner::enum_case::scan_enum_case;
 use crate::scanner::property::scan_properties;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
+use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::symbol::SymbolKind;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -315,9 +316,12 @@ fn scan_class_like<'arena>(
         return None;
     }
 
+    let verdict = evaluate_version_attributes(attribute_lists, context, context.php_version);
+
     let flags = MetadataFlags::origin_flags(context.file.file_type);
 
     let mut class_like_metadata = ClassLikeMetadata::new(name, original_name, span, name_span, flags);
+    class_like_metadata.version_constraint = verdict.constraint;
 
     class_like_metadata.attributes = scan_attribute_lists(attribute_lists, context);
     class_like_metadata.enum_type = match enum_type {
@@ -1551,6 +1555,7 @@ fn create_enum_from_method(enum_name: &str, enum_method_span: Span, backing_type
         globals_accessed: AtomSet::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
+        version_constraint: crate::metadata::version_constraint::VersionConstraint::unconstrained(),
     }
 }
 
@@ -1609,6 +1614,7 @@ fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_
         globals_accessed: AtomSet::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
+        version_constraint: crate::metadata::version_constraint::VersionConstraint::unconstrained(),
     }
 }
 
@@ -1668,5 +1674,6 @@ fn create_enum_cases_method(enum_name: &str, enum_method_span: Span, has_cases: 
         globals_accessed: AtomSet::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
+        version_constraint: crate::metadata::version_constraint::VersionConstraint::unconstrained(),
     }
 }

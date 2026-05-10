@@ -8,6 +8,7 @@ use std::time::Instant;
 
 use bumpalo::Bump;
 use foldhash::HashSet;
+use mago_php_version::PHPVersion;
 use rayon::prelude::*;
 
 use mago_atom::AtomSet;
@@ -98,6 +99,7 @@ pub struct ParallelPipeline<T, I, R> {
     symbol_references: SymbolReferences,
     shared_context: T,
     parser_settings: ParserSettings,
+    php_version: PHPVersion,
     reducer: Box<dyn Reducer<I, R> + Send + Sync>,
     should_use_progress_bar: bool,
 }
@@ -140,6 +142,7 @@ where
     R: Send + 'static,
 {
     /// Creates a new `ParallelPipeline`.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         task_name: &'static str,
         database: ReadDatabase,
@@ -147,6 +150,7 @@ where
         symbol_references: SymbolReferences,
         shared_context: T,
         parser_settings: ParserSettings,
+        php_version: PHPVersion,
         reducer: Box<dyn Reducer<I, R> + Send + Sync>,
         should_use_progress_bar: bool,
     ) -> Self {
@@ -157,6 +161,7 @@ where
             symbol_references,
             shared_context,
             parser_settings,
+            php_version,
             reducer,
             should_use_progress_bar,
         }
@@ -209,6 +214,7 @@ where
         };
 
         let parser_settings = self.parser_settings;
+        let php_version = self.php_version;
         #[cfg(not(target_arch = "wasm32"))]
         let source_count = source_files.len();
 
@@ -233,7 +239,7 @@ where
 
                     let file_signature = signature_builder::build_file_signature(&file, program, &resolved_names);
 
-                    let mut metadata = scan_program(arena, &file, program, &resolved_names);
+                    let mut metadata = scan_program(arena, &file, program, &resolved_names, php_version);
                     metadata.set_file_signature(file.id, file_signature);
 
                     arena.reset();

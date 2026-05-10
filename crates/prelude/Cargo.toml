@@ -22,9 +22,10 @@ bumpalo = { workspace = true, optional = true }
 rust-embed = { workspace = true, optional = true }
 mago-syntax = { workspace = true, optional = true }
 mago-names = { workspace = true, optional = true }
+mago-php-version = { workspace = true, optional = true }
 
 [features]
-build = ["bumpalo", "rust-embed", "mago-syntax", "mago-names"]
+build = ["bumpalo", "rust-embed", "mago-syntax", "mago-names", "mago-php-version"]
 
 [dev-dependencies]
 criterion = { workspace = true }

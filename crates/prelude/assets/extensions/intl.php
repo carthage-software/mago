@@ -713,8 +713,10 @@ class IntlGregorianCalendar extends IntlCalendar
      */
     public function isLeapYear(int $year): bool {}
 
+    #[Mago\AvailableSince(80300)]
     public static function createFromDate(int $year, int $month, int $dayOfMonth): static {}
 
+    #[Mago\AvailableSince(80300)]
     public static function createFromDateTime(
         int $year,
         int $month,
@@ -1002,6 +1004,7 @@ class IntlCalendar
 
     public function setDate(int $year, int $month, int $dayOfMonth): void {}
 
+    #[Mago\AvailableSince(80300)]
     public function setDateTime(
         int $year,
         int $month,
@@ -1132,6 +1135,7 @@ class IntlTimeZone
     public static function getIanaID(string $timezoneId): string|false {}
 }
 
+#[Mago\AvailableSince(80400)]
 final class IntlListFormatter
 {
     public const int TYPE_AND = 0;
@@ -1585,6 +1589,24 @@ function grapheme_strstr(string $haystack, string $needle, bool $beforeNeedle = 
  * @pure
  */
 function grapheme_stristr(string $haystack, string $needle, bool $beforeNeedle = false): string|false {}
+
+/**
+ * @pure
+ */
+#[Mago\AvailableSince(80600)]
+function grapheme_strrev(string $string): string {}
+
+/**
+ * @pure
+ */
+#[Mago\AvailableSince(80500)]
+function grapheme_levenshtein(
+    string $string1,
+    string $string2,
+    int $insertionCost = 1,
+    int $replacementCost = 1,
+    int $deletionCost = 1,
+): int {}
 
 /**
  * @param-out int $next
@@ -2069,8 +2091,10 @@ function intltz_get_windows_id(string $timezoneId): string|false {}
 
 function intltz_get_id_for_windows_id(string $timezoneId, ?string $region = null): string|false {}
 
+#[Mago\AvailableSince(80400)]
 function grapheme_str_split(string $string, int $length = 1): array|false {}
 
+#[Mago\AvailableSince(80000)]
 function intltz_get_iana_id(string $timezoneId): string|false {}
 
 const INTL_MAX_LOCALE_LEN = 156;
@@ -3532,6 +3556,7 @@ class IntlChar
     public static function toupper(int|string $codepoint): string|int|null {}
 }
 
+#[Mago\AvailableSince(80100)]
 class IntlDatePatternGenerator
 {
     public function __construct(?string $locale = null) {}

@@ -46,6 +46,7 @@ use crate::scanner::parameter::scan_function_like_parameter_with_constants;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
 use crate::scanner::ttype::merge_type_preserving_nullability;
+use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::builder;
 use crate::ttype::get_mixed;
 use crate::ttype::resolution::TypeResolutionContext;
@@ -60,7 +61,7 @@ pub fn scan_method<'arena>(
     context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: Option<TypeResolutionContext>,
-) -> FunctionLikeMetadata {
+) -> Option<FunctionLikeMetadata> {
     let span = method.span();
 
     let mut flags = MetadataFlags::origin_flags(context.file.file_type);
@@ -69,7 +70,10 @@ pub fn scan_method<'arena>(
         flags |= MetadataFlags::BY_REFERENCE;
     }
 
+    let verdict = evaluate_version_attributes(&method.attribute_lists, context, context.php_version);
+
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Method, span, flags);
+    metadata.version_constraint = verdict.constraint;
     metadata.attributes = scan_attribute_lists(&method.attribute_lists, context);
     metadata.type_resolution_context = type_resolution_context.filter(|c| !c.is_empty());
     metadata.name = Some(ascii_lowercase_atom(method.name.value));
@@ -80,7 +84,7 @@ pub fn scan_method<'arena>(
         .parameter_list
         .parameters
         .iter()
-        .map(|p| scan_function_like_parameter(p, Some(class_like_metadata.name), context, scope))
+        .filter_map(|p| scan_function_like_parameter(p, Some(class_like_metadata.name), context, scope))
         .collect();
 
     if let Some(return_hint) = method.return_type_hint.as_ref() {
@@ -139,7 +143,7 @@ pub fn scan_method<'arena>(
         metadata.flags |= MetadataFlags::SUSPENDS_FIBER;
     }
 
-    metadata
+    Some(metadata)
 }
 
 #[inline]
@@ -151,7 +155,9 @@ pub fn scan_function<'arena>(
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
     constants: Option<&AtomMap<ConstantMetadata>>,
-) -> FunctionLikeMetadata {
+) -> Option<FunctionLikeMetadata> {
+    let verdict = evaluate_version_attributes(&function.attribute_lists, context, context.php_version);
+
     let mut flags = MetadataFlags::origin_flags(context.file.file_type);
 
     if utils::block_has_yield(&function.body) {
@@ -169,6 +175,7 @@ pub fn scan_function<'arena>(
     let name = context.resolved_names.get(&function.name);
 
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Function, function.span(), flags);
+    metadata.version_constraint = verdict.constraint;
     collect_globals_into(&function.body, &mut metadata.globals_accessed);
 
     metadata.name = Some(ascii_lowercase_atom(name));
@@ -178,7 +185,7 @@ pub fn scan_function<'arena>(
         .parameter_list
         .parameters
         .iter()
-        .map(|p| scan_function_like_parameter_with_constants(p, classname, context, scope, constants))
+        .filter_map(|p| scan_function_like_parameter_with_constants(p, classname, context, scope, constants))
         .collect();
 
     metadata.attributes = scan_attribute_lists(&function.attribute_lists, context);
@@ -201,7 +208,7 @@ pub fn scan_function<'arena>(
         metadata.flags |= MetadataFlags::DEPRECATED;
     }
 
-    metadata
+    Some(metadata)
 }
 
 #[inline]
@@ -230,7 +237,11 @@ pub fn scan_closure<'arena>(
     }
 
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Closure, span, flags).with_parameters(
-        closure.parameter_list.parameters.iter().map(|p| scan_function_like_parameter(p, classname, context, scope)),
+        closure
+            .parameter_list
+            .parameters
+            .iter()
+            .filter_map(|p| scan_function_like_parameter(p, classname, context, scope)),
     );
     collect_globals_into(&closure.body, &mut metadata.globals_accessed);
 
@@ -283,7 +294,7 @@ pub fn scan_arrow_function<'arena>(
             .parameter_list
             .parameters
             .iter()
-            .map(|p| scan_function_like_parameter(p, classname, context, scope)),
+            .filter_map(|p| scan_function_like_parameter(p, classname, context, scope)),
     );
 
     metadata.attributes = scan_attribute_lists(&arrow_function.attribute_lists, context);

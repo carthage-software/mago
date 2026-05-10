@@ -514,12 +514,14 @@ const MYSQLI_REFRESH_THREADS = UNKNOWN;
  * @var int
  */
 #[Deprecated(since: '8.4', message: 'as mysqli_refresh() is deprecated')]
+#[Mago\AvailableSince(80100)]
 const MYSQLI_REFRESH_REPLICA = UNKNOWN;
 
 /**
  * @var int
  */
 #[Deprecated(since: '8.4', message: 'as mysqli_refresh() is deprecated')]
+#[Mago\AvailableUntil(80399)]
 const MYSQLI_REFRESH_SLAVE = UNKNOWN;
 
 /**
@@ -684,7 +686,8 @@ class mysqli
     public function __construct(
         ?string $hostname = null,
         ?string $username = null,
-        #[\SensitiveParameter] ?string $password = null,
+        #[SensitiveParameter]
+        ?string $password = null,
         ?string $database = null,
         ?int $port = null,
         ?string $socket = null,
@@ -705,7 +708,8 @@ class mysqli
     public function connect(
         ?string $hostname = null,
         ?string $username = null,
-        #[\SensitiveParameter] ?string $password = null,
+        #[SensitiveParameter]
+        ?string $password = null,
         ?string $database = null,
         ?int $port = null,
         ?string $socket = null,
@@ -767,7 +771,8 @@ class mysqli
     public function real_connect(
         ?string $hostname = null,
         ?string $username = null,
-        #[\SensitiveParameter] ?string $password = null,
+        #[SensitiveParameter]
+        ?string $password = null,
         ?string $database = null,
         ?int $port = null,
         ?string $socket = null,
@@ -1015,7 +1020,8 @@ function mysqli_begin_transaction(mysqli $mysql, int $flags = 0, ?string $name =
 function mysqli_change_user(
     mysqli $mysql,
     string $username,
-    #[\SensitiveParameter] string $password,
+    #[SensitiveParameter]
+    string $password,
     ?string $database,
 ): bool {}
 
@@ -1030,7 +1036,8 @@ function mysqli_commit(mysqli $mysql, int $flags = 0, ?string $name = null): boo
 function mysqli_connect(
     ?string $hostname = null,
     ?string $username = null,
-    #[\SensitiveParameter] ?string $password = null,
+    #[SensitiveParameter]
+    ?string $password = null,
     ?string $database = null,
     ?int $port = null,
     ?string $socket = null,
@@ -1060,6 +1067,7 @@ function mysqli_stmt_execute(mysqli_stmt $statement, ?array $params = null): boo
 #[Deprecated(since: '8.5', message: 'use mysqli_stmt_execute() instead')]
 function mysqli_execute(mysqli_stmt $statement, ?array $params = null): bool {}
 
+#[Mago\AvailableSince(80200)]
 function mysqli_execute_query(mysqli $mysql, string $query, ?array $params = null): mysqli_result|bool {}
 
 function mysqli_fetch_field(mysqli_result $result): object|false {}
@@ -1102,6 +1110,7 @@ function mysqli_fetch_object(
  */
 function mysqli_fetch_row(mysqli_result $result): array|null|false {}
 
+#[Mago\AvailableSince(80100)]
 function mysqli_fetch_column(mysqli_result $result, int $column = 0): null|int|float|string|false {}
 
 function mysqli_field_count(mysqli $mysql): int {}
@@ -1188,7 +1197,8 @@ function mysqli_real_connect(
     mysqli $mysql,
     ?string $hostname = null,
     ?string $username = null,
-    #[\SensitiveParameter] ?string $password = null,
+    #[SensitiveParameter]
+    ?string $password = null,
     ?string $database = null,
     ?int $port = null,
     ?string $socket = null,
@@ -1198,6 +1208,9 @@ function mysqli_real_connect(
 function mysqli_real_escape_string(mysqli $mysql, string $string): string {}
 
 function mysqli_escape_string(mysqli $mysql, string $string): string {}
+
+#[Mago\AvailableSince(80600)]
+function mysqli_quote_string(mysqli $mysql, string $string, int $quoting_style = 1): string {}
 
 function mysqli_real_query(mysqli $mysql, string $query): bool {}
 

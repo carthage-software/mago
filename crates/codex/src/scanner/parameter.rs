@@ -14,6 +14,8 @@ use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::inference::infer_with_constants;
 use crate::scanner::ttype::get_type_metadata_from_hint;
+use crate::scanner::version_claim::TypeOverride;
+use crate::scanner::version_claim::evaluate_version_attributes;
 
 #[inline]
 pub fn scan_function_like_parameter<'arena>(
@@ -21,7 +23,7 @@ pub fn scan_function_like_parameter<'arena>(
     classname: Option<Atom>,
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
-) -> FunctionLikeParameterMetadata {
+) -> Option<FunctionLikeParameterMetadata> {
     scan_function_like_parameter_with_constants(parameter, classname, context, scope, None)
 }
 
@@ -32,7 +34,12 @@ pub fn scan_function_like_parameter_with_constants<'arena>(
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
     constants: Option<&AtomMap<ConstantMetadata>>,
-) -> FunctionLikeParameterMetadata {
+) -> Option<FunctionLikeParameterMetadata> {
+    let verdict = evaluate_version_attributes(&parameter.attribute_lists, context, context.php_version);
+    if !verdict.is_available(context.php_version) {
+        return None;
+    }
+
     let mut flags = MetadataFlags::origin_flags(context.file.file_type);
 
     if parameter.ellipsis.is_some() {
@@ -69,5 +76,16 @@ pub fn scan_function_like_parameter_with_constants<'arena>(
             });
     }
 
-    metadata
+    if let Some(optional) = verdict.optional {
+        metadata.flags.set(MetadataFlags::HAS_DEFAULT, optional);
+    }
+
+    if matches!(verdict.type_override, Some(TypeOverride::Untyped)) {
+        metadata.type_declaration_metadata = None;
+        metadata.type_metadata = None;
+    }
+    // TypedWith* type-string parsing isn't wired to the type resolver yet; the
+    // claim is still recognized, just left as a no-op until that lands.
+
+    Some(metadata)
 }

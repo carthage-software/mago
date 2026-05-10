@@ -283,7 +283,7 @@ mod tests {
 
         let resolver = NameResolver::new(&arena);
         let resolved_names = resolver.resolve(program);
-        let mut codebase = scan_program(&arena, &source_file, program, &resolved_names);
+        let mut codebase = scan_program(&arena, &source_file, program, &resolved_names, config.settings.version);
         let mut symbol_references = SymbolReferences::new();
 
         populate_codebase(&mut codebase, &mut symbol_references, AtomSet::default(), HashSet::default());

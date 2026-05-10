@@ -86,9 +86,11 @@ class XMLReader
     /** @return bool|XMLReader */
     public static function open(string $uri, ?string $encoding = null, int $flags = 0) {}
 
+    #[Mago\AvailableSince(80400)]
     public static function fromUri(string $uri, ?string $encoding = null, int $flags = 0): static {}
 
     /** @param resource $stream */
+    #[Mago\AvailableSince(80400)]
     public static function fromStream(
         $stream,
         ?string $encoding = null,
@@ -113,6 +115,7 @@ class XMLReader
     /** @return bool|XMLReader */
     public static function XML(string $source, ?string $encoding = null, int $flags = 0) {}
 
+    #[Mago\AvailableSince(80400)]
     public static function fromString(string $source, ?string $encoding = null, int $flags = 0): static {}
 
     public function expand(?DOMNode $baseNode = null): DOMNode|false {}

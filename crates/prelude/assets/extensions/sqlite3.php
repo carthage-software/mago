@@ -60,6 +60,7 @@ const SQLITE3_OPEN_CREATE = UNKNOWN;
  */
 const SQLITE3_DETERMINISTIC = UNKNOWN;
 
+#[Mago\AvailableSince(80300)]
 class SQLite3Exception extends \Exception {}
 
 class SQLite3

@@ -11,6 +11,7 @@ use mago_atom::u64_atom;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
+use mago_php_version::PHPVersion;
 use mago_span::HasSpan;
 use mago_syntax::ast::AnonymousClass;
 use mago_syntax::ast::ArrowFunction;
@@ -75,15 +76,24 @@ pub mod inference;
 mod parameter;
 mod property;
 mod ttype;
+mod version_claim;
 
+/// Scans a parsed PHP program into a [`CodebaseMetadata`] snapshot, gating
+/// each `Mago\AvailableSince` / `Mago\AvailableUntil` symbol against the
+/// configured PHP version on the way in.
+///
+/// Items whose claims exclude `version` are simply not inserted,
+/// so the resulting metadata is already version-correct and downstream
+/// consumers don't need a separate filter pass.
 #[inline]
 pub fn scan_program<'arena, 'ctx>(
     arena: &'arena Bump,
     file: &'ctx File,
     program: &'arena Program<'arena>,
     resolved_names: &'ctx ResolvedNames<'arena>,
+    php_version: PHPVersion,
 ) -> CodebaseMetadata {
-    let mut context = Context::new(arena, file, program, resolved_names);
+    let mut context = Context::new(arena, file, program, resolved_names, php_version);
     let mut scanner = Scanner::new();
 
     scanner.walk_program(program, &mut context);
@@ -97,6 +107,9 @@ struct Context<'ctx, 'arena> {
     pub file: &'ctx File,
     pub program: &'arena Program<'arena>,
     pub resolved_names: &'arena ResolvedNames<'arena>,
+    /// PHP version configured for this scan, used to evaluate `Mago\*`
+    /// version-gating attributes inline.
+    pub php_version: PHPVersion,
 }
 
 impl<'ctx, 'arena> Context<'ctx, 'arena> {
@@ -105,8 +118,9 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
         file: &'ctx File,
         program: &'arena Program<'arena>,
         resolved_names: &'arena ResolvedNames<'arena>,
+        php_version: PHPVersion,
     ) -> Self {
-        Self { arena, file, program, resolved_names }
+        Self { arena, file, program, resolved_names, php_version }
     }
 
     pub fn get_docblock(&self, node: impl HasSpan) -> Option<&'arena Trivia<'arena>> {
@@ -295,7 +309,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
 
         let name = ascii_lowercase_atom(context.resolved_names.get(&function.name));
         let identifier = (empty_atom(), name);
-        let mut metadata = scan_function(
+        let Some(mut metadata) = scan_function(
             identifier,
             function,
             self.stack.last().copied(),
@@ -303,7 +317,11 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             &mut self.scope,
             type_context,
             Some(&self.codebase.constants),
-        );
+        ) else {
+            // Push an empty frame so the matching `walk_out_function` pop balances.
+            self.template_constraints.push(vec![]);
+            return;
+        };
 
         self.template_constraints.push({
             let mut constraints: TemplateConstraintList = vec![];
@@ -552,14 +570,21 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
             context
         };
 
-        let mut function_like_metadata = scan_method(
+        let Some(mut function_like_metadata) = scan_method(
             method_id,
             method,
             &class_like_metadata,
             context,
             &mut self.scope,
             Some(type_resolution_context),
-        );
+        ) else {
+            // Restore the class-like metadata we removed above so the next method on
+            // this class can still find it, and push an empty template-constraints
+            // frame so the matching `walk_out_method` pop balances.
+            self.codebase.class_likes.insert(current_class, class_like_metadata);
+            self.template_constraints.push(vec![]);
+            return;
+        };
 
         #[allow(clippy::unreachable)]
         let Some(method_metadata) = &function_like_metadata.method_metadata else {
@@ -710,6 +735,7 @@ mod polyfill_tests {
     use mago_database::DatabaseReader;
     use mago_database::file::File;
     use mago_names::resolver::NameResolver;
+    use mago_php_version::PHPVersion;
     use mago_syntax::parser::parse_file;
 
     use crate::metadata::CodebaseMetadata;
@@ -728,7 +754,7 @@ mod polyfill_tests {
             let program = parse_file(&arena, &file);
             assert!(!program.has_errors(), "parse failed: {:?}", program.errors);
             let resolved_names = NameResolver::new(&arena).resolve(program);
-            codebase.extend(scan_program(&arena, &file, program, &resolved_names));
+            codebase.extend(scan_program(&arena, &file, program, &resolved_names, PHPVersion::LATEST));
         }
         codebase
     }

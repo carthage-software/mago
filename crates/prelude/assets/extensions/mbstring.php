@@ -6,14 +6,19 @@ const MB_CASE_LOWER = 1;
 
 const MB_CASE_TITLE = 2;
 
+#[Mago\AvailableSince(70300)]
 const MB_CASE_FOLD = 3;
 
+#[Mago\AvailableSince(70300)]
 const MB_CASE_UPPER_SIMPLE = 4;
 
+#[Mago\AvailableSince(70300)]
 const MB_CASE_LOWER_SIMPLE = 5;
 
+#[Mago\AvailableSince(70300)]
 const MB_CASE_TITLE_SIMPLE = 6;
 
+#[Mago\AvailableSince(70300)]
 const MB_CASE_FOLD_SIMPLE = 7;
 
 const MB_ONIGURUMA_VERSION = '6.9.9';
@@ -425,6 +430,7 @@ function mbereg_search_setpos($position) {}
  */
 function mb_str_split(string $string, int $length = 1, ?string $encoding = null): array {}
 
+#[Mago\AvailableSince(80300)]
 function mb_str_pad(
     string $string,
     int $length,
@@ -433,12 +439,14 @@ function mb_str_pad(
     ?string $encoding = null,
 ): string {}
 
+#[Mago\AvailableSince(80400)]
 function mb_ucfirst(string $string, ?string $encoding = null): string {}
 
 function mb_lcfirst(string $string, ?string $encoding = null): string {}
 
 function mb_trim(string $string, ?string $characters = null, ?string $encoding = null): string {}
 
+#[Mago\AvailableSince(80400)]
 function mb_ltrim(string $string, ?string $characters = null, ?string $encoding = null): string {}
 
 function mb_rtrim(string $string, ?string $characters = null, ?string $encoding = null): string {}

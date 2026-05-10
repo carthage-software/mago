@@ -24,6 +24,7 @@ function json_last_error_msg(): string {}
 /**
  * @pure
  */
+#[Mago\AvailableSince(80300)]
 function json_validate(string $json, int $depth = 512, int $flags = 0): bool {}
 
 const JSON_HEX_TAG = 1;
@@ -44,6 +45,7 @@ const JSON_PRETTY_PRINT = 128;
 
 const JSON_UNESCAPED_UNICODE = 256;
 
+#[Mago\AvailableSince(80000)]
 const JSON_PARTIAL_OUTPUT_ON_ERROR = 512;
 
 const JSON_ERROR_STATE_MISMATCH = 2;
@@ -82,6 +84,8 @@ const JSON_ERROR_INVALID_PROPERTY_NAME = 9;
 
 const JSON_ERROR_UTF16 = 10;
 
+#[Mago\AvailableSince(80000)]
 const JSON_THROW_ON_ERROR = 4194304;
 
+#[Mago\AvailableSince(80300)]
 const JSON_ERROR_NON_BACKED_ENUM = 11;

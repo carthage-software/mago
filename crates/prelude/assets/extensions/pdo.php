@@ -772,8 +772,10 @@ namespace {
 }
 
 namespace Pdo {
+    use Mago;
     use PDO;
 
+    #[Mago\AvailableSince(80400)]
     class Sqlite extends PDO
     {
         public const int DETERMINISTIC = 0;
@@ -807,6 +809,7 @@ namespace Pdo {
         ) {}
     }
 
+    #[Mago\AvailableSince(80400)]
     class Mysql extends PDO
     {
         public const int ATTR_USE_BUFFERED_QUERY = 0;
@@ -832,6 +835,7 @@ namespace Pdo {
         public function getWarningCount(): int {}
     }
 
+    #[Mago\AvailableSince(80400)]
     class Pgsql extends PDO
     {
         public const int ATTR_DISABLE_PREPARES = 1000;

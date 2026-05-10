@@ -1,8 +1,5 @@
 <?php
 
-use JetBrains\PhpStorm\Internal\LanguageLevelTypeAware;
-use JetBrains\PhpStorm\Internal\PhpStormStubsElementAvailable;
-
 class SodiumException extends Exception {}
 
 function sodium_crypto_core_ristretto255_add(string $p, string $q): string {}
@@ -35,10 +32,12 @@ function sodium_crypto_scalarmult_ristretto255(string $n, string $p): string {}
 
 function sodium_crypto_scalarmult_ristretto255_base(string $n): string {}
 
+#[Mago\AvailableSince(80100)]
 function sodium_crypto_stream_xchacha20(int $length, string $nonce, string $key): string {}
 
 function sodium_crypto_stream_xchacha20_xor(string $message, string $nonce, string $key): string {}
 
+#[Mago\AvailableSince(80200)]
 function sodium_crypto_stream_xchacha20_xor_ic(string $message, string $nonce, int $counter, string $key): string {}
 
 function sodium_crypto_stream_xchacha20_keygen(): string {}
@@ -674,8 +673,10 @@ const SODIUM_CRYPTO_PWHASH_SALTBYTES = 16;
 
 const SODIUM_CRYPTO_PWHASH_STRPREFIX = '$argon2id$';
 
+#[Mago\AvailableSince(80100)]
 const SODIUM_CRYPTO_STREAM_XCHACHA20_NONCEBYTES = 24;
 
+#[Mago\AvailableSince(80100)]
 const SODIUM_CRYPTO_STREAM_XCHACHA20_KEYBYTES = 32;
 
 const SODIUM_CRYPTO_SCALARMULT_RISTRETTO255_BYTES = 32;

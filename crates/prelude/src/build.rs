@@ -84,5 +84,5 @@ fn scan_file_for_metadata(source_file: &File, arena: &Bump) -> CodebaseMetadata 
     let resolver = NameResolver::new(arena);
     let resolved_names = resolver.resolve(program);
 
-    scan_program(arena, source_file, program, &resolved_names)
+    scan_program(arena, source_file, program, &resolved_names, mago_php_version::PHPVersion::LATEST)
 }

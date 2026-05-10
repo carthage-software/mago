@@ -1,6 +1,7 @@
 <?php
 
 /** @var int */
+#[Mago\AvailableSince(80100)]
 const IMG_AVIF = 256;
 
 /** @var int */
@@ -357,6 +358,7 @@ function imagecreatefromstring(string $data): GdImage|false {}
 /**
  * @psalm-ignore-falsable-return
  */
+#[Mago\AvailableSince(80100)]
 function imagecreatefromavif(string $filename): GdImage|false {}
 
 /**
@@ -414,10 +416,12 @@ function imagecreatefrombmp(string $filename): GdImage|false {}
 /**
  * @psalm-ignore-falsable-return
  */
+#[Mago\AvailableSince(80400)]
 function imagecreatefromtga(string $filename): GdImage|false {}
 
 function imagexbm(GdImage $image, ?string $filename, ?int $foreground_color = null): bool {}
 
+#[Mago\AvailableSince(80100)]
 function imageavif(GdImage $image, $file = null, int $quality = -1, int $speed = -1): bool {}
 
 function imagegif(GdImage $image, $file = null): bool {}

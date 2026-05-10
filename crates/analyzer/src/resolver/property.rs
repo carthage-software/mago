@@ -586,6 +586,14 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
         return None;
     };
 
+    let property_display_name = format!("{}::{}", declaring_class_metadata.original_name, prop_name);
+    crate::utils::availability::check_property_availability(
+        context,
+        property_metadata,
+        &property_display_name,
+        selector.span(),
+    );
+
     // For assignment, use set hook parameter type when not accessing backing store directly
     let mut property_type = if for_assignment {
         if let Some(set_hook) = property_metadata.hooks.get(&atom("set"))

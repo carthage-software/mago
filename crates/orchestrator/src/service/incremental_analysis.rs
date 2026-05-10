@@ -256,6 +256,7 @@ impl IncrementalAnalysisService {
         }
 
         let parser_settings = self.parser_settings;
+        let php_version = self.settings.version;
         let per_file_results: Vec<(FileId, u64, CodebaseMetadata)> = source_files
             .into_par_iter()
             .map_init(Bump::new, |arena, file| {
@@ -274,7 +275,7 @@ impl IncrementalAnalysisService {
                 let resolved_names = resolver.resolve(program);
 
                 let file_signature = signature_builder::build_file_signature(&file, program, &resolved_names);
-                let mut metadata = scan_program(arena, &file, program, &resolved_names);
+                let mut metadata = scan_program(arena, &file, program, &resolved_names, php_version);
                 metadata.set_file_signature(file.id, file_signature);
 
                 arena.reset();
@@ -447,6 +448,7 @@ impl IncrementalAnalysisService {
         }
 
         let parser_settings = self.parser_settings;
+        let php_version = self.settings.version;
         let new_file_scans: Vec<(FileId, CodebaseMetadata)> = changed_files
             .into_par_iter()
             .map_init(Bump::new, |arena, file| {
@@ -462,7 +464,7 @@ impl IncrementalAnalysisService {
                 let resolver = NameResolver::new(arena);
                 let resolved_names = resolver.resolve(program);
 
-                let mut metadata = scan_program(arena, file, program, &resolved_names);
+                let mut metadata = scan_program(arena, file, program, &resolved_names, php_version);
                 metadata.set_file_signature(
                     file.id,
                     signature_builder::build_file_signature(file, program, &resolved_names),

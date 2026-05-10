@@ -29,6 +29,7 @@ schemars = { workspace = true }
 
 [dev-dependencies]
 mago-syntax = { workspace = true }
+mago-php-version = { workspace = true }
 mago-prelude = { workspace = true, features = ["build"] }
 indoc = { workspace = true }
 toml = { workspace = true }

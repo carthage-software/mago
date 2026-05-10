@@ -984,6 +984,7 @@ class php_user_filter
     public function onClose(): void {}
 }
 
+#[Mago\AvailableSince(80400)]
 final class StreamBucket
 {
     public $bucket;
@@ -1597,6 +1598,7 @@ function localeconv(): array {}
  *
  * @since 8.4
  */
+#[Mago\AvailableSince(80400)]
 function array_find(array $array, callable $callback): mixed {}
 
 /**
@@ -1610,6 +1612,7 @@ function array_find(array $array, callable $callback): mixed {}
  *
  * @since 8.4
  */
+#[Mago\AvailableSince(80400)]
 function array_find_key(array $array, callable $callback): mixed {}
 
 /**
@@ -1621,6 +1624,7 @@ function array_find_key(array $array, callable $callback): mixed {}
  *
  * @since 8.4
  */
+#[Mago\AvailableSince(80400)]
 function array_any(array $array, callable $callback): bool {}
 
 /**
@@ -1632,6 +1636,7 @@ function array_any(array $array, callable $callback): bool {}
  *
  * @since 8.4
  */
+#[Mago\AvailableSince(80400)]
 function array_all(array $array, callable $callback): bool {}
 
 /**
@@ -1644,6 +1649,7 @@ function http_get_last_response_headers(): ?array {}
 /**
  * @since 8.4
  */
+#[Mago\AvailableSince(80400)]
 function http_clear_last_response_headers(): void {}
 
 /**
@@ -1655,6 +1661,7 @@ function request_parse_body(?array $options = null): array {}
 
 function fpow(float $num, float $exponent): float {}
 
+#[Mago\AvailableSince(80400)]
 enum RoundingMode implements UnitEnum
 {
     case HalfAwayFromZero;
@@ -1665,6 +1672,13 @@ enum RoundingMode implements UnitEnum
     case AwayFromZero;
     case NegativeInfinity;
     case PositiveInfinity;
+}
+
+#[Mago\AvailableSince(80600)]
+enum SortDirection implements UnitEnum
+{
+    case Ascending;
+    case Descending;
 }
 
 /**
@@ -2185,6 +2199,7 @@ function fmod(float $num1, float $num2): float {}
 /**
  * @pure
  */
+#[Mago\AvailableSince(80000)]
 function fdiv(float $num1, float $num2): float {}
 
 /**
@@ -2431,6 +2446,7 @@ function is_array(mixed $value): bool {}
  *
  * @pure
  */
+#[Mago\AvailableSince(80100)]
 function array_is_list(array $array): bool {}
 
 /**
@@ -2591,6 +2607,7 @@ function fflush($stream): bool {}
 /**
  * @param resource $stream
  */
+#[Mago\AvailableSince(80100)]
 function fsync($stream): bool {}
 
 /**
@@ -2735,6 +2752,7 @@ function memory_get_usage(bool $real_usage = false): int {}
 
 function memory_get_peak_usage(bool $real_usage = false): int {}
 
+#[Mago\AvailableSince(80200)]
 function memory_reset_peak_usage(): void {}
 
 /**
@@ -2796,6 +2814,7 @@ function ini_alter(string $option, string|int|float|bool|null $value): string|fa
 
 function ini_restore(string $option): void {}
 
+#[Mago\AvailableSince(80200)]
 function ini_parse_quantity(string $shorthand): int {}
 
 function get_include_path(): string|false {}
@@ -2991,6 +3010,7 @@ function stream_context_set_option($stream_or_context, array $options): bool {}
 /**
  * @param resource $context
  */
+#[Mago\AvailableSince(80300)]
 function stream_context_set_options($context, array $options): bool {}
 
 /**
@@ -3884,6 +3904,7 @@ function array_key_first(array $array): string|int|null {}
  *
  * @pure
  */
+#[Mago\AvailableSince(80500)]
 function array_first(array $array): mixed {}
 
 /**
@@ -3906,6 +3927,7 @@ function array_key_last(array $array): string|int|null {}
  *
  * @pure
  */
+#[Mago\AvailableSince(80500)]
 function array_last(array $array): mixed {}
 
 /**
@@ -4012,6 +4034,7 @@ function get_mangled_object_vars(object $object): array {}
  *
  * @pure
  */
+#[Mago\AvailableSince(80000)]
 function get_debug_type(mixed $value): string {}
 
 /**
@@ -4284,6 +4307,22 @@ function min(mixed $value, mixed ...$values): mixed {}
  * @pure
  */
 function max(mixed $value, mixed ...$values): mixed {}
+
+/**
+ * Restrict `$num` to the inclusive range `[$min, $max]`.
+ *
+ * @template T of int|float
+ *
+ * @param T $num
+ * @param T $min
+ * @param T $max
+ *
+ * @return T
+ *
+ * @pure
+ */
+#[Mago\AvailableSince(80600)]
+function clamp(int|float $num, int|float $min, int|float $max): int|float {}
 
 /**
  * @template T

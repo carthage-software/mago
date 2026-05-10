@@ -387,6 +387,17 @@ fn get_function_like_target_inner<'ctx>(
         return None;
     };
 
+    let display_name = display_function_like_identifier(context, &identifier);
+    match identifier {
+        FunctionLikeIdentifier::Function(_) => {
+            crate::utils::availability::check_function_availability(context, metadata, &display_name, span);
+        }
+        FunctionLikeIdentifier::Method(..) => {
+            crate::utils::availability::check_method_availability(context, metadata, &display_name, span);
+        }
+        FunctionLikeIdentifier::Closure(..) => {}
+    }
+
     // If this is a method, we need to create a method context so that static types can be resolved properly
     let method_context = if let Some(original_class_name) = original_class_for_method_context {
         // Look up the class metadata for the class this method is being called on (not where it's declared)

@@ -1108,7 +1108,8 @@ mod tests {
             let program = parse_file(&arena, &file);
             assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
             let resolved_names = NameResolver::new(&arena).resolve(program);
-            let program_codebase = scan_program(&arena, &file, program, &resolved_names);
+            let program_codebase =
+                scan_program(&arena, &file, program, &resolved_names, mago_php_version::PHPVersion::LATEST);
 
             codebase.extend(program_codebase);
         }

@@ -8,6 +8,7 @@ const SNMP_OID_OUTPUT_SUFFIX = UNKNOWN;
 /**
  * @var int
  */
+#[Mago\AvailableSince(80100)]
 const SNMP_OID_OUTPUT_MODULE = UNKNOWN;
 
 /**

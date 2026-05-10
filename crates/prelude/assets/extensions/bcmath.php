@@ -95,18 +95,21 @@ namespace {
      * @param numeric-string $num
      * @return numeric-string
      */
+    #[Mago\AvailableSince(80400)]
     function bcfloor(string $num): string {}
 
     /**
      * @param numeric-string $num
      * @return numeric-string
      */
+    #[Mago\AvailableSince(80400)]
     function bcceil(string $num): string {}
 
     /**
      * @param numeric-string $num
      * @return numeric-string
      */
+    #[Mago\AvailableSince(80400)]
     function bcround(string $num, int $precision = 0, RoundingMode $mode = RoundingMode::HalfAwayFromZero): string {}
 
     /**
@@ -115,10 +118,14 @@ namespace {
      * @param non-negative-int|null $scale
      * @return array{0: numeric-string, 1: numeric-string}
      */
+    #[Mago\AvailableSince(80400)]
     function bcdivmod(string $num1, string $num2, ?int $scale = null): array {}
 }
 
 namespace BcMath {
+    use Mago;
+
+    #[Mago\AvailableSince(80400)]
     final readonly class Number implements \Stringable
     {
         /** @var numeric-string */

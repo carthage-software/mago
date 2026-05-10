@@ -25,6 +25,8 @@ use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
 use crate::scanner::ttype::merge_type_preserving_nullability;
+use crate::scanner::version_claim::TypeOverride;
+use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
@@ -173,80 +175,92 @@ pub fn scan_properties<'arena>(
     let mut flags = MetadataFlags::origin_flags(context.file.file_type);
 
     match property {
-        Property::Plain(plain_property) => plain_property
-            .items
-            .iter()
-            .map(|item| {
-                let (name, name_span, has_default, default_type) = scan_property_item(item, classname, context, scope);
+        Property::Plain(plain_property) => {
+            let verdict = evaluate_version_attributes(&plain_property.attribute_lists, context, context.php_version);
 
-                let mut item_flags = flags;
+            plain_property
+                .items
+                .iter()
+                .map(|item| {
+                    let (name, name_span, has_default, default_type) =
+                        scan_property_item(item, classname, context, scope);
 
-                if has_default {
-                    item_flags |= MetadataFlags::HAS_DEFAULT;
-                }
+                    let mut item_flags = flags;
 
-                if plain_property.modifiers.contains_readonly() {
-                    item_flags |= MetadataFlags::READONLY;
-                }
-
-                if plain_property.modifiers.contains_abstract() {
-                    item_flags |= MetadataFlags::ABSTRACT;
-                }
-
-                if plain_property.modifiers.contains_static() {
-                    item_flags |= MetadataFlags::STATIC;
-                }
-
-                if plain_property.modifiers.contains_final() {
-                    item_flags |= MetadataFlags::FINAL;
-                }
-
-                let read_visibility = match plain_property.modifiers.get_first_read_visibility() {
-                    Some(visibility) => Visibility::try_from(visibility).unwrap_or(Visibility::Public),
-                    None => Visibility::Public,
-                };
-
-                let write_visibility = match plain_property.modifiers.get_first_write_visibility() {
-                    Some(visibility) => Visibility::try_from(visibility).unwrap_or(Visibility::Public),
-                    None => {
-                        if plain_property.modifiers.contains_readonly() {
-                            Visibility::Protected
-                        } else {
-                            read_visibility
-                        }
+                    if has_default {
+                        item_flags |= MetadataFlags::HAS_DEFAULT;
                     }
-                };
 
-                let mut metadata = PropertyMetadata::new(name, item_flags);
+                    if plain_property.modifiers.contains_readonly() {
+                        item_flags |= MetadataFlags::READONLY;
+                    }
 
-                metadata.set_name_span(Some(name_span));
-                metadata.set_default_type_metadata(default_type);
-                metadata.set_visibility(read_visibility, write_visibility);
-                metadata.set_type_declaration_metadata(
-                    plain_property
-                        .hint
-                        .as_ref()
-                        .map(|hint| get_type_metadata_from_hint(hint, Some(class_like_metadata.name), context)),
-                );
+                    if plain_property.modifiers.contains_abstract() {
+                        item_flags |= MetadataFlags::ABSTRACT;
+                    }
 
-                if let Some(docblock) = docblock.as_ref() {
-                    update_property_metadata_from_docblock(
-                        context.arena,
-                        &mut metadata,
-                        docblock,
-                        classname,
-                        type_context,
-                        scope,
-                        class_like_metadata,
+                    if plain_property.modifiers.contains_static() {
+                        item_flags |= MetadataFlags::STATIC;
+                    }
+
+                    if plain_property.modifiers.contains_final() {
+                        item_flags |= MetadataFlags::FINAL;
+                    }
+
+                    let read_visibility = match plain_property.modifiers.get_first_read_visibility() {
+                        Some(visibility) => Visibility::try_from(visibility).unwrap_or(Visibility::Public),
+                        None => Visibility::Public,
+                    };
+
+                    let write_visibility = match plain_property.modifiers.get_first_write_visibility() {
+                        Some(visibility) => Visibility::try_from(visibility).unwrap_or(Visibility::Public),
+                        None => {
+                            if plain_property.modifiers.contains_readonly() {
+                                Visibility::Protected
+                            } else {
+                                read_visibility
+                            }
+                        }
+                    };
+
+                    let mut metadata = PropertyMetadata::new(name, item_flags);
+
+                    metadata.set_name_span(Some(name_span));
+                    metadata.set_default_type_metadata(default_type);
+                    metadata.set_visibility(read_visibility, write_visibility);
+                    metadata.set_type_declaration_metadata(
+                        plain_property
+                            .hint
+                            .as_ref()
+                            .map(|hint| get_type_metadata_from_hint(hint, Some(class_like_metadata.name), context)),
                     );
 
+                    if let Some(docblock) = docblock.as_ref() {
+                        update_property_metadata_from_docblock(
+                            context.arena,
+                            &mut metadata,
+                            docblock,
+                            classname,
+                            type_context,
+                            scope,
+                            class_like_metadata,
+                        );
+                    }
+
+                    if matches!(verdict.type_override, Some(TypeOverride::Untyped)) {
+                        metadata.type_declaration_metadata = None;
+                        metadata.type_metadata = None;
+                    }
+
+                    metadata.version_constraint = verdict.constraint.clone();
+
                     metadata
-                } else {
-                    metadata
-                }
-            })
-            .collect(),
+                })
+                .collect()
+        }
         Property::Hooked(hooked_property) => {
+            let verdict = evaluate_version_attributes(&hooked_property.attribute_lists, context, context.php_version);
+
             let (name, name_span, has_default, default_type) =
                 scan_property_item(&hooked_property.item, classname, context, scope);
 
@@ -305,6 +319,13 @@ pub fn scan_properties<'arena>(
 
             let prop_name = name.0.strip_prefix('$').unwrap_or(&name.0);
             metadata.set_is_virtual(!hooks_reference_backing_store(&hooked_property.hook_list.hooks, prop_name));
+
+            if matches!(verdict.type_override, Some(TypeOverride::Untyped)) {
+                metadata.type_declaration_metadata = None;
+                metadata.type_metadata = None;
+            }
+
+            metadata.version_constraint = verdict.constraint;
 
             vec![metadata]
         }

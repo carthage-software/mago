@@ -124,6 +124,7 @@ class XMLWriter
 {
     public function openUri(string $uri): bool {}
 
+    #[Mago\AvailableSince(80400)]
     public static function toUri(string $uri): static {}
 
     public function openMemory(): bool {}
@@ -131,6 +132,7 @@ class XMLWriter
     public static function toMemory(): static {}
 
     /** @param resource $stream */
+    #[Mago\AvailableSince(80400)]
     public static function toStream($stream): static {}
 
     public function setIndent(bool $enable): bool {}

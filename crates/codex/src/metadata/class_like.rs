@@ -1,5 +1,7 @@
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
+use mago_php_version::PHPVersion;
+use mago_php_version::PHPVersionRange;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -17,6 +19,7 @@ use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
+use crate::metadata::version_constraint::VersionConstraint;
 use crate::symbol::SymbolKind;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::template::GenericTemplate;
@@ -90,6 +93,7 @@ pub struct ClassLikeMetadata {
     /// Mixin types from @mixin annotations - these types' methods/properties
     /// can be accessed via magic methods (__call, __get, __set, __callStatic)
     pub mixins: Vec<TUnion>,
+    pub version_constraint: VersionConstraint,
 }
 
 impl ClassLikeMetadata {
@@ -154,7 +158,24 @@ impl ClassLikeMetadata {
             type_aliases: AtomMap::default(),
             imported_type_aliases: AtomMap::default(),
             mixins: Vec::default(),
+            version_constraint: VersionConstraint::unconstrained(),
         }
+    }
+
+    /// Returns `true` when this class-like is available in the given PHP
+    /// version.
+    #[inline]
+    #[must_use]
+    pub fn is_available_in_version(&self, version: PHPVersion) -> bool {
+        self.version_constraint.allows_version(version)
+    }
+
+    /// Returns `true` when this class-like is available across the entire
+    /// supplied [`PHPVersionRange`].
+    #[inline]
+    #[must_use]
+    pub fn is_available_in_version_range(&self, range: PHPVersionRange) -> bool {
+        self.version_constraint.allows_version_range(range)
     }
 
     /// Returns a reference to the map of trait method aliases.

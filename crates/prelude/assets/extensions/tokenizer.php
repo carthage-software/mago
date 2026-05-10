@@ -1,5 +1,6 @@
 <?php
 
+#[Mago\AvailableSince(80000)]
 class PhpToken implements Stringable
 {
     public int $id;
@@ -20,6 +21,7 @@ class PhpToken implements Stringable
     /**
      * @return list<PhpToken>
      */
+    #[Mago\AvailableSince(80000)]
     public static function tokenize(string $code, int $flags = 0): array {}
 
     /**

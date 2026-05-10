@@ -18,6 +18,7 @@ class Reflection
     public static function getModifierNames(int $modifiers): array {}
 }
 
+#[Mago\AvailableSince(80100)]
 final class ReflectionFiber
 {
     public function __construct(Fiber $fiber) {}
@@ -179,6 +180,7 @@ class ReflectionNamedType extends ReflectionType
     public function isBuiltin(): bool {}
 }
 
+#[Mago\AvailableSince(80100)]
 class ReflectionIntersectionType extends ReflectionType
 {
     /**
@@ -383,24 +385,29 @@ class ReflectionClassConstant implements Reflector
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80100)]
     public function isFinal(): bool {}
 
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80300)]
     public function hasType(): bool {}
 
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80300)]
     public function getType(): ?ReflectionType {}
 
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80400)]
     public function isDeprecated(): bool {}
 }
 
+#[Mago\AvailableSince(80400)]
 enum PropertyHookType: string
 {
     case Get = 'get';
@@ -551,32 +558,46 @@ class ReflectionProperty implements Reflector
      */
     public function getAttributes(?string $name = null, int $flags = 0): array {}
 
+    #[Mago\AvailableSince(80100)]
     public function isReadOnly(): bool {}
 
+    #[Mago\AvailableSince(80400)]
     public function getRawValue(object $object): mixed {}
 
+    #[Mago\AvailableSince(80400)]
     public function setRawValue(object $object, mixed $value): void {}
 
+    #[Mago\AvailableSince(80400)]
     public function isAbstract(): bool {}
 
+    #[Mago\AvailableSince(80400)]
     public function isVirtual(): bool {}
 
+    #[Mago\AvailableSince(80400)]
     public function getSettableType(): ?ReflectionType {}
 
+    #[Mago\AvailableSince(80400)]
     public function hasHooks(): bool {}
 
+    #[Mago\AvailableSince(80400)]
     public function getHooks(): array {}
 
+    #[Mago\AvailableSince(80400)]
     public function hasHook(PropertyHookType $type): bool {}
 
+    #[Mago\AvailableSince(80400)]
     public function getHook(PropertyHookType $type): ?ReflectionMethod {}
 
+    #[Mago\AvailableSince(80400)]
     public function isPrivateSet(): bool {}
 
+    #[Mago\AvailableSince(80400)]
     public function isProtectedSet(): bool {}
 
+    #[Mago\AvailableSince(80400)]
     public function setRawValueWithoutLazyInitialization(object $object, mixed $value): void {}
 
+    #[Mago\AvailableSince(80400)]
     public function skipLazyInitialization(object $object): void {}
 
     public function isDynamic(): bool {}
@@ -584,6 +605,12 @@ class ReflectionProperty implements Reflector
     public function isFinal(): bool {}
 
     public function isLazy(object $object): bool {}
+
+    #[Mago\AvailableSince(80600)]
+    public function isReadable(?object $object = null): bool {}
+
+    #[Mago\AvailableSince(80600)]
+    public function isWriteable(?object $object = null): bool {}
 }
 
 final class ReflectionReference
@@ -600,6 +627,7 @@ final class ReflectionReference
     private function __clone(): void {}
 }
 
+#[Mago\AvailableSince(80500)]
 final class ReflectionConstant implements Reflector
 {
     public string $name;
@@ -795,6 +823,7 @@ abstract class ReflectionFunctionAbstract implements Reflector
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80100)]
     public function getClosureCalledClass(): ?ReflectionClass {}
 
     /**
@@ -893,16 +922,19 @@ abstract class ReflectionFunctionAbstract implements Reflector
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80100)]
     public function getClosureUsedVariables(): array {}
 
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80100)]
     public function hasTentativeReturnType(): bool {}
 
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80100)]
     public function getTentativeReturnType(): ?ReflectionType {}
 
     /**
@@ -1062,8 +1094,10 @@ class ReflectionMethod extends ReflectionFunctionAbstract
     #[Deprecated(since: '8.5', message: 'as it has no effect')]
     public function setAccessible(bool $accessible): void {}
 
+    #[Mago\AvailableSince(80100)]
     public function hasPrototype(): bool {}
 
+    #[Mago\AvailableSince(80300)]
     public static function createFromMethodName(string $method): static {}
 }
 
@@ -1276,6 +1310,7 @@ class ReflectionClass implements Reflector
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80200)]
     public function isReadOnly(): bool {}
 
     /**
@@ -1395,25 +1430,34 @@ class ReflectionClass implements Reflector
 
     private function __clone(): void {}
 
+    #[Mago\AvailableSince(80100)]
     public function isEnum(): bool {}
 
+    #[Mago\AvailableSince(80400)]
     public function newLazyGhost(callable $initializer, int $options = 0): object {}
 
     /**
      * @return T
      */
+    #[Mago\AvailableSince(80400)]
     public function newLazyProxy(callable $factory, int $options = 0): object {}
 
+    #[Mago\AvailableSince(80400)]
     public function resetAsLazyGhost(object $object, callable $initializer, int $options = 0): void {}
 
+    #[Mago\AvailableSince(80400)]
     public function resetAsLazyProxy(object $object, callable $factory, int $options = 0): void {}
 
+    #[Mago\AvailableSince(80400)]
     public function initializeLazyObject(object $object): object {}
 
+    #[Mago\AvailableSince(80400)]
     public function isUninitializedLazyObject(object $object): bool {}
 
+    #[Mago\AvailableSince(80400)]
     public function markLazyObjectAsInitialized(object $object): object {}
 
+    #[Mago\AvailableSince(80400)]
     public function getLazyInitializer(object $object): ?callable {}
 }
 
@@ -1422,6 +1466,7 @@ class ReflectionObject extends ReflectionClass
     public function __construct(object $object) {}
 }
 
+#[Mago\AvailableSince(80100)]
 class ReflectionEnum extends ReflectionClass
 {
     public function __construct(object|string $objectOrClass) {}
@@ -1449,6 +1494,7 @@ class ReflectionEnum extends ReflectionClass
     public function getBackingType() {}
 }
 
+#[Mago\AvailableSince(80100)]
 class ReflectionEnumUnitCase extends ReflectionClassConstant
 {
     public function __construct(object|string $class, string $constant) {}
@@ -1464,6 +1510,7 @@ class ReflectionEnumUnitCase extends ReflectionClassConstant
     public function getEnum(): ReflectionEnum {}
 }
 
+#[Mago\AvailableSince(80100)]
 class ReflectionEnumBackedCase extends ReflectionEnumUnitCase
 {
     public function __construct(object|string $class, string $constant) {}

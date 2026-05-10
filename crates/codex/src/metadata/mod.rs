@@ -50,6 +50,7 @@ pub mod parameter;
 pub mod property;
 pub mod property_hook;
 pub mod ttype;
+pub mod version_constraint;
 
 /// Lightweight set of keys extracted from a per-file [`CodebaseMetadata`].
 ///

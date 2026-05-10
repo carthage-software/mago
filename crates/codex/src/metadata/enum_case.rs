@@ -7,6 +7,7 @@ use mago_span::Span;
 
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
+use crate::metadata::version_constraint::VersionConstraint;
 use crate::ttype::atomic::TAtomic;
 
 /// Contains metadata associated with a specific `case` within a PHP `enum`.
@@ -23,6 +24,10 @@ pub struct EnumCaseMetadata {
     pub span: Span,
     pub value_type: Option<TAtomic>,
     pub flags: MetadataFlags,
+    /// PHP version range in which this enum case is available, derived from
+    /// `Mago\AvailableSince` / `Mago\AvailableUntil` attributes during
+    /// scanning.
+    pub version_constraint: VersionConstraint,
 }
 
 impl EnumCaseMetadata {
@@ -38,7 +43,30 @@ impl EnumCaseMetadata {
     #[inline]
     #[must_use]
     pub fn new(name: Atom, name_span: Span, span: Span, flags: MetadataFlags) -> Self {
-        Self { attributes: Vec::new(), name, name_span, span, flags, value_type: None }
+        Self {
+            attributes: Vec::new(),
+            name,
+            name_span,
+            span,
+            flags,
+            value_type: None,
+            version_constraint: VersionConstraint::unconstrained(),
+        }
+    }
+
+    /// Returns `true` when this enum case is available in the given PHP version.
+    #[inline]
+    #[must_use]
+    pub fn is_available_in_version(&self, version: mago_php_version::PHPVersion) -> bool {
+        self.version_constraint.allows_version(version)
+    }
+
+    /// Returns `true` when this enum case is available across the entire
+    /// supplied [`PHPVersionRange`].
+    #[inline]
+    #[must_use]
+    pub fn is_available_in_version_range(&self, range: mago_php_version::PHPVersionRange) -> bool {
+        self.version_constraint.allows_version_range(range)
     }
 }
 

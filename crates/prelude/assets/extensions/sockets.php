@@ -633,4 +633,5 @@ function socket_wsaprotocol_info_import(string $info_id): Socket|false {}
 
 function socket_wsaprotocol_info_release(string $info_id): bool {}
 
+#[Mago\AvailableSince(80300)]
 function socket_atmark(Socket $socket): bool {}

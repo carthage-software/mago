@@ -105,11 +105,11 @@ fn run_test_case_inner(config: TestCase) {
     let resolver = NameResolver::new(&arena);
     let resolved_names = resolver.resolve(program);
 
-    metadata.extend(scan_program(&arena, source_file, program, &resolved_names));
+    let settings = config.settings.unwrap_or_else(default_test_settings);
+
+    metadata.extend(scan_program(&arena, source_file, program, &resolved_names, settings.version));
 
     populate_codebase(&mut metadata, &mut symbol_references, AtomSet::default(), HashSet::default());
-
-    let settings = config.settings.unwrap_or_else(default_test_settings);
 
     let mut analysis_result = AnalysisResult::new(symbol_references);
     let analyzer = Analyzer::new(&arena, source_file, &resolved_names, &metadata, &PLUGIN_REGISTRY, settings);

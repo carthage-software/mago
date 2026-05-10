@@ -1,3 +1,5 @@
+use mago_php_version::PHPVersion;
+use mago_php_version::PHPVersionRange;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -7,6 +9,7 @@ use mago_span::Span;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::property_hook::PropertyHookMetadata;
 use crate::metadata::ttype::TypeMetadata;
+use crate::metadata::version_constraint::VersionConstraint;
 use crate::misc::VariableIdentifier;
 use crate::visibility::Visibility;
 
@@ -71,6 +74,11 @@ pub struct PropertyMetadata {
     /// Key is the hook name atom ("get" or "set").
     /// Only present for PHP 8.4+ hooked properties.
     pub hooks: AtomMap<PropertyHookMetadata>,
+
+    /// PHP version range in which this property is available, derived from
+    /// `Mago\AvailableSince` / `Mago\AvailableUntil` attributes during
+    /// scanning.
+    pub version_constraint: VersionConstraint,
 }
 
 impl PropertyMetadata {
@@ -90,7 +98,24 @@ impl PropertyMetadata {
             default_type_metadata: None,
             flags,
             hooks: AtomMap::default(),
+            version_constraint: VersionConstraint::unconstrained(),
         }
+    }
+
+    /// Returns `true` when this property is available in the given PHP
+    /// version.
+    #[inline]
+    #[must_use]
+    pub fn is_available_in_version(&self, version: PHPVersion) -> bool {
+        self.version_constraint.allows_version(version)
+    }
+
+    /// Returns `true` when this property is available across the entire
+    /// supplied [`PHPVersionRange`].
+    #[inline]
+    #[must_use]
+    pub fn is_available_in_version_range(&self, range: PHPVersionRange) -> bool {
+        self.version_constraint.allows_version_range(range)
     }
 
     #[inline]

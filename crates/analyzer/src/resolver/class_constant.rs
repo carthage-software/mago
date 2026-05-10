@@ -267,6 +267,9 @@ fn find_constant_in_class<'ctx>(
 
     // Check for a defined constant
     if let Some(constant_metadata) = metadata.constants.get(&const_name) {
+        let display = format!("{}::{}", metadata.original_name, const_name);
+        crate::utils::availability::check_class_constant_availability(context, constant_metadata, &display, const_span);
+
         // Prefer the docblock type (@var) when it exists, as it reflects the user's
         // intended type. When type_metadata was merely copied from the type declaration
         // (they are equal), fall back to the more specific inferred type.
@@ -299,7 +302,12 @@ fn find_constant_in_class<'ctx>(
     }
 
     // Check for an enum case
-    if metadata.kind.is_enum() && metadata.enum_cases.contains_key(&const_name) {
+    if metadata.kind.is_enum()
+        && let Some(enum_case_metadata) = metadata.enum_cases.get(&const_name)
+    {
+        let display = format!("{}::{}", metadata.original_name, const_name);
+        crate::utils::availability::check_enum_case_availability(context, enum_case_metadata, &display, const_span);
+
         let const_type =
             TUnion::from_atomic(TAtomic::Object(TObject::Enum(TEnum::new_case(metadata.original_name, const_name))));
 

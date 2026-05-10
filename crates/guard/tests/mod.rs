@@ -60,7 +60,7 @@ fn test_guard(name: &'static str, code: &'static str, settings: Settings) -> For
     let resolver = NameResolver::new(&arena);
     let resolved_names = resolver.resolve(program);
 
-    metadata.extend(scan_program(&arena, source_file, program, &resolved_names));
+    metadata.extend(scan_program(&arena, source_file, program, &resolved_names, mago_php_version::PHPVersion::LATEST));
 
     populate_codebase(&mut metadata, &mut symbol_references, AtomSet::default(), HashSet::default());
 

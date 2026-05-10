@@ -173,6 +173,14 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     };
 
     let classname_str = &metadata.original_name;
+
+    crate::utils::availability::check_class_like_availability(
+        context,
+        metadata,
+        classname_str.as_str(),
+        class_expression_span,
+    );
+
     if metadata.kind.is_interface() && !classname.is_from_class_string() {
         context.collector.report_with_code(
              IssueCode::InterfaceInstantiation,

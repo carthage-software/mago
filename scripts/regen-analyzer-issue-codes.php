@@ -337,6 +337,13 @@ final class AnalyzerCodeModuleGenerator
         'invalid-parameter-default-value',
         'invalid-constant-value',
         'invalid-property-default-value',
+        'unavailable-class-like',
+        'unavailable-function',
+        'unavailable-method',
+        'unavailable-property',
+        'unavailable-constant',
+        'unavailable-class-constant',
+        'unavailable-enum-case',
     ];
 
     /**
@@ -398,6 +405,7 @@ final class AnalyzerCodeModuleGenerator
         $impl = "impl IssueCode {\n";
 
         // as_str() method
+        $impl .= "    #[must_use]\n";
         $impl .= "    pub fn as_str(&self) -> &'static str {\n";
         $impl .= "        match self {\n";
         foreach ($this->allCodes as $code => $value) {
@@ -406,11 +414,13 @@ final class AnalyzerCodeModuleGenerator
         $impl .= "        }\n    }\n\n";
 
         // as_u16() method
+        $impl .= "    #[must_use]\n";
         $impl .= "    pub fn as_u16(&self) -> u16 {\n";
         $impl .= "        *self as u16\n";
         $impl .= "    }\n\n";
 
         // all() method
+        $impl .= "    #[must_use]\n";
         $impl .= "    pub fn all() -> &'static [IssueCode] {\n";
         $impl .= "        &[\n";
         foreach ($this->allCodes as $code => $_) {
@@ -468,8 +478,8 @@ final class AnalyzerCodeModuleGenerator
                 }
             }
 
-            impl<'a> std::borrow::Borrow<str> for &'a IssueCode {
-                fn borrow(&self) -> &'a str {
+            impl<'code> std::borrow::Borrow<str> for &'code IssueCode {
+                fn borrow(&self) -> &'code str {
                     self.as_str()
                 }
             }

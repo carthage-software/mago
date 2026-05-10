@@ -1,12 +1,18 @@
 <?php
 
 namespace Uri {
+    use Mago;
+
+    #[Mago\AvailableSince(80500)]
     class UriException extends \Exception {}
 
+    #[Mago\AvailableSince(80500)]
     class UriError extends \Error {}
 
+    #[Mago\AvailableSince(80500)]
     class InvalidUriException extends UriException {}
 
+    #[Mago\AvailableSince(80500)]
     enum UriComparisonMode
     {
         case IncludeFragment;
@@ -15,6 +21,9 @@ namespace Uri {
 }
 
 namespace Uri\Rfc3986 {
+    use Mago;
+
+    #[Mago\AvailableSince(80500)]
     final readonly class Uri
     {
         public static function parse(string $uri, ?Uri $baseUrl = null): ?static {}
@@ -89,6 +98,9 @@ namespace Uri\Rfc3986 {
 }
 
 namespace Uri\WhatWg {
+    use Mago;
+
+    #[Mago\AvailableSince(80500)]
     class InvalidUrlException extends \Uri\InvalidUriException
     {
         public readonly array $errors;
@@ -101,6 +113,7 @@ namespace Uri\WhatWg {
         ) {}
     }
 
+    #[Mago\AvailableSince(80500)]
     enum UrlValidationErrorType
     {
         case DomainToAscii;
@@ -134,6 +147,7 @@ namespace Uri\WhatWg {
         case FileInvalidWindowsDriveLetterHost;
     }
 
+    #[Mago\AvailableSince(80500)]
     final readonly class UrlValidationError
     {
         public readonly string $context;
@@ -143,6 +157,7 @@ namespace Uri\WhatWg {
         public function __construct(string $context, UrlValidationErrorType $type, bool $failure) {}
     }
 
+    #[Mago\AvailableSince(80500)]
     final readonly class Url
     {
         /**

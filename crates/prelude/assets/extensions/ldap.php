@@ -9,8 +9,10 @@ namespace {
     function ldap_exop_passwd(
         LDAP\Connection $ldap,
         string $user = '',
-        #[SensitiveParameter] string $old_password = '',
-        #[SensitiveParameter] string $new_password = '',
+        #[SensitiveParameter]
+        string $old_password = '',
+        #[SensitiveParameter]
+        string $new_password = '',
         &$controls = null,
     ): string|bool {}
 
@@ -30,6 +32,35 @@ namespace {
         &$response_data,
         &$response_oid,
     ): LDAP\Result|bool {}
+
+    #[Mago\AvailableSince(80300)]
+    function ldap_exop_sync(
+        LDAP\Connection $ldap,
+        string $request_oid,
+        ?string $request_data = null,
+        ?array $controls = null,
+        &$response_data = null,
+        &$response_oid = null,
+    ): bool {}
+
+    #[Mago\AvailableSince(80300)]
+    function ldap_connect_wallet(
+        ?string $uri,
+        string $wallet,
+        #[SensitiveParameter]
+        string $password,
+        int $auth_mode = 1,
+    ): LDAP\Connection|false {}
+
+    #[Mago\AvailableSince(80300)]
+    function ldap_exop_modify_passwd(
+        LDAP\Connection $ldap,
+        string $user = '',
+        #[SensitiveParameter]
+        string $old_password = '',
+        #[SensitiveParameter]
+        string $new_password = '',
+    ): string|bool {}
 
     /**
      * @param-out string $response_data
@@ -71,7 +102,8 @@ namespace {
     function ldap_sasl_bind(
         LDAP\Connection $ldap,
         ?string $dn = null,
-        #[SensitiveParameter] ?string $password = null,
+        #[SensitiveParameter]
+        ?string $password = null,
         ?string $mech = null,
         ?string $realm = null,
         ?string $authc_id = null,

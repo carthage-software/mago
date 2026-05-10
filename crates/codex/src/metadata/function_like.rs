@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use mago_php_version::PHPVersion;
+use mago_php_version::PHPVersionRange;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -15,6 +17,7 @@ use crate::metadata::class_like::TemplateTypes;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::parameter::FunctionLikeParameterMetadata;
 use crate::metadata::ttype::TypeMetadata;
+use crate::metadata::version_constraint::VersionConstraint;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::template::GenericTemplate;
 use crate::visibility::Visibility;
@@ -151,6 +154,11 @@ pub struct FunctionLikeMetadata {
     pub has_docblock: bool,
 
     pub flags: MetadataFlags,
+
+    /// PHP version range in which this function-like is available, derived
+    /// from `Mago\AvailableSince` / `Mago\AvailableUntil` attributes during
+    /// scanning.
+    pub version_constraint: VersionConstraint,
 }
 
 impl FunctionLikeKind {
@@ -212,7 +220,24 @@ impl FunctionLikeMetadata {
             globals_accessed: AtomSet::default(),
             has_docblock: false,
             issues: vec![],
+            version_constraint: VersionConstraint::unconstrained(),
         }
+    }
+
+    /// Returns `true` when this function-like is available in the given PHP
+    /// version.
+    #[inline]
+    #[must_use]
+    pub fn is_available_in_version(&self, version: PHPVersion) -> bool {
+        self.version_constraint.allows_version(version)
+    }
+
+    /// Returns `true` when this function-like is available across the entire
+    /// supplied [`PHPVersionRange`].
+    #[inline]
+    #[must_use]
+    pub fn is_available_in_version_range(&self, range: PHPVersionRange) -> bool {
+        self.version_constraint.allows_version_range(range)
     }
 
     /// Returns the kind of function-like (Function, Method, Closure, `ArrowFunction`).

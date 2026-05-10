@@ -220,6 +220,7 @@ function openssl_decrypt(
 
 function openssl_cipher_iv_length(string $cipher_algo): int|false {}
 
+#[Mago\AvailableSince(80200)]
 function openssl_cipher_key_length(string $cipher_algo): int|false {}
 
 /**
@@ -394,6 +395,7 @@ function openssl_get_curve_names(): array|false {}
  */
 function openssl_pkcs7_read(string $data, &$certificates): bool {}
 
+#[Mago\AvailableSince(80000)]
 function openssl_cms_verify(
     string $input_filename,
     int $flags = 0,
@@ -409,6 +411,7 @@ function openssl_cms_verify(
 /**
  * @param resource|string|array $certificate
  */
+#[Mago\AvailableSince(80000)]
 function openssl_cms_encrypt(
     string $input_filename,
     string $output_filename,
@@ -419,6 +422,7 @@ function openssl_cms_encrypt(
     int $cipher_algo = OPENSSL_CIPHER_AES_128_CBC,
 ): bool {}
 
+#[Mago\AvailableSince(80000)]
 function openssl_cms_sign(
     string $input_filename,
     string $output_filename,
@@ -430,6 +434,7 @@ function openssl_cms_sign(
     ?string $untrusted_certificates_filename = null,
 ): bool {}
 
+#[Mago\AvailableSince(80000)]
 function openssl_cms_decrypt(
     string $input_filename,
     string $output_filename,
@@ -441,6 +446,7 @@ function openssl_cms_decrypt(
 /**
  * @param-out array $certificates
  */
+#[Mago\AvailableSince(80000)]
 function openssl_cms_read(string $input_filename, &$certificates): bool {}
 
 const OPENSSL_VERSION_TEXT = 'OpenSSL 1.0.0e 6 Sep 2011';
@@ -511,6 +517,7 @@ const OPENSSL_SSLV23_PADDING = 2;
 
 const OPENSSL_NO_PADDING = 3;
 
+#[Mago\AvailableSince(80400)]
 const OPENSSL_PKCS1_OAEP_PADDING = 4;
 
 const OPENSSL_CIPHER_RC2_40 = 0;
@@ -527,16 +534,21 @@ const OPENSSL_KEYTYPE_RSA = 0;
 
 const OPENSSL_KEYTYPE_DSA = 1;
 
+#[Mago\AvailableSince(80400)]
 const OPENSSL_KEYTYPE_DH = 2;
 
 const OPENSSL_KEYTYPE_EC = 3;
 
+#[Mago\AvailableSince(80400)]
 const OPENSSL_KEYTYPE_X25519 = 4;
 
+#[Mago\AvailableSince(80100)]
 const OPENSSL_KEYTYPE_ED25519 = 5;
 
+#[Mago\AvailableSince(80100)]
 const OPENSSL_KEYTYPE_X448 = 6;
 
+#[Mago\AvailableSince(80100)]
 const OPENSSL_KEYTYPE_ED448 = 7;
 
 const OPENSSL_TLSEXT_SERVER_NAME = 1;
@@ -553,28 +565,40 @@ const OPENSSL_ZERO_PADDING = 2;
 
 const OPENSSL_DONT_ZERO_PAD_KEY = 4;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_CMS_DETACHED = 64;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_CMS_TEXT = 1;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_CMS_NOINTERN = 16;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_CMS_NOVERIFY = 32;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_CMS_NOCERTS = 2;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_CMS_NOATTR = 256;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_CMS_BINARY = 128;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_CMS_NOSIGS = 12;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_ENCODING_DER = 0;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_ENCODING_SMIME = 1;
 
+#[Mago\AvailableSince(80000)]
 const OPENSSL_ENCODING_PEM = 2;
 
+#[Mago\AvailableSince(80200)]
 const OPENSSL_CMS_OLDMIMETYPE = 1024;
 
 const OPENSSL_DEFAULT_STREAM_CIPHERS =

@@ -36,6 +36,11 @@ macro_rules! test_case {
 }
 
 test_case!(accessing_undefined_class_constant);
+test_case!(unavailable_symbols, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP85;
+    settings
+});
 test_case!(argument_count);
 test_case!(array_append_no_overflow_when_max_below_php_int_max);
 test_case!(array_append_overflow_after_explicit_assign_php_int_max);

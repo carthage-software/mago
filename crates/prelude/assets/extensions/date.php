@@ -355,6 +355,7 @@ class DateTime implements DateTimeInterface
     public static function createFromImmutable(DateTimeImmutable $object): static {}
 
     /** @return static */
+    #[Mago\AvailableSince(80000)]
     public static function createFromInterface(DateTimeInterface $object): DateTime {} // TODO return type should be static
 
     public static function createFromFormat(
@@ -363,6 +364,7 @@ class DateTime implements DateTimeInterface
         ?DateTimeZone $timezone = null,
     ): DateTime|false {}
 
+    #[Mago\AvailableSince(80400)]
     public static function createFromTimestamp(int|float $timestamp): static {}
 
     /**
@@ -389,6 +391,7 @@ class DateTime implements DateTimeInterface
 
     public function getOffset(): int {}
 
+    #[Mago\AvailableSince(80400)]
     public function getMicrosecond(): int {}
 
     public function setTime(int $hour, int $minute, int $second = 0, int $microsecond = 0): DateTime {}
@@ -399,6 +402,7 @@ class DateTime implements DateTimeInterface
 
     public function setTimestamp(int $timestamp): DateTime {}
 
+    #[Mago\AvailableSince(80400)]
     public function setMicrosecond(int $microsecond): static {}
 
     public function getTimestamp(): int {}
@@ -429,6 +433,7 @@ class DateTimeImmutable implements DateTimeInterface
         ?DateTimeZone $timezone = null,
     ): DateTimeImmutable|false {}
 
+    #[Mago\AvailableSince(80400)]
     public static function createFromTimestamp(int|float $timestamp): static {}
 
     /**
@@ -467,6 +472,7 @@ class DateTimeImmutable implements DateTimeInterface
      */
     public function getTimestamp(): int {}
 
+    #[Mago\AvailableSince(80400)]
     public function getMicrosecond(): int {}
 
     /**
@@ -547,6 +553,7 @@ class DateTimeImmutable implements DateTimeInterface
      *
      * @return static
      */
+    #[Mago\AvailableSince(80400)]
     #[NoDiscard(message: 'as DateTimeImmutable::setMicrosecond() does not modify the object itself')]
     public function setMicrosecond(int $microsecond): static {}
 
@@ -562,6 +569,7 @@ class DateTimeImmutable implements DateTimeInterface
      *
      * @return static
      */
+    #[Mago\AvailableSince(80000)]
     public static function createFromInterface(DateTimeInterface $object): DateTimeImmutable {}
 }
 
@@ -748,6 +756,7 @@ class DatePeriod implements IteratorAggregate
     public function getIterator(): Iterator {}
 }
 
+#[Mago\AvailableSince(80300)]
 class DateError extends Error {}
 
 class DateObjectError extends DateError {}
@@ -758,8 +767,10 @@ class DateException extends Exception {}
 
 class DateInvalidTimeZoneException extends DateException {}
 
+#[Mago\AvailableSince(80300)]
 class DateInvalidOperationException extends DateException {}
 
+#[Mago\AvailableSince(80300)]
 class DateMalformedStringException extends DateException {}
 
 class DateMalformedIntervalStringException extends DateException {}

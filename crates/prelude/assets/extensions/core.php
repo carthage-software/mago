@@ -265,6 +265,7 @@ class Error implements Throwable
     public function __wakeup(): void {}
 }
 
+#[Mago\AvailableSince(80000)]
 class ValueError extends Error {}
 
 class TypeError extends Error {}
@@ -279,8 +280,10 @@ class CompileError extends Error {}
 
 class DivisionByZeroError extends ArithmeticError {}
 
+#[Mago\AvailableSince(80000)]
 class UnhandledMatchError extends Error {}
 
+#[Mago\AvailableSince(80400)]
 class RequestParseBodyException extends Exception {}
 
 class ErrorException extends Exception
@@ -357,6 +360,7 @@ final class Closure
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80500)]
     public static function getCurrent(): Closure {}
 }
 
@@ -398,6 +402,7 @@ final class WeakReference
  * @implements ArrayAccess<K, V>
  * @implements IteratorAggregate<K, V>
  */
+#[Mago\AvailableSince(80000)]
 final class WeakMap implements ArrayAccess, Countable, IteratorAggregate
 {
     /**
@@ -448,6 +453,7 @@ final class WeakMap implements ArrayAccess, Countable, IteratorAggregate
     public function count(): int {}
 }
 
+#[Mago\AvailableSince(80000)]
 interface Stringable
 {
     public function __toString(): string;
@@ -488,6 +494,7 @@ final class InternalIterator implements Iterator
 /**
  * @enum-interface
  */
+#[Mago\AvailableSince(80100)]
 interface UnitEnum
 {
     public readonly string $name;
@@ -503,6 +510,7 @@ interface UnitEnum
 /**
  * @enum-interface
  */
+#[Mago\AvailableSince(80100)]
 interface BackedEnum extends UnitEnum
 {
     public readonly int|string $value;
@@ -567,6 +575,7 @@ interface __INTERNAL_DO_NOT_USE__StringBackedEnum extends BackedEnum
  * @template TReturn
  * @template TSuspend
  */
+#[Mago\AvailableSince(80100)]
 final class Fiber
 {
     public function __construct(callable $callback) {}
@@ -629,6 +638,7 @@ final class Fiber
     public static function suspend(mixed $value = null): mixed {}
 }
 
+#[Mago\AvailableSince(80100)]
 final class FiberError extends Error
 {
     public function __construct() {}
@@ -641,6 +651,7 @@ final class ReturnTypeWillChange
 }
 
 #[Attribute(Attribute::TARGET_CLASS)]
+#[Mago\AvailableSince(80200)]
 final class AllowDynamicProperties
 {
     public function __construct() {}
@@ -652,6 +663,7 @@ final class SensitiveParameter
     public function __construct() {}
 }
 
+#[Mago\AvailableSince(80200)]
 final class SensitiveParameterValue
 {
     private readonly mixed $value;
@@ -664,6 +676,7 @@ final class SensitiveParameterValue
 }
 
 #[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY)]
+#[Mago\AvailableSince(80300)]
 final class Override
 {
     public function __construct() {}
@@ -679,6 +692,7 @@ final class Override
     | Attribute::TARGET_CONSTANT
     | Attribute::TARGET_CLASS,
 )]
+#[Mago\AvailableSince(80400)]
 final class Deprecated
 {
     public readonly ?string $message;
@@ -688,6 +702,7 @@ final class Deprecated
 }
 
 #[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION)]
+#[Mago\AvailableSince(80500)]
 final class NoDiscard
 {
     public readonly ?string $message;
@@ -695,6 +710,7 @@ final class NoDiscard
     public function __construct(?string $message = null) {}
 }
 
+#[Mago\AvailableSince(80500)]
 #[Attribute(Attribute::TARGET_ALL)]
 final class DelayedTargetValidation {}
 
@@ -757,6 +773,7 @@ function strncasecmp(string $string1, string $string2, int $length): int {}
  * @pure
  * @no-named-arguments
  */
+#[Mago\AvailableSince(80000)]
 function str_starts_with(string $haystack, string $needle): bool {}
 
 /**
@@ -769,18 +786,21 @@ function str_ends_with(string $haystack, string $needle): bool {}
  * @pure
  * @no-named-arguments
  */
+#[Mago\AvailableSince(80000)]
 function str_contains(string $haystack, string $needle): bool {}
 
 /**
  * @pure
  * @no-named-arguments
  */
+#[Mago\AvailableSince(80300)]
 function str_decrement(string $string): string {}
 
 /**
  * @pure
  * @no-named-arguments
  */
+#[Mago\AvailableSince(80300)]
 function str_increment(string $string): string {}
 
 /**
@@ -878,6 +898,7 @@ function function_exists(string $function): bool {}
  * @pure
  * @no-named-arguments
  */
+#[Mago\AvailableSince(80100)]
 function enum_exists(string $enum, bool $autoload = true): bool {}
 
 /**
@@ -952,6 +973,7 @@ function set_error_handler(?callable $callback, int $error_levels = E_ALL) {}
 /**
  * @return callable|null
  */
+#[Mago\AvailableSince(80500)]
 function get_error_handler(): ?callable {}
 
 function restore_error_handler(): true {}
@@ -964,6 +986,7 @@ function set_exception_handler(?callable $callback) {}
 /**
  * @return callable|null
  */
+#[Mago\AvailableSince(80500)]
 function get_exception_handler(): ?callable {}
 
 function restore_exception_handler(): true {}
@@ -1281,6 +1304,7 @@ const STDOUT = STDOUT;
 
 const STDERR = STDERR;
 
+#[Mago\AvailableSince(80100)]
 const PHP_FD_SETSIZE = 1024;
 
 const PHP_OUTPUT_HANDLER_WRITE = 0;

@@ -113,7 +113,7 @@ impl AnalysisService {
         let semantics_checker = SemanticsChecker::new(self.settings.version);
         issues.extend(semantics_checker.check(file, program, &resolved_names));
 
-        let user_codebase = scan_program(&arena, file, program, &resolved_names);
+        let user_codebase = scan_program(&arena, file, program, &resolved_names, self.settings.version);
         self.codebase.extend(user_codebase);
 
         populate_codebase(&mut self.codebase, &mut self.symbol_references, AtomSet::default(), HashSet::default());
@@ -151,6 +151,7 @@ impl AnalysisService {
             self.symbol_references,
             (self.settings.clone(), self.parser_settings),
             self.parser_settings,
+            self.settings.version,
             Box::new(AnalysisResultReducer),
             self.use_progress_bars,
         );

@@ -18,6 +18,7 @@ use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type_string;
 use crate::scanner::ttype::merge_type_preserving_nullability;
+use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
@@ -35,6 +36,8 @@ pub fn scan_class_like_constants<'arena>(
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
 ) -> Vec<ClassLikeConstantMetadata> {
+    let verdict = evaluate_version_attributes(&constant.attribute_lists, context, context.php_version);
+
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
     let visibility =
         constant.modifiers.get_first_visibility().and_then(|m| Visibility::try_from(m).ok()).unwrap_or_default();
@@ -65,6 +68,7 @@ pub fn scan_class_like_constants<'arena>(
         .iter()
         .map(|item| {
             let mut meta = ClassLikeConstantMetadata::new(atom(item.name.value), item.span(), visibility, flags);
+            meta.version_constraint = verdict.constraint.clone();
             if let Some(type_declaration) = type_declaration.clone() {
                 meta.set_type_declaration(type_declaration);
             }

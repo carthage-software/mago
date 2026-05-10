@@ -81,6 +81,8 @@ impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
             self.span(),
         );
 
+        crate::utils::availability::check_constant_availability(context, constant_metadata, name, self.span());
+
         let mut constant_type = if let Some(t) = get_platform_constant_type(name) {
             t
         } else {

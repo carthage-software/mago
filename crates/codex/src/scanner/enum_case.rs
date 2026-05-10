@@ -10,6 +10,7 @@ use crate::metadata::flags::MetadataFlags;
 use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::inference::infer;
+use crate::scanner::version_claim::evaluate_version_attributes;
 
 use super::super::ttype::union::TUnion;
 
@@ -21,6 +22,7 @@ pub fn scan_enum_case<'arena>(
     scope: &NamespaceScope,
 ) -> EnumCaseMetadata {
     let span = case.span();
+    let verdict = evaluate_version_attributes(&case.attribute_lists, context, context.php_version);
     let attributes = scan_attribute_lists(&case.attribute_lists, context);
 
     match &case.item {
@@ -32,6 +34,7 @@ pub fn scan_enum_case<'arena>(
 
             meta.attributes = attributes;
             meta.value_type = None;
+            meta.version_constraint = verdict.constraint;
             meta
         }
         EnumCaseItem::Backed(item) => {
@@ -42,6 +45,7 @@ pub fn scan_enum_case<'arena>(
 
             meta.attributes = attributes;
             meta.value_type = infer(context, scope, item.value, Some(enum_name)).map(TUnion::get_single_owned);
+            meta.version_constraint = verdict.constraint;
 
             meta
         }

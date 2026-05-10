@@ -33,6 +33,7 @@ function libxml_disable_entity_loader(bool $disable = true): bool {}
 
 function libxml_set_external_entity_loader(?callable $resolver_function): bool {}
 
+#[Mago\AvailableSince(80200)]
 function libxml_get_external_entity_loader(): ?callable {}
 
 const LIBXML_VERSION = 20901;

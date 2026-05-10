@@ -261,6 +261,12 @@ namespace {
 
     function pcntl_fork(): int {}
 
+    #[Mago\AvailableSince(80100)]
+    function pcntl_rfork(int $flags, int $signal = 0): int {}
+
+    #[Mago\AvailableSince(80100)]
+    function pcntl_forkx(int $flags): int {}
+
     /**
      * @param-out array $resource_usage
      */
