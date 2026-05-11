@@ -1,5 +1,5 @@
 {
-  description = "Mago - devshell using rustup (stable 1.95.0 + nightly) and php 8.4 + composer";
+  description = "Mago - devshell using rustup and php 8.4 + composer";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -11,18 +11,15 @@
       let
         pkgs = import nixpkgs { inherit system; };
         isDarwin = pkgs.stdenv.isDarwin;
+        toolchain = "1.95.0";
         php = pkgs.php84;
         composer = pkgs.php84Packages.composer;
       in
       {
         devShells.default = pkgs.mkShell {
           buildInputs = [
-            pkgs.cargo
-            pkgs.rustc
             pkgs.rustup
-            pkgs.rust-analyzer
             pkgs.pkg-config
-            pkgs.openssl
             pkgs.just
             pkgs.wasm-pack
             php
@@ -41,17 +38,11 @@
           CARGO_INCREMENTAL = "1";
 
           shellHook = ''
-            export PATH="$HOME/.cargo/bin:$PATH"
-            if ! command -v rustc >/dev/null 2>&1; then
-              rustup toolchain install 1.95.0 --profile minimal
-              rustup toolchain install nightly --profile minimal
-              rustup default 1.95.0
+            if ! rustup toolchain list | grep -q "^${toolchain}-"; then
+              rustup toolchain install ${toolchain} --no-self-update --profile default --component rust-analyzer >/dev/null
             fi
-            echo "[mago] rustc:     $(rustc --version)"
-            echo "[mago] nightly:   $(rustup run nightly rustc --version)"
-            echo "[mago] php:       $(php -v | head -n1)"
-            echo "[mago] composer:  $(composer --version)"
-            echo "[mago] Run: just build | just test | just check | just fix | just build-wasm"
+
+            rustup override set ${toolchain} >/dev/null
           '';
         };
       });
