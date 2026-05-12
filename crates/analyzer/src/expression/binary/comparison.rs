@@ -124,16 +124,19 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
     let mut reported_general_invalid_operand = false;
 
     if !lhs_type.is_mixed() && !rhs_type.is_mixed() {
-        let lhs_is_array = lhs_type.is_array();
-        let rhs_is_array = rhs_type.is_array();
+        let op_str = binary.operator.as_str();
+        let is_relational = binary.operator.is_comparison() && !binary.operator.is_equality();
+        let lhs_has_array = lhs_type.has_array() || lhs_type.has_iterable();
+        let rhs_has_array = rhs_type.has_array() || rhs_type.has_iterable();
+        let lhs_is_only_array = lhs_type.is_array();
+        let rhs_is_only_array = rhs_type.is_array();
 
-        if lhs_is_array && !rhs_type.has_array() && !rhs_type.has_iterable() && !rhs_type.is_null() {
+        if is_relational && lhs_is_only_array && !rhs_has_array && !rhs_type.is_null() {
             context.collector.report_with_code(
                 IssueCode::InvalidOperand,
                 Issue::warning(format!(
-                    "Comparing an `array` with a non-array type `{}` using `{}`.",
+                    "Comparing an `array` with a non-array type `{}` using `{op_str}`.",
                     rhs_type.get_id(),
-                    binary.operator.as_str()
                 ))
                 .with_annotation(Annotation::primary(binary.lhs.span()).with_message("This is an array"))
                 .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id())))
@@ -142,13 +145,12 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
             );
 
             reported_general_invalid_operand = true;
-        } else if !lhs_type.has_array() && !lhs_type.has_iterable() && rhs_is_array && !lhs_type.is_null() {
+        } else if is_relational && !lhs_has_array && rhs_is_only_array && !lhs_type.is_null() {
             context.collector.report_with_code(
                 IssueCode::InvalidOperand,
                 Issue::warning(format!(
-                    "Comparing a non-array type `{}` with an `array` using `{}`.",
+                    "Comparing a non-array type `{}` with an `array` using `{op_str}`.",
                     lhs_type.get_id(),
-                    binary.operator.as_str()
                 ))
                 .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id())))
                 .with_annotation(Annotation::secondary(binary.rhs.span()).with_message("This is an array"))
@@ -157,8 +159,36 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
             );
 
             reported_general_invalid_operand = true;
+        } else if is_relational && lhs_has_array && !rhs_has_array && !rhs_type.is_null() {
+            context.collector.report_with_code(
+                IssueCode::PossiblyInvalidOperand,
+                Issue::warning(format!(
+                    "Left operand may be an `array` when compared with non-array type `{}` using `{op_str}`.",
+                    rhs_type.get_id(),
+                ))
+                .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This may be an array (type `{}`)", lhs_type.get_id())))
+                .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id())))
+                .with_note("PHP's comparison rules for arrays against other types can be non-obvious (an array is usually considered 'greater' than non-null scalars), so this comparison's result depends on which variant of the union the array side resolves to at runtime.")
+                .with_help("Narrow the array side to a non-array type before comparing, or handle the array case separately."),
+            );
+
+            reported_general_invalid_operand = true;
+        } else if is_relational && !lhs_has_array && rhs_has_array && !lhs_type.is_null() {
+            context.collector.report_with_code(
+                IssueCode::PossiblyInvalidOperand,
+                Issue::warning(format!(
+                    "Right operand may be an `array` when compared with non-array type `{}` using `{op_str}`.",
+                    lhs_type.get_id(),
+                ))
+                .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id())))
+                .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This may be an array (type `{}`)", rhs_type.get_id())))
+                .with_note("PHP's comparison rules for arrays against other types can be non-obvious, so this comparison's result depends on which variant of the union the array side resolves to at runtime.")
+                .with_help("Narrow the array side to a non-array type before comparing, or handle the array case separately."),
+            );
+
+            reported_general_invalid_operand = true;
         } else {
-            // both sides are arrays, both non-arrays, or one side is null; no array/non-array mismatch
+            // both sides have array variants or neither does. no array/non-array mismatch
         }
     }
 

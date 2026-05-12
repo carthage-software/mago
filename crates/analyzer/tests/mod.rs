@@ -2480,6 +2480,7 @@ test_case!(issue_1781, {
     s.check_throws = false;
     s
 });
+test_case!(issue_1815);
 
 #[test]
 fn test_all_test_cases_are_ran() {
