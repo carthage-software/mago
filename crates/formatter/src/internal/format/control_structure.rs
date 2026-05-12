@@ -40,10 +40,10 @@ use crate::document::Group;
 use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
-use crate::internal::format::block::print_block_of_nodes;
 use crate::internal::format::format_token;
 use crate::internal::format::misc;
 use crate::internal::format::misc::print_colon_delimited_body;
+use crate::internal::format::statement;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::settings::BraceStyle;
 use crate::wrap;
@@ -381,8 +381,19 @@ impl<'arena> Format<'arena> for SwitchColonDelimitedBody<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchColonDelimitedBody, {
             let mut contents = vec![in f.arena; Document::String(":")];
-            for case in &self.cases {
+            let case_count = self.cases.len();
+            for (index, case) in self.cases.iter().enumerate() {
                 contents.push(Document::Indent(vec![in f.arena; Document::Line(Line::hard()), case.format(f)]));
+
+                if index + 1 < case_count
+                    && (self
+                        .cases
+                        .get(index + 1)
+                        .is_some_and(|next_case| statement::should_add_empty_line_before_switch_case(f, next_case))
+                        || f.is_next_line_empty(case.span()))
+                {
+                    contents.push(Document::Indent(vec![in f.arena; Document::Line(Line::hard())]));
+                }
             }
 
             if let Some(comment) = f.print_dangling_comments(self.colon.join(self.end_switch.span), true) {
@@ -402,13 +413,50 @@ impl<'arena> Format<'arena> for SwitchColonDelimitedBody<'arena> {
 impl<'arena> Format<'arena> for SwitchBraceDelimitedBody<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchBraceDelimitedBody, {
-            print_block_of_nodes(
-                f,
-                &self.left_brace,
-                &self.cases,
-                &self.right_brace,
-                f.settings.inline_empty_control_braces,
-            )
+            let length = self.cases.len();
+            let mut contents = vec![in f.arena; Document::String("{")];
+            if let Some(comment) = f.print_trailing_comments(self.left_brace) {
+                contents.push(comment);
+            }
+
+            if length != 0 {
+                let mut formatted = vec![in f.arena; Document::Line(Line::hard())];
+                for (index, case) in self.cases.iter().enumerate() {
+                    formatted.push(case.format(f));
+
+                    if index + 1 < length {
+                        formatted.push(Document::Line(Line::hard()));
+
+                        if self
+                            .cases
+                            .get(index + 1)
+                            .is_some_and(|next_case| statement::should_add_empty_line_before_switch_case(f, next_case))
+                            || f.is_next_line_empty(case.span())
+                        {
+                            formatted.push(Document::Line(Line::hard()));
+                        }
+                    }
+                }
+
+                contents.push(Document::Indent(formatted));
+            }
+
+            if let Some(comments) = f.print_dangling_comments(self.left_brace.join(self.right_brace), true) {
+                if length > 0 && f.settings.empty_line_before_dangling_comments {
+                    contents.push(Document::Line(Line::soft()));
+                }
+
+                contents.push(comments);
+            } else if length > 0 || !f.settings.inline_empty_control_braces {
+                contents.push(Document::Line(Line::hard()));
+            }
+
+            contents.push(Document::String("}"));
+            if let Some(comment) = f.print_trailing_comments(self.right_brace) {
+                contents.push(comment);
+            }
+
+            Document::Group(Group::new(contents))
         })
     }
 }
