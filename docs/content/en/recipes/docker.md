@@ -100,9 +100,13 @@ The image does not include PHP or Composer. That works fine for the formatter an
 
 ### GitLab CI
 
+GitLab Runner wraps each `script` line in `sh -c`, which collides with this image's `ENTRYPOINT`. Clear the entrypoint so your commands run as written:
+
 ```yaml
 mago:
-  image: ghcr.io/carthage-software/mago:1
+  image:
+    name: ghcr.io/carthage-software/mago:1
+    entrypoint: [""]
   script:
     - mago fmt --check
     - mago lint

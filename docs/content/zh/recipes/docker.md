@@ -100,9 +100,13 @@ jobs:
 
 ### GitLab CI
 
+GitLab Runner 会把 `script` 中的每一行包到 `sh -c` 里执行，这与该镜像的 `ENTRYPOINT` 冲突。把 entrypoint 清空，命令才能按字面意思运行：
+
 ```yaml
 mago:
-  image: ghcr.io/carthage-software/mago:1
+  image:
+    name: ghcr.io/carthage-software/mago:1
+    entrypoint: [""]
   script:
     - mago fmt --check
     - mago lint

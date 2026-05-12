@@ -100,9 +100,13 @@ L'image n'inclut pas PHP ni Composer. Cela fonctionne très bien pour le formate
 
 ### GitLab CI
 
+GitLab Runner enveloppe chaque ligne de `script` dans `sh -c`, ce qui entre en conflit avec l'`ENTRYPOINT` de cette image. Effacez l'entrypoint pour que vos commandes s'exécutent telles quelles :
+
 ```yaml
 mago:
-  image: ghcr.io/carthage-software/mago:1
+  image:
+    name: ghcr.io/carthage-software/mago:1
+    entrypoint: [""]
   script:
     - mago fmt --check
     - mago lint
