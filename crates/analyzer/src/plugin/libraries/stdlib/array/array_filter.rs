@@ -189,15 +189,46 @@ fn filter_falsy_atomics(mut value_type: TUnion) -> FilterOutcome {
     if value_type.types.is_empty() { FilterOutcome::Removed } else { FilterOutcome::KeptAsOptional(value_type) }
 }
 
-fn apply_assertion_to_narrow_type(original_type: TUnion, assertion: &Assertion, codebase: &CodebaseMetadata) -> TUnion {
+pub(super) fn apply_assertion_to_narrow_type(
+    original_type: TUnion,
+    assertion: &Assertion,
+    codebase: &CodebaseMetadata,
+) -> TUnion {
     match assertion {
         Assertion::IsType(atomic) => {
-            let mut result = original_type.clone();
-            result.types.to_mut().retain(|t| {
-                atomic_comparator::is_contained_by(codebase, t, atomic, false, &mut ComparisonResult::default())
-            });
+            // Intersect each variant with the asserted type:
+            //   variant ⊆ asserted  -> keep the (narrower) variant
+            //   asserted ⊆ variant  -> keep the (narrower) asserted type, e.g. `int ⊆ mixed`
+            //   no overlap          -> drop the variant
+            let mut retained: Vec<TAtomic> = Vec::new();
+            for variant in original_type.types.as_ref().iter() {
+                let variant_is_subtype = atomic_comparator::is_contained_by(
+                    codebase,
+                    variant,
+                    atomic,
+                    false,
+                    &mut ComparisonResult::default(),
+                );
 
-            if result.types.is_empty() { original_type } else { result }
+                if variant_is_subtype {
+                    retained.push(variant.clone());
+                    continue;
+                }
+
+                let asserted_is_subtype = atomic_comparator::is_contained_by(
+                    codebase,
+                    atomic,
+                    variant,
+                    false,
+                    &mut ComparisonResult::default(),
+                );
+
+                if asserted_is_subtype {
+                    retained.push(atomic.clone());
+                }
+            }
+
+            if retained.is_empty() { original_type } else { TUnion::from_vec(retained) }
         }
         Assertion::IsNotType(atomic) => {
             let mut result = original_type.clone();

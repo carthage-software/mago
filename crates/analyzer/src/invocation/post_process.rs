@@ -639,9 +639,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
 
     block_context.locals.retain(|var_id, _| !should_wipe(*var_id));
 
-    block_context
-        .clauses
-        .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(should_wipe));
+    block_context.clauses.retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(should_wipe));
     block_context
         .reconciled_expression_clauses
         .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(should_wipe));

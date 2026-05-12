@@ -56,6 +56,8 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(math::AbsProvider);
         registry.register_function_provider(array::RangeProvider);
 
+        registry.register_function_assertion_provider(array::ArrayAllAssertionProvider);
+
         registry.register_function_call_hook(cookie::SetCookieHook);
         registry.register_function_call_hook(session::SessionSetSaveHandlerHook);
         registry.register_function_call_hook(session::SessionSetCookieParamsHook);
