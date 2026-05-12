@@ -633,12 +633,18 @@ ignore = [
 <li><code>uninitialized-property</code> pour les propriétés typées non assignées dans le constructeur.</li>
 </ul>
 <p><code>class-initializers</code> vous permet de marquer des méthodes supplémentaires qui doivent compter comme initialiseurs, aux côtés de <code>__construct</code>. Les propriétés assignées dans ces méthodes sont traitées comme définitivement initialisées. C'est utile pour les frameworks qui utilisent des méthodes de cycle de vie.</p>
+<p>Chaque entrée peut être soit un simple nom de méthode (applicable à toute classe qui définit cette méthode), soit la forme qualifiée <code>Class::method</code> pour restreindre la règle à une hiérarchie de classes précise. La forme qualifiée correspond lorsque la classe analysée est la classe nommée, en hérite ou implémente l'interface indiquée.</p>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>class-initializers</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Noms de méthodes traitées comme initialiseurs de classe.</td></tr>
+<tr><td style="text-align: left"><code>class-initializers</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Noms de méthodes traitées comme initialiseurs de classe, éventuellement qualifiées sous la forme <code>Class::method</code>.</td></tr>
 </tbody></table>
 <pre><code class="language-toml">[analyzer]
 check-property-initialization = true
-class-initializers = ["setUp", "initialize", "boot"]
+class-initializers = [
+    "boot",
+    "PHPUnit\\Framework\\TestCase::setUp",
+    "PHPUnit\\Framework\\TestCase::setUpBeforeClass",
+    "Symfony\\Component\\Console\\Command\\Command::configure",
+]
 </code></pre>
 <p>Avec cette configuration, le code suivant ne déclenche pas un faux positif :</p>
 <pre><code class="language-php">class MyTest extends TestCase
@@ -651,6 +657,7 @@ class-initializers = ["setUp", "initialize", "boot"]
     }
 }
 </code></pre>
+<p>Une entrée simple comme <code>boot</code> accepte une méthode correspondante sur n'importe quelle classe, tandis que <code>PHPUnit\Framework\TestCase::setUp</code> n'est honorée que pour les classes qui descendent de <code>TestCase</code>. Une classe sans rapport avec sa propre méthode <code>setUp()</code> continue à signaler <code>missing-constructor</code> comme avant.</p>
 <h2 id="exception-filtering">Filtrage d'exceptions</h2>
 <p>Lorsque <code>check-throws</code> est activé, deux options vous permettent d'ignorer des exceptions spécifiques.</p>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>

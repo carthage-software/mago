@@ -631,12 +631,18 @@ ignore = [
 <li><code>uninitialized-property</code> for typed properties not assigned in the constructor.</li>
 </ul>
 <p><code>class-initializers</code> lets you mark additional methods that should count as initialisers, alongside <code>__construct</code>. Properties assigned in those methods are treated as definitely initialised. This is useful for frameworks that use lifecycle methods.</p>
+<p>Entries can be either a bare method name (applies to any class that defines the method) or a fully-qualified <code>Class::method</code> to scope the rule to a specific class hierarchy. The qualified form matches when the analysed class equals the named class or extends/implements it.</p>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>class-initializers</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Method names treated as class initialisers.</td></tr>
+<tr><td style="text-align: left"><code>class-initializers</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Method names treated as class initialisers, optionally qualified as <code>Class::method</code>.</td></tr>
 </tbody></table>
 <pre><code class="language-toml">[analyzer]
 check-property-initialization = true
-class-initializers = ["setUp", "initialize", "boot"]
+class-initializers = [
+    "boot",
+    "PHPUnit\\Framework\\TestCase::setUp",
+    "PHPUnit\\Framework\\TestCase::setUpBeforeClass",
+    "Symfony\\Component\\Console\\Command\\Command::configure",
+]
 </code></pre>
 <p>With this configuration, the following code does not trigger a false positive:</p>
 <pre><code class="language-php">class MyTest extends TestCase
@@ -649,6 +655,7 @@ class-initializers = ["setUp", "initialize", "boot"]
     }
 }
 </code></pre>
+<p>A bare entry like <code>boot</code> accepts a matching method on any class, while <code>PHPUnit\Framework\TestCase::setUp</code> is only honoured for classes that descend from <code>TestCase</code>. An unrelated class with its own <code>setUp()</code> method keeps reporting <code>missing-constructor</code> as usual.</p>
 <h2 id="exception-filtering">Exception filtering</h2>
 <p>When <code>check-throws</code> is enabled, two options let you skip specific exceptions.</p>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
