@@ -486,7 +486,8 @@
           },
           "no-fully-qualified-global-function": {
             "enabled": false,
-            "level": "Help"
+            "level": "Help",
+            "namespaced": false
           },
           "no-alias-function": {
             "enabled": true,
@@ -1482,7 +1483,8 @@
             },
             "no-fully-qualified-global-function": {
               "enabled": false,
-              "level": "Help"
+              "level": "Help",
+              "namespaced": false
             },
             "no-alias-function": {
               "enabled": true,
@@ -2581,7 +2583,8 @@
           "$ref": "#/$defs/RuleSettings97",
           "default": {
             "enabled": false,
-            "level": "Help"
+            "level": "Help",
+            "namespaced": false
           }
         },
         "no-alias-function": {
@@ -5376,6 +5379,10 @@
         "level": {
           "$ref": "#/$defs/Level",
           "default": "Help"
+        },
+        "namespaced": {
+          "type": "boolean",
+          "default": false
         }
       },
       "additionalProperties": false
