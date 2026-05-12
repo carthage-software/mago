@@ -7669,7 +7669,7 @@
           "type": "boolean",
           "default": false
         },
-        "split-trait-use": {
+        "separate-trait-use": {
           "description": "Whether to split a single `use` trait statement that imports multiple traits\n(`use FirstTrait, SecondTrait;`) into one `use` statement per trait, as required\nby PSR-12 / PER-CS-3 section 4.2.\n\nOnly abstract trait-use forms (those terminated with `;`, with no `{ ... }`\nadaptation block) are split. Compound declarations with adaptations are left\nuntouched because the adaptations may reference any of the imported traits.\n\nDefault: true (PER-CS / PSR-12)",
           "type": "boolean",
           "default": true
