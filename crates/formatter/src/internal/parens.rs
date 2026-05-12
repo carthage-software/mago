@@ -601,20 +601,12 @@ impl<'arena> FormatterState<'_, 'arena> {
         )
     }
 
-    pub(crate) fn instantiation_needs_parens(&self, i: &'arena Instantiation<'arena>) -> bool {
-        if self.php_version.is_supported(Feature::NewWithoutParentheses) {
-            if i.argument_list.as_ref().is_none_or(|list| list.arguments.is_empty()) {
-                if self.settings.parentheses_in_new_expression {
-                    self.settings.parentheses_around_new_in_member_access
-                } else {
-                    true
-                }
-            } else {
-                self.settings.parentheses_around_new_in_member_access
-            }
-        } else {
-            true
+    pub(crate) fn instantiation_needs_parens(&self, _i: &'arena Instantiation<'arena>) -> bool {
+        if !self.php_version.is_supported(Feature::NewWithoutParentheses) {
+            return true;
         }
+
+        self.settings.parentheses_around_new_in_member_access
     }
 
     const fn is_unary_or_binary_or_ternary(&self, node: Node<'arena, 'arena>) -> bool {

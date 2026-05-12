@@ -1,11 +1,13 @@
 use bumpalo::collections::Vec;
 use bumpalo::vec;
 
+use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::ArgumentList;
 use mago_syntax::ast::Call;
 use mago_syntax::ast::Expression;
+use mago_syntax::ast::Node;
 use mago_syntax::ast::PartialArgumentList;
 
 use crate::document::BreakMode;
@@ -40,7 +42,9 @@ pub(super) fn print_call_arguments<'arena>(
     expression: CallLikeNode<'arena>,
 ) -> Document<'arena> {
     let Some(argument_list) = expression.arguments() else {
-        return if (expression.is_instantiation() && f.settings.parentheses_in_new_expression)
+        return if (expression.is_instantiation()
+            && (f.settings.parentheses_in_new_expression
+                || instantiation_needs_inline_new_parens(f, expression)))
             || (expression.is_exit_or_die_construct() && f.settings.parentheses_in_exit_and_die)
             || (expression.is_attribute() && f.settings.parentheses_in_attribute)
         {
@@ -51,7 +55,9 @@ pub(super) fn print_call_arguments<'arena>(
     };
 
     if argument_list.arguments.is_empty()
-        && ((expression.is_instantiation() && !f.settings.parentheses_in_new_expression)
+        && ((expression.is_instantiation()
+            && !f.settings.parentheses_in_new_expression
+            && !instantiation_needs_inline_new_parens(f, expression))
             || (expression.is_exit_or_die_construct() && !f.settings.parentheses_in_exit_and_die)
             || (expression.is_attribute() && !f.settings.parentheses_in_attribute))
     {
@@ -68,6 +74,40 @@ pub(super) fn print_call_arguments<'arena>(
     }
 
     print_argument_list(f, argument_list, expression.is_attribute(), !expression.is_phpunit_assertion_call())
+}
+
+fn instantiation_needs_inline_new_parens<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    expression: CallLikeNode<'arena>,
+) -> bool {
+    if !expression.is_instantiation() {
+        return false;
+    }
+
+    if !f.php_version.is_supported(Feature::NewWithoutParentheses) {
+        return false;
+    }
+
+    if f.settings.parentheses_around_new_in_member_access {
+        return false;
+    }
+
+    let Some(grandparent) = f.grandparent_node() else {
+        return false;
+    };
+
+    match grandparent {
+        Node::Call(call) => {
+            matches!(call, Call::Method(_) | Call::NullSafeMethod(_) | Call::StaticMethod(_))
+        }
+        Node::PropertyAccess(_)
+        | Node::NullSafePropertyAccess(_)
+        | Node::StaticPropertyAccess(_)
+        | Node::ClassConstantAccess(_)
+        | Node::MethodPartialApplication(_)
+        | Node::StaticMethodPartialApplication(_) => true,
+        _ => false,
+    }
 }
 
 pub(super) fn print_argument_list<'arena>(
