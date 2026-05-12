@@ -1407,10 +1407,11 @@ function foo() {}
 <details class="rule" name="rule" id="no-negated-ternary">
 <summary><code class="rule__code">no-negated-ternary</code><a class="rule__anchor" href="#no-negated-ternary" aria-label="Lien permanent vers no-negated-ternary">¶</a><span class="rule__level rule__level--help">help</span></summary>
 <div class="rule__body">
-<p>Flags ternary expressions whose condition is a logical negation
-(<code>!$foo ? a : b</code>).</p>
+<p>Flags ternary expressions whose condition is a negated form,
+including logical negation (<code>!$foo ? a : b</code>) and the
+not-equal comparison operators (<code>!==</code>, <code>!=</code>, <code>&lt;&gt;</code>).</p>
 <p>A negated condition adds a layer of indirection the reader has to
-undo to follow the branches. Removing the negation and swapping
+undo to follow the branches. Inverting the condition and swapping
 the <code>then</code> and <code>else</code> branches produces an equivalent expression
 that reads more directly.</p>
 <hr class="rule__separator">
@@ -1420,6 +1421,7 @@ that reads more directly.</p>
 <pre><code class="language-php">&lt;?php
 
 $x = !$foo ? 1 : 0;
+$y = $foo !== null ? transform($foo) : null;
 </code></pre>
 </div>
 <div class="rule-example rule-example--good">
