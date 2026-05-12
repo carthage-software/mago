@@ -107,14 +107,21 @@ When `check-property-initialization` is enabled, the analyzer reports two issues
 
 `class-initializers` lets you mark additional methods that should count as initialisers, alongside `__construct`. Properties assigned in those methods are treated as definitely initialised. This is useful for frameworks that use lifecycle methods.
 
+Entries can be either a bare method name (applies to any class that defines the method) or a fully-qualified `Class::method` to scope the rule to a specific class hierarchy. The qualified form matches when the analysed class equals the named class or extends/implements it.
+
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `class-initializers` | `string[]` | `[]` | Method names treated as class initialisers. |
+| `class-initializers` | `string[]` | `[]` | Method names treated as class initialisers, optionally qualified as `Class::method`. |
 
 ```toml
 [analyzer]
 check-property-initialization = true
-class-initializers = ["setUp", "initialize", "boot"]
+class-initializers = [
+    "boot",
+    "PHPUnit\\Framework\\TestCase::setUp",
+    "PHPUnit\\Framework\\TestCase::setUpBeforeClass",
+    "Symfony\\Component\\Console\\Command\\Command::configure",
+]
 ```
 
 With this configuration, the following code does not trigger a false positive:
@@ -130,6 +137,8 @@ class MyTest extends TestCase
     }
 }
 ```
+
+A bare entry like `boot` accepts a matching method on any class, while `PHPUnit\Framework\TestCase::setUp` is only honoured for classes that descend from `TestCase`. An unrelated class with its own `setUp()` method keeps reporting `missing-constructor` as usual.
 
 ## Exception filtering
 

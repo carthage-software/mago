@@ -412,15 +412,15 @@ fn compute_class_initializer_initializations(
     let class_name = class_like_metadata.name;
     let class_is_final = class_like_metadata.flags.is_final();
 
-    for initializer_name in &context.settings.class_initializers {
-        if let Some(method_id) = class_like_metadata.declaring_method_ids.get(initializer_name) {
+    for initializer_name in context.settings.applicable_class_initializers(class_like_metadata) {
+        if let Some(method_id) = class_like_metadata.declaring_method_ids.get(&initializer_name) {
             let declaring_class_name = method_id.get_class_name();
 
             let initialized = compute_transitive_initializations(
                 artifacts,
                 context,
                 declaring_class_name,
-                *initializer_name,
+                initializer_name,
                 class_is_final,
                 true,
             );
@@ -435,15 +435,15 @@ fn compute_class_initializer_initializations(
             break;
         };
 
-        for initializer_name in &context.settings.class_initializers {
-            if let Some(method_id) = parent_meta.declaring_method_ids.get(initializer_name) {
+        for initializer_name in context.settings.applicable_class_initializers(parent_meta) {
+            if let Some(method_id) = parent_meta.declaring_method_ids.get(&initializer_name) {
                 let declaring_class_name = method_id.get_class_name();
 
                 let initialized = compute_transitive_initializations(
                     artifacts,
                     context,
                     declaring_class_name,
-                    *initializer_name,
+                    initializer_name,
                     parent_meta.flags.is_final(),
                     true,
                 );
@@ -467,9 +467,8 @@ fn compute_class_initializer_initializations(
     let has_any_initializer = {
         let current_has = context
             .settings
-            .class_initializers
-            .iter()
-            .any(|init_name| class_like_metadata.declaring_method_ids.contains_key(init_name));
+            .applicable_class_initializers(class_like_metadata)
+            .any(|init_name| class_like_metadata.declaring_method_ids.contains_key(&init_name));
 
         if current_has {
             true
@@ -482,9 +481,8 @@ fn compute_class_initializer_initializations(
                 };
                 if context
                     .settings
-                    .class_initializers
-                    .iter()
-                    .any(|init_name| parent_meta.declaring_method_ids.contains_key(init_name))
+                    .applicable_class_initializers(parent_meta)
+                    .any(|init_name| parent_meta.declaring_method_ids.contains_key(&init_name))
                 {
                     found = true;
                     break;
@@ -504,9 +502,8 @@ fn compute_class_initializer_initializations(
 
             let parent_has_initializer = context
                 .settings
-                .class_initializers
-                .iter()
-                .any(|init_name| parent_meta.declaring_method_ids.contains_key(init_name));
+                .applicable_class_initializers(parent_meta)
+                .any(|init_name| parent_meta.declaring_method_ids.contains_key(&init_name));
 
             if parent_has_initializer {
                 for (prop_name, declaring_class) in &parent_meta.declaring_property_ids {
@@ -530,7 +527,9 @@ fn is_method_trustworthy(context: &Context<'_, '_>, class_name: Atom, method_nam
         return true;
     }
 
-    if context.settings.class_initializers.contains(&method_name) {
+    if let Some(class_meta) = context.codebase.get_class_like(&class_name)
+        && context.settings.is_class_initializer_for(class_meta, method_name)
+    {
         return true;
     }
 

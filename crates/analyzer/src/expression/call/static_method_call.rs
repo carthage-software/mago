@@ -53,7 +53,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                 block_context.flags.set_calls_parent_constructor(true);
             } else {
                 let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
-                if context.settings.class_initializers.contains(&method_name) {
+                let parent_meta = block_context
+                    .scope
+                    .get_class_like()
+                    .and_then(|m| m.direct_parent_class)
+                    .and_then(|p| context.codebase.get_class_like(&p));
+                if let Some(parent_meta) = parent_meta
+                    && context.settings.is_class_initializer_for(parent_meta, method_name)
+                {
                     block_context.calls_parent_initializer = Some(method_name);
                 }
             }

@@ -5,10 +5,10 @@ use mago_algebra::DEFAULT_CONSENSUS_LIMIT;
 use mago_algebra::DEFAULT_DISJUNCTION_COMPLEXITY;
 use mago_algebra::DEFAULT_NEGATION_COMPLEXITY;
 use mago_algebra::DEFAULT_SATURATION_COMPLEXITY;
+use mago_analyzer::settings::ClassInitializer;
 use mago_analyzer::settings::DEFAULT_FORMULA_SIZE_THRESHOLD;
 use mago_analyzer::settings::DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD;
 use mago_analyzer::settings::Settings;
-use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_codex::ttype::combiner::DEFAULT_ARRAY_COMBINATION_THRESHOLD;
 use mago_codex::ttype::combiner::DEFAULT_INTEGER_COMBINATION_THRESHOLD;
@@ -477,7 +477,7 @@ impl AnalyzerConfiguration {
             use_colors: should_use_colors(color_choice),
             diff: enable_diff,
             trust_existence_checks: self.trust_existence_checks,
-            class_initializers: self.class_initializers.iter().map(|s| ascii_lowercase_atom(s.as_str())).collect(),
+            class_initializers: self.class_initializers.iter().filter_map(|s| ClassInitializer::parse(s)).collect(),
             check_property_initialization: self.check_property_initialization,
             check_use_statements: self.check_use_statements,
             check_experimental: self.check_experimental,

@@ -107,14 +107,21 @@ Lorsque `check-property-initialization` est activé, l'analyseur signale deux pr
 
 `class-initializers` vous permet de marquer des méthodes supplémentaires qui doivent compter comme initialiseurs, aux côtés de `__construct`. Les propriétés assignées dans ces méthodes sont traitées comme définitivement initialisées. C'est utile pour les frameworks qui utilisent des méthodes de cycle de vie.
 
+Chaque entrée peut être soit un simple nom de méthode (applicable à toute classe qui définit cette méthode), soit la forme qualifiée `Class::method` pour restreindre la règle à une hiérarchie de classes précise. La forme qualifiée correspond lorsque la classe analysée est la classe nommée, en hérite ou implémente l'interface indiquée.
+
 | Option | Type | Défaut | Description |
 | :--- | :--- | :--- | :--- |
-| `class-initializers` | `string[]` | `[]` | Noms de méthodes traitées comme initialiseurs de classe. |
+| `class-initializers` | `string[]` | `[]` | Noms de méthodes traitées comme initialiseurs de classe, éventuellement qualifiées sous la forme `Class::method`. |
 
 ```toml
 [analyzer]
 check-property-initialization = true
-class-initializers = ["setUp", "initialize", "boot"]
+class-initializers = [
+    "boot",
+    "PHPUnit\\Framework\\TestCase::setUp",
+    "PHPUnit\\Framework\\TestCase::setUpBeforeClass",
+    "Symfony\\Component\\Console\\Command\\Command::configure",
+]
 ```
 
 Avec cette configuration, le code suivant ne déclenche pas un faux positif :
@@ -130,6 +137,8 @@ class MyTest extends TestCase
     }
 }
 ```
+
+Une entrée simple comme `boot` accepte une méthode correspondante sur n'importe quelle classe, tandis que `PHPUnit\Framework\TestCase::setUp` n'est honorée que pour les classes qui descendent de `TestCase`. Une classe sans rapport avec sa propre méthode `setUp()` continue à signaler `missing-constructor` comme avant.
 
 ## Filtrage d'exceptions
 

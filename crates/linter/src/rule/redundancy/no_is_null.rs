@@ -163,8 +163,7 @@ fn surrounding_context<'arena>(
     let mut negated = false;
     let mut n = 0;
 
-    loop {
-        let Some(parent) = ctx.get_nth_parent(n) else { break };
+    while let Some(parent) = ctx.get_nth_parent(n) {
         match parent {
             Node::Expression(_) | Node::Call(_) => {
                 n += 1;

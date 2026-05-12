@@ -13,7 +13,6 @@ use wasm_bindgen::prelude::*;
 use mago_analyzer::plugin::available_plugins;
 use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_analyzer::settings::Settings as AnalyzerSettings;
-use mago_atom::ascii_lowercase_atom;
 use mago_atom::atom;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
@@ -170,7 +169,11 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         check_arrow_function_missing_type_hints: s.check_arrow_function_missing_type_hints,
         register_super_globals: s.register_super_globals,
         trust_existence_checks: s.trust_existence_checks,
-        class_initializers: s.class_initializers.iter().map(|s| ascii_lowercase_atom(s.as_str())).collect(),
+        class_initializers: s
+            .class_initializers
+            .iter()
+            .filter_map(|s| mago_analyzer::settings::ClassInitializer::parse(s))
+            .collect(),
         check_property_initialization: s.check_property_initialization,
         check_use_statements: s.check_use_statements,
         check_experimental: s.check_experimental,

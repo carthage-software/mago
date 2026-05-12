@@ -1,5 +1,8 @@
 use mago_algebra::AlgebraThresholds;
+use mago_atom::Atom;
 use mago_atom::AtomSet;
+use mago_atom::ascii_lowercase_atom;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_php_version::PHPVersion;
 
@@ -224,10 +227,14 @@ pub struct Settings {
     /// just like in the constructor. This is useful for frameworks that use
     /// lifecycle methods like `PHPUnit`'s `setUp()` or framework `boot()` methods.
     ///
-    /// Example: `["setUp", "initialize", "boot"]`
+    /// Entries can be either bare method names (applying to any class that has
+    /// that method) or qualified as `Fully\\Qualified\\Class::method` to scope
+    /// the rule to a specific class hierarchy.
+    ///
+    /// Example: `["setUp", "boot", "PHPUnit\\Framework\\TestCase::setUpBeforeClass"]`
     ///
     /// Defaults to empty (no additional initializers).
-    pub class_initializers: AtomSet,
+    pub class_initializers: Vec<ClassInitializer>,
 
     /// Enable property initialization checking (`missing-constructor`, `uninitialized-property`).
     ///
@@ -411,7 +418,7 @@ impl Settings {
             register_super_globals: true,
             diff: false,
             trust_existence_checks: true,
-            class_initializers: AtomSet::default(),
+            class_initializers: Vec::new(),
             check_property_initialization: false,
             check_use_statements: false,
             check_experimental: false,
@@ -449,5 +456,67 @@ impl Settings {
             string_combination_threshold: self.string_combination_threshold,
             integer_combination_threshold: self.integer_combination_threshold,
         }
+    }
+
+    /// Returns `true` when `method_name` is a configured class initializer
+    /// applicable to `meta` (either an unrestricted entry, or one whose class
+    /// qualifier `meta` is a subclass/implementer of).
+    #[must_use]
+    pub fn is_class_initializer_for(&self, meta: &ClassLikeMetadata, method_name: Atom) -> bool {
+        self.class_initializers.iter().any(|init| init.method == method_name && init.applies_to(meta))
+    }
+
+    /// Iterator over initializer method names applicable to `meta`.
+    pub fn applicable_class_initializers<'cfg>(
+        &'cfg self,
+        meta: &'cfg ClassLikeMetadata,
+    ) -> impl Iterator<Item = Atom> + 'cfg {
+        self.class_initializers.iter().filter(move |init| init.applies_to(meta)).map(|init| init.method)
+    }
+}
+
+/// A class-initializer entry: a method that, when present on a class, marks
+/// any properties it assigns as definitely initialized.
+///
+/// The optional `class` qualifier restricts the rule to a specific class hierarchy.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ClassInitializer {
+    /// Lowercased FQN of the class/interface this entry is scoped to. `None`
+    /// means the entry applies to any class that has the named method.
+    pub class: Option<Atom>,
+    /// Lowercased method name.
+    pub method: Atom,
+}
+
+impl ClassInitializer {
+    /// Parse `"Class::method"` or `"method"`. Returns `None` for empty input
+    /// or empty halves.
+    #[must_use]
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw.split_once("::") {
+            Some((class, method)) => {
+                let class = class.trim_start_matches('\\').trim();
+                let method = method.trim();
+                if class.is_empty() || method.is_empty() {
+                    return None;
+                }
+
+                Some(Self { class: Some(ascii_lowercase_atom(class)), method: ascii_lowercase_atom(method) })
+            }
+            None => {
+                let method = raw.trim();
+                if method.is_empty() {
+                    return None;
+                }
+                Some(Self { class: None, method: ascii_lowercase_atom(method) })
+            }
+        }
+    }
+
+    /// `true` when this entry's class qualifier (if any) covers `meta`.
+    #[must_use]
+    pub fn applies_to(&self, meta: &ClassLikeMetadata) -> bool {
+        let Some(class) = self.class else { return true };
+        meta.name == class || meta.all_parent_classes.contains(&class) || meta.all_parent_interfaces.contains(&class)
     }
 }
