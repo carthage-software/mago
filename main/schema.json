@@ -473,7 +473,8 @@
           },
           "no-assign-in-condition": {
             "enabled": true,
-            "level": "Warning"
+            "level": "Warning",
+            "ignore-while-statements": false
           },
           "no-fully-qualified-global-class-like": {
             "enabled": false,
@@ -1468,7 +1469,8 @@
             },
             "no-assign-in-condition": {
               "enabled": true,
-              "level": "Warning"
+              "level": "Warning",
+              "ignore-while-statements": false
             },
             "no-fully-qualified-global-class-like": {
               "enabled": false,
@@ -2557,7 +2559,8 @@
           "$ref": "#/$defs/RuleSettings94",
           "default": {
             "enabled": true,
-            "level": "Warning"
+            "level": "Warning",
+            "ignore-while-statements": false
           }
         },
         "no-fully-qualified-global-class-like": {
@@ -5309,6 +5312,10 @@
         "level": {
           "$ref": "#/$defs/Level",
           "default": "Warning"
+        },
+        "ignore-while-statements": {
+          "type": "boolean",
+          "default": false
         }
       },
       "additionalProperties": false
