@@ -25,3 +25,45 @@ trait Issue1727Trait
         $this->assertNotNullValue($foo);
     }
 }
+
+class Issue1727Transaction {}
+
+class Issue1727Repository
+{
+    public function findOne(): ?Issue1727Transaction
+    {
+        return null;
+    }
+}
+
+abstract class Issue1727Assert
+{
+    /**
+     * @phpstan-assert !null $actual
+     */
+    final public static function assertNotNull(mixed $actual, string $message = ''): void
+    {
+    }
+}
+
+abstract class Issue1727TestCase extends Issue1727Assert
+{
+}
+
+/**
+ * @phpstan-require-extends Issue1727TestCase
+ */
+trait Issue1727InheritedAssertTrait
+{
+    protected function getRepo(): Issue1727Repository
+    {
+        return new Issue1727Repository();
+    }
+
+    protected function assertTransactionPresent(): void
+    {
+        $transaction = $this->getRepo()->findOne();
+
+        $this->assertNotNull($transaction);
+    }
+}
