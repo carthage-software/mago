@@ -31,11 +31,12 @@ pub struct NoFullyQualifiedGlobalFunctionRule {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NoFullyQualifiedGlobalFunctionConfig {
     pub level: Level,
+    pub namespaced: bool,
 }
 
 impl Default for NoFullyQualifiedGlobalFunctionConfig {
     fn default() -> Self {
-        Self { level: Level::Help }
+        Self { level: Level::Help, namespaced: false }
     }
 }
 
@@ -125,20 +126,43 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
         let short_name = function_name.rsplit('\\').next().unwrap_or(function_name);
         let fqn_span = identifier.span();
 
-        let resolution = ctx.import_function(function_name);
+        let namespace_part = if self.cfg.namespaced {
+            function_name.rsplit_once('\\').map(|(ns, _)| ns).filter(|ns| !ns.is_empty())
+        } else {
+            None
+        };
 
-        let (title, help) = match &resolution {
-            Some(res) if res.is_already_available() && res.local_name.as_str() != short_name => (
+        let (resolution, replacement, use_statement_text) = match namespace_part {
+            Some(ns) => match ctx.import_name(ns) {
+                Some(res) => {
+                    let replacement = format!("{}\\{}", res.local_name, short_name);
+                    let use_text = format!("use {ns};");
+                    (Some(res), Some(replacement), use_text)
+                }
+                None => (None, None, format!("use {ns};")),
+            },
+            None => match ctx.import_function(function_name) {
+                Some(res) => {
+                    let replacement = res.local_name.to_string();
+                    let use_text = format!("use function {function_name};");
+                    (Some(res), Some(replacement), use_text)
+                }
+                None => (None, None, format!("use function {function_name};")),
+            },
+        };
+
+        let (title, help) = match (&resolution, replacement.as_deref()) {
+            (Some(res), Some(rep)) if res.is_already_available() && rep != short_name => (
                 "Fully-qualified function call can be replaced with an existing alias.",
-                format!("`{function_name}` is already imported as `{}`; replace the call with it.", res.local_name),
+                format!("`{function_name}` is already reachable as `{rep}`; replace the call with it."),
             ),
-            Some(res) if res.is_already_available() => (
+            (Some(res), _) if res.is_already_available() => (
                 "Fully-qualified function call is already in scope.",
-                format!("`{function_name}` is already reachable as `{}`; drop the leading `\\`.", res.local_name),
+                format!("`{function_name}` is already reachable as `{short_name}`; drop the leading `\\`."),
             ),
-            Some(_) | None => (
+            _ => (
                 "Fully-qualified function call detected.",
-                format!("Add `use function {function_name};` and call `{short_name}(...)` directly."),
+                format!("Add `{use_statement_text}` and call `{}(...)` directly.", replacement.as_deref().unwrap_or(short_name)),
             ),
         };
 
@@ -151,16 +175,16 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
             .with_note("Fully-qualified function calls bypass the import system, making it harder to see which global functions a file depends on.")
             .with_help(help);
 
-        match resolution {
-            Some(resolution) => {
+        match (resolution, replacement) {
+            (Some(resolution), Some(replacement)) => {
                 ctx.collector.propose(issue, |edits| {
-                    edits.push(TextEdit::replace(fqn_span, resolution.local_name.as_str()));
+                    edits.push(TextEdit::replace(fqn_span, replacement));
                     if let Some(use_edit) = resolution.use_statement_edit {
                         edits.push(use_edit.with_safety(Safety::Safe));
                     }
                 });
             }
-            None => {
+            _ => {
                 ctx.collector.report(issue);
             }
         }
@@ -506,6 +530,143 @@ mod tests {
             use function Other\helper;
 
             $x = helper();
+        "#}
+    }
+
+    test_lint_fix! {
+        name = namespaced_fix_imports_namespace_and_prefixes_call,
+        rule = NoFullyQualifiedGlobalFunctionRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.no_fully_qualified_global_function.config.namespaced = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $a = \Psl\Str\length($s);
+            $b = \Psl\Str\Byte\length($s);
+            $c = \Psl\Str\Grapheme\length($s);
+            $a = \Psl\Str\length($s);
+            $b = \Psl\Str\Byte\length($s);
+            $c = \Psl\Str\Grapheme\length($s);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Psl\Str;
+
+            use Psl\Str\Byte;
+
+            use Psl\Str\Grapheme;
+
+            $a = Str\length($s);
+            $b = Byte\length($s);
+            $c = Grapheme\length($s);
+            $a = Str\length($s);
+            $b = Byte\length($s);
+            $c = Grapheme\length($s);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = namespaced_fix_uses_function_import_when_no_namespace,
+        rule = NoFullyQualifiedGlobalFunctionRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.no_fully_qualified_global_function.config.namespaced = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            $n = \strlen("x");
+            $n = \strlen("x");
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use function strlen;
+
+            $n = strlen("x");
+            $n = strlen("x");
+        "#}
+    }
+
+    test_lint_fix! {
+        name = namespaced_fix_reuses_existing_namespace_import,
+        rule = NoFullyQualifiedGlobalFunctionRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.no_fully_qualified_global_function.config.namespaced = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Psl\Str;
+
+            $n = \Psl\Str\length($s);
+            $n = \Psl\Str\length($s);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Psl\Str;
+
+            $n = Str\length($s);
+            $n = Str\length($s);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = namespaced_fix_uses_existing_aliased_namespace_import,
+        rule = NoFullyQualifiedGlobalFunctionRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.no_fully_qualified_global_function.config.namespaced = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Psl\Str as S;
+
+            $n = \Psl\Str\length($s);
+            $n = \Psl\Str\length($s);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Psl\Str as S;
+
+            $n = S\length($s);
+            $n = S\length($s);
+        "#}
+    }
+
+    test_lint_success! {
+        name = namespaced_unqualified_namespace_prefixed_call_is_not_flagged,
+        rule = NoFullyQualifiedGlobalFunctionRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.no_fully_qualified_global_function.config.namespaced = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use Psl\Str;
+
+            $n = Str\length($s);
         "#}
     }
 }
