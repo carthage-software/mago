@@ -58,6 +58,20 @@ impl TIndexAccess {
         let mut indexed_values = vec![];
         for target_type in target_types {
             'indices: for index_type in index_types {
+                if let TAtomic::GenericParameter(index_parameter) = index_type
+                    && !retain_generics
+                {
+                    if let Some(generic_indexed_values) = Self::get_indexed_access_result(
+                        std::slice::from_ref(target_type),
+                        index_parameter.get_constraint().types.as_ref(),
+                        retain_generics,
+                    ) {
+                        indexed_values.extend(generic_indexed_values.types.into_owned());
+                    }
+
+                    continue 'indices;
+                }
+
                 match target_type {
                     TAtomic::Array(target_array) => {
                         let Some(array_key) = index_type.to_array_key() else {
