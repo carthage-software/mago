@@ -84,11 +84,9 @@ impl FunctionAssertionProvider for ArrayAllAssertionProvider {
         // `Conjunction<Assertion>` carries an AND of constraints; only emit
         // one `IsType` here, so back out if the input union has more than one
         // array variant we'd need to OR.
-        if narrowed_atomics.len() != 1 {
-            return None;
-        }
+        let [narrowed_atomic] = narrowed_atomics.try_into().ok()?;
 
-        let assertion = Assertion::IsType(narrowed_atomics.into_iter().next().unwrap());
+        let assertion = Assertion::IsType(narrowed_atomic);
 
         let mut result = InvocationAssertions::new();
         result.add_if_true(atom("$array"), vec![assertion]);
