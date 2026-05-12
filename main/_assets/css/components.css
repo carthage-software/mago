@@ -296,7 +296,9 @@
   }
 
   :where(.sidebar-section__chev, .sidebar-subsection__chev, .sidebar-subsubsection__chev) {
-    color: var(--ink-faint);
+    color: var(--ink-soft);
+    font-size: 1rem;
+    line-height: 1;
     transition: transform var(--t-snap);
   }
 
@@ -313,12 +315,12 @@
     grid-template-columns: auto 1fr auto;
     gap: var(--s-3);
     padding-block: var(--s-3);
-    font-size: 0.72rem;
-    color: var(--ink-quiet);
+    font-size: 0.78rem;
+    color: var(--ink-soft);
   }
 
   .sidebar-section__index {
-    color: var(--ink-faint);
+    color: var(--ink-quiet);
   }
 
   .sidebar-section__title {
@@ -337,13 +339,13 @@
   }
 
   .sidebar-subsection > summary {
-    font-size: 0.68rem;
-    color: var(--ink-quiet);
+    font-size: 0.74rem;
+    color: var(--ink-soft);
   }
 
   .sidebar-subsubsection > summary {
-    font-size: 0.66rem;
-    color: var(--ink-quiet);
+    font-size: 0.72rem;
+    color: var(--ink-soft);
   }
 
   :where(.sidebar-section__items, .sidebar-subsection__items, .sidebar-subsubsection__items) {
@@ -380,9 +382,9 @@
   .sidebar-section__items > li > a::before {
     content: counter(nav-item, decimal-leading-zero);
     font-family: var(--mono);
-    font-size: 0.68rem;
+    font-size: 0.78rem;
     letter-spacing: 0.04em;
-    color: var(--ink-faint);
+    color: var(--ink-quiet);
   }
 
   .sidebar-section__items a:hover {

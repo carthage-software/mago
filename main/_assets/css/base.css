@@ -85,6 +85,8 @@
     --warn-bg: rgba(60, 141, 88, 0.10);
     --info-bg: rgba(0, 0, 0, 0.04);
     --inline-code-bg: rgba(0, 0, 0, 0.05);
+    --cm-selection: rgba(60, 141, 88, 0.32);
+    --cm-selection-blur: rgba(60, 141, 88, 0.18);
 
     --syn-comment: #6a737d;
     --syn-keyword: #b91d3a;
@@ -146,6 +148,8 @@
     --warn-bg: rgba(95, 182, 119, 0.12);
     --info-bg: rgba(255, 255, 255, 0.05);
     --inline-code-bg: rgba(255, 255, 255, 0.10);
+    --cm-selection: rgba(95, 182, 119, 0.40);
+    --cm-selection-blur: rgba(95, 182, 119, 0.22);
 
     --syn-comment: #8b949e;
     --syn-keyword: #ff8a82;
@@ -177,6 +181,8 @@
       --warn-bg: rgba(95, 182, 119, 0.12);
       --info-bg: rgba(255, 255, 255, 0.05);
       --inline-code-bg: rgba(255, 255, 255, 0.10);
+      --cm-selection: rgba(95, 182, 119, 0.40);
+      --cm-selection-blur: rgba(95, 182, 119, 0.22);
 
       --syn-comment: #8b949e;
       --syn-keyword: #ff8a82;
