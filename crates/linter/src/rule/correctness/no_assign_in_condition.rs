@@ -31,11 +31,12 @@ pub struct NoAssignInConditionRule {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct NoAssignInConditionConfig {
     pub level: Level,
+    pub ignore_while_statements: bool,
 }
 
 impl Default for NoAssignInConditionConfig {
     fn default() -> Self {
-        Self { level: Level::Warning }
+        Self { level: Level::Warning, ignore_while_statements: false }
     }
 }
 
@@ -98,8 +99,20 @@ impl LintRule for NoAssignInConditionRule {
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let (condition, assignment) = match node {
             Node::If(r#if) => (&r#if.condition, get_assignment_from_expression(r#if.condition)),
-            Node::While(r#while) => (&r#while.condition, get_assignment_from_expression(r#while.condition)),
-            Node::DoWhile(do_while) => (&do_while.condition, get_assignment_from_expression(do_while.condition)),
+            Node::While(r#while) => {
+                if self.cfg.ignore_while_statements {
+                    return;
+                }
+
+                (&r#while.condition, get_assignment_from_expression(r#while.condition))
+            }
+            Node::DoWhile(do_while) => {
+                if self.cfg.ignore_while_statements {
+                    return;
+                }
+
+                (&do_while.condition, get_assignment_from_expression(do_while.condition))
+            }
             Node::IfStatementBodyElseIfClause(if_statement_body_else_if_clause) => (
                 &if_statement_body_else_if_clause.condition,
                 get_assignment_from_expression(if_statement_body_else_if_clause.condition),
