@@ -643,8 +643,11 @@ jobs:
 </code></pre>
 <p>镜像不包含 PHP 或 Composer。这对格式化器和 linter 来说没有问题。分析器需要安装项目的 Composer 依赖才能正确解析符号;否则会对未定义符号产生误报。如果你的项目依赖第三方包并打算运行分析器,优先选择 <a href="../../../../main/zh/guide/installation">原生安装</a> 并安装好 Composer 依赖。</p>
 <h3 id="gitlab-ci">GitLab CI</h3>
+<p>GitLab Runner 会把 <code>script</code> 中的每一行包到 <code>sh -c</code> 里执行，这与该镜像的 <code>ENTRYPOINT</code> 冲突。把 entrypoint 清空，命令才能按字面意思运行：</p>
 <pre><code class="language-yaml">mago:
-  image: ghcr.io/carthage-software/mago:1
+  image:
+    name: ghcr.io/carthage-software/mago:1
+    entrypoint: [""]
   script:
     - mago fmt --check
     - mago lint

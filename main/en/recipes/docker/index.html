@@ -614,8 +614,11 @@ jobs:
 </code></pre>
 <p>The image does not include PHP or Composer. That works fine for the formatter and linter. The analyzer needs your project's Composer dependencies installed to resolve symbols correctly; without them it will report false positives for undefined symbols. If your project depends on third-party packages and you want to run the analyzer, prefer a <a href="../../../../main/en/guide/installation">native installation</a> with Composer dependencies installed.</p>
 <h3 id="gitlab-ci">GitLab CI</h3>
+<p>GitLab Runner wraps each <code>script</code> line in <code>sh -c</code>, which collides with this image's <code>ENTRYPOINT</code>. Clear the entrypoint so your commands run as written:</p>
 <pre><code class="language-yaml">mago:
-  image: ghcr.io/carthage-software/mago:1
+  image:
+    name: ghcr.io/carthage-software/mago:1
+    entrypoint: [""]
   script:
     - mago fmt --check
     - mago lint
