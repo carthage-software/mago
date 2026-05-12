@@ -446,7 +446,8 @@ impl<'arena> Printer<'arena> {
     fn add_indentation(&mut self, indentation: &Indentation<'arena>) -> usize {
         let value = indentation.get_value_in(self.arena, self.settings.use_tabs, self.settings.tab_width);
         self.out.extend(value);
-        value.len()
+
+        indentation.get_width_in(self.settings.tab_width)
     }
 
     fn set_group_mode_from_last_cmd(&mut self, id: Option<GroupIdentifier>) {

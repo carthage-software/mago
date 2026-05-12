@@ -2,6 +2,7 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec;
 
 use crate::document::Document;
+use crate::internal::utils::string_width;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Indentation<'arena> {
@@ -57,6 +58,16 @@ impl<'arena> Indentation<'arena> {
                 }
                 combined.into_bump_slice()
             }
+        }
+    }
+
+    #[must_use]
+    pub fn get_width_in(&self, tab_width: usize) -> usize {
+        match self {
+            Indentation::Root => 0,
+            Indentation::Indent => tab_width,
+            Indentation::Alignment(value) => string_width(value),
+            Indentation::Combined(nested) => nested.iter().map(|i| i.get_width_in(tab_width)).sum(),
         }
     }
 }
