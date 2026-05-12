@@ -8,8 +8,10 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::ast::Argument;
+use mago_syntax::ast::FunctionCall;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use mago_syntax::ast::UnaryPrefixOperator;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;
@@ -102,10 +104,20 @@ impl LintRule for NoIsNullRule {
             return;
         }
 
-        let issue = Issue::new(self.cfg.level(), "Use `=== null` instead of `is_null()`.")
+        let context = surrounding_context(ctx, function_call);
+
+        let (title, help) = if context.negated {
+            ("Use `!== null` instead of `!is_null()`.", "Replace with a strict `!== null` comparison.")
+        } else {
+            ("Use `=== null` instead of `is_null()`.", "Replace with a strict `=== null` comparison.")
+        };
+
+        let annotation_message = if context.negated { "`!is_null()` is redundant" } else { "`is_null()` is redundant" };
+
+        let issue = Issue::new(self.cfg.level(), title)
             .with_code(self.meta.code)
-            .with_annotation(Annotation::primary(function_call.span()).with_message("`is_null()` is redundant"))
-            .with_help("Replace with a strict `=== null` comparison.");
+            .with_annotation(Annotation::primary(context.span).with_message(annotation_message))
+            .with_help(help);
 
         // Only fix single-argument calls without spread.
         let arguments = &function_call.argument_list.arguments;
@@ -125,12 +137,52 @@ impl LintRule for NoIsNullRule {
         }
 
         ctx.collector.propose(issue, |edits| {
-            edits.push(TextEdit::replace(
-                function_call.start_offset()..function_call.argument_list.left_parenthesis.end_offset(),
-                "(null === ",
-            ));
+            let arg_text = &ctx.source_file.contents[arguments[0].value().span().to_range_usize()];
+            let operator = if context.negated { "!==" } else { "===" };
+            edits.push(TextEdit::replace(context.span, format!("null {operator} {arg_text}")));
         });
     }
+}
+
+struct SurroundingContext {
+    /// Span to replace: covers the call plus any surrounding `!`s and redundant
+    /// parens that exist purely to wrap our expression.
+    span: mago_span::Span,
+    /// `true` when an odd number of `!` operators wrap the call.
+    negated: bool,
+}
+
+/// Walk up from the `is_null(...)` call collecting consecutive `!` operators
+/// and the redundant parens between them, so the fix can consume the whole run
+/// in one edit and pick `===` vs `!==` from the parity.
+fn surrounding_context<'arena>(
+    ctx: &LintContext<'_, 'arena>,
+    function_call: &'arena FunctionCall<'arena>,
+) -> SurroundingContext {
+    let mut span = function_call.span();
+    let mut negated = false;
+    let mut n = 0;
+
+    loop {
+        let Some(parent) = ctx.get_nth_parent(n) else { break };
+        match parent {
+            Node::Expression(_) | Node::Call(_) => {
+                n += 1;
+            }
+            Node::Parenthesized(parenthesized) => {
+                span = parenthesized.span();
+                n += 1;
+            }
+            Node::UnaryPrefix(unary) if matches!(unary.operator, UnaryPrefixOperator::Not(_)) => {
+                span = unary.span();
+                negated = !negated;
+                n += 1;
+            }
+            _ => break,
+        }
+    }
+
+    SurroundingContext { span, negated }
 }
 
 #[cfg(test)]
@@ -201,7 +253,7 @@ mod tests {
         fixed = indoc! {r#"
             <?php
 
-            if ((null === $value)) {
+            if (null === $value) {
                 // ...
             }
         "#}
@@ -224,9 +276,103 @@ mod tests {
 
             use function is_null as is_that_one_value;
 
-            if ((null === $value)) {
+            if (null === $value) {
                 // ...
             }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_negated_is_null_to_strict_not_equal,
+        rule = NoIsNullRule,
+        code = indoc! {r#"
+            <?php
+
+            if (!is_null($value)) {
+                // ...
+            }
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            if (null !== $value) {
+                // ...
+            }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_negated_is_null_with_whitespace,
+        rule = NoIsNullRule,
+        code = indoc! {r#"
+            <?php
+
+            echo ! is_null($x);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            echo null !== $x;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_negated_is_null_inside_parens,
+        rule = NoIsNullRule,
+        code = indoc! {r#"
+            <?php
+
+            $r = !(is_null($value));
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $r = null !== $value;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = double_negation_strips_to_positive_form,
+        rule = NoIsNullRule,
+        code = indoc! {r#"
+            <?php
+
+            $r = !!is_null($value);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $r = null === $value;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = triple_negation_strips_to_negative_form,
+        rule = NoIsNullRule,
+        code = indoc! {r#"
+            <?php
+
+            $r = !!!is_null($value);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $r = null !== $value;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = redundant_outer_parens_dropped,
+        rule = NoIsNullRule,
+        code = indoc! {r#"
+            <?php
+
+            $r = ((is_null($value)));
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $r = null === $value;
         "#}
     }
 }

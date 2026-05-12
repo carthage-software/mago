@@ -162,7 +162,10 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
             ),
             _ => (
                 "Fully-qualified function call detected.",
-                format!("Add `{use_statement_text}` and call `{}(...)` directly.", replacement.as_deref().unwrap_or(short_name)),
+                format!(
+                    "Add `{use_statement_text}` and call `{}(...)` directly.",
+                    replacement.as_deref().unwrap_or(short_name)
+                ),
             ),
         };
 

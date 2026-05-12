@@ -43,8 +43,7 @@ pub(super) fn print_call_arguments<'arena>(
 ) -> Document<'arena> {
     let Some(argument_list) = expression.arguments() else {
         return if (expression.is_instantiation()
-            && (f.settings.parentheses_in_new_expression
-                || instantiation_needs_inline_new_parens(f, expression)))
+            && (f.settings.parentheses_in_new_expression || instantiation_needs_inline_new_parens(f, expression)))
             || (expression.is_exit_or_die_construct() && f.settings.parentheses_in_exit_and_die)
             || (expression.is_attribute() && f.settings.parentheses_in_attribute)
         {
