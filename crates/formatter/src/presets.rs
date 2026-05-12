@@ -208,7 +208,7 @@ const DEFAULT_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     attributes_order: SortOrder::Preserve,
     separate_attributes: false,
-    split_trait_use: true,
+    separate_trait_use: true,
     indent_heredoc: true,
     uppercase_literal_keyword: false,
 };
@@ -305,7 +305,7 @@ const PSR12_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     attributes_order: SortOrder::Preserve,
     separate_attributes: false,
-    split_trait_use: true,
+    separate_trait_use: true,
     indent_heredoc: true,
     uppercase_literal_keyword: false,
 };
@@ -402,7 +402,7 @@ const PINT_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     attributes_order: SortOrder::Preserve,
     separate_attributes: false,
-    split_trait_use: false,
+    separate_trait_use: false,
     indent_heredoc: true,
     uppercase_literal_keyword: false,
 };
@@ -499,7 +499,7 @@ const TEMPEST_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     attributes_order: SortOrder::Preserve,
     separate_attributes: false,
-    split_trait_use: false,
+    separate_trait_use: false,
     indent_heredoc: false,
     uppercase_literal_keyword: false,
 };
@@ -596,7 +596,7 @@ const HACK_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     attributes_order: SortOrder::Preserve,
     separate_attributes: false,
-    split_trait_use: false,
+    separate_trait_use: false,
     indent_heredoc: false,
     uppercase_literal_keyword: false,
 };
@@ -693,7 +693,7 @@ const DRUPAL_PRESET: FormatSettings = FormatSettings {
     separate_class_like_members: true,
     attributes_order: SortOrder::Preserve,
     separate_attributes: false,
-    split_trait_use: false,
+    separate_trait_use: false,
     indent_heredoc: true,
     uppercase_literal_keyword: true,
 };

@@ -629,7 +629,7 @@ impl<'arena> Format<'arena> for UseType<'arena> {
 impl<'arena> Format<'arena> for TraitUse<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, TraitUse, {
-            if f.settings.split_trait_use
+            if f.settings.separate_trait_use
                 && self.trait_names.len() > 1
                 && matches!(self.specification, TraitUseSpecification::Abstract(_))
             {

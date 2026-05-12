@@ -232,7 +232,7 @@ public function bar(
 | `empty-line-before-return` | booléen | `false` | Ligne vide avant un `return`. |
 | `empty-line-before-dangling-comments` | booléen | `true` | Ligne vide avant les commentaires pendants. |
 | `separate-class-like-members` | booléen | `true` | Ligne vide entre différents types de membres de classe. |
-| `split-trait-use` | booléen | `true` | Scinde `use FirstTrait, SecondTrait;` en un `use` par trait, conformément à PSR-12 / PER-CS-3 section 4.2. Ne s'applique qu'aux formes abstraites (sans bloc d'adaptations `{ ... }`). |
+| `separate-trait-use` | booléen | `true` | Scinde `use FirstTrait, SecondTrait;` en un `use` par trait, conformément à PSR-12 / PER-CS-3 section 4.2. Ne s'applique qu'aux formes abstraites (sans bloc d'adaptations `{ ... }`). |
 | `attributes-order` | enum | `"preserve"` | Ordre des annotations `#[Attribute]` sur une déclaration. Valeurs: `preserve` (alias `as-is`, `none`, `keep`), `alphanumeric-ascending` (alias `alpha-ascending`, `ascending`), `alphanumeric-descending` (alias `alpha-descending`, `descending`), `length-ascending`, `length-descending`. Les modes par longueur comptent les codepoints du nom source de l'attribut ; en cas d'égalité, l'ordre `alphanumeric-ascending` sert de critère secondaire. Seul l'ordre d'énumération de `ReflectionAttribute` au runtime est affecté ; gardez `preserve` si votre code dépend de l'ordre source. |
 | `separate-attributes` | booléen | `false` | Sépare un groupe `#[Attr1, Attr2]` en lignes distinctes `#[Attr1]` `#[Attr2]`. Combiné avec un `attributes-order` autre que `preserve`, le tri s'applique globalement à tous les attributs, et pas au sein de chaque groupe. |
 

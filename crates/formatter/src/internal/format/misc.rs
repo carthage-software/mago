@@ -6,10 +6,10 @@ use bumpalo::vec;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Access;
-use mago_syntax::ast::Attribute;
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::ArrayAccess;
 use mago_syntax::ast::ArrayElement;
+use mago_syntax::ast::Attribute;
 use mago_syntax::ast::AttributeList;
 use mago_syntax::ast::Call;
 use mago_syntax::ast::CompositeString;
@@ -885,10 +885,7 @@ pub(super) fn sort_attribute_list_refs<'arena>(lists: &mut [&'arena AttributeLis
     sort_by_sort_order(lists, order, |list| attribute_list_sort_key(list));
 }
 
-pub(super) fn sort_attribute_refs<'arena>(
-    attributes: &mut [&'arena Attribute<'arena>],
-    order: SortOrder,
-) {
+pub(super) fn sort_attribute_refs<'arena>(attributes: &mut [&'arena Attribute<'arena>], order: SortOrder) {
     sort_by_sort_order(attributes, order, |attribute| attribute.name.value());
 }
 

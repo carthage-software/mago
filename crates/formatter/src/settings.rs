@@ -1185,7 +1185,7 @@ generate_formatter_settings! {
     /// untouched because the adaptations may reference any of the imported traits.
     ///
     /// Default: true (PER-CS / PSR-12)
-    split_trait_use: bool => "default_true",
+    separate_trait_use: bool => "default_true",
 
     /// Whether to indent heredoc/nowdoc content.
     ///
