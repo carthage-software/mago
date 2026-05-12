@@ -761,6 +761,7 @@ public function bar(
 <tr><td style="text-align: left"><code>empty-line-before-return</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>false</code></td><td style="text-align: left"><code>return</code> 之前的空行。</td></tr>
 <tr><td style="text-align: left"><code>empty-line-before-dangling-comments</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">悬挂注释之前的空行。</td></tr>
 <tr><td style="text-align: left"><code>separate-class-like-members</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">不同种类的类成员之间的空行。</td></tr>
+<tr><td style="text-align: left"><code>split-trait-use</code></td><td style="text-align: left">布尔值</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">按 PSR-12 / PER-CS-3 section 4.2 的要求，将 <code>use FirstTrait, SecondTrait;</code> 拆分为每个 trait 一条 <code>use</code> 语句。仅对不带 <code>{ ... }</code> 适配块的抽象 trait-use 生效。</td></tr>
 </tbody></table>
 <h2 id="casing">大小写</h2>
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
