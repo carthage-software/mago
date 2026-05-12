@@ -11,6 +11,7 @@ use mago_formatter::settings::BraceStyle;
 use mago_formatter::settings::FormatSettings;
 use mago_formatter::settings::MethodChainBreakingStyle;
 use mago_formatter::settings::NullTypeHint;
+use mago_formatter::settings::SortOrder;
 use mago_php_version::PHPVersion;
 
 #[macro_export]
@@ -131,6 +132,13 @@ test_case!(adds_empty_line_after_use);
 test_case!(split_trait_use);
 test_case!(split_trait_use_disabled);
 test_case!(split_trait_use_with_adaptations);
+test_case!(attributes_order_alpha_asc);
+test_case!(attributes_order_alpha_desc);
+test_case!(attributes_order_length_asc);
+test_case!(attributes_order_length_desc);
+test_case!(attributes_order_preserve);
+test_case!(separate_attributes);
+test_case!(attributes_order_with_separation);
 test_case!(leaves_single_empty_line_after_use);
 test_case!(nesting_wrap);
 test_case!(nesting_wrap_wide);

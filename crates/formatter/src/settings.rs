@@ -1165,6 +1165,17 @@ generate_formatter_settings! {
     /// Default: true
     separate_class_like_members: bool => "default_true",
 
+    /// How to order `#[Attribute]` annotations on a declaration.
+    ///
+    /// Default: `preserve`
+    attributes_order: SortOrder => "SortOrder::default",
+
+    /// Whether to split a single `#[Attr1, Attr2]` group into separate
+    /// `#[Attr1]` `#[Attr2]` lines.
+    ///
+    /// Default: false
+    separate_attributes: bool => "default_false",
+
     /// Whether to split a single `use` trait statement that imports multiple traits
     /// (`use FirstTrait, SecondTrait;`) into one `use` statement per trait, as required
     /// by PSR-12 / PER-CS-3 section 4.2.
@@ -1198,9 +1209,23 @@ impl Default for FormatSettings {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum SortOrder {
+    #[default]
+    #[serde(alias = "as-is", alias = "none", alias = "keep")]
+    Preserve,
+    #[serde(alias = "alpha-ascending", alias = "ascending")]
+    AlphanumericAscending,
+    #[serde(alias = "alpha-descending", alias = "descending")]
+    AlphanumericDescending,
+    LengthAscending,
+    LengthDescending,
+}
+
 /// Specifies the style of line endings.
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum EndOfLine {
     #[default]
     #[serde(alias = "Auto")]

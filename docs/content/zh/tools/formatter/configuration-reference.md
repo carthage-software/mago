@@ -233,6 +233,8 @@ public function bar(
 | `empty-line-before-dangling-comments` | 布尔值 | `true` | 悬挂注释之前的空行。 |
 | `separate-class-like-members` | 布尔值 | `true` | 不同种类的类成员之间的空行。 |
 | `split-trait-use` | 布尔值 | `true` | 按 PSR-12 / PER-CS-3 section 4.2 的要求，将 `use FirstTrait, SecondTrait;` 拆分为每个 trait 一条 `use` 语句。仅对不带 `{ ... }` 适配块的抽象 trait-use 生效。 |
+| `attributes-order` | 枚举 | `"preserve"` | 声明上 `#[Attribute]` 注解的排序方式。可选值：`preserve`（别名 `as-is`、`none`、`keep`）、`alphanumeric-ascending`（别名 `alpha-ascending`、`ascending`）、`alphanumeric-descending`（别名 `alpha-descending`、`descending`）、`length-ascending`、`length-descending`。按长度排序时按源码中属性名的码点数计算；长度相同的属性以 `alphanumeric-ascending` 作为次级排序，保证输出稳定。此设置只影响运行时 `ReflectionAttribute` 的枚举顺序；如果代码依赖源码顺序，请保持 `preserve`。 |
+| `separate-attributes` | 布尔值 | `false` | 将单个 `#[Attr1, Attr2]` 组拆分为多行 `#[Attr1]` `#[Attr2]`。与非 `preserve` 的 `attributes-order` 搭配时，会跨组对所有属性进行全局排序，而非仅在组内排序。 |
 
 ## 大小写
 

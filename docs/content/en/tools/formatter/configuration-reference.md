@@ -233,6 +233,8 @@ public function bar(
 | `empty-line-before-dangling-comments` | boolean | `true` | Blank line before dangling comments. |
 | `separate-class-like-members` | boolean | `true` | Blank line between different kinds of class member. |
 | `split-trait-use` | boolean | `true` | Split `use FirstTrait, SecondTrait;` into one `use` per trait, per PSR-12 / PER-CS-3 section 4.2. Only applies to abstract trait-use forms (no `{ ... }` adaptation block). |
+| `attributes-order` | enum | `"preserve"` | How to order `#[Attribute]` annotations on a declaration. Values: `preserve` (aliases `as-is`, `none`, `keep`), `alphanumeric-ascending` (aliases `alpha-ascending`, `ascending`), `alphanumeric-descending` (aliases `alpha-descending`, `descending`), `length-ascending`, `length-descending`. Length modes count codepoints in the source spelling of the attribute name; ties fall back to ascending alphanumeric for stable output. Only affects `ReflectionAttribute` enumeration order at runtime; leave `preserve` if your code depends on source order. |
+| `separate-attributes` | boolean | `false` | Split a single `#[Attr1, Attr2]` group into separate `#[Attr1]` `#[Attr2]` lines. When combined with a non-`preserve` `attributes-order`, the formatter sorts every attribute across all groups globally rather than within each group. |
 
 ## Casing
 

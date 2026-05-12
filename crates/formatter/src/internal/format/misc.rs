@@ -1,9 +1,12 @@
+use std::cmp::Ordering;
+
 use bumpalo::collections::Vec;
 use bumpalo::vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Access;
+use mago_syntax::ast::Attribute;
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::ArrayAccess;
 use mago_syntax::ast::ArrayElement;
@@ -42,6 +45,7 @@ use crate::internal::format::member_access::collect_member_access_chain;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::internal::utils::string_width;
 use crate::settings::BraceStyle;
+use crate::settings::SortOrder;
 
 use super::block::block_is_empty;
 
@@ -630,24 +634,57 @@ pub(super) fn print_attribute_list_sequence<'arena>(
         return None;
     }
 
-    let mut lists = vec![in f.arena;];
-    let mut has_new_line = false;
-    let mut has_potentially_long_attribute = false;
-    for attribute_list in attribute_lists {
-        if !has_potentially_long_attribute {
-            for attribute in &attribute_list.attributes {
-                has_potentially_long_attribute =
-                    !attribute.argument_list.as_ref().is_none_or(|args| args.arguments.is_empty());
+    if f.settings.separate_attributes {
+        let mut flat: std::vec::Vec<&'arena Attribute<'arena>> =
+            attribute_lists.iter().flat_map(|list| list.attributes.iter()).collect();
 
-                if has_potentially_long_attribute {
-                    break;
-                }
+        if !matches!(f.settings.attributes_order, SortOrder::Preserve) {
+            sort_attribute_refs(&mut flat, f.settings.attributes_order);
+        }
+
+        let mut contents = vec![in f.arena;];
+        let last_index = flat.len().saturating_sub(1);
+        for (index, attribute) in flat.into_iter().enumerate() {
+            contents.push(Document::Group(Group::new(vec![in f.arena;
+                Document::String("#["),
+                attribute.format(f),
+                Document::String("]"),
+            ])));
+
+            if index != last_index {
+                contents.push(Document::Line(Line::hard()));
             }
         }
 
-        lists.push(attribute_list.format(f));
+        return Some(Document::Group(Group::new(contents)));
+    }
 
-        has_new_line = has_new_line || f.is_next_line_empty(attribute_list.span());
+    let mut lists = vec![in f.arena;];
+    let mut has_new_line = false;
+    let mut has_potentially_long_attribute = false;
+
+    if matches!(f.settings.attributes_order, SortOrder::Preserve) {
+        for attribute_list in attribute_lists {
+            collect_attribute_list(
+                f,
+                attribute_list,
+                &mut lists,
+                &mut has_new_line,
+                &mut has_potentially_long_attribute,
+            );
+        }
+    } else {
+        let mut sorted: std::vec::Vec<&'arena AttributeList<'arena>> = attribute_lists.iter().collect();
+        sort_attribute_list_refs(&mut sorted, f.settings.attributes_order);
+        for attribute_list in sorted {
+            collect_attribute_list(
+                f,
+                attribute_list,
+                &mut lists,
+                &mut has_new_line,
+                &mut has_potentially_long_attribute,
+            );
+        }
     }
 
     let mut contents = vec![in f.arena;];
@@ -815,4 +852,98 @@ pub(super) fn print_condition<'arena>(
     f.must_break_condition = was_must_break_condition;
 
     condition
+}
+
+fn collect_attribute_list<'arena>(
+    f: &mut FormatterState<'_, 'arena>,
+    attribute_list: &'arena AttributeList<'arena>,
+    lists: &mut Vec<'arena, Document<'arena>>,
+    has_new_line: &mut bool,
+    has_potentially_long_attribute: &mut bool,
+) {
+    if !*has_potentially_long_attribute {
+        for attribute in &attribute_list.attributes {
+            *has_potentially_long_attribute =
+                !attribute.argument_list.as_ref().is_none_or(|args| args.arguments.is_empty());
+
+            if *has_potentially_long_attribute {
+                break;
+            }
+        }
+    }
+
+    lists.push(attribute_list.format(f));
+
+    *has_new_line = *has_new_line || f.is_next_line_empty(attribute_list.span());
+}
+
+fn attribute_list_sort_key<'arena>(list: &'arena AttributeList<'arena>) -> &'arena str {
+    list.attributes.iter().next().map(|a| a.name.value()).unwrap_or("")
+}
+
+pub(super) fn sort_attribute_list_refs<'arena>(lists: &mut [&'arena AttributeList<'arena>], order: SortOrder) {
+    sort_by_sort_order(lists, order, |list| attribute_list_sort_key(list));
+}
+
+pub(super) fn sort_attribute_refs<'arena>(
+    attributes: &mut [&'arena Attribute<'arena>],
+    order: SortOrder,
+) {
+    sort_by_sort_order(attributes, order, |attribute| attribute.name.value());
+}
+
+fn sort_by_sort_order<T, F>(items: &mut [T], order: SortOrder, key: F)
+where
+    F: Fn(&T) -> &str,
+{
+    match order {
+        SortOrder::Preserve => {}
+        SortOrder::AlphanumericAscending => {
+            items.sort_by(|a, b| compare_case_insensitive_chars(key(a), key(b)));
+        }
+        SortOrder::AlphanumericDescending => {
+            items.sort_by(|a, b| compare_case_insensitive_chars(key(b), key(a)));
+        }
+        SortOrder::LengthAscending => {
+            items.sort_by(|a, b| {
+                let a_key = key(a);
+                let b_key = key(b);
+                a_key
+                    .chars()
+                    .count()
+                    .cmp(&b_key.chars().count())
+                    .then_with(|| compare_case_insensitive_chars(a_key, b_key))
+            });
+        }
+        SortOrder::LengthDescending => {
+            items.sort_by(|a, b| {
+                let a_key = key(a);
+                let b_key = key(b);
+                b_key
+                    .chars()
+                    .count()
+                    .cmp(&a_key.chars().count())
+                    .then_with(|| compare_case_insensitive_chars(a_key, b_key))
+            });
+        }
+    }
+}
+
+fn compare_case_insensitive_chars(a: &str, b: &str) -> Ordering {
+    let mut a_chars = a.chars().flat_map(char::to_lowercase);
+    let mut b_chars = b.chars().flat_map(char::to_lowercase);
+
+    loop {
+        match (a_chars.next(), b_chars.next()) {
+            (Some(ac), Some(bc)) => {
+                let ord = ac.cmp(&bc);
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+            }
+            (Some(_), None) => return Ordering::Greater,
+            (None, Some(_)) => return Ordering::Less,
+            (None, None) => return Ordering::Equal,
+        }
+    }
 }

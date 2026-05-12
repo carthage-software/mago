@@ -120,6 +120,7 @@ use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::internal::format::string::print_lowercase_keyword;
 use crate::internal::utils;
+use crate::settings::SortOrder;
 use crate::wrap;
 
 pub mod alignment;
@@ -1555,6 +1556,16 @@ impl<'arena> Format<'arena> for AttributeList<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, AttributeList, {
             let attributes_count = self.attributes.len();
+
+            let sorted_attributes =
+                if attributes_count > 1 && !matches!(f.settings.attributes_order, SortOrder::Preserve) {
+                    let mut sorted: std::vec::Vec<&'arena Attribute<'arena>> = self.attributes.iter().collect();
+                    misc::sort_attribute_refs(&mut sorted, f.settings.attributes_order);
+                    Some(sorted)
+                } else {
+                    None
+                };
+
             let preserve_break = f.settings.preserve_breaking_attribute_list
                 && attributes_count >= 1
                 && misc::has_new_line_in_range(
@@ -1573,11 +1584,18 @@ impl<'arena> Format<'arena> for AttributeList<'arena> {
                 contents.push(self.attributes.as_slice()[0].format(f));
             } else {
                 contents.push(Document::Indent({
-                    let mut attributes = Document::join(
-                        f.arena,
-                        self.attributes.iter().map(|a| Document::Group(Group::new(vec![in f.arena; a.format(f)]))),
-                        Separator::CommaLine,
-                    );
+                    let mut attributes = match &sorted_attributes {
+                        Some(sorted) => Document::join(
+                            f.arena,
+                            sorted.iter().copied().map(|a| Document::Group(Group::new(vec![in f.arena; a.format(f)]))),
+                            Separator::CommaLine,
+                        ),
+                        None => Document::join(
+                            f.arena,
+                            self.attributes.iter().map(|a| Document::Group(Group::new(vec![in f.arena; a.format(f)]))),
+                            Separator::CommaLine,
+                        ),
+                    };
 
                     attributes.insert(0, Document::Line(Line::soft()));
 
