@@ -77,7 +77,8 @@ function main(array $arguments): int
     namespace\refresh_root_seo_files($built, $ghPages, $version);
     namespace\copy_redirect_stubs($docs . '/redirects.toml', $built, $ghPages);
 
-    $versions = namespace\update_versions_file($ghPages . '/versions.json', $version);
+    $currentPaths = namespace\read_current_paths($built . '/versions.json', $version);
+    $versions = namespace\update_versions_file($ghPages . '/versions.json', $version, $currentPaths);
     $latestStable = namespace\latest_stable_version($versions);
     namespace\mirror_latest($ghPages, $latestStable);
     namespace\write_root_redirect($ghPages, null !== $latestStable ? 'latest' : 'main');
@@ -276,9 +277,11 @@ function decode_toml_scalar(string $value): string|bool|null
 }
 
 /**
+ * @param list<string> $currentPaths
+ *
  * @return list<array{id: string, label: string, stable: bool, paths: list<string>}>
  */
-function update_versions_file(string $path, string $version): array
+function update_versions_file(string $path, string $version, array $currentPaths): array
 {
     $versions = namespace\read_versions_file($path);
     $stable = 1 === preg_match('/^\d+\.\d+\.\d+$/', $version);
@@ -291,12 +294,13 @@ function update_versions_file(string $path, string $version): array
         }
         $versions[$index]['label'] = $label;
         $versions[$index]['stable'] = $stable;
+        $versions[$index]['paths'] = $currentPaths;
         $updated = true;
         break;
     }
 
     if (!$updated) {
-        $versions[] = ['id' => $version, 'label' => $label, 'stable' => $stable, 'paths' => []];
+        $versions[] = ['id' => $version, 'label' => $label, 'stable' => $stable, 'paths' => $currentPaths];
     }
 
     file_put_contents(
@@ -305,6 +309,25 @@ function update_versions_file(string $path, string $version): array
     );
 
     return $versions;
+}
+
+/**
+ * Pull the freshly-built page list for `$version` out of the dist
+ * `versions.json` the Rust builder writes. Used to refresh the per-version
+ * `paths` array on gh-pages so the version-switch dropdown can keep readers on
+ * the same page across versions instead of dumping them on the homepage.
+ *
+ * @return list<string>
+ */
+function read_current_paths(string $distVersionsPath, string $version): array
+{
+    foreach (namespace\read_versions_file($distVersionsPath) as $entry) {
+        if ($entry['id'] === $version) {
+            return $entry['paths'];
+        }
+    }
+
+    return [];
 }
 
 /**
