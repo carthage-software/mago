@@ -596,10 +596,11 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         }
     }
 
-    // When an object is passed as an argument, properties on any object could be modified.
-    let has_object_argument = invocation.arguments_source.iter_arguments().any(|argument| {
+    let mut this_escapes = matches!(receiver_variable, Some("$this"));
+    let mut has_object_argument = false;
+    for argument in invocation.arguments_source.iter_arguments() {
         let Some(expression) = argument.value() else {
-            return false;
+            continue;
         };
 
         let Some(argument_id) = get_expression_id(
@@ -608,25 +609,42 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
             context.resolved_names,
             Some(context.codebase),
         ) else {
-            return false;
+            continue;
         };
 
-        block_context.locals.get(&argument_id).is_some_and(|t| t.has_object_type())
-    });
+        if argument_id.as_str() == "$this" {
+            this_escapes = true;
+        }
+
+        if block_context.locals.get(&argument_id).is_some_and(|t| t.has_object_type()) {
+            has_object_argument = true;
+        }
+    }
 
     if !has_object_argument {
         return;
     }
 
-    // Clear ALL property and index narrowings when objects are passed as arguments.
-    block_context.locals.retain(|var_id, _| !is_property_or_index_key(*var_id));
+    let should_wipe = |var_id: Atom| -> bool {
+        if !is_property_or_index_key(var_id) {
+            return false;
+        }
+
+        if !this_escapes && var_id.as_str().starts_with("$this->") {
+            return false;
+        }
+
+        true
+    };
+
+    block_context.locals.retain(|var_id, _| !should_wipe(*var_id));
 
     block_context
         .clauses
-        .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(is_property_or_index_key));
+        .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(should_wipe));
     block_context
         .reconciled_expression_clauses
-        .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(is_property_or_index_key));
+        .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(should_wipe));
 }
 
 fn is_property_or_index_key(var_id: Atom) -> bool {

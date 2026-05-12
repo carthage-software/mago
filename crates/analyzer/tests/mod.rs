@@ -2480,6 +2480,7 @@ test_case!(issue_1781, {
     s.check_throws = false;
     s
 });
+test_case!(issue_1811);
 test_case!(issue_1815);
 
 #[test]
