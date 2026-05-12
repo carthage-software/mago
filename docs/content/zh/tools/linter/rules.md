@@ -5,9 +5,9 @@ nav_order = 70
 nav_section = "Tools"
 nav_subsection = "Linter"
 +++
-Mago 的 linter 共提供 175 条规则,分布在 9 个类别中。点击任意规则可展开其描述、要求、默认配置和示例。
+Mago 的 linter 共提供 176 条规则,分布在 9 个类别中。点击任意规则可展开其描述、要求、默认配置和示例。
 
-<div class="rule-index" role="navigation" aria-label="规则类别"><a class="rule-index__item" href="#clarity"><span class="rule-index__name">清晰度</span><span class="rule-index__count">22 条规则</span><span class="rule-index__blurb">让意图更明确、减少阅读负担的规则。它们指出在技术上合法但会模糊代码意图的写法。</span></a><a class="rule-index__item" href="#bestpractices"><span class="rule-index__name">最佳实践</span><span class="rule-index__count">39 条规则</span><span class="rule-index__blurb">PHP 的惯用写法和被广泛接受的约定。这些规则推动代码靠近经验丰富的 PHP 开发者所采用的现代风格。</span></a><a class="rule-index__item" href="#consistency"><span class="rule-index__name">一致性</span><span class="rule-index__count">27 条规则</span><span class="rule-index__blurb">保持整套代码风格一致。选定一种写法,这些规则帮助所有人坚持下去。</span></a><a class="rule-index__item" href="#deprecation"><span class="rule-index__name">弃用</span><span class="rule-index__count">7 条规则</span><span class="rule-index__blurb">上游已弃用、未来会被移除的 PHP 特性与 API。请在它们彻底失效前迁移。</span></a><a class="rule-index__item" href="#maintainability"><span class="rule-index__name">可维护性</span><span class="rule-index__count">11 条规则</span><span class="rule-index__blurb">难以长期维护的代码,过于复杂、纠缠或脆弱。这些规则提前暴露成本。</span></a><a class="rule-index__item" href="#redundancy"><span class="rule-index__name">冗余</span><span class="rule-index__count">29 条规则</span><span class="rule-index__blurb">无用代码、无效值,以及没有可观察效果的写法。清理它们让代码更诚实。</span></a><a class="rule-index__item" href="#security"><span class="rule-index__name">安全</span><span class="rule-index__count">12 条规则</span><span class="rule-index__blurb">标记安全漏洞的规则,如注入向量、不安全的反序列化,以及不可信输入流入敏感位置。</span></a><a class="rule-index__item" href="#safety"><span class="rule-index__name">安全性</span><span class="rule-index__count">9 条规则</span><span class="rule-index__blurb">可以通过编译但运行时会出问题的写法。这些规则在用户遇到之前就揪出陷阱。</span></a><a class="rule-index__item" href="#correctness"><span class="rule-index__name">正确性</span><span class="rule-index__count">19 条规则</span><span class="rule-index__blurb">缺陷与逻辑错误。本类规则负责发现作者本意之外的行为。</span></a></div>
+<div class="rule-index" role="navigation" aria-label="规则类别"><a class="rule-index__item" href="#clarity"><span class="rule-index__name">清晰度</span><span class="rule-index__count">22 条规则</span><span class="rule-index__blurb">让意图更明确、减少阅读负担的规则。它们指出在技术上合法但会模糊代码意图的写法。</span></a><a class="rule-index__item" href="#bestpractices"><span class="rule-index__name">最佳实践</span><span class="rule-index__count">40 条规则</span><span class="rule-index__blurb">PHP 的惯用写法和被广泛接受的约定。这些规则推动代码靠近经验丰富的 PHP 开发者所采用的现代风格。</span></a><a class="rule-index__item" href="#consistency"><span class="rule-index__name">一致性</span><span class="rule-index__count">27 条规则</span><span class="rule-index__blurb">保持整套代码风格一致。选定一种写法,这些规则帮助所有人坚持下去。</span></a><a class="rule-index__item" href="#deprecation"><span class="rule-index__name">弃用</span><span class="rule-index__count">7 条规则</span><span class="rule-index__blurb">上游已弃用、未来会被移除的 PHP 特性与 API。请在它们彻底失效前迁移。</span></a><a class="rule-index__item" href="#maintainability"><span class="rule-index__name">可维护性</span><span class="rule-index__count">11 条规则</span><span class="rule-index__blurb">难以长期维护的代码,过于复杂、纠缠或脆弱。这些规则提前暴露成本。</span></a><a class="rule-index__item" href="#redundancy"><span class="rule-index__name">冗余</span><span class="rule-index__count">29 条规则</span><span class="rule-index__blurb">无用代码、无效值,以及没有可观察效果的写法。清理它们让代码更诚实。</span></a><a class="rule-index__item" href="#security"><span class="rule-index__name">安全</span><span class="rule-index__count">12 条规则</span><span class="rule-index__blurb">标记安全漏洞的规则,如注入向量、不安全的反序列化,以及不可信输入流入敏感位置。</span></a><a class="rule-index__item" href="#safety"><span class="rule-index__name">安全性</span><span class="rule-index__count">9 条规则</span><span class="rule-index__blurb">可以通过编译但运行时会出问题的写法。这些规则在用户遇到之前就揪出陷阱。</span></a><a class="rule-index__item" href="#correctness"><span class="rule-index__name">正确性</span><span class="rule-index__count">19 条规则</span><span class="rule-index__blurb">缺陷与逻辑错误。本类规则负责发现作者本意之外的行为。</span></a></div>
 
 <h2 id="integration-specific-rules">特定集成的规则</h2>
 
@@ -1246,11 +1246,12 @@ function foo() {}
 
 <div class="rule__body">
 
-Flags ternary expressions whose condition is a logical negation
-(`!$foo ? a : b`).
+Flags ternary expressions whose condition is a negated form,
+including logical negation (`!$foo ? a : b`) and the
+not-equal comparison operators (`!==`, `!=`, `<>`).
 
 A negated condition adds a layer of indirection the reader has to
-undo to follow the branches. Removing the negation and swapping
+undo to follow the branches. Inverting the condition and swapping
 the `then` and `else` branches produces an equivalent expression
 that reads more directly.
 
@@ -1265,6 +1266,7 @@ that reads more directly.
 <?php
 
 $x = !$foo ? 1 : 0;
+$y = $foo !== null ? transform($foo) : null;
 ```
 
 </div>
@@ -2175,6 +2177,60 @@ return new class extends Migration {
 | 选项 | 类型 | 默认值 |
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="prefer-array-spread">
+<summary><code class="rule__code">prefer-array-spread</code><a class="rule__anchor" href="#prefer-array-spread" aria-label="prefer-array-spread 的永久链接">¶</a><span class="rule__level rule__level--warning">warning</span></summary>
+
+<div class="rule__body">
+
+Detects calls to `array_merge()` and suggests using the array spread operator (`...`)
+in an array literal instead.
+
+The spread operator is more concise, avoids a function call, and makes the intent
+of the merge clear at the call site. Since PHP 8.1, the spread operator supports
+string keys in addition to integer keys, making it a complete replacement for
+`array_merge()`.
+
+<blockquote class="rule-requirement">此规则要求 PHP <code>8.1.0</code> 或更高版本。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+$merged = array_merge($first, $second, $third);
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+$merged = [...$first, ...$second, ...$third];
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"warning"` |
 
 </div>
@@ -3542,10 +3598,16 @@ $message .= ' Hello';
 
 <div class="rule__body">
 
-This rule enforces the use of "Yoda" conditions for comparisons. The variable should always be
-on the right side of the comparison, while the constant, literal, or function call is on the left.
-This prevents the common bug of accidentally using an assignment (`=`) instead of a comparison (`==`),
-which would cause a fatal error in a Yoda condition instead of a silent logical bug.
+This rule controls the use of "Yoda" conditions for comparisons, where the constant, literal,
+or function call appears on the left side and the variable on the right.
+
+In `require` mode (default), Yoda style is enforced. Placing the constant on the left prevents
+the accidental-assignment bug (`=` instead of `==`), which causes a fatal error rather than a
+silent logical bug in a Yoda condition.
+
+In `deny` mode, Yoda style is forbidden. The variable must appear on the left for readability.
+When using `deny` mode, consider enabling the `no-assign-in-condition` rule to guard against
+accidental assignments (`=` instead of `==`) that Yoda conditions would otherwise catch.
 
 <hr class="rule__separator">
 
@@ -3557,7 +3619,7 @@ which would cause a fatal error in a Yoda condition instead of a silent logical 
 ```php
 <?php
 
-// Vulnerable to the accidental assignment bug, e.g., if ($is_active = true).
+// configured mode: "require"
 if ( $is_active === true ) { /* ... */ }
 ```
 
@@ -3569,6 +3631,7 @@ if ( $is_active === true ) { /* ... */ }
 ```php
 <?php
 
+// configured mode: "require"
 if ( true === $is_active ) { /* ... */ }
 if ( 5 === $count ) { /* ... */ }
 ```
@@ -3583,6 +3646,7 @@ if ( 5 === $count ) { /* ... */ }
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `false` |
 | `level` | `string` | `"help"` |
+| `mode` | `string` | `"require"` |
 
 </div>
 
@@ -4939,6 +5003,7 @@ $length = strlen("hello");
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `false` |
 | `level` | `string` | `"help"` |
+| `namespaced` | `boolean` | `false` |
 
 </div>
 
@@ -9670,6 +9735,7 @@ if ($x == 1) {
 | 选项 | 类型 | 默认值 |
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
+| `ignore-while-statements` | `boolean` | `false` |
 | `level` | `string` | `"warning"` |
 
 </div>

@@ -200,10 +200,16 @@
   }
 
   .doc-page a {
-    text-decoration-color: var(--rule-hair);
+    color: var(--accent-text);
+    text-decoration-color: color-mix(in srgb, var(--accent-text) 55%, transparent);
   }
 
   .doc-page a:hover {
+    text-decoration-thickness: 2px;
     text-decoration-color: var(--accent-text);
+  }
+
+  .doc-page :is(h1, h2, h3, h4, h5, h6) a:not(.heading-anchor) {
+    color: inherit;
   }
 }
