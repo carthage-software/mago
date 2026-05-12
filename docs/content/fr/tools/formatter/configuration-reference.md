@@ -232,6 +232,7 @@ public function bar(
 | `empty-line-before-return` | booléen | `false` | Ligne vide avant un `return`. |
 | `empty-line-before-dangling-comments` | booléen | `true` | Ligne vide avant les commentaires pendants. |
 | `separate-class-like-members` | booléen | `true` | Ligne vide entre différents types de membres de classe. |
+| `split-trait-use` | booléen | `true` | Scinde `use FirstTrait, SecondTrait;` en un `use` par trait, conformément à PSR-12 / PER-CS-3 section 4.2. Ne s'applique qu'aux formes abstraites (sans bloc d'adaptations `{ ... }`). |
 
 ## Casse
 

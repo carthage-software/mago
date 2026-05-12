@@ -628,6 +628,24 @@ impl<'arena> Format<'arena> for UseType<'arena> {
 impl<'arena> Format<'arena> for TraitUse<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, TraitUse, {
+            if f.settings.split_trait_use
+                && self.trait_names.len() > 1
+                && matches!(self.specification, TraitUseSpecification::Abstract(_))
+            {
+                let mut parts = Vec::with_capacity_in(self.trait_names.len() * 5, f.arena);
+                for (index, trait_name) in self.trait_names.iter().enumerate() {
+                    if index != 0 {
+                        parts.push(Document::Line(Line::hard()));
+                    }
+                    parts.push(self.r#use.format(f));
+                    parts.push(Document::space());
+                    parts.push(trait_name.format(f));
+                    parts.push(Document::String(";"));
+                }
+
+                return Document::Array(parts);
+            }
+
             let mut contents = vec![in f.arena; self.r#use.format(f), Document::space()];
             for (i, trait_name) in self.trait_names.iter().enumerate() {
                 if i != 0 {

@@ -232,6 +232,7 @@ public function bar(
 | `empty-line-before-return` | boolean | `false` | Blank line before a `return`. |
 | `empty-line-before-dangling-comments` | boolean | `true` | Blank line before dangling comments. |
 | `separate-class-like-members` | boolean | `true` | Blank line between different kinds of class member. |
+| `split-trait-use` | boolean | `true` | Split `use FirstTrait, SecondTrait;` into one `use` per trait, per PSR-12 / PER-CS-3 section 4.2. Only applies to abstract trait-use forms (no `{ ... }` adaptation block). |
 
 ## Casing
 

@@ -1165,6 +1165,17 @@ generate_formatter_settings! {
     /// Default: true
     separate_class_like_members: bool => "default_true",
 
+    /// Whether to split a single `use` trait statement that imports multiple traits
+    /// (`use FirstTrait, SecondTrait;`) into one `use` statement per trait, as required
+    /// by PSR-12 / PER-CS-3 section 4.2.
+    ///
+    /// Only abstract trait-use forms (those terminated with `;`, with no `{ ... }`
+    /// adaptation block) are split. Compound declarations with adaptations are left
+    /// untouched because the adaptations may reference any of the imported traits.
+    ///
+    /// Default: true (PER-CS / PSR-12)
+    split_trait_use: bool => "default_true",
+
     /// Whether to indent heredoc/nowdoc content.
     ///
     /// Default: true

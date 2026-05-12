@@ -232,6 +232,7 @@ public function bar(
 | `empty-line-before-return` | 布尔值 | `false` | `return` 之前的空行。 |
 | `empty-line-before-dangling-comments` | 布尔值 | `true` | 悬挂注释之前的空行。 |
 | `separate-class-like-members` | 布尔值 | `true` | 不同种类的类成员之间的空行。 |
+| `split-trait-use` | 布尔值 | `true` | 按 PSR-12 / PER-CS-3 section 4.2 的要求，将 `use FirstTrait, SecondTrait;` 拆分为每个 trait 一条 `use` 语句。仅对不带 `{ ... }` 适配块的抽象 trait-use 生效。 |
 
 ## 大小写
 
