@@ -7659,6 +7659,16 @@
           "type": "boolean",
           "default": true
         },
+        "attributes-order": {
+          "description": "How to order `#[Attribute]` annotations on a declaration.\n\nDefault: `preserve`",
+          "$ref": "#/$defs/SortOrder",
+          "default": "preserve"
+        },
+        "separate-attributes": {
+          "description": "Whether to split a single `#[Attr1, Attr2]` group into separate\n`#[Attr1]` `#[Attr2]` lines.\n\nDefault: false",
+          "type": "boolean",
+          "default": false
+        },
         "split-trait-use": {
           "description": "Whether to split a single `use` trait statement that imports multiple traits\n(`use FirstTrait, SecondTrait;`) into one `use` statement per trait, as required\nby PSR-12 / PER-CS-3 section 4.2.\n\nOnly abstract trait-use forms (those terminated with `;`, with no `{ ... }`\nadaptation block) are split. Compound declarations with adaptations are left\nuntouched because the adaptations may reference any of the imported traits.\n\nDefault: true (PER-CS / PSR-12)",
           "type": "boolean",
@@ -7727,6 +7737,16 @@
         "null_pipe",
         "null_pipe_last",
         "question"
+      ]
+    },
+    "SortOrder": {
+      "type": "string",
+      "enum": [
+        "preserve",
+        "alphanumeric-ascending",
+        "alphanumeric-descending",
+        "length-ascending",
+        "length-descending"
       ]
     },
     "FormatterPreset": {
