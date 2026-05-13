@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use mago_algebra::find_satisfying_assignments;
 use mago_atom::Atom;
+use mago_atom::AtomSet;
 use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
@@ -70,10 +71,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     let mut result_type: TUnion;
     let mut rhs_is_never = false;
 
-    let is_static_var = matches!(
-        unwrap_expression(binary.lhs),
-        Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(&mago_atom::atom(var.name))
-    );
+    let is_static_var = is_rooted_in_static_local(binary.lhs, &block_context.static_locals);
 
     if lhs_type.is_null() && !is_static_var {
         context.collector.propose_with_code(
@@ -96,7 +94,11 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
 
         binary.rhs.analyze(context, block_context, artifacts)?;
         result_type = artifacts.get_expression_type(&binary.rhs).cloned().unwrap_or_else(get_mixed); // Fallback if RHS analysis fails
-    } else if !lhs_type.has_nullish() && !lhs_type.possibly_undefined() && !lhs_type.possibly_undefined_from_try() {
+    } else if !lhs_type.has_nullish()
+        && !lhs_type.possibly_undefined()
+        && !lhs_type.possibly_undefined_from_try()
+        && !is_static_var
+    {
         context.collector.propose_with_code(
             IssueCode::RedundantNullCoalesce,
             Issue::help(
@@ -218,5 +220,13 @@ fn get_variable_name(expr: &Expression<'_>) -> Option<Atom> {
     match unwrap_expression(expr) {
         Expression::Variable(Variable::Direct(var)) => Some(atom(var.name)),
         _ => None,
+    }
+}
+
+fn is_rooted_in_static_local(expr: &Expression<'_>, static_locals: &AtomSet) -> bool {
+    match unwrap_expression(expr) {
+        Expression::Variable(Variable::Direct(var)) => static_locals.contains(&atom(var.name)),
+        Expression::ArrayAccess(access) => is_rooted_in_static_local(access.array, static_locals),
+        _ => false,
     }
 }
