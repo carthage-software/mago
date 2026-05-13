@@ -32,6 +32,7 @@ pub mod constant;
 pub mod control_flow;
 pub mod expression;
 pub mod function_like;
+pub mod generic;
 pub mod hint;
 pub mod literal;
 pub mod partial_application;

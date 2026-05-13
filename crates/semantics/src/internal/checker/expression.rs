@@ -36,7 +36,7 @@ pub fn check_for_clone_with(expr: &Expression, context: &mut Context<'_, '_, '_>
         return;
     }
 
-    let Expression::Call(Call::Function(FunctionCall { function, argument_list })) = expr else {
+    let Expression::Call(Call::Function(FunctionCall { function, argument_list, .. })) = expr else {
         return;
     };
 
