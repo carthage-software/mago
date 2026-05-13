@@ -945,11 +945,14 @@ impl CodebaseMetadata {
     /// When both metadata have the same priority, the one with the smaller span is kept
     /// for deterministic results regardless of scan order.
     pub fn extend(&mut self, other: CodebaseMetadata) {
-        for (k, v) in other.class_likes {
+        for (k, mut v) in other.class_likes {
             match self.class_likes.entry(k) {
                 Entry::Occupied(mut entry) => {
                     if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        v.version_constraint.merge(entry.get().version_constraint.clone());
                         entry.insert(v);
+                    } else {
+                        entry.get_mut().version_constraint.merge(v.version_constraint);
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -958,11 +961,14 @@ impl CodebaseMetadata {
             }
         }
 
-        for (k, v) in other.function_likes {
+        for (k, mut v) in other.function_likes {
             match self.function_likes.entry(k) {
                 Entry::Occupied(mut entry) => {
                     if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        v.version_constraint.merge(entry.get().version_constraint.clone());
                         entry.insert(v);
+                    } else {
+                        entry.get_mut().version_constraint.merge(v.version_constraint);
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -971,11 +977,14 @@ impl CodebaseMetadata {
             }
         }
 
-        for (k, v) in other.constants {
+        for (k, mut v) in other.constants {
             match self.constants.entry(k) {
                 Entry::Occupied(mut entry) => {
                     if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
+                        v.version_constraint.merge(entry.get().version_constraint.clone());
                         entry.insert(v);
+                    } else {
+                        entry.get_mut().version_constraint.merge(v.version_constraint);
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -1010,7 +1019,11 @@ impl CodebaseMetadata {
             match self.class_likes.entry(*k) {
                 Entry::Occupied(mut entry) => {
                     if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
-                        entry.insert(v.clone());
+                        let mut new = v.clone();
+                        new.version_constraint.merge(entry.get().version_constraint.clone());
+                        entry.insert(new);
+                    } else {
+                        entry.get_mut().version_constraint.merge(v.version_constraint.clone());
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -1023,7 +1036,11 @@ impl CodebaseMetadata {
             match self.function_likes.entry(*k) {
                 Entry::Occupied(mut entry) => {
                     if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
-                        entry.insert(v.clone());
+                        let mut new = v.clone();
+                        new.version_constraint.merge(entry.get().version_constraint.clone());
+                        entry.insert(new);
+                    } else {
+                        entry.get_mut().version_constraint.merge(v.version_constraint.clone());
                     }
                 }
                 Entry::Vacant(entry) => {
@@ -1036,7 +1053,11 @@ impl CodebaseMetadata {
             match self.constants.entry(*k) {
                 Entry::Occupied(mut entry) => {
                     if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
-                        entry.insert(v.clone());
+                        let mut new = v.clone();
+                        new.version_constraint.merge(entry.get().version_constraint.clone());
+                        entry.insert(new);
+                    } else {
+                        entry.get_mut().version_constraint.merge(v.version_constraint.clone());
                     }
                 }
                 Entry::Vacant(entry) => {

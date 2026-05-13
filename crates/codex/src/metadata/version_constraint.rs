@@ -53,6 +53,17 @@ impl VersionConstraint {
         self.ranges.push(PHPVersionRange::until(version));
     }
 
+    /// Folds `other` into `self` by unioning their availability ranges.
+    #[inline]
+    pub fn merge(&mut self, other: VersionConstraint) {
+        if self.is_unconstrained() || other.is_unconstrained() {
+            self.ranges.clear();
+            return;
+        }
+
+        self.ranges.extend(other.ranges);
+    }
+
     /// Returns `true` when `version` is allowed by *any* range in this
     /// constraint.
     #[inline]

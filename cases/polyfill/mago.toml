@@ -1,0 +1,3 @@
+extends = "../defaults.toml"
+
+php-version = "8.3"
