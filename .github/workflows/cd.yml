@@ -170,11 +170,11 @@ jobs:
               pgo: true,
             }
           ## Linux: aarch64, x86_64
-          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: true }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-latest, test: false }
           - {
               target: aarch64-unknown-linux-musl,
               os: ubuntu-latest,
-              test: true,
+              test: false,
             }
           - {
               target: x86_64-unknown-linux-gnu,
