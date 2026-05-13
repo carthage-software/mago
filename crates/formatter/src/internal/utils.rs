@@ -355,7 +355,7 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
         Expression::ConstantAccess(ConstantAccess { name: Identifier::Local(local) })
         | Expression::Identifier(Identifier::Local(local)) => string_width(local.value),
         Expression::Variable(Variable::Direct(variable)) => string_width(variable.name),
-        Expression::Call(Call::Function(FunctionCall { function, argument_list })) => {
+        Expression::Call(Call::Function(FunctionCall { function, argument_list, .. })) => {
             let function_width = get_expression_width(function)?;
             let args_width = get_argument_list_width(argument_list)?;
 

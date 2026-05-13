@@ -10,6 +10,7 @@ use mago_syntax::ast::Class;
 use mago_syntax::ast::ClassLikeConstant;
 use mago_syntax::ast::ClassLikeConstantItem;
 use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::ClassLikeReference;
 use mago_syntax::ast::ClosingTag;
 use mago_syntax::ast::Constant;
 use mago_syntax::ast::ConstantItem;
@@ -134,6 +135,7 @@ pub mod class_like;
 pub mod control_structure;
 pub mod expression;
 pub mod function_like;
+pub mod generic;
 pub mod member_access;
 pub mod misc;
 pub mod parameters;
@@ -429,6 +431,18 @@ impl<'arena> Format<'arena> for QualifiedIdentifier<'arena> {
 impl<'arena> Format<'arena> for FullyQualifiedIdentifier<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, FullyQualifiedIdentifier, { Document::String(self.value) })
+    }
+}
+
+impl<'arena> Format<'arena> for ClassLikeReference<'arena> {
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+        wrap!(f, self, ClassLikeReference, {
+            let mut parts = vec![in f.arena; self.name.format(f)];
+            if let Some(arguments) = &self.generic_arguments {
+                parts.push(arguments.format(f));
+            }
+            Document::Array(parts)
+        })
     }
 }
 
@@ -1141,6 +1155,11 @@ impl<'arena> Format<'arena> for Interface<'arena> {
                 self.interface.format(f),
                 Document::space(),
                 self.name.format(f),
+                if let Some(generic_parameters) = &self.generic_parameters {
+                    generic_parameters.format(f)
+                } else {
+                    Document::empty()
+                },
                 if let Some(e) = &self.extends {
                     Document::Array(vec![in f.arena; Document::space(), e.format(f)])
                 } else {
@@ -1184,6 +1203,10 @@ impl<'arena> Format<'arena> for Class<'arena> {
             signature.push(Document::space());
             signature.push(self.name.format(f));
 
+            if let Some(generic_parameters) = &self.generic_parameters {
+                signature.push(generic_parameters.format(f));
+            }
+
             if let Some(e) = &self.extends {
                 signature.push(Document::space());
                 signature.push(e.format(f));
@@ -1218,10 +1241,16 @@ impl<'arena> Format<'arena> for Trait<'arena> {
                 attributes.push(Document::Line(Line::hard()));
             }
 
+            let mut signature =
+                vec![in f.arena; self.r#trait.format(f), Document::space(), self.name.format(f)];
+            if let Some(generic_parameters) = &self.generic_parameters {
+                signature.push(generic_parameters.format(f));
+            }
+
             Document::Group(Group::new(vec![
                 in f.arena;
                 Document::Group(Group::new(attributes)),
-                Document::Group(Group::new(vec![in f.arena; self.r#trait.format(f), Document::space(), self.name.format(f)])),
+                Document::Group(Group::new(signature)),
                 print_class_like_body(f, &self.left_brace, &self.members, &self.right_brace, None),
             ]))
         })
@@ -1511,6 +1540,9 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                     format_token(f, intersection_hint.ampersand, "&"),
                     intersection_hint.right.format(f),
                 ]),
+                Hint::Generic(generic_hint) => {
+                    Document::Array(vec![in f.arena; generic_hint.base.format(f), generic_hint.arguments.format(f)])
+                }
                 Hint::Null(_) => Document::String("null"),
                 Hint::True(_) => Document::String("true"),
                 Hint::False(_) => Document::String("false"),
