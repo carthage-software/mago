@@ -80,6 +80,7 @@ pub enum Feature {
     NeverTypeHint,
     StaticReturnTypeHint,
     NewWithoutParentheses,
+    BoundErasedGenericTypes,
     ClassLikeConstantVisibilityModifiers,
     ListReferenceAssignment,
     NumericLiteralSeparator,
