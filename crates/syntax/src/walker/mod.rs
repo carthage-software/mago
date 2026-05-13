@@ -28,6 +28,7 @@ use crate::ast::ast::ClassLikeConstantSelector;
 use crate::ast::ast::ClassLikeMember;
 use crate::ast::ast::ClassLikeMemberExpressionSelector;
 use crate::ast::ast::ClassLikeMemberSelector;
+use crate::ast::ast::ClassLikeReference;
 use crate::ast::ast::Clone;
 use crate::ast::ast::ClosingTag;
 use crate::ast::ast::Closure;
@@ -80,6 +81,12 @@ use crate::ast::ast::FunctionLikeParameterDefaultValue;
 use crate::ast::ast::FunctionLikeParameterList;
 use crate::ast::ast::FunctionLikeReturnTypeHint;
 use crate::ast::ast::FunctionPartialApplication;
+use crate::ast::ast::GenericArgumentList;
+use crate::ast::ast::GenericHint;
+use crate::ast::ast::GenericParameter;
+use crate::ast::ast::GenericParameterBound;
+use crate::ast::ast::GenericParameterDefault;
+use crate::ast::ast::GenericParameterList;
 use crate::ast::ast::Global;
 use crate::ast::ast::Goto;
 use crate::ast::ast::HaltCompiler;
@@ -198,6 +205,7 @@ use crate::ast::ast::TraitUseSpecification;
 use crate::ast::ast::Try;
 use crate::ast::ast::TryCatchClause;
 use crate::ast::ast::TryFinallyClause;
+use crate::ast::ast::Turbofish;
 use crate::ast::ast::TypedUseItemList;
 use crate::ast::ast::TypedUseItemSequence;
 use crate::ast::ast::UnaryPostfix;
@@ -574,6 +582,10 @@ generate_ast_walker! {
     'arena Attribute as attribute => {
         walker.walk_identifier(&attribute.name, context);
 
+        if let Some(turbofish) = &attribute.turbofish {
+            walker.walk_turbofish(turbofish, context);
+        }
+
         if let Some(argument_list) = &attribute.argument_list {
             walker.walk_argument_list(argument_list, context);
         }
@@ -651,7 +663,7 @@ generate_ast_walker! {
         walker.walk_keyword(&extends.extends, context);
 
         for ty in &extends.types {
-            walker.walk_identifier(ty, context);
+            walker.walk_class_like_reference(ty, context);
         }
     }
 
@@ -659,7 +671,14 @@ generate_ast_walker! {
         walker.walk_keyword(&implements.implements, context);
 
         for ty in &implements.types {
-            walker.walk_identifier(ty, context);
+            walker.walk_class_like_reference(ty, context);
+        }
+    }
+
+    'arena ClassLikeReference as class_like_reference => {
+        walker.walk_identifier(&class_like_reference.name, context);
+        if let Some(arguments) = &class_like_reference.generic_arguments {
+            walker.walk_generic_argument_list(arguments, context);
         }
     }
 
@@ -674,6 +693,9 @@ generate_ast_walker! {
 
         walker.walk_keyword(&class.class, context);
         walker.walk_local_identifier(&class.name, context);
+        if let Some(generic_parameters) = &class.generic_parameters {
+            walker.walk_generic_parameter_list(generic_parameters, context);
+        }
         if let Some(extends) = &class.extends {
             walker.walk_extends(extends, context);
         }
@@ -695,6 +717,10 @@ generate_ast_walker! {
         walker.walk_keyword(&interface.interface, context);
         walker.walk_local_identifier(&interface.name, context);
 
+        if let Some(generic_parameters) = &interface.generic_parameters {
+            walker.walk_generic_parameter_list(generic_parameters, context);
+        }
+
         if let Some(extends) = &interface.extends {
             walker.walk_extends(extends, context);
         }
@@ -711,6 +737,10 @@ generate_ast_walker! {
 
         walker.walk_keyword(&r#trait.r#trait, context);
         walker.walk_local_identifier(&r#trait.name, context);
+
+        if let Some(generic_parameters) = &r#trait.generic_parameters {
+            walker.walk_generic_parameter_list(generic_parameters, context);
+        }
 
         for class_member in &r#trait.members {
             walker.walk_class_like_member(class_member, context);
@@ -766,7 +796,7 @@ generate_ast_walker! {
         walker.walk_keyword(&trait_use.r#use, context);
 
         for trait_name in &trait_use.trait_names {
-            walker.walk_identifier(trait_name, context);
+            walker.walk_class_like_reference(trait_name, context);
         }
 
         walker.walk_trait_use_specification(&trait_use.specification, context);
@@ -1090,6 +1120,9 @@ generate_ast_walker! {
 
         walker.walk_keyword(&method.function, context);
         walker.walk_local_identifier(&method.name, context);
+        if let Some(generic_parameters) = &method.generic_parameters {
+            walker.walk_generic_parameter_list(generic_parameters, context);
+        }
         walker.walk_function_like_parameter_list(&method.parameter_list, context);
         if let Some(hint) = &method.return_type_hint {
             walker.walk_function_like_return_type_hint(hint, context);
@@ -1148,6 +1181,9 @@ generate_ast_walker! {
 
         walker.walk_keyword(&function.function, context);
         walker.walk_local_identifier(&function.name, context);
+        if let Some(generic_parameters) = &function.generic_parameters {
+            walker.walk_generic_parameter_list(generic_parameters, context);
+        }
         walker.walk_function_like_parameter_list(&function.parameter_list, context);
         if let Some(hint) = &function.return_type_hint {
             walker.walk_function_like_return_type_hint(hint, context);
@@ -1877,6 +1913,9 @@ generate_ast_walker! {
         }
 
         walker.walk_keyword(&closure.function, context);
+        if let Some(generic_parameters) = &closure.generic_parameters {
+            walker.walk_generic_parameter_list(generic_parameters, context);
+        }
         walker.walk_function_like_parameter_list(&closure.parameter_list, context);
         if let Some(use_clause) = &closure.use_clause {
             walker.walk_closure_use_clause(use_clause, context);
@@ -1909,6 +1948,9 @@ generate_ast_walker! {
         }
 
         walker.walk_keyword(&arrow_function.r#fn, context);
+        if let Some(generic_parameters) = &arrow_function.generic_parameters {
+            walker.walk_generic_parameter_list(generic_parameters, context);
+        }
         walker.walk_function_like_parameter_list(&arrow_function.parameter_list, context);
 
         if let Some(return_type_hint) = &arrow_function.return_type_hint {
@@ -2150,24 +2192,36 @@ generate_ast_walker! {
 
     'arena FunctionCall as function_call => {
         walker.walk_expression(function_call.function, context);
+        if let Some(turbofish) = &function_call.turbofish {
+            walker.walk_turbofish(turbofish, context);
+        }
         walker.walk_argument_list(&function_call.argument_list, context);
     }
 
     'arena MethodCall as method_call => {
         walker.walk_expression(method_call.object, context);
         walker.walk_class_like_member_selector(&method_call.method, context);
+        if let Some(turbofish) = &method_call.turbofish {
+            walker.walk_turbofish(turbofish, context);
+        }
         walker.walk_argument_list(&method_call.argument_list, context);
     }
 
     'arena NullSafeMethodCall as null_safe_method_call => {
         walker.walk_expression(null_safe_method_call.object, context);
         walker.walk_class_like_member_selector(&null_safe_method_call.method, context);
+        if let Some(turbofish) = &null_safe_method_call.turbofish {
+            walker.walk_turbofish(turbofish, context);
+        }
         walker.walk_argument_list(&null_safe_method_call.argument_list, context);
     }
 
     'arena StaticMethodCall as static_method_call => {
         walker.walk_expression(static_method_call.class, context);
         walker.walk_class_like_member_selector(&static_method_call.method, context);
+        if let Some(turbofish) = &static_method_call.turbofish {
+            walker.walk_turbofish(turbofish, context);
+        }
         walker.walk_argument_list(&static_method_call.argument_list, context);
     }
 
@@ -2188,18 +2242,27 @@ generate_ast_walker! {
 
     'arena FunctionPartialApplication as function_partial_application => {
         walker.walk_expression(function_partial_application.function, context);
+        if let Some(turbofish) = &function_partial_application.turbofish {
+            walker.walk_turbofish(turbofish, context);
+        }
         walker.walk_partial_argument_list(&function_partial_application.argument_list, context);
     }
 
     'arena MethodPartialApplication as method_partial_application => {
         walker.walk_expression(method_partial_application.object, context);
         walker.walk_class_like_member_selector(&method_partial_application.method, context);
+        if let Some(turbofish) = &method_partial_application.turbofish {
+            walker.walk_turbofish(turbofish, context);
+        }
         walker.walk_partial_argument_list(&method_partial_application.argument_list, context);
     }
 
     'arena StaticMethodPartialApplication as static_method_partial_application => {
         walker.walk_expression(static_method_partial_application.class, context);
         walker.walk_class_like_member_selector(&static_method_partial_application.method, context);
+        if let Some(turbofish) = &static_method_partial_application.turbofish {
+            walker.walk_turbofish(turbofish, context);
+        }
         walker.walk_partial_argument_list(&static_method_partial_application.argument_list, context);
     }
 
@@ -2300,6 +2363,9 @@ generate_ast_walker! {
     'arena Instantiation as instantiation => {
         walker.walk_keyword(&instantiation.new, context);
         walker.walk_expression(instantiation.class, context);
+        if let Some(turbofish) = &instantiation.turbofish {
+            walker.walk_turbofish(turbofish, context);
+        }
         if let Some(argument_list) = &instantiation.argument_list {
             walker.walk_argument_list(argument_list, context);
         }
@@ -2330,6 +2396,9 @@ generate_ast_walker! {
             }
             Hint::Intersection(intersection_hint) => {
                 walker.walk_intersection_hint(intersection_hint, context);
+            }
+            Hint::Generic(generic_hint) => {
+                walker.walk_generic_hint(generic_hint, context);
             }
             Hint::Null(keyword) |
             Hint::True(keyword) |
@@ -2371,6 +2440,47 @@ generate_ast_walker! {
     'arena IntersectionHint as intersection_hint => {
         walker.walk_hint(intersection_hint.left, context);
         walker.walk_hint(intersection_hint.right, context);
+    }
+
+    'arena GenericHint as generic_hint => {
+        walker.walk_hint(generic_hint.base, context);
+        walker.walk_generic_argument_list(&generic_hint.arguments, context);
+    }
+
+    'arena GenericArgumentList as generic_argument_list => {
+        for argument in generic_argument_list.arguments.iter() {
+            walker.walk_hint(argument, context);
+        }
+    }
+
+    'arena GenericParameterList as generic_parameter_list => {
+        for parameter in generic_parameter_list.parameters.iter() {
+            walker.walk_generic_parameter(parameter, context);
+        }
+    }
+
+    'arena GenericParameter as generic_parameter => {
+        walker.walk_local_identifier(&generic_parameter.name, context);
+        if let Some(bound) = &generic_parameter.bound {
+            walker.walk_generic_parameter_bound(bound, context);
+        }
+        if let Some(default) = &generic_parameter.default {
+            walker.walk_generic_parameter_default(default, context);
+        }
+    }
+
+    'arena GenericParameterBound as generic_parameter_bound => {
+        walker.walk_hint(&generic_parameter_bound.hint, context);
+    }
+
+    'arena GenericParameterDefault as generic_parameter_default => {
+        walker.walk_hint(&generic_parameter_default.hint, context);
+    }
+
+    'arena Turbofish as turbofish => {
+        for argument in turbofish.arguments.iter() {
+            walker.walk_hint(argument, context);
+        }
     }
 
     'arena Keyword as keyword => {

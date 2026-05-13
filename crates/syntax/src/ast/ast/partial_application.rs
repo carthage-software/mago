@@ -7,6 +7,7 @@ use mago_span::Span;
 use crate::ast::ast::argument::PartialArgumentList;
 use crate::ast::ast::class_like::member::ClassLikeMemberSelector;
 use crate::ast::ast::expression::Expression;
+use crate::ast::ast::generic::Turbofish;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
@@ -19,6 +20,7 @@ pub enum PartialApplication<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct FunctionPartialApplication<'arena> {
     pub function: &'arena Expression<'arena>,
+    pub turbofish: Option<Turbofish<'arena>>,
     pub argument_list: PartialArgumentList<'arena>,
 }
 
@@ -27,6 +29,7 @@ pub struct MethodPartialApplication<'arena> {
     pub object: &'arena Expression<'arena>,
     pub arrow: Span,
     pub method: ClassLikeMemberSelector<'arena>,
+    pub turbofish: Option<Turbofish<'arena>>,
     pub argument_list: PartialArgumentList<'arena>,
 }
 
@@ -35,6 +38,7 @@ pub struct StaticMethodPartialApplication<'arena> {
     pub class: &'arena Expression<'arena>,
     pub double_colon: Span,
     pub method: ClassLikeMemberSelector<'arena>,
+    pub turbofish: Option<Turbofish<'arena>>,
     pub argument_list: PartialArgumentList<'arena>,
 }
 

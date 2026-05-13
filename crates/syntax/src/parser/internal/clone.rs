@@ -68,6 +68,7 @@ impl<'arena> Parser<'_, 'arena> {
                     span: clone.span,
                     value: clone.value,
                 }))),
+                turbofish: None,
                 argument_list: partial_args,
             })));
         }
@@ -86,6 +87,7 @@ impl<'arena> Parser<'_, 'arena> {
                     span: clone.span,
                     value: clone.value,
                 }))),
+                turbofish: None,
                 argument_list: partial_args.into_argument_list(self.arena),
             })));
         }

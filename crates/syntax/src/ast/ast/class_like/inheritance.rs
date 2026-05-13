@@ -3,7 +3,7 @@ use serde::Serialize;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::ast::ast::identifier::Identifier;
+use crate::ast::ast::generic::ClassLikeReference;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::ast::sequence::TokenSeparatedSequenceExt;
@@ -20,7 +20,7 @@ use crate::ast::sequence::TokenSeparatedSequenceExt;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Implements<'arena> {
     pub implements: Keyword<'arena>,
-    pub types: TokenSeparatedSequence<'arena, Identifier<'arena>>,
+    pub types: TokenSeparatedSequence<'arena, ClassLikeReference<'arena>>,
 }
 
 /// Represents `extends` keyword with one or more types.
@@ -41,7 +41,7 @@ pub struct Implements<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Extends<'arena> {
     pub extends: Keyword<'arena>,
-    pub types: TokenSeparatedSequence<'arena, Identifier<'arena>>,
+    pub types: TokenSeparatedSequence<'arena, ClassLikeReference<'arena>>,
 }
 
 impl HasSpan for Implements<'_> {

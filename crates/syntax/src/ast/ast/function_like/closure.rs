@@ -7,6 +7,7 @@ use crate::ast::ast::attribute::AttributeList;
 use crate::ast::ast::block::Block;
 use crate::ast::ast::function_like::parameter::FunctionLikeParameterList;
 use crate::ast::ast::function_like::r#return::FunctionLikeReturnTypeHint;
+use crate::ast::ast::generic::GenericParameterList;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::ast::variable::DirectVariable;
 use crate::ast::sequence::Sequence;
@@ -18,6 +19,7 @@ pub struct Closure<'arena> {
     pub r#static: Option<Keyword<'arena>>,
     pub function: Keyword<'arena>,
     pub ampersand: Option<Span>,
+    pub generic_parameters: Option<GenericParameterList<'arena>>,
     pub parameter_list: FunctionLikeParameterList<'arena>,
     pub use_clause: Option<ClosureUseClause<'arena>>,
     pub return_type_hint: Option<FunctionLikeReturnTypeHint<'arena>>,

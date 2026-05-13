@@ -24,6 +24,10 @@ impl<'arena> Parser<'_, 'arena> {
     }
 
     pub(crate) fn parse_attribute(&mut self) -> Result<Attribute<'arena>, ParseError> {
-        Ok(Attribute { name: self.parse_identifier()?, argument_list: self.parse_optional_argument_list()? })
+        Ok(Attribute {
+            name: self.parse_identifier()?,
+            turbofish: self.parse_optional_turbofish()?,
+            argument_list: self.parse_optional_argument_list()?,
+        })
     }
 }

@@ -1,4 +1,5 @@
 use crate::T;
+use crate::ast::ast::GenericHint;
 use crate::ast::ast::Hint;
 use crate::ast::ast::IntersectionHint;
 use crate::ast::ast::NullableHint;
@@ -84,6 +85,15 @@ impl<'arena> Parser<'_, 'arena> {
                     ],
                 ));
             }
+        };
+
+        // Wrap with generic arguments before any union/intersection composition:
+        // `Box<int>|null` is `Box<int> | null`, not `Box<int|null>`.
+        let hint = if self.is_at_generic_open_angle()? {
+            let arguments = self.parse_generic_argument_list()?;
+            Hint::Generic(GenericHint { base: self.arena.alloc(hint), arguments })
+        } else {
+            hint
         };
 
         let next = self.stream.lookahead(0)?;

@@ -26,6 +26,18 @@ pub struct State {
     pub within_indirect_variable: bool,
     pub within_string_interpolation: bool,
     pub recursion_depth: u16,
+    /// Number of virtual `>` tokens left to consume.
+    ///
+    /// Set when a `>>` (right-shift) token is consumed as the first half of a
+    /// closing angle on a nested generic argument or parameter list. The next
+    /// call to [`Parser::eat_close_angle`] sees this counter, returns a
+    /// synthetic single-`>` span for the second half, and decrements it.
+    pub pending_close_angles: u8,
+    /// Byte offset of the synthetic single `>` token waiting to be consumed.
+    ///
+    /// Tracks the start position of the residual `>` produced when a `>>` is
+    /// split. Only meaningful when `pending_close_angles > 0`.
+    pub pending_close_angle_offset: u32,
 }
 
 /// The main parser for PHP source code.

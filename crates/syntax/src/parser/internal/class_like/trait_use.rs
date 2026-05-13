@@ -26,7 +26,7 @@ impl<'arena> Parser<'_, 'arena> {
                         break;
                     }
 
-                    traits.push(self.parse_identifier()?);
+                    traits.push(self.parse_class_like_reference()?);
 
                     match self.stream.peek_kind(0)? {
                         Some(T![","]) => {

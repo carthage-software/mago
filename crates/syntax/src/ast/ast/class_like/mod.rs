@@ -8,6 +8,7 @@ use crate::ast::ast::attribute::AttributeList;
 use crate::ast::ast::class_like::inheritance::Extends;
 use crate::ast::ast::class_like::inheritance::Implements;
 use crate::ast::ast::class_like::member::ClassLikeMember;
+use crate::ast::ast::generic::GenericParameterList;
 use crate::ast::ast::identifier::LocalIdentifier;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::ast::modifier::Modifier;
@@ -36,6 +37,7 @@ pub struct Interface<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub interface: Keyword<'arena>,
     pub name: LocalIdentifier<'arena>,
+    pub generic_parameters: Option<GenericParameterList<'arena>>,
     pub extends: Option<Extends<'arena>>,
     pub left_brace: Span,
     pub members: Sequence<'arena, ClassLikeMember<'arena>>,
@@ -62,6 +64,7 @@ pub struct Class<'arena> {
     pub modifiers: Sequence<'arena, Modifier<'arena>>,
     pub class: Keyword<'arena>,
     pub name: LocalIdentifier<'arena>,
+    pub generic_parameters: Option<GenericParameterList<'arena>>,
     pub extends: Option<Extends<'arena>>,
     pub implements: Option<Implements<'arena>>,
     pub left_brace: Span,
@@ -115,6 +118,7 @@ pub struct Trait<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub r#trait: Keyword<'arena>,
     pub name: LocalIdentifier<'arena>,
+    pub generic_parameters: Option<GenericParameterList<'arena>>,
     pub left_brace: Span,
     pub members: Sequence<'arena, ClassLikeMember<'arena>>,
     pub right_brace: Span,

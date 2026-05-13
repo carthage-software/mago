@@ -228,6 +228,9 @@ macro_rules! T {
     ("::") => {
         $crate::token::TokenKind::ColonColon
     };
+    ("::<") => {
+        $crate::token::TokenKind::ColonColonLessThan
+    };
     ("==") => {
         $crate::token::TokenKind::EqualEqual
     };

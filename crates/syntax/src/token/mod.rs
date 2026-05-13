@@ -154,6 +154,7 @@ pub enum TokenKind {
     RealCast,                    // `(real)`
     FloatCast,                   // `(float)`
     ColonColon,                  // `::`
+    ColonColonLessThan,          // `::<` (turbofish)
     EqualEqual,                  // `==`
     DoubleQuote,                 // `"`
     Else,                        // `else`
@@ -335,6 +336,7 @@ impl Precedence {
             T!["("] => Self::CallDim,
             T!["["] => Self::ArrayDim,
             T!["->" | "?->" | "::"] => Self::ObjectAccess,
+            T!["::<"] => Self::CallDim,
             _ => Self::Lowest,
         }
     }
@@ -540,7 +542,7 @@ impl TokenKind {
     #[inline]
     #[must_use]
     pub const fn is_postfix(&self) -> bool {
-        matches!(self, T!["++" | "--" | "(" | "[" | "->" | "?->" | "::"])
+        matches!(self, T!["++" | "--" | "(" | "[" | "->" | "?->" | "::" | "::<"])
     }
 
     #[inline]

@@ -4,6 +4,7 @@ use strum::Display;
 use mago_span::HasSpan;
 use mago_span::Span;
 
+use crate::ast::ast::generic::ClassLikeReference;
 use crate::ast::ast::identifier::Identifier;
 use crate::ast::ast::identifier::LocalIdentifier;
 use crate::ast::ast::keyword::Keyword;
@@ -15,7 +16,7 @@ use crate::ast::sequence::TokenSeparatedSequence;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct TraitUse<'arena> {
     pub r#use: Keyword<'arena>,
-    pub trait_names: TokenSeparatedSequence<'arena, Identifier<'arena>>,
+    pub trait_names: TokenSeparatedSequence<'arena, ClassLikeReference<'arena>>,
     pub specification: TraitUseSpecification<'arena>,
 }
 

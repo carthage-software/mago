@@ -28,6 +28,7 @@ impl<'arena> Parser<'_, 'arena> {
             attribute_lists: attributes,
             interface: self.expect_keyword(T!["interface"])?,
             name: self.parse_local_identifier()?,
+            generic_parameters: self.parse_optional_generic_parameter_list()?,
             extends: self.parse_optional_extends()?,
             left_brace: self.stream.eat_span(T!["{"])?,
             members: {
@@ -80,6 +81,7 @@ impl<'arena> Parser<'_, 'arena> {
             modifiers,
             class: self.expect_keyword(T!["class"])?,
             name: self.parse_local_identifier()?,
+            generic_parameters: self.parse_optional_generic_parameter_list()?,
             extends: self.parse_optional_extends()?,
             implements: self.parse_optional_implements()?,
             left_brace: self.stream.eat_span(T!["{"])?,
@@ -163,6 +165,7 @@ impl<'arena> Parser<'_, 'arena> {
             attribute_lists: attributes,
             r#trait: self.expect_keyword(T!["trait"])?,
             name: self.parse_local_identifier()?,
+            generic_parameters: self.parse_optional_generic_parameter_list()?,
             left_brace: self.stream.eat_span(T!["{"])?,
             members: {
                 let mut members = self.new_vec();

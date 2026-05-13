@@ -4,6 +4,7 @@ use strum::Display;
 use mago_span::HasSpan;
 use mago_span::Span;
 
+use crate::ast::ast::generic::GenericHint;
 use crate::ast::ast::identifier::Identifier;
 use crate::ast::ast::identifier::LocalIdentifier;
 use crate::ast::ast::keyword::Keyword;
@@ -25,6 +26,7 @@ pub enum Hint<'arena> {
     Nullable(NullableHint<'arena>),
     Union(UnionHint<'arena>),
     Intersection(IntersectionHint<'arena>),
+    Generic(GenericHint<'arena>),
     Null(Keyword<'arena>),
     True(Keyword<'arena>),
     False(Keyword<'arena>),
@@ -249,6 +251,7 @@ impl HasSpan for Hint<'_> {
             Hint::Nullable(nullable) => nullable.span(),
             Hint::Union(union) => union.span(),
             Hint::Intersection(intersection) => intersection.span(),
+            Hint::Generic(generic) => generic.span(),
             Hint::Null(keyword)
             | Hint::True(keyword)
             | Hint::Static(keyword)

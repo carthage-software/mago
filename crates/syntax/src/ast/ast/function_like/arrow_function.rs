@@ -7,6 +7,7 @@ use crate::ast::ast::attribute::AttributeList;
 use crate::ast::ast::expression::Expression;
 use crate::ast::ast::function_like::parameter::FunctionLikeParameterList;
 use crate::ast::ast::function_like::r#return::FunctionLikeReturnTypeHint;
+use crate::ast::ast::generic::GenericParameterList;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::sequence::Sequence;
 
@@ -25,6 +26,7 @@ pub struct ArrowFunction<'arena> {
     pub r#static: Option<Keyword<'arena>>,
     pub r#fn: Keyword<'arena>,
     pub ampersand: Option<Span>,
+    pub generic_parameters: Option<GenericParameterList<'arena>>,
     pub parameter_list: FunctionLikeParameterList<'arena>,
     pub return_type_hint: Option<FunctionLikeReturnTypeHint<'arena>>,
     pub arrow: Span,
