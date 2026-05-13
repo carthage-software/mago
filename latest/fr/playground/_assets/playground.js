@@ -1024,13 +1024,13 @@ const cmTheme = EditorView.theme({
   },
 
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": {
-    backgroundColor: "var(--accent-soft)",
+    backgroundColor: "var(--cm-selection)",
   },
   ".cm-selectionBackground": {
-    backgroundColor: "var(--accent-soft)",
+    backgroundColor: "var(--cm-selection-blur)",
   },
   ".cm-content ::selection, .cm-line ::selection": {
-    backgroundColor: "transparent",
+    backgroundColor: "var(--cm-selection)",
     color: "inherit",
   },
 
