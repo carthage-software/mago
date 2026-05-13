@@ -812,6 +812,10 @@ fn scrape_type_properties(
                             && combination.list_array_parameter.is_some()
                         {
                             combination.flags.remove(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED);
+                            for (is_optional, _) in combination.list_array_entries.values_mut() {
+                                *is_optional = true;
+                            }
+
                             had_previous_keyed_array = false;
                             combination.flags.remove(CombinationFlags::HAS_KEYED_ARRAY);
 
