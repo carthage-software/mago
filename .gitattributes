@@ -19,4 +19,4 @@ flake.nix export-ignore
 flake.lock export-ignore
 mago.toml export-ignore
 scripts/ export-ignore
-src/ export-ignore
+/src/ export-ignore
