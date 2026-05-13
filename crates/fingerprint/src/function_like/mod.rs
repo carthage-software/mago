@@ -30,6 +30,7 @@ impl Fingerprintable for Closure<'_> {
         }
         self.r#static.is_some().hash(hasher);
         self.ampersand.is_some().hash(hasher);
+        self.generic_parameters.fingerprint_with_hasher(hasher, resolved_names, options);
         self.parameter_list.fingerprint_with_hasher(hasher, resolved_names, options);
         self.use_clause.fingerprint_with_hasher(hasher, resolved_names, options);
         self.return_type_hint.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -88,6 +89,7 @@ impl Fingerprintable for Function<'_> {
         }
         self.ampersand.is_some().hash(hasher);
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.generic_parameters.fingerprint_with_hasher(hasher, resolved_names, options);
         self.parameter_list.fingerprint_with_hasher(hasher, resolved_names, options);
         self.return_type_hint.fingerprint_with_hasher(hasher, resolved_names, options);
 
@@ -111,6 +113,7 @@ impl Fingerprintable for ArrowFunction<'_> {
         }
         self.r#static.is_some().hash(hasher);
         self.ampersand.is_some().hash(hasher);
+        self.generic_parameters.fingerprint_with_hasher(hasher, resolved_names, options);
         self.parameter_list.fingerprint_with_hasher(hasher, resolved_names, options);
         self.return_type_hint.fingerprint_with_hasher(hasher, resolved_names, options);
         self.expression.fingerprint_with_hasher(hasher, resolved_names, options);

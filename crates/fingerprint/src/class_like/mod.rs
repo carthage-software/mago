@@ -7,6 +7,7 @@ use mago_syntax::ast::Class;
 use mago_syntax::ast::ClassLikeConstant;
 use mago_syntax::ast::ClassLikeConstantItem;
 use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::ast::ClassLikeReference;
 use mago_syntax::ast::Enum;
 use mago_syntax::ast::EnumBackingTypeHint;
 use mago_syntax::ast::EnumCase;
@@ -53,6 +54,24 @@ impl Fingerprintable for AnonymousClass<'_> {
         self.implements.fingerprint_with_hasher(hasher, resolved_names, options);
         for member in &self.members {
             member.fingerprint_with_hasher(hasher, resolved_names, options);
+        }
+    }
+}
+
+impl Fingerprintable for ClassLikeReference<'_> {
+    #[inline]
+    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+        &self,
+        hasher: &mut H,
+        resolved_names: &ResolvedNames,
+        options: &FingerprintOptions<'_>,
+    ) {
+        self.name.fingerprint_with_hasher(hasher, resolved_names, options);
+        if let Some(arguments) = &self.generic_arguments {
+            "generic_args".hash(hasher);
+            for argument in arguments.arguments.iter() {
+                argument.fingerprint_with_hasher(hasher, resolved_names, options);
+            }
         }
     }
 }
@@ -475,6 +494,7 @@ impl Fingerprintable for Method<'_> {
             "by_ref".hash(hasher);
         }
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.generic_parameters.fingerprint_with_hasher(hasher, resolved_names, options);
         self.parameter_list.fingerprint_with_hasher(hasher, resolved_names, options);
         self.return_type_hint.fingerprint_with_hasher(hasher, resolved_names, options);
 
@@ -525,6 +545,7 @@ impl Fingerprintable for Class<'_> {
         }
         crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.generic_parameters.fingerprint_with_hasher(hasher, resolved_names, options);
         self.extends.fingerprint_with_hasher(hasher, resolved_names, options);
         self.implements.fingerprint_with_hasher(hasher, resolved_names, options);
         for member in &self.members {
@@ -553,6 +574,7 @@ impl Fingerprintable for Interface<'_> {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.generic_parameters.fingerprint_with_hasher(hasher, resolved_names, options);
         self.extends.fingerprint_with_hasher(hasher, resolved_names, options);
         for member in &self.members {
             member.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -580,6 +602,7 @@ impl Fingerprintable for Trait<'_> {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.generic_parameters.fingerprint_with_hasher(hasher, resolved_names, options);
         for member in &self.members {
             member.fingerprint_with_hasher(hasher, resolved_names, options);
         }

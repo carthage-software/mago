@@ -36,6 +36,7 @@ impl Fingerprintable for FunctionPartialApplication<'_> {
     ) {
         "fn_partial".hash(hasher);
         self.function.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.turbofish.fingerprint_with_hasher(hasher, resolved_names, options);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }
@@ -51,6 +52,7 @@ impl Fingerprintable for MethodPartialApplication<'_> {
         "method_partial".hash(hasher);
         self.object.fingerprint_with_hasher(hasher, resolved_names, options);
         self.method.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.turbofish.fingerprint_with_hasher(hasher, resolved_names, options);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }
@@ -66,6 +68,7 @@ impl Fingerprintable for StaticMethodPartialApplication<'_> {
         "static_method_partial".hash(hasher);
         self.class.fingerprint_with_hasher(hasher, resolved_names, options);
         self.method.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.turbofish.fingerprint_with_hasher(hasher, resolved_names, options);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }
