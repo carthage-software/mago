@@ -1148,7 +1148,7 @@ pub fn infer_parameter_templates_from_default(
         parameter_type,
         default_type,
         template_result,
-        InferenceOptions { infer_only_if_new: default_type.is_callable(), argument_offset: None, source_span: None },
+        InferenceOptions { infer_only_if_new: true, argument_offset: None, source_span: None },
         &mut Vec::new(),
     );
 }
