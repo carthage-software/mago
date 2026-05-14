@@ -124,7 +124,7 @@ mago self-update
 
 ### Cargo
 
-Crates.io publishing can lag a few hours behind a release. Same pattern as Homebrew.
+Crates.io publishing can lag a few hours behind a release. Same pattern as Homebrew, and WinGet.
 
 ```sh
 cargo install mago
