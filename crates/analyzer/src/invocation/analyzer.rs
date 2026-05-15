@@ -489,6 +489,25 @@ pub fn analyze_invocation<'ctx, 'arena>(
         last_argument_offset = *argument_offset as isize;
     }
 
+    let function_template_types = invocation.target.get_template_types();
+
+    // Apply @template T2 = T1 defaults for templates not yet bound from actual arguments.
+    // This must run before unused-parameter PHP-default inference so that explicit template
+    // defaults take priority (e.g., $x = null must not override T2 = T1 when T1 = string).
+    if let Some(template_types) = function_template_types {
+        for (template_name, template) in template_types {
+            if template_result.has_lower_bound(*template_name, &template.defining_entity) {
+                continue;
+            }
+            if let Some(default) = &template.default {
+                let resolved = inferred_type_replacer::replace(default, template_result, context.codebase);
+                if !resolved.has_template_types() {
+                    template_result.add_lower_bound(*template_name, template.defining_entity, resolved);
+                }
+            }
+        }
+    }
+
     if !has_too_many_arguments {
         loop {
             last_argument_offset += 1;
@@ -583,13 +602,19 @@ pub fn analyze_invocation<'ctx, 'arena>(
         }
     }
 
-    if let Some(template_types) = invocation.target.get_template_types() {
+    if let Some(template_types) = function_template_types {
         for (template_name, template) in template_types {
             if template_result.has_lower_bound(*template_name, &template.defining_entity) {
                 continue;
             }
 
-            template_result.add_lower_bound(*template_name, template.defining_entity, template.constraint.clone());
+            let fallback = if let Some(default) = &template.default {
+                inferred_type_replacer::replace(default, template_result, context.codebase)
+            } else {
+                template.constraint.clone()
+            };
+
+            template_result.add_lower_bound(*template_name, template.defining_entity, fallback);
         }
     }
 

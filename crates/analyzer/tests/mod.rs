@@ -332,6 +332,7 @@ test_case!(template_default_as_modifier);
 test_case!(template_default_array_shape);
 test_case!(template_default_argument_mismatch);
 test_case!(template_default_explicit_arg_violates_constraint);
+test_case!(template_default_references_other_template);
 test_case!(docblock_truthy_string);
 test_case!(docblock_non_falsy_string);
 test_case!(docblock_non_falsy_string_invalid);
