@@ -442,6 +442,9 @@ test_case!(idempotency_comment_before_call_args);
 test_case!(idempotency_mixed_breaking_logical_chain);
 test_case!(idempotency_docblock_before_parameter);
 test_case!(idempotency_html_echo_ternary_break);
+test_case!(idempotency_inline_echo_mid_line_call);
+test_case!(idempotency_inline_echo_mid_line_ternary);
+test_case!(idempotency_inline_echo_multi_break_mid_line);
 
 // Full-file idempotency fixtures sourced from the corpus. When a corpus
 // file stops being idempotent, copy it here so the formatter test suite

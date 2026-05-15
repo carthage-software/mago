@@ -173,8 +173,36 @@ fn print_statement_slice<'ctx, 'arena>(
             if let Some(line_start_offset) = f.file.get_line_start_offset(line) {
                 let c = &f.source_text[line_start_offset as usize..offset as usize];
                 let ws = c.chars().take_while(|c| c.is_whitespace()).collect::<String>();
-                let should_apply_align =
-                    !ws.is_empty() && (matches!(stmt, Statement::OpeningTag(_)) || c.len() == ws.len());
+                let c_ends_in_html = {
+                    let (mut in_php, mut i, mut ok_to_align) = (false, 0usize, true);
+                    let b = c.as_bytes();
+                    let ws_len = ws.len();
+                    while i < b.len() {
+                        if !in_php && b[i..].starts_with(b"<?") {
+                            in_php = true;
+                            i += 2;
+                        } else if in_php && b[i..].starts_with(b"?>") {
+                            in_php = false;
+                            i += 2;
+                        } else if !in_php && b[i..].starts_with(b"?>") {
+                            // `?>` seen while not in tracked PHP context: the line started
+                            // inside PHP code. Only allow alignment if the tail between the
+                            // leading whitespace and this `?>` is purely closing syntax
+                            // (`)`, `]`, `}`, `;`, whitespace), i.e. the leftover of a
+                            // broken multi-line expression — not actual statement code.
+                            let tail = &b[ws_len..i];
+                            if !tail.iter().all(|&byte| matches!(byte, b')' | b']' | b'}' | b';' | b' ' | b'\t')) {
+                                ok_to_align = false;
+                            }
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    !in_php && ok_to_align
+                };
+                let should_apply_align = !ws.is_empty()
+                    && (matches!(stmt, Statement::OpeningTag(_)) || c.len() == ws.len() || c_ends_in_html);
                 if should_apply_align {
                     if matches!(stmt, Statement::OpeningTag(_)) {
                         let mut j = i + 1;
