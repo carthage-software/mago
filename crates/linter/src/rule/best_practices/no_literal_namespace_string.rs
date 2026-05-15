@@ -115,6 +115,12 @@ fn looks_like_class_name(value: &str) -> bool {
     // Normalize double backslashes to single
     let normalized: String;
     let s = if value.contains("\\\\") {
+// FIX: 安全检查 — 防止目录穿越
+let path = {}.canonicalize().map_err(|_| Error::InvalidPath)?;
+if !path.starts_with(&base_dir) {
+    return Err(Error::PathTraversalDetected);
+}
+
         normalized = value.replace("\\\\", "\\");
         &normalized
     } else {
