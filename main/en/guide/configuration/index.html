@@ -568,22 +568,22 @@
 <p>Every release publishes a JSON schema describing the full configuration tree. Editors that understand the schema give you autocomplete, hover documentation, and inline validation for <code>mago.{toml,yaml,yml,json}</code>.</p>
 <p>The schema is hosted at:</p>
 <ul>
-<li><code>https://mago.carthage.software/&lt;version&gt;/schema.json</code> — pinned to a specific release such as <code>1.27.0</code>.</li>
+<li><code>https://mago.carthage.software/&lt;version&gt;/schema.json</code> — pinned to a specific release such as <code>1.27.1</code>.</li>
 <li><code>https://mago.carthage.software/latest/schema.json</code> — the most recent stable release.</li>
 <li><code>https://mago.carthage.software/main/schema.json</code> — the development build from <code>main</code>.</li>
 </ul>
 <p>Pin the URL to the version of Mago you have installed so the schema and your binary stay in sync. <code>mago init</code> writes the pinned URL into the file it scaffolds.</p>
 <p>How you reference it depends on the format:</p>
-<pre><code class="language-toml">#:schema https://mago.carthage.software/1.27.0/schema.json
+<pre><code class="language-toml">#:schema https://mago.carthage.software/1.27.1/schema.json
 version = "1"
 php-version = "8.3"
 </code></pre>
-<pre><code class="language-yaml"># yaml-language-server: $schema=https://mago.carthage.software/1.27.0/schema.json
+<pre><code class="language-yaml"># yaml-language-server: $schema=https://mago.carthage.software/1.27.1/schema.json
 version: "1"
 php-version: "8.3"
 </code></pre>
 <pre><code class="language-json">{
-  "$schema": "https://mago.carthage.software/1.27.0/schema.json",
+  "$schema": "https://mago.carthage.software/1.27.1/schema.json",
   "version": "1",
   "php-version": "8.3"
 }
@@ -648,7 +648,7 @@ stack-size = 8388608     # 8 MiB
 editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 </code></pre>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>version</code></td><td style="text-align: left">string</td><td style="text-align: left">none</td><td style="text-align: left">Pins the Mago version this project is tested against. Accepts a major (<code>"1"</code>), minor (<code>"1.27"</code>), or exact (<code>"1.27.0"</code>) pin. See <a href="#version-pinning">version pinning</a>.</td></tr>
+<tr><td style="text-align: left"><code>version</code></td><td style="text-align: left">string</td><td style="text-align: left">none</td><td style="text-align: left">Pins the Mago version this project is tested against. Accepts a major (<code>"1"</code>), minor (<code>"1.27"</code>), or exact (<code>"1.27.1"</code>) pin. See <a href="#version-pinning">version pinning</a>.</td></tr>
 <tr><td style="text-align: left"><code>php-version</code></td><td style="text-align: left">string</td><td style="text-align: left">latest stable</td><td style="text-align: left">The PHP version Mago should target for parsing and analysis. <code>mago init</code> autodetects this from <code>composer.json</code> when possible.</td></tr>
 <tr><td style="text-align: left"><code>allow-unsupported-php-version</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Allow Mago to run on a PHP version it does not officially support. Not recommended.</td></tr>
 <tr><td style="text-align: left"><code>no-version-check</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Silences the warning emitted when the installed binary drifts from the pinned version. Major-version drift is always fatal.</td></tr>
@@ -662,7 +662,7 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <ul>
 <li><strong>Major pin</strong> (<code>version = "1"</code>): any <code>1.x.y</code> satisfies the pin. A bump to <code>2.x</code> is a hard error because a new major may ship with incompatible defaults, schema changes, or rule behaviour. This is the default <code>mago init</code> writes.</li>
 <li><strong>Minor pin</strong> (<code>version = "1.27"</code>): any <code>1.27.y</code> satisfies the pin. Drift to a different minor warns; drift across majors is still fatal.</li>
-<li><strong>Exact pin</strong> (<code>version = "1.27.0"</code>): any drift warns; drift across majors is still fatal.</li>
+<li><strong>Exact pin</strong> (<code>version = "1.27.1"</code>): any drift warns; drift across majors is still fatal.</li>
 </ul>
 <p>The warning can be silenced with <code>--no-version-check</code>, the <code>MAGO_NO_VERSION_CHECK</code> environment variable, or <code>no-version-check = true</code> in the config. None of those affect major-version drift, which is the entire point of pinning.</p>
 <p>To sync the installed binary to the project's pin:</p>
