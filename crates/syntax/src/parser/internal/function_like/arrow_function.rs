@@ -15,6 +15,7 @@ impl<'arena> Parser<'_, 'arena> {
             r#static: self.maybe_expect_keyword(T!["static"])?,
             r#fn: self.expect_keyword(T!["fn"])?,
             ampersand: if self.stream.is_at(T!["&"])? { Some(self.stream.eat_span(T!["&"])?) } else { None },
+            generic_parameters: self.parse_optional_generic_parameter_list()?,
             parameter_list: self.parse_function_like_parameter_list()?,
             return_type_hint: self.parse_optional_function_like_return_type_hint()?,
             arrow: self.stream.eat_span(T!["=>"])?,

@@ -1305,4 +1305,39 @@ mod parser {
     smoke_test!(issue_1713_exit_partial_application_variadic, "<?php exit(1, ?, ...);");
     smoke_test!(issue_1713_match_trailing_comma, "<?php $value = match (1) { 0, 1, => 'Foo', default, => 'Bar', };");
     smoke_test!(issue_1713_yield_unary_minus, "<?php function gen() { yield * -1; }");
+
+    // RFC: Bound-erased generic types
+    smoke_test!(generic_class_one_param, "<?php class Box<T> {}");
+    smoke_test!(generic_class_two_params, "<?php class Pair<K, V> {}");
+    smoke_test!(generic_class_bound, "<?php class Box<T : Stringable> {}");
+    smoke_test!(generic_class_default, "<?php class Box<T = mixed> {}");
+    smoke_test!(generic_class_bound_and_default, "<?php class Box<T : Foo = Bar> {}");
+    smoke_test!(generic_class_covariant, "<?php class Box<+T> {}");
+    smoke_test!(generic_class_contravariant, "<?php class Box<-T> {}");
+    smoke_test!(generic_class_variance_with_bound, "<?php class Box<+T : object> {}");
+    smoke_test!(generic_interface, "<?php interface Comparable<T> {}");
+    smoke_test!(generic_trait, "<?php trait Holder<T> {}");
+    smoke_test!(generic_function, "<?php function id<T>(T $v): T { return $v; }");
+    smoke_test!(generic_method, "<?php class C { public function map<U>(callable $f): array {} }");
+    smoke_test!(generic_closure, "<?php $f = function<K, V>(K $k, V $v): array { return [$k, $v]; };");
+    smoke_test!(generic_arrow_function, "<?php $f = fn<T>(T $x): T => $x;");
+    smoke_test!(generic_type_hint_in_parameter, "<?php function f(Box<int> $b): void {}");
+    smoke_test!(generic_type_hint_in_return, "<?php function f(): Box<int> { return new Box; }");
+    smoke_test!(generic_type_hint_two_args, "<?php function f(): Map<string, int> { return new Map; }");
+    smoke_test!(turbofish_function_call, "<?php id::<int>(1);");
+    smoke_test!(turbofish_method_call, "<?php $b->map::<string>($f);");
+    smoke_test!(turbofish_nullsafe_method_call, "<?php $b?->map::<string>($f);");
+    smoke_test!(turbofish_static_method_call, "<?php C::create::<Order>();");
+    smoke_test!(turbofish_new, "<?php new Box::<int>(1);");
+    smoke_test!(turbofish_new_no_args, "<?php new Box::<int>;");
+    smoke_test!(turbofish_attribute, "<?php #[Attr::<int>] class C {}");
+    smoke_test!(turbofish_first_class_callable, "<?php $cb = id::<int>(...);");
+    smoke_test!(generic_extends, "<?php class Child extends Parent<int> {}");
+    smoke_test!(generic_extends_multiple_args, "<?php class M extends Map<string, int> {}");
+    smoke_test!(generic_implements, "<?php class C implements Comparable<C>, Countable {}");
+    smoke_test!(generic_interface_extends, "<?php interface I extends Iterator<int, string> {}");
+    smoke_test!(generic_trait_use, "<?php class C { use Holder<int>; }");
+    smoke_test!(generic_trait_use_multi, "<?php class C { use Holder<int>, Other<string>; }");
+    smoke_test!(generic_extends_no_args, "<?php class Child extends ParentClass {}");
+    smoke_test!(generic_trait_use_no_args, "<?php class C { use SomeTrait; }");
 }

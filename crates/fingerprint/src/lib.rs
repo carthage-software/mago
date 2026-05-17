@@ -24,6 +24,7 @@ pub mod declare;
 pub mod echo;
 pub mod expression;
 pub mod function_like;
+pub mod generic;
 pub mod global;
 pub mod goto;
 pub mod halt_compiler;

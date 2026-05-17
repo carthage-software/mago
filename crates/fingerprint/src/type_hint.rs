@@ -28,6 +28,13 @@ impl Fingerprintable for Hint<'_> {
             Hint::Nullable(n) => n.fingerprint_with_hasher(hasher, resolved_names, options),
             Hint::Union(u) => u.fingerprint_with_hasher(hasher, resolved_names, options),
             Hint::Intersection(i) => i.fingerprint_with_hasher(hasher, resolved_names, options),
+            Hint::Generic(g) => {
+                "generic".hash(hasher);
+                g.base.fingerprint_with_hasher(hasher, resolved_names, options);
+                for argument in g.arguments.arguments.iter() {
+                    argument.fingerprint_with_hasher(hasher, resolved_names, options);
+                }
+            }
             Hint::Null(_) => "null".hash(hasher),
             Hint::True(_) => "true".hash(hasher),
             Hint::False(_) => "false".hash(hasher),

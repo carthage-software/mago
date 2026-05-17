@@ -4,6 +4,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::ast::argument::ArgumentList;
+use crate::ast::ast::generic::Turbofish;
 use crate::ast::ast::identifier::Identifier;
 use crate::ast::sequence::TokenSeparatedSequence;
 
@@ -23,6 +24,7 @@ pub struct AttributeList<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Attribute<'arena> {
     pub name: Identifier<'arena>,
+    pub turbofish: Option<Turbofish<'arena>>,
     pub argument_list: Option<ArgumentList<'arena>>,
 }
 

@@ -10,6 +10,7 @@ use mago_syntax::ast::ClosureUseClauseVariable;
 use mago_syntax::ast::Function;
 use mago_syntax::ast::FunctionLikeParameterList;
 use mago_syntax::ast::FunctionLikeReturnTypeHint;
+use mago_syntax::ast::GenericParameterList;
 use mago_syntax::ast::Keyword;
 use mago_syntax::ast::LocalIdentifier;
 use mago_syntax::ast::Method;
@@ -56,6 +57,7 @@ struct FunctionLikeParts<'arena> {
     pub fn_or_function: &'arena Keyword<'arena>,
     pub ampersand: Option<Span>,
     pub name: Option<&'arena LocalIdentifier<'arena>>,
+    pub generic_parameters: Option<&'arena GenericParameterList<'arena>>,
     pub parameter_list: &'arena FunctionLikeParameterList<'arena>,
     pub use_clause: Option<&'arena ClosureUseClause<'arena>>,
     pub return_type_hint: Option<&'arena FunctionLikeReturnTypeHint<'arena>>,
@@ -71,6 +73,7 @@ impl<'arena> FunctionLikeParts<'arena> {
             fn_or_function: &closure.function,
             ampersand: closure.ampersand,
             name: None,
+            generic_parameters: closure.generic_parameters.as_ref(),
             parameter_list: &closure.parameter_list,
             use_clause: closure.use_clause.as_ref(),
             return_type_hint: closure.return_type_hint.as_ref(),
@@ -86,6 +89,7 @@ impl<'arena> FunctionLikeParts<'arena> {
             fn_or_function: &function.function,
             ampersand: function.ampersand,
             name: Some(&function.name),
+            generic_parameters: function.generic_parameters.as_ref(),
             parameter_list: &function.parameter_list,
             use_clause: None,
             return_type_hint: function.return_type_hint.as_ref(),
@@ -101,6 +105,7 @@ impl<'arena> FunctionLikeParts<'arena> {
             fn_or_function: &method.function,
             ampersand: method.ampersand,
             name: Some(&method.name),
+            generic_parameters: method.generic_parameters.as_ref(),
             parameter_list: &method.parameter_list,
             use_clause: None,
             return_type_hint: method.return_type_hint.as_ref(),
@@ -196,6 +201,11 @@ impl<'arena> FunctionLikeParts<'arena> {
         // Add name if present (functions and methods)
         if let Some(name) = self.name {
             signature.push(name.format(f));
+        }
+
+        // Add generic type parameters: `<T, U: Bound = Default>`.
+        if let Some(generic_parameters) = self.generic_parameters {
+            signature.push(generic_parameters.format(f));
         }
 
         let signature_id = f.next_id();

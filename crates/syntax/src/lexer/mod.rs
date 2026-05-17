@@ -385,6 +385,7 @@ impl<'input> Lexer<'input> {
                     [b'<', b'<', b'='] => (TokenKind::LeftShiftEqual, 3),
                     [b'>', b'>', b'='] => (TokenKind::RightShiftEqual, 3),
                     [b'*', b'*', b'='] => (TokenKind::AsteriskAsteriskEqual, 3),
+                    [b':', b':', b'<'] => (TokenKind::ColonColonLessThan, 3),
                     [b'<', b'<', b'<'] if matches_start_of_heredoc_document(&self.input, 0) => {
                         let (length, whitespaces, label_length) = read_start_of_heredoc_document(&self.input, false, 0);
 

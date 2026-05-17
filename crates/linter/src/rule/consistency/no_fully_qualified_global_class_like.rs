@@ -183,13 +183,13 @@ impl LintRule for NoFullyQualifiedGlobalClassLikeRule {
                 self.report_if_fq(ctx, attribute.name);
             }
             Node::Extends(extends) => {
-                for identifier in extends.types.iter() {
-                    self.report_if_fq(ctx, *identifier);
+                for reference in extends.types.iter() {
+                    self.report_if_fq(ctx, reference.name);
                 }
             }
             Node::Implements(implements) => {
-                for identifier in implements.types.iter() {
-                    self.report_if_fq(ctx, *identifier);
+                for reference in implements.types.iter() {
+                    self.report_if_fq(ctx, reference.name);
                 }
             }
             Node::Instantiation(instantiation) => {
@@ -235,8 +235,8 @@ impl LintRule for NoFullyQualifiedGlobalClassLikeRule {
                 self.report_if_fq(ctx, *identifier);
             }
             Node::TraitUse(trait_use) => {
-                for identifier in trait_use.trait_names.iter() {
-                    self.report_if_fq(ctx, *identifier);
+                for reference in trait_use.trait_names.iter() {
+                    self.report_if_fq(ctx, reference.name);
                 }
             }
             _ => {}

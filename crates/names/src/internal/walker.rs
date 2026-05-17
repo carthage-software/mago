@@ -125,17 +125,17 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
 
     fn walk_in_trait_use(&mut self, trait_use: &'ast TraitUse<'arena>, context: &mut NameResolutionContext<'arena>) {
         for trait_name in &trait_use.trait_names {
-            let (trait_classlike, imported) = context.resolve(NameKind::Default, trait_name.value());
+            let (trait_classlike, imported) = context.resolve(NameKind::Default, trait_name.name.value());
 
-            self.resolved_names.insert_at(trait_name.span(), trait_classlike, imported);
+            self.resolved_names.insert_at(trait_name.name.span(), trait_classlike, imported);
         }
     }
 
     fn walk_in_extends(&mut self, extends: &'ast Extends<'arena>, context: &mut NameResolutionContext<'arena>) {
         for parent in &extends.types {
-            let (parent_classlike, imported) = context.resolve(NameKind::Default, parent.value());
+            let (parent_classlike, imported) = context.resolve(NameKind::Default, parent.name.value());
 
-            self.resolved_names.insert_at(parent.span(), parent_classlike, imported);
+            self.resolved_names.insert_at(parent.name.span(), parent_classlike, imported);
         }
     }
 
@@ -145,9 +145,9 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         context: &mut NameResolutionContext<'arena>,
     ) {
         for parent in &implements.types {
-            let (parent_classlike, imported) = context.resolve(NameKind::Default, parent.value());
+            let (parent_classlike, imported) = context.resolve(NameKind::Default, parent.name.value());
 
-            self.resolved_names.insert_at(parent.span(), parent_classlike, imported);
+            self.resolved_names.insert_at(parent.name.span(), parent_classlike, imported);
         }
     }
 

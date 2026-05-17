@@ -80,6 +80,7 @@ impl<'arena> Parser<'_, 'arena> {
                                 function: self.arena.alloc(Expression::Identifier(Identifier::Local(
                                     LocalIdentifier { span: exit.span, value: exit.value },
                                 ))),
+                                turbofish: None,
                                 argument_list: partial_args,
                             },
                         )));
@@ -106,6 +107,7 @@ impl<'arena> Parser<'_, 'arena> {
                                 function: self.arena.alloc(Expression::Identifier(Identifier::Local(
                                     LocalIdentifier { span: die.span, value: die.value },
                                 ))),
+                                turbofish: None,
                                 argument_list: partial_args,
                             },
                         )));

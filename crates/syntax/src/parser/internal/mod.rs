@@ -16,6 +16,7 @@ pub(crate) mod declare;
 pub(crate) mod echo;
 pub(crate) mod expression;
 pub(crate) mod function_like;
+pub(crate) mod generic;
 pub(crate) mod global;
 pub(crate) mod goto;
 pub(crate) mod halt_compiler;

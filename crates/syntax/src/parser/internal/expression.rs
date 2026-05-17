@@ -329,17 +329,37 @@ impl<'arena> Parser<'_, 'arena> {
         let operator = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
         Ok(self.arena.alloc(match operator.kind {
+            T!["::<"] => {
+                let turbofish = Some(self.parse_turbofish()?);
+                let partial_args = self.parse_partial_argument_list()?;
+
+                if partial_args.has_placeholders() {
+                    Expression::PartialApplication(PartialApplication::Function(FunctionPartialApplication {
+                        function: lhs,
+                        turbofish,
+                        argument_list: partial_args,
+                    }))
+                } else {
+                    Expression::Call(Call::Function(FunctionCall {
+                        function: lhs,
+                        turbofish,
+                        argument_list: partial_args.into_argument_list(self.arena),
+                    }))
+                }
+            }
             T!["("] => {
                 let partial_args = self.parse_partial_argument_list()?;
 
                 if partial_args.has_placeholders() {
                     Expression::PartialApplication(PartialApplication::Function(FunctionPartialApplication {
                         function: lhs,
+                        turbofish: None,
                         argument_list: partial_args,
                     }))
                 } else {
                     Expression::Call(Call::Function(FunctionCall {
                         function: lhs,
+                        turbofish: None,
                         argument_list: partial_args.into_argument_list(self.arena),
                     }))
                 }
@@ -365,9 +385,11 @@ impl<'arena> Parser<'_, 'arena> {
             T!["::"] => {
                 let double_colon = self.stream.consume_span()?;
                 let selector = self.parse_classlike_member_selector()?;
+                let has_turbofish = matches!(self.stream.peek_kind(0)?, Some(T!["::<"]));
                 let current = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
-                if Precedence::CallDim > precedence && matches!(current.kind, T!["("]) {
+                if Precedence::CallDim > precedence && (has_turbofish || matches!(current.kind, T!["("])) {
+                    let turbofish = if has_turbofish { Some(self.parse_turbofish()?) } else { None };
                     let partial_args = self.parse_partial_argument_list()?;
 
                     if partial_args.has_placeholders() {
@@ -376,6 +398,7 @@ impl<'arena> Parser<'_, 'arena> {
                                 class: lhs,
                                 double_colon,
                                 method: selector,
+                                turbofish,
                                 argument_list: partial_args,
                             },
                         ))
@@ -384,6 +407,7 @@ impl<'arena> Parser<'_, 'arena> {
                             class: lhs,
                             double_colon,
                             method: selector,
+                            turbofish,
                             argument_list: partial_args.into_argument_list(self.arena),
                         }))
                     }
@@ -423,8 +447,12 @@ impl<'arena> Parser<'_, 'arena> {
             T!["->"] => {
                 let arrow = self.stream.consume_span()?;
                 let selector = self.parse_classlike_member_selector()?;
+                let has_turbofish = matches!(self.stream.peek_kind(0)?, Some(T!["::<"]));
 
-                if Precedence::CallDim > precedence && matches!(self.stream.peek_kind(0)?, Some(T!["("])) {
+                if Precedence::CallDim > precedence
+                    && (has_turbofish || matches!(self.stream.peek_kind(0)?, Some(T!["("])))
+                {
+                    let turbofish = if has_turbofish { Some(self.parse_turbofish()?) } else { None };
                     let partial_args = self.parse_partial_argument_list()?;
 
                     if partial_args.has_placeholders() {
@@ -432,6 +460,7 @@ impl<'arena> Parser<'_, 'arena> {
                             object: lhs,
                             arrow,
                             method: selector,
+                            turbofish,
                             argument_list: partial_args,
                         }))
                     } else {
@@ -439,6 +468,7 @@ impl<'arena> Parser<'_, 'arena> {
                             object: lhs,
                             arrow,
                             method: selector,
+                            turbofish,
                             argument_list: partial_args.into_argument_list(self.arena),
                         }))
                     }
@@ -449,12 +479,17 @@ impl<'arena> Parser<'_, 'arena> {
             T!["?->"] => {
                 let question_mark_arrow = self.stream.consume_span()?;
                 let selector = self.parse_classlike_member_selector()?;
+                let has_turbofish = matches!(self.stream.peek_kind(0)?, Some(T!["::<"]));
 
-                if Precedence::CallDim > precedence && matches!(self.stream.peek_kind(0)?, Some(T!["("])) {
+                if Precedence::CallDim > precedence
+                    && (has_turbofish || matches!(self.stream.peek_kind(0)?, Some(T!["("])))
+                {
+                    let turbofish = if has_turbofish { Some(self.parse_turbofish()?) } else { None };
                     Expression::Call(Call::NullSafeMethod(NullSafeMethodCall {
                         object: lhs,
                         question_mark_arrow,
                         method: selector,
+                        turbofish,
                         argument_list: self.parse_argument_list()?,
                     }))
                 } else {

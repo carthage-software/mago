@@ -33,6 +33,7 @@ impl Fingerprintable for Attribute<'_> {
     {
         "attr".hash(hasher);
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.turbofish.fingerprint_with_hasher(hasher, resolved_names, options);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }

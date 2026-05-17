@@ -22,7 +22,11 @@ use mago_syntax::ast::List;
 use mago_syntax::ast::Literal;
 use mago_syntax::ast::Match;
 use mago_syntax::ast::Namespace;
+use mago_syntax::ast::GenericArgumentList;
+use mago_syntax::ast::GenericHint;
+use mago_syntax::ast::GenericParameterList;
 use mago_syntax::ast::PartialApplication;
+use mago_syntax::ast::Turbofish;
 use mago_syntax::ast::Pipe;
 use mago_syntax::ast::Program;
 use mago_syntax::ast::Statement;
@@ -206,6 +210,34 @@ impl<'ast, 'arena> Walker<'ast, 'arena, Context<'_, 'ast, 'arena>> for CheckingW
         context: &mut Context<'_, 'ast, 'arena>,
     ) {
         checker::partial_application::check_partial_application(partial_application, context);
+    }
+
+    #[inline]
+    fn walk_in_generic_parameter_list(
+        &self,
+        list: &'ast GenericParameterList<'arena>,
+        context: &mut Context<'_, 'ast, 'arena>,
+    ) {
+        checker::generic::check_generic_parameter_list(list, context);
+    }
+
+    #[inline]
+    fn walk_in_generic_argument_list(
+        &self,
+        list: &'ast GenericArgumentList<'arena>,
+        context: &mut Context<'_, 'ast, 'arena>,
+    ) {
+        checker::generic::check_generic_argument_list(list, context);
+    }
+
+    #[inline]
+    fn walk_in_turbofish(&self, turbofish: &'ast Turbofish<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
+        checker::generic::check_turbofish(turbofish, context);
+    }
+
+    #[inline]
+    fn walk_in_generic_hint(&self, generic_hint: &'ast GenericHint<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
+        checker::generic::check_generic_hint_base(generic_hint.base, generic_hint.arguments.span(), context);
     }
 
     #[inline]

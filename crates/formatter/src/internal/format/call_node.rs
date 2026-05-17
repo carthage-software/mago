@@ -112,14 +112,39 @@ pub(super) fn print_call_like_node<'arena>(
     // format the callee-like expression
     let mut parts = match node {
         CallLikeNode::Call(c) => match c {
-            Call::Function(c) => vec![in f.arena; c.function.format(f)],
-            Call::StaticMethod(c) => vec![in f.arena; c.class.format(f), Document::String("::"), c.method.format(f)],
+            Call::Function(c) => {
+                let mut parts = vec![in f.arena; c.function.format(f)];
+                if let Some(turbofish) = &c.turbofish {
+                    parts.push(turbofish.format(f));
+                }
+                parts
+            }
+            Call::StaticMethod(c) => {
+                let mut parts =
+                    vec![in f.arena; c.class.format(f), Document::String("::"), c.method.format(f)];
+                if let Some(turbofish) = &c.turbofish {
+                    parts.push(turbofish.format(f));
+                }
+                parts
+            }
             _ => {
                 return print_access_call_node(f, c);
             }
         },
-        CallLikeNode::Instantiation(i) => vec![in f.arena; i.new.format(f), Document::space(), i.class.format(f)],
-        CallLikeNode::Attribute(a) => vec![in f.arena; a.name.format(f)],
+        CallLikeNode::Instantiation(i) => {
+            let mut parts = vec![in f.arena; i.new.format(f), Document::space(), i.class.format(f)];
+            if let Some(turbofish) = &i.turbofish {
+                parts.push(turbofish.format(f));
+            }
+            parts
+        }
+        CallLikeNode::Attribute(a) => {
+            let mut parts = vec![in f.arena; a.name.format(f)];
+            if let Some(turbofish) = &a.turbofish {
+                parts.push(turbofish.format(f));
+            }
+            parts
+        }
         CallLikeNode::DieConstruct(d) => vec![in f.arena; d.die.format(f)],
         CallLikeNode::ExitConstruct(e) => vec![in f.arena; e.exit.format(f)],
     };
@@ -130,13 +155,20 @@ pub(super) fn print_call_like_node<'arena>(
 }
 
 fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'arena Call<'arena>) -> Document<'arena> {
-    let (base, operator, operator_str, selector) = match node {
-        Call::Method(method_call) => (&method_call.object, method_call.arrow, "->", &method_call.method),
+    let (base, operator, operator_str, selector, turbofish) = match node {
+        Call::Method(method_call) => (
+            &method_call.object,
+            method_call.arrow,
+            "->",
+            &method_call.method,
+            method_call.turbofish.as_ref(),
+        ),
         Call::NullSafeMethod(null_safe_method_call) => (
             &null_safe_method_call.object,
             null_safe_method_call.question_mark_arrow,
             "?->",
             &null_safe_method_call.method,
+            null_safe_method_call.turbofish.as_ref(),
         ),
         #[allow(clippy::unreachable)]
         _ => unreachable!(),
@@ -147,6 +179,8 @@ fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'ar
         || (f.settings.preserve_breaking_member_access_chain
             && misc::has_new_line_in_range(f.source_text, base_span.end.offset, operator.start.offset));
 
+    let turbofish_doc = turbofish.map(|t| t.format(f)).unwrap_or_else(Document::empty);
+
     if should_break {
         Document::Group(Group::new(vec![
             in f.arena;
@@ -156,6 +190,7 @@ fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'ar
                 Document::Line(Line::hard()),
                 format_access_operator(f, operator, operator_str),
                 selector.format(f),
+                turbofish_doc,
                 print_call_arguments(f, CallLikeNode::Call(node)),
             ]),
         ]))
@@ -165,6 +200,7 @@ fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'ar
             base.format(f),
             format_access_operator(f, operator, operator_str),
             selector.format(f),
+            turbofish_doc,
             print_call_arguments(f, CallLikeNode::Call(node)),
         ]))
     }

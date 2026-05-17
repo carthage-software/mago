@@ -17,6 +17,7 @@ impl Fingerprintable for Instantiation<'_> {
     {
         "new".hash(hasher);
         self.class.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.turbofish.fingerprint_with_hasher(hasher, resolved_names, options);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }

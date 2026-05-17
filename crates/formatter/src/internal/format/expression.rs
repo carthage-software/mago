@@ -753,6 +753,9 @@ impl<'arena> Format<'arena> for ArrowFunction<'arena> {
             }
 
             contents.push(self.r#fn.format(f));
+            if let Some(generic_parameters) = &self.generic_parameters {
+                contents.push(generic_parameters.format(f));
+            }
             if f.settings.space_before_arrow_function_parameter_list_parenthesis {
                 contents.push(Document::space());
             }
@@ -1748,7 +1751,12 @@ impl<'arena> Format<'arena> for PartialApplication<'arena> {
 impl<'arena> Format<'arena> for FunctionPartialApplication<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, FunctionPartialApplication, {
-            Document::Group(Group::new(vec![in f.arena; self.function.format(f), self.argument_list.format(f)]))
+            let mut parts = vec![in f.arena; self.function.format(f)];
+            if let Some(turbofish) = &self.turbofish {
+                parts.push(turbofish.format(f));
+            }
+            parts.push(self.argument_list.format(f));
+            Document::Group(Group::new(parts))
         })
     }
 }
@@ -1756,13 +1764,17 @@ impl<'arena> Format<'arena> for FunctionPartialApplication<'arena> {
 impl<'arena> Format<'arena> for MethodPartialApplication<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, MethodPartialApplication, {
-            Document::Group(Group::new(vec![
+            let mut parts = vec![
                 in f.arena;
                 self.object.format(f),
                 Document::String("->"),
                 self.method.format(f),
-                self.argument_list.format(f),
-            ]))
+            ];
+            if let Some(turbofish) = &self.turbofish {
+                parts.push(turbofish.format(f));
+            }
+            parts.push(self.argument_list.format(f));
+            Document::Group(Group::new(parts))
         })
     }
 }
@@ -1770,13 +1782,17 @@ impl<'arena> Format<'arena> for MethodPartialApplication<'arena> {
 impl<'arena> Format<'arena> for StaticMethodPartialApplication<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, StaticMethodPartialApplication, {
-            Document::Group(Group::new(vec![
+            let mut parts = vec![
                 in f.arena;
                 self.class.format(f),
                 Document::String("::"),
                 self.method.format(f),
-                self.argument_list.format(f),
-            ]))
+            ];
+            if let Some(turbofish) = &self.turbofish {
+                parts.push(turbofish.format(f));
+            }
+            parts.push(self.argument_list.format(f));
+            Document::Group(Group::new(parts))
         })
     }
 }

@@ -34,6 +34,7 @@ use crate::ast::ast::ClassLikeConstantSelector;
 use crate::ast::ast::ClassLikeMember;
 use crate::ast::ast::ClassLikeMemberExpressionSelector;
 use crate::ast::ast::ClassLikeMemberSelector;
+use crate::ast::ast::ClassLikeReference;
 use crate::ast::ast::Clone;
 use crate::ast::ast::ClosingTag;
 use crate::ast::ast::Closure;
@@ -86,6 +87,12 @@ use crate::ast::ast::FunctionLikeParameterDefaultValue;
 use crate::ast::ast::FunctionLikeParameterList;
 use crate::ast::ast::FunctionLikeReturnTypeHint;
 use crate::ast::ast::FunctionPartialApplication;
+use crate::ast::ast::GenericArgumentList;
+use crate::ast::ast::GenericHint;
+use crate::ast::ast::GenericParameter;
+use crate::ast::ast::GenericParameterBound;
+use crate::ast::ast::GenericParameterDefault;
+use crate::ast::ast::GenericParameterList;
 use crate::ast::ast::Global;
 use crate::ast::ast::Goto;
 use crate::ast::ast::HaltCompiler;
@@ -204,6 +211,7 @@ use crate::ast::ast::TraitUseSpecification;
 use crate::ast::ast::Try;
 use crate::ast::ast::TryCatchClause;
 use crate::ast::ast::TryFinallyClause;
+use crate::ast::ast::Turbofish;
 use crate::ast::ast::TypedUseItemList;
 use crate::ast::ast::TypedUseItemSequence;
 use crate::ast::ast::UnaryPostfix;
@@ -372,6 +380,14 @@ pub enum NodeKind {
     FunctionLikeParameterDefaultValue,
     FunctionLikeParameterList,
     FunctionLikeReturnTypeHint,
+    ClassLikeReference,
+    GenericArgumentList,
+    GenericHint,
+    GenericParameter,
+    GenericParameterBound,
+    GenericParameterDefault,
+    GenericParameterList,
+    Turbofish,
     Global,
     Goto,
     Label,
@@ -606,6 +622,14 @@ pub enum Node<'ast, 'arena> {
     FunctionLikeParameterDefaultValue(&'ast FunctionLikeParameterDefaultValue<'arena>),
     FunctionLikeParameterList(&'ast FunctionLikeParameterList<'arena>),
     FunctionLikeReturnTypeHint(&'ast FunctionLikeReturnTypeHint<'arena>),
+    ClassLikeReference(&'ast ClassLikeReference<'arena>),
+    GenericArgumentList(&'ast GenericArgumentList<'arena>),
+    GenericHint(&'ast GenericHint<'arena>),
+    GenericParameter(&'ast GenericParameter<'arena>),
+    GenericParameterBound(&'ast GenericParameterBound<'arena>),
+    GenericParameterDefault(&'ast GenericParameterDefault<'arena>),
+    GenericParameterList(&'ast GenericParameterList<'arena>),
+    Turbofish(&'ast Turbofish<'arena>),
     Global(&'ast Global<'arena>),
     Goto(&'ast Goto<'arena>),
     Label(&'ast Label<'arena>),
@@ -915,6 +939,14 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Self::FunctionLikeParameterDefaultValue(_) => NodeKind::FunctionLikeParameterDefaultValue,
             Self::FunctionLikeParameterList(_) => NodeKind::FunctionLikeParameterList,
             Self::FunctionLikeReturnTypeHint(_) => NodeKind::FunctionLikeReturnTypeHint,
+            Self::ClassLikeReference(_) => NodeKind::ClassLikeReference,
+            Self::GenericArgumentList(_) => NodeKind::GenericArgumentList,
+            Self::GenericHint(_) => NodeKind::GenericHint,
+            Self::GenericParameter(_) => NodeKind::GenericParameter,
+            Self::GenericParameterBound(_) => NodeKind::GenericParameterBound,
+            Self::GenericParameterDefault(_) => NodeKind::GenericParameterDefault,
+            Self::GenericParameterList(_) => NodeKind::GenericParameterList,
+            Self::Turbofish(_) => NodeKind::Turbofish,
             Self::Global(_) => NodeKind::Global,
             Self::Goto(_) => NodeKind::Goto,
             Self::Label(_) => NodeKind::Label,
@@ -1112,6 +1144,9 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::VariadicArrayElement(node) => f(Node::Expression(node.value)),
             Node::Attribute(node) => {
                 f(Node::Identifier(&node.name));
+                if let Some(turbofish) = &node.turbofish {
+                    f(Node::Turbofish(turbofish));
+                }
                 if let Some(arguments) = &node.argument_list {
                     f(Node::ArgumentList(arguments));
                 }
@@ -1134,21 +1169,33 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             },
             Node::FunctionCall(node) => {
                 f(Node::Expression(node.function));
+                if let Some(turbofish) = &node.turbofish {
+                    f(Node::Turbofish(turbofish));
+                }
                 f(Node::ArgumentList(&node.argument_list));
             }
             Node::MethodCall(node) => {
                 f(Node::Expression(node.object));
                 f(Node::ClassLikeMemberSelector(&node.method));
+                if let Some(turbofish) = &node.turbofish {
+                    f(Node::Turbofish(turbofish));
+                }
                 f(Node::ArgumentList(&node.argument_list));
             }
             Node::NullSafeMethodCall(node) => {
                 f(Node::Expression(node.object));
                 f(Node::ClassLikeMemberSelector(&node.method));
+                if let Some(turbofish) = &node.turbofish {
+                    f(Node::Turbofish(turbofish));
+                }
                 f(Node::ArgumentList(&node.argument_list));
             }
             Node::StaticMethodCall(node) => {
                 f(Node::Expression(node.class));
                 f(Node::ClassLikeMemberSelector(&node.method));
+                if let Some(turbofish) = &node.turbofish {
+                    f(Node::Turbofish(turbofish));
+                }
                 f(Node::ArgumentList(&node.argument_list));
             }
             Node::PartialApplication(node) => match node {
@@ -1158,16 +1205,25 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             },
             Node::FunctionPartialApplication(node) => {
                 f(Node::Expression(node.function));
+                if let Some(turbofish) = &node.turbofish {
+                    f(Node::Turbofish(turbofish));
+                }
                 f(Node::PartialArgumentList(&node.argument_list));
             }
             Node::MethodPartialApplication(node) => {
                 f(Node::Expression(node.object));
                 f(Node::ClassLikeMemberSelector(&node.method));
+                if let Some(turbofish) = &node.turbofish {
+                    f(Node::Turbofish(turbofish));
+                }
                 f(Node::PartialArgumentList(&node.argument_list));
             }
             Node::StaticMethodPartialApplication(node) => {
                 f(Node::Expression(node.class));
                 f(Node::ClassLikeMemberSelector(&node.method));
+                if let Some(turbofish) = &node.turbofish {
+                    f(Node::Turbofish(turbofish));
+                }
                 f(Node::PartialArgumentList(&node.argument_list));
             }
             Node::ClassLikeConstant(node) => {
@@ -1213,13 +1269,19 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::Extends(node) => {
                 f(Node::Keyword(&node.extends));
                 for item in node.types.iter() {
-                    f(Node::Identifier(item));
+                    f(Node::ClassLikeReference(item));
                 }
             }
             Node::Implements(node) => {
                 f(Node::Keyword(&node.implements));
                 for item in node.types.iter() {
-                    f(Node::Identifier(item));
+                    f(Node::ClassLikeReference(item));
+                }
+            }
+            Node::ClassLikeReference(node) => {
+                f(Node::Identifier(&node.name));
+                if let Some(generic_arguments) = &node.generic_arguments {
+                    f(Node::GenericArgumentList(generic_arguments));
                 }
             }
             Node::ClassLikeConstantSelector(node) => match node {
@@ -1249,15 +1311,22 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 for item in node.attribute_lists.iter() {
                     f(Node::AttributeList(item));
                 }
+
                 for item in node.modifiers.iter() {
                     f(Node::Modifier(item));
                 }
+
                 f(Node::Keyword(&node.function));
                 f(Node::LocalIdentifier(&node.name));
+                if let Some(generic_parameters) = &node.generic_parameters {
+                    f(Node::GenericParameterList(generic_parameters));
+                }
+
                 f(Node::FunctionLikeParameterList(&node.parameter_list));
                 for item in node.return_type_hint.iter() {
                     f(Node::FunctionLikeReturnTypeHint(item));
                 }
+
                 f(Node::MethodBody(&node.body));
             }
             Node::MethodAbstractBody(_) => {}
@@ -1269,15 +1338,19 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 for item in node.attribute_lists.iter() {
                     f(Node::AttributeList(item));
                 }
+
                 for item in node.var.iter() {
                     f(Node::Keyword(item));
                 }
+
                 for item in node.modifiers.iter() {
                     f(Node::Modifier(item));
                 }
+
                 for item in node.hint.iter() {
                     f(Node::Hint(item));
                 }
+
                 f(Node::PropertyItem(&node.item));
                 f(Node::PropertyHookList(&node.hook_list));
             }
@@ -1285,15 +1358,19 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 for item in node.attribute_lists.iter() {
                     f(Node::AttributeList(item));
                 }
+
                 for item in node.var.iter() {
                     f(Node::Keyword(item));
                 }
+
                 for item in node.modifiers.iter() {
                     f(Node::Modifier(item));
                 }
+
                 for item in node.hint.iter() {
                     f(Node::Hint(item));
                 }
+
                 for item in node.items.iter() {
                     f(Node::PropertyItem(item));
                 }
@@ -1313,13 +1390,16 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 for item in node.attribute_lists.iter() {
                     f(Node::AttributeList(item));
                 }
+
                 for item in node.modifiers.iter() {
                     f(Node::Modifier(item));
                 }
+
                 f(Node::LocalIdentifier(&node.name));
                 for item in node.parameter_list.iter() {
                     f(Node::FunctionLikeParameterList(item));
                 }
+
                 f(Node::PropertyHookBody(&node.body));
             }
             Node::PropertyHookAbstractBody(_) => {}
@@ -1344,8 +1424,9 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::TraitUse(node) => {
                 f(Node::Keyword(&node.r#use));
                 for item in node.trait_names.iter() {
-                    f(Node::Identifier(item));
+                    f(Node::ClassLikeReference(item));
                 }
+
                 f(Node::TraitUseSpecification(&node.specification));
             }
             Node::TraitUseAbsoluteMethodReference(node) => {
@@ -1361,6 +1442,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                     for item in adaptation.trait_names.iter() {
                         f(Node::Identifier(item));
                     }
+
                     f(Node::Terminator(&adaptation.terminator));
                 }
                 TraitUseAdaptation::Alias(adaptation) => {
@@ -1453,6 +1535,9 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 }
                 f(Node::Keyword(&node.class));
                 f(Node::LocalIdentifier(&node.name));
+                if let Some(generic_parameters) = &node.generic_parameters {
+                    f(Node::GenericParameterList(generic_parameters));
+                }
                 for item in node.extends.iter() {
                     f(Node::Extends(item));
                 }
@@ -1488,6 +1573,9 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 }
                 f(Node::Keyword(&node.interface));
                 f(Node::LocalIdentifier(&node.name));
+                if let Some(generic_parameters) = &node.generic_parameters {
+                    f(Node::GenericParameterList(generic_parameters));
+                }
                 for item in node.extends.iter() {
                     f(Node::Extends(item));
                 }
@@ -1499,8 +1587,13 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 for item in node.attribute_lists.iter() {
                     f(Node::AttributeList(item));
                 }
+
                 f(Node::Keyword(&node.r#trait));
                 f(Node::LocalIdentifier(&node.name));
+                if let Some(generic_parameters) = &node.generic_parameters {
+                    f(Node::GenericParameterList(generic_parameters));
+                }
+
                 for item in node.members.iter() {
                     f(Node::ClassLikeMember(item));
                 }
@@ -1838,14 +1931,21 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 for item in node.attribute_lists.iter() {
                     f(Node::AttributeList(item));
                 }
+
                 if let Some(r#static) = &node.r#static {
                     f(Node::Keyword(r#static));
                 }
+
                 f(Node::Keyword(&node.r#fn));
+                if let Some(generic_parameters) = &node.generic_parameters {
+                    f(Node::GenericParameterList(generic_parameters));
+                }
+
                 f(Node::FunctionLikeParameterList(&node.parameter_list));
                 if let Some(return_type_hint) = &node.return_type_hint {
                     f(Node::FunctionLikeReturnTypeHint(return_type_hint));
                 }
+
                 f(Node::Expression(node.expression));
             }
             Node::Closure(node) => {
@@ -1853,6 +1953,9 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                     f(Node::AttributeList(item));
                 }
                 f(Node::Keyword(&node.function));
+                if let Some(generic_parameters) = &node.generic_parameters {
+                    f(Node::GenericParameterList(generic_parameters));
+                }
                 f(Node::FunctionLikeParameterList(&node.parameter_list));
                 if let Some(use_clause) = &node.use_clause {
                     f(Node::ClosureUseClause(use_clause));
@@ -1873,8 +1976,13 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 for item in node.attribute_lists.iter() {
                     f(Node::AttributeList(item));
                 }
+
                 f(Node::Keyword(&node.function));
                 f(Node::LocalIdentifier(&node.name));
+                if let Some(generic_parameters) = &node.generic_parameters {
+                    f(Node::GenericParameterList(generic_parameters));
+                }
+
                 f(Node::FunctionLikeParameterList(&node.parameter_list));
                 if let Some(return_type_hint) = &node.return_type_hint {
                     f(Node::FunctionLikeReturnTypeHint(return_type_hint));
@@ -1936,6 +2044,10 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::Instantiation(node) => {
                 f(Node::Keyword(&node.new));
                 f(Node::Expression(node.class));
+
+                if let Some(turbofish) = &node.turbofish {
+                    f(Node::Turbofish(turbofish));
+                }
 
                 if let Some(argument_list) = &node.argument_list {
                     f(Node::ArgumentList(argument_list));
@@ -2332,6 +2444,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 Hint::Nullable(nullable_hint) => f(Node::NullableHint(nullable_hint)),
                 Hint::Union(union_hint) => f(Node::UnionHint(union_hint)),
                 Hint::Intersection(intersection_hint) => f(Node::IntersectionHint(intersection_hint)),
+                Hint::Generic(generic_hint) => f(Node::GenericHint(generic_hint)),
                 Hint::Null(keyword)
                 | Hint::True(keyword)
                 | Hint::False(keyword)
@@ -2350,6 +2463,37 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 | Hint::Mixed(local_identifier)
                 | Hint::Iterable(local_identifier) => f(Node::LocalIdentifier(local_identifier)),
             },
+            Node::GenericHint(node) => {
+                f(Node::Hint(node.base));
+                f(Node::GenericArgumentList(&node.arguments));
+            }
+            Node::GenericArgumentList(node) => {
+                for arg in node.arguments.iter() {
+                    f(Node::Hint(arg));
+                }
+            }
+            Node::GenericParameterList(node) => {
+                for param in node.parameters.iter() {
+                    f(Node::GenericParameter(param));
+                }
+            }
+            Node::GenericParameter(node) => {
+                f(Node::LocalIdentifier(&node.name));
+                if let Some(bound) = &node.bound {
+                    f(Node::GenericParameterBound(bound));
+                }
+
+                if let Some(default) = &node.default {
+                    f(Node::GenericParameterDefault(default));
+                }
+            }
+            Node::GenericParameterBound(node) => f(Node::Hint(&node.hint)),
+            Node::GenericParameterDefault(node) => f(Node::Hint(&node.hint)),
+            Node::Turbofish(node) => {
+                for arg in node.arguments.iter() {
+                    f(Node::Hint(arg));
+                }
+            }
             Node::IntersectionHint(node) => {
                 f(Node::Hint(node.left));
                 f(Node::Hint(node.right));
@@ -2540,6 +2684,14 @@ impl HasSpan for Node<'_, '_> {
             Self::FunctionLikeParameterDefaultValue(node) => node.span(),
             Self::FunctionLikeParameterList(node) => node.span(),
             Self::FunctionLikeReturnTypeHint(node) => node.span(),
+            Self::ClassLikeReference(node) => node.span(),
+            Self::GenericArgumentList(node) => node.span(),
+            Self::GenericHint(node) => node.span(),
+            Self::GenericParameter(node) => node.span(),
+            Self::GenericParameterBound(node) => node.span(),
+            Self::GenericParameterDefault(node) => node.span(),
+            Self::GenericParameterList(node) => node.span(),
+            Self::Turbofish(node) => node.span(),
             Self::Global(node) => node.span(),
             Self::Goto(node) => node.span(),
             Self::Label(node) => node.span(),

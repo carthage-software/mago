@@ -5,12 +5,14 @@ use mago_span::Span;
 
 use crate::ast::ast::argument::ArgumentList;
 use crate::ast::ast::expression::Expression;
+use crate::ast::ast::generic::Turbofish;
 use crate::ast::ast::keyword::Keyword;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Instantiation<'arena> {
     pub new: Keyword<'arena>,
     pub class: &'arena Expression<'arena>,
+    pub turbofish: Option<Turbofish<'arena>>,
     pub argument_list: Option<ArgumentList<'arena>>,
 }
 

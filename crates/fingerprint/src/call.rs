@@ -41,6 +41,7 @@ impl Fingerprintable for FunctionCall<'_> {
     {
         "fn_call".hash(hasher);
         self.function.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.turbofish.fingerprint_with_hasher(hasher, resolved_names, options);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }
@@ -58,6 +59,7 @@ impl Fingerprintable for MethodCall<'_> {
         "method_call".hash(hasher);
         self.object.fingerprint_with_hasher(hasher, resolved_names, options);
         self.method.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.turbofish.fingerprint_with_hasher(hasher, resolved_names, options);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }
@@ -76,6 +78,7 @@ impl Fingerprintable for NullSafeMethodCall<'_> {
 
         self.object.fingerprint_with_hasher(hasher, resolved_names, options);
         self.method.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.turbofish.fingerprint_with_hasher(hasher, resolved_names, options);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }
@@ -93,6 +96,7 @@ impl Fingerprintable for StaticMethodCall<'_> {
         "static_method_call".hash(hasher);
         self.class.fingerprint_with_hasher(hasher, resolved_names, options);
         self.method.fingerprint_with_hasher(hasher, resolved_names, options);
+        self.turbofish.fingerprint_with_hasher(hasher, resolved_names, options);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }

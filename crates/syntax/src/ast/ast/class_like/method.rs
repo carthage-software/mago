@@ -8,6 +8,7 @@ use crate::ast::ast::attribute::AttributeList;
 use crate::ast::ast::block::Block;
 use crate::ast::ast::function_like::parameter::FunctionLikeParameterList;
 use crate::ast::ast::function_like::r#return::FunctionLikeReturnTypeHint;
+use crate::ast::ast::generic::GenericParameterList;
 use crate::ast::ast::identifier::LocalIdentifier;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::ast::modifier::Modifier;
@@ -31,6 +32,7 @@ pub struct Method<'arena> {
     pub function: Keyword<'arena>,
     pub ampersand: Option<Span>,
     pub name: LocalIdentifier<'arena>,
+    pub generic_parameters: Option<GenericParameterList<'arena>>,
     pub parameter_list: FunctionLikeParameterList<'arena>,
     pub return_type_hint: Option<FunctionLikeReturnTypeHint<'arena>>,
     pub body: MethodBody<'arena>,

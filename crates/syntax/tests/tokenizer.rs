@@ -1721,6 +1721,43 @@ fn test_heredoc_escaped_backslash_before_dollar_brace_interpolation() -> Result<
     })
 }
 
+#[test]
+fn test_turbofish_token_is_single_3byte() -> Result<(), SyntaxError> {
+    let code = b"<?php Foo::<int>";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Identifier,
+        TokenKind::ColonColonLessThan,
+        TokenKind::Identifier,
+        TokenKind::GreaterThan,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
+fn test_turbofish_is_whitespace_sensitive() -> Result<(), SyntaxError> {
+    // `:: <` must stay as ColonColon then LessThan, NOT a single turbofish.
+    let code = b"<?php Foo:: <int>";
+    let expected = &[
+        TokenKind::OpenTag,
+        TokenKind::Whitespace,
+        TokenKind::Identifier,
+        TokenKind::ColonColon,
+        TokenKind::Whitespace,
+        TokenKind::LessThan,
+        TokenKind::Identifier,
+        TokenKind::GreaterThan,
+    ];
+
+    test_lexer(code, expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
 pub const KEYWORD_TYPES: [(&[u8], TokenKind); 84] = [
     (b"eval", TokenKind::Eval),
     (b"die", TokenKind::Die),
