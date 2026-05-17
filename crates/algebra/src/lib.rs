@@ -800,6 +800,9 @@ fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Opt
 }
 
 #[inline]
-fn index_keys_match<T: Eq + Ord + Hash, U, V>(map1: &IndexMap<T, U>, map2: &IndexMap<T, V>) -> bool {
+fn index_keys_match<T, U, V>(map1: &IndexMap<T, U>, map2: &IndexMap<T, V>) -> bool
+where
+    T: Eq + Ord + Hash,
+{
     map1.len() == map2.len() && map1.keys().all(|k| map2.contains_key(k))
 }

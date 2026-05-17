@@ -146,7 +146,10 @@ pub const fn unwrap_expression<'ast, 'arena>(expression: &'ast Expression<'arena
 }
 
 #[inline]
-pub fn unique_vec<T: PartialEq>(actions: impl IntoIterator<Item = T>) -> Vec<T> {
+pub fn unique_vec<T>(actions: impl IntoIterator<Item = T>) -> Vec<T>
+where
+    T: PartialEq,
+{
     let mut unique_list = Vec::new();
     for action in actions {
         if !unique_list.contains(&action) {

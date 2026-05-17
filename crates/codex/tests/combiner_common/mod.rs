@@ -99,7 +99,10 @@ pub fn atomic_id_string(a: &TAtomic) -> String {
 }
 
 /// Asserts that the combined atomics produce exactly one element matching `predicate`.
-pub fn assert_single<F: Fn(&TAtomic) -> bool>(input: Vec<TAtomic>, predicate: F) {
+pub fn assert_single<F>(input: Vec<TAtomic>, predicate: F)
+where
+    F: Fn(&TAtomic) -> bool,
+{
     let result = combine_default(input);
     assert_eq!(result.len(), 1, "expected single atom, got: {result:#?}");
     assert!(predicate(&result[0]), "predicate failed for: {:#?}", result[0]);

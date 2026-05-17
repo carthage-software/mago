@@ -17,12 +17,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for Construct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         use Construct::Die;
         use Construct::Empty;
         use Construct::Eval;
@@ -51,12 +53,14 @@ impl Fingerprintable for Construct<'_> {
 
 impl Fingerprintable for IssetConstruct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "isset".hash(hasher);
         for value in &self.values {
             value.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -66,12 +70,14 @@ impl Fingerprintable for IssetConstruct<'_> {
 
 impl Fingerprintable for EmptyConstruct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "empty".hash(hasher);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -79,12 +85,14 @@ impl Fingerprintable for EmptyConstruct<'_> {
 
 impl Fingerprintable for EvalConstruct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "eval".hash(hasher);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -92,12 +100,14 @@ impl Fingerprintable for EvalConstruct<'_> {
 
 impl Fingerprintable for IncludeConstruct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "include".hash(hasher);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -105,12 +115,14 @@ impl Fingerprintable for IncludeConstruct<'_> {
 
 impl Fingerprintable for IncludeOnceConstruct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "include_once".hash(hasher);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -118,12 +130,14 @@ impl Fingerprintable for IncludeOnceConstruct<'_> {
 
 impl Fingerprintable for RequireConstruct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "require".hash(hasher);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -131,12 +145,14 @@ impl Fingerprintable for RequireConstruct<'_> {
 
 impl Fingerprintable for RequireOnceConstruct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "require_once".hash(hasher);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -144,12 +160,14 @@ impl Fingerprintable for RequireOnceConstruct<'_> {
 
 impl Fingerprintable for PrintConstruct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "print".hash(hasher);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -157,12 +175,14 @@ impl Fingerprintable for PrintConstruct<'_> {
 
 impl Fingerprintable for ExitConstruct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "exit".hash(hasher);
 
         self.arguments.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -171,12 +191,14 @@ impl Fingerprintable for ExitConstruct<'_> {
 
 impl Fingerprintable for DieConstruct<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "exit".hash(hasher);
 
         self.arguments.fingerprint_with_hasher(hasher, resolved_names, options);

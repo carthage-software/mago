@@ -10,12 +10,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for Static<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "static".hash(hasher);
 
         for item in &self.items {
@@ -26,12 +28,14 @@ impl Fingerprintable for Static<'_> {
 
 impl Fingerprintable for StaticItem<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             StaticItem::Abstract(item) => item.fingerprint_with_hasher(hasher, resolved_names, options),
             StaticItem::Concrete(item) => item.fingerprint_with_hasher(hasher, resolved_names, options),
@@ -41,12 +45,14 @@ impl Fingerprintable for StaticItem<'_> {
 
 impl Fingerprintable for StaticAbstractItem<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "static_abstract".hash(hasher);
         self.variable.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -54,12 +60,14 @@ impl Fingerprintable for StaticAbstractItem<'_> {
 
 impl Fingerprintable for StaticConcreteItem<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "static_concrete".hash(hasher);
         self.variable.fingerprint_with_hasher(hasher, resolved_names, options);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);

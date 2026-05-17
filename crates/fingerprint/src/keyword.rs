@@ -8,12 +8,14 @@ use crate::Fingerprintable;
 
 impl Fingerprintable for Keyword<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         mago_atom::ascii_lowercase_atom(self.value).hash(hasher);
     }
 }

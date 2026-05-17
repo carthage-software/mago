@@ -6,12 +6,14 @@ use mago_syntax::ast::Parenthesized;
 
 impl Fingerprintable for Expression<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             Expression::Binary(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
             Expression::UnaryPrefix(node) => node.fingerprint_with_hasher(hasher, resolved_names, options),
@@ -60,12 +62,14 @@ impl Fingerprintable for Expression<'_> {
 
 impl Fingerprintable for Parenthesized<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         self.expression.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }

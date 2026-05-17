@@ -8,12 +8,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for Echo<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "echo".hash(hasher);
 
         for value in &self.values {
@@ -24,12 +26,14 @@ impl Fingerprintable for Echo<'_> {
 
 impl Fingerprintable for EchoTag<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "echo_tag".hash(hasher);
 
         for value in &self.values {

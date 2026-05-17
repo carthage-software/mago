@@ -7,12 +7,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for MagicConstant<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             MagicConstant::Line(_) => "magic_line".hash(hasher),
             MagicConstant::File(_) => "magic_file".hash(hasher),

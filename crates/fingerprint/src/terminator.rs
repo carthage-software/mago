@@ -7,12 +7,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for Terminator<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "terminator".hash(hasher);
     }
 }
@@ -31,7 +33,10 @@ mod tests {
     use mago_syntax::ast::ast::tag::ShortOpeningTag;
     use std::hash::Hasher;
 
-    fn fingerprint_item<T: Fingerprintable>(item: &T, opts: &FingerprintOptions, names: &ResolvedNames) -> u64 {
+    fn fingerprint_item<T>(item: &T, opts: &FingerprintOptions, names: &ResolvedNames) -> u64
+    where
+        T: Fingerprintable,
+    {
         let mut hasher = FixedState::default().build_hasher();
         item.fingerprint_with_hasher(&mut hasher, names, opts);
         hasher.finish()

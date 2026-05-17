@@ -9,12 +9,14 @@ use crate::Fingerprintable;
 
 impl Fingerprintable for Constant<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "const_stmt".hash(hasher);
         for attr_list in &self.attribute_lists {
             attr_list.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -27,12 +29,14 @@ impl Fingerprintable for Constant<'_> {
 
 impl Fingerprintable for ConstantItem<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "const_item".hash(hasher);
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);

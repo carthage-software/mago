@@ -55,14 +55,20 @@ impl<'arena> ResolvedNames<'arena> {
     /// Panics if no resolved name is found at the specified `position`.
     /// Use `contains` first if unsure.
     #[allow(clippy::expect_used)]
-    pub fn get<T: HasPosition>(&self, position: &T) -> &'arena str {
+    pub fn get<T>(&self, position: &T) -> &'arena str
+    where
+        T: HasPosition,
+    {
         self.names.get(&position.offset()).map(|(_, (name, _))| *name).expect("resolved name not found at position")
     }
 
     /// Attempts to resolve the name at the given source position.
     ///
     /// Returns `Some(&str)` if a resolved name exists at the position, or `None` otherwise.
-    pub fn resolve<T: HasPosition>(&self, position: &T) -> Option<&'arena str> {
+    pub fn resolve<T>(&self, position: &T) -> Option<&'arena str>
+    where
+        T: HasPosition,
+    {
         self.names.get(&position.offset()).map(|(_, (name, _))| *name)
     }
 
@@ -71,7 +77,10 @@ impl<'arena> ResolvedNames<'arena> {
     ///
     /// Returns `false` if the name was resolved relative to the namespace, is a
     /// definition, or if no name is found at the position.
-    pub fn is_imported<T: HasPosition>(&self, position: &T) -> bool {
+    pub fn is_imported<T>(&self, position: &T) -> bool
+    where
+        T: HasPosition,
+    {
         self.names.get(&position.offset()).is_some_and(|(_, (_, imported))| *imported)
     }
 

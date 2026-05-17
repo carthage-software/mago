@@ -36,7 +36,10 @@ use crate::error::DatabaseError;
 /// glob pattern rather than a literal path.
 #[inline]
 #[must_use]
-pub fn contains_glob_metacharacters<T: AsRef<str>>(pattern: T) -> bool {
+pub fn contains_glob_metacharacters<T>(pattern: T) -> bool
+where
+    T: AsRef<str>,
+{
     pattern.as_ref().chars().any(|c| matches!(c, '*' | '?' | '[' | '{'))
 }
 

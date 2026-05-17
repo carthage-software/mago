@@ -16,12 +16,14 @@ use crate::Fingerprintable;
 
 impl Fingerprintable for CompositeString<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         use CompositeString::Document;
         use CompositeString::Interpolated;
         use CompositeString::ShellExecute;
@@ -36,12 +38,14 @@ impl Fingerprintable for CompositeString<'_> {
 
 impl Fingerprintable for ShellExecuteString<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "shell_execute".hash(hasher);
         for part in &self.parts {
             part.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -51,12 +55,14 @@ impl Fingerprintable for ShellExecuteString<'_> {
 
 impl Fingerprintable for InterpolatedString<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "interpolated_string".hash(hasher);
         for part in &self.parts {
             part.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -66,12 +72,14 @@ impl Fingerprintable for InterpolatedString<'_> {
 
 impl Fingerprintable for DocumentString<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self.kind {
             DocumentKind::Heredoc => "heredoc".hash(hasher),
             DocumentKind::Nowdoc => "nowdoc".hash(hasher),
@@ -86,12 +94,14 @@ impl Fingerprintable for DocumentString<'_> {
 
 impl Fingerprintable for DocumentIndentation {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         use DocumentIndentation::Mixed;
         use DocumentIndentation::None;
         use DocumentIndentation::Tab;
@@ -120,12 +130,14 @@ impl Fingerprintable for DocumentIndentation {
 
 impl Fingerprintable for StringPart<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         use StringPart::BracedExpression;
         use StringPart::Expression;
         use StringPart::Literal;
@@ -143,12 +155,14 @@ impl Fingerprintable for StringPart<'_> {
 
 impl Fingerprintable for LiteralStringPart<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "string_literal".hash(hasher);
         self.value.hash(hasher);
     }
@@ -156,12 +170,14 @@ impl Fingerprintable for LiteralStringPart<'_> {
 
 impl Fingerprintable for BracedExpressionStringPart<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "string_braced_expr".hash(hasher);
         self.expression.fingerprint_with_hasher(hasher, resolved_names, options);
     }

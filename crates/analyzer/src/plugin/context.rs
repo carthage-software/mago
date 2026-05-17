@@ -66,12 +66,18 @@ impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'bloc
     }
 
     #[inline]
-    pub fn get_expression_type<T: HasSpan>(&self, expr: &T) -> Option<&TUnion> {
+    pub fn get_expression_type<T>(&self, expr: &T) -> Option<&TUnion>
+    where
+        T: HasSpan,
+    {
         self.artifacts.get_expression_type(expr)
     }
 
     #[inline]
-    pub fn get_rc_expression_type<T: HasSpan>(&self, expr: &T) -> Option<&Rc<TUnion>> {
+    pub fn get_rc_expression_type<T>(&self, expr: &T) -> Option<&Rc<TUnion>>
+    where
+        T: HasSpan,
+    {
         self.artifacts.get_rc_expression_type(expr)
     }
 
@@ -244,13 +250,19 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
 
     /// Get the type of an expression.
     #[inline]
-    pub fn get_expression_type<T: HasSpan>(&self, expr: &T) -> Option<&TUnion> {
+    pub fn get_expression_type<T>(&self, expr: &T) -> Option<&TUnion>
+    where
+        T: HasSpan,
+    {
         self.artifacts.get_expression_type(expr)
     }
 
     /// Get the type of an expression as an Rc.
     #[inline]
-    pub fn get_rc_expression_type<T: HasSpan>(&self, expr: &T) -> Option<&Rc<TUnion>> {
+    pub fn get_rc_expression_type<T>(&self, expr: &T) -> Option<&Rc<TUnion>>
+    where
+        T: HasSpan,
+    {
         self.artifacts.get_rc_expression_type(expr)
     }
 
@@ -302,7 +314,10 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
 
     /// Set the type of an expression.
     #[inline]
-    pub fn set_expression_type<T: HasSpan>(&mut self, expr: &T, ty: TUnion) {
+    pub fn set_expression_type<T>(&mut self, expr: &T, ty: TUnion)
+    where
+        T: HasSpan,
+    {
         self.artifacts.set_expression_type(expr, ty);
     }
 

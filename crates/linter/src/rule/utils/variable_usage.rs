@@ -280,11 +280,14 @@ impl<'arena> Recorder<'arena> for UsageCollector<'arena> {
     }
 }
 
-pub fn analyze<'arena, R: Recorder<'arena> + Default + Sync + Send>(
+pub fn analyze<'arena, R>(
     parameter_list: &FunctionLikeParameterList<'arena>,
     body: &Block<'arena>,
     use_clause: Option<&ClosureUseClause<'arena>>,
-) -> R {
+) -> R
+where
+    R: Recorder<'arena> + Default + Sync + Send,
+{
     let mut walker: UsageWalker<'arena, R> =
         UsageWalker { rec: R::default(), ctx: ExprCtx::Read, excluded: Vec::new() };
 
@@ -346,7 +349,10 @@ struct UsageWalker<'arena, R: Recorder<'arena>> {
 }
 
 impl<'arena, R: Recorder<'arena>> UsageWalker<'arena, R> {
-    fn with_ctx<F: FnOnce(&mut Self)>(&mut self, ctx: ExprCtx, f: F) {
+    fn with_ctx<F>(&mut self, ctx: ExprCtx, f: F)
+    where
+        F: FnOnce(&mut Self),
+    {
         let saved = self.ctx;
         self.ctx = ctx;
         f(self);

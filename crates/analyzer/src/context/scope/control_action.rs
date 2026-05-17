@@ -526,7 +526,10 @@ impl ControlActionSet {
 }
 
 impl FromIterator<ControlAction> for ControlActionSet {
-    fn from_iter<T: IntoIterator<Item = ControlAction>>(iter: T) -> Self {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = ControlAction>,
+    {
         let mut set = Self::new();
         for action in iter {
             set.insert(action);

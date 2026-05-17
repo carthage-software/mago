@@ -86,7 +86,10 @@ pub fn rejects(src: &str) {
     }
 }
 
-pub fn rejects_with<F: Fn(&ParseError) -> bool>(src: &str, matcher: F) {
+pub fn rejects_with<F>(src: &str, matcher: F)
+where
+    F: Fn(&ParseError) -> bool,
+{
     let arena = Bump::new();
     let tpl = parse(&arena, src);
     if !tpl.has_errors() {
@@ -122,7 +125,10 @@ pub fn kinds_and_values(src: &str) -> Vec<(TwigTokenKind, String)> {
 
 /// Return the first token matching `pred` (non-trivia by default if caller
 /// passes the appropriate predicate).
-pub fn find_first_token<'a, F: Fn(&TwigToken<'a>) -> bool>(src: &'a str, pred: F) -> Option<TwigToken<'a>> {
+pub fn find_first_token<'a, F>(src: &'a str, pred: F) -> Option<TwigToken<'a>>
+where
+    F: Fn(&TwigToken<'a>) -> bool,
+{
     let toks = tokenize(src).ok()?;
     toks.into_iter().find(|t| pred(t))
 }

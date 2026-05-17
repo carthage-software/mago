@@ -16,12 +16,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for ArgumentList<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if self.arguments.is_empty() {
             return;
         }
@@ -35,12 +37,14 @@ impl Fingerprintable for ArgumentList<'_> {
 
 impl Fingerprintable for Argument<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             Argument::Positional(arg) => arg.fingerprint_with_hasher(hasher, resolved_names, options),
             Argument::Named(arg) => arg.fingerprint_with_hasher(hasher, resolved_names, options),
@@ -50,12 +54,14 @@ impl Fingerprintable for Argument<'_> {
 
 impl Fingerprintable for PositionalArgument<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "pos_arg".hash(hasher);
         self.ellipsis.is_some().hash(hasher);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -64,12 +70,14 @@ impl Fingerprintable for PositionalArgument<'_> {
 
 impl Fingerprintable for NamedArgument<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "named_arg".hash(hasher);
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -78,12 +86,14 @@ impl Fingerprintable for NamedArgument<'_> {
 
 impl Fingerprintable for PartialArgumentList<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if self.arguments.is_empty() {
             return;
         }
@@ -97,12 +107,14 @@ impl Fingerprintable for PartialArgumentList<'_> {
 
 impl Fingerprintable for PartialArgument<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             PartialArgument::Positional(arg) => arg.fingerprint_with_hasher(hasher, resolved_names, options),
             PartialArgument::Named(arg) => arg.fingerprint_with_hasher(hasher, resolved_names, options),
@@ -121,36 +133,42 @@ impl Fingerprintable for PartialArgument<'_> {
 
 impl Fingerprintable for PlaceholderArgument {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "placeholder".hash(hasher);
     }
 }
 
 impl Fingerprintable for VariadicPlaceholderArgument {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "variadic_placeholder".hash(hasher);
     }
 }
 
 impl Fingerprintable for NamedPlaceholderArgument<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "named_placeholder".hash(hasher);
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
     }

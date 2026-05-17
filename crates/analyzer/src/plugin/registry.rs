@@ -148,7 +148,10 @@ impl PluginRegistry {
         crate::plugin::create_registry()
     }
 
-    pub fn register_function_provider<P: FunctionReturnTypeProvider + 'static>(&mut self, provider: P) {
+    pub fn register_function_provider<P>(&mut self, provider: P)
+    where
+        P: FunctionReturnTypeProvider + 'static,
+    {
         let index = self.function_providers.len();
 
         match P::targets() {
@@ -173,7 +176,10 @@ impl PluginRegistry {
         self.function_providers.push(Box::new(provider));
     }
 
-    pub fn register_method_provider<P: MethodReturnTypeProvider + 'static>(&mut self, provider: P) {
+    pub fn register_method_provider<P>(&mut self, provider: P)
+    where
+        P: MethodReturnTypeProvider + 'static,
+    {
         let index = self.method_providers.len();
         let targets = P::targets();
 
@@ -196,66 +202,108 @@ impl PluginRegistry {
         self.method_providers.push(Box::new(provider));
     }
 
-    pub fn register_program_hook<H: ProgramHook + 'static>(&mut self, hook: H) {
+    pub fn register_program_hook<H>(&mut self, hook: H)
+    where
+        H: ProgramHook + 'static,
+    {
         self.program_hooks.push(Box::new(hook));
     }
 
-    pub fn register_statement_hook<H: StatementHook + 'static>(&mut self, hook: H) {
+    pub fn register_statement_hook<H>(&mut self, hook: H)
+    where
+        H: StatementHook + 'static,
+    {
         self.statement_hooks.push(Box::new(hook));
     }
 
-    pub fn register_expression_hook<H: ExpressionHook + 'static>(&mut self, hook: H) {
+    pub fn register_expression_hook<H>(&mut self, hook: H)
+    where
+        H: ExpressionHook + 'static,
+    {
         self.expression_hooks.push(Box::new(hook));
     }
 
-    pub fn register_function_call_hook<H: FunctionCallHook + 'static>(&mut self, hook: H) {
+    pub fn register_function_call_hook<H>(&mut self, hook: H)
+    where
+        H: FunctionCallHook + 'static,
+    {
         self.function_call_hooks.push(Box::new(hook));
     }
 
-    pub fn register_method_call_hook<H: MethodCallHook + 'static>(&mut self, hook: H) {
+    pub fn register_method_call_hook<H>(&mut self, hook: H)
+    where
+        H: MethodCallHook + 'static,
+    {
         self.method_call_hooks.push(Box::new(hook));
     }
 
-    pub fn register_static_method_call_hook<H: StaticMethodCallHook + 'static>(&mut self, hook: H) {
+    pub fn register_static_method_call_hook<H>(&mut self, hook: H)
+    where
+        H: StaticMethodCallHook + 'static,
+    {
         self.static_method_call_hooks.push(Box::new(hook));
     }
 
-    pub fn register_nullsafe_method_call_hook<H: NullSafeMethodCallHook + 'static>(&mut self, hook: H) {
+    pub fn register_nullsafe_method_call_hook<H>(&mut self, hook: H)
+    where
+        H: NullSafeMethodCallHook + 'static,
+    {
         self.nullsafe_method_call_hooks.push(Box::new(hook));
     }
 
-    pub fn register_class_hook<H: ClassDeclarationHook + 'static>(&mut self, hook: H) {
+    pub fn register_class_hook<H>(&mut self, hook: H)
+    where
+        H: ClassDeclarationHook + 'static,
+    {
         self.class_hooks.push(Box::new(hook));
     }
 
-    pub fn register_interface_hook<H: InterfaceDeclarationHook + 'static>(&mut self, hook: H) {
+    pub fn register_interface_hook<H>(&mut self, hook: H)
+    where
+        H: InterfaceDeclarationHook + 'static,
+    {
         self.interface_hooks.push(Box::new(hook));
     }
 
-    pub fn register_trait_hook<H: TraitDeclarationHook + 'static>(&mut self, hook: H) {
+    pub fn register_trait_hook<H>(&mut self, hook: H)
+    where
+        H: TraitDeclarationHook + 'static,
+    {
         self.trait_hooks.push(Box::new(hook));
     }
 
-    pub fn register_enum_hook<H: EnumDeclarationHook + 'static>(&mut self, hook: H) {
+    pub fn register_enum_hook<H>(&mut self, hook: H)
+    where
+        H: EnumDeclarationHook + 'static,
+    {
         self.enum_hooks.push(Box::new(hook));
     }
 
-    pub fn register_function_decl_hook<H: FunctionDeclarationHook + 'static>(&mut self, hook: H) {
+    pub fn register_function_decl_hook<H>(&mut self, hook: H)
+    where
+        H: FunctionDeclarationHook + 'static,
+    {
         self.function_decl_hooks.push(Box::new(hook));
     }
 
-    pub fn register_property_initialization_provider<P: PropertyInitializationProvider + 'static>(
-        &mut self,
-        provider: P,
-    ) {
+    pub fn register_property_initialization_provider<P>(&mut self, provider: P)
+    where
+        P: PropertyInitializationProvider + 'static,
+    {
         self.property_initialization_providers.push(Box::new(provider));
     }
 
-    pub fn register_issue_filter_hook<H: IssueFilterHook + 'static>(&mut self, hook: H) {
+    pub fn register_issue_filter_hook<H>(&mut self, hook: H)
+    where
+        H: IssueFilterHook + 'static,
+    {
         self.issue_filter_hooks.push(Box::new(hook));
     }
 
-    pub fn register_function_assertion_provider<P: FunctionAssertionProvider + 'static>(&mut self, provider: P) {
+    pub fn register_function_assertion_provider<P>(&mut self, provider: P)
+    where
+        P: FunctionAssertionProvider + 'static,
+    {
         let index = self.function_assertion_providers.len();
 
         match P::targets() {
@@ -280,7 +328,10 @@ impl PluginRegistry {
         self.function_assertion_providers.push(Box::new(provider));
     }
 
-    pub fn register_method_assertion_provider<P: MethodAssertionProvider + 'static>(&mut self, provider: P) {
+    pub fn register_method_assertion_provider<P>(&mut self, provider: P)
+    where
+        P: MethodAssertionProvider + 'static,
+    {
         let index = self.method_assertion_providers.len();
         let targets = P::targets();
 
@@ -303,11 +354,17 @@ impl PluginRegistry {
         self.method_assertion_providers.push(Box::new(provider));
     }
 
-    pub fn register_expression_throw_provider<P: ExpressionThrowTypeProvider + 'static>(&mut self, provider: P) {
+    pub fn register_expression_throw_provider<P>(&mut self, provider: P)
+    where
+        P: ExpressionThrowTypeProvider + 'static,
+    {
         self.expression_throw_providers.push(Box::new(provider));
     }
 
-    pub fn register_function_throw_provider<P: FunctionThrowTypeProvider + 'static>(&mut self, provider: P) {
+    pub fn register_function_throw_provider<P>(&mut self, provider: P)
+    where
+        P: FunctionThrowTypeProvider + 'static,
+    {
         let index = self.function_throw_providers.len();
 
         match P::targets() {
@@ -332,7 +389,10 @@ impl PluginRegistry {
         self.function_throw_providers.push(Box::new(provider));
     }
 
-    pub fn register_method_throw_provider<P: MethodThrowTypeProvider + 'static>(&mut self, provider: P) {
+    pub fn register_method_throw_provider<P>(&mut self, provider: P)
+    where
+        P: MethodThrowTypeProvider + 'static,
+    {
         let index = self.method_throw_providers.len();
         let targets = P::targets();
 

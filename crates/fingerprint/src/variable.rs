@@ -11,12 +11,14 @@ use crate::Fingerprintable;
 
 impl Fingerprintable for Variable<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             Variable::Direct(var) => var.fingerprint_with_hasher(hasher, resolved_names, options),
             Variable::Indirect(var) => var.fingerprint_with_hasher(hasher, resolved_names, options),
@@ -27,12 +29,14 @@ impl Fingerprintable for Variable<'_> {
 
 impl Fingerprintable for DirectVariable<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "var".hash(hasher);
         self.name.hash(hasher);
     }
@@ -40,12 +44,14 @@ impl Fingerprintable for DirectVariable<'_> {
 
 impl Fingerprintable for IndirectVariable<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "var_indirect".hash(hasher);
         self.expression.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -53,12 +59,14 @@ impl Fingerprintable for IndirectVariable<'_> {
 
 impl Fingerprintable for NestedVariable<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "var_nested".hash(hasher);
         self.variable.fingerprint_with_hasher(hasher, resolved_names, options);
     }

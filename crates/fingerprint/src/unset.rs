@@ -7,12 +7,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for Unset<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "unset".hash(hasher);
 
         for value in &self.values {

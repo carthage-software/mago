@@ -12,12 +12,14 @@ use crate::Fingerprintable;
 
 impl Fingerprintable for Hint<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             Hint::Identifier(id) => {
                 id.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -49,24 +51,28 @@ impl Fingerprintable for Hint<'_> {
 
 impl Fingerprintable for ParenthesizedHint<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         self.hint.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }
 
 impl Fingerprintable for NullableHint<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "nullable".hash(hasher);
         self.hint.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -74,12 +80,14 @@ impl Fingerprintable for NullableHint<'_> {
 
 impl Fingerprintable for UnionHint<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "union".hash(hasher);
         self.left.fingerprint_with_hasher(hasher, resolved_names, options);
         self.right.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -88,12 +96,14 @@ impl Fingerprintable for UnionHint<'_> {
 
 impl Fingerprintable for IntersectionHint<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "intersection".hash(hasher);
         self.left.fingerprint_with_hasher(hasher, resolved_names, options);
         self.right.fingerprint_with_hasher(hasher, resolved_names, options);

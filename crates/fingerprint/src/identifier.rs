@@ -11,12 +11,14 @@ use crate::Fingerprintable;
 
 impl Fingerprintable for Identifier<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             Identifier::Local(ident) => ident.fingerprint_with_hasher(hasher, resolved_names, options),
             Identifier::Qualified(ident) => ident.fingerprint_with_hasher(hasher, resolved_names, options),
@@ -27,12 +29,14 @@ impl Fingerprintable for Identifier<'_> {
 
 impl Fingerprintable for LocalIdentifier<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if let Some(name) = resolved_names.resolve(self) {
             mago_atom::ascii_lowercase_atom(name).hash(hasher);
         } else {
@@ -43,12 +47,14 @@ impl Fingerprintable for LocalIdentifier<'_> {
 
 impl Fingerprintable for QualifiedIdentifier<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if let Some(name) = resolved_names.resolve(self) {
             mago_atom::ascii_lowercase_atom(name).hash(hasher);
         } else {
@@ -59,12 +65,14 @@ impl Fingerprintable for QualifiedIdentifier<'_> {
 
 impl Fingerprintable for FullyQualifiedIdentifier<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if let Some(name) = resolved_names.resolve(self) {
             mago_atom::ascii_lowercase_atom(name).hash(hasher);
         } else {

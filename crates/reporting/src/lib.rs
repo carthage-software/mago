@@ -766,7 +766,10 @@ impl IntoIterator for Issue {
 }
 
 impl FromIterator<Issue> for IssueCollection {
-    fn from_iter<T: IntoIterator<Item = Issue>>(iter: T) -> Self {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = Issue>,
+    {
         Self { issues: iter.into_iter().collect() }
     }
 }

@@ -37,12 +37,14 @@ use crate::Fingerprintable;
 
 impl Fingerprintable for AnonymousClass<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "anon_class".hash(hasher);
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -59,12 +61,14 @@ impl Fingerprintable for AnonymousClass<'_> {
 
 impl Fingerprintable for Extends<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "extends".hash(hasher);
         for type_name in &self.types {
             type_name.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -74,12 +78,14 @@ impl Fingerprintable for Extends<'_> {
 
 impl Fingerprintable for Implements<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "implements".hash(hasher);
         for type_name in &self.types {
             type_name.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -89,12 +95,14 @@ impl Fingerprintable for Implements<'_> {
 
 impl Fingerprintable for ClassLikeMember<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             ClassLikeMember::TraitUse(trait_use) => {
                 trait_use.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -117,12 +125,14 @@ impl Fingerprintable for ClassLikeMember<'_> {
 
 impl Fingerprintable for TraitUse<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "trait_use".hash(hasher);
         for trait_name in &self.trait_names {
             trait_name.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -133,12 +143,14 @@ impl Fingerprintable for TraitUse<'_> {
 
 impl Fingerprintable for TraitUseSpecification<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             TraitUseSpecification::Abstract(spec) => {
                 "trait_use_abstract".hash(hasher);
@@ -156,12 +168,14 @@ impl Fingerprintable for TraitUseSpecification<'_> {
 
 impl Fingerprintable for TraitUseAdaptation<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             TraitUseAdaptation::Precedence(adaptation) => {
                 "precedence".hash(hasher);
@@ -184,12 +198,14 @@ impl Fingerprintable for TraitUseAdaptation<'_> {
 
 impl Fingerprintable for TraitUseMethodReference<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             TraitUseMethodReference::Identifier(id) => {
                 "method_ref_id".hash(hasher);
@@ -205,12 +221,14 @@ impl Fingerprintable for TraitUseMethodReference<'_> {
 
 impl Fingerprintable for TraitUseAbsoluteMethodReference<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         self.trait_name.fingerprint_with_hasher(hasher, resolved_names, options);
         self.method_name.fingerprint_with_hasher(hasher, resolved_names, options);
     }
@@ -218,12 +236,14 @@ impl Fingerprintable for TraitUseAbsoluteMethodReference<'_> {
 
 impl Fingerprintable for ClassLikeConstant<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "class_const".hash(hasher);
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -239,12 +259,14 @@ impl Fingerprintable for ClassLikeConstant<'_> {
 
 impl Fingerprintable for ClassLikeConstantItem<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "const_item".hash(hasher);
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -253,12 +275,14 @@ impl Fingerprintable for ClassLikeConstantItem<'_> {
 
 impl Fingerprintable for Property<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             Property::Plain(plain) => {
                 "property_plain".hash(hasher);
@@ -274,12 +298,14 @@ impl Fingerprintable for Property<'_> {
 
 impl Fingerprintable for PlainProperty<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
@@ -295,12 +321,14 @@ impl Fingerprintable for PlainProperty<'_> {
 
 impl Fingerprintable for HookedProperty<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
@@ -314,12 +342,14 @@ impl Fingerprintable for HookedProperty<'_> {
 
 impl Fingerprintable for PropertyItem<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             PropertyItem::Abstract(item) => {
                 "prop_item_abstract".hash(hasher);
@@ -336,12 +366,14 @@ impl Fingerprintable for PropertyItem<'_> {
 
 impl Fingerprintable for PropertyHookList<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "hook_list".hash(hasher);
         for hook in &self.hooks {
             hook.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -351,12 +383,14 @@ impl Fingerprintable for PropertyHookList<'_> {
 
 impl Fingerprintable for PropertyHook<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "hook".hash(hasher);
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -373,12 +407,14 @@ impl Fingerprintable for PropertyHook<'_> {
 
 impl Fingerprintable for PropertyHookBody<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             PropertyHookBody::Abstract(_) => {
                 "hook_body_abstract".hash(hasher);
@@ -393,12 +429,14 @@ impl Fingerprintable for PropertyHookBody<'_> {
 
 impl Fingerprintable for PropertyHookConcreteBody<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             PropertyHookConcreteBody::Block(block) => {
                 "hook_block".hash(hasher);
@@ -414,12 +452,14 @@ impl Fingerprintable for PropertyHookConcreteBody<'_> {
 
 impl Fingerprintable for EnumCase<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "enum_case".hash(hasher);
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -431,12 +471,14 @@ impl Fingerprintable for EnumCase<'_> {
 
 impl Fingerprintable for EnumCaseItem<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             EnumCaseItem::Unit(item) => {
                 "enum_case_unit".hash(hasher);
@@ -453,12 +495,14 @@ impl Fingerprintable for EnumCaseItem<'_> {
 
 impl Fingerprintable for Method<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if let Some(trivia) = options.trivia_context {
             for t in PrecedingDocblocks::new(trivia, self.span().start.offset)
                 .important_only(options.important_comment_patterns)
@@ -486,12 +530,14 @@ impl Fingerprintable for Method<'_> {
 
 impl Fingerprintable for MethodBody<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             MethodBody::Abstract(_) => {
                 "method_abstract".hash(hasher);
@@ -506,12 +552,14 @@ impl Fingerprintable for MethodBody<'_> {
 
 impl Fingerprintable for Class<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if let Some(trivia) = options.trivia_context {
             for t in PrecedingDocblocks::new(trivia, self.span().start.offset)
                 .important_only(options.important_comment_patterns)
@@ -535,12 +583,14 @@ impl Fingerprintable for Class<'_> {
 
 impl Fingerprintable for Interface<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if let Some(trivia) = options.trivia_context {
             for t in PrecedingDocblocks::new(trivia, self.span().start.offset)
                 .important_only(options.important_comment_patterns)
@@ -562,12 +612,14 @@ impl Fingerprintable for Interface<'_> {
 
 impl Fingerprintable for Trait<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if let Some(trivia) = options.trivia_context {
             for t in PrecedingDocblocks::new(trivia, self.span().start.offset)
                 .important_only(options.important_comment_patterns)
@@ -588,12 +640,14 @@ impl Fingerprintable for Trait<'_> {
 
 impl Fingerprintable for Enum<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if let Some(trivia) = options.trivia_context {
             for t in PrecedingDocblocks::new(trivia, self.span().start.offset)
                 .important_only(options.important_comment_patterns)
@@ -616,12 +670,14 @@ impl Fingerprintable for Enum<'_> {
 
 impl Fingerprintable for EnumBackingTypeHint<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "enum_backing_type".hash(hasher);
         self.hint.fingerprint_with_hasher(hasher, resolved_names, options);
     }

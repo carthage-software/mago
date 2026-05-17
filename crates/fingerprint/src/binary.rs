@@ -7,12 +7,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for Binary<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "binary".hash(hasher);
         self.lhs.fingerprint_with_hasher(hasher, resolved_names, options);
         self.operator.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -22,12 +24,14 @@ impl Fingerprintable for Binary<'_> {
 
 impl Fingerprintable for BinaryOperator<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         use BinaryOperator::Addition;
         use BinaryOperator::And;
         use BinaryOperator::AngledNotEqual;

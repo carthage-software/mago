@@ -105,13 +105,19 @@ impl AnalysisArtifacts {
 
     /// Set the type of expression `expression` to `t`.
     #[inline]
-    pub fn set_expression_type<T: HasSpan>(&mut self, expression: &T, t: TUnion) {
+    pub fn set_expression_type<T>(&mut self, expression: &T, t: TUnion)
+    where
+        T: HasSpan,
+    {
         self.expression_types.insert(get_expression_range(expression), Rc::new(t));
     }
 
     /// Get the type of expression `expression`.
     #[inline]
-    pub fn get_expression_type<T: HasSpan>(&self, expression: &T) -> Option<&TUnion> {
+    pub fn get_expression_type<T>(&self, expression: &T) -> Option<&TUnion>
+    where
+        T: HasSpan,
+    {
         let t = self.expression_types.get(&get_expression_range(expression))?;
 
         Some(&**t)
@@ -119,19 +125,28 @@ impl AnalysisArtifacts {
 
     /// Set the type of expression `expression` to `t`.
     #[inline]
-    pub fn set_rc_expression_type<T: HasSpan>(&mut self, expression: &T, t: Rc<TUnion>) {
+    pub fn set_rc_expression_type<T>(&mut self, expression: &T, t: Rc<TUnion>)
+    where
+        T: HasSpan,
+    {
         self.expression_types.insert(get_expression_range(expression), t);
     }
 
     /// Get the type of expression `expression`.
     #[inline]
-    pub fn get_rc_expression_type<T: HasSpan>(&self, expression: &T) -> Option<&Rc<TUnion>> {
+    pub fn get_rc_expression_type<T>(&self, expression: &T) -> Option<&Rc<TUnion>>
+    where
+        T: HasSpan,
+    {
         self.expression_types.get(&get_expression_range(expression))
     }
 }
 
 #[inline]
-pub fn get_expression_range<T: HasSpan>(expression: &T) -> (u32, u32) {
+pub fn get_expression_range<T>(expression: &T) -> (u32, u32)
+where
+    T: HasSpan,
+{
     let span = expression.span();
 
     (span.start.offset, span.end.offset)

@@ -256,11 +256,10 @@ fn get_definitely_evaluated_expression_inside_if<'ast, 'arena>(
     condition
 }
 
-pub fn handle_paradoxical_condition<T: HasSpan>(
-    context: &mut Context<'_, '_>,
-    expression: &T,
-    expression_type: &TUnion,
-) {
+pub fn handle_paradoxical_condition<T>(context: &mut Context<'_, '_>, expression: &T, expression_type: &TUnion)
+where
+    T: HasSpan,
+{
     let type_id = expression_type.get_id();
 
     if expression_type.is_always_falsy() {

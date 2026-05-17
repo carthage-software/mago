@@ -6,12 +6,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for Modifier<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             Modifier::Static(_) => "static".hash(hasher),
             Modifier::Final(_) => "final".hash(hasher),
@@ -28,12 +30,14 @@ impl Fingerprintable for Modifier<'_> {
 }
 
 #[inline]
-pub fn fingerprint_modifiers<'modifier, H: std::hash::Hasher>(
+pub fn fingerprint_modifiers<'modifier, H>(
     modifiers: impl IntoIterator<Item = &'modifier Modifier<'modifier>>,
     hasher: &mut H,
     _resolved_names: &ResolvedNames,
     _options: &FingerprintOptions<'_>,
-) {
+) where
+    H: std::hash::Hasher,
+{
     let mut modifier_strings: Vec<&str> = modifiers
         .into_iter()
         .filter_map(|m| match m {

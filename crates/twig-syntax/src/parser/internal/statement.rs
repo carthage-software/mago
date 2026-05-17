@@ -32,10 +32,13 @@ impl Terminator for BlockTerminator {
 impl<'arena> Parser<'_, 'arena> {
     /// Parse a sequence of top-level statements until `terminator` matches
     /// or EOF is reached.
-    pub(crate) fn parse_statements<T: Terminator>(
+    pub(crate) fn parse_statements<T>(
         &mut self,
         terminator: &T,
-    ) -> Result<Sequence<'arena, Statement<'arena>>, ParseError> {
+    ) -> Result<Sequence<'arena, Statement<'arena>>, ParseError>
+    where
+        T: Terminator,
+    {
         let mut statements = self.new_vec();
         while let Some(token) = self.stream.lookahead(0)? {
             match token.kind {

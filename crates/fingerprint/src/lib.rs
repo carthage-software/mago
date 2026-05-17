@@ -64,22 +64,25 @@ pub trait Fingerprintable {
         hasher.finish()
     }
 
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    );
+    ) where
+        H: std::hash::Hasher;
 }
 
 impl<T: Fingerprintable> Fingerprintable for Option<T> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if let Some(value) = self {
             value.fingerprint_with_hasher(hasher, resolved_names, options);
         }
@@ -91,12 +94,14 @@ where
     T: Fingerprintable,
 {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         (*self).fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }

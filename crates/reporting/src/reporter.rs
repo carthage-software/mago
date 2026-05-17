@@ -191,12 +191,15 @@ impl Reporter {
     /// let mut file = File::create("report.txt")?;
     /// reporter.report_to(issues, None, &mut file)?;
     /// ```
-    pub fn report_to<W: Write>(
+    pub fn report_to<W>(
         &self,
         mut issues: IssueCollection,
         baseline: Option<Baseline>,
         writer: &mut W,
-    ) -> Result<ReportStatus, ReportingError> {
+    ) -> Result<ReportStatus, ReportingError>
+    where
+        W: Write,
+    {
         // Apply baseline filtering
         let mut baseline_dead_issues = 0;
         let mut baseline_filtered_issues = 0;

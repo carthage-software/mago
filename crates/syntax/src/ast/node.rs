@@ -700,9 +700,10 @@ pub enum Node<'ast, 'arena> {
 
 impl<'ast, 'arena> Node<'ast, 'arena> {
     #[inline]
-    pub fn filter_map<F, T: 'ast>(&self, f: F) -> Vec<T>
+    pub fn filter_map<F, T>(&self, f: F) -> Vec<T>
     where
         F: Fn(&Node<'ast, 'arena>) -> Option<T>,
+        T: 'ast,
     {
         let mut result = vec![];
         self.filter_map_internal(&f, &mut result);
@@ -710,9 +711,10 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
     }
 
     #[inline]
-    fn filter_map_internal<F, T: 'ast>(&self, f: &F, result: &mut Vec<T>)
+    fn filter_map_internal<F, T>(&self, f: &F, result: &mut Vec<T>)
     where
         F: Fn(&Node<'ast, 'arena>) -> Option<T>,
+        T: 'ast,
     {
         self.visit_children(|child| child.filter_map_internal(f, result));
 
@@ -1007,7 +1009,10 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
         }
     }
 
-    pub fn visit_children<F: FnMut(Node<'ast, 'arena>)>(&self, mut f: F) {
+    pub fn visit_children<F>(&self, mut f: F)
+    where
+        F: FnMut(Node<'ast, 'arena>),
+    {
         match &self {
             Node::Program(node) => {
                 for node in node.statements.as_slice() {

@@ -9,12 +9,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for Try<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "try".hash(hasher);
         self.block.fingerprint_with_hasher(hasher, resolved_names, options);
         for catch_clause in &self.catch_clauses {
@@ -26,12 +28,14 @@ impl Fingerprintable for Try<'_> {
 
 impl Fingerprintable for TryCatchClause<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "catch".hash(hasher);
         self.hint.fingerprint_with_hasher(hasher, resolved_names, options);
         self.variable.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -41,12 +45,14 @@ impl Fingerprintable for TryCatchClause<'_> {
 
 impl Fingerprintable for TryFinallyClause<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "finally".hash(hasher);
         self.block.fingerprint_with_hasher(hasher, resolved_names, options);
     }

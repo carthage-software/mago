@@ -7,12 +7,14 @@ use crate::Fingerprintable;
 
 impl Fingerprintable for Statement<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             Statement::OpeningTag(tag) => tag.fingerprint_with_hasher(hasher, resolved_names, options),
             Statement::ClosingTag(tag) => tag.fingerprint_with_hasher(hasher, resolved_names, options),
@@ -60,12 +62,14 @@ impl Fingerprintable for Statement<'_> {
 
 impl Fingerprintable for ExpressionStatement<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         self.expression.fingerprint_with_hasher(hasher, resolved_names, options);
         self.terminator.fingerprint_with_hasher(hasher, resolved_names, options);
     }

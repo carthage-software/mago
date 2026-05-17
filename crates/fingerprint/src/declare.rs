@@ -11,12 +11,14 @@ use crate::Fingerprintable;
 
 impl Fingerprintable for Declare<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "declare".hash(hasher);
 
         for item in &self.items {
@@ -29,12 +31,14 @@ impl Fingerprintable for Declare<'_> {
 
 impl Fingerprintable for DeclareItem<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "declare_item".hash(hasher);
         mago_atom::ascii_lowercase_atom(self.name.value).hash(hasher);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -43,12 +47,14 @@ impl Fingerprintable for DeclareItem<'_> {
 
 impl Fingerprintable for DeclareBody<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             DeclareBody::Statement(statement) => {
                 "declare_statement".hash(hasher);
@@ -63,12 +69,14 @@ impl Fingerprintable for DeclareBody<'_> {
 
 impl Fingerprintable for DeclareColonDelimitedBody<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "declare_colon_delimited".hash(hasher);
 
         for statement in &self.statements {

@@ -493,7 +493,10 @@ pub fn read_digits_of_base(input: &Input, offset: usize, base: u8) -> usize {
 }
 
 #[inline]
-fn read_digits_with<F: Fn(&u8) -> bool>(input: &Input, offset: usize, is_digit: F) -> usize {
+fn read_digits_with<F>(input: &Input, offset: usize, is_digit: F) -> usize
+where
+    F: Fn(&u8) -> bool,
+{
     let bytes = input.bytes;
     let total = input.length;
     let start = input.offset;

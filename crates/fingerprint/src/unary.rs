@@ -9,12 +9,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for UnaryPrefix<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "unary_prefix".hash(hasher);
         self.operator.fingerprint_with_hasher(hasher, resolved_names, options);
         self.operand.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -23,12 +25,14 @@ impl Fingerprintable for UnaryPrefix<'_> {
 
 impl Fingerprintable for UnaryPostfix<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "unary_postfix".hash(hasher);
         self.operand.fingerprint_with_hasher(hasher, resolved_names, options);
         self.operator.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -37,12 +41,14 @@ impl Fingerprintable for UnaryPostfix<'_> {
 
 impl Fingerprintable for UnaryPrefixOperator<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         use UnaryPrefixOperator::ArrayCast;
         use UnaryPrefixOperator::BinaryCast;
         use UnaryPrefixOperator::BitwiseNot;
@@ -89,12 +95,14 @@ impl Fingerprintable for UnaryPrefixOperator<'_> {
 
 impl Fingerprintable for UnaryPostfixOperator {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         use UnaryPostfixOperator::PostDecrement;
         use UnaryPostfixOperator::PostIncrement;
 

@@ -14,13 +14,16 @@ use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::statement;
 
-pub(super) fn print_block_of_nodes<'ast, 'arena, T: Format<'arena> + HasSpan>(
+pub(super) fn print_block_of_nodes<'ast, 'arena, T>(
     f: &mut FormatterState<'_, 'arena>,
     left_brace: &Span,
     nodes: &'arena Sequence<'arena, T>,
     right_brace: &Span,
     inline_empty: bool,
-) -> Document<'arena> {
+) -> Document<'arena>
+where
+    T: Format<'arena> + HasSpan,
+{
     let length = nodes.len();
     let mut contents = vec![in f.arena; Document::String("{")];
     if let Some(c) = f.print_trailing_comments(*left_brace) {

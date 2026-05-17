@@ -32,13 +32,14 @@ use crate::settings::Settings;
 /// Panics if:
 /// - The code fails to parse
 /// - The actual issue count doesn't match the expected count
-pub fn run_lint_test<R: LintRule, F>(
+pub fn run_lint_test<R, F>(
     code: &str,
     filename: Option<&'static str>,
     expected_count: Option<usize>,
     settings_fn: Option<F>,
 ) where
     F: FnOnce(&mut Settings),
+    R: LintRule,
 {
     let arena = Bump::new();
     let file = File::ephemeral(Cow::Borrowed(filename.unwrap_or("test.php")), Cow::Owned(code.to_string()));
@@ -108,13 +109,10 @@ pub fn run_lint_test<R: LintRule, F>(
 /// - No issues are produced
 /// - No edits are attached to any issue
 /// - The fixed output doesn't match `expected_fixed`
-pub fn run_lint_fix_test<R: LintRule, F>(
-    code: &str,
-    filename: Option<&'static str>,
-    expected_fixed: &str,
-    settings_fn: Option<F>,
-) where
+pub fn run_lint_fix_test<R, F>(code: &str, filename: Option<&'static str>, expected_fixed: &str, settings_fn: Option<F>)
+where
     F: FnOnce(&mut Settings),
+    R: LintRule,
 {
     use mago_text_edit::TextEditor;
 

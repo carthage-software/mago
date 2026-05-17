@@ -16,12 +16,14 @@ use std::hash::Hash;
 
 impl Fingerprintable for Use<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         if !options.include_use_statements {
             return;
         }
@@ -33,12 +35,14 @@ impl Fingerprintable for Use<'_> {
 
 impl Fingerprintable for UseItems<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             UseItems::Sequence(items) => items.fingerprint_with_hasher(hasher, resolved_names, options),
             UseItems::TypedSequence(items) => items.fingerprint_with_hasher(hasher, resolved_names, options),
@@ -50,12 +54,14 @@ impl Fingerprintable for UseItems<'_> {
 
 impl Fingerprintable for UseType<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         _resolved_names: &ResolvedNames,
         _options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         match self {
             UseType::Function(_) => "function".hash(hasher),
             UseType::Const(_) => "const".hash(hasher),
@@ -65,12 +71,14 @@ impl Fingerprintable for UseType<'_> {
 
 impl Fingerprintable for UseItemSequence<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "use_sequence".hash(hasher);
         for item in &self.items {
             item.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -80,12 +88,14 @@ impl Fingerprintable for UseItemSequence<'_> {
 
 impl Fingerprintable for TypedUseItemSequence<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "use_typed_sequence".hash(hasher);
         self.r#type.fingerprint_with_hasher(hasher, resolved_names, options);
         for item in &self.items {
@@ -96,12 +106,14 @@ impl Fingerprintable for TypedUseItemSequence<'_> {
 
 impl Fingerprintable for TypedUseItemList<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "use_typed_list".hash(hasher);
         self.r#type.fingerprint_with_hasher(hasher, resolved_names, options);
         self.namespace.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -113,12 +125,14 @@ impl Fingerprintable for TypedUseItemList<'_> {
 
 impl Fingerprintable for MixedUseItemList<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "use_mixed_list".hash(hasher);
         self.namespace.fingerprint_with_hasher(hasher, resolved_names, options);
         for item in &self.items {
@@ -129,12 +143,14 @@ impl Fingerprintable for MixedUseItemList<'_> {
 
 impl Fingerprintable for MaybeTypedUseItem<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "use_maybe_typed_item".hash(hasher);
         self.r#type.fingerprint_with_hasher(hasher, resolved_names, options);
         self.item.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -143,12 +159,14 @@ impl Fingerprintable for MaybeTypedUseItem<'_> {
 
 impl Fingerprintable for UseItem<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "use_item".hash(hasher);
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
         self.alias.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -157,12 +175,14 @@ impl Fingerprintable for UseItem<'_> {
 
 impl Fingerprintable for UseItemAlias<'_> {
     #[inline]
-    fn fingerprint_with_hasher<H: std::hash::Hasher>(
+    fn fingerprint_with_hasher<H>(
         &self,
         hasher: &mut H,
         resolved_names: &ResolvedNames,
         options: &FingerprintOptions<'_>,
-    ) {
+    ) where
+        H: std::hash::Hasher,
+    {
         "as".hash(hasher);
         self.identifier.fingerprint_with_hasher(hasher, resolved_names, options);
     }
