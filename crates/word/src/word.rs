@@ -237,7 +237,10 @@ impl Hash for Word {
 #[cfg(not(feature = "sso"))]
 impl Hash for Word {
     #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
         state.write_usize(self.repr.ptr.as_ptr() as usize);
     }
 }
