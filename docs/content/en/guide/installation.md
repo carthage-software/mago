@@ -113,9 +113,18 @@ brew install mago
 mago self-update
 ```
 
+### WinGet
+
+For Windows. The WinGet package can lag behind the GitHub release, so update the installed binary afterwards.
+
+```powershell
+winget install CarthageSoftware.Mago
+mago self-update
+```
+
 ### Cargo
 
-Crates.io publishing can lag a few hours behind a release. Same pattern as Homebrew.
+Crates.io publishing can lag a few hours behind a release. Same pattern as Homebrew, and WinGet.
 
 ```sh
 cargo install mago
