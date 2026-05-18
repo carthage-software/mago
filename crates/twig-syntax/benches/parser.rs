@@ -53,7 +53,7 @@ fn bench_roundtrip(c: &mut Criterion) {
                 let input = Input::new(FileId::zero(), black_box(src).as_bytes());
                 let mut lexer = TwigLexer::new(input, LexerSettings::default());
                 while let Some(result) = lexer.advance() {
-                    out.push_str(result.expect("lex ok").value);
+                    out.push_str(&String::from_utf8_lossy(result.expect("lex ok").value));
                 }
                 black_box(out.len())
             });
@@ -71,7 +71,7 @@ fn bench_parser(c: &mut Criterion) {
             let mut arena = Bump::new();
             b.iter(|| {
                 arena.reset();
-                let tpl = parse_file_content(&arena, FileId::zero(), black_box(src));
+                let tpl = parse_file_content(&arena, FileId::zero(), black_box(src.as_bytes()));
                 assert!(!tpl.has_errors());
                 black_box(tpl.statements.len())
             });

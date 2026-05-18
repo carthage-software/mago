@@ -139,7 +139,7 @@ impl LintRule for NoEmptyCommentRule {
                 continue;
             }
 
-            let is_empty = comment_lines(trivia).iter().all(|(_, line)| line.trim().is_empty());
+            let is_empty = comment_lines(trivia).iter().all(|(_, line)| line.iter().all(|b| b.is_ascii_whitespace()));
             if !is_empty {
                 if trivia.kind.is_single_line_comment() {
                     current_block = Some((trivia.kind, trivia.end_position()));

@@ -23,7 +23,7 @@ impl<'arena> Parser<'_, 'arena> {
 
     /// Expect a plain `Name` token and wrap it as an [`Identifier`].
     #[inline]
-    pub(crate) fn expect_identifier(&mut self, what: &str) -> Result<Identifier<'arena>, ParseError> {
+    pub(crate) fn expect_identifier(&mut self, what: &[u8]) -> Result<Identifier<'arena>, ParseError> {
         let token = self.stream.expect_kind(TwigTokenKind::Name, what)?;
         Ok(self.identifier_from(&token))
     }
@@ -31,15 +31,15 @@ impl<'arena> Parser<'_, 'arena> {
     /// Accept either a `Name` or any word-keyword that is also usable as
     /// an identifier (e.g. `in`, `is`, `and`, `matches`, `divisible`).
     #[inline]
-    pub(crate) fn expect_flexible_identifier(&mut self, what: &str) -> Result<Identifier<'arena>, ParseError> {
+    pub(crate) fn expect_flexible_identifier(&mut self, what: &[u8]) -> Result<Identifier<'arena>, ParseError> {
         match self.stream.lookahead(0)? {
             Some(token) if token.kind == TwigTokenKind::Name || is_keyword_usable_as_name(token.kind) => {
                 self.stream.consume()?;
                 Ok(self.identifier_from(&token))
             }
-            Some(token) => Err(ParseError::UnexpectedToken(what.to_string(), token.span_for(self.stream.file_id()))),
+            Some(token) => Err(ParseError::UnexpectedToken(what.to_vec(), token.span_for(self.stream.file_id()))),
             None => {
-                Err(ParseError::UnexpectedEof(self.stream.file_id(), what.to_string(), self.stream.current_position()))
+                Err(ParseError::UnexpectedEof(self.stream.file_id(), what.to_vec(), self.stream.current_position()))
             }
         }
     }
@@ -47,7 +47,7 @@ impl<'arena> Parser<'_, 'arena> {
     /// Optionally consume a `Name` token with a specific literal value
     /// (e.g. `"with"`, `"only"`, `"as"`) and return it as a keyword.
     #[inline]
-    pub(crate) fn try_consume_name_keyword(&mut self, name: &str) -> Result<Option<Keyword<'arena>>, ParseError> {
+    pub(crate) fn try_consume_name_keyword(&mut self, name: &[u8]) -> Result<Option<Keyword<'arena>>, ParseError> {
         match self.stream.try_consume_name(name)? {
             Some(token) => Ok(Some(self.keyword_from(&token))),
             None => Ok(None),

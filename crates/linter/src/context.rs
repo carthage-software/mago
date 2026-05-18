@@ -73,18 +73,18 @@ impl<'ctx, 'arena> LintContext<'ctx, 'arena> {
     /// at different offsets don't overlap, so the fixer can apply all of them
     /// in a single pass. When the whitespace run is exhausted later imports
     /// fall back to the base offset and conflict with the first.
-    pub fn import_name(&mut self, fqn: &str) -> Option<ImportResolution> {
+    pub fn import_name(&mut self, fqn: &[u8]) -> Option<ImportResolution> {
         self.imports.import(fqn, ImportKind::Name)
     }
 
     /// Same as [`import_name`](Self::import_name) but emits `use function ...;`.
-    pub fn import_function(&mut self, fqn: &str) -> Option<ImportResolution> {
+    pub fn import_function(&mut self, fqn: &[u8]) -> Option<ImportResolution> {
         self.imports.import(fqn, ImportKind::Function)
     }
 
     /// Same as [`import_name`](Self::import_name) but emits `use const ...;`.
     /// Constant short names are matched case-sensitively (PHP semantics).
-    pub fn import_constant(&mut self, fqn: &str) -> Option<ImportResolution> {
+    pub fn import_constant(&mut self, fqn: &[u8]) -> Option<ImportResolution> {
         self.imports.import(fqn, ImportKind::Constant)
     }
 
@@ -107,7 +107,7 @@ impl<'ctx, 'arena> LintContext<'ctx, 'arena> {
     /// # Panics
     ///
     /// Panics if no name is found at the specified position.
-    pub fn lookup_name(&self, position: &impl HasPosition) -> &'arena str {
+    pub fn lookup_name(&self, position: &impl HasPosition) -> &'arena [u8] {
         self.resolved_names.get(&position.position())
     }
 

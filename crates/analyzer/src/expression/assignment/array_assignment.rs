@@ -2,9 +2,6 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::empty_atom;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -28,6 +25,9 @@ use mago_codex::ttype::wrap_atomic;
 use mago_span::HasSpan;
 use mago_syntax::ast::Access;
 use mago_syntax::ast::Expression;
+use mago_word::Word;
+use mago_word::empty_word;
+use mago_word::word;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -336,7 +336,7 @@ fn update_atomic_given_key(
         for key_value in key_values {
             if let TAtomic::Array(array) = &mut atomic_type {
                 let array_key = if let Some(str) = key_value.get_literal_string_value() {
-                    ArrayKey::String(atom(str))
+                    ArrayKey::String(word(str))
                 } else if let Some(int) = key_value.get_literal_int_value() {
                     ArrayKey::Integer(int)
                 } else {
@@ -378,7 +378,7 @@ fn update_atomic_given_key(
                                 }
                             }
 
-                            known_items.insert(ustr.into(), (false, current_type.clone()));
+                            known_items.insert(ArrayKey::String(ustr), (false, current_type.clone()));
 
                             *array = TArray::Keyed(TKeyedArray {
                                 parameters,
@@ -438,7 +438,7 @@ fn update_array_assignment_child_type<'ctx>(
             let mut types: Vec<TAtomic> = key_type.types.iter().filter(|t| !t.is_null()).cloned().collect();
 
             // Add empty string literal since null coerces to ''
-            types.push(TAtomic::Scalar(TScalar::String(TString::known_literal(empty_atom()))));
+            types.push(TAtomic::Scalar(TScalar::String(TString::known_literal(empty_word()))));
 
             Rc::new(TUnion::from_vec(types))
         } else {
@@ -628,14 +628,14 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     mut array_target_expressions: Vec<ArrayTarget<'ast, 'arena>>,
     assign_value_type: &TUnion,
-    root_var_id: Option<Atom>,
+    root_var_id: Option<Word>,
     root_type: &mut TUnion,
     last_array_expr_type: &mut TUnion,
 ) -> Result<Option<&'ast Expression<'arena>>, AnalysisError> {
     let mut var_id_additions: Vec<String> = Vec::new();
     let mut last_array_expression_index = None;
-    let mut extended_var_id: Option<Atom> = None;
-    let mut parent_var_id: Option<Atom> = None;
+    let mut extended_var_id: Option<Word> = None;
+    let mut parent_var_id: Option<Word> = None;
     let mut full_var_id = true;
 
     array_target_expressions.reverse();
@@ -734,11 +734,11 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
         artifacts.set_expression_type(array_target.get_array(), array_expression_type_inner.clone());
 
         if let Some(root_var_id) = &root_var_id {
-            let combined = format!("{}{}", root_var_id.as_str(), var_id_additions.join(""));
-            extended_var_id = Some(Atom::from(&combined));
+            let combined = format!("{}{}", root_var_id, var_id_additions.join(""));
+            extended_var_id = Some(mago_word::word(&combined));
 
             if let Some(parent_var_id) = &parent_var_id {
-                if full_var_id && parent_var_id.as_str().contains("[$") {
+                if full_var_id && memchr::memmem::find(parent_var_id.as_bytes(), b"[$").is_some() {
                     block_context.locals.insert(*parent_var_id, Rc::new(array_expression_type_inner.clone()));
                     block_context.possibly_assigned_variable_ids.insert(*parent_var_id);
                 }
@@ -763,10 +763,10 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
     if let Some(root_var_id) = &root_var_id
         && artifacts.get_expression_type(first_array_target.get_array()).is_some()
     {
-        let combined = format!("{}{}", root_var_id.as_str(), var_id_additions.join(""));
-        let extended_var_id = Atom::from(&combined);
+        let combined = format!("{}{}", root_var_id, var_id_additions.join(""));
+        let extended_var_id = mago_word::word(&combined);
 
-        if full_var_id && extended_var_id.as_str().contains("[$") {
+        if full_var_id && memchr::memmem::find(extended_var_id.as_bytes(), b"[$").is_some() {
             block_context.locals.insert(extended_var_id, Rc::new(assign_value_type.clone()));
             block_context.possibly_assigned_variable_ids.insert(extended_var_id);
         }
@@ -798,7 +798,7 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
                 // so `last()` will always return `Some`.
                 var_id_additions.last().unwrap_unchecked()
             });
-            Atom::from(&combined)
+            mago_word::word(&combined)
         });
 
         array_expr_type = update_type_with_key_values(
@@ -813,7 +813,7 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
         last_array_expression_index = array_target.get_index();
 
         if let Some(array_expr_id) = &array_expr_id
-            && array_expr_id.as_str().contains("[$")
+            && memchr::memmem::find(array_expr_id.as_bytes(), b"[$").is_some()
         {
             block_context.locals.insert(*array_expr_id, Rc::new(array_expr_type.clone()));
             block_context.possibly_assigned_variable_ids.insert(*array_expr_id);

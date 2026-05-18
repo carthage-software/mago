@@ -1,6 +1,6 @@
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
@@ -46,7 +46,7 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
     'resolve_names: {
         let variable_type = match property_variable {
             Variable::Direct(direct_variable) => {
-                property_names.push(atom(direct_variable.name));
+                property_names.push(word(direct_variable.name));
 
                 break 'resolve_names;
             }
@@ -84,7 +84,7 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
                 continue;
             };
 
-            property_names.push(concat_atom!("$", property_name));
+            property_names.push(concat_word!("$", property_name));
         }
     };
 
@@ -126,13 +126,13 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
 fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
-    class_id: Atom,
-    property_name: Atom,
+    class_id: Word,
+    property_name: Word,
     variable: &'ast Variable<'arena>,
     class_expr: &'ast Expression<'arena>,
     result: &mut PropertyResolutionResult,
 ) -> Option<ResolvedProperty> {
-    let Some(class_metadata) = context.codebase.get_class_like(&class_id) else {
+    let Some(class_metadata) = context.codebase.get_class_like(class_id.as_bytes()) else {
         // Error reporting for non-existent class is handled by `resolve_classnames_from_expression`.
         result.has_invalid_path = true;
         return None;
@@ -140,10 +140,10 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
 
     let declaring_class_id = context
         .codebase
-        .get_declaring_property_class(&class_id, &property_name)
+        .get_declaring_property_class(class_id.as_bytes(), property_name.as_bytes())
         .unwrap_or(class_metadata.original_name);
 
-    let Some(declaring_class_metadata) = context.codebase.get_class_like(&declaring_class_id) else {
+    let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_id.as_bytes()) else {
         // Should not happen if declaring_class_id is valid.
         result.has_error_path = true;
         return None;
@@ -153,15 +153,15 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
         for required_class in
             declaring_class_metadata.require_extends.iter().chain(declaring_class_metadata.require_implements.iter())
         {
-            let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+            let Some(required_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
                 continue;
             };
             let required_declaring_id = context
                 .codebase
-                .get_declaring_property_class(required_class, &property_name)
+                .get_declaring_property_class(required_class.as_bytes(), property_name.as_bytes())
                 .unwrap_or(*required_class);
             let required_declaring_metadata =
-                context.codebase.get_class_like(&required_declaring_id).unwrap_or(required_metadata);
+                context.codebase.get_class_like(required_declaring_id.as_bytes()).unwrap_or(required_metadata);
 
             if let Some(prop_meta) = required_declaring_metadata.properties.get(&property_name) {
                 if !prop_meta.flags.is_static() {
@@ -222,8 +222,8 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     if !check_property_read_visibility(
         context,
         block_context,
-        &declaring_class_id,
-        &property_name,
+        declaring_class_id.as_bytes(),
+        property_name.as_bytes(),
         class_expr.span(),
         Some(variable.span()),
     ) {
@@ -256,12 +256,12 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
 
 fn report_non_existent_property(
     context: &mut Context<'_, '_>,
-    classname: Atom,
-    property_name: Atom,
+    classname: Word,
+    property_name: Word,
     selector_span: Span,
     class_like_name_span: Span,
 ) {
-    let class_kind_str = context.codebase.get_class_like(&classname).map_or("class", |m| m.kind.as_str());
+    let class_kind_str = context.codebase.get_class_like(classname.as_bytes()).map_or("class", |m| m.kind.as_str());
 
     context.collector.report_with_code(
         IssueCode::NonExistentProperty,

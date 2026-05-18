@@ -1,4 +1,3 @@
-use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
@@ -13,6 +12,8 @@ use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_syntax::ast::CompositeString;
 use mago_syntax::ast::StringPart;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -39,8 +40,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                 StringPart::Literal(literal_string_part) => {
                     non_empty = non_empty || !literal_string_part.value.is_empty();
                     if let Some(strings) = resulting_strings.as_mut() {
-                        for s in strings.iter_mut() {
-                            s.push_str(literal_string_part.value);
+                        if let Ok(part_str) = std::str::from_utf8(literal_string_part.value) {
+                            for s in strings.iter_mut() {
+                                s.push_str(part_str);
+                            }
+                        } else {
+                            resulting_strings = None;
                         }
                     }
 
@@ -90,7 +95,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
 
             let casted_part_type = cast_type_to_string(
                 &part_type,
-                part_expression_id.as_deref(),
+                part_expression_id.as_ref().map(|w| w.as_bytes()),
                 context,
                 block_context,
                 artifacts,
@@ -106,7 +111,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
             let mut is_non_empty_part = true;
             let mut part_is_all_literals = true;
             let mut has_unspecified_literal = false;
-            let mut part_literal_values: Vec<&str> = Vec::new();
+            let mut part_literal_values: Vec<Word> = Vec::new();
 
             for cast_part_atomic in casted_part_type.types.as_ref() {
                 is_non_empty_part = is_non_empty_part && cast_part_atomic.is_non_empty_string();
@@ -126,8 +131,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                         has_unspecified_literal = true;
                     }
                     TStringLiteral::Value(literal_string) => {
-                        if !part_literal_values.contains(&literal_string.as_str()) {
-                            part_literal_values.push(literal_string);
+                        if !part_literal_values.contains(literal_string) {
+                            part_literal_values.push(*literal_string);
                         }
                     }
                 }
@@ -140,20 +145,33 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                 resulting_strings = None;
             } else if let Some(strings) = resulting_strings.as_mut() {
                 if part_literal_values.len() == 1 {
-                    for s in strings.iter_mut() {
-                        s.push_str(part_literal_values[0]);
+                    if let Ok(part_str) = std::str::from_utf8(part_literal_values[0].as_bytes()) {
+                        for s in strings.iter_mut() {
+                            s.push_str(part_str);
+                        }
+                    } else {
+                        resulting_strings = None;
                     }
                 } else {
                     let mut new_strings = Vec::with_capacity(strings.len() * part_literal_values.len());
+                    let mut had_invalid = false;
                     for s in strings.iter() {
                         for val in &part_literal_values {
-                            let mut fork = s.clone();
-                            fork.push_str(val);
-                            new_strings.push(fork);
+                            if let Ok(part_str) = std::str::from_utf8(val.as_bytes()) {
+                                let mut fork = s.clone();
+                                fork.push_str(part_str);
+                                new_strings.push(fork);
+                            } else {
+                                had_invalid = true;
+                            }
                         }
                     }
 
-                    *strings = new_strings;
+                    if had_invalid {
+                        resulting_strings = None;
+                    } else {
+                        *strings = new_strings;
+                    }
                 }
             } else {
                 // resulting_strings was already cleared by an earlier non-literal part; keep it as None
@@ -171,12 +189,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
             get_never()
         } else if let Some(literal_strings) = resulting_strings {
             if literal_strings.len() == 1 {
-                get_literal_string(atom(literal_strings[0].as_ref()))
+                get_literal_string(word(literal_strings[0].as_bytes()))
             } else {
                 TUnion::from_vec(
                     literal_strings
                         .iter()
-                        .map(|s| TAtomic::Scalar(TScalar::literal_string(atom(s.as_ref()))))
+                        .map(|s| TAtomic::Scalar(TScalar::literal_string(word(s.as_bytes()))))
                         .collect(),
                 )
             }

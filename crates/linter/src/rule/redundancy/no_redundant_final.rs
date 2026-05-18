@@ -115,15 +115,14 @@ impl LintRule for NoRedundantFinalRule {
                     continue;
                 };
 
+                let method_name_display = mago_bytes::BytesDisplay(method.name.value);
                 let message = if is_enum {
                     format!(
-                        "The `final` modifier on enum method `{}` is redundant as enums cannot be extended.",
-                        method.name.value,
+                        "The `final` modifier on enum method `{method_name_display}` is redundant as enums cannot be extended.",
                     )
                 } else {
                     format!(
-                        "The `final` modifier on method `{}` is redundant as the class is already final.",
-                        method.name.value,
+                        "The `final` modifier on method `{method_name_display}` is redundant as the class is already final.",
                     )
                 };
 

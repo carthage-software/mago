@@ -95,21 +95,22 @@ impl LintRule for InvalidOpenTagRule {
         };
 
         let content = inline_stmt.value;
-        let trimmed_content = content.trim_start();
+        let trim_start_idx = content.iter().position(|&b| !b.is_ascii_whitespace()).unwrap_or(content.len());
+        let trimmed_content = &content[trim_start_idx..];
 
         for &invalid_tag in INVALID_TAGS {
-            let mut content_chars = trimmed_content.chars();
+            let tag_bytes = invalid_tag.as_bytes();
             let mut matches = true;
             let mut prefix_byte_len = 0;
 
-            for tag_char in invalid_tag.chars() {
-                if let Some(content_char) = content_chars.next() {
-                    if !tag_char.eq_ignore_ascii_case(&content_char) {
+            for (i, &tag_byte) in tag_bytes.iter().enumerate() {
+                if let Some(&content_byte) = trimmed_content.get(i) {
+                    if !tag_byte.eq_ignore_ascii_case(&content_byte) {
                         matches = false;
                         break;
                     }
 
-                    prefix_byte_len += content_char.len_utf8();
+                    prefix_byte_len += 1;
                 } else {
                     matches = false;
                     break;
@@ -122,7 +123,10 @@ impl LintRule for InvalidOpenTagRule {
 
                 let issue = Issue::new(
                     self.cfg.level(),
-                    format!("Misspelled PHP opening tag `{}`.", &trimmed_content[..prefix_byte_len]),
+                    format!(
+                        "Misspelled PHP opening tag `{}`.",
+                        mago_bytes::BytesDisplay(&trimmed_content[..prefix_byte_len])
+                    ),
                 )
                 .with_code(self.meta.code)
                 .with_annotation(

@@ -118,7 +118,7 @@ impl LintRule for NoUnusedClosureCaptureRule {
             return;
         }
 
-        let interest: HashSet<&'arena str> = captures.iter().map(|cap| cap.variable.name).collect();
+        let interest: HashSet<&'arena [u8]> = captures.iter().map(|cap| cap.variable.name).collect();
         let usage = variable_usage::collect_used_names(body, interest);
         if usage.bailed {
             return;
@@ -130,12 +130,14 @@ impl LintRule for NoUnusedClosureCaptureRule {
                 continue;
             }
 
+            let name_display = mago_bytes::BytesDisplay(name);
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Closure capture `{name}` is unused."))
+                Issue::new(self.cfg.level(), format!("Closure capture `{name_display}` is unused."))
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(cap.variable.span)
-                            .with_message(format!("`{name}` is captured here but never read in the closure body")),
+                        Annotation::primary(cap.variable.span).with_message(format!(
+                            "`{name_display}` is captured here but never read in the closure body"
+                        )),
                     )
                     .with_note("If you only need to mutate the outer binding, use `&` to capture by reference.")
                     .with_help("Remove this capture, or reference it inside the closure body."),

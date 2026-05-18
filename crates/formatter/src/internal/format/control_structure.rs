@@ -133,11 +133,11 @@ impl<'arena> Format<'arena> for IfColonDelimitedBody<'arena> {
             f.is_wrapped_in_parens |= needed_to_wrap_in_parens;
             let leading = f.print_leading_comments(node.span());
             let doc = {
-                let mut parts = vec![in f.arena; Document::String(":")];
+                let mut parts = vec![in f.arena; Document::String(b":")];
                 let mut statements = print_statement_sequence(f, &self.statements);
                 if !statements.is_empty() {
                     if let Some(Statement::ClosingTag(_)) = self.statements.first() {
-                        statements.insert(0, Document::String(" "));
+                        statements.insert(0, Document::String(b" "));
                         parts.push(Document::Array(statements));
                     } else {
                         statements.insert(0, Document::Line(Line::hard()));
@@ -188,16 +188,16 @@ impl<'arena> Format<'arena> for IfColonDelimitedBodyElseIfClause<'arena> {
             let condition = misc::print_condition(f, self.left_parenthesis, self.condition, self.right_parenthesis);
             let is_first_stmt_closing_tag = matches!(self.statements.first(), Some(Statement::ClosingTag(_)));
             if is_first_stmt_closing_tag {
-                parts.push(Document::Indent(vec![in f.arena; condition, Document::String(":")]));
+                parts.push(Document::Indent(vec![in f.arena; condition, Document::String(b":")]));
             } else {
                 parts.push(condition);
-                parts.push(Document::String(":"));
+                parts.push(Document::String(b":"));
             }
 
             let mut statements = print_statement_sequence(f, &self.statements);
             if !statements.is_empty() {
                 if is_first_stmt_closing_tag {
-                    statements.insert(0, Document::String(" "));
+                    statements.insert(0, Document::String(b" "));
                     parts.push(Document::Array(statements));
                 } else {
                     statements.insert(0, Document::Line(Line::hard()));
@@ -213,12 +213,12 @@ impl<'arena> Format<'arena> for IfColonDelimitedBodyElseIfClause<'arena> {
 impl<'arena> Format<'arena> for IfColonDelimitedBodyElseClause<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, IfColonDelimitedBodyElseClause, {
-            let mut parts = vec![in f.arena; self.r#else.format(f), Document::String(":")];
+            let mut parts = vec![in f.arena; self.r#else.format(f), Document::String(b":")];
 
             let mut statements = print_statement_sequence(f, &self.statements);
             if !statements.is_empty() {
                 if let Some(Statement::ClosingTag(_)) = self.statements.first() {
-                    statements.insert(0, Document::String(" "));
+                    statements.insert(0, Document::String(b" "));
                     parts.push(Document::Array(statements));
                 } else {
                     statements.insert(0, Document::Line(Line::hard()));
@@ -258,7 +258,7 @@ impl<'arena> Format<'arena> for For<'arena> {
                 in f.arena;
                 self.r#for.format(f),
                 Document::space(),
-                format_token(f, self.left_parenthesis, "("),
+                format_token(f, self.left_parenthesis, b"("),
             ];
 
             fn format_expressions<'arena>(
@@ -275,10 +275,10 @@ impl<'arena> Format<'arena> for For<'arena> {
                 if rest.is_empty() {
                     first
                 } else {
-                    let mut contents = vec![in f.arena; first, Document::String(",")];
+                    let mut contents = vec![in f.arena; first, Document::String(b",")];
                     for (i, expression) in rest.into_iter().enumerate() {
                         if i != 0 {
-                            contents.push(Document::String(","));
+                            contents.push(Document::String(b","));
                         }
 
                         contents.push(Document::Indent(vec![in f.arena; Document::Line(Line::default()), expression]));
@@ -294,17 +294,17 @@ impl<'arena> Format<'arena> for For<'arena> {
                     in f.arena;
                     Document::Line(Line::soft()),
                     format_expressions(f, self.initializations.as_slice()),
-                    Document::String(";"),
+                    Document::String(b";"),
                     if self.conditions.is_empty() { Document::empty() } else { Document::Line(Line::default()) },
                     format_expressions(f, self.conditions.as_slice()),
-                    Document::String(";"),
+                    Document::String(b";"),
                     if self.increments.is_empty() { Document::empty() } else { Document::Line(Line::default()) },
                     format_expressions(f, self.increments.as_slice()),
                 ]),
                 Document::Line(Line::soft()),
             ])));
 
-            contents.push(format_token(f, self.right_parenthesis, ")"));
+            contents.push(format_token(f, self.right_parenthesis, b")"));
             contents.push(self.body.format(f));
 
             Document::Group(Group::new(contents))
@@ -380,7 +380,7 @@ impl<'arena> Format<'arena> for SwitchBody<'arena> {
 impl<'arena> Format<'arena> for SwitchColonDelimitedBody<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchColonDelimitedBody, {
-            let mut contents = vec![in f.arena; Document::String(":")];
+            let mut contents = vec![in f.arena; Document::String(b":")];
             for case in &self.cases {
                 contents.push(Document::Indent(vec![in f.arena; Document::Line(Line::hard()), case.format(f)]));
             }
@@ -461,8 +461,8 @@ impl<'arena> Format<'arena> for SwitchCaseSeparator {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, SwitchCaseSeparator, {
             match self {
-                SwitchCaseSeparator::Colon(_) => Document::String(":"),
-                SwitchCaseSeparator::SemiColon(_) => Document::String(";"),
+                SwitchCaseSeparator::Colon(_) => Document::String(b":"),
+                SwitchCaseSeparator::SemiColon(_) => Document::String(b";"),
             }
         })
     }
@@ -512,13 +512,13 @@ impl<'arena> Format<'arena> for Foreach<'arena> {
                 in f.arena;
                 self.foreach.format(f),
                 Document::space(),
-                format_token(f, self.left_parenthesis, "("),
+                format_token(f, self.left_parenthesis, b"("),
                 self.expression.format(f),
                 Document::space(),
                 self.r#as.format(f),
                 Document::space(),
                 self.target.format(f),
-                format_token(f, self.right_parenthesis, ")"),
+                format_token(f, self.right_parenthesis, b")"),
                 self.body.format(f),
             ])
         })
@@ -549,7 +549,7 @@ impl<'arena> Format<'arena> for ForeachKeyValueTarget<'arena> {
                 in f.arena;
                 self.key.format(f),
                 Document::space(),
-                Document::String("=>"),
+                Document::String(b"=>"),
                 Document::space(),
                 self.value.format(f),
             ]))

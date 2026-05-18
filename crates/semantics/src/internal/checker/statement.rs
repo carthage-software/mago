@@ -1,3 +1,4 @@
+use mago_bytes::BytesDisplay;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -180,8 +181,9 @@ pub fn check_top_level_statements<'ast, 'arena>(
 pub fn check_declare(declare: &Declare, context: &mut Context<'_, '_, '_>) {
     for item in &declare.items {
         let name = item.name.value;
+        let lowered = name.to_ascii_lowercase();
 
-        match name.to_ascii_lowercase().as_str() {
+        match lowered.as_slice() {
             STRICT_TYPES_DECLARE_DIRECTIVE => {
                 let value = match &item.value {
                     Expression::Literal(Literal::Integer(LiteralInteger { value, .. })) => *value,
@@ -246,17 +248,25 @@ pub fn check_declare(declare: &Declare, context: &mut Context<'_, '_, '_>) {
                 }
             }
             _ => {
+                let mut directives = Vec::new();
+                for (i, d) in DECLARE_DIRECTIVES.iter().enumerate() {
+                    if i > 0 {
+                        directives.extend_from_slice(b"`, `");
+                    }
+                    directives.extend_from_slice(d);
+                }
+                let directives = BytesDisplay(&directives);
+                let name = BytesDisplay(name);
+
                 context.report(
                     Issue::error(format!(
-                        "`{}` is not a supported `declare` directive. Supported directives are: `{}`.",
-                        name,
-                        DECLARE_DIRECTIVES.join("`, `")
+                        "`{name}` is not a supported `declare` directive. Supported directives are: `{directives}`."
                     ))
                     .with_annotation(
                         Annotation::primary(item.name.span()).with_message("Unsupported directive used here."),
                     )
                     .with_note("Only specific directives are allowed in `declare` statements.")
-                    .with_help(format!("Use one of the supported directives: `{}`.", DECLARE_DIRECTIVES.join("`, `"))),
+                    .with_help(format!("Use one of the supported directives: `{directives}`.")),
                 );
             }
         }
@@ -306,21 +316,24 @@ pub fn check_goto<'ast, 'arena>(goto: &'ast Goto<'arena>, context: &mut Context<
         }
     }
 
-    let mut issue = Issue::error(format!("Undefined `goto` label `{going_to}`."))
+    let going_to_display = BytesDisplay(going_to);
+    let mut issue = Issue::error(format!("Undefined `goto` label `{going_to_display}`."))
         .with_annotation(Annotation::primary(goto.label.span).with_message("This `goto` label is not defined."))
-        .with_annotations(
-            suggestions
-                .iter()
-                .map(|(name, span)| Annotation::secondary(*span).with_message(format!("Did you mean `{name}`?"))),
-        );
+        .with_annotations(suggestions.iter().map(|(name, span)| {
+            Annotation::secondary(*span).with_message(format!("Did you mean `{}`?", BytesDisplay(name)))
+        }));
 
     if suggestions.len() == 1 {
-        issue = issue
-            .with_note(format!("The `goto` label `{}` was not found. Did you mean `{}`?", going_to, suggestions[0].0));
-    } else if !suggestions.is_empty() {
-        let names = suggestions.iter().map(|(name, _)| format!("`{name}`")).collect::<Vec<_>>().join(", ");
         issue = issue.with_note(format!(
-            "The `goto` label `{going_to}` was not found. Did you mean one of the following: {names}?"
+            "The `goto` label `{}` was not found. Did you mean `{}`?",
+            going_to_display,
+            BytesDisplay(suggestions[0].0)
+        ));
+    } else if !suggestions.is_empty() {
+        let names =
+            suggestions.iter().map(|(name, _)| format!("`{}`", BytesDisplay(name))).collect::<Vec<_>>().join(", ");
+        issue = issue.with_note(format!(
+            "The `goto` label `{going_to_display}` was not found. Did you mean one of the following: {names}?"
         ));
     }
 

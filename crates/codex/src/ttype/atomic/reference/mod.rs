@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -14,23 +14,23 @@ pub enum TReferenceMemberSelector {
     /// A wildcard member selector, e.g., `Foo::*`.
     Wildcard,
     /// A specific member name, e.g., `Foo::bar`.
-    Identifier(Atom),
+    Identifier(Word),
     /// A member that starts with a specific prefix, e.g., `Foo::bar*`.
-    StartsWith(Atom),
+    StartsWith(Word),
     /// A member that ends with a specific suffix, e.g., `*::bar`.
-    EndsWith(Atom),
+    EndsWith(Word),
 }
 
 impl TReferenceMemberSelector {
     /// Returns true if this selector matches the given member name.
     #[inline]
     #[must_use]
-    pub fn matches(&self, name: Atom) -> bool {
+    pub fn matches(&self, name: Word) -> bool {
         match self {
             Self::Wildcard => true,
             Self::Identifier(n) => *n == name,
-            Self::StartsWith(prefix) => name.starts_with(prefix.as_str()),
-            Self::EndsWith(suffix) => name.ends_with(suffix.as_str()),
+            Self::StartsWith(prefix) => name.as_bytes().starts_with(prefix.as_bytes()),
+            Self::EndsWith(suffix) => name.as_bytes().ends_with(suffix.as_bytes()),
         }
     }
 }
@@ -44,19 +44,19 @@ impl TReferenceMemberSelector {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum TGlobalReferenceSelector {
     /// A global constant whose name starts with a given prefix, e.g. `FILTER_FLAG_*`.
-    StartsWith(Atom),
+    StartsWith(Word),
     /// A global constant whose name ends with a given suffix, e.g. `*_SUFFIX`.
-    EndsWith(Atom),
+    EndsWith(Word),
 }
 
 impl TGlobalReferenceSelector {
     /// Returns true if this selector matches the given constant name.
     #[inline]
     #[must_use]
-    pub fn matches(&self, name: Atom) -> bool {
+    pub fn matches(&self, name: Word) -> bool {
         match self {
-            Self::StartsWith(prefix) => name.starts_with(prefix.as_str()),
-            Self::EndsWith(suffix) => name.ends_with(suffix.as_str()),
+            Self::StartsWith(prefix) => name.as_bytes().starts_with(prefix.as_bytes()),
+            Self::EndsWith(suffix) => name.as_bytes().ends_with(suffix.as_bytes()),
         }
     }
 }
@@ -71,7 +71,7 @@ pub enum TReference {
     /// Example: `Foo`, `Bar<int>`, `T`.
     Symbol {
         /// The potentially qualified name identifier being referenced.
-        name: Atom,
+        name: Word,
         /// Generic arguments provided at the reference site, e.g., the `<int>` in `Foo<int>`.
         /// Kept original name `type_params` as requested for fields.
         parameters: Option<Vec<TUnion>>,
@@ -83,7 +83,7 @@ pub enum TReference {
     /// Example: `Client::THRESHOLD`, `Status::Ok`.
     Member {
         /// The FQCN of the class-like structure containing the member.
-        class_like_name: Atom,
+        class_like_name: Word,
         /// The name of the member being referenced (constant name, case name).
         member_selector: TReferenceMemberSelector,
     },
@@ -100,21 +100,21 @@ impl TReference {
     /// Creates a simple symbol reference with no generic parameters.
     #[inline]
     #[must_use]
-    pub fn new_symbol(name: Atom) -> Self {
+    pub fn new_symbol(name: Word) -> Self {
         TReference::Symbol { name, parameters: None, intersection_types: None }
     }
 
     /// Creates a symbol reference with generic parameters.
     #[inline]
     #[must_use]
-    pub fn new_symbol_with_parameters(name: Atom, parameters: Vec<TUnion>) -> Self {
+    pub fn new_symbol_with_parameters(name: Word, parameters: Vec<TUnion>) -> Self {
         TReference::Symbol { name, parameters: Some(parameters), intersection_types: None }
     }
 
     /// Creates a class-like member reference.
     #[inline]
     #[must_use]
-    pub fn new_member(class_like_name: Atom, member_selector: TReferenceMemberSelector) -> Self {
+    pub fn new_member(class_like_name: Word, member_selector: TReferenceMemberSelector) -> Self {
         TReference::Member { class_like_name, member_selector }
     }
 
@@ -143,7 +143,7 @@ impl TReference {
     #[inline]
     #[allow(clippy::type_complexity)]
     #[must_use]
-    pub const fn get_symbol_data(&self) -> Option<(Atom, &Option<Vec<TUnion>>, &Option<Vec<TAtomic>>)> {
+    pub const fn get_symbol_data(&self) -> Option<(Word, &Option<Vec<TUnion>>, &Option<Vec<TAtomic>>)> {
         match self {
             TReference::Symbol { name, parameters, intersection_types } => {
                 Some((*name, parameters, intersection_types))
@@ -155,7 +155,7 @@ impl TReference {
     /// Returns the class-like name and member name if this is a Member reference.
     #[inline]
     #[must_use]
-    pub const fn get_member_data(&self) -> Option<(Atom, &TReferenceMemberSelector)> {
+    pub const fn get_member_data(&self) -> Option<(Word, &TReferenceMemberSelector)> {
         match self {
             TReference::Member { class_like_name: classlike_name, member_selector } => {
                 Some((*classlike_name, member_selector))
@@ -237,37 +237,37 @@ impl TType for TReference {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
             TReference::Symbol { name, .. } => {
-                concat_atom!("unknown-ref(", name, ")")
+                concat_word!(b"unknown-ref(", name, b")")
             }
             TReference::Member { class_like_name, member_selector } => match member_selector {
                 TReferenceMemberSelector::Wildcard => {
-                    concat_atom!("unknown-ref(", class_like_name, "::*)")
+                    concat_word!(b"unknown-ref(", class_like_name, b"::*)")
                 }
                 TReferenceMemberSelector::Identifier(member_name) => {
-                    concat_atom!("unknown-ref(", class_like_name, "::", member_name, ")")
+                    concat_word!(b"unknown-ref(", class_like_name, b"::", member_name, b")")
                 }
                 TReferenceMemberSelector::StartsWith(member_name) => {
-                    concat_atom!("unknown-ref(", class_like_name, "::", member_name, "*)")
+                    concat_word!(b"unknown-ref(", class_like_name, b"::", member_name, b"*)")
                 }
                 TReferenceMemberSelector::EndsWith(member_name) => {
-                    concat_atom!("unknown-ref(", class_like_name, "::*", member_name, ")")
+                    concat_word!(b"unknown-ref(", class_like_name, b"::*", member_name, b")")
                 }
             },
             TReference::Global { selector } => match selector {
                 TGlobalReferenceSelector::StartsWith(name) => {
-                    concat_atom!("unknown-global-ref(", name, "*)")
+                    concat_word!(b"unknown-global-ref(", name, b"*)")
                 }
                 TGlobalReferenceSelector::EndsWith(name) => {
-                    concat_atom!("unknown-global-ref(*", name, ")")
+                    concat_word!(b"unknown-global-ref(*", name, b")")
                 }
             },
         }
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

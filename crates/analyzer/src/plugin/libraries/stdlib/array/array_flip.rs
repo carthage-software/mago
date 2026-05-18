@@ -42,7 +42,7 @@ impl Provider for ArrayFlipProvider {
 
 impl FunctionReturnTypeProvider for ArrayFlipProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("array_flip")
+        FunctionTarget::Exact(b"array_flip")
     }
 
     fn get_return_type(
@@ -50,7 +50,7 @@ impl FunctionReturnTypeProvider for ArrayFlipProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let array_argument = invocation.get_argument(0, &["array"])?;
+        let array_argument = invocation.get_argument(0, &[b"array"])?;
         let array_type = context.get_expression_type(array_argument)?;
 
         if !array_type.is_single() {

@@ -192,7 +192,7 @@ impl FormatCommand {
         for (file_id, parse_error) in result.parse_errors() {
             let file = database.get_ref(file_id)?;
 
-            tracing::error!("Failed to parse file '{}': {parse_error}", file.name);
+            tracing::error!("Failed to parse file '{}': {parse_error}", mago_bytes::BytesDisplay(&file.name));
         }
 
         let changed_files_count = result.changed_files_count();
@@ -241,11 +241,12 @@ impl FormatCommand {
         mut orchestrator: mago_orchestrator::Orchestrator<'_>,
         configuration: &Configuration,
     ) -> Result<ExitCode, Error> {
-        let mut content = String::new();
-        std::io::stdin().read_to_string(&mut content).map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
+        // PHP source is binary-safe, so read raw bytes: a buffer piped in may not be valid UTF-8.
+        let mut content: Vec<u8> = Vec::new();
+        std::io::stdin().read_to_end(&mut content).map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
         let Some(filepath) = self.stdin_filepath.as_deref() else {
-            let file = File::ephemeral(Cow::Borrowed("<stdin>"), Cow::Owned(content));
+            let file = File::ephemeral(Cow::Borrowed(b"<stdin>"), Cow::Owned(content));
             return Ok(emit_stdin_result(orchestrator.format_file(&file)?, &file));
         };
 
@@ -259,11 +260,12 @@ impl FormatCommand {
             Some((logical_name.clone(), content.clone())),
         )?;
 
-        let file = match database.get_by_name(&logical_name) {
+        let file = match database.get_by_name(logical_name.as_bytes()) {
             Ok(file) => file.clone(),
             Err(_) => {
                 // File is excluded.
-                print!("{content}");
+                use std::io::Write;
+                let _ = std::io::stdout().write_all(&content);
                 return Ok(ExitCode::SUCCESS);
             }
         };
@@ -354,17 +356,18 @@ fn to_change_log(
 }
 
 fn emit_stdin_result(status: FileFormatStatus, file: &File) -> ExitCode {
+    use std::io::Write;
     match status {
         FileFormatStatus::Unchanged => {
-            print!("{}", file.contents);
+            let _ = std::io::stdout().write_all(&file.contents);
             ExitCode::SUCCESS
         }
         FileFormatStatus::Changed(new_content) => {
-            print!("{new_content}");
+            let _ = std::io::stdout().write_all(&new_content);
             ExitCode::SUCCESS
         }
         FileFormatStatus::FailedToParse(parse_error) => {
-            tracing::error!("Failed to parse {}: {parse_error}", file.name);
+            tracing::error!("Failed to parse {}: {parse_error}", mago_bytes::BytesDisplay(&file.name));
             ExitCode::from(EXIT_CODE_ERROR)
         }
     }

@@ -18,6 +18,7 @@ use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
+use mago_bytes::BytesDisplay;
 
 #[derive(Debug, Clone)]
 pub struct InterfaceNameRule {
@@ -92,8 +93,9 @@ impl LintRule for InterfaceNameRule {
         };
 
         let mut issues = vec![];
-        let name = interface.name.value;
-        let fqcn = ctx.lookup_name(&interface.name);
+        let name_bytes = interface.name.value;
+        let Some(name) = std::str::from_utf8(name_bytes).ok() else { return };
+        let fqcn = BytesDisplay(ctx.lookup_name(&interface.name));
 
         if !is_class_case(name) {
             issues.push(
@@ -115,7 +117,7 @@ impl LintRule for InterfaceNameRule {
             );
         }
 
-        if self.cfg.psr && !name.ends_with("Interface") {
+        if self.cfg.psr && !name_bytes.ends_with(b"Interface") {
             issues.push(
                 Issue::new(self.cfg.level(), format!("Interface name `{name}` should be suffixed with `Interface`."))
                     .with_code(self.meta.code)

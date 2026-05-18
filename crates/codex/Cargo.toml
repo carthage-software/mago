@@ -19,7 +19,8 @@ property-tests = []
 [dependencies]
 mago-reporting = { workspace = true }
 mago-docblock = { workspace = true }
-mago-atom = { workspace = true }
+mago-word = { workspace = true }
+mago-bytes = { workspace = true }
 mago-span = { workspace = true }
 mago-syntax = { workspace = true }
 mago-type-syntax = { workspace = true }
@@ -34,6 +35,7 @@ strum = { workspace = true }
 indexmap = { workspace = true }
 ordered-float = { workspace = true }
 bumpalo = { workspace = true }
+memchr = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

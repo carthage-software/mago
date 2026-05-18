@@ -62,13 +62,10 @@ impl<'arena> Printer<'arena> {
         }
     }
 
-    pub fn build(mut self) -> &'arena str {
+    pub fn build(mut self) -> &'arena [u8] {
         self.print_doc_to_string();
 
-        let output_slice = self.out.into_bump_slice();
-
-        // SAFETY: The printer logic is assumed to always produce valid UTF-8.
-        unsafe { std::str::from_utf8_unchecked(output_slice) }
+        self.out.into_bump_slice()
     }
 
     /// Turn Doc into a string
@@ -78,7 +75,7 @@ impl<'arena> Printer<'arena> {
             Self::propagate_breaks(&document);
 
             match document {
-                Document::String(s) => self.handle_str(s),
+                Document::String(s) => self.handle_bytes(s),
                 Document::Space(space) => self.handle_space(space),
                 Document::Array(docs) => self.handle_array(&indentation, mode, docs),
                 Document::Indent(docs) => self.handle_indent(&indentation, mode, docs),
@@ -113,8 +110,8 @@ impl<'arena> Printer<'arena> {
         (self.settings.print_width as isize) - (self.position as isize)
     }
 
-    fn handle_str(&mut self, s: &'arena str) {
-        self.out.extend(s.as_bytes());
+    fn handle_bytes(&mut self, s: &'arena [u8]) {
+        self.out.extend(s);
         self.position += string_width(s);
     }
 

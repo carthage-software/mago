@@ -36,7 +36,7 @@ impl<'arena> FormatterState<'_, 'arena> {
             Document::Group(
                 Group::new(vec![
                     in self.arena;
-                    Document::String("("),
+                    Document::String(b"("),
                     Document::IndentIfBreak(IndentIfBreak::new(
                         group_id,
                         vec![
@@ -54,18 +54,18 @@ impl<'arena> FormatterState<'_, 'arena> {
                     } else {
                         Document::Line(Line::soft())
                     },
-                    Document::String(")"),
+                    Document::String(b")"),
                 ])
                 .with_id(group_id),
             )
         } else {
             Document::Group(Group::new(vec![
                 in self.arena;
-                Document::String("("),
+                Document::String(b"("),
                 if self.settings.space_within_grouping_parenthesis { Document::space() } else { Document::empty() },
                 document,
                 if self.settings.space_within_grouping_parenthesis { Document::space() } else { Document::empty() },
-                Document::String(")"),
+                Document::String(b")"),
             ]))
         }
     }

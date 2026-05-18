@@ -74,7 +74,7 @@ impl Formatter for GitlabFormatter {
                                 column: file.column_number(annotation.span.end.offset) + 1,
                             };
 
-                            (file.name.to_string(), Positions { begin, end })
+                            (String::from_utf8_lossy(&file.name).into_owned(), Positions { begin, end })
                         }
                         None => (
                             "<unknown>".to_string(),

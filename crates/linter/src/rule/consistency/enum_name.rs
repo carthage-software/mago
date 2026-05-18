@@ -20,6 +20,7 @@ use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
+use mago_bytes::BytesDisplay;
 
 #[derive(Debug, Clone)]
 pub struct EnumNameRule {
@@ -92,8 +93,8 @@ impl LintRule for EnumNameRule {
             return;
         };
 
-        let name = r#enum.name.value;
-        let fqcn = ctx.lookup_name(&r#enum.name);
+        let Some(name) = std::str::from_utf8(r#enum.name.value).ok() else { return };
+        let fqcn = BytesDisplay(ctx.lookup_name(&r#enum.name));
 
         if !is_class_case(name) {
             ctx.collector.report(

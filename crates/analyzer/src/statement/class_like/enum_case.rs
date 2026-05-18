@@ -63,7 +63,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCaseBackedItem<'arena> {
         };
 
         let enum_name = current_enum.original_name;
-        let case_name = self.name.value;
+        let case_name = mago_bytes::BytesDisplay(self.name.value);
 
         let Some(backing_type) = &current_enum.enum_type else {
             context.collector.report_with_code(

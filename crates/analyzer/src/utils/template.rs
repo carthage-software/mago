@@ -2,8 +2,6 @@ use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::class_like::TemplateTypes;
 use mago_codex::misc::GenericParent;
@@ -17,11 +15,13 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_word::Word;
+use mago_word::WordMap;
 
 use crate::context::Context;
 
 /// Type alias for template lower bounds - maps parameter names to their bounds per defining entity.
-pub type TemplateLowerBounds = HashMap<Atom, HashMap<GenericParent, TUnion>>;
+pub type TemplateLowerBounds = HashMap<Word, HashMap<GenericParent, TUnion>>;
 
 /// Resolves and expands template types applicable to a class member (method or property)
 /// within a specific call context.
@@ -52,15 +52,15 @@ pub type TemplateLowerBounds = HashMap<Atom, HashMap<GenericParent, TUnion>>;
 pub fn get_template_types_for_class_member(
     context: &Context<'_, '_>,
     declaring_class_meta: Option<&ClassLikeMetadata>,
-    appearing_class_name: Option<Atom>,
+    appearing_class_name: Option<Word>,
     calling_class_meta: Option<&ClassLikeMetadata>,
     existing_template_types: &TemplateTypes,
-    class_template_parameters: &IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
+    class_template_parameters: &IndexMap<Word, Vec<GenericTemplate>, RandomState>,
 ) -> TemplateLowerBounds {
     let codebase = context.codebase;
 
     // Convert existing_template_types to internal Vec-based format for accumulation
-    let mut template_types: IndexMap<Atom, Vec<GenericTemplate>, RandomState> =
+    let mut template_types: IndexMap<Word, Vec<GenericTemplate>, RandomState> =
         existing_template_types.iter().map(|(name, template)| (*name, vec![template.clone()])).collect();
 
     if let Some(declaring_class_meta) = declaring_class_meta {
@@ -91,7 +91,7 @@ pub fn get_template_types_for_class_member(
                                         *defining_entity,
                                         *parameter_name,
                                         calling_template_extended,
-                                        &combined_parameters.into_iter().collect::<AtomMap<_>>(),
+                                        &combined_parameters.into_iter().collect::<WordMap<_>>(),
                                     )
                                 } else {
                                     wrap_atomic(atomic_type.clone())
@@ -180,10 +180,10 @@ pub fn get_template_types_for_class_member(
 /// An `TUnion` representing the resolved concrete type for the template parameter,
 /// or `any` if it cannot be resolved.
 pub fn get_generic_parameter_for_offset(
-    class_like_name: Atom,
-    template_name: Atom,
-    template_extended_parameters: &AtomMap<IndexMap<Atom, TUnion, RandomState>>,
-    found_generic_parameters: &AtomMap<Vec<GenericTemplate>>,
+    class_like_name: Word,
+    template_name: Word,
+    template_extended_parameters: &WordMap<IndexMap<Word, TUnion, RandomState>>,
+    found_generic_parameters: &WordMap<Vec<GenericTemplate>>,
 ) -> TUnion {
     if let Some(result_map) = found_generic_parameters.get(&template_name)
         && let Some(found_parameter_type) = result_map

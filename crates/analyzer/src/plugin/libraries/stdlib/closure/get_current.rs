@@ -23,7 +23,7 @@ static META: ProviderMeta = ProviderMeta::new(
     "Returns the current closure's signature type",
 );
 
-static TARGETS: [MethodTarget; 1] = [MethodTarget::exact("closure", "getcurrent")];
+static TARGETS: [MethodTarget; 1] = [MethodTarget::exact(b"closure", b"getcurrent")];
 
 /// Provider for the `Closure::getCurrent()` method.
 ///
@@ -47,8 +47,8 @@ impl MethodReturnTypeProvider for ClosureGetCurrentProvider {
     fn get_return_type(
         &self,
         context: &ProviderContext<'_, '_, '_>,
-        _class_name: &str,
-        _method_name: &str,
+        _class_name: &[u8],
+        _method_name: &[u8],
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
         let scope = context.scope();

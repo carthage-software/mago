@@ -1,7 +1,7 @@
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
-use mago_atom::Atom;
-use mago_atom::AtomMap;
+use mago_word::Word;
+use mago_word::WordMap;
 
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::misc::GenericParent;
@@ -64,7 +64,7 @@ pub fn extend_template_parameters(metadata: &mut ClassLikeMetadata, parent_metad
 /// maps `T` defined on `ParentClass` to `string`, this returns a `TUnion` containing `string`.
 pub fn extend_type(
     extended_type: &TUnion,
-    template_extended_parameters: &AtomMap<IndexMap<Atom, TUnion, RandomState>>,
+    template_extended_parameters: &WordMap<IndexMap<Word, TUnion, RandomState>>,
 ) -> TUnion {
     if !extended_type.has_template() {
         return extended_type.clone();

@@ -110,7 +110,7 @@ impl LintRule for NoUnusedStaticRule {
             return;
         }
 
-        let interest: HashSet<&'arena str> = decls.items.iter().map(|(name, _)| *name).collect();
+        let interest: HashSet<&'arena [u8]> = decls.items.iter().map(|(name, _)| *name).collect();
         let usage = variable_usage::collect_used_names(body, interest);
         if usage.bailed {
             return;
@@ -125,12 +125,14 @@ impl LintRule for NoUnusedStaticRule {
                 continue;
             }
 
+            let name_display = mago_bytes::BytesDisplay(name);
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Static variable `{name}` is declared but never used."))
+                Issue::new(self.cfg.level(), format!("Static variable `{name_display}` is declared but never used."))
                     .with_code(self.meta.code)
                     .with_annotation(
-                        Annotation::primary(*span)
-                            .with_message(format!("`{name}` is declared `static` here but never read or written")),
+                        Annotation::primary(*span).with_message(format!(
+                            "`{name_display}` is declared `static` here but never read or written"
+                        )),
                     )
                     .with_help("Remove this `static` declaration, or reference the variable below."),
             );
@@ -139,7 +141,7 @@ impl LintRule for NoUnusedStaticRule {
 }
 
 struct StaticDeclCollector<'arena> {
-    items: Vec<(&'arena str, mago_span::Span)>,
+    items: Vec<(&'arena [u8], mago_span::Span)>,
 }
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for StaticDeclCollector<'arena> {

@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
@@ -19,26 +19,26 @@ use crate::ttype::union::TUnion;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TAlias {
     /// The FQCN of the class where the alias is defined or imported
-    class_name: Atom,
+    class_name: Word,
     /// The name of the type alias
-    alias_name: Atom,
+    alias_name: Word,
 }
 
 impl TAlias {
     #[must_use]
-    pub fn new(class_name: Atom, alias_name: Atom) -> Self {
+    pub fn new(class_name: Word, alias_name: Word) -> Self {
         Self { class_name, alias_name }
     }
 
     #[inline]
     #[must_use]
-    pub const fn get_class_name(&self) -> Atom {
+    pub const fn get_class_name(&self) -> Word {
         self.class_name
     }
 
     #[inline]
     #[must_use]
-    pub const fn get_alias_name(&self) -> Atom {
+    pub const fn get_alias_name(&self) -> Word {
         self.alias_name
     }
 
@@ -47,7 +47,7 @@ impl TAlias {
     /// Returns None if the alias cannot be resolved.
     #[must_use]
     pub fn resolve<'codebase>(&self, codebase: &'codebase CodebaseMetadata) -> Option<&'codebase TUnion> {
-        let class_like = codebase.get_class_like(&self.class_name)?;
+        let class_like = codebase.get_class_like(self.class_name.as_bytes())?;
         if let Some(type_alias) = class_like.type_aliases.get(&self.alias_name) {
             return Some(&type_alias.type_union);
         }
@@ -58,7 +58,7 @@ impl TAlias {
             class_like.type_aliases.get(type_alias)
         } else {
             codebase
-                .get_class_like(source_class)
+                .get_class_like(source_class.as_bytes())
                 .and_then(|source_class_like| source_class_like.type_aliases.get(type_alias))
         };
 
@@ -83,11 +83,11 @@ impl TType for TAlias {
         false
     }
 
-    fn get_id(&self) -> Atom {
-        concat_atom!("!", self.class_name.as_str(), "::", self.alias_name.as_str())
+    fn get_id(&self) -> Word {
+        concat_word!(b"!", self.class_name.as_bytes(), b"::", self.alias_name.as_bytes())
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

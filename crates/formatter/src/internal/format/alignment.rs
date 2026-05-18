@@ -84,7 +84,7 @@ pub fn has_blank_line_between(f: &FormatterState<'_, '_>, prev_span: Span, next_
     }
 
     let between = &source[start..end];
-    let newline_count = between.chars().filter(|&c| c == '\n').count();
+    let newline_count = memchr::memchr_iter(b'\n', between).count();
 
     newline_count >= 2
 }

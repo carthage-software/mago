@@ -62,8 +62,8 @@ impl<'arena> Parser<'_, 'arena> {
     /// Build a parser for `content`, which must already live in the arena.
     #[inline]
     #[must_use]
-    pub fn new(arena: &'arena Bump, file_id: FileId, content: &'arena str, settings: ParserSettings) -> Self {
-        let input = Input::new(file_id, content.as_bytes());
+    pub fn new(arena: &'arena Bump, file_id: FileId, content: &'arena [u8], settings: ParserSettings) -> Self {
+        let input = Input::new(file_id, content);
         let lexer = TwigLexer::new(input, settings.lexer);
         let stream = TokenStream::new(arena, lexer);
         Self {
@@ -86,7 +86,7 @@ impl<'arena> Parser<'_, 'arena> {
     #[must_use]
     pub fn from_lexer(
         arena: &'arena Bump,
-        _source_text: &'arena str,
+        _source_text: &'arena [u8],
         lexer: TwigLexer<'arena>,
         settings: ParserSettings,
     ) -> Self {
@@ -103,7 +103,7 @@ impl<'arena> Parser<'_, 'arena> {
 
     /// Consume the parser and produce an arena-allocated [`Template`].
     #[must_use]
-    pub fn parse(mut self, source_text: &'arena str, file_id: FileId) -> &'arena Template<'arena> {
+    pub fn parse(mut self, source_text: &'arena [u8], file_id: FileId) -> &'arena Template<'arena> {
         let statements = match self.parse_statements(&internal::NoTerminator) {
             Ok(sequence) => sequence,
             Err(error) => {
@@ -152,7 +152,7 @@ pub fn parse_file_with_settings<'arena>(
 
 /// Parse Twig source into an AST, associating every produced [`Span`] with
 /// the supplied [`FileId`].  Uses default parser settings.
-pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content: &str) -> &'arena Template<'arena> {
+pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content: &[u8]) -> &'arena Template<'arena> {
     parse_file_content_with_settings(arena, file_id, content, ParserSettings::default())
 }
 
@@ -162,9 +162,9 @@ pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content:
 pub fn parse_file_content_with_settings<'arena>(
     arena: &'arena Bump,
     file_id: FileId,
-    content: &str,
+    content: &[u8],
     settings: ParserSettings,
 ) -> &'arena Template<'arena> {
-    let source_text = arena.alloc_str(content);
+    let source_text = arena.alloc_slice_copy(content);
     Parser::new(arena, file_id, source_text, settings).parse(source_text, file_id)
 }

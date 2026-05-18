@@ -119,7 +119,10 @@ fn issue_to_actions(database: &Database<'_>, issue: &Issue) -> Vec<CodeActionOrC
 }
 
 fn convert_edit(file: &MagoFile, edit: &MagoTextEdit) -> TextEdit {
-    TextEdit { range: range_at_offsets(file, edit.range.start, edit.range.end), new_text: edit.new_text.clone() }
+    TextEdit {
+        range: range_at_offsets(file, edit.range.start, edit.range.end),
+        new_text: String::from_utf8_lossy(&edit.new_text).into_owned(),
+    }
 }
 
 fn issue_to_diagnostic(database: &Database<'_>, issue: &Issue) -> Option<Diagnostic> {

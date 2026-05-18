@@ -272,7 +272,7 @@ impl TwigTokenKind {
 pub struct TwigToken<'input> {
     pub kind: TwigTokenKind,
     pub start: Position,
-    pub value: &'input str,
+    pub value: &'input [u8],
 }
 
 impl mago_span::HasPosition for TwigToken<'_> {
@@ -285,7 +285,7 @@ impl mago_span::HasPosition for TwigToken<'_> {
 impl<'input> TwigToken<'input> {
     #[inline]
     #[must_use]
-    pub const fn new(kind: TwigTokenKind, value: &'input str, start: Position) -> Self {
+    pub const fn new(kind: TwigTokenKind, value: &'input [u8], start: Position) -> Self {
         Self { kind, start, value }
     }
 
@@ -312,6 +312,6 @@ impl<'input> TwigToken<'input> {
 
 impl std::fmt::Display for TwigToken<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}({})", self.kind, self.value)
+        write!(f, "{}({})", self.kind, String::from_utf8_lossy(self.value))
     }
 }

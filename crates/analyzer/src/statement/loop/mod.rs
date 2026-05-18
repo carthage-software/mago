@@ -11,9 +11,6 @@ use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
-use mago_atom::Atom;
-use mago_atom::AtomSet;
-use mago_atom::atom;
 use mago_codex::ttype;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
@@ -45,6 +42,9 @@ use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Foreach;
 use mago_syntax::ast::Statement;
+use mago_word::Word;
+use mago_word::WordSet;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::analyze_statements;
@@ -99,7 +99,7 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
 
     let mut loop_scope = LoopScope::new(span, block_context.locals.clone(), None);
     loop_scope.variables_possibly_in_scope =
-        if infinite_loop { block_context.variables_possibly_in_scope.clone() } else { AtomSet::default() };
+        if infinite_loop { block_context.variables_possibly_in_scope.clone() } else { WordSet::default() };
 
     let (inner_loop_block_context, loop_scope) = analyze(
         context,
@@ -123,7 +123,7 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
             let type_id = artifacts
                 .get_expression_type(*condition)
                 .map(|t| t.get_id())
-                .unwrap_or_else(|| mago_atom::atom("false"));
+                .unwrap_or_else(|| mago_word::word("false"));
 
             context.collector.report_with_code(
                 IssueCode::ImpossibleCondition,
@@ -242,7 +242,7 @@ fn analyze<'ctx, 'ast, 'arena>(
         0
     };
 
-    let mut always_assigned_before_loop_body_variables = AtomSet::default();
+    let mut always_assigned_before_loop_body_variables = WordSet::default();
 
     let mut pre_condition_clauses = Vec::new();
 
@@ -859,10 +859,10 @@ fn analyze<'ctx, 'ast, 'arena>(
         .unwrap_or_default();
 
         let (negated_pre_condition_types, _) =
-            find_satisfying_assignments(negated_pre_condition_clauses.iter().as_slice(), None, &mut AtomSet::default());
+            find_satisfying_assignments(negated_pre_condition_clauses.iter().as_slice(), None, &mut WordSet::default());
 
         if !negated_pre_condition_types.is_empty() {
-            let mut changed_variable_ids = AtomSet::default();
+            let mut changed_variable_ids = WordSet::default();
 
             reconcile_keyed_types(
                 context,
@@ -870,7 +870,7 @@ fn analyze<'ctx, 'ast, 'arena>(
                 IndexMap::new(),
                 &mut continue_context,
                 &mut changed_variable_ids,
-                &AtomSet::default(),
+                &WordSet::default(),
                 &unsafe {
                     // SAFETY: we know that pre_conditions is not empty, so we can safely
                     // get the span of the first pre_condition.
@@ -1009,8 +1009,8 @@ fn mark_array_keys_definite(union: &mut TUnion) -> bool {
 /// The walk short-circuits as soon as `maximum` is reached, so deep graphs
 /// cost O(maximum) work instead of traversing every chain down to the leaves.
 fn get_assignment_map_depth(
-    first_variable_id: Atom,
-    assignment_map: &mut BTreeMap<Atom, BTreeSet<Atom>>,
+    first_variable_id: Word,
+    assignment_map: &mut BTreeMap<Word, BTreeSet<Word>>,
     maximum: usize,
 ) -> usize {
     if maximum == 0 {
@@ -1106,7 +1106,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     is_do: bool,
     first_application: bool,
-) -> Result<AtomSet, AnalysisError> {
+) -> Result<WordSet, AnalysisError> {
     let pre_condition_span = pre_condition.span();
     let pre_referenced_variable_ids = std::mem::take(&mut loop_context.conditionally_referenced_variable_ids);
 
@@ -1172,7 +1172,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
             &reconcilable_while_types,
             active_while_types,
             loop_context,
-            &mut AtomSet::default(),
+            &mut WordSet::default(),
             &new_referenced_variable_ids,
             &pre_condition_span,
             first_application,
@@ -1181,7 +1181,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     }
 
     if is_do {
-        return Ok(AtomSet::default());
+        return Ok(WordSet::default());
     }
 
     if !loop_context.clauses.is_empty() {
@@ -1210,7 +1210,7 @@ fn update_loop_scope_contexts<'ctx>(
         }
 
         for (variable_id, variable_type) in &loop_scope.possibly_redefined_loop_variables {
-            if continue_context.has_variable(variable_id) {
+            if continue_context.has_variable(variable_id.as_bytes()) {
                 continue_context.locals.insert(
                     *variable_id,
                     combine_union_types_rc(
@@ -1266,7 +1266,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     iterator: &'ast Expression<'arena>,
-    iterator_variable_id: Option<Atom>,
+    iterator_variable_id: Option<Word>,
     foreach: &'ast Foreach<'arena>,
 ) -> Result<(bool, TUnion, TUnion), AnalysisError> {
     let was_inside_general_use = block_context.flags.inside_general_use();
@@ -1436,7 +1436,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                         let enum_name = enum_instance.get_name();
                         let enum_backing_type = context
                             .codebase
-                            .get_enum(&enum_instance.get_name())
+                            .get_enum(enum_instance.get_name().as_bytes())
                             .and_then(|class_like| class_like.enum_type.as_ref());
 
                         context.collector.report_with_code(
@@ -1460,15 +1460,15 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
                         match enum_backing_type {
                             Some(backing_type) => (
                                 TUnion::from_vec(vec![
-                                    TAtomic::Scalar(TScalar::literal_string(atom("name"))),
-                                    TAtomic::Scalar(TScalar::literal_string(atom("value"))),
+                                    TAtomic::Scalar(TScalar::literal_string(word(b"name"))),
+                                    TAtomic::Scalar(TScalar::literal_string(word(b"value"))),
                                 ]),
                                 TUnion::from_vec(vec![
                                     TAtomic::Scalar(TScalar::non_empty_string()),
                                     backing_type.clone(),
                                 ]),
                             ),
-                            None => (get_literal_string(atom("name")), get_non_empty_string()),
+                            None => (get_literal_string(word(b"name")), get_non_empty_string()),
                         }
                     }
                 };
@@ -1480,7 +1480,7 @@ fn analyze_iterator<'ctx, 'ast, 'arena>(
             }
             _ => {
                 let iterator_atomic_id = iterator_atomic.get_id();
-                invalid_atomic_ids.push(iterator_atomic_id.as_str());
+                invalid_atomic_ids.push(iterator_atomic_id.to_string());
             }
         }
     }

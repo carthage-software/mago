@@ -3,7 +3,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
@@ -14,6 +13,7 @@ use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
+use mago_word::word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -42,7 +42,7 @@ impl Provider for ShapeProvider {
 
 impl FunctionReturnTypeProvider for ShapeProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("psl\\type\\shape")
+        FunctionTarget::Exact(b"psl\\type\\shape")
     }
 
     fn get_return_type(
@@ -50,7 +50,7 @@ impl FunctionReturnTypeProvider for ShapeProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let elements = invocation.get_argument(0, &["elements"])?;
+        let elements = invocation.get_argument(0, &[b"elements"])?;
         let elements_type = context.get_expression_type(elements)?;
 
         let argument_array = if let Some(argument_array) = elements_type.get_single_array()
@@ -61,7 +61,7 @@ impl FunctionReturnTypeProvider for ShapeProvider {
             return None;
         };
 
-        let allows_unknown_elements = if let Some(argument) = invocation.get_argument(1, &["allow_unknown_fields"]) {
+        let allows_unknown_elements = if let Some(argument) = invocation.get_argument(1, &[b"allow_unknown_fields"]) {
             context
                 .get_expression_type(argument)
                 .and_then(|union| union.get_single_bool())
@@ -88,7 +88,7 @@ impl FunctionReturnTypeProvider for ShapeProvider {
                 }
 
                 Some(TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
-                    atom("Psl\\Type\\TypeInterface"),
+                    word("Psl\\Type\\TypeInterface"),
                     Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::List(TList {
                         element_type: if allows_unknown_elements {
                             Arc::new(get_mixed())
@@ -117,7 +117,7 @@ impl FunctionReturnTypeProvider for ShapeProvider {
                 }
 
                 Some(TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
-                    atom("Psl\\Type\\TypeInterface"),
+                    word("Psl\\Type\\TypeInterface"),
                     Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                         parameters: if allows_unknown_elements {
                             Some((Arc::new(get_arraykey()), Arc::new(get_mixed())))

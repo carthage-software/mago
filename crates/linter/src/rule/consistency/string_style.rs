@@ -300,8 +300,8 @@ fn collect_concat_side(expr: &Expression<'_>, parts: &mut Vec<ConcatPart>) {
             collect_concat_side(binary.rhs, parts);
         }
         Expression::Literal(Literal::String(literal)) => {
-            let safe_to_double_quote =
-                matches!(literal.kind, LiteralStringKind::DoubleQuoted) || !literal.raw.contains(['\\', '$', '"']);
+            let safe_to_double_quote = matches!(literal.kind, LiteralStringKind::DoubleQuoted)
+                || !literal.raw.iter().any(|&b| matches!(b, b'\\' | b'$' | b'"'));
             parts.push(ConcatPart::Literal { span: literal.span, safe_to_double_quote });
         }
         other if is_interpolable(other) => {

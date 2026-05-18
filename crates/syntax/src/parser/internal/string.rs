@@ -1,5 +1,6 @@
-use mago_database::file::HasFileId;
+use std::vec::Vec;
 
+use mago_database::file::HasFileId;
 use mago_span::Span;
 
 use crate::T;
@@ -47,7 +48,7 @@ impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_interpolated_string(&mut self) -> Result<InterpolatedString<'arena>, ParseError> {
         let token = self.stream.consume()?;
         let token_span = token.span_for(self.stream.file_id());
-        let has_prefix = token.value.starts_with('b') || token.value.starts_with('B');
+        let has_prefix = token.value.starts_with(b"b") || token.value.starts_with(b"B");
         let prefix = if has_prefix {
             let prefix_span = Span { start: token_span.start, end: token_span.start.forward(1), ..token_span };
             Some(Keyword { span: prefix_span, value: &token.value[..1] })
@@ -81,7 +82,7 @@ impl<'arena> Parser<'_, 'arena> {
 
     pub(crate) fn parse_document_string(&mut self) -> Result<DocumentString<'arena>, ParseError> {
         let current = self.stream.consume()?;
-        let has_prefix = current.value.starts_with('b') || current.value.starts_with('B');
+        let has_prefix = current.value.starts_with(b"b") || current.value.starts_with(b"B");
         let current_span = current.span_for(self.stream.file_id());
         let prefix = if has_prefix {
             let prefix_span =
@@ -112,17 +113,17 @@ impl<'arena> Parser<'_, 'arena> {
 
         let mut whitespaces = 0usize;
         let mut tabs = 0usize;
-        let mut label = std::string::String::new();
-        for char in close.value.chars() {
-            match char {
-                ' ' => {
+        let mut label: Vec<u8> = Vec::new();
+        for &byte in close.value {
+            match byte {
+                b' ' => {
                     whitespaces += 1;
                 }
-                '\t' => {
+                b'\t' => {
                     tabs += 1;
                 }
                 _ => {
-                    label.push(char);
+                    label.push(byte);
                 }
             }
         }
@@ -143,7 +144,7 @@ impl<'arena> Parser<'_, 'arena> {
             kind,
             indentation,
             parts: Sequence::new(parts),
-            label: self.str(&label),
+            label: self.bytes(&label),
             close: close.span_for(self.stream.file_id()),
         })
     }

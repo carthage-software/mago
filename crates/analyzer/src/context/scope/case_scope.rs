@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
-use mago_atom::AtomMap;
 use mago_codex::ttype::union::TUnion;
+use mago_word::WordMap;
 
 #[derive(Clone, Debug)]
 pub struct CaseScope {
-    pub break_vars: Option<AtomMap<Rc<TUnion>>>,
+    pub break_vars: Option<WordMap<Rc<TUnion>>>,
 }
 
 impl CaseScope {

@@ -29,6 +29,8 @@ use mago_syntax::walker::MutWalker;
 use crate::ResolvedNames;
 use crate::internal::context::NameResolutionContext;
 use crate::kind::NameKind;
+use crate::scope::concat_with_sep;
+use crate::scope::trim_start_byte;
 
 /// An AST visitor (`MutWalker`) that traverses a PHP Abstract Syntax Tree
 /// to resolve names (classes, functions, constants, etc.) according to
@@ -56,29 +58,29 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         match &r#use.items {
             UseItems::Sequence(seq) => {
                 for item in &seq.items {
-                    let fqn = item.name.value().trim_start_matches('\\');
+                    let fqn = trim_start_byte(item.name.value(), b'\\');
                     self.resolved_names.insert_at(item.name.span(), fqn, true);
                 }
             }
             UseItems::TypedSequence(seq) => {
                 for item in &seq.items {
-                    let fqn = item.name.value().trim_start_matches('\\');
+                    let fqn = trim_start_byte(item.name.value(), b'\\');
                     self.resolved_names.insert_at(item.name.span(), fqn, true);
                 }
             }
             UseItems::TypedList(list) => {
-                let prefix = list.namespace.value().trim_start_matches('\\');
+                let prefix = trim_start_byte(list.namespace.value(), b'\\');
                 self.resolved_names.insert_at(list.namespace.span(), context.intern(prefix), true);
                 for item in &list.items {
-                    let fqn = context.intern(&format!("{prefix}\\{}", item.name.value()));
+                    let fqn = context.intern(&concat_with_sep(&[prefix, item.name.value()], b'\\'));
                     self.resolved_names.insert_at(item.name.span(), fqn, true);
                 }
             }
             UseItems::MixedList(list) => {
-                let prefix = list.namespace.value().trim_start_matches('\\');
+                let prefix = trim_start_byte(list.namespace.value(), b'\\');
                 self.resolved_names.insert_at(list.namespace.span(), context.intern(prefix), true);
                 for mixed in &list.items {
-                    let fqn = context.intern(&format!("{prefix}\\{}", mixed.item.name.value()));
+                    let fqn = context.intern(&concat_with_sep(&[prefix, mixed.item.name.value()], b'\\'));
                     self.resolved_names.insert_at(mixed.item.name.span(), fqn, true);
                 }
             }

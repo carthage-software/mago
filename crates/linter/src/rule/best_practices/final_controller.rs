@@ -113,7 +113,7 @@ impl LintRule for FinalControllerRule {
             return;
         }
 
-        if !class.name.value.ends_with("Controller") {
+        if !class.name.value.ends_with(b"Controller") {
             return;
         }
 

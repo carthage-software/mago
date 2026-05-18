@@ -19,9 +19,10 @@ impl<'arena> Parser<'_, 'arena> {
         let mut options = self.new_vec();
         while self.stream.peek_kind(0)? == Some(TwigTokenKind::Name) {
             let option_tok = self.stream.consume()?;
-            if !(option_tok.value == "package" || option_tok.value == "version") {
+            if !(option_tok.value == b"package" || option_tok.value == b"version") {
                 return Err(ParseError::UnexpectedToken(
-                    format!("unknown option `{}` on `deprecated`", option_tok.value),
+                    format!("unknown option `{}` on `deprecated`", String::from_utf8_lossy(option_tok.value))
+                        .into_bytes(),
                     self.stream.span_of(&option_tok),
                 ));
             }

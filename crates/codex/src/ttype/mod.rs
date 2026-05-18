@@ -2,8 +2,8 @@ use std::borrow::Cow;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
@@ -180,13 +180,13 @@ pub trait TType {
     ///
     /// The resulting identifier must be unique for the type,
     /// but it does not have to be globally unique.
-    fn get_id(&self) -> Atom;
+    fn get_id(&self) -> Word;
 
-    fn get_pretty_id(&self) -> Atom {
+    fn get_pretty_id(&self) -> Word {
         self.get_pretty_id_with_indent(0)
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom;
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word;
 }
 
 /// Implements the `TType` trait for `TypeRef`.
@@ -240,14 +240,14 @@ impl<'ty> TType for TypeRef<'ty> {
         }
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
             TypeRef::Union(ttype) => ttype.get_id(),
             TypeRef::Atomic(ttype) => ttype.get_id(),
         }
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         match self {
             TypeRef::Union(ttype) => ttype.get_pretty_id_with_indent(indent),
             TypeRef::Atomic(ttype) => ttype.get_pretty_id_with_indent(indent),
@@ -523,7 +523,7 @@ pub fn get_string_with_props(
 
 #[inline]
 #[must_use]
-pub fn get_literal_class_string(value: Atom) -> TUnion {
+pub fn get_literal_class_string(value: Word) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(value)))))
 }
 
@@ -585,7 +585,7 @@ pub fn get_trait_string_of_type(constraint: TAtomic) -> TUnion {
 
 #[inline]
 #[must_use]
-pub fn get_literal_string(value: Atom) -> TUnion {
+pub fn get_literal_string(value: Word) -> TUnion {
     TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::literal_string(value))))
 }
 
@@ -825,7 +825,7 @@ pub fn get_mixed_closure() -> TUnion {
 
 #[inline]
 #[must_use]
-pub fn get_named_object(name: Atom, type_resolution_context: Option<&TypeResolutionContext>) -> TUnion {
+pub fn get_named_object(name: Word, type_resolution_context: Option<&TypeResolutionContext>) -> TUnion {
     if let Some(type_resolution_context) = type_resolution_context
         && let Some(defining_entities) = type_resolution_context.get_template_definition(name)
     {
@@ -1229,7 +1229,8 @@ fn intersect_atomic_types(
 
     if type_1.can_be_intersected() && type_2.can_be_intersected() {
         if let (TAtomic::Object(TObject::Named(n1)), TAtomic::Object(TObject::Named(n2))) = (type_1, type_2)
-            && let (Some(c1), Some(c2)) = (codebase.get_class_like(&n1.name), codebase.get_class_like(&n2.name))
+            && let (Some(c1), Some(c2)) =
+                (codebase.get_class_like(n1.name.as_bytes()), codebase.get_class_like(n2.name.as_bytes()))
             && !c1.kind.is_interface()
             && !c1.kind.is_trait()
             && !c2.kind.is_interface()
@@ -1285,21 +1286,21 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
             }
             TAtomic::Object(object) => {
                 let name = object.get_name()?;
-                let traversable = atom("traversable");
-                let iterator = atom("iterator");
-                let iterator_aggregate = atom("iteratoraggregate");
+                let traversable = word("traversable");
+                let iterator = word("iterator");
+                let iterator_aggregate = word("iteratoraggregate");
 
-                let class_metadata = codebase.get_class_like(&name)?;
-                if !codebase.is_instance_of(&class_metadata.name, &traversable) {
+                let class_metadata = codebase.get_class_like(name.as_bytes())?;
+                if !codebase.is_instance_of(class_metadata.name.as_bytes(), traversable.as_bytes()) {
                     break 'parameters None;
                 }
 
                 let is_iterator_interface = name == iterator || name == traversable || name == iterator_aggregate;
                 if !is_iterator_interface
-                    && codebase.is_instance_of(&class_metadata.name, &iterator)
+                    && codebase.is_instance_of(class_metadata.name.as_bytes(), iterator.as_bytes())
                     && let (Some(key_type), Some(value_type)) = (
-                        get_iterator_method_return_type(codebase, name, "key"),
-                        get_iterator_method_return_type(codebase, name, "current"),
+                        get_iterator_method_return_type(codebase, name, b"key"),
+                        get_iterator_method_return_type(codebase, name, b"current"),
                     )
                 {
                     let contains_generic_param = |t: &TUnion| t.types.iter().any(atomic::TAtomic::is_generic_parameter);
@@ -1313,7 +1314,7 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                     }
                 }
 
-                let traversable_metadata = codebase.get_class_like(&traversable)?;
+                let traversable_metadata = codebase.get_class_like(traversable.as_bytes())?;
                 let key_template = traversable_metadata.template_types.get_index(0).map(|(name, _)| *name)?;
                 let value_template = traversable_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
 
@@ -1428,14 +1429,14 @@ pub fn get_iterable_value_parameter(atomic: &TAtomic, codebase: &CodebaseMetadat
         TAtomic::Array(array_type) => Some(get_array_value_parameter(array_type, codebase)),
         TAtomic::Object(object) => {
             let name = object.get_name()?;
-            let traversable = atom("traversable");
+            let traversable = word("traversable");
 
-            let class_metadata = codebase.get_class_like(&name)?;
-            if !codebase.is_instance_of(&class_metadata.name, &traversable) {
+            let class_metadata = codebase.get_class_like(name.as_bytes())?;
+            if !codebase.is_instance_of(class_metadata.name.as_bytes(), traversable.as_bytes()) {
                 return None;
             }
 
-            let traversable_metadata = codebase.get_class_like(&traversable)?;
+            let traversable_metadata = codebase.get_class_like(traversable.as_bytes())?;
             let value_template = traversable_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
 
             get_specialized_template_type(
@@ -1507,12 +1508,12 @@ pub fn get_array_value_parameter(array_type: &TArray, codebase: &CodebaseMetadat
 #[must_use]
 pub fn get_specialized_template_type(
     codebase: &CodebaseMetadata,
-    template_name: Atom,
-    template_defining_class_id: Atom,
+    template_name: Word,
+    template_defining_class_id: Word,
     instantiated_class_metadata: &ClassLikeMetadata,
     instantiated_type_parameters: Option<&[TUnion]>,
 ) -> Option<TUnion> {
-    let defining_class_metadata = codebase.get_class_like(&template_defining_class_id)?;
+    let defining_class_metadata = codebase.get_class_like(template_defining_class_id.as_bytes())?;
 
     if defining_class_metadata.name == instantiated_class_metadata.name {
         let index = instantiated_class_metadata.get_template_index_for_name(template_name)?;
@@ -1575,8 +1576,12 @@ pub fn get_specialized_template_type(
     Some(template_type)
 }
 
-fn get_iterator_method_return_type(codebase: &CodebaseMetadata, class_name: Atom, method_name: &str) -> Option<TUnion> {
-    let method = codebase.get_declaring_method(&class_name, method_name)?;
+fn get_iterator_method_return_type(
+    codebase: &CodebaseMetadata,
+    class_name: Word,
+    method_name: &[u8],
+) -> Option<TUnion> {
+    let method = codebase.get_declaring_method(class_name.as_bytes(), method_name)?;
     let return_type_meta = method.return_type_metadata.as_ref()?;
     let mut return_type = return_type_meta.type_union.clone();
     expander::expand_union(codebase, &mut return_type, &TypeExpansionOptions::default());

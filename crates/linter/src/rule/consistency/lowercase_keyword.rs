@@ -99,26 +99,30 @@ impl LintRule for LowercaseKeywordRule {
             return;
         };
 
-        if keyword.value.chars().all(|c| !c.is_ascii_alphabetic() || c.is_ascii_lowercase()) {
+        if keyword.value.iter().all(|&b| !b.is_ascii_alphabetic() || b.is_ascii_lowercase()) {
             return; // Already in lowercase, no issue to report
-        }
-
-        if ctx.registry.is_integration_enabled(Integration::Drupal)
-            && matches!(keyword.value.to_ascii_lowercase().as_str(), "true" | "false" | "null")
-        {
-            return;
         }
 
         let lowercase = keyword.value.to_ascii_lowercase();
 
-        let issue = Issue::new(self.cfg.level(), format!("Keyword `{}` should be in lowercase.", keyword.value))
+        if ctx.registry.is_integration_enabled(Integration::Drupal)
+            && matches!(lowercase.as_slice(), b"true" | b"false" | b"null")
+        {
+            return;
+        }
+
+        let Some(lowercase_str) = std::str::from_utf8(&lowercase).ok() else { return };
+        let keyword_display = mago_bytes::BytesDisplay(keyword.value);
+
+        let issue = Issue::new(self.cfg.level(), format!("Keyword `{keyword_display}` should be in lowercase."))
             .with_code(self.meta.code)
             .with_annotation(Annotation::primary(keyword.span()))
-            .with_note(format!("The keyword `{}` does not follow lowercase convention.", keyword.value))
-            .with_help(format!("Consider using `{}` instead of `{}`.", lowercase, keyword.value));
+            .with_note(format!("The keyword `{keyword_display}` does not follow lowercase convention."))
+            .with_help(format!("Consider using `{lowercase_str}` instead of `{keyword_display}`."));
 
+        let lowercase_owned = lowercase_str.to_owned();
         ctx.collector.propose(issue, |edits| {
-            edits.push(TextEdit::replace(keyword.span, lowercase));
+            edits.push(TextEdit::replace(keyword.span, lowercase_owned));
         });
     }
 }

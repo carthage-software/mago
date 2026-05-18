@@ -557,7 +557,7 @@ impl IssueProcessor {
                 // Each batch contains all edits from a single issue - they must be applied together
                 for (rule_code, edits) in batches {
                     let rule_code = rule_code.as_deref().unwrap_or("unknown");
-                    let result = editor.apply_batch(edits, Some(|code: &str| check_php_code(arena, file_id, code, parser_settings)));
+                    let result = editor.apply_batch(edits, Some(|code: &[u8]| check_php_code(arena, file_id, code, parser_settings)));
                     arena.reset();
 
                     match result {
@@ -571,23 +571,23 @@ impl IssueProcessor {
                             skipped_potentially_unsafe += 1;
                         }
                         ApplyResult::OutOfBounds => {
-                            tracing::warn!("Edit out of bounds for `{}` (issue: `{rule_code}`). This is a bug in Mago.", file.name.as_ref());
+                            tracing::warn!("Edit out of bounds for `{}` (issue: `{rule_code}`). This is a bug in Mago.", mago_bytes::BytesDisplay(&file.name));
                             tracing::error!("Please report this issue at {}", ISSUE_URL);
 
                             bugs += 1;
                         }
                         ApplyResult::Overlap => {
-                            tracing::warn!("Overlapping edit for `{}` (issue: `{rule_code}`), skipping.", file.name.as_ref());
+                            tracing::warn!("Overlapping edit for `{}` (issue: `{rule_code}`), skipping.", mago_bytes::BytesDisplay(&file.name));
                             tracing::warn!("This can happen when multiple fixers modify the same code. Try running the fixer again to apply remaining fixes.");
                         }
                         ApplyResult::Rejected => {
-                            tracing::error!("Edit for `{}` (issue: `{rule_code}`) was rejected because it would produce invalid PHP syntax.", file.name.as_ref());
+                            tracing::error!("Edit for `{}` (issue: `{rule_code}`) was rejected because it would produce invalid PHP syntax.", mago_bytes::BytesDisplay(&file.name));
                             tracing::error!("This is a bug in Mago. Please report this issue at {}", ISSUE_URL);
 
                             bugs += 1;
                         }
                         _ => {
-                            tracing::error!("Unexpected edit application result for `{}` (issue: `{rule_code}`). This is a bug in Mago.", file.name.as_ref());
+                            tracing::error!("Unexpected edit application result for `{}` (issue: `{rule_code}`). This is a bug in Mago.", mago_bytes::BytesDisplay(&file.name));
                             tracing::error!("Please report this issue at {}", ISSUE_URL);
 
                             bugs += 1;
@@ -596,7 +596,7 @@ impl IssueProcessor {
                 }
 
                 let fixed_content = editor.finish();
-                if fixed_content == file.contents {
+                if *fixed_content == *file.contents {
                     return Ok((false, skipped_unsafe, skipped_potentially_unsafe, bugs));
                 }
 
@@ -610,7 +610,7 @@ impl IssueProcessor {
                         FileFormatStatus::FailedToParse(parse_error) => {
                             tracing::warn!(
                                 "Failed to format file `{}` after applying fixes: {}",
-                                ephemeral_file.name.as_ref(),
+                                mago_bytes::BytesDisplay(&ephemeral_file.name),
                                 parse_error
                             );
 
@@ -938,6 +938,6 @@ impl BaselineIssueProcessor {
 /// # Returns
 ///
 /// * `true` if the code is syntactically valid, `false` otherwise.
-fn check_php_code(arena: &Bump, file_id: FileId, code: &str, parser_settings: ParserSettings) -> bool {
+fn check_php_code(arena: &Bump, file_id: FileId, code: &[u8], parser_settings: ParserSettings) -> bool {
     !parse_file_content_with_settings(arena, file_id, code, parser_settings).has_errors()
 }

@@ -48,7 +48,9 @@ pub mod r#try;
 /// 3. Whether the magic method has to be public.
 /// 4. Whether the magic method has to be static.
 /// 5. Whether the magic method can contain a return type.
-const MAGIC_METHOD_SEMANTICS: &[(&str, Option<usize>, bool, bool, bool)] = &[
+type MagicMethodSemantic = (&'static [u8], Option<usize>, bool, bool, bool);
+
+const MAGIC_METHOD_SEMANTICS: &[MagicMethodSemantic] = &[
     (CONSTRUCTOR_MAGIC_METHOD, None, false, false, false),
     (DESTRUCTOR_MAGIC_METHOD, None, false, false, false),
     (CLONE_MAGIC_METHOD, None, false, false, true),
@@ -83,7 +85,7 @@ fn hint_contains_generator(context: &mut Context<'_, '_, '_>, hint: &Hint) -> bo
         Hint::Identifier(identifier) => {
             let symbol = context.get_name(identifier.span().start);
 
-            "generator".eq_ignore_ascii_case(symbol)
+            symbol.eq_ignore_ascii_case(b"generator")
         }
         Hint::Parenthesized(parenthesized_hint) => hint_contains_generator(context, parenthesized_hint.hint),
         Hint::Nullable(nullable_hint) => hint_contains_generator(context, nullable_hint.hint),

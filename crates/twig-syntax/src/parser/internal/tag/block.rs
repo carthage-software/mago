@@ -17,7 +17,7 @@ impl<'arena> Parser<'_, 'arena> {
     ) -> Result<Statement<'arena>, ParseError> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let keyword = self.keyword_from(&keyword_tok);
-        let name = self.expect_flexible_identifier("expected block name")?;
+        let name = self.expect_flexible_identifier(b"expected block name")?;
 
         if !self.stream.is_block_end()? {
             let expression = self.parse_expression()?;
@@ -31,14 +31,14 @@ impl<'arena> Parser<'_, 'arena> {
         }
 
         let close_tag = self.stream.expect_block_end()?;
-        let body = self.parse_statements(&BlockTerminator { names: &["endblock"] })?;
+        let body = self.parse_statements(&BlockTerminator { names: &[b"endblock"] })?;
         let end_open_tok = self.stream.expect_block_start()?;
         let end_open_tag = self.stream.span_of(&end_open_tok);
-        let end_kw_tok = self.stream.expect_name("expected `endblock`")?;
-        if end_kw_tok.value != "endblock" {
+        let end_kw_tok = self.stream.expect_name(b"expected `endblock`")?;
+        if end_kw_tok.value != b"endblock" {
             return Err(ParseError::MismatchedEndTag {
-                expected: "endblock".to_string(),
-                got: end_kw_tok.value.to_string(),
+                expected: b"endblock".to_vec(),
+                got: end_kw_tok.value.to_vec(),
                 span: self.stream.span_of(&end_kw_tok),
             });
         }
@@ -47,8 +47,8 @@ impl<'arena> Parser<'_, 'arena> {
         let end_name = if let Some(closing_tok) = self.stream.try_consume(TwigTokenKind::Name)? {
             if closing_tok.value != name.value {
                 return Err(ParseError::MismatchedEndTag {
-                    expected: name.value.to_string(),
-                    got: closing_tok.value.to_string(),
+                    expected: name.value.to_vec(),
+                    got: closing_tok.value.to_vec(),
                     span: self.stream.span_of(&closing_tok),
                 });
             }

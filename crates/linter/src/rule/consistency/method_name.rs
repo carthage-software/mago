@@ -112,14 +112,14 @@ impl LintRule for MethodNameRule {
             return;
         };
 
-        let name = method.name.value;
+        let name_bytes = method.name.value;
+        let Some(name) = std::str::from_utf8(name_bytes).ok() else { return };
 
-        // Skip magic methods (__construct, __destruct, __get, etc.)
-        if name.starts_with("__") {
+        if name_bytes.starts_with(b"__") {
             return;
         }
 
-        let is_test_method = name.starts_with("test") || name.starts_with("Test");
+        let is_test_method = name_bytes.starts_with(b"test") || name_bytes.starts_with(b"Test");
 
         // Test methods with snake_case enforcement
         if self.cfg.use_snake_case_for_tests && is_test_method {

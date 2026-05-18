@@ -1,3 +1,4 @@
+use mago_bytes::BytesDisplay;
 use mago_database::file::HasFileId;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
@@ -33,7 +34,7 @@ use super::returns_generator;
 fn contains_this_in_expression(expression: &Expression<'_>) -> Option<Span> {
     // Check if this expression is $this
     if let Expression::Variable(Variable::Direct(var)) = expression
-        && var.name == "$this"
+        && var.name == b"$this"
     {
         return Some(var.span());
     }
@@ -202,8 +203,8 @@ pub fn check_function<'arena>(function: &Function<'arena>, context: &mut Context
         return;
     };
 
-    let name = function.name.value;
-    let fqfn = context.get_name(function.name.span.start);
+    let name = BytesDisplay(function.name.value);
+    let fqfn = BytesDisplay(context.get_name(function.name.span.start));
 
     match &return_hint.hint {
         Hint::Void(_) => {

@@ -6,14 +6,14 @@ use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
 use mago_algebra::negate_formula;
-use mago_atom::Atom;
-use mago_atom::AtomMap;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
+use mago_word::Word;
+use mago_word::WordMap;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::assertion::scrape_assertions;
@@ -237,8 +237,11 @@ pub fn get_formula(
 
             for assertions in scraped_assertions {
                 for (var, anded_types) in assertions {
-                    let var =
-                        if let Some(stripped) = var.as_str().strip_prefix('=') { Atom::from(stripped) } else { var };
+                    let var = if let Some(stripped) = var.as_bytes().strip_prefix(b"=") {
+                        mago_word::word(stripped)
+                    } else {
+                        var
+                    };
 
                     for orred_types in anded_types {
                         let has_equality =
@@ -511,7 +514,7 @@ fn get_formula_from_assertions(
     conditional_object_id: Span,
     creating_object_id: Span,
     conditional: &Expression,
-    anded_assertions: Vec<AtomMap<AssertionSet>>,
+    anded_assertions: Vec<WordMap<AssertionSet>>,
     formula_size_threshold: u16,
 ) -> Option<Vec<Clause>> {
     let mut clauses = Vec::new();
@@ -548,7 +551,7 @@ fn get_formula_from_assertions(
 
     let conditional_span = conditional.span();
     let conditional_ref =
-        Atom::from(format!("*{}-{}", conditional_span.start.offset, conditional_span.end.offset).as_str());
+        Word::from(format!("*{}-{}", conditional_span.start.offset, conditional_span.end.offset).as_str());
 
     Some(vec![Clause::new(
         {
@@ -663,7 +666,7 @@ fn handle_binary_and_operation(
 
 pub fn remove_clauses_with_mixed_variables(
     clauses: Vec<Clause>,
-    mut mixed_var_ids: Vec<Atom>,
+    mut mixed_var_ids: Vec<Word>,
     cond_object_id: Span,
 ) -> Vec<Clause> {
     clauses

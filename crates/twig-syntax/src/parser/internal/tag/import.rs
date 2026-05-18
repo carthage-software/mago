@@ -13,9 +13,9 @@ impl<'arena> Parser<'_, 'arena> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let keyword = self.keyword_from(&keyword_tok);
         let template = self.parse_expression()?;
-        let as_tok = self.stream.expect_name_value("as")?;
+        let as_tok = self.stream.expect_name_value(b"as")?;
         let as_keyword = self.keyword_from(&as_tok);
-        let alias = self.expect_flexible_identifier("expected alias name")?;
+        let alias = self.expect_flexible_identifier(b"expected alias name")?;
         let close_tag = self.stream.expect_block_end()?;
         Ok(Statement::Import(Import { open_tag, keyword, template, as_keyword, alias, close_tag }))
     }

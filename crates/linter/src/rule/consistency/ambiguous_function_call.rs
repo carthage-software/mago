@@ -128,7 +128,7 @@ impl LintRule for AmbiguousFunctionCallRule {
             return;
         }
 
-        let function_name = identifier.value();
+        let function_name = mago_bytes::BytesDisplay(identifier.value());
 
         ctx.collector.report(
             Issue::new(self.cfg.level, "Ambiguous function call detected.")

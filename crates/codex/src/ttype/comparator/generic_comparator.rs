@@ -1,4 +1,4 @@
-use mago_atom::Atom;
+use mago_word::Word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
@@ -21,21 +21,21 @@ pub(crate) fn is_contained_by(
         return false;
     };
 
-    let (input_name, input_type_parameters): (Atom, Option<&[TUnion]>) = match input_type_part {
+    let (input_name, input_type_parameters): (Word, Option<&[TUnion]>) = match input_type_part {
         TAtomic::Object(TObject::Named(obj)) => (obj.name, obj.get_type_parameters()),
         TAtomic::Object(TObject::Enum(e)) => (e.name, None),
         _ => return false,
     };
 
-    let Some(container_metadata) = codebase.get_class_like(&container_object.name) else {
+    let Some(container_metadata) = codebase.get_class_like(container_object.name.as_bytes()) else {
         return false;
     };
 
-    let Some(input_metadata) = codebase.get_class_like(&input_name) else {
+    let Some(input_metadata) = codebase.get_class_like(input_name.as_bytes()) else {
         return false;
     };
 
-    if !codebase.is_instance_of(&input_name, &container_object.name) {
+    if !codebase.is_instance_of(input_name.as_bytes(), container_object.name.as_bytes()) {
         return false;
     }
 

@@ -1,15 +1,15 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use mago_atom::AtomSet;
+use mago_word::WordSet;
 
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -40,7 +40,7 @@ pub fn check_property_initialization<'ctx>(
         .iter()
         .sorted_by_key(|(k, _)| *k)
         .filter_map(|(&name, declaring_class)| {
-            let declaring_meta = context.codebase.get_class_like(declaring_class)?;
+            let declaring_meta = context.codebase.get_class_like(declaring_class.as_bytes())?;
             let prop = declaring_meta.properties.get(&name)?;
             if property_requires_initialization(name, prop, class_like_metadata, declaring_meta, context) {
                 Some((name, prop))
@@ -54,7 +54,7 @@ pub fn check_property_initialization<'ctx>(
         return;
     }
 
-    let constructor_method_id = class_like_metadata.declaring_method_ids.get(&atom("__construct"));
+    let constructor_method_id = class_like_metadata.declaring_method_ids.get(&word("__construct"));
     let Some(constructor_method_id) = constructor_method_id else {
         let parent_initializes =
             check_parent_constructor_initializes(context, artifacts, class_like_metadata, &uninitialized_properties);
@@ -110,7 +110,7 @@ pub fn check_property_initialization<'ctx>(
             artifacts,
             context,
             constructor_declaring_class,
-            atom("__construct"),
+            word("__construct"),
             class_like_metadata.flags.is_final(),
             false,
         );
@@ -119,7 +119,7 @@ pub fn check_property_initialization<'ctx>(
         // Due to per-file artifacts, we can't verify trait constructor behavior across files,
         // so we trust that a trait's constructor initializes properties declared by the same trait
         let constructor_is_from_trait =
-            context.codebase.get_class_like(&constructor_declaring_class).is_some_and(|m| m.kind.is_trait());
+            context.codebase.get_class_like(constructor_declaring_class.as_bytes()).is_some_and(|m| m.kind.is_trait());
 
         // For inherited properties, check if the parent constructor, trait constructor, or class initializers initialize them
         if !inherited_uninitialized.is_empty() {
@@ -145,8 +145,10 @@ pub fn check_property_initialization<'ctx>(
                         && let Some(prop_declaring_class) =
                             class_like_metadata.declaring_property_ids.get(prop_name).copied()
                     {
-                        let prop_is_from_trait =
-                            context.codebase.get_class_like(&prop_declaring_class).is_some_and(|m| m.kind.is_trait());
+                        let prop_is_from_trait = context
+                            .codebase
+                            .get_class_like(prop_declaring_class.as_bytes())
+                            .is_some_and(|m| m.kind.is_trait());
                         if prop_is_from_trait {
                             return false; // Trait constructor + trait property - trust it
                         }
@@ -195,7 +197,7 @@ pub fn check_property_initialization<'ctx>(
         artifacts,
         context,
         constructor_declaring_class,
-        atom("__construct"),
+        word("__construct"),
         class_like_metadata.flags.is_final(),
         false,
     );
@@ -225,7 +227,7 @@ pub fn check_property_initialization<'ctx>(
 
 /// Determines if a property requires initialization in the constructor.
 fn property_requires_initialization(
-    _name: Atom,
+    _name: Word,
     property: &PropertyMetadata,
     class_like_metadata: &ClassLikeMetadata,
     declaring_class_metadata: &ClassLikeMetadata,
@@ -279,8 +281,8 @@ fn property_requires_initialization(
         // However, if the child defines its own constructor, we cannot blindly trust the parent's
         // constructor because the child's constructor overrides it and may not call parent::__construct().
         if declaring_class_metadata.flags.is_abstract()
-            && declaring_class_metadata.declaring_method_ids.contains_key(&atom("__construct"))
-            && !class_like_metadata.declaring_method_ids.contains_key(&atom("__construct"))
+            && declaring_class_metadata.declaring_method_ids.contains_key(&word("__construct"))
+            && !class_like_metadata.declaring_method_ids.contains_key(&word("__construct"))
         {
             return false;
         }
@@ -300,17 +302,17 @@ fn property_requires_initialization(
 fn compute_transitive_initializations(
     artifacts: &AnalysisArtifacts,
     context: &Context<'_, '_>,
-    class_name: Atom,
-    method_name: Atom,
+    class_name: Word,
+    method_name: Word,
     class_is_final: bool,
     trust_all_methods: bool,
-) -> AtomSet {
-    let mut all_initialized = AtomSet::default();
+) -> WordSet {
+    let mut all_initialized = WordSet::default();
 
-    let mut work_queue: Vec<(Atom, Atom, bool, bool, Atom)> =
+    let mut work_queue: Vec<(Word, Word, bool, bool, Word)> =
         vec![(class_name, method_name, class_is_final, trust_all_methods, class_name)];
 
-    let mut visited: HashSet<(Atom, Atom)> = HashSet::default();
+    let mut visited: HashSet<(Word, Word)> = HashSet::default();
 
     while let Some((current_class, current_method, current_is_final, current_trust_all, origin_class)) =
         work_queue.pop()
@@ -320,7 +322,7 @@ fn compute_transitive_initializations(
         }
 
         let mut methods_to_process = vec![current_method];
-        let mut visited_methods: HashSet<Atom> = HashSet::default();
+        let mut visited_methods: HashSet<Word> = HashSet::default();
 
         while let Some(method) = methods_to_process.pop() {
             if !visited_methods.insert(method) {
@@ -332,7 +334,7 @@ fn compute_transitive_initializations(
             if let Some(props) = artifacts.method_initialized_properties.get(&method_key) {
                 if current_class == origin_class {
                     all_initialized.extend(props.iter().copied());
-                } else if let Some(origin_meta) = context.codebase.get_class_like(&origin_class) {
+                } else if let Some(origin_meta) = context.codebase.get_class_like(origin_class.as_bytes()) {
                     for prop_name in props {
                         let is_inherited = origin_meta
                             .declaring_property_ids
@@ -364,18 +366,18 @@ fn compute_transitive_initializations(
 
         let method_key = (current_class, current_method);
         if artifacts.method_calls_parent_constructor.get(&method_key) == Some(&true)
-            && let Some(class_meta) = context.codebase.get_class_like(&current_class)
+            && let Some(class_meta) = context.codebase.get_class_like(current_class.as_bytes())
             && let Some(parent_name) = &class_meta.direct_parent_class
-            && let Some(parent_meta) = context.codebase.get_class_like(parent_name)
-            && parent_meta.declaring_method_ids.contains_key(&atom("__construct"))
+            && let Some(parent_meta) = context.codebase.get_class_like(parent_name.as_bytes())
+            && parent_meta.declaring_method_ids.contains_key(&word("__construct"))
         {
-            work_queue.push((*parent_name, atom("__construct"), parent_meta.flags.is_final(), false, origin_class));
+            work_queue.push((*parent_name, word("__construct"), parent_meta.flags.is_final(), false, origin_class));
         }
 
         if let Some(parent_initializer_name) = artifacts.method_calls_parent_initializer.get(&method_key)
-            && let Some(class_meta) = context.codebase.get_class_like(&current_class)
+            && let Some(class_meta) = context.codebase.get_class_like(current_class.as_bytes())
             && let Some(parent_name) = &class_meta.direct_parent_class
-            && let Some(parent_meta) = context.codebase.get_class_like(parent_name)
+            && let Some(parent_meta) = context.codebase.get_class_like(parent_name.as_bytes())
             && let Some(method_id) = parent_meta.declaring_method_ids.get(parent_initializer_name)
         {
             let declaring_class_name = method_id.get_class_name();
@@ -401,8 +403,8 @@ fn compute_class_initializer_initializations(
     artifacts: &AnalysisArtifacts,
     context: &Context<'_, '_>,
     class_like_metadata: &ClassLikeMetadata,
-) -> AtomSet {
-    let mut all_initialized = AtomSet::default();
+) -> WordSet {
+    let mut all_initialized = WordSet::default();
 
     // No class initializers configured
     if context.settings.class_initializers.is_empty() {
@@ -431,7 +433,7 @@ fn compute_class_initializer_initializations(
 
     let mut current_class = class_like_metadata.direct_parent_class.as_ref();
     while let Some(parent_name) = current_class {
-        let Some(parent_meta) = context.codebase.get_class_like(parent_name) else {
+        let Some(parent_meta) = context.codebase.get_class_like(parent_name.as_bytes()) else {
             break;
         };
 
@@ -476,7 +478,7 @@ fn compute_class_initializer_initializations(
             let mut found = false;
             let mut check_class = class_like_metadata.direct_parent_class.as_ref();
             while let Some(parent_name) = check_class {
-                let Some(parent_meta) = context.codebase.get_class_like(parent_name) else {
+                let Some(parent_meta) = context.codebase.get_class_like(parent_name.as_bytes()) else {
                     break;
                 };
                 if context
@@ -496,7 +498,7 @@ fn compute_class_initializer_initializations(
     if has_any_initializer {
         let mut current_class = class_like_metadata.direct_parent_class.as_ref();
         while let Some(parent_name) = current_class {
-            let Some(parent_meta) = context.codebase.get_class_like(parent_name) else {
+            let Some(parent_meta) = context.codebase.get_class_like(parent_name.as_bytes()) else {
                 break;
             };
 
@@ -522,24 +524,24 @@ fn compute_class_initializer_initializations(
 
 /// A method is trustworthy if it cannot be overridden by subclasses,
 /// or if it's explicitly listed as a class initializer.
-fn is_method_trustworthy(context: &Context<'_, '_>, class_name: Atom, method_name: Atom, class_is_final: bool) -> bool {
+fn is_method_trustworthy(context: &Context<'_, '_>, class_name: Word, method_name: Word, class_is_final: bool) -> bool {
     if class_is_final {
         return true;
     }
 
-    if let Some(class_meta) = context.codebase.get_class_like(&class_name)
+    if let Some(class_meta) = context.codebase.get_class_like(class_name.as_bytes())
         && context.settings.is_class_initializer_for(class_meta, method_name)
     {
         return true;
     }
 
-    if let Some(visibility) = context.codebase.get_method_visibility(&class_name, &method_name)
+    if let Some(visibility) = context.codebase.get_method_visibility(class_name.as_bytes(), method_name.as_bytes())
         && visibility.is_private()
     {
         return true;
     }
 
-    if context.codebase.method_is_final(&class_name, &method_name) {
+    if context.codebase.method_is_final(class_name.as_bytes(), method_name.as_bytes()) {
         return true;
     }
 
@@ -557,17 +559,17 @@ fn check_parent_constructor_initializes(
     context: &Context<'_, '_>,
     artifacts: &AnalysisArtifacts,
     class_like_metadata: &ClassLikeMetadata,
-    uninitialized_properties: &[(Atom, &PropertyMetadata)],
+    uninitialized_properties: &[(Word, &PropertyMetadata)],
 ) -> bool {
     let mut current_class = class_like_metadata.direct_parent_class.as_ref();
 
     while let Some(parent_name) = current_class {
-        let Some(parent_meta) = context.codebase.get_class_like(parent_name) else {
+        let Some(parent_meta) = context.codebase.get_class_like(parent_name.as_bytes()) else {
             return false;
         };
 
-        if parent_meta.declaring_method_ids.contains_key(&atom("__construct")) {
-            let method_key = (*parent_name, atom("__construct"));
+        if parent_meta.declaring_method_ids.contains_key(&word("__construct")) {
+            let method_key = (*parent_name, word("__construct"));
             let constructor_initialized = artifacts.method_initialized_properties.get(&method_key);
 
             let all_initialized = uninitialized_properties.iter().all(|(prop_name, _)| {
@@ -609,7 +611,7 @@ fn report_missing_constructor(
     class_like_metadata: &ClassLikeMetadata,
     declaration_span: Span,
     name_span: Option<Span>,
-    uninitialized_properties: &[(Atom, &PropertyMetadata)],
+    uninitialized_properties: &[(Word, &PropertyMetadata)],
 ) {
     let class_name = &class_like_metadata.original_name;
     let prop_names: Vec<_> = uninitialized_properties.iter().map(|(name, _)| name.to_string()).collect();
@@ -639,10 +641,10 @@ fn report_missing_constructor(
 fn report_uninitialized_property(
     context: &mut Context<'_, '_>,
     class_like_metadata: &ClassLikeMetadata,
-    prop_name: Atom,
+    prop_name: Word,
     prop_span: Option<Span>,
     class_span: Span,
-    declaring_class: Option<Atom>,
+    declaring_class: Option<Word>,
 ) {
     let class_name = &class_like_metadata.original_name;
 
@@ -654,7 +656,7 @@ fn report_uninitialized_property(
     if let Some(span) = prop_span {
         let message = if is_inherited
             && let Some(decl_class) = declaring_class
-            && let Some(decl_meta) = context.codebase.get_class_like(&decl_class)
+            && let Some(decl_meta) = context.codebase.get_class_like(decl_class.as_bytes())
         {
             format!("Property declared in `{}`", decl_meta.original_name)
         } else {

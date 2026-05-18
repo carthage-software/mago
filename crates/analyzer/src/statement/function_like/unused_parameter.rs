@@ -13,8 +13,9 @@ use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::unused_parameter::utils::expression_potentially_contains_function_call;
 use crate::statement::function_like::unused_parameter::utils::get_foreign_variable_names;
 use crate::statement::function_like::unused_parameter::utils::is_variable_used_in_expression;
+use mago_bytes::BytesDisplay;
 
-const FUNC_GET_ARGS: &str = "func_get_args";
+const FUNC_GET_ARGS: &[u8] = b"func_get_args";
 
 pub fn check_unused_params<'ctx, 'ast, 'arena>(
     metadata: &'ctx FunctionLikeMetadata,
@@ -81,10 +82,11 @@ fn report_parameter<'arena>(
     }
 
     let parameter_name = parameter.variable.name;
-    if parameter_name.starts_with("$_") {
+    if parameter_name.starts_with(b"$_") {
         return;
     }
 
+    let parameter_name = BytesDisplay(parameter_name);
     let issue = Issue::help(format!("Parameter `{parameter_name}` is never used."))
         .with_code(IssueCode::UnusedParameter)
         .with_annotations([
@@ -116,24 +118,32 @@ pub mod utils {
 
     #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
     pub struct ForeignVariable<'arena> {
-        pub name: &'arena str,
+        pub name: &'arena [u8],
         pub conditionally: bool,
     }
 
-    pub fn is_super_global_variable(name: &str) -> bool {
+    pub fn is_super_global_variable(name: &[u8]) -> bool {
         matches!(
             name,
-            "$_GET" | "$_POST" | "$_COOKIE" | "$_REQUEST" | "$_SERVER" | "$_FILES" | "$_ENV" | "$_SESSION" | "$GLOBALS"
+            b"$_GET"
+                | b"$_POST"
+                | b"$_COOKIE"
+                | b"$_REQUEST"
+                | b"$_SERVER"
+                | b"$_FILES"
+                | b"$_ENV"
+                | b"$_SESSION"
+                | b"$GLOBALS"
         )
     }
 
-    pub fn is_predefined_variable(name: &str) -> bool {
-        is_super_global_variable(name) || "$this" == name
+    pub fn is_predefined_variable(name: &[u8]) -> bool {
+        is_super_global_variable(name) || b"$this" == name
     }
 
     pub fn potentially_contains_function_call<'arena>(
         block: &[Statement<'arena>],
-        function_name: &'static str,
+        function_name: &'static [u8],
         context: &Context<'_, 'arena>,
     ) -> bool {
         let mut context = (false, context);
@@ -152,7 +162,7 @@ pub mod utils {
 
     pub fn expression_potentially_contains_function_call<'arena>(
         expression: &Expression<'arena>,
-        function_name: &'static str,
+        function_name: &'static [u8],
         context: &Context<'_, 'arena>,
     ) -> bool {
         let mut context = (false, context);
@@ -165,7 +175,7 @@ pub mod utils {
     pub fn is_variable_used_in_expression<'arena>(
         expression: &Expression<'arena>,
         context: &Context<'_, 'arena>,
-        variable: &'arena str,
+        variable: &'arena [u8],
     ) -> bool {
         use crate::statement::function_like::unused_parameter::utils::internal::VariableReference;
         use crate::statement::function_like::unused_parameter::utils::internal::VariableWalker;
@@ -290,16 +300,16 @@ pub mod utils {
 
         #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
         pub(super) enum VariableReference<'arena> {
-            Use(&'arena str),
-            Assign(&'arena str, bool),
-            Unset(&'arena str),
+            Use(&'arena [u8]),
+            Assign(&'arena [u8], bool),
+            Unset(&'arena [u8]),
         }
 
         #[derive(Debug)]
         pub(super) struct VariableWalker;
 
         #[derive(Debug)]
-        pub(super) struct FunctionCallWalker(pub &'static str);
+        pub(super) struct FunctionCallWalker(pub &'static [u8]);
 
         impl<'ast, 'arena> Walker<'ast, 'arena, (Vec<VariableReference<'arena>>, &Context<'_, 'arena>, usize)>
             for VariableWalker

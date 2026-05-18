@@ -2,8 +2,6 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
@@ -52,6 +50,8 @@ use mago_codex::ttype::shared::MIXED_KEYED_ARRAY_ATOMIC;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::intersect_simple;
 use crate::reconciler::Context;
@@ -66,7 +66,7 @@ pub(crate) fn reconcile(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     span: Option<&Span>,
     negated: bool,
     inside_loop: bool,
@@ -344,7 +344,7 @@ pub(crate) fn intersect_null(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
@@ -408,7 +408,7 @@ pub(crate) fn intersect_resource(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     resource_to_intersection: TResource,
@@ -473,7 +473,7 @@ fn intersect_object(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -521,7 +521,7 @@ fn intersect_iterable(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -588,7 +588,7 @@ fn intersect_array_list(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -713,7 +713,7 @@ fn intersect_keyed_array(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -827,7 +827,7 @@ fn intersect_arraykey(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -907,7 +907,7 @@ fn intersect_numeric(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -984,7 +984,7 @@ fn intersect_string(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -1105,7 +1105,7 @@ fn intersect_bool(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -1189,7 +1189,7 @@ fn intersect_float(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -1261,7 +1261,7 @@ fn intersect_int(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -1335,7 +1335,7 @@ fn reconcile_truthy_or_non_empty(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
@@ -1416,7 +1416,7 @@ fn reconcile_isset(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     inside_loop: bool,
@@ -1476,7 +1476,7 @@ fn reconcile_non_empty_countable(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     recursive_check: bool,
@@ -1545,7 +1545,7 @@ fn reconcile_exactly_countable(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     recursive_check: bool,
@@ -1617,7 +1617,7 @@ fn reconcile_at_least_countable(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     recursive_check: bool,
@@ -1690,13 +1690,13 @@ fn reconcile_countable(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
     if existing_var_type.has_mixed() || existing_var_type.has_template() {
         return TUnion::from_vec(vec![
-            TAtomic::Object(TObject::Named(TNamedObject::new(atom("Countable")))),
+            TAtomic::Object(TObject::Named(TNamedObject::new(word("Countable")))),
             MIXED_KEYED_ARRAY_ATOMIC.clone(),
         ]);
     }
@@ -1708,10 +1708,10 @@ fn reconcile_countable(
         if atomic.is_countable(context.codebase) {
             countable_types.push(atomic.clone());
         } else if matches!(atomic, TAtomic::Object(TObject::Any)) {
-            countable_types.push(TAtomic::Object(TObject::Named(TNamedObject::new(atom("Countable")))));
+            countable_types.push(TAtomic::Object(TObject::Named(TNamedObject::new(word("Countable")))));
             redundant = false;
         } else if matches!(atomic, TAtomic::Object(_)) {
-            let mut countable = TNamedObject::new(atom("Countable"));
+            let mut countable = TNamedObject::new(word("Countable"));
             countable.add_intersection_type(atomic.clone());
             countable_types.push(TAtomic::Object(TObject::Named(countable)));
 
@@ -1724,10 +1724,10 @@ fn reconcile_countable(
                 ))));
             }
 
-            let mut object = TNamedObject::new(atom("Traversable"))
+            let mut object = TNamedObject::new(word("Traversable"))
                 .with_type_parameters(Some(vec![iterable.get_key_type().clone(), iterable.get_value_type().clone()]));
 
-            object.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(atom("Countable")))));
+            object.add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(word("Countable")))));
 
             countable_types.push(TAtomic::Object(TObject::Named(object)));
             redundant = false;
@@ -1759,7 +1759,7 @@ fn reconcile_less_than(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     value: i64,
@@ -1782,7 +1782,7 @@ fn reconcile_less_than_or_equal(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     value: i64,
@@ -1805,7 +1805,7 @@ fn reconcile_greater_than(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     value: i64,
@@ -1828,7 +1828,7 @@ fn reconcile_greater_than_or_equal(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     value: i64,
@@ -1850,7 +1850,7 @@ fn reconcile_integer_comparison(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     value: i64,
@@ -1934,7 +1934,7 @@ fn reconcile_array_access(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     allow_int_key: bool,
@@ -1981,7 +1981,7 @@ fn reconcile_in_array(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     typed_value: &TUnion,
@@ -2005,7 +2005,7 @@ fn reconcile_has_array_key(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     key_name: &ArrayKey,
     negated: bool,
     span: Option<&Span>,
@@ -2137,7 +2137,7 @@ fn reconcile_has_nonnull_entry_for_key(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     key_name: &ArrayKey,
     negated: bool,
     span: Option<&Span>,
@@ -2281,8 +2281,8 @@ fn reconcile_has_method(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
-    method_name: Atom,
+    key: Option<&[u8]>,
+    method_name: Word,
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
@@ -2377,8 +2377,8 @@ fn reconcile_has_property(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
-    property_name: Atom,
+    key: Option<&[u8]>,
+    property_name: Word,
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
@@ -2460,7 +2460,7 @@ pub(crate) fn get_acceptable_type(
     context: &mut Context<'_, '_>,
     acceptable_types: Vec<TAtomic>,
     did_remove_type: bool,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     span: Option<&Span>,
     existing_var_type: &TUnion,
     assertion: &Assertion,

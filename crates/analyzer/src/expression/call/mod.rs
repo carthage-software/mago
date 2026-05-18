@@ -1,9 +1,5 @@
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::concat_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
@@ -19,6 +15,10 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Call;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::ascii_lowercase_word;
+use mago_word::concat_word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -66,14 +66,14 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
     invocation_targets: Vec<InvocationTarget<'ctx>>,
     invocation_arguments: InvocationArgumentsSource<'ast, 'arena>,
     call_span: Span,
-    this_variable: Option<&str>,
+    this_variable: Option<&[u8]>,
     encountered_invalid_targets: bool,
     encountered_mixed_targets: bool,
     should_add_null: bool,
     object_has_nullsafe_null: bool,
     all_targets_non_nullable_return: bool,
 ) -> Result<(), AnalysisError> {
-    let method_name_for_assertions: Option<Atom> = invocation_targets.iter().find_map(|target| {
+    let method_name_for_assertions: Option<Word> = invocation_targets.iter().find_map(|target| {
         if let InvocationTarget::FunctionLike {
             identifier: FunctionLikeIdentifier::Method(_, _),
             method_context: Some(_),
@@ -93,7 +93,7 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
             && let Some(name) = metadata.name
         {
             match true {
-                _ if name.eq_ignore_ascii_case("mago\\inspect") => {
+                _ if name.as_bytes().eq_ignore_ascii_case(b"mago\\inspect") => {
                     inspect_arguments(context, block_context, artifacts, &target, &invocation_arguments)?;
 
                     resulting_type =
@@ -101,7 +101,7 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
 
                     continue;
                 }
-                _ if name.eq_ignore_ascii_case("mago\\confirm") => {
+                _ if name.as_bytes().eq_ignore_ascii_case(b"mago\\confirm") => {
                     confirm_argument_type(context, block_context, artifacts, &target, &invocation_arguments)?;
 
                     resulting_type =
@@ -116,7 +116,7 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
         if let Some(identifier) = target.get_function_like_identifier() {
             match identifier {
                 FunctionLikeIdentifier::Function(function_name) => {
-                    let normalized_name = ascii_lowercase_atom(function_name.as_ref());
+                    let normalized_name = ascii_lowercase_word(function_name.as_ref());
                     artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, normalized_name, false);
                 }
                 FunctionLikeIdentifier::Method(class_name, method_name) => {
@@ -132,7 +132,7 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
         }
 
         let invocation: Invocation<'ctx, 'ast, 'arena> = Invocation::new(target, invocation_arguments, call_span);
-        let mut argument_types = AtomMap::default();
+        let mut argument_types = WordMap::default();
 
         analyze_invocation(
             context,
@@ -235,8 +235,8 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
 fn apply_method_call_assertions<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
-    this_variable: Option<&str>,
-    method_name: Option<Atom>,
+    this_variable: Option<&[u8]>,
+    method_name: Option<Word>,
     mut return_type: TUnion,
 ) -> TUnion {
     let Some(this_var) = this_variable else {
@@ -251,7 +251,7 @@ fn apply_method_call_assertions<'ctx>(
         return return_type;
     }
 
-    let method_call_key = concat_atom!(this_var, "->", method, "()");
+    let method_call_key = concat_word!(this_var, "->", method, "()");
     let Some(assertions) = block_context.active_method_call_assertions.get(&method_call_key) else {
         return return_type;
     };
@@ -321,7 +321,7 @@ fn get_function_like_target_inner<'ctx>(
         .or_else(|| {
             // If this is a method and we can't find it, try looking up the inheritance chain
             if let FunctionLikeIdentifier::Method(class_name, method_name) = identifier {
-                if let Some(class_metadata) = context.codebase.get_class_like(&class_name) {
+                if let Some(class_metadata) = context.codebase.get_class_like(class_name.as_bytes()) {
                     // Try to find the method in parent classes
                     if let Some(declaring_method_id) = class_metadata.declaring_method_ids.get(&method_name) {
                         let declaring_class_id = declaring_method_id.get_class_name();
@@ -401,7 +401,7 @@ fn get_function_like_target_inner<'ctx>(
     // If this is a method, we need to create a method context so that static types can be resolved properly
     let method_context = if let Some(original_class_name) = original_class_for_method_context {
         // Look up the class metadata for the class this method is being called on (not where it's declared)
-        if let Some(class_like_metadata) = context.codebase.get_class_like(&original_class_name) {
+        if let Some(class_like_metadata) = context.codebase.get_class_like(original_class_name.as_bytes()) {
             // Create the method identifier using the looked up identifier (which points to where the method is declared)
             let declaring_method_id = if let FunctionLikeIdentifier::Method(class_name, method_name) = identifier {
                 Some(MethodIdentifier::new(class_name, method_name))
@@ -454,8 +454,9 @@ fn inspect_arguments<'ctx, 'arena>(
         };
 
         let argument_span = argument_expression.span();
-        let argument_type_string =
-            artifacts.get_expression_type(argument_expression).map_or("<unknown type>", |t| t.get_id().as_str());
+        let argument_type_string = artifacts
+            .get_expression_type(argument_expression)
+            .map_or_else(|| "<unknown type>".to_string(), |t| t.get_id().to_string());
 
         argument_annotations.push(
             Annotation::secondary(argument_span)
@@ -602,7 +603,8 @@ fn confirm_argument_type<'ctx, 'arena>(
     };
 
     let actual_argument_type_string = actual_argument_type.get_id();
-    let is_match = expected_type_literal_string.eq_ignore_ascii_case(&actual_argument_type_string);
+    let is_match = expected_type_literal_string.eq_ignore_ascii_case(actual_argument_type_string.as_bytes());
+    let expected_type_literal_string = mago_bytes::BytesDisplay(expected_type_literal_string);
 
     if is_match {
         context.collector.report_with_code(

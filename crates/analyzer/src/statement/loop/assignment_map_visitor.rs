@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
-use mago_atom::Atom;
 use mago_syntax::ast::ArgumentList;
 use mago_syntax::ast::ArrowFunction;
 use mago_syntax::ast::Assignment;
@@ -14,6 +13,7 @@ use mago_syntax::ast::UnaryPostfix;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::Unset;
 use mago_syntax::walker::MutWalker;
+use mago_word::Word;
 
 use crate::utils::expression::get_root_expression_id;
 
@@ -21,7 +21,7 @@ pub fn get_assignment_map<'ast, 'arena>(
     pre_conditions: &[&'ast Expression<'arena>],
     post_expressions: &[&'ast Expression<'arena>],
     statements: &'ast [Statement<'arena>],
-) -> (BTreeMap<Atom, BTreeSet<Atom>>, Option<Atom>) {
+) -> (BTreeMap<Word, BTreeSet<Word>>, Option<Word>) {
     let mut walker = AssignmentMapWalker::default();
 
     for pre_condition in pre_conditions {
@@ -43,7 +43,7 @@ pub fn get_assignment_map<'ast, 'arena>(
 
 #[derive(Debug, Clone, Default)]
 struct AssignmentMapWalker {
-    assignment_map: BTreeMap<Atom, BTreeSet<Atom>>,
+    assignment_map: BTreeMap<Word, BTreeSet<Word>>,
 }
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for AssignmentMapWalker {
@@ -68,7 +68,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for AssignmentMapWalker {
     }
 
     fn walk_assignment(&mut self, assignment: &'ast Assignment<'arena>, _context: &mut ()) {
-        let right_expression_id = get_root_expression_id(assignment.rhs).unwrap_or_else(|| Atom::from("isset"));
+        let right_expression_id = get_root_expression_id(assignment.rhs).unwrap_or_else(|| Word::from("isset"));
 
         if let Some(array_elements) = assignment.lhs.get_array_like_elements() {
             for array_element in array_elements {
@@ -103,7 +103,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for AssignmentMapWalker {
         let root_expression_id = get_root_expression_id(method_call.object);
 
         if let Some(root_expression_id) = root_expression_id {
-            self.assignment_map.entry(root_expression_id).or_default().insert(Atom::from("isset"));
+            self.assignment_map.entry(root_expression_id).or_default().insert(Word::from("isset"));
         }
     }
 
@@ -115,7 +115,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for AssignmentMapWalker {
         let root_expression_id = get_root_expression_id(method_partial_application.object);
 
         if let Some(root_expression_id) = root_expression_id {
-            self.assignment_map.entry(root_expression_id).or_default().insert(Atom::from("isset"));
+            self.assignment_map.entry(root_expression_id).or_default().insert(Word::from("isset"));
         }
     }
 

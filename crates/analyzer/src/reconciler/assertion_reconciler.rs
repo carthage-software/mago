@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_codex::assertion::Assertion;
+use mago_word::Word;
+use mago_word::word;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -46,7 +46,7 @@ pub fn reconcile(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: Option<&TUnion>,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     inside_loop: bool,
     span: Option<&Span>,
     can_report_issues: bool,
@@ -369,7 +369,7 @@ pub(crate) fn intersect_atomic_with_atomic(
 
     match (first_type, second_type) {
         (TAtomic::Object(TObject::Enum(first_enum)), TAtomic::Object(TObject::Enum(second_enum))) => {
-            if context.codebase.is_instance_of(&first_enum.name, &second_enum.name)
+            if context.codebase.is_instance_of(first_enum.name.as_bytes(), second_enum.name.as_bytes())
                 && first_enum.case == second_enum.case
             {
                 return Some(first_type.clone());
@@ -381,10 +381,10 @@ pub(crate) fn intersect_atomic_with_atomic(
             let first_object_name = first_object.get_name();
             let second_object_name = second_object.get_name();
 
-            if (context.codebase.interface_exists(&first_object_name)
-                && context.codebase.is_inheritable(&second_object_name))
-                || (context.codebase.interface_exists(&second_object_name)
-                    && context.codebase.is_inheritable(&first_object_name))
+            if (context.codebase.interface_exists(first_object_name.as_bytes())
+                && context.codebase.is_inheritable(second_object_name.as_bytes()))
+                || (context.codebase.interface_exists(second_object_name.as_bytes())
+                    && context.codebase.is_inheritable(first_object_name.as_bytes()))
             {
                 let mut first_type = first_type.clone();
                 first_type.add_intersection_type(second_type.clone());
@@ -427,9 +427,9 @@ pub(crate) fn intersect_atomic_with_atomic(
         (TAtomic::Iterable(iterable), object @ TAtomic::Object(TObject::Named(named_object)))
         | (object @ TAtomic::Object(TObject::Named(named_object)), TAtomic::Iterable(iterable))
             if object.is_traversable(context.codebase)
-                && (named_object.name.eq_ignore_ascii_case("Iterator")
-                    || named_object.name.eq_ignore_ascii_case("IteratorAggregate")
-                    || named_object.name.eq_ignore_ascii_case("Traversable")) =>
+                && (named_object.name.as_bytes().eq_ignore_ascii_case(b"Iterator")
+                    || named_object.name.as_bytes().eq_ignore_ascii_case(b"IteratorAggregate")
+                    || named_object.name.as_bytes().eq_ignore_ascii_case(b"Traversable")) =>
         {
             let mut object = named_object.clone();
             if object.get_type_parameters().is_none() {
@@ -696,9 +696,9 @@ fn intersect_contained_atomic_with_another(
 
     if let TAtomic::Iterable(iterable) = super_atomic
         && named_object.get_type_parameters().is_none()
-        && (named_object.name.eq_ignore_ascii_case("Iterator")
-            || named_object.name.eq_ignore_ascii_case("IteratorAggregate")
-            || named_object.name.eq_ignore_ascii_case("Traversable"))
+        && (named_object.name.as_bytes().eq_ignore_ascii_case(b"Iterator")
+            || named_object.name.as_bytes().eq_ignore_ascii_case(b"IteratorAggregate")
+            || named_object.name.as_bytes().eq_ignore_ascii_case(b"Traversable"))
     {
         return Some(TAtomic::Object(TObject::Named(
             named_object
@@ -781,8 +781,8 @@ fn handle_literal_equality(
     assertion: &Assertion,
     assertion_type: &TAtomic,
     existing_var_type: &TUnion,
-    key: Option<&str>,
-    old_var_type_atom: Atom,
+    key: Option<&[u8]>,
+    old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -855,8 +855,8 @@ fn handle_literal_equality_with_int(
     assertion: &Assertion,
     assertion_integer: i64,
     existing_var_type: &TUnion,
-    key: Option<&str>,
-    old_var_type_atom: Atom,
+    key: Option<&[u8]>,
+    old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -908,7 +908,7 @@ fn handle_literal_equality_with_int(
             }
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(string_value)), ..
-            })) if is_loose_equality && string_value.as_str() == assertion_integer.to_string() => {
+            })) if is_loose_equality && string_value.as_bytes() == assertion_integer.to_string().as_bytes() => {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Float(TFloat::Float)) if is_loose_equality => {
@@ -961,14 +961,14 @@ fn handle_literal_equality_with_int(
 fn handle_literal_equality_with_str(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
-    assertion_str_val: &str,
+    assertion_str_val: &[u8],
     existing_var_type: &TUnion,
-    key: Option<&str>,
-    old_var_type_atom: Atom,
+    key: Option<&[u8]>,
+    old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
-    let literal_asserted_type = TAtomic::Scalar(TScalar::literal_string(atom(assertion_str_val)));
+    let literal_asserted_type = TAtomic::Scalar(TScalar::literal_string(word(assertion_str_val)));
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 
     if existing_var_type.has_scalar() || existing_var_type.has_array_key() || existing_var_type.has_mixed() {
@@ -984,7 +984,7 @@ fn handle_literal_equality_with_str(
             }
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(existing_str)), ..
-            })) if existing_str.eq(assertion_str_val) => {
+            })) if existing_str.as_bytes() == assertion_str_val => {
                 if existing_var_type.is_single()
                     && let Some(key) = &key
                     && let Some(span) = span
@@ -995,7 +995,7 @@ fn handle_literal_equality_with_str(
                 acceptable_types.push(literal_asserted_type.clone());
             }
             TAtomic::Scalar(TScalar::Float(TFloat::Literal(float_value)))
-                if is_loose_equality && float_value.to_string() == assertion_str_val =>
+                if is_loose_equality && float_value.to_string().as_bytes() == assertion_str_val =>
             {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
@@ -1005,12 +1005,12 @@ fn handle_literal_equality_with_str(
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Bool(TBool { value: Some(true) }))
-                if is_loose_equality && assertion_str_val == "1" =>
+                if is_loose_equality && assertion_str_val == b"1" =>
             {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Integer(TInteger::Literal(int_value)))
-                if is_loose_equality && int_value.to_string() == assertion_str_val =>
+                if is_loose_equality && int_value.to_string().as_bytes() == assertion_str_val =>
             {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
@@ -1063,10 +1063,10 @@ fn handle_literal_equality_with_str(
 fn handle_literal_equality_with_class_string(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
-    assertion_class_string_val: Atom,
+    assertion_class_string_val: Word,
     existing_var_type: &TUnion,
-    key: Option<&str>,
-    old_var_type_atom: Atom,
+    key: Option<&[u8]>,
+    old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -1164,8 +1164,8 @@ fn handle_literal_equality_with_float(
     assertion: &Assertion,
     assertion_float_val: f64,
     existing_var_type: &TUnion,
-    key: Option<&str>,
-    old_var_type_atom: Atom,
+    key: Option<&[u8]>,
+    old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -1203,9 +1203,10 @@ fn handle_literal_equality_with_float(
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(string_value)), ..
             })) if is_loose_equality
-                && string_value
-                    .parse::<f64>()
-                    .is_ok_and(|f_val| (f_val - assertion_float_val).abs() < f64::EPSILON) =>
+                && std::str::from_utf8(string_value.as_bytes())
+                    .ok()
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .is_some_and(|f_val| (f_val - assertion_float_val).abs() < f64::EPSILON) =>
             {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
@@ -1274,8 +1275,8 @@ fn handle_literal_equality_with_bool(
     assertion: &Assertion,
     assertion_bool_val: bool,
     existing_var_type: &TUnion,
-    key: Option<&str>,
-    old_var_type_atom: Atom,
+    key: Option<&[u8]>,
+    old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -1326,7 +1327,7 @@ fn handle_literal_equality_with_bool(
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(string_value)), ..
             })) if is_loose_equality => {
-                let string_as_bool = !string_value.is_empty() && string_value != "0";
+                let string_as_bool = !string_value.is_empty() && string_value.as_bytes() != b"0";
 
                 if string_as_bool == assertion_bool_val {
                     acceptable_types.push(existing_var_atomic_type.clone());

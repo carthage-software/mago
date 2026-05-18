@@ -39,7 +39,7 @@ fn check_for_not_in_chain(expr: &Expression<'_>) -> bool {
         Expression::Access(access) => match access {
             Access::Property(property_access) => {
                 if let ClassLikeMemberSelector::Identifier(ident) = &property_access.property
-                    && ident.value == "not"
+                    && ident.value == b"not"
                 {
                     return true;
                 }
@@ -48,7 +48,7 @@ fn check_for_not_in_chain(expr: &Expression<'_>) -> bool {
             }
             Access::NullSafeProperty(property_access) => {
                 if let ClassLikeMemberSelector::Identifier(ident) = &property_access.property
-                    && ident.value == "not"
+                    && ident.value == b"not"
                 {
                     return true;
                 }
@@ -119,7 +119,7 @@ pub fn get_first_argument<'arena>(method_call: &'arena MethodCall<'arena>) -> Op
 
 /// Checks if a method selector is `and`, which resets the negation context in Pest chains.
 fn is_and_method(method: &ClassLikeMemberSelector<'_>) -> bool {
-    matches!(method, ClassLikeMemberSelector::Identifier(ident) if ident.value == "and")
+    matches!(method, ClassLikeMemberSelector::Identifier(ident) if ident.value == b"and")
 }
 
 /// Finds the span covering `->not->method()` in a method call chain.
@@ -135,7 +135,7 @@ fn find_not_arrow_span(expr: &Expression<'_>) -> Option<Span> {
         Expression::Access(access) => match access {
             Access::Property(property_access) => {
                 if let ClassLikeMemberSelector::Identifier(ident) = &property_access.property
-                    && ident.value == "not"
+                    && ident.value == b"not"
                 {
                     // Return the span of the arrow before `not`
                     return Some(property_access.arrow);
@@ -145,7 +145,7 @@ fn find_not_arrow_span(expr: &Expression<'_>) -> Option<Span> {
             }
             Access::NullSafeProperty(property_access) => {
                 if let ClassLikeMemberSelector::Identifier(ident) = &property_access.property
-                    && ident.value == "not"
+                    && ident.value == b"not"
                 {
                     return Some(property_access.question_mark_arrow);
                 }

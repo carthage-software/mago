@@ -5,7 +5,6 @@ use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
 
-use mago_atom::ascii_lowercase_atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::atomic::TAtomic;
@@ -24,6 +23,7 @@ use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
+use mago_word::ascii_lowercase_word;
 
 /// Benchmark union comparisons with simple types
 fn bench_union_simple_comparison(c: &mut Criterion) {
@@ -82,7 +82,7 @@ fn bench_union_simple_comparison(c: &mut Criterion) {
 
     c.bench_function("is_contained_by_generic_constraint_union", |b| {
         let input = TUnion::from_atomic(TAtomic::GenericParameter(TGenericParameter::new(
-            ascii_lowercase_atom("T"),
+            ascii_lowercase_word(b"T"),
             Arc::new(TUnion::from_vec(vec![
                 TAtomic::Scalar(TScalar::int()),
                 TAtomic::Scalar(TScalar::string()),
@@ -90,7 +90,7 @@ fn bench_union_simple_comparison(c: &mut Criterion) {
                 TAtomic::Scalar(TScalar::bool()),
                 TAtomic::Null,
             ])),
-            GenericParent::FunctionLike((ascii_lowercase_atom("bench"), ascii_lowercase_atom("compare"))),
+            GenericParent::FunctionLike((ascii_lowercase_word(b"bench"), ascii_lowercase_word(b"compare"))),
         )));
 
         let container = TUnion::from_vec(vec![
@@ -99,7 +99,7 @@ fn bench_union_simple_comparison(c: &mut Criterion) {
             TAtomic::Scalar(TScalar::float()),
             TAtomic::Scalar(TScalar::bool()),
             TAtomic::Null,
-            TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("Foo")))),
+            TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"Foo")))),
         ]);
 
         b.iter(|| {
@@ -158,7 +158,7 @@ fn bench_union_multi_type_comparison(c: &mut Criterion) {
             TAtomic::Scalar(TScalar::float()),
             TAtomic::Scalar(TScalar::bool()),
             TAtomic::Null,
-            TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("Foo")))),
+            TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"Foo")))),
         ]);
         b.iter(|| {
             let mut result = ComparisonResult::new();
@@ -283,15 +283,15 @@ fn bench_array_comparison(c: &mut Criterion) {
     c.bench_function("is_contained_by_keyed_in_keyed", |b| {
         let input = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new().with_known_items(
             BTreeMap::from_iter([
-                (ArrayKey::String(ascii_lowercase_atom("a")), (false, get_int())),
-                (ArrayKey::String(ascii_lowercase_atom("b")), (false, get_string())),
+                (ArrayKey::String(ascii_lowercase_word(b"a")), (false, get_int())),
+                (ArrayKey::String(ascii_lowercase_word(b"b")), (false, get_string())),
             ]),
         ))));
         let container = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new().with_known_items(
             BTreeMap::from_iter([
-                (ArrayKey::String(ascii_lowercase_atom("a")), (false, get_int())),
-                (ArrayKey::String(ascii_lowercase_atom("b")), (false, get_string())),
-                (ArrayKey::String(ascii_lowercase_atom("c")), (true, get_int())),
+                (ArrayKey::String(ascii_lowercase_word(b"a")), (false, get_int())),
+                (ArrayKey::String(ascii_lowercase_word(b"b")), (false, get_string())),
+                (ArrayKey::String(ascii_lowercase_word(b"c")), (true, get_int())),
             ]),
         ))));
         b.iter(|| {
@@ -315,9 +315,9 @@ fn bench_object_comparison(c: &mut Criterion) {
 
     c.bench_function("is_contained_by_object_same", |b| {
         let input =
-            TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("Foo")))));
+            TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"Foo")))));
         let container =
-            TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("Foo")))));
+            TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"Foo")))));
         b.iter(|| {
             let mut result = ComparisonResult::new();
             std::hint::black_box(union_comparator::is_contained_by(
@@ -334,9 +334,9 @@ fn bench_object_comparison(c: &mut Criterion) {
 
     c.bench_function("is_contained_by_object_different", |b| {
         let input =
-            TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("Foo")))));
+            TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"Foo")))));
         let container =
-            TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("Bar")))));
+            TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"Bar")))));
         b.iter(|| {
             let mut result = ComparisonResult::new();
             std::hint::black_box(union_comparator::is_contained_by(
@@ -353,11 +353,11 @@ fn bench_object_comparison(c: &mut Criterion) {
 
     c.bench_function("is_contained_by_generic_object", |b| {
         let input = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
-            ascii_lowercase_atom("Container"),
+            ascii_lowercase_word(b"Container"),
             Some(vec![get_int()]),
         ))));
         let container = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
-            ascii_lowercase_atom("Container"),
+            ascii_lowercase_word(b"Container"),
             Some(vec![get_int()]),
         ))));
         b.iter(|| {
@@ -409,7 +409,7 @@ fn bench_can_be_identical(c: &mut Criterion) {
         ]);
         let type2 = TUnion::from_vec(vec![
             TAtomic::Scalar(TScalar::string()),
-            TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("Foo")))),
+            TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"Foo")))),
             TAtomic::Scalar(TScalar::float()),
             TAtomic::Array(TArray::List(TList::new(Arc::new(get_int())))),
             TAtomic::Null,

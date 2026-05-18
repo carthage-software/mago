@@ -18,6 +18,7 @@ use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
+use mago_bytes::BytesDisplay;
 
 #[derive(Debug, Clone)]
 pub struct TraitNameRule {
@@ -92,8 +93,9 @@ impl LintRule for TraitNameRule {
 
         let mut issues = vec![];
 
-        let name = r#trait.name.value;
-        let fqcn = ctx.lookup_name(&r#trait.name);
+        let name_bytes = r#trait.name.value;
+        let Some(name) = std::str::from_utf8(name_bytes).ok() else { return };
+        let fqcn = BytesDisplay(ctx.lookup_name(&r#trait.name));
 
         if !is_class_case(name) {
             issues.push(
@@ -114,7 +116,7 @@ impl LintRule for TraitNameRule {
             );
         }
 
-        if self.cfg.psr && !name.ends_with("Trait") {
+        if self.cfg.psr && !name_bytes.ends_with(b"Trait") {
             issues.push(
                 Issue::new(self.cfg.level(), format!("Trait name `{name}` should be suffixed with `Trait`."))
                     .with_code(self.meta.code)

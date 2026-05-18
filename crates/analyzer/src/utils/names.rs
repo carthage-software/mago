@@ -1,29 +1,33 @@
 //! Helpers for rendering symbol names in user-facing diagnostics.
 
-use mago_atom::Atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_word::Word;
 
 use crate::context::Context;
 
 /// Returns the case-preserved name of a class-like for user-facing diagnostics,
 /// falling back to the input if no metadata is available.
 #[inline]
-pub(crate) fn display_class_like_name(context: &Context<'_, '_>, name: Atom) -> Atom {
-    context.codebase.get_class_like(&name).map(|m| m.original_name).unwrap_or(name)
+pub(crate) fn display_class_like_name(context: &Context<'_, '_>, name: Word) -> Word {
+    context.codebase.get_class_like(name.as_bytes()).map(|m| m.original_name).unwrap_or(name)
 }
 
 /// Returns the case-preserved method name on the given class-like for
 /// user-facing diagnostics. Falls back to the input if metadata is missing.
 #[inline]
-pub(crate) fn display_method_name(context: &Context<'_, '_>, class_name: Atom, method_name: Atom) -> Atom {
-    context.codebase.get_method(&class_name, &method_name).and_then(|m| m.original_name).unwrap_or(method_name)
+pub(crate) fn display_method_name(context: &Context<'_, '_>, class_name: Word, method_name: Word) -> Word {
+    context
+        .codebase
+        .get_method(class_name.as_bytes(), method_name.as_bytes())
+        .and_then(|m| m.original_name)
+        .unwrap_or(method_name)
 }
 
 /// Returns the case-preserved name of a global function for user-facing
 /// diagnostics. Falls back to the input if metadata is missing.
 #[inline]
-pub(crate) fn display_function_name(context: &Context<'_, '_>, name: Atom) -> Atom {
-    context.codebase.get_function(&name).and_then(|m| m.original_name).unwrap_or(name)
+pub(crate) fn display_function_name(context: &Context<'_, '_>, name: Word) -> Word {
+    context.codebase.get_function(name.as_bytes()).and_then(|m| m.original_name).unwrap_or(name)
 }
 
 /// Produces a user-facing display string for a `FunctionLikeIdentifier`.

@@ -123,14 +123,19 @@ impl LintRule for NoDeadStoreRule {
             }
 
             for span in &info.dead_stores {
+                let name_display = mago_bytes::BytesDisplay(name);
                 ctx.collector.report(
-                    Issue::new(self.cfg.level(), format!("Variable `{name}` is overwritten before its value is read."))
-                        .with_code(self.meta.code)
-                        .with_annotation(
-                            Annotation::primary(*span)
-                                .with_message(format!("`{name}` is assigned here but overwritten without being read")),
-                        )
-                        .with_help("Remove this assignment, or use the value before the next assignment."),
+                    Issue::new(
+                        self.cfg.level(),
+                        format!("Variable `{name_display}` is overwritten before its value is read."),
+                    )
+                    .with_code(self.meta.code)
+                    .with_annotation(
+                        Annotation::primary(*span).with_message(format!(
+                            "`{name_display}` is assigned here but overwritten without being read"
+                        )),
+                    )
+                    .with_help("Remove this assignment, or use the value before the next assignment."),
                 );
             }
         }

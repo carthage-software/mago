@@ -14,7 +14,7 @@ pub enum OpeningTag<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct FullOpeningTag<'arena> {
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]

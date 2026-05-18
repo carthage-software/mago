@@ -22,7 +22,11 @@ use crate::language_server::state::WorkspaceState;
 
 pub fn prepare(resolved: &ResolvedNames<'_>, file: &MagoFile, offset: u32) -> Option<PrepareRenameResponse> {
     if let Some((start, end, fqn, _)) = resolved.at_offset(offset) {
-        let placeholder = fqn.rsplit('\\').next().unwrap_or(fqn).to_string();
+        let local = match memchr::memrchr(b'\\', fqn) {
+            Some(i) => &fqn[i + 1..],
+            None => fqn,
+        };
+        let placeholder = String::from_utf8_lossy(local).into_owned();
         return Some(PrepareRenameResponse::RangeWithPlaceholder {
             range: range_at_offsets(file, start, end),
             placeholder,
@@ -32,7 +36,7 @@ pub fn prepare(resolved: &ResolvedNames<'_>, file: &MagoFile, offset: u32) -> Op
     let var = lookup::variable_at_offset(file, offset)?;
     Some(PrepareRenameResponse::RangeWithPlaceholder {
         range: range_at_offsets(file, var.start, var.end),
-        placeholder: var.name.to_string(),
+        placeholder: String::from_utf8_lossy(var.name).into_owned(),
     })
 }
 

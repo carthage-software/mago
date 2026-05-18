@@ -12,9 +12,9 @@ rust-version.workspace = true
 [dependencies]
 mago-syntax = { workspace = true }
 mago-names = { workspace = true }
-mago-atom = { workspace = true }
 mago-span = { workspace = true }
 foldhash = { workspace = true }
+memchr = { workspace = true }
 
 [dev-dependencies]
 mago-database = { workspace = true }

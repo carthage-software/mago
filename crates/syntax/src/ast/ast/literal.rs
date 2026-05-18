@@ -29,21 +29,21 @@ pub enum LiteralStringKind {
 pub struct LiteralString<'arena> {
     pub kind: LiteralStringKind,
     pub span: Span,
-    pub raw: &'arena str,
-    pub value: Option<&'arena str>,
+    pub raw: &'arena [u8],
+    pub value: Option<&'arena [u8]>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct LiteralInteger<'arena> {
     pub span: Span,
-    pub raw: &'arena str,
+    pub raw: &'arena [u8],
     pub value: Option<u64>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct LiteralFloat<'arena> {
     pub span: Span,
-    pub raw: &'arena str,
+    pub raw: &'arena [u8],
     pub value: OrderedFloat<f64>,
 }
 

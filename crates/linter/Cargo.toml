@@ -13,7 +13,8 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-mago-atom = { workspace = true }
+mago-bytes = { workspace = true }
+mago-word = { workspace = true }
 mago-text-edit = { workspace = true }
 mago-reporting = { workspace = true }
 mago-docblock = { workspace = true }
@@ -25,6 +26,7 @@ mago-names = { workspace = true }
 mago-php-version = { workspace = true }
 mago-collector = { workspace = true }
 foldhash = { workspace = true }
+memchr = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }

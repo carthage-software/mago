@@ -16,15 +16,15 @@ impl<'arena> Parser<'_, 'arena> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let keyword = self.keyword_from(&keyword_tok);
         let template = self.parse_expression()?;
-        let import_tok = self.stream.expect_name_value("import")?;
+        let import_tok = self.stream.expect_name_value(b"import")?;
         let import_keyword = self.keyword_from(&import_tok);
 
         let mut name_nodes = self.new_vec();
         let mut name_commas = self.new_vec();
         loop {
-            let from = self.expect_flexible_identifier("expected imported macro name")?;
-            let (as_keyword, to) = if let Some(as_keyword) = self.try_consume_name_keyword("as")? {
-                let alias = self.expect_flexible_identifier("expected alias")?;
+            let from = self.expect_flexible_identifier(b"expected imported macro name")?;
+            let (as_keyword, to) = if let Some(as_keyword) = self.try_consume_name_keyword(b"as")? {
+                let alias = self.expect_flexible_identifier(b"expected alias")?;
                 (Some(as_keyword), Some(alias))
             } else {
                 (None, None)

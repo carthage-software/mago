@@ -1,6 +1,4 @@
 use bumpalo::Bump;
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -8,6 +6,8 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::*;
 use mago_syntax::walker::MutWalker;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;
@@ -35,7 +35,7 @@ pub fn scan_promoted_property<'arena>(
     parameter: &'arena FunctionLikeParameter<'arena>,
     parameter_metadata: &mut FunctionLikeParameterMetadata,
     class_like_metadata: &mut ClassLikeMetadata,
-    classname: Atom,
+    classname: Word,
     type_context: &TypeResolutionContext,
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
@@ -99,7 +99,8 @@ pub fn scan_promoted_property<'arena>(
             property_metadata.hooks.insert(hook_metadata.name, hook_metadata);
         }
 
-        let prop_name = name.0.strip_prefix('$').unwrap_or(&name.0);
+        let name_bytes = name.0.as_bytes();
+        let prop_name = name_bytes.strip_prefix(b"$").unwrap_or(name_bytes);
         property_metadata.set_is_virtual(!hooks_reference_backing_store(&hook_list.hooks, prop_name));
     }
 
@@ -152,7 +153,7 @@ pub fn scan_promoted_property<'arena>(
 pub fn scan_properties<'arena>(
     property: &'arena Property<'arena>,
     class_like_metadata: &mut ClassLikeMetadata,
-    classname: Atom,
+    classname: Word,
     type_context: &TypeResolutionContext,
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
@@ -317,7 +318,8 @@ pub fn scan_properties<'arena>(
                 metadata.hooks.insert(hook_metadata.name, hook_metadata);
             }
 
-            let prop_name = name.0.strip_prefix('$').unwrap_or(&name.0);
+            let name_bytes = name.0.as_bytes();
+            let prop_name = name_bytes.strip_prefix(b"$").unwrap_or(name_bytes);
             metadata.set_is_virtual(!hooks_reference_backing_store(&hooked_property.hook_list.hooks, prop_name));
 
             if matches!(verdict.type_override, Some(TypeOverride::Untyped)) {
@@ -338,9 +340,9 @@ fn scan_property_hook<'arena>(
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
 ) -> PropertyHookMetadata {
-    let name = atom(hook.name.value);
-    let is_get = hook.name.value == "get";
-    let is_set = hook.name.value == "set";
+    let name = word(hook.name.value);
+    let is_get = hook.name.value == b"get";
+    let is_set = hook.name.value == b"set";
     let is_abstract = matches!(hook.body, PropertyHookBody::Abstract(_));
     let has_explicit_parameter = hook.parameter_list.is_some();
 
@@ -459,7 +461,7 @@ fn scan_hook_parameter<'arena>(
     property_metadata: &PropertyMetadata,
     context: &mut Context<'_, 'arena>,
 ) -> FunctionLikeParameterMetadata {
-    let name = VariableIdentifier(atom(param.variable.name));
+    let name = VariableIdentifier(word(param.variable.name));
     let name_span = param.variable.span;
 
     let mut flags = MetadataFlags::empty();
@@ -480,7 +482,7 @@ fn scan_hook_parameter<'arena>(
 }
 
 fn create_implicit_value_parameter(property_metadata: &PropertyMetadata, span: Span) -> FunctionLikeParameterMetadata {
-    let name = VariableIdentifier(atom("$value"));
+    let name = VariableIdentifier(word("$value"));
     let mut param = FunctionLikeParameterMetadata::new(name, span, span, MetadataFlags::empty());
 
     if let Some(type_meta) = &property_metadata.type_metadata {
@@ -493,13 +495,13 @@ fn create_implicit_value_parameter(property_metadata: &PropertyMetadata, span: S
 #[inline]
 pub fn scan_property_item<'arena>(
     property_item: &'arena PropertyItem<'arena>,
-    classname: Atom,
+    classname: Word,
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
 ) -> (VariableIdentifier, Span, bool, Option<TypeMetadata>) {
     match property_item {
         PropertyItem::Abstract(property_abstract_item) => {
-            let name = VariableIdentifier(atom(property_abstract_item.variable.name));
+            let name = VariableIdentifier(word(property_abstract_item.variable.name));
             let name_span = property_abstract_item.variable.span;
             let has_default = false;
             let default_type = None;
@@ -507,7 +509,7 @@ pub fn scan_property_item<'arena>(
             (name, name_span, has_default, default_type)
         }
         PropertyItem::Concrete(property_concrete_item) => {
-            let name = VariableIdentifier(atom(property_concrete_item.variable.name));
+            let name = VariableIdentifier(word(property_concrete_item.variable.name));
             let name_span = property_concrete_item.variable.span;
             let has_default = true;
             let default_type = infer(context, scope, property_concrete_item.value, Some(classname)).map(|u| {
@@ -525,7 +527,7 @@ fn update_property_metadata_from_docblock(
     arena: &Bump,
     property_metadata: &mut PropertyMetadata,
     docblock: &PropertyDocblockComment,
-    classname: Atom,
+    classname: Word,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
     class_like_metadata: &mut ClassLikeMetadata,
@@ -571,16 +573,16 @@ fn update_property_metadata_from_docblock(
 /// when the shorthand body does not itself contain any assignment).
 fn hooks_reference_backing_store<'arena>(
     hooks: impl IntoIterator<Item = &'arena PropertyHook<'arena>>,
-    property_name: &str,
+    property_name: &[u8],
 ) -> bool {
     struct Walker<'arena> {
-        property_name: &'arena str,
+        property_name: &'arena [u8],
         found: bool,
         assignment_seen: bool,
     }
 
     impl<'arena> Walker<'arena> {
-        fn new(property_name: &'arena str) -> Self {
+        fn new(property_name: &'arena [u8]) -> Self {
             Self { property_name, found: false, assignment_seen: false }
         }
 
@@ -597,7 +599,7 @@ fn hooks_reference_backing_store<'arena>(
                 return;
             };
 
-            if direct_variable.name != "$this" {
+            if direct_variable.name != b"$this" {
                 return;
             }
 
@@ -634,7 +636,7 @@ fn hooks_reference_backing_store<'arena>(
             return true;
         }
 
-        if hook.name.value == "set"
+        if hook.name.value == b"set"
             && matches!(hook.body, PropertyHookBody::Concrete(PropertyHookConcreteBody::Expression(_)))
             && !walker.assignment_seen
         {

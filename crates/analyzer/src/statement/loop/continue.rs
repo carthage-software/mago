@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use mago_atom::AtomSet;
+use mago_word::WordSet;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type_rc;
@@ -45,7 +45,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
                                 "Expected an integer literal here, found an expression of type `{}`.",
                                 artifacts
                                     .get_expression_type(expression)
-                                    .map_or_else(|| "unknown", |union| union.get_id().as_str())
+                                    .map_or_else(|| "unknown".to_string(), |union| union.get_id().to_string())
                             )),
                         ),
                     );
@@ -120,7 +120,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             loop_scope.final_actions.insert(ControlAction::Continue);
         }
 
-        let mut removed_var_ids = AtomSet::default();
+        let mut removed_var_ids = WordSet::default();
         let redefined_vars =
             block_context.get_redefined_locals(&loop_scope.parent_context_variables, false, &mut removed_var_ids);
 

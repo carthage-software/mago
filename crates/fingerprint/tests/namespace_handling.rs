@@ -3,9 +3,9 @@ use mago_database::file::File;
 use mago_fingerprint::FingerprintOptions;
 use mago_fingerprint::Fingerprintable;
 
-fn get_fingerprint(code: &'static str) -> u64 {
+fn get_fingerprint(code: &'static [u8]) -> u64 {
     let arena = Bump::new();
-    let file = File::ephemeral("test.php".into(), code.into());
+    let file = File::ephemeral(b"test.php".into(), code.into());
     let program = mago_syntax::parser::parse_file(&arena, &file);
     assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
 
@@ -22,33 +22,33 @@ fn get_fingerprint(code: &'static str) -> u64 {
 
 #[test]
 fn test_simple_namespace() {
-    let global = get_fingerprint("<?php class Foo {}");
-    let namespaced = get_fingerprint("<?php namespace App; class Foo {}");
+    let global = get_fingerprint(b"<?php class Foo {}");
+    let namespaced = get_fingerprint(b"<?php namespace App; class Foo {}");
 
     assert_ne!(global, namespaced, "Namespace should change fingerprint");
 }
 
 #[test]
 fn test_nested_namespace() {
-    let simple = get_fingerprint("<?php namespace App; class Foo {}");
-    let nested = get_fingerprint("<?php namespace App\\Models; class Foo {}");
+    let simple = get_fingerprint(b"<?php namespace App; class Foo {}");
+    let nested = get_fingerprint(b"<?php namespace App\\Models; class Foo {}");
 
     assert_ne!(simple, nested, "Nested namespace should change fingerprint");
 }
 
 #[test]
 fn test_deeply_nested_namespace() {
-    let shallow = get_fingerprint("<?php namespace A; class C {}");
-    let deep = get_fingerprint("<?php namespace A\\B\\C\\D\\E; class C {}");
+    let shallow = get_fingerprint(b"<?php namespace A; class C {}");
+    let deep = get_fingerprint(b"<?php namespace A\\B\\C\\D\\E; class C {}");
 
     assert_ne!(shallow, deep, "Deep namespace nesting should change fingerprint");
 }
 
 #[test]
 fn test_namespace_case_insensitivity() {
-    let lower = get_fingerprint("<?php namespace app; class Foo {}");
-    let upper = get_fingerprint("<?php namespace APP; class Foo {}");
-    let mixed = get_fingerprint("<?php namespace App; class Foo {}");
+    let lower = get_fingerprint(b"<?php namespace app; class Foo {}");
+    let upper = get_fingerprint(b"<?php namespace APP; class Foo {}");
+    let mixed = get_fingerprint(b"<?php namespace App; class Foo {}");
 
     assert_eq!(lower, upper, "Namespaces are case-insensitive");
     assert_eq!(lower, mixed, "Namespaces are case-insensitive");
@@ -56,8 +56,8 @@ fn test_namespace_case_insensitivity() {
 
 #[test]
 fn test_braced_namespace() {
-    let unbraced = get_fingerprint("<?php namespace Foo; class Bar {}");
-    let braced = get_fingerprint("<?php namespace Foo { class Bar {} }");
+    let unbraced = get_fingerprint(b"<?php namespace Foo; class Bar {}");
+    let braced = get_fingerprint(b"<?php namespace Foo { class Bar {} }");
 
     assert_ne!(unbraced, braced, "Braced and unbraced namespaces are syntactically different");
 }
@@ -65,7 +65,7 @@ fn test_braced_namespace() {
 #[test]
 fn test_multiple_braced_namespaces() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace Foo {
             class A {}
         }
@@ -79,9 +79,9 @@ fn test_multiple_braced_namespaces() {
 
 #[test]
 fn test_namespace_switch() {
-    let single = get_fingerprint("<?php namespace Foo; class A {} class B {}");
+    let single = get_fingerprint(b"<?php namespace Foo; class A {} class B {}");
     let switched = get_fingerprint(
-        "<?php
+        b"<?php
         namespace Foo;
         class A {}
         namespace Bar;
@@ -94,7 +94,7 @@ fn test_namespace_switch() {
 #[test]
 fn test_multiple_namespace_switches() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace NS1;
         class C1 {}
 
@@ -111,13 +111,13 @@ fn test_multiple_namespace_switches() {
 #[test]
 fn test_return_to_same_namespace() {
     let sequential = get_fingerprint(
-        "<?php
+        b"<?php
         namespace Foo;
         class A {}
         class B {}",
     );
     let switched_back = get_fingerprint(
-        "<?php
+        b"<?php
         namespace Foo;
         class A {}
 
@@ -133,8 +133,8 @@ fn test_return_to_same_namespace() {
 
 #[test]
 fn test_explicit_global_namespace() {
-    let implicit = get_fingerprint("<?php class Foo {}");
-    let explicit = get_fingerprint("<?php namespace { class Foo {} }");
+    let implicit = get_fingerprint(b"<?php class Foo {}");
+    let explicit = get_fingerprint(b"<?php namespace { class Foo {} }");
 
     assert_ne!(implicit, explicit, "Explicit and implicit global are syntactically different");
 }
@@ -142,7 +142,7 @@ fn test_explicit_global_namespace() {
 #[test]
 fn test_global_then_namespaced() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         class Global {}
 
         namespace App {
@@ -155,56 +155,56 @@ fn test_global_then_namespaced() {
 
 #[test]
 fn test_namespace_with_class() {
-    let global = get_fingerprint("<?php class User {}");
-    let namespaced = get_fingerprint("<?php namespace App; class User {}");
+    let global = get_fingerprint(b"<?php class User {}");
+    let namespaced = get_fingerprint(b"<?php namespace App; class User {}");
 
     assert_ne!(global, namespaced, "Namespaced class should differ from global");
 }
 
 #[test]
 fn test_namespace_with_interface() {
-    let global = get_fingerprint("<?php interface Repository {}");
-    let namespaced = get_fingerprint("<?php namespace App; interface Repository {}");
+    let global = get_fingerprint(b"<?php interface Repository {}");
+    let namespaced = get_fingerprint(b"<?php namespace App; interface Repository {}");
 
     assert_ne!(global, namespaced, "Namespaced interface should differ from global");
 }
 
 #[test]
 fn test_namespace_with_trait() {
-    let global = get_fingerprint("<?php trait Timestampable {}");
-    let namespaced = get_fingerprint("<?php namespace App; trait Timestampable {}");
+    let global = get_fingerprint(b"<?php trait Timestampable {}");
+    let namespaced = get_fingerprint(b"<?php namespace App; trait Timestampable {}");
 
     assert_ne!(global, namespaced, "Namespaced trait should differ from global");
 }
 
 #[test]
 fn test_namespace_with_enum() {
-    let global = get_fingerprint("<?php enum Status {}");
-    let namespaced = get_fingerprint("<?php namespace App; enum Status {}");
+    let global = get_fingerprint(b"<?php enum Status {}");
+    let namespaced = get_fingerprint(b"<?php namespace App; enum Status {}");
 
     assert_ne!(global, namespaced, "Namespaced enum should differ from global");
 }
 
 #[test]
 fn test_namespace_with_function() {
-    let global = get_fingerprint("<?php function helper() {}");
-    let namespaced = get_fingerprint("<?php namespace App; function helper() {}");
+    let global = get_fingerprint(b"<?php function helper() {}");
+    let namespaced = get_fingerprint(b"<?php namespace App; function helper() {}");
 
     assert_ne!(global, namespaced, "Namespaced function should differ from global");
 }
 
 #[test]
 fn test_namespace_with_constant() {
-    let global = get_fingerprint("<?php const VERSION = '1.0';");
-    let namespaced = get_fingerprint("<?php namespace App; const VERSION = '1.0';");
+    let global = get_fingerprint(b"<?php const VERSION = '1.0';");
+    let namespaced = get_fingerprint(b"<?php namespace App; const VERSION = '1.0';");
 
     assert_ne!(global, namespaced, "Namespaced constant should differ from global");
 }
 
 #[test]
 fn test_multiple_classes_in_namespace() {
-    let one = get_fingerprint("<?php namespace App; class A {}");
-    let two = get_fingerprint("<?php namespace App; class A {} class B {}");
+    let one = get_fingerprint(b"<?php namespace App; class A {}");
+    let two = get_fingerprint(b"<?php namespace App; class A {} class B {}");
 
     assert_ne!(one, two, "Adding class in namespace should change fingerprint");
 }
@@ -212,7 +212,7 @@ fn test_multiple_classes_in_namespace() {
 #[test]
 fn test_mixed_symbols_in_namespace() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App;
 
         class MyClass {}
@@ -229,13 +229,13 @@ fn test_mixed_symbols_in_namespace() {
 #[test]
 fn test_nested_function_inherits_namespace() {
     let global = get_fingerprint(
-        "<?php
+        b"<?php
         function outer() {
             function inner() {}
         }",
     );
     let namespaced = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App;
         function outer() {
             function inner() {}
@@ -248,7 +248,7 @@ fn test_nested_function_inherits_namespace() {
 #[test]
 fn test_nested_function_multiple_levels() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App\\Services;
 
         function level1() {
@@ -264,7 +264,7 @@ fn test_nested_function_multiple_levels() {
 #[test]
 fn test_namespaced_class_extends() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App;
         class Child extends Parent {}",
     );
@@ -275,7 +275,7 @@ fn test_namespaced_class_extends() {
 #[test]
 fn test_namespaced_class_implements() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App;
         class Implementation implements Interface1, Interface2 {}",
     );
@@ -286,7 +286,7 @@ fn test_namespaced_class_implements() {
 #[test]
 fn test_namespaced_trait_usage() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App;
         class MyClass {
             use Trait1, Trait2;
@@ -298,72 +298,72 @@ fn test_namespaced_trait_usage() {
 
 #[test]
 fn test_use_statement_added() {
-    let without = get_fingerprint("<?php namespace App; class Foo {}");
-    let with = get_fingerprint("<?php namespace App; use Some\\Thing; class Foo {}");
+    let without = get_fingerprint(b"<?php namespace App; class Foo {}");
+    let with = get_fingerprint(b"<?php namespace App; use Some\\Thing; class Foo {}");
 
     assert_ne!(without, with, "Adding use statement should change fingerprint");
 }
 
 #[test]
 fn test_use_statement_change() {
-    let use1 = get_fingerprint("<?php namespace App; use Lib\\A; class Foo {}");
-    let use2 = get_fingerprint("<?php namespace App; use Lib\\B; class Foo {}");
+    let use1 = get_fingerprint(b"<?php namespace App; use Lib\\A; class Foo {}");
+    let use2 = get_fingerprint(b"<?php namespace App; use Lib\\B; class Foo {}");
 
     assert_ne!(use1, use2, "Changing use statement should change fingerprint");
 }
 
 #[test]
 fn test_multiple_use_statements() {
-    let one = get_fingerprint("<?php namespace App; use Lib\\A; class Foo {}");
-    let two = get_fingerprint("<?php namespace App; use Lib\\A; use Lib\\B; class Foo {}");
+    let one = get_fingerprint(b"<?php namespace App; use Lib\\A; class Foo {}");
+    let two = get_fingerprint(b"<?php namespace App; use Lib\\A; use Lib\\B; class Foo {}");
 
     assert_ne!(one, two, "Adding use statement should change fingerprint");
 }
 
 #[test]
 fn test_use_statement_order() {
-    let order1 = get_fingerprint("<?php namespace App; use Lib\\A; use Lib\\B; class Foo {}");
-    let order2 = get_fingerprint("<?php namespace App; use Lib\\B; use Lib\\A; class Foo {}");
+    let order1 = get_fingerprint(b"<?php namespace App; use Lib\\A; use Lib\\B; class Foo {}");
+    let order2 = get_fingerprint(b"<?php namespace App; use Lib\\B; use Lib\\A; class Foo {}");
 
     assert_ne!(order1, order2, "Use statement order should matter");
 }
 
 #[test]
 fn test_use_with_alias() {
-    let without = get_fingerprint("<?php namespace App; use Lib\\Thing; class Foo {}");
-    let with = get_fingerprint("<?php namespace App; use Lib\\Thing as Alias; class Foo {}");
+    let without = get_fingerprint(b"<?php namespace App; use Lib\\Thing; class Foo {}");
+    let with = get_fingerprint(b"<?php namespace App; use Lib\\Thing as Alias; class Foo {}");
 
     assert_ne!(without, with, "Use alias should change fingerprint");
 }
 
 #[test]
 fn test_use_alias_change() {
-    let alias1 = get_fingerprint("<?php namespace App; use Lib\\Thing as A; class Foo {}");
-    let alias2 = get_fingerprint("<?php namespace App; use Lib\\Thing as B; class Foo {}");
+    let alias1 = get_fingerprint(b"<?php namespace App; use Lib\\Thing as A; class Foo {}");
+    let alias2 = get_fingerprint(b"<?php namespace App; use Lib\\Thing as B; class Foo {}");
 
     assert_ne!(alias1, alias2, "Changing use alias should change fingerprint");
 }
 
 #[test]
 fn test_grouped_use_statements() {
-    let separate = get_fingerprint("<?php namespace App; use Lib\\A; use Lib\\B; class Foo {}");
-    let grouped = get_fingerprint("<?php namespace App; use Lib\\{A, B}; class Foo {}");
+    let separate = get_fingerprint(b"<?php namespace App; use Lib\\A; use Lib\\B; class Foo {}");
+    let grouped = get_fingerprint(b"<?php namespace App; use Lib\\{A, B}; class Foo {}");
 
     assert_ne!(separate, grouped, "Grouped and separate use are syntactically different");
 }
 
 #[test]
 fn test_use_function() {
-    let without = get_fingerprint("<?php namespace App; function foo() {}");
-    let with = get_fingerprint("<?php namespace App; use function Lib\\helper; function foo() {}");
+    let without = get_fingerprint(b"<?php namespace App; function foo() {}");
+    let with = get_fingerprint(b"<?php namespace App; use function Lib\\helper; function foo() {}");
 
     assert_ne!(without, with, "Use function should change fingerprint");
 }
 
 #[test]
 fn test_use_const() {
-    let without = get_fingerprint("<?php namespace App; const X = 1;");
-    let with = get_fingerprint("<?php namespace App; use const Lib\\CONSTANT; const X = 1;");
+    let without = get_fingerprint(b"<?php namespace App; const X = 1;");
+    let with = get_fingerprint(b"<?php namespace App; use const Lib\\CONSTANT; const X = 1;");
 
     assert_ne!(without, with, "Use const should change fingerprint");
 }
@@ -371,7 +371,7 @@ fn test_use_const() {
 #[test]
 fn test_mixed_use_types() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App;
 
         use Lib\\ClassA;
@@ -387,7 +387,7 @@ fn test_mixed_use_types() {
 #[test]
 fn test_namespace_with_all_features() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App\\Models;
 
         use App\\Traits\\Timestampable;
@@ -408,8 +408,8 @@ fn test_namespace_with_all_features() {
 
 #[test]
 fn test_relative_namespace_references() {
-    let absolute = get_fingerprint("<?php namespace App; class Foo extends \\Base\\Parent {}");
-    let relative = get_fingerprint("<?php namespace App; class Foo extends Parent {}");
+    let absolute = get_fingerprint(b"<?php namespace App; class Foo extends \\Base\\Parent {}");
+    let relative = get_fingerprint(b"<?php namespace App; class Foo extends Parent {}");
 
     assert_ne!(absolute, relative, "Absolute vs relative namespace reference should differ");
 }
@@ -417,7 +417,7 @@ fn test_relative_namespace_references() {
 #[test]
 fn test_namespace_keyword_in_code() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App;
 
         class Foo {
@@ -432,8 +432,8 @@ fn test_namespace_keyword_in_code() {
 
 #[test]
 fn test_empty_namespace_declaration() {
-    let fp1 = get_fingerprint("<?php namespace Foo;");
-    let fp2 = get_fingerprint("<?php namespace Bar;");
+    let fp1 = get_fingerprint(b"<?php namespace Foo;");
+    let fp2 = get_fingerprint(b"<?php namespace Bar;");
 
     assert_ne!(fp1, fp2, "Different empty namespaces should differ");
 }
@@ -441,7 +441,7 @@ fn test_empty_namespace_declaration() {
 #[test]
 fn test_namespace_then_empty_namespace() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace Foo;
         class A {}
 
@@ -458,7 +458,7 @@ fn test_namespace_then_empty_namespace() {
 #[test]
 fn test_function_in_control_flow_inherits_namespace() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App;
 
         if (true) {
@@ -472,7 +472,7 @@ fn test_function_in_control_flow_inherits_namespace() {
 #[test]
 fn test_nested_namespace_scoping() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace Outer;
 
         function outer() {

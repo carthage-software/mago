@@ -12,7 +12,7 @@ use std::cmp::Ordering;
 use foldhash::HashMap;
 use foldhash::HashSet;
 
-use mago_atom::Atom;
+use mago_word::Word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
@@ -33,8 +33,8 @@ use crate::ttype::union::TUnion;
 #[must_use]
 #[allow(clippy::implicit_hasher)]
 pub fn get_root_template_type(
-    lower_bounds: &HashMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>>,
-    parameter_name: Atom,
+    lower_bounds: &HashMap<Word, HashMap<GenericParent, Vec<TemplateBound>>>,
+    parameter_name: Word,
     defining_entity: &GenericParent,
     mut visited_entities: HashSet<GenericParent>,
     codebase: &CodebaseMetadata,

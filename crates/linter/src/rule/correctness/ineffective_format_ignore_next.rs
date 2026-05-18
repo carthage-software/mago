@@ -159,7 +159,7 @@ fn build_ignore_next_markers(program: &mago_syntax::ast::Program<'_>) -> Vec<Ign
             continue;
         }
 
-        if IGNORE_NEXT_MARKERS.iter().any(|m| trivia.value.contains(m)) {
+        if IGNORE_NEXT_MARKERS.iter().any(|m| memchr::memmem::find(trivia.value, m.as_bytes()).is_some()) {
             markers.push(IgnoreNextMarker { marker_span: trivia.span, used: false });
         }
     }

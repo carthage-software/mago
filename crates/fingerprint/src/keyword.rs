@@ -1,5 +1,3 @@
-use std::hash::Hash;
-
 use mago_names::ResolvedNames;
 use mago_syntax::ast::Keyword;
 
@@ -16,7 +14,7 @@ impl Fingerprintable for Keyword<'_> {
     ) where
         H: std::hash::Hasher,
     {
-        mago_atom::ascii_lowercase_atom(self.value).hash(hasher);
+        crate::hash_ascii_lowercase(self.value, hasher);
     }
 }
 

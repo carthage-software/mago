@@ -102,10 +102,11 @@ impl LintRule for NoRedundantLabelRule {
                 continue;
             }
 
-            let issue = Issue::new(self.cfg.level(), format!("Redundant goto label `{label_name}`."))
+            let label_display = mago_bytes::BytesDisplay(label_name);
+            let issue = Issue::new(self.cfg.level(), format!("Redundant goto label `{label_display}`."))
                 .with_code(self.meta.code)
                 .with_annotation(Annotation::primary(label_span).with_message("This label is declared but not used"))
-                .with_note(format!("Label `{label_name}` is declared but not used by any `goto` statement."))
+                .with_note(format!("Label `{label_display}` is declared but not used by any `goto` statement."))
                 .with_help("Remove the redundant label.");
 
             ctx.collector.report(issue);

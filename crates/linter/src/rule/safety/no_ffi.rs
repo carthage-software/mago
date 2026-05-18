@@ -123,10 +123,11 @@ impl LintRule for NoFfiRule {
         let class_name = ctx.lookup_name(identifier);
 
         if FFI_CLASSES.iter().any(|ffi| ffi.eq_ignore_ascii_case(class_name)) {
+            let class_name_display = mago_bytes::BytesDisplay(class_name);
             ctx.collector.report(
                 Issue::new(
                     self.cfg.level(),
-                    format!("Potentially unsafe use of FFI class `{class_name}`."),
+                    format!("Potentially unsafe use of FFI class `{class_name_display}`."),
                 )
                 .with_code(self.meta.code)
                 .with_annotation(Annotation::primary(identifier.span())
@@ -141,4 +142,4 @@ impl LintRule for NoFfiRule {
     }
 }
 
-const FFI_CLASSES: [&str; 3] = ["FFI", "FFI\\Cdata", "FFI\\Ctype"];
+const FFI_CLASSES: [&[u8]; 3] = [b"FFI", b"FFI\\Cdata", b"FFI\\Ctype"];

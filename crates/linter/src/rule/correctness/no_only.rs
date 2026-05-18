@@ -112,7 +112,7 @@ impl LintRule for NoOnlyRule {
             return;
         };
 
-        if method_name != "only" {
+        if method_name != b"only" {
             return;
         }
 

@@ -92,9 +92,9 @@ impl LintRule for NoMultiAssignmentsRule {
             return;
         };
 
-        let a = &ctx.source_file.contents[assignment.lhs.span().to_range_usize()];
-        let b = &ctx.source_file.contents[other_assignment.lhs.span().to_range_usize()];
-        let c = &ctx.source_file.contents[other_assignment.rhs.span().to_range_usize()];
+        let a = mago_bytes::BytesDisplay(&ctx.source_file.contents[assignment.lhs.span().to_range_usize()]);
+        let b = mago_bytes::BytesDisplay(&ctx.source_file.contents[other_assignment.lhs.span().to_range_usize()]);
+        let c = mago_bytes::BytesDisplay(&ctx.source_file.contents[other_assignment.rhs.span().to_range_usize()]);
 
         let issue = Issue::new(self.cfg.level, "Avoid multiple assignments in a single statement.")
             .with_code(self.meta.code)

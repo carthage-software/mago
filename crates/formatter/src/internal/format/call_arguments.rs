@@ -47,7 +47,7 @@ pub(super) fn print_call_arguments<'arena>(
             || (expression.is_exit_or_die_construct() && f.settings.parentheses_in_exit_and_die)
             || (expression.is_attribute() && f.settings.parentheses_in_attribute)
         {
-            Document::String("()")
+            Document::String(b"()")
         } else {
             Document::empty()
         };
@@ -63,9 +63,9 @@ pub(super) fn print_call_arguments<'arena>(
         return if let Some(inner_comments) = f.print_inner_comment(argument_list.span(), true) {
             Document::Array(vec![
                 in f.arena;
-                Document::String("("),
+                Document::String(b"("),
                 inner_comments,
-                Document::String(")"),
+                Document::String(b")"),
             ])
         } else {
             Document::empty()
@@ -119,7 +119,7 @@ pub(super) fn print_argument_list<'arena>(
     let left_parenthesis = {
         let mut contents = vec![
             in f.arena;
-            Document::String("(")
+            Document::String(b"(")
         ];
 
         if let Some(trailing_comment) = f.print_trailing_comments(argument_list.left_parenthesis) {
@@ -162,7 +162,7 @@ pub(super) fn print_argument_list<'arena>(
     {
         let argument = &argument_list.arguments.as_slice()[0];
         let argument_doc = argument.format(f);
-        let right_parenthesis = format_token(f, argument_list.right_parenthesis, ")");
+        let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
 
         return Document::Array(vec![in f.arena; left_parenthesis, argument_doc, right_parenthesis]);
     }
@@ -221,7 +221,7 @@ pub(super) fn print_argument_list<'arena>(
     f.argument_state.named_argument_padding = previous_named_argument_padding;
 
     let dangling_comments = f.print_dangling_comments(argument_list.span(), true);
-    let right_parenthesis = format_token(f, argument_list.right_parenthesis, ")");
+    let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
 
     if arguments_count == 0 {
         contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(false)));
@@ -248,7 +248,7 @@ pub(super) fn print_argument_list<'arena>(
             let element = &argument_list.arguments.as_slice()[arg_idx];
             let mut argument = vec![in f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
             if i < (length - 1) {
-                argument.push(Document::String(","));
+                argument.push(Document::String(b","));
 
                 if f.is_next_line_empty(element.span()) {
                     argument.push(Document::Line(Line::hard()));
@@ -273,7 +273,7 @@ pub(super) fn print_argument_list<'arena>(
             in f.arena;
             Document::Line(Line::hard()),
             Document::Group(Group::new(get_printed_arguments(f, true, 0))),
-            if f.settings.trailing_comma { Document::String(",") } else { Document::empty() },
+            if f.settings.trailing_comma { Document::String(b",") } else { Document::empty() },
         ]));
 
         parts.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(true)));
@@ -303,7 +303,7 @@ pub(super) fn print_argument_list<'arena>(
                         Document::Group(Group::new(vec![in f.arena; clone_in_arena(f.arena, &single_argument)])),
                     ])),
                     if f.settings.trailing_comma {
-                        Document::IfBreak(IfBreak::new(f.arena, Document::String(","), Document::empty()))
+                        Document::IfBreak(IfBreak::new(f.arena, Document::String(b","), Document::empty()))
                     } else {
                         Document::empty()
                     },
@@ -343,7 +343,7 @@ pub(super) fn print_argument_list<'arena>(
                         in f.arena;
                         clone_in_arena(f.arena, &left_parenthesis),
                         Document::Group(Group::new(vec![in f.arena; first_argument]).with_break_mode(BreakMode::Force)),
-                        Document::String(", "),
+                        Document::String(b", "),
                         last_argument,
                         print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                     ],
@@ -359,7 +359,7 @@ pub(super) fn print_argument_list<'arena>(
                     in f.arena;
                     clone_in_arena(f.arena, &left_parenthesis),
                     clone_in_arena(f.arena, &first_argument),
-                    Document::String(", "),
+                    Document::String(b", "),
                     clone_in_arena(f.arena, &last_argument),
                     print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                 ],
@@ -369,7 +369,7 @@ pub(super) fn print_argument_list<'arena>(
                         in f.arena;
                         clone_in_arena(f.arena, &left_parenthesis),
                         Document::Group(Group::new(vec![in f.arena; first_argument]).with_break_mode(BreakMode::Force)),
-                        Document::String(", "),
+                        Document::String(b", "),
                         last_argument,
                         print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                     ]),
@@ -386,7 +386,7 @@ pub(super) fn print_argument_list<'arena>(
         }
 
         if !first_arguments.is_empty() {
-            first_arguments.push(Document::String(","));
+            first_arguments.push(Document::String(b","));
             first_arguments.push(Document::Line(Line::default()));
         }
 
@@ -417,7 +417,7 @@ pub(super) fn print_argument_list<'arena>(
     printed_arguments.insert(0, Document::Line(Line::soft()));
     contents.push(Document::IndentIfBreak(IndentIfBreak::new(group_id, printed_arguments)));
     if f.settings.trailing_comma {
-        contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
+        contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
     }
     contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None));
 
@@ -496,10 +496,10 @@ pub(super) fn print_partial_argument_list<'arena>(
     argument_list: &'arena PartialArgumentList<'arena>,
 ) -> Document<'arena> {
     if argument_list.is_first_class_callable() {
-        return Document::String("(...)");
+        return Document::String(b"(...)");
     }
 
-    let left_parenthesis = Document::String("(");
+    let left_parenthesis = Document::String(b"(");
     let mut contents = vec![in f.arena; left_parenthesis];
 
     let arguments_count = argument_list.arguments.len();
@@ -509,7 +509,7 @@ pub(super) fn print_partial_argument_list<'arena>(
     }
 
     let dangling_comments = f.print_dangling_comments(argument_list.span(), true);
-    let right_parenthesis = format_token(f, argument_list.right_parenthesis, ")");
+    let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
 
     if arguments_count == 0 {
         // Technically, this is impossible, but just in case..
@@ -524,7 +524,7 @@ pub(super) fn print_partial_argument_list<'arena>(
             let element = &argument_list.arguments.as_slice()[arg_idx];
             let mut argument = vec![in f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
             if i < (arguments_count - 1) {
-                argument.push(Document::String(","));
+                argument.push(Document::String(b","));
 
                 if f.is_next_line_empty(element.span()) {
                     argument.push(Document::Line(Line::hard()));

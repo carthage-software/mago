@@ -20,10 +20,10 @@ impl<'arena> Parser<'_, 'arena> {
 
         let mut target_nodes = self.new_vec();
         let mut target_commas = self.new_vec();
-        target_nodes.push(self.expect_flexible_identifier("expected loop variable name")?);
+        target_nodes.push(self.expect_flexible_identifier(b"expected loop variable name")?);
         while let Some(comma) = self.stream.try_consume(TwigTokenKind::Comma)? {
             target_commas.push(comma);
-            target_nodes.push(self.expect_flexible_identifier("expected second loop variable name")?);
+            target_nodes.push(self.expect_flexible_identifier(b"expected second loop variable name")?);
         }
         let targets = TokenSeparatedSequence::new(target_nodes, target_commas);
 
@@ -34,24 +34,24 @@ impl<'arena> Parser<'_, 'arena> {
         let in_keyword = self.keyword_from(&in_tok);
 
         let sequence = self.parse_expression()?;
-        let if_clause = if let Some(keyword) = self.try_consume_name_keyword("if")? {
+        let if_clause = if let Some(keyword) = self.try_consume_name_keyword(b"if")? {
             let condition = self.parse_expression()?;
             Some(ForIfClause { keyword, condition })
         } else {
             None
         };
         let close_tag = self.stream.expect_block_end()?;
-        let body = self.parse_statements(&BlockTerminator { names: &["else", "endfor"] })?;
+        let body = self.parse_statements(&BlockTerminator { names: &[b"else", b"endfor"] })?;
 
         let next_open_tok = self.stream.expect_block_start()?;
         let next_open_tag = self.stream.span_of(&next_open_tok);
-        let next_name_tok = self.stream.expect_name("expected `else` or `endfor`")?;
+        let next_name_tok = self.stream.expect_name(b"expected `else` or `endfor`")?;
 
         let (else_branch, end_open_tag, end_keyword, end_close_tag) = match next_name_tok.value {
-            "else" => {
+            b"else" => {
                 let else_keyword = self.keyword_from(&next_name_tok);
                 let else_close_tag = self.stream.expect_block_end()?;
-                let else_body = self.parse_statements(&BlockTerminator { names: &["endfor"] })?;
+                let else_body = self.parse_statements(&BlockTerminator { names: &[b"endfor"] })?;
                 let else_branch = ElseBranch {
                     open_tag: next_open_tag,
                     keyword: else_keyword,
@@ -60,11 +60,11 @@ impl<'arena> Parser<'_, 'arena> {
                 };
                 let end_open_tok = self.stream.expect_block_start()?;
                 let end_open_tag = self.stream.span_of(&end_open_tok);
-                let end_kw_tok = self.stream.expect_name("expected `endfor`")?;
-                if end_kw_tok.value != "endfor" {
+                let end_kw_tok = self.stream.expect_name(b"expected `endfor`")?;
+                if end_kw_tok.value != b"endfor" {
                     return Err(ParseError::MismatchedEndTag {
-                        expected: "endfor".to_string(),
-                        got: end_kw_tok.value.to_string(),
+                        expected: b"endfor".to_vec(),
+                        got: end_kw_tok.value.to_vec(),
                         span: self.stream.span_of(&end_kw_tok),
                     });
                 }
@@ -72,15 +72,15 @@ impl<'arena> Parser<'_, 'arena> {
                 let end_close_tag = self.stream.expect_block_end()?;
                 (Some(else_branch), end_open_tag, end_keyword, end_close_tag)
             }
-            "endfor" => {
+            b"endfor" => {
                 let end_keyword = self.keyword_from(&next_name_tok);
                 let end_close_tag = self.stream.expect_block_end()?;
                 (None, next_open_tag, end_keyword, end_close_tag)
             }
             other => {
                 return Err(ParseError::MismatchedEndTag {
-                    expected: "endfor".to_string(),
-                    got: other.to_string(),
+                    expected: b"endfor".to_vec(),
+                    got: other.to_vec(),
                     span: self.stream.span_of(&next_name_tok),
                 });
             }

@@ -52,7 +52,7 @@ fn tag_for_basic() {
     let tpl = parse_ok(&arena, "{% for x in list %}{{ x }}{% endfor %}");
     let Statement::For(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.targets.len(), 1);
-    assert_eq!(n.targets.nodes[0].value, "x");
+    assert_eq!(n.targets.nodes[0].value, b"x".as_slice());
     assert!(n.else_branch.is_none());
     assert!(n.if_clause.is_none());
 }
@@ -63,8 +63,8 @@ fn tag_for_key_value() {
     let tpl = parse_ok(&arena, "{% for k, v in items %}{{ k }}={{ v }}{% endfor %}");
     let Statement::For(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.targets.len(), 2);
-    assert_eq!(n.targets.nodes[0].value, "k");
-    assert_eq!(n.targets.nodes[1].value, "v");
+    assert_eq!(n.targets.nodes[0].value, b"k".as_slice());
+    assert_eq!(n.targets.nodes[1].value, b"v".as_slice());
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn tag_block_short_form() {
     let arena = Bump::new();
     let tpl = parse_ok(&arena, "{% block title 'hi' %}");
     let Statement::Block(n) = &tpl.statements.nodes[0] else { panic!() };
-    assert_eq!(n.name.value, "title");
+    assert_eq!(n.name.value, b"title".as_slice());
     assert!(matches!(n.body, mago_twig_syntax::ast::BlockBody::Short(_)));
 }
 
@@ -135,7 +135,7 @@ fn tag_block_body_form() {
     let arena = Bump::new();
     let tpl = parse_ok(&arena, "{% block main %}body{% endblock %}");
     let Statement::Block(n) = &tpl.statements.nodes[0] else { panic!() };
-    assert_eq!(n.name.value, "main");
+    assert_eq!(n.name.value, b"main".as_slice());
     assert!(matches!(n.body, mago_twig_syntax::ast::BlockBody::Long(_)));
 }
 
@@ -251,7 +251,7 @@ fn tag_macro_with_args() {
     let arena = Bump::new();
     let tpl = parse_ok(&arena, "{% macro foo(a, b) %}{{ a }}{{ b }}{% endmacro %}");
     let Statement::Macro(n) = &tpl.statements.nodes[0] else { panic!() };
-    assert_eq!(n.name.value, "foo");
+    assert_eq!(n.name.value, b"foo".as_slice());
     assert_eq!(n.arguments.len(), 2);
 }
 
@@ -275,7 +275,7 @@ fn tag_import() {
     let arena = Bump::new();
     let tpl = parse_ok(&arena, "{% import 'macros.twig' as m %}");
     let Statement::Import(n) = &tpl.statements.nodes[0] else { panic!() };
-    assert_eq!(n.alias.value, "m");
+    assert_eq!(n.alias.value, b"m".as_slice());
 }
 
 #[test]
@@ -285,11 +285,11 @@ fn tag_from() {
     let Statement::From(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.names.len(), 2);
     let e0 = &n.names.nodes[0];
-    assert_eq!(e0.from.value, "foo");
-    assert_eq!(e0.to.map(|t| t.value).unwrap_or(e0.from.value), "foo");
+    assert_eq!(e0.from.value, b"foo".as_slice());
+    assert_eq!(e0.to.map(|t| t.value).unwrap_or(e0.from.value), b"foo".as_slice());
     let e1 = &n.names.nodes[1];
-    assert_eq!(e1.from.value, "bar");
-    assert_eq!(e1.to.map(|t| t.value).unwrap_or(e1.from.value), "baz");
+    assert_eq!(e1.from.value, b"bar".as_slice());
+    assert_eq!(e1.to.map(|t| t.value).unwrap_or(e1.from.value), b"baz".as_slice());
 }
 
 #[test]
@@ -311,7 +311,7 @@ fn tag_apply_single_filter() {
     let tpl = parse_ok(&arena, "{% apply upper %}hi{% endapply %}");
     let Statement::Apply(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.filters.len(), 1);
-    assert_eq!(n.filters.nodes[0].name.value, "upper");
+    assert_eq!(n.filters.nodes[0].name.value, b"upper".as_slice());
 }
 
 #[test]
@@ -319,8 +319,8 @@ fn tag_apply_filter_chain() {
     let arena = Bump::new();
     let tpl = parse_ok(&arena, "{% apply lower|title %}HELLO{% endapply %}");
     let Statement::Apply(n) = &tpl.statements.nodes[0] else { panic!() };
-    let names: Vec<&str> = n.filters.iter().map(|f| f.name.value).collect();
-    assert_eq!(names, vec!["lower", "title"]);
+    let names: Vec<&[u8]> = n.filters.iter().map(|f| f.name.value).collect();
+    assert_eq!(names, vec![b"lower".as_slice(), b"title"]);
     // The `|` separator between the two filters is preserved in the
     // token-separated sequence.
     assert_eq!(n.filters.tokens.len(), 1);
@@ -332,9 +332,9 @@ fn tag_apply_filter_with_args() {
     let tpl = parse_ok(&arena, r#"{% apply replace({'a': 'b'})|upper %}x{% endapply %}"#);
     let Statement::Apply(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.filters.len(), 2);
-    assert_eq!(n.filters.nodes[0].name.value, "replace");
+    assert_eq!(n.filters.nodes[0].name.value, b"replace".as_slice());
     assert_eq!(n.filters.nodes[0].argument_list.as_ref().map(|a| a.arguments.len()).unwrap_or(0), 1);
-    assert_eq!(n.filters.nodes[1].name.value, "upper");
+    assert_eq!(n.filters.nodes[1].name.value, b"upper".as_slice());
     assert!(n.filters.nodes[1].argument_list.is_none());
 }
 
@@ -399,7 +399,7 @@ fn tag_guard_function() {
     let tpl = parse_ok(&arena, "{% guard function constant %}ok{% endguard %}");
     let Statement::Guard(g) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(g.kind, GuardKind::Function);
-    assert_eq!(g.name.value, "constant");
+    assert_eq!(g.name.value, b"constant".as_slice());
 }
 
 #[test]
@@ -408,7 +408,7 @@ fn tag_guard_filter() {
     let tpl = parse_ok(&arena, "{% guard filter upper %}ok{% endguard %}");
     let Statement::Guard(g) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(g.kind, GuardKind::Filter);
-    assert_eq!(g.name.value, "upper");
+    assert_eq!(g.name.value, b"upper".as_slice());
 }
 
 #[test]
@@ -417,7 +417,7 @@ fn tag_guard_test() {
     let tpl = parse_ok(&arena, "{% guard test defined %}ok{% endguard %}");
     let Statement::Guard(g) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(g.kind, GuardKind::Test);
-    assert_eq!(g.name.value, "defined");
+    assert_eq!(g.name.value, b"defined".as_slice());
 }
 
 #[test]
@@ -435,7 +435,7 @@ fn tag_guard_test_compound_divisible_by() {
     let tpl = parse_ok(&arena, "{% guard test divisible by %}yes{% endguard %}");
     let Statement::Guard(g) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(g.kind, GuardKind::Test);
-    assert_eq!(g.name.value, "divisible by");
+    assert_eq!(g.name.value, b"divisible by".as_slice());
 }
 
 #[test]
@@ -478,7 +478,7 @@ fn tag_verbatim_preserves_body_raw() {
     let arena = Bump::new();
     let tpl = parse_ok(&arena, "{% verbatim %}{{ not_parsed }}{% endverbatim %}");
     let Statement::Verbatim(v) = &tpl.statements.nodes[0] else { panic!() };
-    assert_eq!(v.body, "{{ not_parsed }}");
+    assert_eq!(v.body, b"{{ not_parsed }}".as_slice());
 }
 
 #[test]
@@ -486,7 +486,7 @@ fn tag_raw_alias_parses() {
     let arena = Bump::new();
     let tpl = parse_ok(&arena, "{% raw %}{{ nope }}{% endraw %}");
     let Statement::Verbatim(v) = &tpl.statements.nodes[0] else { panic!() };
-    assert_eq!(v.body, "{{ nope }}");
+    assert_eq!(v.body, b"{{ nope }}".as_slice());
 }
 
 #[test]
@@ -500,7 +500,7 @@ fn comment_surfaces_as_trivia() {
     let tpl = parse_ok(&arena, "{# hi #}");
     assert!(tpl.statements.is_empty(), "comments must not appear as statements");
     let c = tpl.trivia.iter().find(|t| t.kind == TriviaKind::Comment).expect("comment trivia");
-    assert_eq!(c.value, "{# hi #}");
+    assert_eq!(c.value, b"{# hi #}".as_slice());
 }
 
 #[test]
@@ -508,7 +508,7 @@ fn comment_value_preserves_markers() {
     let arena = Bump::new();
     let tpl = parse_ok(&arena, "{# hello world #}");
     let c = tpl.trivia.iter().find(|t| t.kind == TriviaKind::Comment).expect("comment trivia");
-    assert_eq!(c.value, "{# hello world #}");
+    assert_eq!(c.value, b"{# hello world #}".as_slice());
 }
 
 #[test]
@@ -517,7 +517,7 @@ fn empty_comment_is_trivia() {
     let tpl = parse_ok(&arena, "{##}");
     assert!(tpl.statements.is_empty());
     let c = tpl.trivia.iter().find(|t| t.kind == TriviaKind::Comment).expect("comment trivia");
-    assert_eq!(c.value, "{##}");
+    assert_eq!(c.value, b"{##}".as_slice());
 }
 
 #[test]
@@ -525,7 +525,7 @@ fn tag_unknown_is_opaque_node() {
     let arena = Bump::new();
     let tpl = parse_ok(&arena, "{% nosuchtag foo bar %}");
     let Statement::Unknown(u) = &tpl.statements.nodes[0] else { panic!() };
-    assert_eq!(u.name.value, "nosuchtag");
+    assert_eq!(u.name.value, b"nosuchtag".as_slice());
 }
 
 #[test]

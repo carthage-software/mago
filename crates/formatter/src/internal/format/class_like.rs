@@ -65,7 +65,7 @@ pub fn print_class_like_body<'arena>(
     let length = class_like_members.len();
     let class_like_members = {
         let mut contents = vec![in f.arena;];
-        contents.push(Document::String("{"));
+        contents.push(Document::String(b"{"));
         if let Some(c) = f.print_trailing_comments(*left_brace) {
             contents.push(c);
         }
@@ -237,7 +237,7 @@ pub fn print_class_like_body<'arena>(
             contents.push(Document::Line(Line::hard()));
         }
 
-        contents.push(Document::String("}"));
+        contents.push(Document::String(b"}"));
         if let Some(comments) = f.print_trailing_comments(*right_brace) {
             contents.push(comments);
         }
@@ -359,8 +359,8 @@ fn compare_methods<'arena>(a: &Method<'arena>, b: &Method<'arena>) -> Ordering {
     let b_name = b.name.value;
 
     // 1. Constructor always comes first
-    let a_is_constructor = a_name.eq_ignore_ascii_case("__construct");
-    let b_is_constructor = b_name.eq_ignore_ascii_case("__construct");
+    let a_is_constructor = a_name.eq_ignore_ascii_case(b"__construct");
+    let b_is_constructor = b_name.eq_ignore_ascii_case(b"__construct");
 
     if a_is_constructor && !b_is_constructor {
         return Ordering::Less;
@@ -370,8 +370,8 @@ fn compare_methods<'arena>(a: &Method<'arena>, b: &Method<'arena>) -> Ordering {
     }
 
     // 2. Destructor always comes last
-    let a_is_destructor = a_name.eq_ignore_ascii_case("__destruct");
-    let b_is_destructor = b_name.eq_ignore_ascii_case("__destruct");
+    let a_is_destructor = a_name.eq_ignore_ascii_case(b"__destruct");
+    let b_is_destructor = b_name.eq_ignore_ascii_case(b"__destruct");
 
     if a_is_destructor && !b_is_destructor {
         return Ordering::Greater;
@@ -381,15 +381,15 @@ fn compare_methods<'arena>(a: &Method<'arena>, b: &Method<'arena>) -> Ordering {
     }
 
     // 3. Other magic methods (excluding constructor and destructor) come before destructor but after regular methods
-    let a_is_magic = a_name.starts_with("__") && !a_is_constructor && !a_is_destructor;
-    let b_is_magic = b_name.starts_with("__") && !b_is_constructor && !b_is_destructor;
+    let a_is_magic = a_name.starts_with(b"__") && !a_is_constructor && !a_is_destructor;
+    let b_is_magic = b_name.starts_with(b"__") && !b_is_constructor && !b_is_destructor;
 
     match (a_is_magic, b_is_magic) {
         (true, false) => return Ordering::Greater,
         (false, true) => return Ordering::Less,
         (true, true) => {
             // Both are magic methods, sort alphabetically
-            return a_name.to_lowercase().cmp(&b_name.to_lowercase());
+            return a_name.to_ascii_lowercase().cmp(&b_name.to_ascii_lowercase());
         }
         _ => {}
     }
@@ -424,7 +424,7 @@ fn compare_methods<'arena>(a: &Method<'arena>, b: &Method<'arena>) -> Ordering {
     }
 
     // 6. Sort alphabetically by name (case-insensitive)
-    a_name.to_lowercase().cmp(&b_name.to_lowercase())
+    a_name.to_ascii_lowercase().cmp(&b_name.to_ascii_lowercase())
 }
 
 /// Returns a numeric order for visibility modifiers.

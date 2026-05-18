@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use foldhash::HashSet;
 
-use mago_atom::atom;
+use mago_word::word;
+
 use mago_codex::context::ScopeContext;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -30,6 +31,7 @@ use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::unused_parameter;
 use crate::utils::expression::variable::get_variables_referenced_in_expression;
 use crate::utils::missing_type_hints;
+use mago_bytes::BytesDisplay;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
     fn analyze<'ctx>(
@@ -44,7 +46,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             return Err(AnalysisError::InternalError(
                 format!(
                     "Metadata for arrow function defined in `{}` at offset {} not found.",
-                    context.source_file.name, s.start.offset
+                    BytesDisplay(&context.source_file.name),
+                    s.start.offset
                 ),
                 s,
             ));
@@ -54,7 +57,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         scope.set_function_like(Some(function_metadata));
         if let Some(bind_scope) = &artifacts.closure_bind_scope {
             if let Some(class_name) = bind_scope.class_name {
-                scope.set_class_like(context.codebase.get_class_like(&class_name));
+                scope.set_class_like(context.codebase.get_class_like(class_name.as_bytes()));
             } else {
                 scope.set_class_like(block_context.scope.get_class_like());
             }
@@ -75,7 +78,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
                 continue;
             }
 
-            let variable_atom = atom(variable);
+            let variable_atom = word(variable);
 
             if inner_block_context.variables_possibly_in_scope.contains(&variable_atom) {
                 continue;
@@ -104,7 +107,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
                 context,
                 block_context.scope.get_class_like(),
                 function_metadata,
-                "arrow function",
+                b"arrow function",
                 self.return_type_hint.as_ref(),
                 self.span(),
             );
@@ -118,7 +121,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         missing_type_hints::check_imprecise_return_type_hint(
             context,
             function_metadata,
-            "arrow function",
+            b"arrow function",
             self.return_type_hint.as_ref(),
         );
 
@@ -160,7 +163,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
                 }
 
                 let generator = TNamedObject::new_with_type_parameters(
-                    atom("Generator"),
+                    word("Generator"),
                     Some(vec![
                         key_type.unwrap_or_else(get_mixed),
                         value_type.unwrap_or_else(get_mixed),

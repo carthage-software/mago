@@ -1,12 +1,6 @@
 use std::collections::HashSet;
 
 use indoc::indoc;
-use mago_atom::atom;
-use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
-
-use mago_atom::AtomSet;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
@@ -15,6 +9,9 @@ use mago_span::Span;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
+use schemars::JsonSchema;
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -38,13 +35,12 @@ pub struct TaintedDataToSinkRule {
 #[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
 pub struct TaintedDataToSinkConfig {
     pub level: Level,
-    #[schemars(with = "HashSet<String>")]
-    pub known_sink_functions: AtomSet,
+    pub known_sink_functions: HashSet<String>,
 }
 
 impl Default for TaintedDataToSinkConfig {
     fn default() -> Self {
-        Self { level: Level::Error, known_sink_functions: AtomSet::from_iter([atom(PRINTF_FUNCTION)]) }
+        Self { level: Level::Error, known_sink_functions: HashSet::from_iter([PRINTF_FUNCTION.to_owned()]) }
     }
 }
 
@@ -113,7 +109,7 @@ impl LintRule for TaintedDataToSinkRule {
                 self.check_tainted_data_to_sink(ctx, print_construct.print.span, print_construct.value);
             }
             Node::FunctionCall(function_call) => {
-                let sinks = self.cfg.known_sink_functions.iter().map(mago_atom::Atom::as_str).collect::<Vec<&str>>();
+                let sinks = self.cfg.known_sink_functions.iter().map(String::as_str).collect::<Vec<&str>>();
                 if function_call_matches_any(ctx, function_call, &sinks).is_none() {
                     return;
                 }

@@ -1,7 +1,7 @@
-use mago_atom::Atom;
-use mago_atom::AtomSet;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
+use mago_word::Word;
+use mago_word::WordSet;
 
 use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
@@ -25,7 +25,7 @@ use super::merge::merge_metadata_from_required_class_like;
 use super::merge::merge_metadata_from_trait;
 
 #[inline]
-fn sorted_atoms(iter: impl Iterator<Item = Atom>) -> Vec<Atom> {
+fn sorted_atoms(iter: impl Iterator<Item = Word>) -> Vec<Word> {
     let mut values: Vec<_> = iter.collect();
     if values.len() > 1 {
         values.sort_unstable();
@@ -39,12 +39,12 @@ fn sorted_atoms(iter: impl Iterator<Item = Atom>) -> Vec<Atom> {
 /// Returns `Some(chain)` if a cycle is detected, where chain is the path of type names forming the cycle.
 /// Returns `None` if no cycle is found.
 fn detect_circular_type_reference(
-    type_name: Atom,
+    type_name: Word,
     type_metadata: &TypeMetadata,
-    all_aliases: &mago_atom::AtomMap<TypeMetadata>,
-    visiting: &mut AtomSet,
-    path: &mut Vec<Atom>,
-) -> Option<Vec<Atom>> {
+    all_aliases: &mago_word::WordMap<TypeMetadata>,
+    visiting: &mut WordSet,
+    path: &mut Vec<Word>,
+) -> Option<Vec<Word>> {
     if visiting.contains(&type_name) {
         let mut cycle_chain = path.clone();
         cycle_chain.push(type_name);
@@ -66,10 +66,10 @@ fn detect_circular_type_reference(
 /// Recursively checks a `TUnion` for circular type alias references.
 fn check_union_for_circular_refs(
     type_union: &TUnion,
-    all_aliases: &mago_atom::AtomMap<TypeMetadata>,
-    visiting: &mut AtomSet,
-    path: &mut Vec<Atom>,
-) -> Option<Vec<Atom>> {
+    all_aliases: &mago_word::WordMap<TypeMetadata>,
+    visiting: &mut WordSet,
+    path: &mut Vec<Word>,
+) -> Option<Vec<Word>> {
     let nodes = type_union.get_all_child_nodes();
     for node in nodes {
         if let TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) = node {
@@ -96,7 +96,7 @@ fn check_union_for_circular_refs(
 /// (parent classes, interfaces, traits) have already been populated.
 /// Populates the metadata for a single class-like iteratively (non-recursive).
 pub fn populate_class_like_metadata_iterative(
-    classlike_name: Atom,
+    classlike_name: Word,
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,
 ) {
@@ -191,13 +191,13 @@ pub fn populate_class_like_metadata_iterative(
     }
 
     for (type_name, type_metadata) in &metadata.type_aliases {
-        let mut visiting = AtomSet::default();
+        let mut visiting = WordSet::default();
         let mut path = Vec::new();
 
         if let Some(cycle) =
             detect_circular_type_reference(*type_name, type_metadata, &metadata.type_aliases, &mut visiting, &mut path)
         {
-            let cycle_strs: Vec<&str> = cycle.iter().map(Atom::as_str).collect();
+            let cycle_strs: Vec<String> = cycle.iter().map(Word::to_string).collect();
             metadata.issues.push(
                 Issue::error(format!("Circular type reference detected: {}", cycle_strs.join(" → ")))
                     .with_code(crate::issue::ScanningIssueKind::CircularTypeImport)
@@ -231,7 +231,7 @@ pub fn populate_class_like_metadata_iterative(
 
 /// Populates types for properties, constants, enum cases, and type aliases within a class-like.
 pub fn populate_class_like_types(
-    name: Atom,
+    name: Word,
     metadata: &mut ClassLikeMetadata,
     codebase_symbols: &crate::symbol::Symbols,
     symbol_references: &mut SymbolReferences,

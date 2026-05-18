@@ -1,8 +1,5 @@
 use foldhash::HashSet;
 
-use mago_atom::Atom;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
@@ -26,6 +23,9 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
+use mago_word::Word;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -43,7 +43,7 @@ use crate::visibility::check_method_visibility;
 pub struct ResolvedMethod {
     /// The name of the class this method is called on, not necessarily the same
     /// as the class of the method itself, especially in cases of inheritance.
-    pub classname: Atom,
+    pub classname: Word,
     /// The method identifiers that were successfully resolved.
     pub method_identifier: MethodIdentifier,
     /// The type of `$this` or the static class type if it's a static method.
@@ -59,7 +59,7 @@ pub struct ResolvedMethod {
 #[derive(Debug, Clone)]
 pub struct MixinWithoutMagicMethod {
     /// The name of the mixin class where the method was found.
-    pub mixin_class_name: Atom,
+    pub mixin_class_name: Word,
     /// Whether the target class (that has the mixin) is final.
     pub target_is_final: bool,
 }
@@ -120,7 +120,7 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
         }
 
         if let Some(name) = resolved_selector.name() {
-            method_names.push(ascii_lowercase_atom(&name));
+            method_names.push(ascii_lowercase_word(name.as_bytes()));
         } else {
             result.has_invalid_target = true;
         }
@@ -178,7 +178,7 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                 object,
                 selector,
                 obj_type,
-                atom("__call"),
+                word(b"__call"),
                 access_span,
                 true,
                 &mut result,
@@ -199,8 +199,8 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
 
                 if resolved_methods.is_empty() {
                     if let Some(classname) = obj_type.get_name() {
-                        let method_name_str: &str = method_name.as_ref();
-                        let has_method_assertion = type_has_method_assertion(obj_type, method_name_str);
+                        let method_name_bytes: &[u8] = method_name.as_ref();
+                        let has_method_assertion = type_has_method_assertion(obj_type, method_name_bytes);
 
                         if !has_method_assertion {
                             if resolved_magic_call_method.is_empty() {
@@ -287,7 +287,7 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
     object: &'ast Expression<'arena>,
     selector: &'ast ClassLikeMemberSelector<'arena>,
     object_type: &TObject,
-    method_name: Atom,
+    method_name: Word,
     access_span: Span,
     has_magic_call: bool,
     result: &mut MethodResolutionResult,
@@ -309,7 +309,7 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
 
     for (metadata, declaring_method_id, object, classname, mixin_without_magic_method) in method_ids {
         let declaring_class_metadata =
-            context.codebase.get_class_like(&declaring_method_id.get_class_name()).unwrap_or(metadata);
+            context.codebase.get_class_like(declaring_method_id.get_class_name().as_bytes()).unwrap_or(metadata);
 
         let class_template_parameters = super::class_template_type_collector::collect(
             context.codebase,
@@ -354,11 +354,11 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
     selector: &'ast ClassLikeMemberSelector<'arena>,
     object_type: &'object TObject,
     outer_object: &'object TObject,
-    method_name: Atom,
+    method_name: Word,
     access_span: Span,
     has_magic_call: bool,
     result: &mut MethodResolutionResult,
-) -> Vec<(&'ctx ClassLikeMetadata, MethodIdentifier, TObject, Atom, Option<MixinWithoutMagicMethod>)> {
+) -> Vec<(&'ctx ClassLikeMetadata, MethodIdentifier, TObject, Word, Option<MixinWithoutMagicMethod>)> {
     let mut ids = vec![];
 
     let Some(name) = object_type.get_name() else {
@@ -366,8 +366,8 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
             result.has_ambiguous_target = true;
 
             if !has_magic_call {
-                let method_name_str: &str = method_name.as_ref();
-                let has_method_assertion = type_has_method_assertion(object_type, method_name_str);
+                let method_name_bytes: &[u8] = method_name.as_ref();
+                let has_method_assertion = type_has_method_assertion(object_type, method_name_bytes);
                 if !has_method_assertion {
                     report_call_on_ambiguous_object(context, object.span(), selector.span());
                 }
@@ -377,7 +377,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         return ids;
     };
 
-    let Some(class_metadata) = context.codebase.get_class_like(&name) else {
+    let Some(class_metadata) = context.codebase.get_class_like(name.as_bytes()) else {
         result.has_invalid_target = true;
         report_non_existent_class_like(context, object.span(), name);
         return ids;
@@ -392,8 +392,8 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         if !check_method_visibility(
             context,
             block_context,
-            &class_metadata.original_name,
-            &method_name,
+            class_metadata.original_name.as_bytes(),
+            method_name.as_bytes(),
             access_span,
             Some(selector.span()),
         ) {
@@ -413,12 +413,12 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         }
 
         if function_like_metadata.flags.is_magic_method() {
-            let lowercase_method = ascii_lowercase_atom(&method_name);
+            let lowercase_method = ascii_lowercase_word(method_name.as_bytes());
             let is_pseudo = class_metadata.pseudo_methods.contains(&lowercase_method)
                 || class_metadata.all_parent_classes.iter().any(|parent_name| {
                     context
                         .codebase
-                        .get_class_like(parent_name)
+                        .get_class_like(parent_name.as_bytes())
                         .is_some_and(|parent| parent.pseudo_methods.contains(&lowercase_method))
                 });
 
@@ -426,7 +426,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
 
             if is_pseudo {
                 for parent_class_name in &class_metadata.all_parent_classes {
-                    if let Some(parent_metadata) = context.codebase.get_class_like(parent_class_name)
+                    if let Some(parent_metadata) = context.codebase.get_class_like(parent_class_name.as_bytes())
                         && parent_metadata.methods.contains(&lowercase_method)
                         && !parent_metadata.pseudo_methods.contains(&lowercase_method)
                     {
@@ -475,7 +475,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         ids.push((class_metadata, method_id, outer_object.clone(), name, None));
     } else if !class_metadata.require_extends.is_empty() || !class_metadata.require_implements.is_empty() {
         for required_class in class_metadata.require_extends.iter().chain(class_metadata.require_implements.iter()) {
-            let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+            let Some(required_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
                 continue;
             };
 
@@ -495,7 +495,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
         let mixin_types = collect_mixin_types(class_metadata, outer_object, &class_metadata.mixins);
 
         for (mixin_class_name, mixin_object) in mixin_types {
-            let Some(mixin_metadata) = context.codebase.get_class_like(&mixin_class_name) else {
+            let Some(mixin_metadata) = context.codebase.get_class_like(mixin_class_name.as_bytes()) else {
                 continue;
             };
 
@@ -508,8 +508,8 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
                 if !check_method_visibility(
                     context,
                     block_context,
-                    &mixin_metadata.original_name,
-                    &method_name,
+                    mixin_metadata.original_name.as_bytes(),
+                    method_name.as_bytes(),
                     access_span,
                     Some(selector.span()),
                 ) {
@@ -595,7 +595,7 @@ fn check_where_method_constraints(
     selector: &ClassLikeMemberSelector,
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: &FunctionLikeMetadata,
-    defining_class_id: Atom,
+    defining_class_id: Word,
 ) -> bool {
     let Some(method_metadata) = function_like_metadata.method_metadata.as_ref() else {
         return true;
@@ -694,8 +694,8 @@ pub(super) fn report_non_existent_method(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: Atom,
-    method_name: Atom,
+    classname: Word,
+    method_name: Word,
 ) {
     let classname = display_class_like_name(context, classname);
     let method_name = display_method_name(context, classname, method_name);
@@ -714,8 +714,8 @@ pub(super) fn report_non_documented_method(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: Atom,
-    method_name: Atom,
+    classname: Word,
+    method_name: Word,
 ) {
     let classname = display_class_like_name(context, classname);
     let method_name = display_method_name(context, classname, method_name);
@@ -745,9 +745,9 @@ fn report_possibly_non_existent_mixin_method(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: Atom,
-    method_name: Atom,
-    mixin_classname: Atom,
+    classname: Word,
+    method_name: Word,
+    mixin_classname: Word,
 ) {
     let mixin_classname = display_class_like_name(context, mixin_classname);
     let method_name = display_method_name(context, classname, method_name);
@@ -781,9 +781,9 @@ fn report_non_existent_mixin_method(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: Atom,
-    method_name: Atom,
-    mixin_classname: Atom,
+    classname: Word,
+    method_name: Word,
+    mixin_classname: Word,
 ) {
     let mixin_classname = display_class_like_name(context, mixin_classname);
     let method_name = display_method_name(context, classname, method_name);
@@ -812,8 +812,8 @@ pub(super) fn report_possibly_missing_magic_call(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: Atom,
-    method_name: Atom,
+    classname: Word,
+    method_name: Word,
     is_static: bool,
 ) {
     let magic_method_name = if is_static { "__callStatic" } else { "__call" };
@@ -845,8 +845,8 @@ pub(super) fn report_magic_call_without_call_method(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: Atom,
-    method_name: Atom,
+    classname: Word,
+    method_name: Word,
     is_static: bool,
 ) {
     let magic_method_name = if is_static { "__callStatic" } else { "__call" };
@@ -878,8 +878,8 @@ pub(super) fn report_dynamic_static_method_call(
     context: &mut Context,
     obj_span: Span,
     selector_span: Span,
-    classname: Atom,
-    method_name: Atom,
+    classname: Word,
+    method_name: Word,
     has_magic_call: bool,
 ) {
     let classname = display_class_like_name(context, classname);
@@ -928,7 +928,7 @@ pub(super) fn report_dynamic_static_method_call(
 ///
 /// This checks for `HasMethod` types or intersection types containing them.
 /// Comparison is case-insensitive since PHP method names are case-insensitive.
-fn type_has_method_assertion(object_type: &TObject, method_name: &str) -> bool {
+fn type_has_method_assertion(object_type: &TObject, method_name: &[u8]) -> bool {
     match object_type {
         TObject::HasMethod(has_method) => {
             if has_method.has_method(method_name) {
@@ -959,17 +959,17 @@ fn collect_mixin_types<'object>(
     class_metadata: &ClassLikeMetadata,
     outer_object: &'object TObject,
     mixins: &'object [TUnion],
-) -> Vec<(Atom, &'object TObject)> {
+) -> Vec<(Word, &'object TObject)> {
     let mut results = Vec::new();
 
     for mixin_type in mixins {
         for mixin_atomic in mixin_type.types.as_ref() {
             match mixin_atomic {
                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                    results.push((ascii_lowercase_atom(&named.name), obj));
+                    results.push((ascii_lowercase_word(named.name.as_bytes()), obj));
                 }
                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                    results.push((ascii_lowercase_atom(&enum_type.name), obj));
+                    results.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
                 }
                 TAtomic::GenericParameter(TGenericParameter {
                     parameter_name, constraint, defining_entity, ..
@@ -979,18 +979,18 @@ fn collect_mixin_types<'object>(
                     if let TObject::Named(named_object) = outer_object
                         && let Some(type_params) = named_object.get_type_parameters()
                         && let GenericParent::ClassLike(defining_class) = defining_entity
-                        && named_object.name.eq_ignore_ascii_case(defining_class)
+                        && named_object.name.as_bytes().eq_ignore_ascii_case(defining_class.as_bytes())
                         && let Some(index) = class_metadata.get_template_index_for_name(*parameter_name)
                         && let Some(concrete_type) = type_params.get(index)
                     {
                         for atomic in concrete_type.types.as_ref() {
                             match atomic {
                                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                                    results.push((ascii_lowercase_atom(&named.name), obj));
+                                    results.push((ascii_lowercase_word(named.name.as_bytes()), obj));
                                     resolved = true;
                                 }
                                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                                    results.push((ascii_lowercase_atom(&enum_type.name), obj));
+                                    results.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
                                     resolved = true;
                                 }
                                 _ => {}
@@ -1003,10 +1003,10 @@ fn collect_mixin_types<'object>(
                         for constraint_atomic in constraint.types.as_ref() {
                             match constraint_atomic {
                                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                                    results.push((ascii_lowercase_atom(&named.name), obj));
+                                    results.push((ascii_lowercase_word(named.name.as_bytes()), obj));
                                 }
                                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                                    results.push((ascii_lowercase_atom(&enum_type.name), obj));
+                                    results.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
                                 }
                                 _ => {}
                             }

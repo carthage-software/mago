@@ -15,12 +15,7 @@ use mago_database::file::File;
 use mago_syntax::parser::parse_file;
 
 fuzz_target!(|data: &[u8]| {
-    // Reject bytes that aren't valid UTF-8: the parser's input layer expects a `&str`.
-    let Ok(src) = std::str::from_utf8(data) else {
-        return;
-    };
-
     let arena = Bump::new();
-    let file = File::ephemeral(Cow::Borrowed("fuzz.php"), Cow::Owned(src.to_string()));
+    let file = File::ephemeral(Cow::Borrowed(b"fuzz.php"), Cow::Owned(data.to_vec()));
     let _ = parse_file(&arena, &file);
 });

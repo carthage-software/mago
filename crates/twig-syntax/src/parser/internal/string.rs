@@ -32,7 +32,7 @@ impl<'arena> Parser<'_, 'arena> {
                     let open_brace = self.stream.span_of(&open_tok);
                     let inner = self.parse_expression()?;
                     let close_tok =
-                        self.stream.expect_kind(TwigTokenKind::InterpolationEnd, "expected `}` closing `#{`")?;
+                        self.stream.expect_kind(TwigTokenKind::InterpolationEnd, b"expected `}` closing `#{`")?;
                     let close_brace = self.stream.span_of(&close_tok);
                     parts.push(StringPart::Interpolation(Interpolation {
                         open_brace,
@@ -47,7 +47,7 @@ impl<'arena> Parser<'_, 'arena> {
                 }
                 _ => {
                     return Err(ParseError::UnexpectedToken(
-                        format!("unexpected token {:?} in interpolated string", token.kind),
+                        format!("unexpected token {:?} in interpolated string", token.kind).into_bytes(),
                         self.stream.span_of(&token),
                     ));
                 }

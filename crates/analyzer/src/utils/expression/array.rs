@@ -2,8 +2,8 @@
 
 use std::borrow::Cow;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
@@ -98,7 +98,7 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
     array_like_type: &TUnion,
     index_type: &TUnion,
     in_assignment: bool,
-    extended_var_id: Option<Atom>,
+    extended_var_id: Option<Word>,
     assign_value_type: Option<&TUnion>,
     is_array_like_nullsafe: bool,
 ) -> TUnion {
@@ -408,11 +408,11 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
     if !has_valid_expected_index {
         let index_type_str = index_type.get_id();
         let array_like_type_str = array_like_type.get_id();
-        let expected_index_types_str = expected_index_types
+        let expected_index_types_str: Vec<String> = expected_index_types
             .iter()
             .flat_map(|union| union.types.as_ref())
-            .map(|t| t.get_id().as_str())
-            .collect::<Vec<_>>();
+            .map(|t| t.get_id().to_string())
+            .collect();
 
         let expected_types_list = if let Some(last_index_str) = expected_index_types_str.last() {
             if expected_index_types_str.len() == 1 {
@@ -1300,16 +1300,16 @@ pub(crate) fn handle_array_access_on_named_object(
                 break 'metadata None;
             };
 
-            let array_access = atom("ArrayAccess");
-            if !context.codebase.is_instance_of(&named_object.name, &array_access) {
+            let array_access = word(b"ArrayAccess");
+            if !context.codebase.is_instance_of(named_object.name.as_bytes(), array_access.as_bytes()) {
                 break 'metadata None;
             }
 
-            let Some(metadata) = context.codebase.get_class_like(&named_object.name) else {
+            let Some(metadata) = context.codebase.get_class_like(named_object.name.as_bytes()) else {
                 break 'metadata None;
             };
 
-            let Some(array_access_metadata) = context.codebase.get_class_like(&array_access) else {
+            let Some(array_access_metadata) = context.codebase.get_class_like(array_access.as_bytes()) else {
                 break 'metadata None;
             };
 

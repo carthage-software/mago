@@ -96,9 +96,9 @@ impl LintRule for PslOutputRule {
                     let Some(arg) = call.argument_list.arguments.get(0) else { return };
                     let Expression::ConstantAccess(constant) = arg.value() else { return };
 
-                    if constant.name.value().eq_ignore_ascii_case("STDOUT") {
+                    if constant.name.value().eq_ignore_ascii_case(b"STDOUT") {
                         ("fwrite", true)
-                    } else if constant.name.value().eq_ignore_ascii_case("STDERR") {
+                    } else if constant.name.value().eq_ignore_ascii_case(b"STDERR") {
                         ("fwrite", false)
                     } else {
                         return;

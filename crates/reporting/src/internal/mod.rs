@@ -92,7 +92,7 @@ impl Expandable<ExpandedFileId> for FileId {
         let file = database.get(self)?;
 
         Ok(ExpandedFileId {
-            name: file.name.clone(),
+            name: Cow::Owned(String::from_utf8_lossy(&file.name).into_owned()),
             path: file.path.clone(),
             size: file.size,
             file_type: file.file_type,

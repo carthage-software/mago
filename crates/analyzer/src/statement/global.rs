@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
-use mago_atom::Atom;
 use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::Global;
+use mago_word::Word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -37,7 +37,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
 
         for variable in &self.variables {
             if let Some(var_id) = get_variable_id(variable) {
-                block_context.locals.insert(Atom::from(var_id), Rc::new(get_mixed()));
+                block_context.locals.insert(Word::from(var_id), Rc::new(get_mixed()));
             }
         }
 
@@ -46,8 +46,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
                 continue;
             };
 
-            let var_id_atom = Atom::from(var_id);
-            let is_argc_or_argv = var_id == "$argc" || var_id == "$argv";
+            let var_id_atom = mago_word::word(var_id);
+            let is_argc_or_argv = var_id == b"$argc" || var_id == b"$argv";
             let global_type = get_global_variable_type(var_id).unwrap_or_else(|| Rc::new(get_mixed()));
 
             block_context.locals.insert(var_id_atom, global_type);
@@ -63,7 +63,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
             block_context.references_to_external_scope.insert(var_id_atom);
 
             if block_context.references_in_scope.contains_key(&var_id_atom) {
-                block_context.decrement_reference_count(&var_id_atom);
+                block_context.decrement_reference_count(var_id_atom.as_bytes());
                 block_context.references_in_scope.remove(&var_id_atom);
             }
         }

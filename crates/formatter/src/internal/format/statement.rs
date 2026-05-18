@@ -172,25 +172,24 @@ fn print_statement_slice<'ctx, 'arena>(
 
             if let Some(line_start_offset) = f.file.get_line_start_offset(line) {
                 let c = &f.source_text[line_start_offset as usize..offset as usize];
-                let ws = c.chars().take_while(|c| c.is_whitespace()).collect::<String>();
+                let ws_len = c.iter().take_while(|&&b| b.is_ascii_whitespace()).count();
+                let ws: &[u8] = &c[..ws_len];
                 let c_ends_in_html = {
                     let (mut in_php, mut i, mut ok_to_align) = (false, 0usize, true);
-                    let b = c.as_bytes();
-                    let ws_len = ws.len();
-                    while i < b.len() {
-                        if !in_php && b[i..].starts_with(b"<?") {
+                    while i < c.len() {
+                        if !in_php && c[i..].starts_with(b"<?") {
                             in_php = true;
                             i += 2;
-                        } else if in_php && b[i..].starts_with(b"?>") {
+                        } else if in_php && c[i..].starts_with(b"?>") {
                             in_php = false;
                             i += 2;
-                        } else if !in_php && b[i..].starts_with(b"?>") {
+                        } else if !in_php && c[i..].starts_with(b"?>") {
                             // `?>` seen while not in tracked PHP context: the line started
                             // inside PHP code. Only allow alignment if the tail between the
                             // leading whitespace and this `?>` is purely closing syntax
                             // (`)`, `]`, `}`, `;`, whitespace), i.e. the leftover of a
                             // broken multi-line expression — not actual statement code.
-                            let tail = &b[ws_len..i];
+                            let tail = &c[ws_len..i];
                             if !tail.iter().all(|&byte| matches!(byte, b')' | b']' | b'}' | b';' | b' ' | b'\t')) {
                                 ok_to_align = false;
                             }
@@ -204,6 +203,11 @@ fn print_statement_slice<'ctx, 'arena>(
                 let should_apply_align = !ws.is_empty()
                     && (matches!(stmt, Statement::OpeningTag(_)) || c.len() == ws.len() || c_ends_in_html);
                 if should_apply_align {
+                    let alignment_slice: &'arena [u8] = {
+                        let mut buf = bumpalo::collections::Vec::with_capacity_in(ws.len(), f.arena);
+                        buf.extend_from_slice(ws);
+                        buf.into_bump_slice()
+                    };
                     if matches!(stmt, Statement::OpeningTag(_)) {
                         let mut j = i + 1;
                         let mut stmts_to_format = vec![in f.arena];
@@ -218,7 +222,7 @@ fn print_statement_slice<'ctx, 'arena>(
                         }
 
                         parts.push(Document::Group(Group::new(vec![in f.arena; Document::Align(Align {
-                            alignment: f.as_str(&ws),
+                            alignment: alignment_slice,
                             contents: {
                                 formatted_statement.extend(print_statement_slice(f, stmts_to_format.as_slice()));
                                 formatted_statement
@@ -228,7 +232,7 @@ fn print_statement_slice<'ctx, 'arena>(
                         i = j + 1;
                     } else {
                         parts.push(Document::Group(Group::new(vec![in f.arena; Document::Align(Align {
-                            alignment: f.as_str(&ws),
+                            alignment: alignment_slice,
                             contents: formatted_statement,
                         })])));
 
@@ -446,7 +450,7 @@ fn is_inline_php_template(stmts: &[&Statement<'_>]) -> bool {
         n => {
             // Pattern: [..., ClosingTag, Inline(whitespace-only)] at end
             if matches!(stmts.get(n.wrapping_sub(2)), Some(Statement::ClosingTag(_)))
-                && matches!(stmts.get(n - 1), Some(Statement::Inline(inline)) if inline.value.trim().is_empty())
+                && matches!(stmts.get(n - 1), Some(Statement::Inline(inline)) if inline.value.trim_ascii().is_empty())
             {
                 1
             // Pattern: [..., ClosingTag] at end (no trailing inline)
@@ -511,7 +515,7 @@ fn print_use_statements<'arena>(
 
     use bumpalo::collections::Vec as BumpVec;
 
-    fn join_item_name<'arena>(arena: &'arena Bump, namespace: &[&'arena str], name: &'arena str) -> &'arena str {
+    fn join_item_name<'arena>(arena: &'arena Bump, namespace: &[&'arena [u8]], name: &'arena [u8]) -> &'arena [u8] {
         if namespace.is_empty() {
             return name;
         }
@@ -520,17 +524,16 @@ fn print_use_statements<'arena>(
         let mut bytes = BumpVec::with_capacity_in(total_len, arena);
 
         for (i, part) in namespace.iter().enumerate() {
-            bytes.extend_from_slice(part.as_bytes());
+            bytes.extend_from_slice(part);
             if i < namespace.len() {
                 // Add a separator after every part
                 bytes.push(b'\\');
             }
         }
 
-        bytes.extend_from_slice(name.as_bytes());
+        bytes.extend_from_slice(name);
 
-        // SAFETY: We are joining valid UTF-8 slices with an ASCII separator.
-        unsafe { std::str::from_utf8_unchecked(bytes.into_bump_slice()) }
+        bytes.into_bump_slice()
     }
 
     let should_sort = f.settings.sort_uses;
@@ -573,11 +576,11 @@ fn print_use_statements<'arena>(
             let a_full_name = join_item_name(f.arena, &a.namespace, a.name);
             let b_full_name = join_item_name(f.arena, &b.namespace, b.name);
 
-            let mut a_chars = a_full_name.chars().flat_map(char::to_lowercase);
-            let mut b_chars = b_full_name.chars().flat_map(char::to_lowercase);
+            let mut a_iter = a_full_name.iter().map(u8::to_ascii_lowercase);
+            let mut b_iter = b_full_name.iter().map(u8::to_ascii_lowercase);
 
             loop {
-                match (a_chars.next(), b_chars.next()) {
+                match (a_iter.next(), b_iter.next()) {
                     (Some(ac), Some(bc)) => match ac.cmp(&bc) {
                         Ordering::Equal => {}
                         other => return other,
@@ -645,7 +648,7 @@ fn print_use_statements<'arena>(
 
                 if let Some(alias) = item.alias {
                     parts.push(Document::space());
-                    parts.push(Document::String("as "));
+                    parts.push(Document::String(b"as "));
                     parts.push(Document::String(alias));
                 }
 
@@ -671,9 +674,9 @@ fn print_use_statements<'arena>(
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 struct ExpandedUseItem<'arena> {
     use_type: Option<&'arena UseType<'arena>>,
-    namespace: Vec<'arena, &'arena str>,
-    name: &'arena str,
-    alias: Option<&'arena str>,
+    namespace: Vec<'arena, &'arena [u8]>,
+    name: &'arena [u8],
+    alias: Option<&'arena [u8]>,
     original_node: &'arena Use<'arena>,
 }
 
@@ -688,9 +691,10 @@ fn expand_use<'arena>(
     fn extract_namespace_and_name_from_item<'arena>(
         f: &mut FormatterState<'_, 'arena>,
         item: &'arena UseItem<'arena>,
-        mut namespace: Vec<'arena, &'arena str>,
-    ) -> (Vec<'arena, &'arena str>, &'arena str) {
-        let mut parts = item.name.value().split('\\').collect_in::<Vec<_>>(f.arena);
+        mut namespace: Vec<'arena, &'arena [u8]>,
+    ) -> (Vec<'arena, &'arena [u8]>, &'arena [u8]) {
+        let mut parts: Vec<'arena, &'arena [u8]> =
+            item.name.value().split(|&b| b == b'\\').collect_in::<Vec<_>>(f.arena);
         // SAFETY: split always returns at least one element
         let name = unsafe { parts.pop().unwrap_unchecked() };
         namespace.extend(parts);
@@ -701,19 +705,19 @@ fn expand_use<'arena>(
     /// The namespace is the list's namespace appended to the current namespace,
     /// and the name is extracted from the first item.
     fn extract_namespace_and_name_from_grouped_list<'arena>(
-        list_namespace: &'arena str,
-        first_item_name: Option<&'arena str>,
-        mut namespace: Vec<'arena, &'arena str>,
-    ) -> (Vec<'arena, &'arena str>, &'arena str) {
+        list_namespace: &'arena [u8],
+        first_item_name: Option<&'arena [u8]>,
+        mut namespace: Vec<'arena, &'arena [u8]>,
+    ) -> (Vec<'arena, &'arena [u8]>, &'arena [u8]) {
         namespace.push(list_namespace);
-        let name = first_item_name.unwrap_or("");
+        let name = first_item_name.unwrap_or(b"");
         (namespace, name)
     }
 
     fn expand_items<'arena>(
         f: &mut FormatterState<'_, 'arena>,
         items: &'arena UseItems<'arena>,
-        current_namespace: Vec<'arena, &'arena str>,
+        current_namespace: Vec<'arena, &'arena [u8]>,
         use_type: Option<&'arena UseType<'arena>>,
         expanded_items: &mut std::vec::Vec<ExpandedUseItem<'arena>>,
         original_node: &'arena Use<'arena>,
@@ -731,7 +735,7 @@ fn expand_use<'arena>(
                         .items
                         .first()
                         .map(|item| extract_namespace_and_name_from_item(f, item, current_namespace.clone()))
-                        .unwrap_or((current_namespace, ""));
+                        .unwrap_or((current_namespace, b""));
                     expanded_items.push(ExpandedUseItem { use_type, namespace, name, alias: None, original_node });
                 }
             }
@@ -753,7 +757,7 @@ fn expand_use<'arena>(
                         .items
                         .first()
                         .map(|item| extract_namespace_and_name_from_item(f, item, current_namespace.clone()))
-                        .unwrap_or((current_namespace, ""));
+                        .unwrap_or((current_namespace, b""));
                     expanded_items.push(ExpandedUseItem {
                         use_type: Some(&seq.r#type),
                         namespace,
@@ -831,12 +835,13 @@ fn expand_use<'arena>(
     fn expand_single_item<'arena>(
         f: &mut FormatterState<'_, 'arena>,
         item: &'arena UseItem<'arena>,
-        mut current_namespace: Vec<'arena, &'arena str>,
+        mut current_namespace: Vec<'arena, &'arena [u8]>,
         use_type: Option<&'arena UseType<'arena>>,
         expanded_items: &mut std::vec::Vec<ExpandedUseItem<'arena>>,
         original_node: &'arena Use<'arena>,
     ) {
-        let mut parts = item.name.value().split('\\').collect_in::<Vec<_>>(f.arena);
+        let mut parts: Vec<'arena, &'arena [u8]> =
+            item.name.value().split(|&b| b == b'\\').collect_in::<Vec<_>>(f.arena);
         // SAFETY: split always returns at least one element
         let name = unsafe { parts.pop().unwrap_unchecked() };
         current_namespace.extend(parts);
@@ -859,7 +864,7 @@ pub fn sort_use_items<'arena>(
     items: impl Iterator<Item = &'arena UseItem<'arena>>,
 ) -> std::vec::Vec<&'arena UseItem<'arena>> {
     let mut items = items.collect::<std::vec::Vec<_>>();
-    items.sort_by_cached_key(|item| item.name.value().to_lowercase());
+    items.sort_by_cached_key(|item| item.name.value().to_ascii_lowercase());
     items
 }
 
@@ -879,7 +884,7 @@ pub fn sort_maybe_typed_use_items<'arena>(
             }
         };
 
-        (type_order, item.item.name.value().to_lowercase())
+        (type_order, item.item.name.value().to_ascii_lowercase())
     });
 
     items

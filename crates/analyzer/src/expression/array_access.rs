@@ -65,10 +65,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
         block_context.flags.set_inside_general_use(was_inside_general_use);
 
         if let Some(keyed_array_var_id) = &keyed_array_var_id
-            && block_context.has_variable(keyed_array_var_id)
+            && block_context.has_variable(keyed_array_var_id.as_bytes())
             && let Some(array_access_type) = block_context.locals.get(keyed_array_var_id).cloned()
         {
-            let is_variable_key = keyed_array_var_id.contains("[$");
+            let is_variable_key = memchr::memmem::find(keyed_array_var_id.as_bytes(), b"[$").is_some();
             if is_variable_key || !array_access_type.possibly_undefined() {
                 artifacts.set_rc_expression_type(self, Rc::clone(&array_access_type));
 
@@ -77,7 +77,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
         }
 
         if let Some(saved_type) = saved_narrowed_type {
-            let is_variable_key = keyed_array_var_id.as_ref().is_some_and(|k| k.contains("[$"));
+            let is_variable_key =
+                keyed_array_var_id.as_ref().is_some_and(|k| memchr::memmem::find(k.as_bytes(), b"[$").is_some());
             if is_variable_key || !saved_type.possibly_undefined() {
                 artifacts.set_rc_expression_type(self, saved_type);
 
@@ -107,7 +108,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
 
                 if !block_context.flags.inside_isset()
                     && can_store_result
-                    && keyed_array_var_id.contains("[$")
+                    && memchr::memmem::find(keyed_array_var_id.as_bytes(), b"[$").is_some()
                     && !block_context.locals.contains_key(keyed_array_var_id)
                 {
                     block_context.locals.insert(*keyed_array_var_id, Rc::new(access_type.clone()));

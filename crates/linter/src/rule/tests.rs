@@ -42,7 +42,8 @@ pub fn run_lint_test<R, F>(
     R: LintRule,
 {
     let arena = Bump::new();
-    let file = File::ephemeral(Cow::Borrowed(filename.unwrap_or("test.php")), Cow::Owned(code.to_string()));
+    let file =
+        File::ephemeral(Cow::Borrowed(filename.unwrap_or("test.php").as_bytes()), Cow::Owned(code.as_bytes().to_vec()));
 
     let program = parse_file(&arena, &file);
     if program.has_errors() {
@@ -117,7 +118,8 @@ where
     use mago_text_edit::TextEditor;
 
     let arena = Bump::new();
-    let file = File::ephemeral(Cow::Borrowed(filename.unwrap_or("test.php")), Cow::Owned(code.to_string()));
+    let file =
+        File::ephemeral(Cow::Borrowed(filename.unwrap_or("test.php").as_bytes()), Cow::Owned(code.as_bytes().to_vec()));
 
     let program = parse_file(&arena, &file);
     if program.has_errors() {
@@ -145,18 +147,19 @@ where
         "Test failed for rule '{rule_code}': Expected code to produce lint issues, but none were found."
     );
 
-    let mut editor = TextEditor::new(code);
+    let mut editor = TextEditor::new(code.as_bytes());
     let mut has_edits = false;
     for (_, edits) in issues.take_edits() {
         for edit in edits {
             has_edits = true;
-            editor.apply(edit, None::<fn(&str) -> bool>);
+            editor.apply(edit, None::<fn(&[u8]) -> bool>);
         }
     }
 
     assert!(has_edits, "Test failed for rule '{rule_code}': Issues were produced but none had auto-fix edits.");
 
-    let fixed = editor.finish();
+    let fixed_bytes = editor.finish();
+    let fixed = String::from_utf8_lossy(&fixed_bytes);
     assert_eq!(
         fixed, expected_fixed,
         "Test failed for rule '{rule_code}': Fixed output doesn't match expected.\n\nGot:\n{fixed}\n\nExpected:\n{expected_fixed}"

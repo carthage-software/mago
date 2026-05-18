@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
-use mago_atom::i64_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::i64_word;
+use mago_word::word;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -28,13 +29,13 @@ pub enum ArrayKey {
     /// An integer array key.
     Integer(i64),
     /// A string array key.
-    String(Atom),
+    String(Word),
     /// A class-like constant or enum case key, not yet resolved to its concrete value.
     ///
     /// This is used when a docblock specifies `array{Foo::BAR: string}` where
     /// `Foo::BAR` is a class constant or enum case. The key will be resolved
     /// to its concrete `Integer` or `String` value during type expansion.
-    ClassLikeConstant { class_like_name: Atom, constant_name: Atom },
+    ClassLikeConstant { class_like_name: Word, constant_name: Word },
 }
 
 impl ArrayKey {
@@ -53,9 +54,9 @@ impl ArrayKey {
     // Not const because it returns a reference derived from a match on a reference.
     // While theoretically possible in future Rust, currently references from matches prevent const.
     #[must_use]
-    pub fn get_string(&self) -> Option<&str> {
+    pub fn get_string(&self) -> Option<&[u8]> {
         match self {
-            ArrayKey::String(s) => Some(s),
+            ArrayKey::String(s) => Some(s.as_bytes()),
             _ => None,
         }
     }
@@ -81,16 +82,41 @@ impl ArrayKey {
         matches!(self, ArrayKey::ClassLikeConstant { .. })
     }
 
-    /// Converts the array key into an `Atom` representing the key *value*.
+    /// Converts the array key into an `Word` representing the key *value*.
     /// Preserves the literal value (e.g., `10`, `"abc"`).
     #[inline]
     #[must_use]
-    pub fn to_atom(&self) -> Atom {
+    pub fn to_atom(&self) -> Word {
         match self {
-            ArrayKey::Integer(i) => i64_atom(*i),
+            ArrayKey::Integer(i) => i64_word(*i),
             ArrayKey::String(s) => *s,
             ArrayKey::ClassLikeConstant { class_like_name, constant_name } => {
-                concat_atom!(class_like_name, "::", constant_name)
+                concat_word!(class_like_name, b"::", constant_name)
+            }
+        }
+    }
+
+    /// Builds the identifier form of this key for use in type ids: an integer as its
+    /// decimal digits, a string key single-quoted, a class-like constant as `Class::CONST`.
+    ///
+    /// Unlike the [`Display`](std::fmt::Display) impl, this uses the raw interned bytes of
+    /// every `Word`, so a non-UTF-8 string key round-trips exactly into the resulting id
+    /// instead of being lossily folded to replacement characters.
+    #[inline]
+    #[must_use]
+    pub fn id_word(&self) -> Word {
+        match self {
+            ArrayKey::Integer(i) => i64_word(*i),
+            ArrayKey::String(s) => {
+                let bytes = s.as_bytes();
+                let mut buf = Vec::with_capacity(bytes.len() + 2);
+                buf.push(b'\'');
+                buf.extend_from_slice(bytes);
+                buf.push(b'\'');
+                word(&buf)
+            }
+            ArrayKey::ClassLikeConstant { class_like_name, constant_name } => {
+                concat_word!(class_like_name, b"::", constant_name)
             }
         }
     }
@@ -161,9 +187,9 @@ where
     T: AsRef<str>,
 {
     /// Converts any type that can be referenced as a `str` to an `ArrayKey::String`.
-    /// The string is cloned into a `Atom`.
+    /// The string is cloned into a `Word`.
     #[inline]
     fn from(s: T) -> Self {
-        ArrayKey::String(Atom::from(s.as_ref()))
+        ArrayKey::String(Word::from(s.as_ref()))
     }
 }

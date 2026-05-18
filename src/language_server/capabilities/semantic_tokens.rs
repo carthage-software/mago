@@ -101,14 +101,14 @@ fn classify(token: &Token<'_>, prev: Option<TokenKind>) -> Option<u32> {
 
         Identifier => match prev {
             Some(Function | Class | Interface | Trait | Enum | Const | New | Use | Namespace) => {
-                match token.value.chars().next() {
-                    Some(c) if c.is_ascii_uppercase() => T_TYPE,
+                match token.value.first() {
+                    Some(b) if b.is_ascii_uppercase() => T_TYPE,
                     _ => T_FUNCTION,
                 }
             }
             Some(MinusGreaterThan | QuestionMinusGreaterThan | ColonColon) => T_FUNCTION,
-            _ => match token.value.chars().next() {
-                Some(c) if c.is_ascii_uppercase() => T_TYPE,
+            _ => match token.value.first() {
+                Some(b) if b.is_ascii_uppercase() => T_TYPE,
                 _ => T_FUNCTION,
             },
         },

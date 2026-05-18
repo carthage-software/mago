@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -86,19 +86,19 @@ impl TType for TIntMask {
         false
     }
 
-    fn get_id(&self) -> Atom {
-        let mut id = String::from("int-mask<");
+    fn get_id(&self) -> Word {
+        let mut id: Vec<u8> = b"int-mask<".to_vec();
         for (i, value) in self.values.iter().enumerate() {
             if i > 0 {
-                id.push_str(", ");
+                id.extend_from_slice(b", ");
             }
-            id.push_str(value.get_id().as_str());
+            id.extend_from_slice(value.get_id().as_bytes());
         }
-        id.push('>');
-        atom(&id)
+        id.push(b'>');
+        word(&id)
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

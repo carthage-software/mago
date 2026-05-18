@@ -6,7 +6,6 @@ use indexmap::IndexMap;
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
-use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
@@ -20,6 +19,7 @@ use mago_syntax::ast::Conditional;
 use mago_syntax::ast::Expression;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
+use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -93,7 +93,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
         vec![]
     });
 
-    let mut mixed_variables = AtomSet::default();
+    let mut mixed_variables = WordSet::default();
     for (variable_id, variable_type) in &block_context.locals {
         if variable_type.is_mixed() {
             mixed_variables.insert(*variable_id);
@@ -107,7 +107,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     }
 
     for clause in &mut if_clauses {
-        let keys: AtomSet = clause.possibilities.keys().copied().collect();
+        let keys: WordSet = clause.possibilities.keys().copied().collect();
         mixed_variables.retain(|i| !keys.contains(i));
 
         'outer: for key in keys {
@@ -182,7 +182,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
         )
         .as_slice(),
         None,
-        &mut AtomSet::default(),
+        &mut WordSet::default(),
     )
     .0;
 
@@ -193,7 +193,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     );
 
     if !reconcilable_if_types.is_empty() {
-        let mut changed_variable_ids = AtomSet::default();
+        let mut changed_variable_ids = WordSet::default();
 
         reconcile_keyed_types(
             context,
@@ -227,7 +227,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     .collect::<Vec<_>>();
 
     if !if_scope.negated_types.is_empty() {
-        let mut changed_variable_ids = AtomSet::default();
+        let mut changed_variable_ids = WordSet::default();
 
         reconcile_keyed_types(
             context,
@@ -259,9 +259,9 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     r#else.analyze(context, &mut else_block_context, artifacts)?;
     else_block_context.flags.set_inside_general_use(was_inside_general_use);
 
-    let if_assigned_variables = if_block_context.assigned_variable_ids.keys().copied().collect::<AtomSet>();
-    let else_assigned_variables = else_block_context.assigned_variable_ids.keys().copied().collect::<AtomSet>();
-    let assigned_variables = if_assigned_variables.intersection(&else_assigned_variables).copied().collect::<AtomSet>();
+    let if_assigned_variables = if_block_context.assigned_variable_ids.keys().copied().collect::<WordSet>();
+    let else_assigned_variables = else_block_context.assigned_variable_ids.keys().copied().collect::<WordSet>();
+    let assigned_variables = if_assigned_variables.intersection(&else_assigned_variables).copied().collect::<WordSet>();
 
     for assigned_variable in assigned_variables {
         let Some(if_type) = if_block_context.locals.get(&assigned_variable) else {
@@ -284,19 +284,19 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
     }
 
     let if_redefined_variables = if_block_context
-        .get_redefined_locals(&block_context.locals, false, &mut AtomSet::default())
+        .get_redefined_locals(&block_context.locals, false, &mut WordSet::default())
         .keys()
         .copied()
-        .collect::<AtomSet>();
+        .collect::<WordSet>();
 
     let else_redefined_variables = else_block_context
-        .get_redefined_locals(&block_context.locals, false, &mut AtomSet::default())
+        .get_redefined_locals(&block_context.locals, false, &mut WordSet::default())
         .keys()
         .copied()
-        .collect::<AtomSet>();
+        .collect::<WordSet>();
 
     let redefined_variable_ids =
-        if_redefined_variables.intersection(&else_redefined_variables).copied().collect::<AtomSet>();
+        if_redefined_variables.intersection(&else_redefined_variables).copied().collect::<WordSet>();
 
     for redefined_variable_id in redefined_variable_ids {
         let if_type = if_block_context.locals.get(&redefined_variable_id);
@@ -363,7 +363,7 @@ pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
             context,
             &Assertion::Truthy,
             Some(condition_type.as_ref()),
-            Some(""),
+            Some(b""),
             block_context.flags.inside_loop(),
             Some(&condition.span()),
             false,

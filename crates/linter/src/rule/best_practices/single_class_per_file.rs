@@ -116,17 +116,19 @@ impl LintRule for SingleClassPerFileRule {
         }
 
         let (first_kind, first_name, first_span) = collector.definitions[0];
+        let first_name_display = mago_bytes::BytesDisplay(first_name);
 
         for &(kind, name, span) in &collector.definitions[1..] {
+            let name_display = mago_bytes::BytesDisplay(name);
             let issue = Issue::new(
                 self.cfg.level(),
-                format!("File contains multiple class-like definitions; found {kind} `{name}` but {first_kind} `{first_name}` is already defined in this file."),
+                format!("File contains multiple class-like definitions; found {kind} `{name_display}` but {first_kind} `{first_name_display}` is already defined in this file."),
             )
             .with_code(self.meta.code)
-            .with_annotation(Annotation::primary(span).with_message(format!("{kind} `{name}` defined here")))
+            .with_annotation(Annotation::primary(span).with_message(format!("{kind} `{name_display}` defined here")))
             .with_annotation(
                 Annotation::secondary(first_span)
-                    .with_message(format!("First {first_kind} `{first_name}` defined here")),
+                    .with_message(format!("First {first_kind} `{first_name_display}` defined here")),
             )
             .with_help("Move each class-like definition into its own file.");
 
@@ -136,7 +138,7 @@ impl LintRule for SingleClassPerFileRule {
 }
 
 struct ClassLikeCollector<'arena> {
-    definitions: Vec<(&'static str, &'arena str, Span)>,
+    definitions: Vec<(&'static str, &'arena [u8], Span)>,
 }
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for ClassLikeCollector<'arena> {

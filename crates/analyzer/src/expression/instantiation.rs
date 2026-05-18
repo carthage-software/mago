@@ -5,8 +5,8 @@ use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
-use mago_atom::AtomMap;
-use mago_atom::atom;
+use mago_word::WordMap;
+use mago_word::word;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
@@ -66,12 +66,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Instantiation<'arena> {
         if classnames.len() > 1 {
             let possible_class_names_str = classnames
                 .iter()
-                .map(|classname| classname.fqcn.map_or("<unknown>", |id| id.as_str()))
+                .map(|classname| match classname.fqcn {
+                    Some(id) => id.to_string(),
+                    None => "<unknown>".to_string(),
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
 
-            let class_expression_type_str =
-                artifacts.get_expression_type(&self.class).map_or("<unknown>", |u| u.get_id().as_str());
+            let class_expression_type_str = artifacts
+                .get_expression_type(&self.class)
+                .map_or_else(|| "<unknown>".to_string(), |u| u.get_id().to_string());
 
             context.collector.report_with_code(
                 IssueCode::AmbiguousInstantiationTarget,
@@ -154,7 +158,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         return Ok(get_object());
     };
 
-    let Some(metadata) = context.codebase.get_class_like(&fq_classname) else {
+    let Some(metadata) = context.codebase.get_class_like(fq_classname.as_bytes()) else {
         context.collector.report_with_code(
             IssueCode::NonExistentClass,
             Issue::error(format!("Class `{fq_classname}` not found."))
@@ -174,12 +178,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 
     let classname_str = &metadata.original_name;
 
-    crate::utils::availability::check_class_like_availability(
-        context,
-        metadata,
-        classname_str.as_str(),
-        class_expression_span,
-    );
+    crate::utils::availability::check_class_like_availability(context, metadata, classname_str, class_expression_span);
 
     if metadata.kind.is_interface() && !classname.is_from_class_string() {
         context.collector.report_with_code(
@@ -274,7 +273,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     }
 
     if metadata.flags.is_deprecated()
-        && block_context.scope.get_class_like_name().is_none_or(|self_id| *self_id != metadata.original_name)
+        && block_context.scope.get_class_like_name().is_none_or(|self_id| self_id != metadata.original_name)
     {
         context.collector.report_with_code(
             IssueCode::DeprecatedClass,
@@ -290,7 +289,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 
     let mut type_parameters = None;
 
-    let constructor_id = MethodIdentifier::new(metadata.original_name, atom("__construct"));
+    let constructor_id = MethodIdentifier::new(metadata.original_name, word("__construct"));
     let constructor_declraing_id = context.codebase.get_declaring_method_identifier(&constructor_id);
 
     artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);
@@ -301,7 +300,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 
     let mut template_result = TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
 
-    let is_spl_object_storage = classname_str.eq_ignore_ascii_case("splobjectstorage");
+    let is_spl_object_storage = classname_str.as_bytes().eq_ignore_ascii_case(b"splobjectstorage");
 
     if let Some(constructor) = context.codebase.get_method_by_id(&constructor_declraing_id) {
         has_inconsistent_constructor =
@@ -332,7 +331,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
             span: instantiation_span,
         };
 
-        let mut argument_types = AtomMap::default();
+        let mut argument_types = WordMap::default();
         analyze_invocation(
             context,
             block_context,
@@ -357,8 +356,8 @@ fn analyze_class_instantiation<'ctx, 'arena>(
         if !check_method_visibility(
             context,
             block_context,
-            &constructor_declraing_id.get_class_name(),
-            &constructor_declraing_id.get_method_name(),
+            constructor_declraing_id.get_class_name().as_bytes(),
+            constructor_declraing_id.get_method_name().as_bytes(),
             instantiation_span,
             None,
         ) {
@@ -389,7 +388,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
                                 .collect::<Vec<_>>(),
                         )
                     })
-                    .collect::<AtomMap<_>>();
+                    .collect::<WordMap<_>>();
 
                 get_generic_parameter_for_offset(
                     metadata.name,
@@ -482,7 +481,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
     }
 
     if classname.is_from_class_string() || classname.is_from_any_object() {
-        let descendants = context.codebase.get_all_descendants(&metadata.name);
+        let descendants = context.codebase.get_all_descendants(metadata.name.as_bytes());
 
         for descendant_class in descendants {
             artifacts.symbol_references.add_reference_to_overridden_class_member(
@@ -539,7 +538,7 @@ pub fn analyze_anonymous_class_constructor<'ctx, 'arena>(
 ) -> Result<(), AnalysisError> {
     let classlike_name = class_like_metadata.name;
 
-    let constructor_id = MethodIdentifier::new(classlike_name, atom("__construct"));
+    let constructor_id = MethodIdentifier::new(classlike_name, word("__construct"));
     let constructor_declaring_id = context.codebase.get_declaring_method_identifier(&constructor_id);
 
     artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);
@@ -571,7 +570,7 @@ pub fn analyze_anonymous_class_constructor<'ctx, 'arena>(
 
         let mut template_result =
             TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
-        let mut argument_types = AtomMap::default();
+        let mut argument_types = WordMap::default();
 
         analyze_invocation(
             context,

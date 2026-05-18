@@ -2,9 +2,6 @@ use std::borrow::Cow;
 
 use foldhash::HashMap;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::concat_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
@@ -26,6 +23,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::Expression;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::artifacts::ClosureBindScope;
@@ -47,6 +47,8 @@ use crate::invocation::template_result::check_template_result;
 use crate::invocation::template_result::get_class_template_parameters_from_result;
 use crate::invocation::template_result::populate_template_result_from_invocation;
 use crate::invocation::template_result::refine_template_result_for_function_like;
+use mago_bytes::BytesDisplay;
+use mago_bytes::trim_start_byte;
 
 /// Finds the parameter that corresponds to a given argument.
 fn get_parameter_of_argument<'target, 'ctx>(
@@ -69,12 +71,12 @@ where
 /// Finds the offset of a named parameter in the parameter list.
 fn find_named_parameter_offset<'target, 'ctx>(
     target: &'target InvocationTarget<'ctx>,
-    argument_name: mago_atom::Atom,
+    argument_name: mago_word::Word,
 ) -> Option<usize>
 where
     'ctx: 'target,
 {
-    let argument_variable_name = concat_atom!("$", argument_name);
+    let argument_variable_name = concat_word!("$", argument_name);
     target
         .iter_parameters()
         .position(|parameter| parameter.get_name().is_some_and(|param_name| argument_variable_name == param_name.0))
@@ -99,9 +101,9 @@ pub fn analyze_invocation<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
-    calling_class_like: Option<(Atom, Option<&TAtomic>)>,
+    calling_class_like: Option<(Word, Option<&TAtomic>)>,
     template_result: &mut TemplateResult,
-    parameter_types: &mut AtomMap<TUnion>,
+    parameter_types: &mut WordMap<TUnion>,
 ) -> Result<(), AnalysisError> {
     if !context.settings.allow_side_effects_in_conditions
         && block_context.flags.inside_conditional()
@@ -143,7 +145,8 @@ pub fn analyze_invocation<'ctx, 'arena>(
         }
     }
 
-    let calling_class_like_metadata = calling_class_like.and_then(|(id, _)| context.codebase.get_class_like(&id));
+    let calling_class_like_metadata =
+        calling_class_like.and_then(|(id, _)| context.codebase.get_class_like(id.as_bytes()));
     let method_call_context = invocation.target.get_method_context();
     let base_class_metadata = method_call_context.map(|ctx| ctx.class_like_metadata).or(calling_class_like_metadata);
     let calling_instance_type = calling_class_like.and_then(|(_, atomic)| atomic);
@@ -341,12 +344,13 @@ pub fn analyze_invocation<'ctx, 'arena>(
         let parameter_ref = get_parameter_of_argument(&invocation.target, argument, *argument_offset);
         if let Some((parameter_offset, parameter_ref)) = parameter_ref {
             if let Some(named_argument) = argument.get_named_argument() {
+                let named_value_display = BytesDisplay(named_argument.name.value);
                 if let Some(previous_span) = assigned_parameters_by_name.get(&named_argument.name.value) {
                     context.collector.report_with_code(
                         IssueCode::DuplicateNamedArgument,
                         Issue::error(format!(
                             "Duplicate named argument `${}` in call to {} `{}`.",
-                            named_argument.name.value, target_kind_str, target_name_str
+                            named_value_display, target_kind_str, target_name_str
                         ))
                         .with_annotation(
                             Annotation::primary(named_argument.name.span()).with_message("Duplicate argument name"),
@@ -363,7 +367,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                             IssueCode::NamedArgumentAfterPositional,
                              Issue::warning(format!(
                                 "Named argument `${}` for {} `{}` targets a variadic parameter that has already captured positional arguments.",
-                                named_argument.name.value, target_kind_str, target_name_str
+                                named_value_display, target_kind_str, target_name_str
                             ))
                             .with_annotation(Annotation::primary(named_argument.name.span()).with_message("Named argument for variadic parameter"))
                             .with_annotation(Annotation::secondary(*previous_span).with_message("Positional arguments already captured by variadic here"))
@@ -375,7 +379,7 @@ pub fn analyze_invocation<'ctx, 'arena>(
                             IssueCode::NamedArgumentOverridesPositional,
                             Issue::error(format!(
                                 "Named argument `${}` for {} `{}` targets a parameter already provided positionally.",
-                                named_argument.name.value, target_kind_str, target_name_str
+                                named_value_display, target_kind_str, target_name_str
                             ))
                             .with_annotation(
                                 Annotation::primary(named_argument.name.span()).with_message("This named argument"),
@@ -436,9 +440,8 @@ pub fn analyze_invocation<'ctx, 'arena>(
                 parameter_types.insert(parameter_name.0, argument_value_type);
             }
         } else if let Some(named_argument) = argument.get_named_argument() {
-            let argument_name = named_argument.name.value;
+            let argument_name = BytesDisplay(named_argument.name.value);
 
-            // For variadic functions, allow extra named arguments
             let has_variadic_parameter = invocation
                 .target
                 .parameter_count()
@@ -466,11 +469,14 @@ pub fn analyze_invocation<'ctx, 'arena>(
                         } else if invocation.target.parameter_count() == 0 {
                             format!("The {target_kind_str} `{target_name_str}` has no parameters.")
                         } else {
-                            let available_params: Vec<_> = invocation
+                            let available_params: Vec<String> = invocation
                                 .target
                                 .iter_parameters()
                                 .filter_map(|parameter| parameter.get_name())
-                                .map(|n| n.0.trim_start_matches('$'))
+                                .map(|n| {
+                                    let bytes = trim_start_byte(n.0.as_bytes(), b'$');
+                                    BytesDisplay(bytes).to_string()
+                                })
                                 .collect();
                             format!("Available parameters are: `{}`.", available_params.join("`, `"))
                         }
@@ -1123,9 +1129,9 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
     target_kind_str: &str,
     target_name_str: &str,
 ) {
-    use mago_atom::concat_atom;
     use mago_codex::ttype::atomic::array::key::ArrayKey;
     use mago_codex::ttype::template::inferred_type_replacer;
+    use mago_word::concat_word;
 
     let Some(known_items) = &keyed_array.known_items else {
         return;
@@ -1133,7 +1139,7 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
 
     for (array_key, (_, element_type)) in known_items {
         let parameter_name = match array_key {
-            ArrayKey::String(key_str) => concat_atom!("$", key_str),
+            ArrayKey::String(key_str) => concat_word!(b"$", key_str.as_bytes()),
             ArrayKey::Integer(key_int) => {
                 if let Some(parameter_ref) = invocation_target.get_parameter(*key_int as usize) {
                     if let Some(param_name) = parameter_ref.get_name() {
@@ -1194,7 +1200,7 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                 invocation_target,
             );
         } else if let ArrayKey::String(key_str) = array_key {
-            let argument_name = key_str.as_str();
+            let argument_name = BytesDisplay(key_str.as_bytes());
 
             // For variadic functions, allow extra named arguments
             let has_variadic_parameter = invocation_target
@@ -1223,7 +1229,10 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
                         let available_params: Vec<String> = invocation_target
                             .iter_parameters()
                             .filter_map(|p| {
-                                p.get_name().map(|name| format!("${}", name.0.as_str().trim_start_matches('$')))
+                                p.get_name().map(|name| {
+                                    let stripped = trim_start_byte(name.0.as_bytes(), b'$');
+                                    format!("${}", BytesDisplay(stripped))
+                                })
                             })
                             .collect();
 
@@ -1259,13 +1268,13 @@ fn detect_closure_bind_scope<'ctx, 'arena>(
         return None;
     };
 
-    if !class_id.eq_ignore_ascii_case("closure") {
+    if !class_id.as_bytes().eq_ignore_ascii_case(b"closure") {
         return None;
     }
 
-    let method_name = method_id.as_str().to_ascii_lowercase();
+    let method_name = method_id.as_bytes().to_ascii_lowercase();
 
-    let (new_this_offset, new_scope_offset) = if method_name.eq_ignore_ascii_case("bind") {
+    let (new_this_offset, new_scope_offset) = if method_name.as_slice().eq_ignore_ascii_case(b"bind") {
         (1, 2)
     } else {
         return None;
@@ -1287,7 +1296,7 @@ fn detect_closure_bind_scope<'ctx, 'arena>(
 
 /// Extracts a class name from a scope argument (typically the 3rd argument to Closure::bind).
 /// This handles cases like `Foo::class`, `'Foo'`, or a class instance type.
-fn extract_class_name_from_scope_arg(context: &Context<'_, '_>, scope_type: &TUnion) -> Option<Atom> {
+fn extract_class_name_from_scope_arg(context: &Context<'_, '_>, scope_type: &TUnion) -> Option<Word> {
     for atomic in scope_type.types.as_ref() {
         match atomic {
             TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Literal { value })) => {
@@ -1299,7 +1308,7 @@ fn extract_class_name_from_scope_arg(context: &Context<'_, '_>, scope_type: &TUn
                 return Some(name);
             }
             TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(value)), .. }))
-                if context.codebase.get_class_like(value).is_some() =>
+                if context.codebase.get_class_like(value.as_bytes()).is_some() =>
             {
                 return Some(*value);
             }
@@ -1317,7 +1326,7 @@ fn extract_class_name_from_scope_arg(context: &Context<'_, '_>, scope_type: &TUn
 }
 
 /// Extracts a class name from a type union (typically for $this type).
-fn extract_class_name_from_type(t: &TUnion) -> Option<Atom> {
+fn extract_class_name_from_type(t: &TUnion) -> Option<Word> {
     for atomic in t.types.as_ref() {
         if let Some(name) = extract_class_name_from_atomic(atomic) {
             return Some(name);
@@ -1327,7 +1336,7 @@ fn extract_class_name_from_type(t: &TUnion) -> Option<Atom> {
 }
 
 /// Extracts a class name from an atomic type.
-fn extract_class_name_from_atomic(atomic: &TAtomic) -> Option<Atom> {
+fn extract_class_name_from_atomic(atomic: &TAtomic) -> Option<Word> {
     match atomic {
         TAtomic::Object(TObject::Named(named)) => Some(named.name),
         TAtomic::Object(TObject::Enum(enum_obj)) => Some(enum_obj.name),
@@ -1346,7 +1355,7 @@ fn filter_array_filter_callback_type(
     analyzed_argument_types: &HashMap<usize, (TUnion, mago_span::Span)>,
 ) {
     let is_array_filter = target.get_function_like_identifier().is_some_and(
-        |id| matches!(id, FunctionLikeIdentifier::Function(name) if name.eq_ignore_ascii_case("array_filter")),
+        |id| matches!(id, FunctionLikeIdentifier::Function(name) if name.as_bytes().eq_ignore_ascii_case(b"array_filter")),
     );
 
     if !is_array_filter {

@@ -190,7 +190,7 @@ impl<'arena> FunctionLikeParts<'arena> {
 
         // Add ampersand if present
         if self.ampersand.is_some() {
-            signature.push(Document::String("&"));
+            signature.push(Document::String(b"&"));
         }
 
         // Add name if present (functions and methods)
@@ -264,7 +264,7 @@ impl<'arena> FunctionLikeParts<'arena> {
         dangling_comments: Option<Document<'arena>>,
     ) -> Document<'arena> {
         match self.body {
-            FunctionLikeBody::Abstract(span) => format_token(f, span, ";"),
+            FunctionLikeBody::Abstract(span) => format_token(f, span, b";"),
             FunctionLikeBody::Block(block) => {
                 let inlined_braces = self.should_use_inlined_braces(f, settings);
                 let spacing =
@@ -363,7 +363,7 @@ impl<'arena> Format<'arena> for ClosureUseClauseVariable<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, ClosureUseClauseVariable, {
             if self.ampersand.is_some() {
-                Document::Group(Group::new(vec![in f.arena; Document::String("&"), self.variable.format(f)]))
+                Document::Group(Group::new(vec![in f.arena; Document::String(b"&"), self.variable.format(f)]))
             } else {
                 self.variable.format(f)
             }
@@ -379,7 +379,7 @@ impl<'arena> Format<'arena> for ClosureUseClause<'arena> {
                 contents.push(Document::space());
             }
 
-            contents.push(Document::String("("));
+            contents.push(Document::String(b"("));
 
             let mut variables = vec![in f.arena];
             for variable in &self.variables {
@@ -389,7 +389,7 @@ impl<'arena> Format<'arena> for ClosureUseClause<'arena> {
             let mut inner_content = Document::join(f.arena, variables, Separator::CommaLine);
             inner_content.insert(0, Document::Line(Line::soft()));
             if f.settings.trailing_comma {
-                inner_content.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
+                inner_content.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
             }
 
             contents.push(Document::Indent(inner_content));
@@ -400,7 +400,7 @@ impl<'arena> Format<'arena> for ClosureUseClause<'arena> {
                 contents.push(Document::Line(Line::soft()));
             }
 
-            contents.push(Document::String(")"));
+            contents.push(Document::String(b")"));
 
             Document::Group(Group::new(contents))
         })
@@ -415,7 +415,7 @@ impl<'arena> Format<'arena> for Method<'arena> {
             parts.format(
                 f,
                 FunctionLikeSettings {
-                    inline_empty_braces: if self.name.value.eq_ignore_ascii_case("__construct") {
+                    inline_empty_braces: if self.name.value.eq_ignore_ascii_case(b"__construct") {
                         f.settings.inline_empty_constructor_braces
                     } else {
                         f.settings.inline_empty_method_braces
@@ -441,6 +441,6 @@ impl<'arena> Format<'arena> for MethodBody<'arena> {
 
 impl<'arena> Format<'arena> for MethodAbstractBody {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, MethodAbstractBody, { Document::String(";") })
+        wrap!(f, self, MethodAbstractBody, { Document::String(b";") })
     }
 }

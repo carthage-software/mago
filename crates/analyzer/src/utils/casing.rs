@@ -1,6 +1,3 @@
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -9,17 +6,20 @@ use mago_span::Span;
 use mago_syntax::ast::Use;
 use mago_syntax::ast::UseItems;
 use mago_syntax::ast::UseType;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::code::IssueCode;
 use crate::context::Context;
 
 /// Checks if the used class-like name matches the canonical casing and reports if not.
-pub fn check_class_like_casing(context: &mut Context<'_, '_>, used_name: Atom, span: Span) {
+pub fn check_class_like_casing(context: &mut Context<'_, '_>, used_name: Word, span: Span) {
     if !context.settings.check_name_casing {
         return;
     }
 
-    let Some(metadata) = context.codebase.get_class_like(&used_name) else {
+    let Some(metadata) = context.codebase.get_class_like(used_name.as_bytes()) else {
         return;
     };
 
@@ -45,7 +45,7 @@ pub fn check_class_like_casing(context: &mut Context<'_, '_>, used_name: Atom, s
 pub fn check_function_casing_with_metadata(
     context: &mut Context<'_, '_>,
     metadata: &FunctionLikeMetadata,
-    used_name: Atom,
+    used_name: Word,
     span: Span,
 ) {
     if !context.settings.check_name_casing {
@@ -60,11 +60,11 @@ pub fn check_function_casing_with_metadata(
         return;
     }
 
-    let canonical_str = canonical.as_str();
-    let used_str = used_name.as_str();
-    if !canonical_str.contains('\\')
-        && let Some(used_basename) = used_str.rsplit('\\').next()
-        && used_basename == canonical_str
+    let canonical_bytes = canonical.as_bytes();
+    let used_bytes = used_name.as_bytes();
+    if memchr::memchr(b'\\', canonical_bytes).is_none()
+        && let Some(idx) = memchr::memrchr(b'\\', used_bytes)
+        && &used_bytes[idx + 1..] == canonical_bytes
     {
         return;
     }
@@ -80,12 +80,12 @@ pub fn check_function_casing_with_metadata(
 }
 
 /// Checks if the used function name matches the canonical casing and reports if not.
-fn check_function_casing(context: &mut Context<'_, '_>, used_name: Atom, span: Span) {
+fn check_function_casing(context: &mut Context<'_, '_>, used_name: Word, span: Span) {
     if !context.settings.check_name_casing {
         return;
     }
 
-    let Some(metadata) = context.codebase.get_function(&used_name) else {
+    let Some(metadata) = context.codebase.get_function(used_name.as_bytes()) else {
         return;
     };
 
@@ -97,27 +97,27 @@ pub fn check_use_statement_casing(context: &mut Context<'_, '_>, r#use: &Use<'_>
     match &r#use.items {
         UseItems::Sequence(sequence) => {
             for item in sequence.items.iter() {
-                let fqn = atom(item.name.value().trim_start_matches('\\'));
+                let fqn = word(mago_bytes::trim_start_byte(item.name.value(), b'\\'));
                 check_class_like_casing(context, fqn, item.name.span());
             }
         }
         UseItems::TypedSequence(typed_sequence) => {
             for item in typed_sequence.items.iter() {
-                let fqn = atom(item.name.value().trim_start_matches('\\'));
+                let fqn = word(mago_bytes::trim_start_byte(item.name.value(), b'\\'));
                 check_typed_use_casing(context, fqn, item.name.span(), &typed_sequence.r#type);
             }
         }
         UseItems::TypedList(typed_list) => {
-            let prefix = typed_list.namespace.value().trim_start_matches('\\');
+            let prefix = mago_bytes::trim_start_byte(typed_list.namespace.value(), b'\\');
             for item in typed_list.items.iter() {
-                let fqn = concat_atom!(prefix, "\\", item.name.value());
+                let fqn = concat_word!(prefix, b"\\", item.name.value());
                 check_typed_use_casing(context, fqn, item.name.span(), &typed_list.r#type);
             }
         }
         UseItems::MixedList(mixed_list) => {
-            let prefix = mixed_list.namespace.value().trim_start_matches('\\');
+            let prefix = mago_bytes::trim_start_byte(mixed_list.namespace.value(), b'\\');
             for maybe_typed_item in mixed_list.items.iter() {
-                let fqn = concat_atom!(prefix, "\\", maybe_typed_item.item.name.value());
+                let fqn = concat_word!(prefix, b"\\", maybe_typed_item.item.name.value());
                 match &maybe_typed_item.r#type {
                     Some(UseType::Function(_)) => {
                         check_function_casing(context, fqn, maybe_typed_item.item.name.span())
@@ -130,7 +130,7 @@ pub fn check_use_statement_casing(context: &mut Context<'_, '_>, r#use: &Use<'_>
     }
 }
 
-fn check_typed_use_casing(context: &mut Context<'_, '_>, fqn: Atom, span: Span, use_type: &UseType<'_>) {
+fn check_typed_use_casing(context: &mut Context<'_, '_>, fqn: Word, span: Span, use_type: &UseType<'_>) {
     match use_type {
         UseType::Function(_) => check_function_casing(context, fqn, span),
         UseType::Const(_) => {} // Constants are case-sensitive

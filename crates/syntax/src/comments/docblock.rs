@@ -14,7 +14,7 @@ use crate::ast::TriviaKind;
 pub struct PrecedingDocblocks<'arena, 'pat> {
     trivia: &'arena [Trivia<'arena>],
     start: u32,
-    important_patterns: &'pat [&'pat str],
+    important_patterns: &'pat [&'pat [u8]],
 }
 
 impl<'arena> PrecedingDocblocks<'arena, 'static> {
@@ -29,7 +29,10 @@ impl<'arena> PrecedingDocblocks<'arena, '_> {
     /// `patterns`. Non-matching docblocks are skipped; the search continues
     /// backward past them.
     #[must_use]
-    pub fn important_only<'new_pat>(self, patterns: &'new_pat [&'new_pat str]) -> PrecedingDocblocks<'arena, 'new_pat> {
+    pub fn important_only<'new_pat>(
+        self,
+        patterns: &'new_pat [&'new_pat [u8]],
+    ) -> PrecedingDocblocks<'arena, 'new_pat> {
         PrecedingDocblocks { trivia: self.trivia, start: self.start, important_patterns: patterns }
     }
 }
@@ -41,7 +44,9 @@ impl<'arena> Iterator for PrecedingDocblocks<'arena, '_> {
         loop {
             let trivia = get_docblock_before_position(self.trivia, self.start)?;
             self.start = trivia.span.start_offset();
-            if self.important_patterns.is_empty() || self.important_patterns.iter().any(|p| trivia.value.contains(*p)) {
+            if self.important_patterns.is_empty()
+                || self.important_patterns.iter().any(|p| memchr::memmem::find(trivia.value, p).is_some())
+            {
                 return Some(trivia);
             }
         }
@@ -147,19 +152,19 @@ mod tests {
         // code gap between the docblock's end offset and the class's start offset.
         // This verifies the assumption that strict trivia contiguity == no code gap.
         let arena = Bump::new();
-        let program = parse_file_content(&arena, FileId::zero(), "<?php\n\n/** @return int */\n\nclass Foo {}");
+        let program = parse_file_content(&arena, FileId::zero(), b"<?php\n\n/** @return int */\n\nclass Foo {}");
         // statements[0] is the <?php opening tag; statements[1] is the class.
         let class_start = program.statements.iter().nth(1).unwrap().span().start.offset;
         let docblock = get_docblock_before_position(program.trivia.as_slice(), class_start);
         assert!(docblock.is_some(), "expected docblock to be found across whitespace");
-        assert!(docblock.unwrap().value.contains("@return int"));
+        assert!(memchr::memmem::find(docblock.unwrap().value, b"@return int").is_some());
     }
 
     #[test]
     fn code_between_docblock_and_function_blocks_attribution() {
         let arena = Bump::new();
         let program =
-            parse_file_content(&arena, FileId::zero(), "<?php\n/** @return int */\necho 1;\nfunction foo() {}");
+            parse_file_content(&arena, FileId::zero(), b"<?php\n/** @return int */\necho 1;\nfunction foo() {}");
         // statements: [0]=OpeningTag, [1]=Echo, [2]=Function
         let func_start = program.statements.iter().nth(2).unwrap().span().start.offset;
         let docblock = get_docblock_before_position(program.trivia.as_slice(), func_start);

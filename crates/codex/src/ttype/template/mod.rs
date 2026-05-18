@@ -4,8 +4,8 @@ use indexmap::IndexMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
 use mago_span::Span;
+use mago_word::Word;
 
 use crate::misc::GenericParent;
 use crate::ttype::union::TUnion;
@@ -32,9 +32,9 @@ pub struct GenericTemplate {
 
 #[derive(Clone, Debug, Default)]
 pub struct TemplateResult {
-    pub template_types: IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
-    pub lower_bounds: HashMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>>,
-    pub upper_bounds: HashMap<Atom, HashMap<GenericParent, TemplateBound>>,
+    pub template_types: IndexMap<Word, Vec<GenericTemplate>, RandomState>,
+    pub lower_bounds: HashMap<Word, HashMap<GenericParent, Vec<TemplateBound>>>,
+    pub upper_bounds: HashMap<Word, HashMap<GenericParent, TemplateBound>>,
     pub readonly: bool,
     pub upper_bounds_unintersectable_types: Vec<TUnion>,
 }
@@ -44,7 +44,7 @@ pub struct TemplateBound {
     pub bound_type: TUnion,
     pub appearance_depth: usize,
     pub argument_offset: Option<usize>,
-    pub equality_bound_classlike: Option<Atom>,
+    pub equality_bound_classlike: Option<Word>,
     pub span: Option<Span>,
 }
 
@@ -66,8 +66,8 @@ impl GenericTemplate {
 impl TemplateResult {
     #[must_use]
     pub fn new(
-        template_types: IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
-        lower_bounds: HashMap<Atom, HashMap<GenericParent, TUnion>>,
+        template_types: IndexMap<Word, Vec<GenericTemplate>, RandomState>,
+        lower_bounds: HashMap<Word, HashMap<GenericParent, TUnion>>,
     ) -> TemplateResult {
         let mut new_lower_bounds = HashMap::default();
 
@@ -95,7 +95,7 @@ impl TemplateResult {
         !self.template_types.is_empty()
     }
 
-    pub fn add_lower_bounds(&mut self, lower_bounds: HashMap<Atom, HashMap<GenericParent, TUnion>>) {
+    pub fn add_lower_bounds(&mut self, lower_bounds: HashMap<Word, HashMap<GenericParent, TUnion>>) {
         for (k, v) in lower_bounds {
             let mut th = HashMap::default();
 
@@ -107,18 +107,18 @@ impl TemplateResult {
         }
     }
 
-    pub fn add_lower_bound(&mut self, parameter_name: Atom, generic_parent: GenericParent, bound: TUnion) {
+    pub fn add_lower_bound(&mut self, parameter_name: Word, generic_parent: GenericParent, bound: TUnion) {
         let entry = self.lower_bounds.entry(parameter_name).or_default();
 
         entry.entry(generic_parent).or_default().push(TemplateBound::new(bound, 0, None, None));
     }
 
-    pub fn add_template_type(&mut self, parameter_name: Atom, generic_parent: GenericParent, constraint: TUnion) {
+    pub fn add_template_type(&mut self, parameter_name: Word, generic_parent: GenericParent, constraint: TUnion) {
         let entry = self.template_types.entry(parameter_name).or_default();
         entry.push(GenericTemplate::new(generic_parent, constraint));
     }
 
-    pub fn add_upper_bound(&mut self, parameter_name: Atom, generic_parent: GenericParent, bound: TemplateBound) {
+    pub fn add_upper_bound(&mut self, parameter_name: Word, generic_parent: GenericParent, bound: TemplateBound) {
         let entry = self.upper_bounds.entry(parameter_name).or_default();
         entry.insert(generic_parent, bound);
     }
@@ -128,7 +128,7 @@ impl TemplateResult {
     }
 
     #[must_use]
-    pub fn has_lower_bound(&self, parameter_name: Atom, generic_parent: &GenericParent) -> bool {
+    pub fn has_lower_bound(&self, parameter_name: Word, generic_parent: &GenericParent) -> bool {
         self.lower_bounds
             .get(&parameter_name)
             .and_then(|bounds| bounds.get(generic_parent))
@@ -136,15 +136,15 @@ impl TemplateResult {
     }
 
     #[must_use]
-    pub fn has_lower_bound_for_class_like(&self, parameter_name: Atom, classlike_name: &Atom) -> bool {
+    pub fn has_lower_bound_for_class_like(&self, parameter_name: Word, classlike_name: &Word) -> bool {
         self.has_lower_bound(parameter_name, &GenericParent::ClassLike(*classlike_name))
     }
 
     #[must_use]
     pub fn get_lower_bounds_for_class_like(
         &self,
-        parameter_name: Atom,
-        classlike_name: Atom,
+        parameter_name: Word,
+        classlike_name: Word,
     ) -> Option<&Vec<TemplateBound>> {
         self.lower_bounds.get(&parameter_name).and_then(|bounds| bounds.get(&GenericParent::ClassLike(classlike_name)))
     }
@@ -156,7 +156,7 @@ impl TemplateBound {
         bound_type: TUnion,
         appearance_depth: usize,
         argument_offset: Option<usize>,
-        equality_bound_classlike: Option<Atom>,
+        equality_bound_classlike: Option<Word>,
     ) -> Self {
         Self { bound_type, appearance_depth, argument_offset, equality_bound_classlike, span: None }
     }

@@ -114,11 +114,12 @@ impl LintRule for NoGotoRule {
                 ctx.collector.report(issue);
             }
             Node::Label(label) => {
+                let label_name_display = mago_bytes::BytesDisplay(label.name.value);
                 let issue = Issue::new(self.cfg.level, "`goto` labels are discouraged.")
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(label.span())
-                            .with_message(format!("Label `{}` is declared here", label.name.value)),
+                            .with_message(format!("Label `{label_name_display}` is declared here")),
                     )
                     .with_note(
                         "Labels are used with `goto` statements, which can lead to confusing 'spaghetti code'.",

@@ -42,7 +42,7 @@ impl FunctionCallHook for SessionSetSaveHandlerHook {
             return Ok(());
         };
 
-        if !identifier.value().eq_ignore_ascii_case("session_set_save_handler") {
+        if !identifier.value().eq_ignore_ascii_case(b"session_set_save_handler") {
             return Ok(());
         }
 

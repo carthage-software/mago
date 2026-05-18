@@ -776,6 +776,8 @@ impl FromIterator<Issue> for IssueCollection {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[test]
@@ -924,12 +926,13 @@ mod tests {
         assert_eq!(issue.primary_span(), Some(span_earlier));
     }
 
-    fn ignore_fixture() -> (IssueCollection, std::collections::HashMap<FileId, &'static str>) {
-        let file_id = |name: &str| FileId::new(name);
+    fn ignore_fixture() -> (IssueCollection, HashMap<FileId, &'static [u8]>) {
+        let file_id = |name: &[u8]| FileId::new(name);
 
-        let paths = ["src/App.php", "tests/Unit/FooTest.php", "modules/auth/views/login.tpl", "types/user/form.tpl"];
+        let paths: [&[u8]; 4] =
+            [b"src/App.php", b"tests/Unit/FooTest.php", b"modules/auth/views/login.tpl", b"types/user/form.tpl"];
 
-        let mut mapping = std::collections::HashMap::new();
+        let mut mapping = HashMap::new();
         let issues: Vec<Issue> = paths
             .iter()
             .map(|p| {
@@ -952,12 +955,14 @@ mod tests {
         let ignore =
             vec![IgnoreEntry::Scoped { code: "invalid-global".to_string(), paths: vec!["tests/".to_string()] }];
 
-        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| mapping.get(&id).map(|s| s.to_string()));
+        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| {
+            mapping.get(&id).map(|s| String::from_utf8_lossy(s).into_owned())
+        });
 
         let remaining: Vec<String> = collection
             .iter()
             .filter_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
-            .map(String::from)
+            .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
             .collect();
 
         assert_eq!(
@@ -978,12 +983,14 @@ mod tests {
             paths: vec!["modules/*/*/*.tpl".to_string(), "types/*/*.tpl".to_string()],
         }];
 
-        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| mapping.get(&id).map(|s| s.to_string()));
+        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| {
+            mapping.get(&id).map(|s| String::from_utf8_lossy(s).into_owned())
+        });
 
         let remaining: Vec<String> = collection
             .iter()
             .filter_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
-            .map(String::from)
+            .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
             .collect();
 
         assert_eq!(remaining, vec!["src/App.php".to_string(), "tests/Unit/FooTest.php".to_string(),]);
@@ -997,12 +1004,14 @@ mod tests {
             paths: vec!["tests/".to_string(), "modules/*/*/*.tpl".to_string(), "types/*/*.tpl".to_string()],
         }];
 
-        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| mapping.get(&id).map(|s| s.to_string()));
+        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| {
+            mapping.get(&id).map(|s| String::from_utf8_lossy(s).into_owned())
+        });
 
         let remaining: Vec<String> = collection
             .iter()
             .filter_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
-            .map(String::from)
+            .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
             .collect();
 
         assert_eq!(remaining, vec!["src/App.php".to_string()]);
@@ -1013,7 +1022,9 @@ mod tests {
         let (mut collection, mapping) = ignore_fixture();
         let ignore = vec![IgnoreEntry::Scoped { code: "different-code".to_string(), paths: vec!["**/*".to_string()] }];
 
-        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| mapping.get(&id).map(|s| s.to_string()));
+        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| {
+            mapping.get(&id).map(|s| String::from_utf8_lossy(s).into_owned())
+        });
 
         assert_eq!(collection.len(), 4);
     }

@@ -1,16 +1,16 @@
 use std::rc::Rc;
 
-use mago_atom::AtomMap;
 use mago_codex::ttype::union::TUnion;
+use mago_word::WordMap;
 
 #[derive(Clone, Debug)]
 pub struct FinallyScope {
-    pub locals: AtomMap<Rc<TUnion>>,
+    pub locals: WordMap<Rc<TUnion>>,
 }
 
 impl FinallyScope {
     pub fn new() -> Self {
-        Self { locals: AtomMap::default() }
+        Self { locals: WordMap::default() }
     }
 }
 

@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -139,14 +139,14 @@ impl TScalar {
     /// Creates a literal `string` type with a known value (e.g., `"hello"`).
     #[inline]
     #[must_use]
-    pub fn literal_string(value: Atom) -> Self {
+    pub fn literal_string(value: Word) -> Self {
         TScalar::String(TString::known_literal(value))
     }
 
     /// Creates a literal `class-string` type with a known value (e.g., `"MyClass"`).
     #[inline]
     #[must_use]
-    pub const fn literal_class_string(value: Atom) -> Self {
+    pub const fn literal_class_string(value: Word) -> Self {
         TScalar::ClassLikeString(TClassLikeString::literal(value))
     }
 
@@ -439,7 +439,7 @@ impl TScalar {
     /// Gets the value if this is a literal `string` with a known value.
     #[inline]
     #[must_use]
-    pub fn get_known_literal_string_value(&self) -> Option<&str> {
+    pub fn get_known_literal_string_value(&self) -> Option<&[u8]> {
         match self {
             TScalar::String(s) => s.get_known_literal_value(),
             _ => None,
@@ -457,7 +457,7 @@ impl TScalar {
 
     #[inline]
     #[must_use]
-    pub fn get_literal_class_string_value(&self) -> Option<Atom> {
+    pub fn get_literal_class_string_value(&self) -> Option<Word> {
         match self {
             TScalar::ClassLikeString(s) => s.literal_value(),
             _ => None,
@@ -528,7 +528,7 @@ impl TScalar {
                 None => false,
             },
             TScalar::Float(f) => f.get_literal_value().is_some_and(|v| v == 0.0),
-            TScalar::String(s) => s.get_known_literal_value().is_some_and(str::is_empty),
+            TScalar::String(s) => s.get_known_literal_value().is_some_and(<[u8]>::is_empty),
             TScalar::ClassLikeString(_) => false,
             _ => false,
         }
@@ -645,29 +645,29 @@ impl TType for TScalar {
         }
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
             TScalar::Bool(t) => t.get_id(),
             TScalar::Float(t) => t.get_id(),
             TScalar::String(t) => t.get_id(),
             TScalar::ClassLikeString(t) => t.get_id(),
             TScalar::Integer(t) => t.get_id(),
-            TScalar::Generic => atom("scalar"),
-            TScalar::ArrayKey => atom("array-key"),
-            TScalar::Numeric => atom("numeric"),
+            TScalar::Generic => word("scalar"),
+            TScalar::ArrayKey => word("array-key"),
+            TScalar::Numeric => word("numeric"),
         }
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         match self {
             TScalar::Bool(t) => t.get_pretty_id_with_indent(indent),
             TScalar::Float(t) => t.get_pretty_id_with_indent(indent),
             TScalar::String(t) => t.get_pretty_id_with_indent(indent),
             TScalar::ClassLikeString(t) => t.get_pretty_id_with_indent(indent),
             TScalar::Integer(t) => t.get_pretty_id_with_indent(indent),
-            TScalar::Generic => atom("scalar"),
-            TScalar::ArrayKey => atom("array-key"),
-            TScalar::Numeric => atom("numeric"),
+            TScalar::Generic => word("scalar"),
+            TScalar::ArrayKey => word("array-key"),
+            TScalar::Numeric => word("numeric"),
         }
     }
 }

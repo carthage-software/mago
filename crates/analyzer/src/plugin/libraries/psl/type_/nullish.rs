@@ -1,10 +1,10 @@
 //! `Psl\Type\nullish()` return type provider.
 
-use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::union::TUnion;
+use mago_word::word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -30,7 +30,7 @@ impl Provider for NullishProvider {
 
 impl FunctionReturnTypeProvider for NullishProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("psl\\type\\nullish")
+        FunctionTarget::Exact(b"psl\\type\\nullish")
     }
 
     fn get_return_type(
@@ -38,7 +38,7 @@ impl FunctionReturnTypeProvider for NullishProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let type_interface = invocation.get_argument(0, &["inner_type"])?;
+        let type_interface = invocation.get_argument(0, &[b"inner_type"])?;
         let type_interface_type = context.get_expression_type(type_interface)?;
 
         let inner_type = type_interface_type
@@ -49,7 +49,7 @@ impl FunctionReturnTypeProvider for NullishProvider {
             .as_nullable();
 
         Some(TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
-            atom("Psl\\Type\\TypeInterface"),
+            word("Psl\\Type\\TypeInterface"),
             Some(vec![inner_type]),
         )))))
     }

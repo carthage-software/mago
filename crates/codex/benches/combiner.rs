@@ -4,7 +4,6 @@ use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
 
-use mago_atom::ascii_lowercase_atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -18,6 +17,7 @@ use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
+use mago_word::ascii_lowercase_word;
 
 /// Core benchmarks for combiner performance
 fn bench_combiner(c: &mut Criterion) {
@@ -49,7 +49,7 @@ fn bench_combiner(c: &mut Criterion) {
     c.bench_function("literal_strings_50", |b| {
         b.iter(|| {
             let types: Vec<TAtomic> = (0..50)
-                .map(|i| TAtomic::Scalar(TScalar::literal_string(ascii_lowercase_atom(&format!("s{i}")))))
+                .map(|i| TAtomic::Scalar(TScalar::literal_string(ascii_lowercase_word(format!("s{i}").as_bytes()))))
                 .collect();
             std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
@@ -74,7 +74,9 @@ fn bench_combiner(c: &mut Criterion) {
     c.bench_function("named_objects_50", |b| {
         b.iter(|| {
             let types: Vec<TAtomic> = (0..50)
-                .map(|i| TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom(&format!("C{i}"))))))
+                .map(|i| {
+                    TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(format!("C{i}").as_bytes()))))
+                })
                 .collect();
             std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });
@@ -86,7 +88,7 @@ fn bench_combiner(c: &mut Criterion) {
             let types: Vec<TAtomic> = (0..20)
                 .map(|i| {
                     TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
-                        ascii_lowercase_atom("Container"),
+                        ascii_lowercase_word(b"Container"),
                         Some(vec![TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::literal(
                             i64::from(i),
                         ))))]),
@@ -105,10 +107,12 @@ fn bench_combiner(c: &mut Criterion) {
                 types.push(TAtomic::Scalar(TScalar::Integer(TInteger::literal(i))));
             }
             for i in 0..10 {
-                types.push(TAtomic::Scalar(TScalar::literal_string(ascii_lowercase_atom(&format!("s{i}")))));
+                types.push(TAtomic::Scalar(TScalar::literal_string(ascii_lowercase_word(format!("s{i}").as_bytes()))));
             }
             for i in 0..10 {
-                types.push(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom(&format!("C{i}"))))));
+                types.push(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(
+                    format!("C{i}").as_bytes(),
+                )))));
             }
             for _ in 0..10 {
                 types.push(TAtomic::Array(TArray::List(TList::from_known_elements(BTreeMap::from_iter([(
@@ -130,13 +134,14 @@ fn bench_combiner(c: &mut Criterion) {
             }
             // 2500 literal strings
             for i in 0..2500 {
-                types.push(TAtomic::Scalar(TScalar::literal_string(ascii_lowercase_atom(&format!("str{i}")))));
+                types
+                    .push(TAtomic::Scalar(TScalar::literal_string(ascii_lowercase_word(format!("str{i}").as_bytes()))));
             }
             // 2500 named objects
             for i in 0..2500 {
-                types.push(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom(&format!(
-                    "Class{i}"
-                ))))));
+                types.push(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(
+                    format!("Class{i}").as_bytes(),
+                )))));
             }
             // 2500 sealed arrays
             for _ in 0..2500 {
@@ -153,7 +158,7 @@ fn bench_combiner(c: &mut Criterion) {
     c.bench_function("literal_strings_5k", |b| {
         b.iter(|| {
             let types: Vec<TAtomic> = (0..5000)
-                .map(|i| TAtomic::Scalar(TScalar::literal_string(ascii_lowercase_atom(&format!("s{i}")))))
+                .map(|i| TAtomic::Scalar(TScalar::literal_string(ascii_lowercase_word(format!("s{i}").as_bytes()))))
                 .collect();
             std::hint::black_box(combine(types, &codebase, CombinerOptions::default()))
         });

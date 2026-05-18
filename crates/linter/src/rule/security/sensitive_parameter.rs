@@ -103,7 +103,7 @@ impl LintRule for SensitiveParameterRule {
             for attribute in &attribute_list.attributes {
                 let name = ctx.resolved_names.get(&attribute.name);
 
-                if name.eq_ignore_ascii_case("SensitiveParameter") {
+                if name.eq_ignore_ascii_case(b"SensitiveParameter") {
                     return; // Attribute found, no issue
                 }
             }

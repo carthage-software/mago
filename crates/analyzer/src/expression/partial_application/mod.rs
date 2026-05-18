@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use mago_atom::atom;
-use mago_atom::concat_atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -12,6 +10,8 @@ use mago_codex::ttype::template::inferred_type_replacer;
 use mago_syntax::ast::PartialApplication;
 use mago_syntax::ast::PartialArgument;
 use mago_syntax::ast::PartialArgumentList;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -51,9 +51,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PartialApplication<'arena> {
 /// the actual parameter position when named arguments can reorder parameters.
 fn find_parameter_index_by_name(
     parameters: &[InvocationTargetParameter<'_>],
-    argument_name: mago_atom::Atom,
+    argument_name: mago_word::Word,
 ) -> Option<usize> {
-    let argument_variable_name = concat_atom!("$", argument_name);
+    let argument_variable_name = concat_word!("$", argument_name);
     parameters
         .iter()
         .position(|parameter| parameter.get_name().is_some_and(|param_name| argument_variable_name == param_name.0))
@@ -118,7 +118,7 @@ fn create_closure_from_partial_application(
                 }
             }
             PartialArgument::NamedPlaceholder(named_placeholder) => {
-                let param_name = atom(named_placeholder.name.value);
+                let param_name = word(named_placeholder.name.value);
                 let param_index = find_parameter_index_by_name(original_parameters, param_name);
 
                 if let Some(index) = param_index

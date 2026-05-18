@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::ttype::TType;
 
@@ -10,9 +10,9 @@ use crate::ttype::TType;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct TEnum {
     /// The fully qualified name (FQCN) of the enum.
-    pub name: Atom,
+    pub name: Word,
     /// The case name of the enum variant, if specified.
-    pub case: Option<Atom>,
+    pub case: Option<Word>,
 }
 
 impl TEnum {
@@ -20,10 +20,10 @@ impl TEnum {
     ///
     /// # Arguments
     ///
-    /// * `name`: The `Atom` for the enum's FQCN.
+    /// * `name`: The `Word` for the enum's FQCN.
     #[inline]
     #[must_use]
-    pub const fn new(name: Atom) -> Self {
+    pub const fn new(name: Word) -> Self {
         Self { name, case: None }
     }
 
@@ -31,25 +31,25 @@ impl TEnum {
     ///
     /// # Arguments
     ///
-    /// * `name`: The `Atom` for the enum's FQCN.
-    /// * `case`: The `Atom` for the enum case name.
+    /// * `name`: The `Word` for the enum's FQCN.
+    /// * `case`: The `Word` for the enum case name.
     #[inline]
     #[must_use]
-    pub const fn new_case(name: Atom, case: Atom) -> Self {
+    pub const fn new_case(name: Word, case: Word) -> Self {
         Self { name, case: Some(case) }
     }
 
-    /// Returns the `Atom` for the enum's FQCN.
+    /// Returns the `Word` for the enum's FQCN.
     #[inline]
     #[must_use]
-    pub const fn get_name(&self) -> Atom {
+    pub const fn get_name(&self) -> Word {
         self.name
     }
 
-    /// Returns the `Atom` for the enum case, if it exists.
+    /// Returns the `Word` for the enum case, if it exists.
     #[inline]
     #[must_use]
-    pub const fn get_case(&self) -> Option<Atom> {
+    pub const fn get_case(&self) -> Option<Word> {
         self.case
     }
 }
@@ -67,14 +67,14 @@ impl TType for TEnum {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self.case {
-            Some(case) => concat_atom!("enum(", self.name, "::", case, ")"),
-            None => concat_atom!("enum(", self.name, ")"),
+            Some(case) => concat_word!(b"enum(", self.name, b"::", case, b")"),
+            None => concat_word!(b"enum(", self.name, b")"),
         }
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

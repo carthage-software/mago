@@ -1,16 +1,16 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
+use mago_word::Word;
 
 /// Represents a unique identifier for a method within a class-like structure.
 /// Combines the fully qualified class name (FQCN) and the method name.
 #[derive(Clone, Debug, PartialEq, Eq, Copy, Serialize, Deserialize, Hash, PartialOrd, Ord)]
 pub struct MethodIdentifier {
     /// The fully qualified name of the class, interface, trait, or enum containing the method.
-    class_name: Atom,
+    class_name: Word,
     /// The name of the method itself.
-    method_name: Atom,
+    method_name: Word,
 }
 
 impl MethodIdentifier {
@@ -18,25 +18,25 @@ impl MethodIdentifier {
     ///
     /// # Arguments
     ///
-    /// * `class_name`: The `Atom` for the fully qualified class name.
-    /// * `method_name`: The `Atom` for the method name.
+    /// * `class_name`: The `Word` for the fully qualified class name.
+    /// * `method_name`: The `Word` for the method name.
     #[inline]
     #[must_use]
-    pub const fn new(class_name: Atom, method_name: Atom) -> Self {
+    pub const fn new(class_name: Word, method_name: Word) -> Self {
         Self { class_name, method_name }
     }
 
-    /// Returns the `Atom` for the class name.
+    /// Returns the `Word` for the class name.
     #[inline]
     #[must_use]
-    pub const fn get_class_name(&self) -> Atom {
+    pub const fn get_class_name(&self) -> Word {
         self.class_name
     }
 
-    /// Returns the `Atom` for the method name.
+    /// Returns the `Word` for the method name.
     #[inline]
     #[must_use]
-    pub const fn get_method_name(&self) -> Atom {
+    pub const fn get_method_name(&self) -> Word {
         self.method_name
     }
 
@@ -47,10 +47,10 @@ impl MethodIdentifier {
         format!("{}::{}", self.class_name, self.method_name)
     }
 
-    /// Converts the identifier to a tuple of `Atom`s representing the class name and method name.
+    /// Converts the identifier to a tuple of `Word`s representing the class name and method name.
     #[inline]
     #[must_use]
-    pub fn get_key(&self) -> (Atom, Atom) {
+    pub fn get_key(&self) -> (Word, Word) {
         (self.class_name, self.method_name)
     }
 }

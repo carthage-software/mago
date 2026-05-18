@@ -1,9 +1,9 @@
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::AttributeList;
 use mago_syntax::ast::Sequence;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::flags::attribute::AttributeFlags;
 use crate::metadata::attribute::AttributeMetadata;
@@ -20,7 +20,7 @@ pub fn scan_attribute_lists<'arena>(
     for attribute_list in attribute_lists {
         for attribute in &attribute_list.attributes {
             metadata.push(AttributeMetadata {
-                name: atom(context.resolved_names.get(&attribute.name)),
+                name: word(context.resolved_names.get(&attribute.name)),
                 span: attribute.span(),
             });
         }
@@ -31,19 +31,19 @@ pub fn scan_attribute_lists<'arena>(
 
 #[inline]
 pub fn get_attribute_flags<'arena>(
-    class_like_name: Atom,
+    class_like_name: Word,
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
-    classname: Option<Atom>,
+    classname: Option<Word>,
 ) -> Option<AttributeFlags> {
-    if class_like_name.eq_ignore_ascii_case("Attribute") {
+    if class_like_name.as_bytes().eq_ignore_ascii_case(b"Attribute") {
         return Some(AttributeFlags::TARGET_CLASS);
     }
 
     for attribute in attribute_lists.iter().flat_map(|list| list.attributes.iter()) {
         let attribute_name = context.resolved_names.get(&attribute.name);
-        if !attribute_name.eq_ignore_ascii_case("Attribute") {
+        if !attribute_name.eq_ignore_ascii_case(b"Attribute") {
             continue;
         }
 

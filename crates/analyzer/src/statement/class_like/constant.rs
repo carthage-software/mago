@@ -1,4 +1,3 @@
-use mago_atom::atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
@@ -10,6 +9,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::ClassLikeConstant;
 use mago_syntax::ast::ClassLikeConstantItem;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -53,7 +53,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstantItem<'arena> {
         self.value.analyze(context, block_context, artifacts)?;
 
         if let Some(class_metadata) = block_context.scope.get_class_like()
-            && let Some(constant_metadata) = class_metadata.constants.get(&atom(self.name.value))
+            && let Some(constant_metadata) = class_metadata.constants.get(&word(self.name.value))
         {
             if let Some(inferred_type) = constant_metadata.inferred_type.as_ref()
                 && inferred_type.is_never()
@@ -62,7 +62,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstantItem<'arena> {
                     IssueCode::UnresolvableClassConstant,
                     Issue::error(format!(
                         "Cannot resolve the value of class constant `{}::{}`.",
-                        class_metadata.original_name, self.name.value,
+                        class_metadata.original_name,
+                        mago_bytes::BytesDisplay(self.name.value),
                     ))
                     .with_annotation(
                         Annotation::primary(self.value.span()).with_message("This initializer could not be evaluated"),
@@ -104,7 +105,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstantItem<'arena> {
                     let value_type_str = value_type.get_id();
                     let declared_type_str = declared_type.get_id();
                     let class_name = class_metadata.original_name;
-                    let constant_name = self.name.value;
+                    let constant_name = mago_bytes::BytesDisplay(self.name.value);
 
                     let issue = Issue::error(format!(
                         "Value for constant `{class_name}::{constant_name}` is not assignable to its declared type."

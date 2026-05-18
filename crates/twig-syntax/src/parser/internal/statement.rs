@@ -8,23 +8,23 @@ use crate::token::TwigTokenKind;
 
 /// Trait used by block parsers to recognise their closing `{% endX %}` tag.
 pub trait Terminator {
-    fn is_end(&self, name: &str) -> bool;
+    fn is_end(&self, name: &[u8]) -> bool;
 }
 
 pub struct NoTerminator;
 
 impl Terminator for NoTerminator {
-    fn is_end(&self, _name: &str) -> bool {
+    fn is_end(&self, _name: &[u8]) -> bool {
         false
     }
 }
 
 pub struct BlockTerminator {
-    pub names: &'static [&'static str],
+    pub names: &'static [&'static [u8]],
 }
 
 impl Terminator for BlockTerminator {
-    fn is_end(&self, name: &str) -> bool {
+    fn is_end(&self, name: &[u8]) -> bool {
         self.names.contains(&name)
     }
 }
@@ -59,7 +59,7 @@ impl<'arena> Parser<'_, 'arena> {
                     };
                     if name_tok.kind != TwigTokenKind::Name {
                         return Err(ParseError::UnexpectedToken(
-                            "a block tag must start with a tag name".to_string(),
+                            b"a block tag must start with a tag name".to_vec(),
                             self.stream.span_of(&name_tok),
                         ));
                     }
@@ -79,7 +79,7 @@ impl<'arena> Parser<'_, 'arena> {
                 }
                 _ => {
                     return Err(ParseError::UnexpectedToken(
-                        format!("unexpected token {:?} at statement level", token.kind),
+                        format!("unexpected token {:?} at statement level", token.kind).into_bytes(),
                         self.stream.span_of(&token),
                     ));
                 }

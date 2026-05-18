@@ -35,7 +35,7 @@ mod tests {
 
     use super::*;
 
-    fn make_inline(value: &str, kind: InlineKind) -> Inline<'_> {
+    fn make_inline(value: &[u8], kind: InlineKind) -> Inline<'_> {
         Inline {
             kind,
             value,
@@ -58,8 +58,8 @@ mod tests {
         let opts = FingerprintOptions::default();
         let names = ResolvedNames::default();
 
-        let inline1 = make_inline("Hello", InlineKind::Text);
-        let inline2 = make_inline("World", InlineKind::Text);
+        let inline1 = make_inline(b"Hello", InlineKind::Text);
+        let inline2 = make_inline(b"World", InlineKind::Text);
 
         assert_eq!(fingerprint_inline(&inline1, &opts, &names), fingerprint_inline(&inline2, &opts, &names));
     }
@@ -69,8 +69,8 @@ mod tests {
         let opts = FingerprintOptions::default();
         let names = ResolvedNames::default();
 
-        let inline_text = make_inline("Some text", InlineKind::Text);
-        let inline_html = make_inline("Some text", InlineKind::Shebang);
+        let inline_text = make_inline(b"Some text", InlineKind::Text);
+        let inline_html = make_inline(b"Some text", InlineKind::Shebang);
 
         assert_ne!(fingerprint_inline(&inline_text, &opts, &names), fingerprint_inline(&inline_html, &opts, &names));
     }

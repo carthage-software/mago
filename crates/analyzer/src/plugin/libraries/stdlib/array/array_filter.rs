@@ -47,7 +47,7 @@ impl Provider for ArrayFilterProvider {
 
 impl FunctionReturnTypeProvider for ArrayFilterProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("array_filter")
+        FunctionTarget::Exact(b"array_filter")
     }
 
     fn get_return_type(
@@ -55,10 +55,10 @@ impl FunctionReturnTypeProvider for ArrayFilterProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let array_argument = invocation.get_argument(0, &["array"])?;
+        let array_argument = invocation.get_argument(0, &[b"array"])?;
         let array_type = context.get_expression_type(array_argument)?;
 
-        let callback_argument = invocation.get_argument(1, &["callback"]);
+        let callback_argument = invocation.get_argument(1, &[b"callback"]);
 
         let codebase = context.codebase();
 

@@ -4,11 +4,11 @@ use std::hash::Hash;
 
 use foldhash::fast::FixedState;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
-use mago_atom::i64_atom;
-use mago_atom::usize_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::i64_word;
+use mago_word::usize_word;
+use mago_word::word;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -62,50 +62,50 @@ pub enum Assertion {
 
 impl Assertion {
     #[must_use]
-    pub fn to_atom(&self) -> Atom {
+    pub fn to_atom(&self) -> Word {
         match self {
-            Assertion::Any => atom("any"),
-            Assertion::Falsy => atom("falsy"),
-            Assertion::Truthy => atom("truthy"),
-            Assertion::IsEqualIsset => atom("=isset"),
-            Assertion::IsIsset => atom("isset"),
-            Assertion::IsNotIsset => atom("!isset"),
-            Assertion::HasStringArrayAccess => atom("=string-array-access"),
-            Assertion::HasIntOrStringArrayAccess => atom("=int-or-string-array-access"),
-            Assertion::ArrayKeyExists => atom("array-key-exists"),
-            Assertion::ArrayKeyDoesNotExist => atom("!array-key-exists"),
-            Assertion::EmptyCountable => atom("empty-countable"),
-            Assertion::Empty => atom("empty"),
-            Assertion::NonEmpty => atom("non-empty"),
-            Assertion::Countable => atom("countable"),
-            Assertion::NotCountable(_) => atom("!countable"),
+            Assertion::Any => word("any"),
+            Assertion::Falsy => word("falsy"),
+            Assertion::Truthy => word("truthy"),
+            Assertion::IsEqualIsset => word("=isset"),
+            Assertion::IsIsset => word("isset"),
+            Assertion::IsNotIsset => word("!isset"),
+            Assertion::HasStringArrayAccess => word("=string-array-access"),
+            Assertion::HasIntOrStringArrayAccess => word("=int-or-string-array-access"),
+            Assertion::ArrayKeyExists => word("array-key-exists"),
+            Assertion::ArrayKeyDoesNotExist => word("!array-key-exists"),
+            Assertion::EmptyCountable => word("empty-countable"),
+            Assertion::Empty => word("empty"),
+            Assertion::NonEmpty => word("non-empty"),
+            Assertion::Countable => word("countable"),
+            Assertion::NotCountable(_) => word("!countable"),
             Assertion::IsType(atomic) => atomic.get_id(),
-            Assertion::IsNotType(atomic) => concat_atom!("!", atomic.get_id()),
-            Assertion::IsIdentical(atomic) => concat_atom!("=", atomic.get_id()),
-            Assertion::IsNotIdentical(atomic) => concat_atom!("!=", atomic.get_id()),
-            Assertion::IsEqual(atomic) => concat_atom!("~", atomic.get_id()),
-            Assertion::IsNotEqual(atomic) => concat_atom!("!~", atomic.get_id()),
-            Assertion::InArray(union) => concat_atom!("=in-array-", union.get_id()),
-            Assertion::NotInArray(union) => concat_atom!("!=in-array-", union.get_id()),
-            Assertion::HasArrayKey(key) => concat_atom!("=has-array-key-", key.to_atom()),
-            Assertion::DoesNotHaveArrayKey(key) => concat_atom!("!=has-array-key-", key.to_atom()),
-            Assertion::HasNonnullEntryForKey(key) => concat_atom!("=has-nonnull-entry-for-", key.to_atom()),
+            Assertion::IsNotType(atomic) => concat_word!(b"!", atomic.get_id()),
+            Assertion::IsIdentical(atomic) => concat_word!(b"=", atomic.get_id()),
+            Assertion::IsNotIdentical(atomic) => concat_word!(b"!=", atomic.get_id()),
+            Assertion::IsEqual(atomic) => concat_word!(b"~", atomic.get_id()),
+            Assertion::IsNotEqual(atomic) => concat_word!(b"!~", atomic.get_id()),
+            Assertion::InArray(union) => concat_word!(b"=in-array-", union.get_id()),
+            Assertion::NotInArray(union) => concat_word!(b"!=in-array-", union.get_id()),
+            Assertion::HasArrayKey(key) => concat_word!(b"=has-array-key-", key.to_atom()),
+            Assertion::DoesNotHaveArrayKey(key) => concat_word!(b"!=has-array-key-", key.to_atom()),
+            Assertion::HasNonnullEntryForKey(key) => concat_word!(b"=has-nonnull-entry-for-", key.to_atom()),
             Assertion::DoesNotHaveNonnullEntryForKey(key) => {
-                concat_atom!("!=has-nonnull-entry-for-", key.to_atom())
+                concat_word!(b"!=has-nonnull-entry-for-", key.to_atom())
             }
-            Assertion::HasExactCount(number) => concat_atom!("has-exactly-", usize_atom(*number)),
-            Assertion::HasAtLeastCount(number) => concat_atom!("has-at-least-", usize_atom(*number)),
-            Assertion::DoesNotHaveExactCount(number) => concat_atom!("!has-exactly-", usize_atom(*number)),
-            Assertion::DoesNotHasAtLeastCount(number) => concat_atom!("has-at-most-", usize_atom(*number)),
-            Assertion::IsLessThan(number) => concat_atom!("is-less-than-", i64_atom(*number)),
-            Assertion::IsLessThanOrEqual(number) => concat_atom!("is-less-than-or-equal-", i64_atom(*number)),
-            Assertion::IsGreaterThan(number) => concat_atom!("is-greater-than-", i64_atom(*number)),
-            Assertion::IsGreaterThanOrEqual(number) => concat_atom!("is-greater-than-or-equal-", i64_atom(*number)),
+            Assertion::HasExactCount(number) => concat_word!(b"has-exactly-", usize_word(*number)),
+            Assertion::HasAtLeastCount(number) => concat_word!(b"has-at-least-", usize_word(*number)),
+            Assertion::DoesNotHaveExactCount(number) => concat_word!(b"!has-exactly-", usize_word(*number)),
+            Assertion::DoesNotHasAtLeastCount(number) => concat_word!(b"has-at-most-", usize_word(*number)),
+            Assertion::IsLessThan(number) => concat_word!(b"is-less-than-", i64_word(*number)),
+            Assertion::IsLessThanOrEqual(number) => concat_word!(b"is-less-than-or-equal-", i64_word(*number)),
+            Assertion::IsGreaterThan(number) => concat_word!(b"is-greater-than-", i64_word(*number)),
+            Assertion::IsGreaterThanOrEqual(number) => concat_word!(b"is-greater-than-or-equal-", i64_word(*number)),
             Assertion::NonEmptyCountable(negatable) => {
                 if *negatable {
-                    atom("non-empty-countable")
+                    word("non-empty-countable")
                 } else {
-                    atom("=non-empty-countable")
+                    word("=non-empty-countable")
                 }
             }
         }

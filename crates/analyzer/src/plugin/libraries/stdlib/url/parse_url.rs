@@ -2,7 +2,6 @@
 
 use std::collections::BTreeMap;
 
-use mago_atom::Atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -14,6 +13,7 @@ use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::get_int_range;
 use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::union::TUnion;
+use mago_word::Word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -52,7 +52,7 @@ impl Provider for ParseUrlProvider {
 
 impl FunctionReturnTypeProvider for ParseUrlProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("parse_url")
+        FunctionTarget::Exact(b"parse_url")
     }
 
     fn get_return_type(
@@ -60,7 +60,7 @@ impl FunctionReturnTypeProvider for ParseUrlProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let component_arg = invocation.get_argument(1, &["component"]);
+        let component_arg = invocation.get_argument(1, &[b"component"]);
 
         if let Some(arg) = component_arg {
             if let Some(component_type) = context.get_expression_type(arg) {
@@ -197,10 +197,10 @@ fn get_full_array_return_type() -> TUnion {
 
     let optional_string_fields = ["scheme", "user", "pass", "host", "path", "query", "fragment"];
     for field in optional_string_fields {
-        known_items.insert(ArrayKey::String(Atom::from(field)), (true, get_non_empty_string()));
+        known_items.insert(ArrayKey::String(Word::from(field)), (true, get_non_empty_string()));
     }
 
-    known_items.insert(ArrayKey::String(Atom::from("port")), (true, get_int_range(Some(0), Some(0xFFFF))));
+    known_items.insert(ArrayKey::String(Word::from("port")), (true, get_int_range(Some(0), Some(0xFFFF))));
 
     let keyed_array = TKeyedArray::new().with_known_items(known_items);
 

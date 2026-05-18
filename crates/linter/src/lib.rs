@@ -95,7 +95,7 @@ impl<'arena> Linter<'arena> {
         }
 
         // Compute which rules are excluded for this file
-        let file_name = source_file.name.as_ref();
+        let file_name = std::str::from_utf8(source_file.name.as_ref()).ok();
         let excluded_rules: HashSet<usize> = self
             .registry
             .rules()
@@ -103,7 +103,8 @@ impl<'arena> Linter<'arena> {
             .enumerate()
             .filter(|(idx, _)| {
                 let matcher = self.registry.excludes_for(*idx);
-                !matcher.is_empty() && matcher.is_match(file_name)
+                let Some(name) = file_name else { return false };
+                !matcher.is_empty() && matcher.is_match(name)
             })
             .map(|(idx, _)| idx)
             .collect();

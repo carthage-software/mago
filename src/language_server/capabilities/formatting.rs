@@ -34,6 +34,6 @@ pub fn compute(file: &MagoFile, php_version: PHPVersion, settings: FormatSetting
             start: Position { line: 0, character: 0 },
             end: Position { line: end_line, character: end_character },
         },
-        new_text: formatted.to_string(),
+        new_text: String::from_utf8_lossy(formatted).into_owned(),
     })
 }

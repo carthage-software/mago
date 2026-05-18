@@ -3,9 +3,9 @@ use mago_php_version::PHPVersionRange;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_word::Word;
 
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
@@ -18,7 +18,7 @@ use crate::visibility::Visibility;
 #[non_exhaustive]
 pub struct ClassLikeConstantMetadata {
     pub attributes: Vec<AttributeMetadata>,
-    pub name: Atom,
+    pub name: Word,
     pub span: Span,
     pub visibility: Visibility,
     pub type_declaration: Option<TypeMetadata>,
@@ -30,7 +30,7 @@ pub struct ClassLikeConstantMetadata {
 
 impl ClassLikeConstantMetadata {
     #[must_use]
-    pub fn new(name: Atom, span: Span, visibility: Visibility, flags: MetadataFlags) -> Self {
+    pub fn new(name: Word, span: Span, visibility: Visibility, flags: MetadataFlags) -> Self {
         Self {
             attributes: Vec::new(),
             name,

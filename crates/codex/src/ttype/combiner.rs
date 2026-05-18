@@ -4,23 +4,23 @@ use std::sync::LazyLock;
 
 use foldhash::HashSet;
 
-use mago_atom::Atom;
-use mago_atom::AtomSet;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::WordSet;
+use mago_word::word;
 
-static ATOM_FALSE: LazyLock<Atom> = LazyLock::new(|| atom("false"));
-static ATOM_TRUE: LazyLock<Atom> = LazyLock::new(|| atom("true"));
-static ATOM_BOOL: LazyLock<Atom> = LazyLock::new(|| atom("bool"));
-static ATOM_VOID: LazyLock<Atom> = LazyLock::new(|| atom("void"));
-static ATOM_NULL: LazyLock<Atom> = LazyLock::new(|| atom("null"));
-static ATOM_STRING: LazyLock<Atom> = LazyLock::new(|| atom("string"));
-static ATOM_FLOAT: LazyLock<Atom> = LazyLock::new(|| atom("float"));
-static ATOM_INT: LazyLock<Atom> = LazyLock::new(|| atom("int"));
-static ATOM_MIXED: LazyLock<Atom> = LazyLock::new(|| atom("mixed"));
-static ATOM_SCALAR: LazyLock<Atom> = LazyLock::new(|| atom("scalar"));
-static ATOM_ARRAY_KEY: LazyLock<Atom> = LazyLock::new(|| atom("array-key"));
-static ATOM_NUMERIC: LazyLock<Atom> = LazyLock::new(|| atom("numeric"));
-static ATOM_NEVER: LazyLock<Atom> = LazyLock::new(|| atom("never"));
+static ATOM_FALSE: LazyLock<Word> = LazyLock::new(|| word("false"));
+static ATOM_TRUE: LazyLock<Word> = LazyLock::new(|| word("true"));
+static ATOM_BOOL: LazyLock<Word> = LazyLock::new(|| word("bool"));
+static ATOM_VOID: LazyLock<Word> = LazyLock::new(|| word("void"));
+static ATOM_NULL: LazyLock<Word> = LazyLock::new(|| word("null"));
+static ATOM_STRING: LazyLock<Word> = LazyLock::new(|| word("string"));
+static ATOM_FLOAT: LazyLock<Word> = LazyLock::new(|| word("float"));
+static ATOM_INT: LazyLock<Word> = LazyLock::new(|| word("int"));
+static ATOM_MIXED: LazyLock<Word> = LazyLock::new(|| word("mixed"));
+static ATOM_SCALAR: LazyLock<Word> = LazyLock::new(|| word("scalar"));
+static ATOM_ARRAY_KEY: LazyLock<Word> = LazyLock::new(|| word("array-key"));
+static ATOM_NUMERIC: LazyLock<Word> = LazyLock::new(|| word("numeric"));
+static ATOM_NEVER: LazyLock<Word> = LazyLock::new(|| word("never"));
 
 use crate::metadata::CodebaseMetadata;
 use crate::symbol::SymbolKind;
@@ -455,7 +455,7 @@ fn scrape_type_properties(
             }
 
             let has_non_truthy = combination.value_types.values().any(|v| !v.is_truthy())
-                || combination.literal_strings.iter().any(|s| s.is_empty() || s.as_str() == "0");
+                || combination.literal_strings.iter().any(|s| s.is_empty() || s.as_bytes() == b"0");
 
             if has_non_truthy {
                 combination.flags.insert(CombinationFlags::GENERIC_MIXED);
@@ -485,7 +485,7 @@ fn scrape_type_properties(
             }
 
             let has_non_falsy = combination.value_types.values().any(|v| !v.is_falsy())
-                || combination.literal_strings.iter().any(|s| !s.is_empty() && s.as_str() != "0");
+                || combination.literal_strings.iter().any(|s| !s.is_empty() && s.as_bytes() != b"0");
 
             if has_non_falsy {
                 combination.flags.insert(CombinationFlags::GENERIC_MIXED);
@@ -1003,7 +1003,7 @@ fn scrape_type_properties(
         let is_class = matches!(symbol_type, SymbolKind::Class);
         let is_interface = matches!(symbol_type, SymbolKind::Interface);
 
-        let mut types_to_remove: Vec<Atom> = Vec::new();
+        let mut types_to_remove: Vec<Word> = Vec::new();
 
         for (key, existing_type) in &combination.value_types {
             if let TAtomic::Object(TObject::Named(existing_object)) = &existing_type {
@@ -1040,29 +1040,31 @@ fn scrape_type_properties(
 
                 if matches!(existing_symbol_kind, SymbolKind::Class) {
                     // remove subclasses
-                    if codebase.is_instance_of(&existing_name, &fq_class_name) {
+                    if codebase.is_instance_of(existing_name.as_bytes(), fq_class_name.as_bytes()) {
                         types_to_remove.push(*key);
                         continue;
                     }
 
                     if is_class {
                         // if covered by a parent class
-                        if codebase.class_extends(&fq_class_name, &existing_name) {
+                        if codebase.class_extends(fq_class_name.as_bytes(), existing_name.as_bytes()) {
                             return;
                         }
                     } else if is_interface {
                         // if covered by a parent class
-                        if codebase.class_implements(&fq_class_name, &existing_name) {
+                        if codebase.class_implements(fq_class_name.as_bytes(), existing_name.as_bytes()) {
                             return;
                         }
                     }
                 } else if matches!(existing_symbol_kind, SymbolKind::Interface) {
-                    if codebase.class_implements(&existing_name, &fq_class_name) {
+                    if codebase.class_implements(existing_name.as_bytes(), fq_class_name.as_bytes()) {
                         types_to_remove.push(existing_name);
                         continue;
                     }
 
-                    if (is_class || is_interface) && codebase.class_implements(&fq_class_name, &existing_name) {
+                    if (is_class || is_interface)
+                        && codebase.class_implements(fq_class_name.as_bytes(), existing_name.as_bytes())
+                    {
                         return;
                     }
                 }
@@ -1083,13 +1085,13 @@ fn scrape_type_properties(
         combination.integers.clear();
         combination.literal_floats.clear();
         combination.value_types.retain(|k, _| {
-            k != "string"
-                && k != "bool"
-                && k != "false"
-                && k != "true"
-                && k != "float"
-                && k != "numeric"
-                && k != "array-key"
+            k.as_bytes() != b"string"
+                && k.as_bytes() != b"bool"
+                && k.as_bytes() != b"false"
+                && k.as_bytes() != b"true"
+                && k.as_bytes() != b"float"
+                && k.as_bytes() != b"numeric"
+                && k.as_bytes() != b"array-key"
         });
 
         combination.value_types.insert(atomic.get_id(), atomic);
@@ -1126,12 +1128,12 @@ fn scrape_type_properties(
         if let Some(existing_string_type) = combination.value_types.get_mut(&*ATOM_STRING) {
             if let TAtomic::Scalar(TScalar::String(existing_string_type)) = existing_string_type {
                 if let Some(lit_atom) = string_scalar.get_known_literal_atom() {
-                    let lit_value = lit_atom.as_str();
+                    let lit_value = lit_atom.as_bytes();
                     let is_incompatible = (existing_string_type.is_numeric && !str_is_numeric(lit_value))
-                        || (existing_string_type.is_truthy && (lit_value.is_empty() || lit_value == "0"))
+                        || (existing_string_type.is_truthy && (lit_value.is_empty() || lit_value == b"0"))
                         || (existing_string_type.is_non_empty && lit_value.is_empty())
-                        || (existing_string_type.is_lowercase() && lit_value.chars().any(char::is_uppercase))
-                        || (existing_string_type.is_uppercase() && lit_value.chars().any(char::is_lowercase));
+                        || (existing_string_type.is_lowercase() && lit_value.iter().any(u8::is_ascii_uppercase))
+                        || (existing_string_type.is_uppercase() && lit_value.iter().any(u8::is_ascii_lowercase));
 
                     if is_incompatible {
                         // Check threshold before adding literal string
@@ -1158,7 +1160,7 @@ fn scrape_type_properties(
                 combination.literal_strings.insert(atom);
             }
         } else {
-            let mut literals_to_keep = AtomSet::default();
+            let mut literals_to_keep = WordSet::default();
             if !combination.literal_strings.is_empty() {
                 string_scalar.is_callable = false;
             }
@@ -1174,19 +1176,23 @@ fn scrape_type_properties(
                         string_scalar.is_truthy = false;
                         string_scalar.is_numeric = false;
                         break;
-                    } else if value == "0" {
+                    } else if value.as_bytes() == b"0" {
                         string_scalar.is_truthy = false;
                     }
 
-                    if string_scalar.is_numeric && !str_is_numeric(value) {
+                    if string_scalar.is_numeric && !str_is_numeric(value.as_bytes()) {
                         literals_to_keep.insert(*value);
                     } else {
-                        string_scalar.is_numeric = string_scalar.is_numeric && str_is_numeric(value);
+                        string_scalar.is_numeric = string_scalar.is_numeric && str_is_numeric(value.as_bytes());
                     }
 
                     string_scalar.casing = match string_scalar.casing {
-                        TStringCasing::Lowercase if value.chars().all(|c| c.is_lowercase()) => TStringCasing::Lowercase,
-                        TStringCasing::Uppercase if value.chars().all(|c| c.is_uppercase()) => TStringCasing::Uppercase,
+                        TStringCasing::Lowercase if value.as_bytes().iter().all(u8::is_ascii_lowercase) => {
+                            TStringCasing::Lowercase
+                        }
+                        TStringCasing::Uppercase if value.as_bytes().iter().all(u8::is_ascii_uppercase) => {
+                            TStringCasing::Uppercase
+                        }
                         _ => TStringCasing::Unspecified,
                     };
                 }
@@ -1464,14 +1470,14 @@ fn flush_sealed_keyed_arrays_into_combination(
 
 const COMBINER_KEY_STACK_BUF: usize = 256;
 
-fn get_combiner_key(name: Atom, type_params: &[TUnion], codebase: &CodebaseMetadata) -> Atom {
-    let covariants = if let Some(class_like_metadata) = codebase.get_class_like(&name) {
+fn get_combiner_key(name: Word, type_params: &[TUnion], codebase: &CodebaseMetadata) -> Word {
+    let covariants = if let Some(class_like_metadata) = codebase.get_class_like(name.as_bytes()) {
         &class_like_metadata.template_variance
     } else {
         return name;
     };
 
-    let name_str = name.as_str();
+    let name_str = name.as_bytes();
     let mut estimated_len = name_str.len() + 2; // name + "<" + ">"
     for (i, tunion) in type_params.iter().enumerate() {
         if i > 0 {
@@ -1489,7 +1495,7 @@ fn get_combiner_key(name: Atom, type_params: &[TUnion], codebase: &CodebaseMetad
         let mut buffer = [0u8; COMBINER_KEY_STACK_BUF];
         let mut pos = 0;
 
-        buffer[pos..pos + name_str.len()].copy_from_slice(name_str.as_bytes());
+        buffer[pos..pos + name_str.len()].copy_from_slice(name_str);
         pos += name_str.len();
 
         buffer[pos] = b'<';
@@ -1500,34 +1506,35 @@ fn get_combiner_key(name: Atom, type_params: &[TUnion], codebase: &CodebaseMetad
                 buffer[pos..pos + 2].copy_from_slice(b", ");
                 pos += 2;
             }
-            let param_str =
-                if covariants.get(i) == Some(&Variance::Covariant) { "*" } else { tunion.get_id().as_str() };
-            buffer[pos..pos + param_str.len()].copy_from_slice(param_str.as_bytes());
-            pos += param_str.len();
+            let id_word = tunion.get_id();
+            let param_bytes: &[u8] =
+                if covariants.get(i) == Some(&Variance::Covariant) { b"*" } else { id_word.as_bytes() };
+            let need = param_bytes.len();
+            buffer[pos..pos + need].copy_from_slice(param_bytes);
+            pos += need;
         }
 
         buffer[pos] = b'>';
         pos += 1;
 
-        // SAFETY: We only write valid UTF-8 (ASCII characters and valid UTF-8 from Atom strings)
-        return atom(unsafe { std::str::from_utf8_unchecked(&buffer[..pos]) });
+        return word(&buffer[..pos]);
     }
 
-    let mut result = String::with_capacity(estimated_len);
-    result.push_str(name_str);
-    result.push('<');
+    let mut result: Vec<u8> = Vec::with_capacity(estimated_len);
+    result.extend_from_slice(name_str);
+    result.push(b'<');
     for (i, tunion) in type_params.iter().enumerate() {
         if i > 0 {
-            result.push_str(", ");
+            result.extend_from_slice(b", ");
         }
         if covariants.get(i) == Some(&Variance::Covariant) {
-            result.push('*');
+            result.push(b'*');
         } else {
-            result.push_str(tunion.get_id().as_str());
+            result.extend_from_slice(tunion.get_id().as_bytes());
         }
     }
-    result.push('>');
-    atom(&result)
+    result.push(b'>');
+    word(&result)
 }
 
 fn combine_string_scalars(s1: &TString, s2: TString) -> TString {

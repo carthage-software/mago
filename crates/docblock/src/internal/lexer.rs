@@ -4,8 +4,8 @@ use crate::error::ParseError;
 use crate::internal::token::Token;
 
 #[inline]
-pub fn tokenize<'src>(comment: &'src str, span: Span) -> Result<Vec<Token<'src>>, ParseError> {
-    if comment.len() < 5 || !comment.starts_with("/**") || !comment.ends_with("*/") {
+pub fn tokenize<'src>(comment: &'src [u8], span: Span) -> Result<Vec<Token<'src>>, ParseError> {
+    if comment.len() < 5 || !comment.starts_with(b"/**") || !comment.ends_with(b"*/") {
         return Err(ParseError::InvalidComment(span));
     }
 
@@ -14,40 +14,44 @@ pub fn tokenize<'src>(comment: &'src str, span: Span) -> Result<Vec<Token<'src>>
 
     let content = &comment[3..(comment.len() - 2)];
 
-    if content.contains('\n') {
-        let lines_with_positions: Vec<(&'src str, u32)> = content
-            .split('\n')
-            .map(|line| {
-                let cleaned_line = line.strip_suffix('\r').unwrap_or(line);
-
-                let start_offset = (cleaned_line.as_ptr() as usize - content.as_ptr() as usize) as u32;
-
-                (cleaned_line, start_offset)
-            })
-            .collect();
+    if content.contains(&b'\n') {
+        let mut lines_with_positions: Vec<(&'src [u8], u32)> = Vec::new();
+        let mut cursor = 0usize;
+        for nl in memchr::memmem::find_iter(content, b"\n") {
+            let raw_line = &content[cursor..nl];
+            let cleaned_line = raw_line.strip_suffix(b"\r").unwrap_or(raw_line);
+            lines_with_positions.push((cleaned_line, cursor as u32));
+            cursor = nl + 1;
+        }
+        if cursor <= content.len() {
+            let raw_line = &content[cursor..];
+            let cleaned_line = raw_line.strip_suffix(b"\r").unwrap_or(raw_line);
+            lines_with_positions.push((cleaned_line, cursor as u32));
+        }
 
         let mut comment_lines = Vec::new();
         for (line, line_start_in_content) in lines_with_positions {
-            let trimmed_line = line.trim_end();
+            let trimmed_line = line.trim_ascii_end();
 
-            if trimmed_line.trim().is_empty() {
+            if trimmed_line.trim_ascii().is_empty() {
                 continue;
             }
 
-            let line_indent_length = trimmed_line.find(|c: char| !c.is_whitespace()).unwrap_or(trimmed_line.len());
+            let line_indent_length =
+                trimmed_line.iter().position(|b| !b.is_ascii_whitespace()).unwrap_or(trimmed_line.len());
             let line_content_after_indent = &trimmed_line[line_indent_length..];
 
             let mut content_start_in_line = line_indent_length as u32;
-            let line_after_asterisk = if let Some(line_after_asterisk) = line_content_after_indent.strip_prefix('*') {
+            let line_after_asterisk = if let Some(line_after_asterisk) = line_content_after_indent.strip_prefix(b"*") {
                 content_start_in_line += 1;
                 line_after_asterisk
             } else {
                 line_content_after_indent
             };
 
-            if let Some(first_char) = line_after_asterisk.chars().next() {
-                if first_char.is_whitespace() {
-                    content_start_in_line += first_char.len_utf8() as u32;
+            if let Some(&first_byte) = line_after_asterisk.first() {
+                if first_byte.is_ascii_whitespace() {
+                    content_start_in_line += 1;
                 }
 
                 let content_end_in_line = trimmed_line.len() as u32;
@@ -55,10 +59,10 @@ pub fn tokenize<'src>(comment: &'src str, span: Span) -> Result<Vec<Token<'src>>
                 let content_start_in_comment = content_start + line_start_in_content + content_start_in_line;
                 let content_end_in_comment = content_start + line_start_in_content + content_end_in_line;
 
-                let content_str = &comment[content_start_in_comment as usize..content_end_in_comment as usize];
+                let content_bytes = &comment[content_start_in_comment as usize..content_end_in_comment as usize];
                 let content_span = span.subspan(content_start_in_comment, content_end_in_comment);
 
-                comment_lines.push(Token::Line { content: content_str, span: content_span });
+                comment_lines.push(Token::Line { content: content_bytes, span: content_span });
             } else {
                 comment_lines.push(Token::EmptyLine {
                     span: span.subspan(content_start + line_start_in_content, content_start + line_start_in_content),
@@ -72,15 +76,15 @@ pub fn tokenize<'src>(comment: &'src str, span: Span) -> Result<Vec<Token<'src>>
             return Ok(Vec::new());
         }
 
-        let content = if let Some(content) = content.strip_prefix(' ') {
-            content_start += 1; // Adjust start position to skip leading space
+        let content = if let Some(content) = content.strip_prefix(b" ") {
+            content_start += 1;
             content
         } else {
             content
         };
 
-        let content = if let Some(content) = content.strip_suffix(' ') {
-            content_end -= 1; // Adjust end position to skip trailing space
+        let content = if let Some(content) = content.strip_suffix(b" ") {
+            content_end -= 1;
             content
         } else {
             content
@@ -106,7 +110,7 @@ mod tests {
         let comment = "/***/";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 0);
             }
@@ -121,7 +125,7 @@ mod tests {
         let comment = "/**\n*/";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 0);
             }
@@ -136,7 +140,7 @@ mod tests {
         let comment = "/** This is a single-line comment */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 1);
 
@@ -144,8 +148,8 @@ mod tests {
                     panic!("Expected a line, but got something else");
                 };
 
-                assert_eq!(*content, "This is a single-line comment");
-                assert!(comment[span.start.offset as usize..span.end.offset as usize].eq(*content));
+                assert_eq!(*content, b"This is a single-line comment" as &[u8]);
+                assert!(comment.as_bytes()[span.start.offset as usize..span.end.offset as usize].eq(*content));
             }
             Err(e) => {
                 panic!("Error parsing comment: {e:?}");
@@ -158,7 +162,7 @@ mod tests {
         let comment = "/**This is a single-line comment */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 1);
 
@@ -166,8 +170,8 @@ mod tests {
                     panic!("Expected a line, but got something else");
                 };
 
-                assert_eq!(*content, "This is a single-line comment");
-                assert!(comment[span.start.offset as usize..span.end.offset as usize].eq(*content));
+                assert_eq!(*content, b"This is a single-line comment" as &[u8]);
+                assert!(comment.as_bytes()[span.start.offset as usize..span.end.offset as usize].eq(*content));
             }
             Err(e) => {
                 panic!("Error parsing comment: {e:?}");
@@ -180,7 +184,7 @@ mod tests {
         let comment = "/** This is a single-line comment*/";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 1);
 
@@ -188,8 +192,8 @@ mod tests {
                     panic!("Expected a line, but got something else");
                 };
 
-                assert_eq!(*content, "This is a single-line comment");
-                assert!(comment[span.start.offset as usize..span.end.offset as usize].eq(*content));
+                assert_eq!(*content, b"This is a single-line comment" as &[u8]);
+                assert!(comment.as_bytes()[span.start.offset as usize..span.end.offset as usize].eq(*content));
             }
             Err(e) => {
                 panic!("Error parsing comment: {e:?}");
@@ -207,12 +211,15 @@ mod tests {
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 3);
 
-                let expected_contents =
-                    ["This is a multi-line comment.", "It has multiple lines.", "Each line starts with an asterisk."];
+                let expected_contents: [&[u8]; 3] = [
+                    b"This is a multi-line comment.",
+                    b"It has multiple lines.",
+                    b"Each line starts with an asterisk.",
+                ];
 
                 for (i, line) in tokens.iter().enumerate() {
                     let Token::Line { content, span } = line else {
@@ -220,7 +227,7 @@ mod tests {
                     };
 
                     assert_eq!(*content, expected_contents[i]);
-                    assert!(comment[span.start.offset as usize..span.end.offset as usize].eq(*content));
+                    assert!(comment.as_bytes()[span.start.offset as usize..span.end.offset as usize].eq(*content));
                 }
             }
             Err(e) => {
@@ -242,17 +249,17 @@ mod tests {
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 6);
 
-                let expected_contents = [
-                    "This is a multi-line comment.",
-                    "It has multiple lines.",
-                    "Each line starts with an asterisk.",
-                    "",
-                    "    $foo = \"bar\";",
-                    "    $bar = \"baz\";",
+                let expected_contents: [&[u8]; 6] = [
+                    b"This is a multi-line comment.",
+                    b"It has multiple lines.",
+                    b"Each line starts with an asterisk.",
+                    b"",
+                    b"    $foo = \"bar\";",
+                    b"    $bar = \"baz\";",
                 ];
 
                 for (i, line) in tokens.iter().enumerate() {
@@ -272,7 +279,7 @@ mod tests {
                         };
 
                         assert_eq!(*content, expected_content);
-                        assert!(comment[span.start.offset as usize..span.end.offset as usize].eq(*content));
+                        assert!(comment.as_bytes()[span.start.offset as usize..span.end.offset as usize].eq(*content));
                     }
                 }
             }
@@ -292,12 +299,15 @@ mod tests {
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 3);
 
-                let expected_contents =
-                    ["This is a multi-line comment.", "It has multiple lines.", "Each line starts with an asterisk."];
+                let expected_contents: [&[u8]; 3] = [
+                    b"This is a multi-line comment.",
+                    b"It has multiple lines.",
+                    b"Each line starts with an asterisk.",
+                ];
 
                 for (i, line) in tokens.iter().enumerate() {
                     let Token::Line { content, span } = line else {
@@ -305,7 +315,7 @@ mod tests {
                     };
 
                     assert_eq!(*content, expected_contents[i]);
-                    assert!(comment[span.start.offset as usize..span.end.offset as usize].eq(*content));
+                    assert!(comment.as_bytes()[span.start.offset as usize..span.end.offset as usize].eq(*content));
                 }
             }
             Err(e) => {
@@ -324,12 +334,15 @@ mod tests {
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 3);
 
-                let expected_contents =
-                    ["This is a multi-line comment.", "It has multiple lines.", "Each line starts with an asterisk."];
+                let expected_contents: [&[u8]; 3] = [
+                    b"This is a multi-line comment.",
+                    b"It has multiple lines.",
+                    b"Each line starts with an asterisk.",
+                ];
 
                 for (i, line) in tokens.iter().enumerate() {
                     let Token::Line { content, span } = line else {
@@ -337,7 +350,7 @@ mod tests {
                     };
 
                     assert_eq!(*content, expected_contents[i]);
-                    assert!(comment[span.start.offset as usize..span.end.offset as usize].eq(*content));
+                    assert!(comment.as_bytes()[span.start.offset as usize..span.end.offset as usize].eq(*content));
                 }
             }
             Err(e) => {
@@ -356,12 +369,15 @@ mod tests {
 
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 3);
 
-                let expected_contents =
-                    ["This is a multi-line comment.", "It has multiple lines.", "Each line starts with an asterisk."];
+                let expected_contents: [&[u8]; 3] = [
+                    b"This is a multi-line comment.",
+                    b"It has multiple lines.",
+                    b"Each line starts with an asterisk.",
+                ];
 
                 for (i, line) in tokens.iter().enumerate() {
                     let Token::Line { content, span } = line else {
@@ -369,7 +385,7 @@ mod tests {
                     };
 
                     assert_eq!(*content, expected_contents[i]);
-                    assert!(comment[span.start.offset as usize..span.end.offset as usize].eq(*content));
+                    assert!(comment.as_bytes()[span.start.offset as usize..span.end.offset as usize].eq(*content));
                 }
             }
             Err(e) => {
@@ -384,7 +400,7 @@ mod tests {
         let comment = "/**\r\n * blah blah ‰©\r\n */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(comment.len() as u32));
 
-        match tokenize(comment, span) {
+        match tokenize(comment.as_bytes(), span) {
             Ok(tokens) => {
                 assert_eq!(tokens.len(), 1, "Should have parsed exactly one line of content");
 
@@ -392,11 +408,11 @@ mod tests {
                     panic!("Expected a Token::Line");
                 };
 
-                let expected_content = "blah blah ‰©";
+                let expected_content = "blah blah ‰©".as_bytes();
                 assert_eq!(*content, expected_content);
 
                 let sliced = &comment[token_span.start.offset as usize..token_span.end.offset as usize];
-                assert_eq!(sliced, expected_content);
+                assert_eq!(sliced.as_bytes(), expected_content);
             }
             Err(e) => {
                 panic!("Failed to tokenize comment with CRLF endings: {e:?}");

@@ -1,12 +1,12 @@
 use bumpalo::Bump;
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_docblock::tag::TypeString;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::Hint;
 use mago_syntax::ast::Identifier;
 use mago_syntax::ast::UnionHint;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::metadata::ttype::TypeMetadata;
 use crate::scanner::Context;
@@ -44,7 +44,7 @@ use crate::ttype::wrap_atomic;
 #[inline]
 pub fn get_type_metadata_from_hint<'arena>(
     hint: &'arena Hint<'arena>,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     context: &mut Context<'_, 'arena>,
 ) -> TypeMetadata {
     let type_union = get_union_from_hint(hint, classname, context);
@@ -58,7 +58,7 @@ pub fn get_type_metadata_from_hint<'arena>(
 pub fn get_type_metadata_from_type_string(
     arena: &Bump,
     ttype: &TypeString,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
 ) -> Result<TypeMetadata, TypeError> {
@@ -72,7 +72,7 @@ pub fn get_type_metadata_from_type_string(
 #[inline]
 fn get_union_from_hint<'arena>(
     hint: &'arena Hint<'arena>,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     context: &mut Context<'_, 'arena>,
 ) -> TUnion {
     match hint {
@@ -116,12 +116,12 @@ fn get_union_from_hint<'arena>(
         Hint::Array(_) => get_mixed_keyed_array(),
         Hint::Callable(_) => get_mixed_callable(),
         Hint::Static(_) => {
-            let classname = classname.unwrap_or_else(|| atom("static"));
+            let classname = classname.unwrap_or_else(|| word("static"));
 
             wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_static(classname))))
         }
         Hint::Self_(_) => {
-            let classname = classname.unwrap_or_else(|| atom("static"));
+            let classname = classname.unwrap_or_else(|| word("static"));
 
             wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(classname))))
         }
@@ -133,7 +133,7 @@ fn get_union_from_hint<'arena>(
         Hint::String(_) => get_string(),
         Hint::Object(_) => get_object(),
         Hint::Mixed(_) => get_mixed(),
-        Hint::Parent(_) => wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(atom("parent"))))),
+        Hint::Parent(_) => wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word("parent"))))),
         Hint::Intersection(intersection) => {
             let left = get_union_from_hint(intersection.left, classname, context);
             let right = get_union_from_hint(intersection.right, classname, context);
@@ -185,7 +185,7 @@ fn get_union_from_identifier_hint<'arena>(
 ) -> TUnion {
     let name = context.resolved_names.get(identifier);
 
-    if name.eq_ignore_ascii_case("Generator") {
+    if name.eq_ignore_ascii_case(b"Generator") {
         let mixed_default = || {
             let mut union = get_mixed();
             union.set_from_template_default(true);
@@ -193,7 +193,7 @@ fn get_union_from_identifier_hint<'arena>(
         };
 
         return wrap_atomic(TAtomic::Object(TObject::Named(
-            TNamedObject::new(atom(name)).with_type_parameters(Some(vec![
+            TNamedObject::new(word(name)).with_type_parameters(Some(vec![
                 mixed_default(),
                 mixed_default(),
                 mixed_default(),
@@ -202,11 +202,11 @@ fn get_union_from_identifier_hint<'arena>(
         )));
     }
 
-    if name.eq_ignore_ascii_case("Closure") {
+    if name.eq_ignore_ascii_case(b"Closure") {
         return wrap_atomic(TAtomic::Callable(TCallable::Signature(TCallableSignature::mixed(true))));
     }
 
-    wrap_atomic(TAtomic::Reference(TReference::Symbol { name: atom(name), parameters: None, intersection_types: None }))
+    wrap_atomic(TAtomic::Reference(TReference::Symbol { name: word(name), parameters: None, intersection_types: None }))
 }
 
 /// Merges a docblock type with a real type, preserving nullability from the real type.

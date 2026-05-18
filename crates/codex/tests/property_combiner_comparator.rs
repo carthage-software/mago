@@ -6,7 +6,6 @@ use proptest::collection::vec;
 use proptest::prelude::*;
 use proptest::sample::select;
 
-use mago_atom::atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -30,6 +29,7 @@ use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::union::TUnion;
+use mago_word::word;
 
 const CLASSES: &[&str] = &["A", "B", "C"];
 
@@ -107,12 +107,12 @@ fn arb_string() -> impl Strategy<Value = TAtomic> {
         Just(TAtomic::Scalar(TScalar::enum_string())),
         Just(TAtomic::Scalar(TScalar::trait_string())),
         select(vec!["foo", "bar", "baz", "", "0", "hello"])
-            .prop_map(|s| TAtomic::Scalar(TScalar::literal_string(atom(s)))),
+            .prop_map(|s| TAtomic::Scalar(TScalar::literal_string(word(s)))),
     ]
 }
 
 fn arb_named_object() -> impl Strategy<Value = TAtomic> {
-    select(CLASSES.to_vec()).prop_map(|name| TAtomic::Object(TObject::Named(TNamedObject::new(atom(name)))))
+    select(CLASSES.to_vec()).prop_map(|name| TAtomic::Object(TObject::Named(TNamedObject::new(word(name)))))
 }
 
 fn arb_array_key() -> impl Strategy<Value = TAtomic> {

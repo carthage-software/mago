@@ -30,12 +30,12 @@ use crate::rule::utils::call::function_call_matches;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
-const REQUEST_CLASS: &str = "Request";
+const REQUEST_CLASS: &[u8] = b"Request";
 const REQUEST_HELPER: &str = "request";
-const REQUEST_FQCN: &str = "Illuminate\\Http\\Request";
-const REQUEST_FACADE: &str = "Illuminate\\Support\\Facades\\Request";
-const REQUEST_VAR: &str = "$request";
-const ALL_METHOD: &str = "all";
+const REQUEST_FQCN: &[u8] = b"Illuminate\\Http\\Request";
+const REQUEST_FACADE: &[u8] = b"Illuminate\\Support\\Facades\\Request";
+const REQUEST_VAR: &[u8] = b"$request";
+const ALL_METHOD: &[u8] = b"all";
 
 #[derive(Debug, Clone)]
 pub struct NoRequestAllRule {

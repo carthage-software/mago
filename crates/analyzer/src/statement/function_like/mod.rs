@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use foldhash::HashMap;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -161,7 +161,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
         && let Some(class_like_metadata) = block_context.scope.get_class_like()
     {
         block_context.locals.insert(
-            Atom::from("$this"),
+            Word::from("$this"),
             Rc::new(wrap_atomic(TAtomic::Object(get_this_type(
                 context,
                 class_like_metadata,
@@ -181,14 +181,14 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
 
             for variable in &global.variables {
                 if let Some(var_id) = get_variable_id(variable) {
-                    block_context.conditionally_referenced_variable_ids.insert(Atom::from(var_id));
+                    block_context.conditionally_referenced_variable_ids.insert(Word::from(var_id));
                 }
             }
         }
     }
 
     if let Some(calling_class) = block_context.scope.get_class_like_name()
-        && let Some(class_like_metadata) = context.codebase.get_class_like(&calling_class)
+        && let Some(class_like_metadata) = context.codebase.get_class_like(calling_class.as_bytes())
     {
         add_properties_to_context(context, block_context, class_like_metadata, Some(function_like_metadata))?;
     }
@@ -270,7 +270,7 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
         && let Some(class_name) = block_context.scope.get_class_like_name()
         && let Some(method_name) = function_like_metadata.name
     {
-        context.codebase.method_is_overriding(class_name.as_str(), method_name.as_str())
+        context.codebase.method_is_overriding(class_name.as_bytes(), method_name.as_bytes())
     } else {
         false
     };
@@ -577,7 +577,7 @@ pub(super) fn add_properties_to_context<'ctx>(
     };
 
     for (property_name, declaring_class) in &class_like_metadata.declaring_property_ids {
-        let Some(property_class_metadata) = context.codebase.get_class_like(declaring_class) else {
+        let Some(property_class_metadata) = context.codebase.get_class_like(declaring_class.as_bytes()) else {
             return Err(AnalysisError::InternalError(
                 format!("Could not load property class metadata for `{declaring_class}`."),
                 class_like_metadata.span,
@@ -594,11 +594,9 @@ pub(super) fn add_properties_to_context<'ctx>(
             ));
         };
 
-        // Skip write-only properties (only have set hook, no get hook) since they can't be read.
-        // This ensures the visibility check runs when accessing them.
         if !property_metadata.hooks.is_empty()
-            && property_metadata.hooks.contains_key(&atom("set"))
-            && !property_metadata.hooks.contains_key(&atom("get"))
+            && property_metadata.hooks.contains_key(&word(b"set"))
+            && !property_metadata.hooks.contains_key(&word(b"get"))
         {
             continue;
         }
@@ -610,10 +608,11 @@ pub(super) fn add_properties_to_context<'ctx>(
             .cloned()
             .unwrap_or_else(get_mixed);
 
-        let raw_property_name = property_name.strip_prefix("$").unwrap_or(property_name);
+        let property_name_bytes = property_name.as_bytes();
+        let raw_property_name = property_name_bytes.strip_prefix(b"$").unwrap_or(property_name_bytes);
 
         let expression_id = if property_metadata.flags.is_static() {
-            Atom::from(&format!("{}::${raw_property_name}", class_like_metadata.name))
+            concat_word!(class_like_metadata.name.as_bytes(), b"::$", raw_property_name)
         } else {
             let this_type = get_this_type(context, class_like_metadata, function_like_metadata);
 
@@ -625,7 +624,7 @@ pub(super) fn add_properties_to_context<'ctx>(
                 property_class_metadata,
             );
 
-            Atom::from(&format!("$this->{raw_property_name}"))
+            concat_word!(b"$this->", raw_property_name)
         };
 
         if property_metadata.type_declaration_metadata.is_some() && !property_metadata.flags.has_default() {
@@ -669,7 +668,7 @@ pub fn get_this_type(
 
     let mut intersections = vec![];
     for required_interface in &class_like_metadata.require_implements {
-        let Some(interface_metadata) = context.codebase.get_interface(required_interface) else {
+        let Some(interface_metadata) = context.codebase.get_interface(required_interface.as_bytes()) else {
             continue;
         };
 
@@ -689,7 +688,7 @@ pub fn get_this_type(
     }
 
     for required_class in &class_like_metadata.require_extends {
-        let Some(parent_class_metadata) = context.codebase.get_class_like(required_class) else {
+        let Some(parent_class_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
             continue;
         };
 
@@ -825,7 +824,7 @@ fn check_return_type_width<'ctx>(
         && let Some(class_name) = block_context.scope.get_class_like_name()
         && let Some(method_name) = function_like_metadata.name
     {
-        context.codebase.method_is_overriding(class_name.as_str(), method_name.as_str())
+        context.codebase.method_is_overriding(class_name.as_bytes(), method_name.as_bytes())
     } else {
         false
     };
@@ -902,7 +901,7 @@ fn check_return_type_width<'ctx>(
 
     let declared_str = expanded_declared.get_id();
     let return_span = return_type_metadata.span;
-    let function_label = function_like_metadata.name.unwrap_or_else(|| atom("closure"));
+    let function_label = function_like_metadata.name.unwrap_or_else(|| word("closure"));
 
     let issue = Issue::help(format!(
         "Declared return type `{declared_str}` for `{function_label}` has unused branches: `{unused_list}`."
@@ -948,7 +947,7 @@ fn check_thrown_types<'ctx>(
             return;
         };
 
-        let name = concat_atom!(&class_like_metadata.original_name, "::", function_name);
+        let name = concat_word!(&class_like_metadata.original_name, "::", function_name);
 
         ("method", name)
     } else {
@@ -1017,20 +1016,20 @@ fn check_thrown_types<'ctx>(
 /// Returns `true` if the exception is:
 /// - In `unchecked_exception_classes` (exact match only)
 /// - In `unchecked_exceptions` or is a subclass of any exception in that set (hierarchy-aware)
-fn is_exception_unchecked(context: &Context<'_, '_>, exception_name: Atom) -> bool {
+fn is_exception_unchecked(context: &Context<'_, '_>, exception_name: Word) -> bool {
     // Check exact match in unchecked_exception_classes
     if context
         .settings
         .unchecked_exception_classes
         .iter()
-        .any(|unchecked| exception_name.eq_ignore_ascii_case(unchecked))
+        .any(|unchecked| exception_name.as_bytes().eq_ignore_ascii_case(unchecked.as_bytes()))
     {
         return true;
     }
 
-    // Check hierarchy match in unchecked_exceptions (includes subclasses)
     if context.settings.unchecked_exceptions.iter().any(|unchecked| {
-        exception_name.eq_ignore_ascii_case(unchecked) || context.codebase.is_instance_of(&exception_name, unchecked)
+        exception_name.as_bytes().eq_ignore_ascii_case(unchecked.as_bytes())
+            || context.codebase.is_instance_of(exception_name.as_bytes(), unchecked.as_bytes())
     }) {
         return true;
     }
@@ -1041,8 +1040,8 @@ fn is_exception_unchecked(context: &Context<'_, '_>, exception_name: Atom) -> bo
 /// Checks if a type union contains a reference to a specific function-level template parameter.
 fn type_contains_function_template_param(
     type_union: &TUnion,
-    param_name: Atom,
-    function_identifier: (Atom, Atom),
+    param_name: Word,
+    function_identifier: (Word, Word),
 ) -> bool {
     type_union.types.iter().any(|atomic| {
         if let TAtomic::GenericParameter(gp) = atomic
@@ -1090,7 +1089,7 @@ pub fn check_unused_function_template_parameters<'ctx>(
     function_like_metadata: &'ctx FunctionLikeMetadata,
     name_span: Span,
     kind_str: &str,
-    display_name: Atom,
+    display_name: Word,
 ) {
     if !context.settings.find_unused_definitions {
         return;
@@ -1109,7 +1108,7 @@ pub fn check_unused_function_template_parameters<'ctx>(
     };
 
     for (template_name, _) in &function_like_metadata.template_types {
-        if template_name.as_str().starts_with('_') {
+        if template_name.as_bytes().starts_with(b"_") {
             continue;
         }
 

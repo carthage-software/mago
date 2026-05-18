@@ -25,8 +25,8 @@ pub fn new_synthetic_call<'arena>(arena: &'arena Bump, f: &str, expression: Expr
         function: arena.alloc(Expression::Literal(Literal::String(LiteralString {
             kind: LiteralStringKind::SingleQuoted,
             span: Span::zero(),
-            raw: arena.alloc_str(&format!("'{f}'")),
-            value: Some(arena.alloc_str(f)),
+            raw: arena.alloc_slice_copy(format!("'{f}'").as_bytes()),
+            value: Some(arena.alloc_slice_copy(f.as_bytes())),
         }))),
         argument_list: ArgumentList {
             left_parenthesis: Span::zero(),
@@ -83,8 +83,8 @@ pub fn new_synthetic_negation<'arena>(arena: &'arena Bump, expression: &Expressi
     })
 }
 
-pub fn new_synthetic_variable<'arena>(arena: &'arena Bump, name: &str, span: Span) -> Expression<'arena> {
-    Expression::Variable(Variable::Direct(DirectVariable { span, name: arena.alloc_str(name) }))
+pub fn new_synthetic_variable<'arena>(arena: &'arena Bump, name: &[u8], span: Span) -> Expression<'arena> {
+    Expression::Variable(Variable::Direct(DirectVariable { span, name: arena.alloc_slice_copy(name) }))
 }
 
 pub fn new_synthetic_identical<'ast, 'arena>(

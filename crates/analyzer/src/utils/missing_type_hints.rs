@@ -17,6 +17,7 @@ use mago_syntax::ast::PropertyItem;
 
 use crate::code::IssueCode;
 use crate::context::Context;
+use mago_bytes::BytesDisplay;
 
 /// Check if a constant is missing a type hint and whether it's safe to add one.
 ///
@@ -39,7 +40,7 @@ pub fn check_constant_type_hint<'arena>(
 
     let item = class_like_constant.first_item();
 
-    let constant_name = item.name.value;
+    let constant_name = BytesDisplay(item.name.value);
 
     context.collector.report_with_code(
         IssueCode::MissingConstantType,
@@ -97,24 +98,25 @@ pub fn check_property_type_hint<'arena>(
 
     for variable in variables {
         // Skip variables prefixed with `$_`
-        if variable.name.starts_with("$_") {
+        if variable.name.starts_with(b"$_") {
             continue;
         }
 
         // Check if it's safe to add a type hint by verifying no parent class/trait has
         // the same property without a type hint
         if is_safe_to_add_property_type_hint(context, class_like_metadata, variable.name) {
+            let variable_name = BytesDisplay(variable.name);
             context.collector.report(
-                Issue::warning(format!("Property `{}` is missing a type hint.", variable.name))
+                Issue::warning(format!("Property `{variable_name}` is missing a type hint."))
                     .with_code(IssueCode::MissingPropertyType.as_str())
                     .with_annotation(
                         Annotation::primary(property.span())
-                            .with_message(format!("Property `{}` declared here without a type hint", variable.name)),
+                            .with_message(format!("Property `{variable_name}` declared here without a type hint")),
                     )
                     .with_note(
                         "Adding type hints to properties improves code readability and helps prevent type errors.",
                     )
-                    .with_help(format!("Consider adding a type hint to property `{}`.", variable.name)),
+                    .with_help(format!("Consider adding a type hint to property `{variable_name}`.")),
             );
         }
     }
@@ -139,7 +141,7 @@ pub fn check_parameter_type_hint<'arena>(
     }
 
     // If it already has a type hint, nothing to check
-    if parameter.hint.is_some() || parameter.variable.name.starts_with("$_") {
+    if parameter.hint.is_some() || parameter.variable.name.starts_with(b"$_") {
         return;
     }
 
@@ -163,15 +165,16 @@ pub fn check_parameter_type_hint<'arena>(
         return;
     }
 
+    let parameter_name = BytesDisplay(parameter.variable.name);
     context.collector.report(
-        Issue::warning(format!("Parameter `{}` is missing a type hint.", parameter.variable.name))
+        Issue::warning(format!("Parameter `{parameter_name}` is missing a type hint."))
             .with_code(IssueCode::MissingParameterType.as_str())
             .with_annotation(
                 Annotation::primary(parameter.span())
-                    .with_message(format!("Parameter `{}` declared here without a type hint", parameter.variable.name)),
+                    .with_message(format!("Parameter `{parameter_name}` declared here without a type hint")),
             )
             .with_note("Type hints improve code readability and help prevent type-related errors.")
-            .with_help(format!("Consider adding a type hint to parameter `{}`.", parameter.variable.name)),
+            .with_help(format!("Consider adding a type hint to parameter `{parameter_name}`.")),
     );
 }
 
@@ -187,7 +190,7 @@ pub fn check_return_type_hint<'arena>(
     context: &mut Context<'_, 'arena>,
     class_like_metadata: Option<&ClassLikeMetadata>,
     function_like_metadata: &FunctionLikeMetadata,
-    function_name: &str,
+    function_name: &[u8],
     return_type_hint: Option<&FunctionLikeReturnTypeHint<'arena>>,
     span: Span,
 ) {
@@ -213,7 +216,7 @@ pub fn check_return_type_hint<'arena>(
     }
 
     // Skip constructors and destructors
-    if function_name == "__construct" || function_name == "__destruct" {
+    if function_name == b"__construct" || function_name == b"__destruct" {
         return;
     }
 
@@ -224,6 +227,7 @@ pub fn check_return_type_hint<'arena>(
         return;
     }
 
+    let function_name = BytesDisplay(function_name);
     context.collector.report(
         Issue::warning(format!("Function `{function_name}` is missing a return type hint."))
             .with_code(IssueCode::MissingReturnType.as_str())
@@ -241,7 +245,7 @@ pub fn check_return_type_hint<'arena>(
 pub fn check_imprecise_return_type_hint<'arena>(
     context: &mut Context<'_, 'arena>,
     function_like_metadata: &FunctionLikeMetadata,
-    function_name: &str,
+    function_name: &[u8],
     return_type_hint: Option<&FunctionLikeReturnTypeHint<'arena>>,
 ) {
     if !context.settings.check_missing_type_hints {
@@ -268,6 +272,7 @@ pub fn check_imprecise_return_type_hint<'arena>(
         return;
     }
 
+    let function_name = BytesDisplay(function_name);
     for (type_name, span) in collect_imprecise_hints(&return_type_hint.hint) {
         report_imprecise_type(context, type_name, span, &format!("return type of `{function_name}`"));
     }
@@ -308,8 +313,9 @@ pub fn check_imprecise_parameter_type_hint<'arena>(
         return;
     }
 
+    let parameter_name = BytesDisplay(parameter.variable.name);
     for (type_name, span) in collect_imprecise_hints(hint) {
-        report_imprecise_type(context, type_name, span, &format!("parameter `{}`", parameter.variable.name));
+        report_imprecise_type(context, type_name, span, &format!("parameter `{parameter_name}`"));
     }
 }
 
@@ -358,6 +364,7 @@ pub fn check_imprecise_property_type_hint<'arena>(
     }
 
     for variable_name in variables {
+        let variable_name = BytesDisplay(variable_name);
         for &(type_name, span) in &imprecise {
             report_imprecise_type(context, type_name, span, &format!("property `{variable_name}`"));
         }
@@ -420,20 +427,15 @@ fn report_imprecise_type(context: &mut Context<'_, '_>, type_name: &str, span: S
 fn is_safe_to_add_property_type_hint(
     context: &Context,
     class_like_metadata: &ClassLikeMetadata,
-    property_name: &str,
+    property_name: &[u8],
 ) -> bool {
-    let property_atom = mago_atom::atom(property_name);
+    let property_word = mago_word::word(property_name);
 
     // Check all parent classes
     for parent_name in &class_like_metadata.all_parent_classes {
-        if let Some(parent_metadata) = context.codebase.get_class_like(parent_name) {
+        if let Some(parent_metadata) = context.codebase.get_class_like(parent_name.as_bytes()) {
             // If parent has this property
-            if parent_metadata.properties.contains_key(&property_atom) {
-                // Check if parent property has a type hint
-                // If parent has no type hint, we can't safely add one to the child
-                // For now, we'll be conservative and not report if parent has the property
-                // TODO: We need to check if parent property actually has a type hint or not
-                // This requires metadata about whether properties have type hints
+            if parent_metadata.properties.contains_key(&property_word) {
                 return false;
             }
         }
@@ -441,10 +443,9 @@ fn is_safe_to_add_property_type_hint(
 
     // Check all used traits
     for trait_name in &class_like_metadata.used_traits {
-        if let Some(trait_metadata) = context.codebase.get_class_like(trait_name)
-            && trait_metadata.properties.contains_key(&property_atom)
+        if let Some(trait_metadata) = context.codebase.get_class_like(trait_name.as_bytes())
+            && trait_metadata.properties.contains_key(&property_word)
         {
-            // Same reasoning as parent classes
             return false;
         }
     }
@@ -472,7 +473,7 @@ fn is_safe_to_add_parameter_type_hint(
     };
 
     // Check if this method is overriding a parent method
-    if context.codebase.method_is_overriding(&class_like_metadata.name, &method_name) {
+    if context.codebase.method_is_overriding(class_like_metadata.name.as_bytes(), method_name.as_bytes()) {
         // If overriding, we need to be conservative and not report
         // because we'd need to check if all parameters in the parent have type hints
         return false;
@@ -501,7 +502,7 @@ fn is_safe_to_add_return_type_hint(
     };
 
     // Check if this method is overriding a parent method
-    if context.codebase.method_is_overriding(&class_like_metadata.name, &method_name) {
+    if context.codebase.method_is_overriding(class_like_metadata.name.as_bytes(), method_name.as_bytes()) {
         // If overriding, we need to be conservative and not report
         return false;
     }

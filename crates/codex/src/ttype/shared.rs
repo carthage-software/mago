@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use std::sync::LazyLock;
 
-use mago_atom::empty_atom;
+use mago_word::empty_word;
 
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
@@ -133,7 +133,7 @@ pub const NUMERIC_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::Numeric);
 /// A static `TAtomic` representing an empty string literal (`""`).
 pub static EMPTY_STRING_ATOMIC: LazyLock<TAtomic> = LazyLock::new(|| {
     TAtomic::Scalar(TScalar::String(TString {
-        literal: Some(TStringLiteral::Value(empty_atom())),
+        literal: Some(TStringLiteral::Value(empty_word())),
         is_numeric: false,
         is_truthy: false,
         is_non_empty: false,

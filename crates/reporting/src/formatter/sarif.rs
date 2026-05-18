@@ -129,7 +129,11 @@ fn annotation_to_location(annotation: &Annotation, database: &ReadDatabase) -> R
     let end_line = file.line_number(annotation.span.end.offset);
     let end_column = file.column_number(annotation.span.end.offset);
 
-    let uri = if let Some(path) = &file.path { path.to_string_lossy().to_string() } else { file.name.to_string() };
+    let uri = if let Some(path) = &file.path {
+        path.to_string_lossy().to_string()
+    } else {
+        String::from_utf8_lossy(&file.name).into_owned()
+    };
 
     let artifact_location = ArtifactLocation::builder().uri(uri).build();
 

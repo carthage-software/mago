@@ -122,26 +122,31 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
             return;
         }
 
-        let function_name = identifier.value().trim_start_matches('\\');
-        let short_name = function_name.rsplit('\\').next().unwrap_or(function_name);
+        let function_name_bytes = mago_bytes::trim_start_byte(identifier.value(), b'\\');
+        let short_name_bytes = function_name_bytes.rsplit(|&b| b == b'\\').next().unwrap_or(function_name_bytes);
         let fqn_span = identifier.span();
+        let function_name = mago_bytes::BytesDisplay(function_name_bytes);
+        let short_name = mago_bytes::BytesDisplay(short_name_bytes);
 
-        let namespace_part = if self.cfg.namespaced {
-            function_name.rsplit_once('\\').map(|(ns, _)| ns).filter(|ns| !ns.is_empty())
+        let namespace_part: Option<&[u8]> = if self.cfg.namespaced {
+            memchr::memrchr(b'\\', function_name_bytes).map(|i| &function_name_bytes[..i]).filter(|ns| !ns.is_empty())
         } else {
             None
         };
 
         let (resolution, replacement, use_statement_text) = match namespace_part {
-            Some(ns) => match ctx.import_name(ns) {
-                Some(res) => {
-                    let replacement = format!("{}\\{}", res.local_name, short_name);
-                    let use_text = format!("use {ns};");
-                    (Some(res), Some(replacement), use_text)
+            Some(ns_bytes) => {
+                let ns_display = mago_bytes::BytesDisplay(ns_bytes);
+                match ctx.import_name(ns_bytes) {
+                    Some(res) => {
+                        let replacement = format!("{}\\{short_name}", res.local_name);
+                        let use_text = format!("use {ns_display};");
+                        (Some(res), Some(replacement), use_text)
+                    }
+                    None => (None, None, format!("use {ns_display};")),
                 }
-                None => (None, None, format!("use {ns};")),
-            },
-            None => match ctx.import_function(function_name) {
+            }
+            None => match ctx.import_function(function_name_bytes) {
                 Some(res) => {
                     let replacement = res.local_name.to_string();
                     let use_text = format!("use function {function_name};");
@@ -151,8 +156,9 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
             },
         };
 
+        let short_name_str = short_name.to_string();
         let (title, help) = match (&resolution, replacement.as_deref()) {
-            (Some(res), Some(rep)) if res.is_already_available() && rep != short_name => (
+            (Some(res), Some(rep)) if res.is_already_available() && rep != short_name_str => (
                 "Fully-qualified function call can be replaced with an existing alias.",
                 format!("`{function_name}` is already reachable as `{rep}`; replace the call with it."),
             ),
@@ -164,7 +170,7 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
                 "Fully-qualified function call detected.",
                 format!(
                     "Add `{use_statement_text}` and call `{}(...)` directly.",
-                    replacement.as_deref().unwrap_or(short_name)
+                    replacement.as_deref().unwrap_or(&short_name_str)
                 ),
             ),
         };

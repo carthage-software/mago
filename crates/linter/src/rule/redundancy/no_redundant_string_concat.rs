@@ -107,7 +107,7 @@ impl LintRule for NoRedundantStringConcatRule {
                 return;
             }
 
-            let dangerous = matches!(&right.raw.as_bytes()[1..], [b'{', ..]);
+            let dangerous = matches!(&right.raw[1..], [b'{', ..]);
             if dangerous {
                 return;
             }

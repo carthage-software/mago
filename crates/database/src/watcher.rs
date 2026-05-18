@@ -4,6 +4,8 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::mem::ManuallyDrop;
+#[cfg(not(windows))]
+use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -30,6 +32,7 @@ use crate::exclusion::Exclusion;
 use crate::file::File;
 use crate::file::FileId;
 use crate::file::FileType;
+use crate::utils::bytes_to_path;
 
 const DEFAULT_POLL_INTERVAL_MS: u64 = 1000;
 const WAIT_INTERNAL_MS: u64 = 100;
@@ -120,7 +123,7 @@ impl<'config> DatabaseWatcher<'config> {
             })
             .collect();
 
-        let extensions: HashSet<String> = config.extensions.iter().map(std::string::ToString::to_string).collect();
+        let extensions: HashSet<Vec<u8>> = config.extensions.iter().map(|c| c.to_vec()).collect();
         let workspace = config.workspace.as_ref().to_path_buf();
 
         // Build the set of explicitly configured watch paths so that events from
@@ -215,20 +218,26 @@ impl<'config> DatabaseWatcher<'config> {
     /// - `"src/**/*.php"` → `"src"`
     /// - `"lib/*/foo.php"` → `"lib"`
     /// - `"tests/fixtures"` → `"tests/fixtures"` (unchanged)
-    fn extract_watch_path(pattern: &str) -> PathBuf {
-        let is_glob = pattern.contains('*') || pattern.contains('?') || pattern.contains('[') || pattern.contains('{');
+    fn extract_watch_path(pattern: &[u8]) -> PathBuf {
+        let is_glob =
+            pattern.contains(&b'*') || pattern.contains(&b'?') || pattern.contains(&b'[') || pattern.contains(&b'{');
 
         if !is_glob {
-            return PathBuf::from(pattern);
+            return bytes_to_path(pattern).into_owned();
         }
 
-        let first_glob_pos = pattern.find(['*', '?', '[', '{']).unwrap_or(pattern.len());
+        let first_glob_pos =
+            pattern.iter().position(|&b| matches!(b, b'*' | b'?' | b'[' | b'{')).unwrap_or(pattern.len());
 
         let base = &pattern[..first_glob_pos];
 
-        let base = base.trim_end_matches('/').trim_end_matches('\\');
+        let mut end = base.len();
+        while end > 0 && matches!(base[end - 1], b'/' | b'\\') {
+            end -= 1;
+        }
+        let base = &base[..end];
 
-        if base.is_empty() { PathBuf::from(".") } else { PathBuf::from(base) }
+        if base.is_empty() { PathBuf::from(".") } else { bytes_to_path(base).into_owned() }
     }
 
     fn handle_event(
@@ -236,7 +245,7 @@ impl<'config> DatabaseWatcher<'config> {
         workspace: &Path,
         glob_excludes: &GlobSet,
         path_excludes: &HashSet<PathBuf>,
-        extensions: &HashSet<String>,
+        extensions: &HashSet<Vec<u8>>,
         explicit_watch_paths: &[PathBuf],
     ) -> Option<Vec<ChangedFile>> {
         tracing::debug!("Watcher received event: kind={:?}, paths={:?}", event.kind, event.paths);
@@ -254,7 +263,7 @@ impl<'config> DatabaseWatcher<'config> {
         for path in event.paths {
             // Check if file has a valid extension
             if let Some(ext) = path.extension() {
-                if !extensions.contains(ext.to_string_lossy().as_ref()) {
+                if !extensions.contains(ext.as_bytes()) {
                     continue;
                 }
             } else {
@@ -291,7 +300,18 @@ impl<'config> DatabaseWatcher<'config> {
             }
 
             // Normalize to forward slashes for cross-platform determinism
-            let logical_name = path.strip_prefix(workspace).unwrap_or(&path).to_string_lossy().replace('\\', "/");
+            #[cfg(windows)]
+            let logical_name = path
+                .strip_prefix(workspace)
+                .unwrap_or(&path)
+                .as_os_str()
+                .as_bytes()
+                .iter()
+                .map(|i| if *i == b'\\' { b'/' } else { *i })
+                .collect::<Vec<_>>();
+            #[cfg(not(windows))]
+            let logical_name = path.strip_prefix(workspace).unwrap_or(&path).as_os_str().as_bytes().to_owned();
+
             let file_id = FileId::new(&logical_name);
 
             changed_files.push(ChangedFile { id: file_id, path: path.clone() });
@@ -361,16 +381,19 @@ impl<'config> DatabaseWatcher<'config> {
 
                     if !changed_file.path.exists() {
                         self.database.delete(changed_file.id);
-                        tracing::trace!("Deleted file from database: {}", file.name);
+                        tracing::trace!("Deleted file from database: {}", String::from_utf8_lossy(&file.name));
                         continue;
                     }
 
                     match Self::read_stable_contents(&changed_file.path) {
                         Ok(contents) => {
                             if self.database.update(changed_file.id, Cow::Owned(contents)) {
-                                tracing::trace!("Updated file in database: {}", file.name);
+                                tracing::trace!("Updated file in database: {}", String::from_utf8_lossy(&file.name));
                             } else {
-                                tracing::warn!("Failed to update file in database (ID not found): {}", file.name);
+                                tracing::warn!(
+                                    "Failed to update file in database (ID not found): {}",
+                                    String::from_utf8_lossy(&file.name)
+                                );
                             }
                         }
                         Err(e) => {
@@ -394,13 +417,13 @@ impl<'config> DatabaseWatcher<'config> {
     /// Some IDEs and formatters write files in multiple steps (save, then format).
     /// This method reads the file, waits briefly, and re-reads to ensure the content
     /// has stabilized before returning.
-    fn read_stable_contents(path: &Path) -> std::io::Result<String> {
-        let contents = std::fs::read_to_string(path)?;
+    fn read_stable_contents(path: &Path) -> std::io::Result<Vec<u8>> {
+        let contents = std::fs::read(path)?;
 
         std::thread::sleep(Duration::from_millis(STABILITY_CHECK_MS));
 
         if path.exists()
-            && let Ok(reread) = std::fs::read_to_string(path)
+            && let Ok(reread) = std::fs::read(path)
             && reread != contents
         {
             tracing::debug!("File content changed during stability check: {}", path.display());

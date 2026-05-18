@@ -1114,13 +1114,7 @@ impl<'input> Lexer<'input> {
     }
 
     #[inline]
-    fn token(&self, kind: TokenKind, v: &'input [u8], start: Position, _end: Position) -> Token<'input> {
-        // SAFETY: The input bytes are guaranteed to be valid UTF-8 because:
-        // 1. File contents are validated via simdutf8 during database loading
-        // 2. Invalid UTF-8 is converted lossily before reaching the lexer
-        // 3. All byte slices here are subslices of the validated input
-        let value = unsafe { std::str::from_utf8_unchecked(v) };
-
+    fn token(&self, kind: TokenKind, value: &'input [u8], start: Position, _end: Position) -> Token<'input> {
         Token { kind, start, value }
     }
 

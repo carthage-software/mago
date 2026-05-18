@@ -2,8 +2,8 @@ use mago_database::file::FileId;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
 use mago_span::Position;
+use mago_word::Word;
 
 use crate::identifier::method::MethodIdentifier;
 
@@ -14,12 +14,12 @@ use crate::identifier::method::MethodIdentifier;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum FunctionLikeIdentifier {
     /// A globally or namespaced defined function.
-    /// * `Atom` - The fully qualified name (FQN) of the function.
-    Function(Atom),
+    /// * `Word` - The fully qualified name (FQN) of the function.
+    Function(Word),
     /// A method within a class, interface, trait, or enum.
-    /// * `Atom` - The fully qualified class name (FQCN) of the containing structure.
-    /// * `Atom` - The name of the method.
-    Method(Atom, Atom),
+    /// * `Word` - The fully qualified class name (FQCN) of the containing structure.
+    /// * `Word` - The name of the method.
+    Method(Word, Word),
     /// A closure (anonymous function `function() {}` or arrow function `fn() => expr`).
     ///
     /// * `FileId` - The identifier of the file where the closure is defined.

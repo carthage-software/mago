@@ -81,7 +81,7 @@ pub(super) fn is_intersection_shallowly_contained_by(
                     GenericParent::ClassLike(container_defining_class),
                 ) => {
                     if input_defining_class != container_defining_class
-                        && let Some(input_class_metadata) = codebase.get_class_like(input_defining_class)
+                        && let Some(input_class_metadata) = codebase.get_class_like(input_defining_class.as_bytes())
                         && let Some(defining_entity_params) =
                             &input_class_metadata.template_extended_parameters.get(container_defining_class)
                         && defining_entity_params.contains_key(container_parameter_name)
@@ -159,14 +159,14 @@ pub(super) fn is_intersection_shallowly_contained_by(
         }
     }
 
-    if codebase.is_instance_of(&input_name, &container_name)
-        || codebase.class_uses_trait(&input_name, &container_name)
-        || codebase.class_uses_trait(&container_name, &input_name)
+    if codebase.is_instance_of(input_name.as_bytes(), container_name.as_bytes())
+        || codebase.class_uses_trait(input_name.as_bytes(), container_name.as_bytes())
+        || codebase.class_uses_trait(container_name.as_bytes(), input_name.as_bytes())
     {
         return true;
     }
 
-    if codebase.is_instance_of(&container_name, &input_name) {
+    if codebase.is_instance_of(container_name.as_bytes(), input_name.as_bytes()) {
         atomic_comparison_result.type_coerced = Some(true);
     }
 

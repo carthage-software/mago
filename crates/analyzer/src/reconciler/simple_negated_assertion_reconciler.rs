@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -25,6 +23,8 @@ use mago_codex::ttype::get_undefined_null;
 use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_span::Span;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::reconciler::Context;
 use crate::reconciler::map_generic_constraint;
@@ -36,7 +36,7 @@ pub(crate) fn reconcile(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     span: Option<&Span>,
     negated: bool,
 ) -> Option<TUnion> {
@@ -73,15 +73,16 @@ pub(crate) fn reconcile(
                         _ => None,
                     })
                     .filter_map(|existing_class| {
-                        if context.codebase.is_instance_of(&subtracting_named.name, existing_class) {
-                            context.codebase.get_class_like(existing_class)
+                        if context.codebase.is_instance_of(subtracting_named.name.as_bytes(), existing_class.as_bytes())
+                        {
+                            context.codebase.get_class_like(existing_class.as_bytes())
                         } else {
                             None
                         }
                     })
                     .any(|parent_class| {
                         parent_class.permitted_inheritors.as_ref().is_some_and(|permitted_inheritors| {
-                            permitted_inheritors.contains(&ascii_lowercase_atom(&subtracting_named.name))
+                            permitted_inheritors.contains(&ascii_lowercase_word(subtracting_named.name.as_bytes()))
                         })
                     }) =>
             {
@@ -256,7 +257,7 @@ pub(crate) fn reconcile(
                 match existing_atomic {
                     TAtomic::Array(_) => {}
                     TAtomic::Iterable(iterable) => {
-                        let mut traversable = TNamedObject::new(atom("Traversable")).with_type_parameters(Some(vec![
+                        let mut traversable = TNamedObject::new(word("Traversable")).with_type_parameters(Some(vec![
                             (*iterable.key_type).clone(),
                             (*iterable.value_type).clone(),
                         ]));
@@ -290,7 +291,7 @@ fn subtract_object(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -331,30 +332,30 @@ fn subtract_object(
             } else if let TAtomic::Object(TObject::Named(existing_named)) = &atomic
                 && let Some(TAtomic::Object(TObject::Named(subtracting_named))) = type_to_subtract
             {
-                let lowercase_subtracting_name = ascii_lowercase_atom(&subtracting_named.get_name());
+                let lowercase_subtracting_name = ascii_lowercase_word(subtracting_named.get_name().as_bytes());
 
-                // If the class names match (case-insensitive), this type is being subtracted - don't add it
-                if existing_named.get_name().eq_ignore_ascii_case(&lowercase_subtracting_name) {
-                    // Type is removed, don't add to acceptable_types
-                } else if let Some(existing_metadata) = context.codebase.get_class_like(&existing_named.get_name())
-                    // Check if the existing type has permitted inheritors
+                if existing_named.get_name().as_bytes().eq_ignore_ascii_case(lowercase_subtracting_name.as_bytes()) {
+                } else if let Some(existing_metadata) =
+                    context.codebase.get_class_like(existing_named.get_name().as_bytes())
                     && let Some(permitted_inheritors) = &existing_metadata.permitted_inheritors
-                    // Check if the subtracting type is an inheritor of the existing type
-                    && context.codebase.is_instance_of(&lowercase_subtracting_name, &existing_named.get_name())
-                    // If the type we're subtracting is one of the permitted inheritors
-                    // PHP class names are case-insensitive, so we need to compare case-insensitively
+                    && context
+                        .codebase
+                        .is_instance_of(lowercase_subtracting_name.as_bytes(), existing_named.get_name().as_bytes())
                     && permitted_inheritors.contains(&lowercase_subtracting_name)
                 {
-                    // This is a sealed BASE class/interface and we're subtracting one of its permitted inheritors
-                    // Expand to all OTHER permitted inheritors, transferring parent's type params
                     let parent_type_params = existing_named.get_type_parameters();
                     acceptable_types.extend(
                         permitted_inheritors
                             .iter()
-                            .filter(|inheritor| !inheritor.eq_ignore_ascii_case(&lowercase_subtracting_name))
+                            .filter(|inheritor| {
+                                !inheritor.as_bytes().eq_ignore_ascii_case(lowercase_subtracting_name.as_bytes())
+                            })
                             .map(|inheritor| {
                                 let child = TNamedObject::new(
-                                    context.codebase.get_class_like(inheritor).map_or(*inheritor, |m| m.original_name),
+                                    context
+                                        .codebase
+                                        .get_class_like(inheritor.as_bytes())
+                                        .map_or(*inheritor, |m| m.original_name),
                                 );
 
                                 if let Some(type_params) = parent_type_params {
@@ -398,7 +399,7 @@ fn subtract_list_array(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -477,7 +478,7 @@ fn subtract_keyed_array(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -532,7 +533,7 @@ fn subtract_string(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -614,7 +615,7 @@ fn subtract_numeric(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -709,7 +710,7 @@ fn subtract_int(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -796,7 +797,7 @@ fn subtract_float(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -861,7 +862,7 @@ fn subtract_arraykey(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -925,7 +926,7 @@ fn subtract_bool(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -989,7 +990,7 @@ pub(crate) fn subtract_null(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
@@ -1047,7 +1048,7 @@ pub(crate) fn subtract_resource(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     resource_to_subtract: TResource,
@@ -1107,7 +1108,7 @@ fn subtract_false(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -1174,7 +1175,7 @@ fn subtract_true(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
@@ -1242,7 +1243,7 @@ fn reconcile_falsy_or_empty(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
@@ -1288,11 +1289,11 @@ fn reconcile_falsy_or_empty(
                 }
                 TAtomic::Scalar(TScalar::String(s)) => {
                     if !s.is_non_empty {
-                        acceptable_types.push(TAtomic::Scalar(TScalar::literal_string(atom(""))));
+                        acceptable_types.push(TAtomic::Scalar(TScalar::literal_string(word(""))));
                     }
 
                     if !is_empty_assertion {
-                        acceptable_types.push(TAtomic::Scalar(TScalar::literal_string(atom("0"))));
+                        acceptable_types.push(TAtomic::Scalar(TScalar::literal_string(word("0"))));
                     }
                 }
                 TAtomic::Scalar(TScalar::Integer(i)) => {
@@ -1328,7 +1329,7 @@ fn reconcile_falsy_or_empty(
 fn reconcile_not_isset(
     _context: &mut Context<'_, '_>,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     span: Option<&Span>,
 ) -> TUnion {
     // When !isset is true, the value is definitely not set (either null or undefined)
@@ -1340,7 +1341,7 @@ fn reconcile_not_isset(
 
     if !existing_var_type.is_nullable()
         && let Some(key) = key
-        && !key.contains('[')
+        && memchr::memchr(b'[', key).is_none()
         && (!existing_var_type.is_mixed() || existing_var_type.is_always_truthy())
     {
         if span.is_some() {
@@ -1357,7 +1358,7 @@ fn reconcile_empty_countable(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
 ) -> TUnion {
@@ -1409,7 +1410,7 @@ fn reconcile_not_exactly_countable(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     count: usize,
@@ -1459,7 +1460,7 @@ fn reconcile_not_in_array(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     typed_value: &TUnion,
@@ -1483,7 +1484,7 @@ fn reconcile_no_array_key(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
+    key: Option<&[u8]>,
     span: Option<&Span>,
     key_name: &ArrayKey,
     negated: bool,

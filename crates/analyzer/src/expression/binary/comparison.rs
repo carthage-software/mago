@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use mago_atom::atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
@@ -17,6 +16,7 @@ use mago_syntax::ast::Literal;
 use mago_syntax::ast::Parenthesized;
 use mago_syntax::ast::Variable;
 use mago_text_edit::TextEdit;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -33,6 +33,7 @@ use crate::expression::binary::utils::is_always_identical_to;
 use crate::expression::binary::utils::is_always_less_than;
 use crate::expression::binary::utils::is_always_less_than_or_equal;
 use crate::utils::misc::unwrap_expression;
+use mago_bytes::BytesDisplay;
 
 /// Analyzes standard comparison operations (e.g., `==`, `===`, `<`, `<=`, `>`, `>=`).
 ///
@@ -124,7 +125,7 @@ pub fn analyze_comparison_operation<'ctx, 'arena>(
     let mut reported_general_invalid_operand = false;
 
     if !lhs_type.is_mixed() && !rhs_type.is_mixed() {
-        let op_str = binary.operator.as_str();
+        let op_str = BytesDisplay(binary.operator.as_bytes());
         let is_relational = binary.operator.is_comparison() && !binary.operator.is_equality();
         let lhs_has_array = lhs_type.has_array() || lhs_type.has_iterable();
         let rhs_has_array = rhs_type.has_array() || rhs_type.has_iterable();
@@ -435,12 +436,12 @@ fn should_use_specific_equality_inference(
 
 /// Checks if an expression involves a static variable.
 fn involves_static_variable(expr: &Expression<'_>, block_context: &BlockContext<'_>) -> bool {
-    matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(&atom(var.name)))
+    matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.static_locals.contains(&word(var.name)))
 }
 
 /// Checks if an expression involves a variable captured by reference from an outer scope.
 fn involves_external_reference(expr: &Expression<'_>, block_context: &BlockContext<'_>) -> bool {
-    matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.references_to_external_scope.contains(&atom(var.name)))
+    matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.references_to_external_scope.contains(&word(var.name)))
 }
 
 /// Checks a single operand of a comparison operation for problematic types.
@@ -455,7 +456,7 @@ fn check_comparison_operand<'ast, 'arena>(
         return;
     }
 
-    let op_str = operator.as_str();
+    let op_str = BytesDisplay(operator.as_bytes());
 
     if operand_type.is_null() {
         context.collector.report_with_code(
@@ -532,7 +533,7 @@ fn report_redundant_comparison<'arena>(
         IssueCode::RedundantComparison,
         Issue::help(format!(
             "Redundant `{}` comparison: left-hand side is {} right-hand side.",
-            binary.operator.as_str(),
+            BytesDisplay(binary.operator.as_bytes()),
             comparison_description
         ))
         .with_annotation(Annotation::primary(binary.lhs.span()).with_message(
@@ -549,7 +550,7 @@ fn report_redundant_comparison<'arena>(
         ))
         .with_note(format!(
             "The `{}` operator will always return {} in this case.",
-            binary.operator.as_str(),
+            BytesDisplay(binary.operator.as_bytes()),
             result_value_str
         ))
         .with_help(format!(

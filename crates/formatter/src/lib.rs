@@ -35,7 +35,7 @@ pub mod settings;
 mod internal;
 
 /// Markers that indicate a file should not be formatted.
-const FORMAT_IGNORE_MARKERS: [&str; 2] = ["@mago-format-ignore", "@mago-formatter-ignore"];
+const FORMAT_IGNORE_MARKERS: [&[u8]; 2] = [b"@mago-format-ignore", b"@mago-formatter-ignore"];
 
 /// The main entry point for formatting PHP code.
 ///
@@ -82,7 +82,7 @@ impl<'arena> Formatter<'arena> {
     /// # Errors
     ///
     /// Returns a [`ParseError`] if the input code contains syntax errors.
-    pub fn format_code(&self, name: Cow<'static, str>, code: Cow<'static, str>) -> Result<&'arena str, ParseError> {
+    pub fn format_code(&self, name: Cow<'static, [u8]>, code: Cow<'static, [u8]>) -> Result<&'arena [u8], ParseError> {
         let file = File::ephemeral(name, code);
 
         self.format_file(&file)
@@ -97,7 +97,7 @@ impl<'arena> Formatter<'arena> {
     /// # Errors
     ///
     /// Returns the first [`ParseError`] if the file's content contains syntax errors.
-    pub fn format_file<'ctx>(&self, file: &'ctx File) -> Result<&'arena str, ParseError> {
+    pub fn format_file<'ctx>(&self, file: &'ctx File) -> Result<&'arena [u8], ParseError> {
         let program = parse_file_with_settings(self.arena, file, self.parser_settings);
         if let Some(error) = program.errors.first() {
             return Err(error.clone());
@@ -112,7 +112,7 @@ impl<'arena> Formatter<'arena> {
     /// It first builds an intermediate [`Document`] representation and then prints it.
     /// This is useful if you have already parsed the code and want to avoid re-parsing.
     #[must_use]
-    pub fn format<'ctx>(&self, file: &'ctx File, program: &'arena Program<'arena>) -> &'arena str {
+    pub fn format<'ctx>(&self, file: &'ctx File, program: &'arena Program<'arena>) -> &'arena [u8] {
         let document = self.build(file, program);
 
         self.print(document, Some(file.size as usize))
@@ -148,7 +148,7 @@ impl<'arena> Formatter<'arena> {
     /// # Returns
     ///
     /// A formatted string representation of the document.
-    pub fn print(&self, document: Document<'arena>, capacity_hint: Option<usize>) -> &'arena str {
+    pub fn print(&self, document: Document<'arena>, capacity_hint: Option<usize>) -> &'arena [u8] {
         Printer::new(self.arena, document, capacity_hint.unwrap_or(0), self.settings).build()
     }
 }
@@ -159,8 +159,8 @@ impl<'arena> Formatter<'arena> {
 fn has_format_ignore_comment(program: &Program<'_>) -> bool {
     program.trivia.comments().any(|comment| {
         FORMAT_IGNORE_MARKERS.iter().any(|marker| {
-            if let Some(pos) = comment.value.find(marker) {
-                !comment.value[pos + marker.len()..].starts_with('-')
+            if let Some(pos) = memchr::memmem::find(comment.value, marker) {
+                !comment.value[pos + marker.len()..].starts_with(b"-")
             } else {
                 false
             }

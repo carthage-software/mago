@@ -20,6 +20,9 @@ use crate::file::File;
 use crate::file::FileId;
 use crate::file::FileType;
 use crate::matcher::build_glob_set;
+use crate::utils::bytes_to_os_str;
+use crate::utils::bytes_to_path;
+use crate::utils::bytes_to_string_lossy;
 use crate::utils::read_file;
 
 /// Holds a file along with the specificity of the pattern that matched it.
@@ -37,8 +40,8 @@ struct FileWithSpecificity {
 pub struct DatabaseLoader<'config> {
     database: Option<Database<'config>>,
     configuration: DatabaseConfiguration<'config>,
-    memory_sources: Vec<(&'static str, &'static str, FileType)>,
-    stdin_override: Option<(Cow<'config, str>, String)>,
+    memory_sources: Vec<(&'static [u8], &'static [u8], FileType)>,
+    stdin_override: Option<(Cow<'config, [u8]>, Vec<u8>)>,
 }
 
 impl<'config> DatabaseLoader<'config> {
@@ -57,16 +60,19 @@ impl<'config> DatabaseLoader<'config> {
 
     /// When set, the file with this logical name (workspace-relative path) will use the given
     /// content instead of being read from disk. The logical name is used for baseline and reporting.
+    ///
+    /// `content` is raw bytes: PHP source is binary-safe, so a buffer piped in via `--stdin-input`
+    /// may not be valid UTF-8.
     #[inline]
     #[must_use]
-    pub fn with_stdin_override(mut self, logical_name: impl Into<Cow<'config, str>>, content: String) -> Self {
-        self.stdin_override = Some((logical_name.into(), content));
+    pub fn with_stdin_override(mut self, logical_name: impl AsRef<[u8]>, content: Vec<u8>) -> Self {
+        self.stdin_override = Some((Cow::Owned(logical_name.as_ref().to_vec()), content));
         self
     }
 
     #[inline]
     pub fn add_memory_source(&mut self, name: &'static str, contents: &'static str, file_type: FileType) {
-        self.memory_sources.push((name, contents, file_type));
+        self.memory_sources.push((name.as_bytes(), contents.as_bytes(), file_type));
     }
 
     /// Loads files from disk into the database.
@@ -76,7 +82,7 @@ impl<'config> DatabaseLoader<'config> {
     /// Returns a [`DatabaseError`] if:
     /// - A glob pattern is invalid
     /// - File system operations fail (reading directories, files)
-    /// - File content cannot be read as valid UTF-8
+    /// - A file exceeds the maximum supported size
     #[inline]
     pub fn load(mut self) -> Result<Database<'config>, DatabaseError> {
         let mut db = self.database.take().unwrap_or_else(|| Database::new(self.configuration.clone()));
@@ -86,7 +92,7 @@ impl<'config> DatabaseLoader<'config> {
         db.configuration = self.configuration.clone();
 
         let extensions_set: HashSet<OsString> =
-            self.configuration.extensions.iter().map(|s| OsString::from(s.as_ref())).collect();
+            self.configuration.extensions.iter().map(|s| bytes_to_os_str(s.as_ref()).into_owned()).collect();
 
         let glob_exclude_patterns: Vec<&str> = self
             .configuration
@@ -158,12 +164,13 @@ impl<'config> DatabaseLoader<'config> {
         // so that editor integrations using `--stdin-input` honor the same
         // exclude rules as a regular filesystem scan.
         if let Some((name, content)) = &self.stdin_override {
-            let virtual_path = self.configuration.workspace.join(name.as_ref());
+            let virtual_path = self.configuration.workspace.join(bytes_to_path(name.as_ref()).as_ref());
             let virtual_path_canonical = virtual_path.canonicalize().unwrap_or_else(|_| virtual_path.clone());
             let virtual_path_str = virtual_path_canonical.to_string_lossy();
 
             let matched_glob = !glob_excludes.is_empty()
-                && (glob_excludes.is_match(virtual_path_canonical.as_path()) || glob_excludes.is_match(name.as_ref()));
+                && (glob_excludes.is_match(virtual_path_canonical.as_path())
+                    || glob_excludes.is_match(bytes_to_path(name.as_ref()).as_ref()));
 
             let matched_path = path_excludes.iter().any(|excl| {
                 let canonical = if Path::new(excl.as_ref()).is_absolute() {
@@ -179,7 +186,7 @@ impl<'config> DatabaseLoader<'config> {
             });
 
             if !matched_glob && !matched_path {
-                let file = File::ephemeral(Cow::Owned(name.as_ref().to_string()), Cow::Owned(content.clone()));
+                let file = File::ephemeral(Cow::Owned(name.as_ref().to_vec()), Cow::Owned(content.clone()));
                 let file_id = file.id;
                 if let Entry::Vacant(e) = all_files.entry(file_id) {
                     e.insert(file);
@@ -232,7 +239,7 @@ impl<'config> DatabaseLoader<'config> {
     /// Returns files along with their pattern specificity for conflict resolution.
     fn load_paths(
         &self,
-        roots: &[Cow<'config, str>],
+        roots: &[Cow<'config, [u8]>],
         file_type: FileType,
         extensions: &HashSet<OsString>,
         glob_excludes: &GlobSet,
@@ -280,23 +287,24 @@ impl<'config> DatabaseLoader<'config> {
             // Check if this is a glob pattern (contains glob metacharacters).
             // First check if it's an actual file/directory on disk. if so, treat it
             // as a literal path even if the name contains glob metacharacters like `[]`.
-            let resolved_path = if Path::new(root.as_ref()).is_absolute() {
-                Path::new(root.as_ref()).to_path_buf()
+            let root_path = bytes_to_path(root.as_ref());
+            let resolved_path = if root_path.is_absolute() {
+                root_path.as_ref().to_path_buf()
             } else {
-                self.configuration.workspace.join(root.as_ref())
+                self.configuration.workspace.join(root_path.as_ref())
             };
 
             let is_glob_pattern = !resolved_path.exists()
-                && (root.contains('*') || root.contains('?') || root.contains('[') || root.contains('{'));
+                && (root.contains(&b'*') || root.contains(&b'?') || root.contains(&b'[') || root.contains(&b'{'));
 
             let specificity = Self::calculate_pattern_specificity(root.as_ref());
             if is_glob_pattern {
                 // Handle as glob pattern
-                let pattern = if Path::new(root.as_ref()).is_absolute() {
-                    root.to_string()
+                let pattern = if root_path.is_absolute() {
+                    bytes_to_string_lossy(root.as_ref()).into_owned()
                 } else {
                     // Make relative patterns absolute by prepending workspace
-                    self.configuration.workspace.join(root.as_ref()).to_string_lossy().to_string()
+                    self.configuration.workspace.join(root_path.as_ref()).to_string_lossy().to_string()
                 };
 
                 match glob::glob(&pattern) {
@@ -402,10 +410,10 @@ impl<'config> DatabaseLoader<'config> {
                     path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
 
                 if let Some((override_name, override_content)) = &self.stdin_override
-                    && override_name.as_ref() == logical_name
+                    && override_name.as_ref() == logical_name.as_bytes()
                 {
                     let file = File::new(
-                        Cow::Owned(logical_name),
+                        Cow::Owned(logical_name.into_bytes()),
                         file_type,
                         Some(path.clone()),
                         Cow::Owned(override_content.clone()),
@@ -431,11 +439,12 @@ impl<'config> DatabaseLoader<'config> {
     /// - "src/b.php" matching src/b.php: ~2000 (exact file, 2 components)
     /// - "src/" matching src/b.php: ~100 (directory, 1 component)
     /// - "src" matching src/b.php: ~100 (directory, 1 component)
-    fn calculate_pattern_specificity(pattern: &str) -> usize {
-        let pattern_path = Path::new(pattern);
+    fn calculate_pattern_specificity(pattern: &[u8]) -> usize {
+        let pattern_path = bytes_to_path(pattern);
 
         let component_count = pattern_path.components().count();
-        let is_glob = pattern.contains('*') || pattern.contains('?') || pattern.contains('[') || pattern.contains('{');
+        let is_glob =
+            pattern.contains(&b'*') || pattern.contains(&b'?') || pattern.contains(&b'[') || pattern.contains(&b'{');
 
         if is_glob {
             let non_wildcard_components = pattern_path
@@ -448,7 +457,7 @@ impl<'config> DatabaseLoader<'config> {
             non_wildcard_components * 10
         } else if pattern_path.is_file()
             || pattern_path.extension().is_some()
-            || pattern.rsplit('.').next().is_some_and(|ext| ext.eq_ignore_ascii_case("php"))
+            || pattern.rsplit(|&b| b == b'.').next().is_some_and(|ext| ext.eq_ignore_ascii_case(b"php"))
         {
             component_count * 1000
         } else {
@@ -472,12 +481,17 @@ mod tests {
 
         DatabaseConfiguration {
             workspace: Cow::Owned(temp_dir.path().to_path_buf()),
-            paths: paths.into_iter().map(|s| Cow::Owned(normalize(s))).collect(),
-            includes: includes.into_iter().map(|s| Cow::Owned(normalize(s))).collect(),
+            paths: paths.into_iter().map(|s| Cow::Owned(normalize(s).into_bytes())).collect(),
+            includes: includes.into_iter().map(|s| Cow::Owned(normalize(s).into_bytes())).collect(),
             excludes: vec![],
-            extensions: vec![Cow::Borrowed("php")],
+            extensions: vec![Cow::Borrowed(b"php")],
             glob: GlobSettings::default(),
         }
+    }
+
+    /// Returns the file's logical name as a lossy UTF-8 string for assertion matching.
+    fn name_str(name: &[u8]) -> std::borrow::Cow<'_, str> {
+        String::from_utf8_lossy(name)
     }
 
     fn create_test_file(temp_dir: &TempDir, relative_path: &str, content: &str) {
@@ -490,26 +504,26 @@ mod tests {
 
     #[test]
     fn test_specificity_calculation_exact_file() {
-        let spec = DatabaseLoader::calculate_pattern_specificity("src/b.php");
+        let spec = DatabaseLoader::calculate_pattern_specificity(b"src/b.php");
         assert!(spec >= 2000, "Exact file should have high specificity, got {spec}");
     }
 
     #[test]
     fn test_specificity_calculation_directory() {
-        let spec = DatabaseLoader::calculate_pattern_specificity("src/");
+        let spec = DatabaseLoader::calculate_pattern_specificity(b"src/");
         assert!((100..1000).contains(&spec), "Directory should have moderate specificity, got {spec}");
     }
 
     #[test]
     fn test_specificity_calculation_glob() {
-        let spec = DatabaseLoader::calculate_pattern_specificity("src/*.php");
+        let spec = DatabaseLoader::calculate_pattern_specificity(b"src/*.php");
         assert!(spec < 100, "Glob pattern should have low specificity, got {spec}");
     }
 
     #[test]
     fn test_specificity_calculation_deeper_path() {
-        let shallow_spec = DatabaseLoader::calculate_pattern_specificity("src/");
-        let deep_spec = DatabaseLoader::calculate_pattern_specificity("src/foo/bar/");
+        let shallow_spec = DatabaseLoader::calculate_pattern_specificity(b"src/");
+        let deep_spec = DatabaseLoader::calculate_pattern_specificity(b"src/foo/bar/");
         assert!(deep_spec > shallow_spec, "Deeper path should have higher specificity");
     }
 
@@ -524,10 +538,10 @@ mod tests {
         let loader = DatabaseLoader::new(config);
         let db = loader.load().unwrap();
 
-        let b_file = db.files().find(|f| f.name.contains("b.php")).unwrap();
+        let b_file = db.files().find(|f| name_str(&f.name).contains("b.php")).unwrap();
         assert_eq!(b_file.file_type, FileType::Host, "src/b.php should be Host (exact file beats directory)");
 
-        let a_file = db.files().find(|f| f.name.contains("a.php")).unwrap();
+        let a_file = db.files().find(|f| name_str(&f.name).contains("a.php")).unwrap();
         assert_eq!(a_file.file_type, FileType::Vendored, "src/a.php should be Vendored");
     }
 
@@ -541,7 +555,7 @@ mod tests {
         let loader = DatabaseLoader::new(config);
         let db = loader.load().unwrap();
 
-        let file = db.files().find(|f| f.name.contains("bar.php")).unwrap();
+        let file = db.files().find(|f| name_str(&f.name).contains("bar.php")).unwrap();
         assert_eq!(file.file_type, FileType::Host, "Deeper directory pattern should win");
     }
 
@@ -555,7 +569,7 @@ mod tests {
         let loader = DatabaseLoader::new(config);
         let db = loader.load().unwrap();
 
-        let file = db.files().find(|f| f.name.contains("b.php")).unwrap();
+        let file = db.files().find(|f| name_str(&f.name).contains("b.php")).unwrap();
         assert_eq!(file.file_type, FileType::Host, "Exact file should beat glob pattern");
     }
 
@@ -569,7 +583,7 @@ mod tests {
         let loader = DatabaseLoader::new(config);
         let db = loader.load().unwrap();
 
-        let file = db.files().find(|f| f.name.contains("a.php")).unwrap();
+        let file = db.files().find(|f| name_str(&f.name).contains("a.php")).unwrap();
         assert_eq!(file.file_type, FileType::Vendored, "Equal specificity: includes should win");
     }
 
@@ -588,13 +602,16 @@ mod tests {
         let loader = DatabaseLoader::new(config);
         let db = loader.load().unwrap();
 
-        let b_file = db.files().find(|f| f.name.contains("src/b.php") || f.name.ends_with("b.php")).unwrap();
+        let b_file = db
+            .files()
+            .find(|f| name_str(&f.name).contains("src/b.php") || name_str(&f.name).ends_with("b.php"))
+            .unwrap();
         assert_eq!(b_file.file_type, FileType::Host, "src/b.php should be Host in bug scenario");
 
-        let d_file = db.files().find(|f| f.name.contains("d.php")).unwrap();
+        let d_file = db.files().find(|f| name_str(&f.name).contains("d.php")).unwrap();
         assert_eq!(d_file.file_type, FileType::Vendored, "src/c/d.php should be Vendored");
 
-        let lib_file = db.files().find(|f| f.name.contains("lib1.php")).unwrap();
+        let lib_file = db.files().find(|f| name_str(&f.name).contains("lib1.php")).unwrap();
         assert_eq!(lib_file.file_type, FileType::Vendored, "vendor/lib1.php should be Vendored");
     }
 
@@ -608,7 +625,7 @@ mod tests {
         let loader = DatabaseLoader::new(config);
         let db = loader.load().unwrap();
 
-        let file = db.files().find(|f| f.name.contains("a.php")).unwrap();
+        let file = db.files().find(|f| name_str(&f.name).contains("a.php")).unwrap();
         assert_eq!(file.file_type, FileType::Host, "File only in paths should be Host");
     }
 
@@ -622,7 +639,7 @@ mod tests {
         let loader = DatabaseLoader::new(config);
         let db = loader.load().unwrap();
 
-        let file = db.files().find(|f| f.name.contains("lib.php")).unwrap();
+        let file = db.files().find(|f| name_str(&f.name).contains("lib.php")).unwrap();
         assert_eq!(file.file_type, FileType::Vendored, "File only in includes should be Vendored");
     }
 
@@ -632,13 +649,13 @@ mod tests {
         create_test_file(&temp_dir, "src/foo.php", "<?php\n// on disk");
 
         let config = create_test_config(&temp_dir, vec!["src/"], vec![]);
-        let loader = DatabaseLoader::new(config).with_stdin_override("src/foo.php", "<?php\n// from stdin".to_string());
+        let loader = DatabaseLoader::new(config).with_stdin_override("src/foo.php", b"<?php\n// from stdin".to_vec());
         let db = loader.load().unwrap();
 
-        let file = db.files().find(|f| f.name.contains("foo.php")).unwrap();
+        let file = db.files().find(|f| name_str(&f.name).contains("foo.php")).unwrap();
         assert_eq!(
             file.contents.as_ref(),
-            "<?php\n// from stdin",
+            b"<?php\n// from stdin",
             "stdin override content should be used instead of disk"
         );
     }
@@ -657,7 +674,7 @@ mod tests {
         let loader = DatabaseLoader::new(config);
         let db = loader.load().unwrap();
 
-        let names: Vec<String> = db.files().map(|f| f.name.to_string()).collect();
+        let names: Vec<String> = db.files().map(|f| name_str(&f.name).into_owned()).collect();
         assert!(names.iter().any(|n| n.ends_with("src/Absences/Foo/Foo.php")), "non-Test file should be loaded");
         assert!(
             !names.iter().any(|n| n.contains("src/Absences/Test/")),
@@ -682,7 +699,7 @@ mod tests {
         let loader = DatabaseLoader::new(config);
         let db = loader.load().unwrap();
 
-        let names: Vec<String> = db.files().map(|f| f.name.to_string()).collect();
+        let names: Vec<String> = db.files().map(|f| name_str(&f.name).into_owned()).collect();
         assert!(names.iter().any(|n| n.ends_with("packages/foo/src/main.php")));
         assert!(
             !names.iter().any(|n| n.contains("/vendor/")),
@@ -704,7 +721,7 @@ mod tests {
         let loader = DatabaseLoader::new(config);
         let db = loader.load().unwrap();
 
-        let names: Vec<String> = db.files().map(|f| f.name.to_string()).collect();
+        let names: Vec<String> = db.files().map(|f| name_str(&f.name).into_owned()).collect();
         assert!(names.iter().any(|n| n.ends_with("vendor/slevomat/coding-standard/main.php")));
         assert!(names.iter().any(|n| n.ends_with("vendor/another/lib.php")));
         assert!(
@@ -720,11 +737,29 @@ mod tests {
 
         let config = create_test_config(&temp_dir, vec!["src/"], vec![]);
         let loader =
-            DatabaseLoader::new(config).with_stdin_override("src/unsaved.php", "<?php\n// unsaved buffer".to_string());
+            DatabaseLoader::new(config).with_stdin_override("src/unsaved.php", b"<?php\n// unsaved buffer".to_vec());
         let db = loader.load().unwrap();
 
-        let file = db.files().find(|f| f.name.contains("unsaved.php")).unwrap();
+        let file = db.files().find(|f| name_str(&f.name).contains("unsaved.php")).unwrap();
         assert_eq!(file.file_type, FileType::Host);
-        assert_eq!(file.contents.as_ref(), "<?php\n// unsaved buffer");
+        assert_eq!(file.contents.as_ref(), b"<?php\n// unsaved buffer");
+    }
+
+    #[test]
+    fn test_stdin_override_accepts_non_utf8_content() {
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "src/.gitkeep", "");
+
+        let config = create_test_config(&temp_dir, vec!["src/"], vec![]);
+        // PHP identifiers are binary-safe, so a buffer piped in via `--stdin-input` may not
+        // be valid UTF-8. The loaded file must carry those bytes through verbatim.
+        let content = b"<?php\n\nfunction f\xC9\xFF(): void {}\n".to_vec();
+        assert!(std::str::from_utf8(&content).is_err(), "test buffer must contain non-UTF-8 bytes");
+
+        let loader = DatabaseLoader::new(config).with_stdin_override("src/buffer.php", content.clone());
+        let db = loader.load().unwrap();
+
+        let file = db.files().find(|f| name_str(&f.name).contains("buffer.php")).unwrap();
+        assert_eq!(file.contents.as_ref(), content.as_slice());
     }
 }

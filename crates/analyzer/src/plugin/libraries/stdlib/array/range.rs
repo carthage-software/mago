@@ -38,7 +38,7 @@ impl Provider for RangeProvider {
 
 impl FunctionReturnTypeProvider for RangeProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("range")
+        FunctionTarget::Exact(b"range")
     }
 
     fn get_return_type(
@@ -46,8 +46,8 @@ impl FunctionReturnTypeProvider for RangeProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let start_expr = invocation.get_argument(0, &["start"])?;
-        let end_expr = invocation.get_argument(1, &["end"])?;
+        let start_expr = invocation.get_argument(0, &[b"start"])?;
+        let end_expr = invocation.get_argument(1, &[b"end"])?;
 
         let start_type = context.get_expression_type(start_expr)?;
         let end_type = context.get_expression_type(end_expr)?;

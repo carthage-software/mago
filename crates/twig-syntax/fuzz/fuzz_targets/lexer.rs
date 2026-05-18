@@ -10,10 +10,6 @@ use mago_twig_syntax::lexer::TwigLexer;
 use mago_twig_syntax::settings::LexerSettings;
 
 fuzz_target!(|data: &[u8]| {
-    if std::str::from_utf8(data).is_err() {
-        return;
-    }
-
     let input = Input::new(FileId::zero(), data);
     let mut lexer = TwigLexer::new(input, LexerSettings::default());
 
@@ -22,7 +18,7 @@ fuzz_target!(|data: &[u8]| {
 
     while let Some(result) = lexer.advance() {
         match result {
-            Ok(token) => reconstructed.extend_from_slice(token.value.as_bytes()),
+            Ok(token) => reconstructed.extend_from_slice(token.value),
             Err(_) => {
                 hit_error = true;
                 break;

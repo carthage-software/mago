@@ -54,8 +54,8 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     ///
     /// A new `Parser` instance.
     #[inline]
-    pub fn new(arena: &'arena Bump, file_id: FileId, content: &'input str, settings: ParserSettings) -> Self {
-        let input = Input::new(file_id, content.as_bytes());
+    pub fn new(arena: &'arena Bump, file_id: FileId, content: &'input [u8], settings: ParserSettings) -> Self {
+        let input = Input::new(file_id, content);
         let lexer = Lexer::new(input, settings.lexer);
         let stream = TokenStream::new(arena, lexer);
 
@@ -78,7 +78,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     }
 
     /// Parses and returns the program AST.
-    fn parse(mut self, source_text: &'arena str, file_id: FileId) -> &'arena Program<'arena> {
+    fn parse(mut self, source_text: &'arena [u8], file_id: FileId) -> &'arena Program<'arena> {
         let mut statements = Vec::new_in(self.arena);
 
         loop {
@@ -170,8 +170,8 @@ pub fn parse_file_with_settings<'arena>(
 /// # Returns
 ///
 /// The parsed `Program` AST.
-pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content: &str) -> &'arena Program<'arena> {
-    let source_text = arena.alloc_str(content);
+pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content: &[u8]) -> &'arena Program<'arena> {
+    let source_text = arena.alloc_slice_copy(content);
     Parser::new(arena, file_id, source_text, ParserSettings::default()).parse(source_text, file_id)
 }
 
@@ -190,9 +190,9 @@ pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content:
 pub fn parse_file_content_with_settings<'arena>(
     arena: &'arena Bump,
     file_id: FileId,
-    content: &str,
+    content: &[u8],
     settings: ParserSettings,
 ) -> &'arena Program<'arena> {
-    let source_text = arena.alloc_str(content);
+    let source_text = arena.alloc_slice_copy(content);
     Parser::new(arena, file_id, source_text, settings).parse(source_text, file_id)
 }

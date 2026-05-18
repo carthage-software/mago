@@ -150,7 +150,8 @@ fn emit_argument_hints(
         }
 
         let Some(param) = meta.parameters.get(arg_index) else { continue };
-        let label = format!("{}:", param.name.0.as_str().trim_start_matches('$'));
+        let label =
+            format!("{}:", mago_bytes::BytesDisplay(mago_bytes::trim_start_byte(param.name.0.as_bytes(), b'$')));
 
         out.push(InlayHint {
             position: position_at_offset(file, t.start.offset),

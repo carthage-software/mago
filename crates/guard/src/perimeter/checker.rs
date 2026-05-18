@@ -24,15 +24,15 @@ use crate::settings::Settings;
 /// * `span` - The span of the usage in the source code
 pub fn check_usage(
     ctx: &mut GuardContext<'_, '_>,
-    dependency_fqn: &str,
+    dependency_fqn: &[u8],
     dependency_kind: PermittedDependencyKind,
     vector: BreachVector,
     span: Span,
 ) {
     if let Some(reason) = check_allowed(ctx, dependency_fqn, dependency_kind) {
         ctx.boundary_breaches.push(BoundaryBreach {
-            source_namespace: ctx.get_current_namespace().to_string(),
-            dependency_fqn: dependency_fqn.to_string(),
+            source_namespace: ctx.get_current_namespace().to_vec(),
+            dependency_fqn: dependency_fqn.to_vec(),
             dependency_kind,
             vector,
             span,
@@ -42,22 +42,9 @@ pub fn check_usage(
 }
 
 /// Checks if a usage is allowed based on the configured rules.
-///
-/// # Arguments
-///
-/// * `codebase` - The codebase metadata for symbol lookups
-/// * `settings` - The guard settings
-/// * `source_namespace` - The namespace where the usage occurs
-/// * `target_fqn` - The fully qualified name being used
-/// * `target_type` - The type of the symbol being used (class, interface, etc.)
-///
-/// # Returns
-///
-/// `Some(ArchitecturalViolationReason)` if the usage is not allowed, `None` if it is allowed
-/// or if layering rules apply and permit the usage.
 fn check_allowed(
     ctx: &GuardContext<'_, '_>,
-    target_fqn: &str,
+    target_fqn: &[u8],
     dependency_kind: PermittedDependencyKind,
 ) -> Option<BreachReason> {
     let rule = ctx
@@ -69,7 +56,7 @@ fn check_allowed(
             let specificity = match &rule.namespace {
                 NamespacePath::Global if ctx.get_current_namespace().is_empty() => 0,
                 NamespacePath::Specific(rule_namespace)
-                    if matcher::matches(ctx.get_current_namespace(), rule_namespace, false, true) =>
+                    if matcher::matches(ctx.get_current_namespace(), rule_namespace.as_bytes(), false, true) =>
                 {
                     rule_namespace.len()
                 }
@@ -124,34 +111,12 @@ fn check_allowed(
 }
 
 /// Extracts the root namespace from a fully qualified name.
-///
-/// # Arguments
-///
-/// * `fqn` - The fully qualified name
-///
-/// # Returns
-///
-/// The root namespace, or the full name if there's no namespace separator
-fn get_root_namespace(fqn: &str) -> &str {
-    if let Some(pos) = fqn.find('\\') { &fqn[..pos] } else { fqn }
+fn get_root_namespace(fqn: &[u8]) -> &[u8] {
+    if let Some(pos) = fqn.iter().position(|&b| b == b'\\') { &fqn[..pos] } else { fqn }
 }
 
 /// Checks if a fully qualified name is considered native/builtin.
-///
-/// A symbol is native if:
-/// - It's a class-like with the BUILTIN metadata flag set
-/// - It's a function with the BUILTIN metadata flag set
-/// - It's a constant with the BUILTIN metadata flag set
-///
-/// # Arguments
-///
-/// * `codebase` - The codebase metadata to look up the symbol
-/// * `fqn` - The fully qualified name to check
-///
-/// # Returns
-///
-/// `true` if the name is considered native/builtin, `false` otherwise
-fn is_native(codebase: &CodebaseMetadata, fqn: &str) -> bool {
+fn is_native(codebase: &CodebaseMetadata, fqn: &[u8]) -> bool {
     codebase
         .get_class_like(fqn)
         .map(|c| &c.flags)
@@ -160,13 +125,13 @@ fn is_native(codebase: &CodebaseMetadata, fqn: &str) -> bool {
         .is_some_and(|flags| flags.is_built_in())
 }
 
-fn get_layer_index(namespace: &str, settings: &Settings) -> Option<usize> {
+fn get_layer_index(namespace: &[u8], settings: &Settings) -> Option<usize> {
     for (i, layer_namespace) in settings.perimeter.layering.iter().enumerate() {
         match layer_namespace {
             NamespacePath::Global if namespace.is_empty() => {
                 return Some(i);
             }
-            NamespacePath::Specific(ns) if matcher::matches(namespace, ns, false, true) => {
+            NamespacePath::Specific(ns) if matcher::matches(namespace, ns.as_bytes(), false, true) => {
                 return Some(i);
             }
             _ => {}
@@ -177,25 +142,12 @@ fn get_layer_index(namespace: &str, settings: &Settings) -> Option<usize> {
 }
 
 /// Checks if a target FQN is allowed based on a specific path configuration.
-///
-/// # Arguments
-///
-/// * `codebase` - The codebase metadata for symbol lookups
-/// * `settings` - The guard settings
-/// * `path` - The path configuration
-/// * `source_namespace` - The namespace where the usage occurs
-/// * `target_fqn` - The fully qualified name being used
-/// * `_target_type` - The type of the symbol being used
-///
-/// # Returns
-///
-/// `true` if the path allows the target FQN, `false` otherwise
 fn is_path_allowed(
     codebase: &CodebaseMetadata,
     settings: &Settings,
     path: &Path,
-    source_namespace: &str,
-    target_fqn: &str,
+    source_namespace: &[u8],
+    target_fqn: &[u8],
 ) -> bool {
     match path {
         Path::All => true,
@@ -211,11 +163,11 @@ fn is_path_allowed(
         }),
         Path::Selector(selector) => match selector {
             SymbolSelector::Namespace(ns) => match ns {
-                NamespacePath::Global => !target_fqn.contains('\\'),
-                NamespacePath::Specific(pattern) => matcher::matches(target_fqn, pattern, false, true),
+                NamespacePath::Global => !target_fqn.contains(&b'\\'),
+                NamespacePath::Specific(pattern) => matcher::matches(target_fqn, pattern.as_bytes(), false, true),
             },
-            SymbolSelector::Symbol(sn) => target_fqn.eq_ignore_ascii_case(sn),
-            SymbolSelector::Pattern(p) => matcher::matches(target_fqn, p, false, false),
+            SymbolSelector::Symbol(sn) => target_fqn.eq_ignore_ascii_case(sn.as_bytes()),
+            SymbolSelector::Pattern(p) => matcher::matches(target_fqn, p.as_bytes(), false, false),
         },
     }
 }
@@ -226,8 +178,8 @@ mod tests {
 
     #[test]
     fn test_get_root_namespace() {
-        assert_eq!(get_root_namespace("Foo\\Bar\\Baz"), "Foo");
-        assert_eq!(get_root_namespace("Foo\\Bar"), "Foo");
-        assert_eq!(get_root_namespace("Foo"), "Foo");
+        assert_eq!(get_root_namespace(b"Foo\\Bar\\Baz"), b"Foo");
+        assert_eq!(get_root_namespace(b"Foo\\Bar"), b"Foo");
+        assert_eq!(get_root_namespace(b"Foo"), b"Foo");
     }
 }

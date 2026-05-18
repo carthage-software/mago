@@ -9,18 +9,18 @@ use mago_syntax::ast::*;
 use mago_syntax::walker::MutWalker;
 
 pub trait Recorder<'arena> {
-    fn declare_external(&mut self, name: &'arena str);
-    fn record_write(&mut self, name: &'arena str, span: Span);
-    fn record_read(&mut self, name: &'arena str);
-    fn record_read_then_write(&mut self, name: &'arena str, span: Span);
-    fn record_call_argument(&mut self, name: &'arena str, span: Span);
-    fn record_unset(&mut self, name: &'arena str);
+    fn declare_external(&mut self, name: &'arena [u8]);
+    fn record_write(&mut self, name: &'arena [u8], span: Span);
+    fn record_read(&mut self, name: &'arena [u8]);
+    fn record_read_then_write(&mut self, name: &'arena [u8], span: Span);
+    fn record_call_argument(&mut self, name: &'arena [u8], span: Span);
+    fn record_unset(&mut self, name: &'arena [u8]);
     fn enter_arm(&mut self);
     fn exit_arm(&mut self);
     fn bail(&mut self);
     fn is_bailed(&self) -> bool;
-    fn is_seen(&self, name: &str) -> bool;
-    fn tracked_names(&self) -> Vec<&'arena str>;
+    fn is_seen(&self, name: &[u8]) -> bool;
+    fn tracked_names(&self) -> Vec<&'arena [u8]>;
 
     fn enter_rescan(&mut self) {}
     fn exit_rescan(&mut self) {}
@@ -39,13 +39,13 @@ pub struct RedundantVarInfo {
 #[derive(Default)]
 #[allow(clippy::partial_pub_fields)]
 pub struct RedundantRecorder<'arena> {
-    pub info: HashMap<&'arena str, RedundantVarInfo>,
+    pub info: HashMap<&'arena [u8], RedundantVarInfo>,
     pub bailed: bool,
     rescan_depth: u32,
 }
 
 impl<'arena> RedundantRecorder<'arena> {
-    fn entry(&mut self, name: &'arena str) -> &mut RedundantVarInfo {
+    fn entry(&mut self, name: &'arena [u8]) -> &mut RedundantVarInfo {
         self.info.entry(name).or_default()
     }
 
@@ -55,11 +55,11 @@ impl<'arena> RedundantRecorder<'arena> {
 }
 
 impl<'arena> Recorder<'arena> for RedundantRecorder<'arena> {
-    fn declare_external(&mut self, name: &'arena str) {
+    fn declare_external(&mut self, name: &'arena [u8]) {
         self.entry(name).do_not_flag = true;
     }
 
-    fn record_write(&mut self, name: &'arena str, span: Span) {
+    fn record_write(&mut self, name: &'arena [u8], span: Span) {
         if self.in_rescan() {
             return;
         }
@@ -67,11 +67,11 @@ impl<'arena> Recorder<'arena> for RedundantRecorder<'arena> {
         self.entry(name).pending_write = Some(span);
     }
 
-    fn record_read(&mut self, name: &'arena str) {
+    fn record_read(&mut self, name: &'arena [u8]) {
         self.entry(name).pending_write = None;
     }
 
-    fn record_read_then_write(&mut self, name: &'arena str, span: Span) {
+    fn record_read_then_write(&mut self, name: &'arena [u8], span: Span) {
         if self.in_rescan() {
             self.entry(name).pending_write = None;
             return;
@@ -80,7 +80,7 @@ impl<'arena> Recorder<'arena> for RedundantRecorder<'arena> {
         self.entry(name).pending_write = Some(span);
     }
 
-    fn record_call_argument(&mut self, name: &'arena str, span: Span) {
+    fn record_call_argument(&mut self, name: &'arena [u8], span: Span) {
         if self.is_seen(name) {
             self.record_read(name);
         } else {
@@ -88,7 +88,7 @@ impl<'arena> Recorder<'arena> for RedundantRecorder<'arena> {
         }
     }
 
-    fn record_unset(&mut self, name: &'arena str) {
+    fn record_unset(&mut self, name: &'arena [u8]) {
         self.record_read(name);
     }
 
@@ -104,11 +104,11 @@ impl<'arena> Recorder<'arena> for RedundantRecorder<'arena> {
         self.bailed
     }
 
-    fn is_seen(&self, name: &str) -> bool {
+    fn is_seen(&self, name: &[u8]) -> bool {
         self.info.contains_key(name)
     }
 
-    fn tracked_names(&self) -> Vec<&'arena str> {
+    fn tracked_names(&self) -> Vec<&'arena [u8]> {
         self.info.keys().copied().collect()
     }
 
@@ -135,14 +135,14 @@ pub struct DeadStoreVarInfo {
 #[derive(Default)]
 #[allow(clippy::partial_pub_fields)]
 pub struct DeadStoreRecorder<'arena> {
-    pub info: HashMap<&'arena str, DeadStoreVarInfo>,
+    pub info: HashMap<&'arena [u8], DeadStoreVarInfo>,
     pub bailed: bool,
     arm_counter: u32,
     arm_stack: Vec<u32>,
 }
 
 impl<'arena> DeadStoreRecorder<'arena> {
-    fn entry(&mut self, name: &'arena str) -> &mut DeadStoreVarInfo {
+    fn entry(&mut self, name: &'arena [u8]) -> &mut DeadStoreVarInfo {
         self.info.entry(name).or_default()
     }
 
@@ -152,11 +152,11 @@ impl<'arena> DeadStoreRecorder<'arena> {
 }
 
 impl<'arena> Recorder<'arena> for DeadStoreRecorder<'arena> {
-    fn declare_external(&mut self, name: &'arena str) {
+    fn declare_external(&mut self, name: &'arena [u8]) {
         self.entry(name).do_not_flag = true;
     }
 
-    fn record_write(&mut self, name: &'arena str, span: Span) {
+    fn record_write(&mut self, name: &'arena [u8], span: Span) {
         let arm = self.current_arm();
         let info = self.entry(name);
         let prev = info.pending_write.replace((span, arm));
@@ -167,16 +167,16 @@ impl<'arena> Recorder<'arena> for DeadStoreRecorder<'arena> {
         }
     }
 
-    fn record_read(&mut self, name: &'arena str) {
+    fn record_read(&mut self, name: &'arena [u8]) {
         self.entry(name).pending_write = None;
     }
 
-    fn record_read_then_write(&mut self, name: &'arena str, span: Span) {
+    fn record_read_then_write(&mut self, name: &'arena [u8], span: Span) {
         let arm = self.current_arm();
         self.entry(name).pending_write = Some((span, arm));
     }
 
-    fn record_call_argument(&mut self, name: &'arena str, span: Span) {
+    fn record_call_argument(&mut self, name: &'arena [u8], span: Span) {
         if self.is_seen(name) {
             self.record_read(name);
         } else {
@@ -184,7 +184,7 @@ impl<'arena> Recorder<'arena> for DeadStoreRecorder<'arena> {
         }
     }
 
-    fn record_unset(&mut self, name: &'arena str) {
+    fn record_unset(&mut self, name: &'arena [u8]) {
         self.record_read(name);
     }
 
@@ -205,11 +205,11 @@ impl<'arena> Recorder<'arena> for DeadStoreRecorder<'arena> {
         self.bailed
     }
 
-    fn is_seen(&self, name: &str) -> bool {
+    fn is_seen(&self, name: &[u8]) -> bool {
         self.info.contains_key(name)
     }
 
-    fn tracked_names(&self) -> Vec<&'arena str> {
+    fn tracked_names(&self) -> Vec<&'arena [u8]> {
         self.info.keys().copied().collect()
     }
 }
@@ -231,31 +231,31 @@ impl<'arena> Recorder<'arena> for DeadStoreRecorder<'arena> {
 /// without the collector having to fabricate `&'arena` strings on the fly.
 #[derive(Default)]
 pub struct UsageCollector<'arena> {
-    pub interest: HashSet<&'arena str>,
-    pub referenced: HashSet<&'arena str>,
+    pub interest: HashSet<&'arena [u8]>,
+    pub referenced: HashSet<&'arena [u8]>,
     pub bailed: bool,
 }
 
 impl<'arena> Recorder<'arena> for UsageCollector<'arena> {
-    fn declare_external(&mut self, _name: &'arena str) {}
+    fn declare_external(&mut self, _name: &'arena [u8]) {}
 
-    fn record_write(&mut self, name: &'arena str, _span: Span) {
+    fn record_write(&mut self, name: &'arena [u8], _span: Span) {
         self.referenced.insert(name);
     }
 
-    fn record_read(&mut self, name: &'arena str) {
+    fn record_read(&mut self, name: &'arena [u8]) {
         self.referenced.insert(name);
     }
 
-    fn record_read_then_write(&mut self, name: &'arena str, _span: Span) {
+    fn record_read_then_write(&mut self, name: &'arena [u8], _span: Span) {
         self.referenced.insert(name);
     }
 
-    fn record_call_argument(&mut self, name: &'arena str, _span: Span) {
+    fn record_call_argument(&mut self, name: &'arena [u8], _span: Span) {
         self.referenced.insert(name);
     }
 
-    fn record_unset(&mut self, name: &'arena str) {
+    fn record_unset(&mut self, name: &'arena [u8]) {
         self.referenced.insert(name);
     }
 
@@ -271,11 +271,11 @@ impl<'arena> Recorder<'arena> for UsageCollector<'arena> {
         self.bailed
     }
 
-    fn is_seen(&self, name: &str) -> bool {
+    fn is_seen(&self, name: &[u8]) -> bool {
         self.interest.contains(name) || self.referenced.contains(name)
     }
 
-    fn tracked_names(&self) -> Vec<&'arena str> {
+    fn tracked_names(&self) -> Vec<&'arena [u8]> {
         self.interest.iter().copied().collect()
     }
 }
@@ -309,7 +309,7 @@ where
 ///
 /// Returns the collector after the walk; callers should check `bailed` first
 /// before consulting `referenced`.
-pub fn collect_used_names<'arena>(body: &Block<'arena>, interest: HashSet<&'arena str>) -> UsageCollector<'arena> {
+pub fn collect_used_names<'arena>(body: &Block<'arena>, interest: HashSet<&'arena [u8]>) -> UsageCollector<'arena> {
     let collector = UsageCollector { interest, referenced: HashSet::default(), bailed: false };
     let mut walker: UsageWalker<'arena, UsageCollector<'arena>> =
         UsageWalker { rec: collector, ctx: ExprCtx::Read, excluded: Vec::new() };
@@ -331,9 +331,9 @@ pub fn function_like_parts<'ast, 'arena>(
     }
 }
 
-pub fn is_silenced_name(name: &str) -> bool {
-    let bare = name.strip_prefix('$').unwrap_or(name);
-    bare.starts_with('_')
+pub fn is_silenced_name(name: &[u8]) -> bool {
+    let bare = name.strip_prefix(b"$").unwrap_or(name);
+    bare.starts_with(b"_")
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -345,7 +345,7 @@ enum ExprCtx {
 struct UsageWalker<'arena, R: Recorder<'arena>> {
     rec: R,
     ctx: ExprCtx,
-    excluded: Vec<&'arena str>,
+    excluded: Vec<&'arena [u8]>,
 }
 
 impl<'arena, R: Recorder<'arena>> UsageWalker<'arena, R> {
@@ -753,12 +753,12 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
 
     fn walk_function_call(&mut self, fc: &'ast FunctionCall<'arena>, ctx: &mut ()) {
         if let Some(name) = simple_function_name(fc.function) {
-            if name.eq_ignore_ascii_case("extract") {
+            if name.eq_ignore_ascii_case(b"extract") {
                 self.rec.bail();
                 return;
             }
 
-            if name.eq_ignore_ascii_case("compact") {
+            if name.eq_ignore_ascii_case(b"compact") {
                 for arg in fc.argument_list.arguments.iter() {
                     let value = match arg {
                         Argument::Positional(p) => p.value,
@@ -777,7 +777,7 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
                         }
 
                         for key in self.rec.tracked_names() {
-                            if key.strip_prefix('$').map(|s| s == inner).unwrap_or(false) {
+                            if key.strip_prefix(b"$").map(|s| s == inner).unwrap_or(false) {
                                 self.rec.record_read(key);
                             }
                         }
@@ -817,6 +817,6 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
     fn walk_anonymous_class(&mut self, _: &'ast AnonymousClass<'arena>, _: &mut ()) {}
 }
 
-fn simple_function_name<'arena>(expr: &Expression<'arena>) -> Option<&'arena str> {
+fn simple_function_name<'arena>(expr: &Expression<'arena>) -> Option<&'arena [u8]> {
     if let Expression::Identifier(Identifier::Local(local)) = expr { Some(local.value) } else { None }
 }

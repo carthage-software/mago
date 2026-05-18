@@ -21,13 +21,13 @@ impl<'arena> Parser<'_, 'arena> {
             if self.stream.has_reached_eof()? {
                 return Err(ParseError::UnexpectedEof(
                     self.stream.file_id(),
-                    "expected `%}` closing tag".to_string(),
+                    b"expected `%}` closing tag".to_vec(),
                     open_tag_tok.start,
                 ));
             }
             self.stream.consume()?;
         }
         let close_tag = self.stream.expect_block_end()?;
-        Ok(Statement::Unknown(Unknown { open_tag, name, raw: "", close_tag }))
+        Ok(Statement::Unknown(Unknown { open_tag, name, raw: b"", close_tag }))
     }
 }

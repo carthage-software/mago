@@ -112,7 +112,7 @@ impl LintRule for NoRedundantFileRule {
 #[inline]
 fn is_statement_useful(statement: &Statement<'_>) -> bool {
     match statement {
-        Statement::Inline(inline) => !inline.value.trim().is_empty(),
+        Statement::Inline(inline) => inline.value.iter().any(|b| !b.is_ascii_whitespace()),
         Statement::Namespace(namespace) => {
             let statements = namespace.statements().as_slice();
 

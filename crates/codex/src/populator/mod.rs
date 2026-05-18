@@ -1,8 +1,8 @@
 use foldhash::HashSet;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::constant::ConstantMetadata;
@@ -34,7 +34,7 @@ mod templates;
 pub fn populate_codebase(
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,
-    safe_symbols: AtomSet,
+    safe_symbols: WordSet,
     safe_symbol_members: HashSet<SymbolIdentifier>,
 ) {
     populate_codebase_inner(codebase, symbol_references, safe_symbols, safe_symbol_members, None)
@@ -49,7 +49,7 @@ pub fn populate_codebase(
 pub fn populate_codebase_targeted(
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,
-    safe_symbols: AtomSet,
+    safe_symbols: WordSet,
     safe_symbol_members: HashSet<SymbolIdentifier>,
     dirty_symbols: HashSet<SymbolIdentifier>,
 ) {
@@ -59,13 +59,13 @@ pub fn populate_codebase_targeted(
 fn populate_codebase_inner(
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,
-    safe_symbols: AtomSet,
+    safe_symbols: WordSet,
     safe_symbol_members: HashSet<SymbolIdentifier>,
     dirty_symbols: Option<HashSet<SymbolIdentifier>>,
 ) {
-    let mut class_likes_to_repopulate = AtomSet::default();
+    let mut class_likes_to_repopulate = WordSet::default();
     if let Some(dirty) = &dirty_symbols {
-        let mut dirty_class_names = AtomSet::default();
+        let mut dirty_class_names = WordSet::default();
         for (name, _) in dirty {
             dirty_class_names.insert(*name);
         }
@@ -248,7 +248,7 @@ fn populate_codebase_inner(
     }
 
     if let Some(dirty) = &dirty_symbols {
-        let mut dirty_const_names: AtomSet = AtomSet::default();
+        let mut dirty_const_names: WordSet = WordSet::default();
         for (name, member) in dirty {
             if member.is_empty() {
                 dirty_const_names.insert(*name);
@@ -277,28 +277,28 @@ fn populate_codebase_inner(
     }
 
     if !incremental || !class_likes_to_repopulate.is_empty() {
-        let mut direct_classlike_descendants = AtomMap::default();
-        let mut all_classlike_descendants = AtomMap::default();
+        let mut direct_classlike_descendants = WordMap::default();
+        let mut all_classlike_descendants = WordMap::default();
 
         for (class_like_name, class_like_metadata) in &codebase.class_likes {
             for parent_interface in &class_like_metadata.all_parent_interfaces {
                 all_classlike_descendants
                     .entry(*parent_interface)
-                    .or_insert_with(AtomSet::default)
+                    .or_insert_with(WordSet::default)
                     .insert(*class_like_name);
             }
 
             for parent_interface in &class_like_metadata.direct_parent_interfaces {
                 direct_classlike_descendants
                     .entry(*parent_interface)
-                    .or_insert_with(AtomSet::default)
+                    .or_insert_with(WordSet::default)
                     .insert(*class_like_name);
             }
 
             for parent_class in &class_like_metadata.all_parent_classes {
                 all_classlike_descendants
                     .entry(*parent_class)
-                    .or_insert_with(AtomSet::default)
+                    .or_insert_with(WordSet::default)
                     .insert(*class_like_name);
             }
 
@@ -309,7 +309,7 @@ fn populate_codebase_inner(
             if let Some(parent_class) = &class_like_metadata.direct_parent_class {
                 direct_classlike_descendants
                     .entry(*parent_class)
-                    .or_insert_with(AtomSet::default)
+                    .or_insert_with(WordSet::default)
                     .insert(*class_like_name);
             }
         }
@@ -336,7 +336,7 @@ fn populate_codebase_inner(
 
 /// Populates a single constant's type metadata.
 fn populate_constant(
-    name: Atom,
+    name: Word,
     constant: &mut ConstantMetadata,
     symbols: &Symbols,
     symbol_references: &mut SymbolReferences,

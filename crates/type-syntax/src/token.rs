@@ -143,14 +143,14 @@ pub enum TypeTokenKind {
 pub struct TypeToken<'arena> {
     pub kind: TypeTokenKind,
     pub start: Position,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 impl<'arena> TypeToken<'arena> {
     /// Creates a new TypeToken.
     #[inline]
     #[must_use]
-    pub const fn new(kind: TypeTokenKind, value: &'arena str, start: Position) -> Self {
+    pub const fn new(kind: TypeTokenKind, value: &'arena [u8], start: Position) -> Self {
         Self { kind, start, value }
     }
 

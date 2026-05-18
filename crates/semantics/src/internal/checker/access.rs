@@ -48,7 +48,7 @@ pub fn check_access(access: &Access, context: &mut Context<'_, '_, '_>) {
 
             // If the constant is not `class`, we don't care.
             let value = local_identifier.value;
-            if !value.eq_ignore_ascii_case("class") {
+            if !value.eq_ignore_ascii_case(b"class") {
                 return;
             }
 

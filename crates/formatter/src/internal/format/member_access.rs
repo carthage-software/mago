@@ -59,11 +59,11 @@ impl<'arena> MemberAccess<'arena> {
     }
 
     #[inline]
-    const fn get_operator_as_str(&self) -> &'static str {
+    const fn get_operator_as_bytes(&self) -> &'static [u8] {
         match self {
-            MemberAccess::PropertyAccess(_) | MemberAccess::MethodCall(_) => "->",
-            MemberAccess::NullSafePropertyAccess(_) | MemberAccess::NullSafeMethodCall(_) => "?->",
-            MemberAccess::StaticMethodCall(_) => "::",
+            MemberAccess::PropertyAccess(_) | MemberAccess::MethodCall(_) => b"->",
+            MemberAccess::NullSafePropertyAccess(_) | MemberAccess::NullSafeMethodCall(_) => b"?->",
+            MemberAccess::StaticMethodCall(_) => b"::",
         }
     }
 
@@ -106,7 +106,7 @@ impl<'arena> MemberAccess<'arena> {
             None => 0,
         };
 
-        Some(string_width(self.get_operator_as_str()) + selector_width + arguments_width)
+        Some(string_width(self.get_operator_as_bytes()) + selector_width + arguments_width)
     }
 }
 
@@ -495,7 +495,7 @@ impl<'arena> MemberAccessChain<'arena> {
         }
 
         if let Expression::Variable(Variable::Direct(variable)) = self.base
-            && variable.name.eq_ignore_ascii_case("$builder")
+            && variable.name.eq_ignore_ascii_case(b"$builder")
             && self.accesses.len() >= 3
             && self.accesses.iter().all(|access| {
                 let (MemberAccess::MethodCall(MethodCall { method: ClassLikeMemberSelector::Identifier(id), .. })
@@ -507,7 +507,7 @@ impl<'arena> MemberAccessChain<'arena> {
                     return false;
                 };
 
-                id.value.starts_with("add") || id.value.starts_with("with")
+                id.value.starts_with(b"add") || id.value.starts_with(b"with")
             })
         {
             return true;
@@ -522,7 +522,7 @@ impl<'arena> MemberAccessChain<'arena> {
                 })
             }
             Expression::Variable(Variable::Direct(variable)) => {
-                variable.name == "$this" && self.accesses.len() > 5
+                variable.name == b"$this" && self.accesses.len() > 5
             }
             _ => false,
         };
@@ -652,22 +652,22 @@ fn get_flat_expression_width(expression: &Expression<'_>) -> Option<usize> {
         }
         Expression::Access(Access::Property(access)) => get_flat_expression_width(access.object)
             .zip(get_selector_width(&access.property))
-            .map(|(object, property)| object + string_width("->") + property),
+            .map(|(object, property)| object + string_width(b"->") + property),
         Expression::Access(Access::NullSafeProperty(access)) => get_flat_expression_width(access.object)
             .zip(get_selector_width(&access.property))
-            .map(|(object, property)| object + string_width("?->") + property),
+            .map(|(object, property)| object + string_width(b"?->") + property),
         Expression::Call(Call::Method(call)) => get_flat_expression_width(call.object)
             .zip(get_selector_width(&call.method))
             .zip(get_argument_list_width(&call.argument_list))
-            .map(|((object, method), arguments)| object + string_width("->") + method + arguments),
+            .map(|((object, method), arguments)| object + string_width(b"->") + method + arguments),
         Expression::Call(Call::NullSafeMethod(call)) => get_flat_expression_width(call.object)
             .zip(get_selector_width(&call.method))
             .zip(get_argument_list_width(&call.argument_list))
-            .map(|((object, method), arguments)| object + string_width("?->") + method + arguments),
+            .map(|((object, method), arguments)| object + string_width(b"?->") + method + arguments),
         Expression::Call(Call::StaticMethod(call)) => get_flat_expression_width(call.class)
             .zip(get_selector_width(&call.method))
             .zip(get_argument_list_width(&call.argument_list))
-            .map(|((class, method), arguments)| class + string_width("::") + method + arguments),
+            .map(|((class, method), arguments)| class + string_width(b"::") + method + arguments),
         _ => None,
     }
 }
@@ -754,7 +754,7 @@ pub(super) fn print_member_access_chain<'arena>(
     let mut parts = if base_adds_parens || !base_needs_parens(f, member_access_chain.base) {
         vec![in f.arena; base_document]
     } else {
-        vec![in f.arena; Document::String("("), base_document, Document::String(")")]
+        vec![in f.arena; Document::String(b"("), base_document, Document::String(b")")]
     };
 
     let mut accesses_iter = member_access_chain.accesses.iter().enumerate().peekable();
@@ -772,7 +772,7 @@ pub(super) fn print_member_access_chain<'arena>(
         parts.push(format_access_operator(
             f,
             first_chain_link.get_operator_span(),
-            first_chain_link.get_operator_as_str(),
+            first_chain_link.get_operator_as_bytes(),
         ));
 
         let selector = first_chain_link.get_selector();
@@ -811,7 +811,7 @@ pub(super) fn print_member_access_chain<'arena>(
             vec![in f.arena;] // No newline if in fluent chain and last was property
         };
 
-        contents.push(format_access_operator(f, chain_link.get_operator_span(), chain_link.get_operator_as_str()));
+        contents.push(format_access_operator(f, chain_link.get_operator_span(), chain_link.get_operator_as_bytes()));
         let selector = chain_link.get_selector();
         last_element_end = selector.span().end;
         contents.push(selector.format(f));
@@ -903,7 +903,7 @@ fn should_inline_first_access<'arena>(
     }
 
     if let Expression::Variable(Variable::Direct(variable)) = member_access_chain.base
-        && variable.name == "$this"
+        && variable.name == b"$this"
     {
         return true;
     }
@@ -922,7 +922,7 @@ fn base_needs_parens<'arena>(f: &FormatterState<'_, 'arena>, base: &'arena Expre
 pub(super) fn format_access_operator<'arena>(
     f: &mut FormatterState<'_, 'arena>,
     span: Span,
-    operator: &'arena str,
+    operator: &'arena [u8],
 ) -> Document<'arena> {
     let leading = f.print_leading_comments(span);
     let doc = Document::String(operator);

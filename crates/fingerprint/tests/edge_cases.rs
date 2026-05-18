@@ -3,9 +3,9 @@ use mago_database::file::File;
 use mago_fingerprint::FingerprintOptions;
 use mago_fingerprint::Fingerprintable;
 
-fn get_fingerprint(code: &'static str) -> u64 {
+fn get_fingerprint(code: &'static [u8]) -> u64 {
     let arena = Bump::new();
-    let file = File::ephemeral("test.php".into(), code.into());
+    let file = File::ephemeral(b"test.php".into(), code.into());
     let program = mago_syntax::parser::parse_file(&arena, &file);
     assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
 
@@ -25,16 +25,16 @@ fn get_fingerprint(code: &'static str) -> u64 {
 
 #[test]
 fn test_anonymous_class_inside_anonymous_class() {
-    let simple = get_fingerprint("<?php $x = new class {};");
-    let nested = get_fingerprint("<?php $x = new class { public function foo() { $y = new class {}; } };");
+    let simple = get_fingerprint(b"<?php $x = new class {};");
+    let nested = get_fingerprint(b"<?php $x = new class { public function foo() { $y = new class {}; } };");
 
     assert_ne!(simple, nested, "Nested anonymous class should change fingerprint");
 }
 
 #[test]
 fn test_nested_anonymous_class_with_extends() {
-    let without = get_fingerprint("<?php $x = new class { function m() { return new class {}; } };");
-    let with = get_fingerprint("<?php $x = new class { function m() { return new class extends Base {}; } };");
+    let without = get_fingerprint(b"<?php $x = new class { function m() { return new class {}; } };");
+    let with = get_fingerprint(b"<?php $x = new class { function m() { return new class extends Base {}; } };");
 
     assert_ne!(without, with, "Extends in nested anonymous class should change fingerprint");
 }
@@ -42,7 +42,7 @@ fn test_nested_anonymous_class_with_extends() {
 #[test]
 fn test_deeply_nested_anonymous_classes() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         $a = new class {
             function level1() {
                 $b = new class {
@@ -59,8 +59,8 @@ fn test_deeply_nested_anonymous_classes() {
 
 #[test]
 fn test_function_inside_function() {
-    let simple = get_fingerprint("<?php function outer() {}");
-    let nested = get_fingerprint("<?php function outer() { function inner() {} }");
+    let simple = get_fingerprint(b"<?php function outer() {}");
+    let nested = get_fingerprint(b"<?php function outer() { function inner() {} }");
 
     assert_ne!(simple, nested, "Nested function should change fingerprint");
 }
@@ -68,7 +68,7 @@ fn test_function_inside_function() {
 #[test]
 fn test_deeply_nested_functions() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         function level1() {
             function level2() {
                 function level3() {
@@ -83,16 +83,16 @@ fn test_deeply_nested_functions() {
 
 #[test]
 fn test_function_in_if_block() {
-    let without = get_fingerprint("<?php if (true) {}");
-    let with = get_fingerprint("<?php if (true) { function foo() {} }");
+    let without = get_fingerprint(b"<?php if (true) {}");
+    let with = get_fingerprint(b"<?php if (true) { function foo() {} }");
 
     assert_ne!(without, with, "Function in if block should change fingerprint");
 }
 
 #[test]
 fn test_function_in_foreach_block() {
-    let without = get_fingerprint("<?php foreach ($items as $item) {}");
-    let with = get_fingerprint("<?php foreach ($items as $item) { function process() {} }");
+    let without = get_fingerprint(b"<?php foreach ($items as $item) {}");
+    let with = get_fingerprint(b"<?php foreach ($items as $item) { function process() {} }");
 
     assert_ne!(without, with, "Function in foreach should change fingerprint");
 }
@@ -100,7 +100,7 @@ fn test_function_in_foreach_block() {
 #[test]
 fn test_function_in_try_catch() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         try {
             function tryFunc() {}
         } catch (Exception $e) {
@@ -115,48 +115,48 @@ fn test_function_in_try_catch() {
 
 #[test]
 fn test_anonymous_class_in_array() {
-    let without = get_fingerprint("<?php $arr = [];");
-    let with = get_fingerprint("<?php $arr = [new class {}, new class {}];");
+    let without = get_fingerprint(b"<?php $arr = [];");
+    let with = get_fingerprint(b"<?php $arr = [new class {}, new class {}];");
 
     assert_ne!(without, with, "Anonymous classes in array should change fingerprint");
 }
 
 #[test]
 fn test_anonymous_class_as_array_value() {
-    let simple = get_fingerprint("<?php $arr = ['key' => null];");
-    let with_anon = get_fingerprint("<?php $arr = ['key' => new class {}];");
+    let simple = get_fingerprint(b"<?php $arr = ['key' => null];");
+    let with_anon = get_fingerprint(b"<?php $arr = ['key' => new class {}];");
 
     assert_ne!(simple, with_anon, "Anonymous class as array value should change fingerprint");
 }
 
 #[test]
 fn test_anonymous_class_in_function_call() {
-    let simple = get_fingerprint("<?php foo(null);");
-    let with_anon = get_fingerprint("<?php foo(new class {});");
+    let simple = get_fingerprint(b"<?php foo(null);");
+    let with_anon = get_fingerprint(b"<?php foo(new class {});");
 
     assert_ne!(simple, with_anon, "Anonymous class as argument should change fingerprint");
 }
 
 #[test]
 fn test_anonymous_class_in_return() {
-    let simple = get_fingerprint("<?php function factory() { return null; }");
-    let with_anon = get_fingerprint("<?php function factory() { return new class {}; }");
+    let simple = get_fingerprint(b"<?php function factory() { return null; }");
+    let with_anon = get_fingerprint(b"<?php function factory() { return new class {}; }");
 
     assert_ne!(simple, with_anon, "Returning anonymous class should change fingerprint");
 }
 
 #[test]
 fn test_anonymous_class_in_closure() {
-    let simple = get_fingerprint("<?php $fn = function() { return null; };");
-    let with_anon = get_fingerprint("<?php $fn = function() { return new class {}; };");
+    let simple = get_fingerprint(b"<?php $fn = function() { return null; };");
+    let with_anon = get_fingerprint(b"<?php $fn = function() { return new class {}; };");
 
     assert_ne!(simple, with_anon, "Anonymous class in closure should change fingerprint");
 }
 
 #[test]
 fn test_anonymous_class_in_arrow_function() {
-    let simple = get_fingerprint("<?php $fn = fn() => null;");
-    let with_anon = get_fingerprint("<?php $fn = fn() => new class {};");
+    let simple = get_fingerprint(b"<?php $fn = fn() => null;");
+    let with_anon = get_fingerprint(b"<?php $fn = fn() => new class {};");
 
     assert_ne!(simple, with_anon, "Anonymous class in arrow function should change fingerprint");
 }
@@ -164,7 +164,7 @@ fn test_anonymous_class_in_arrow_function() {
 #[test]
 fn test_global_then_namespaced_code() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         class GlobalClass {}
         namespace App;
         class NamespacedClass {}",
@@ -176,7 +176,7 @@ fn test_global_then_namespaced_code() {
 #[test]
 fn test_multiple_namespace_declarations() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App\\Models;
         class User {}
 
@@ -190,7 +190,7 @@ fn test_multiple_namespace_declarations() {
 #[test]
 fn test_braced_namespaces() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace App\\A {
             class ClassA {}
         }
@@ -205,52 +205,52 @@ fn test_braced_namespaces() {
 
 #[test]
 fn test_anonymous_class_in_namespace() {
-    let global = get_fingerprint("<?php $x = new class extends Parent {};");
-    let namespaced = get_fingerprint("<?php namespace Foo; $x = new class extends Parent {};");
+    let global = get_fingerprint(b"<?php $x = new class extends Parent {};");
+    let namespaced = get_fingerprint(b"<?php namespace Foo; $x = new class extends Parent {};");
 
     assert_ne!(global, namespaced, "Namespace affects anonymous class parent resolution");
 }
 
 #[test]
 fn test_empty_class() {
-    let fp = get_fingerprint("<?php class Empty {}");
+    let fp = get_fingerprint(b"<?php class Empty {}");
     assert_ne!(fp, 0, "Empty class should have fingerprint");
 }
 
 #[test]
 fn test_empty_interface() {
-    let fp = get_fingerprint("<?php interface Empty {}");
+    let fp = get_fingerprint(b"<?php interface Empty {}");
     assert_ne!(fp, 0, "Empty interface should have fingerprint");
 }
 
 #[test]
 fn test_empty_trait() {
-    let fp = get_fingerprint("<?php trait Empty {}");
+    let fp = get_fingerprint(b"<?php trait Empty {}");
     assert_ne!(fp, 0, "Empty trait should have fingerprint");
 }
 
 #[test]
 fn test_empty_enum() {
-    let fp = get_fingerprint("<?php enum Empty {}");
+    let fp = get_fingerprint(b"<?php enum Empty {}");
     assert_ne!(fp, 0, "Empty enum should have fingerprint");
 }
 
 #[test]
 fn test_empty_function() {
-    let fp = get_fingerprint("<?php function empty() {}");
+    let fp = get_fingerprint(b"<?php function empty() {}");
     assert_ne!(fp, 0, "Empty function should have fingerprint");
 }
 
 #[test]
 fn test_function_with_only_semicolon() {
-    let fp = get_fingerprint("<?php function foo() { ; }");
+    let fp = get_fingerprint(b"<?php function foo() { ; }");
     assert_ne!(fp, 0, "Function with semicolon should have fingerprint");
 }
 
 #[test]
 fn test_class_with_method_with_nested_function_with_anonymous_class() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         class Outer {
             public function method() {
                 function nested() {
@@ -268,7 +268,7 @@ fn test_class_with_method_with_nested_function_with_anonymous_class() {
 #[test]
 fn test_extreme_nesting_depth() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace Level1;
         class C1 {
             function m1() {
@@ -291,7 +291,7 @@ fn test_extreme_nesting_depth() {
 #[test]
 fn test_five_level_function_nesting() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         function level1() {
             function level2() {
                 function level3() {
@@ -308,7 +308,7 @@ fn test_five_level_function_nesting() {
 
 #[test]
 fn test_identical_code_same_fingerprint() {
-    let code = "<?php namespace App; class Test { function method() {} }";
+    let code = b"<?php namespace App; class Test { function method() {} }";
     let fp1 = get_fingerprint(code);
     let fp2 = get_fingerprint(code);
 
@@ -317,9 +317,9 @@ fn test_identical_code_same_fingerprint() {
 
 #[test]
 fn test_whitespace_ignored_in_complex_nesting() {
-    let compact = get_fingerprint("<?php namespace A;class B{function c(){function d(){$x=new class{};}}}");
+    let compact = get_fingerprint(b"<?php namespace A;class B{function c(){function d(){$x=new class{};}}}");
     let spaced = get_fingerprint(
-        "<?php
+        b"<?php
         namespace A;
 
         class B {
@@ -336,23 +336,23 @@ fn test_whitespace_ignored_in_complex_nesting() {
 
 #[test]
 fn test_trailing_comma_in_arrays() {
-    let without = get_fingerprint("<?php $x = [1, 2, 3];");
-    let with = get_fingerprint("<?php $x = [1, 2, 3,];");
+    let without = get_fingerprint(b"<?php $x = [1, 2, 3];");
+    let with = get_fingerprint(b"<?php $x = [1, 2, 3,];");
 
     assert_eq!(without, with, "Trailing comma in array should be ignored");
 }
 
 #[test]
 fn test_trailing_comma_in_parameters() {
-    let without = get_fingerprint("<?php function foo($a, $b) {}");
-    let with = get_fingerprint("<?php function foo($a, $b,) {}");
+    let without = get_fingerprint(b"<?php function foo($a, $b) {}");
+    let with = get_fingerprint(b"<?php function foo($a, $b,) {}");
 
     assert_eq!(without, with, "Trailing comma in parameters should be ignored");
 }
 
 #[test]
 fn test_fingerprint_deterministic_multiple_runs() {
-    let code = "<?php class Foo { public function bar() {} }";
+    let code = b"<?php class Foo { public function bar() {} }";
     let fingerprints: Vec<u64> = std::iter::repeat_with(|| get_fingerprint(code)).take(10).collect();
 
     for fp in &fingerprints[1..] {
@@ -362,7 +362,7 @@ fn test_fingerprint_deterministic_multiple_runs() {
 
 #[test]
 fn test_complex_code_stability() {
-    let code = "<?php
+    let code = b"<?php
         namespace App\\Models;
 
         use App\\Traits\\Timestampable;
@@ -395,8 +395,8 @@ fn test_complex_code_stability() {
 
 #[test]
 fn test_function_in_while_block() {
-    let without = get_fingerprint("<?php while (true) {}");
-    let with = get_fingerprint("<?php while (true) { function loopFunc() {} }");
+    let without = get_fingerprint(b"<?php while (true) {}");
+    let with = get_fingerprint(b"<?php while (true) { function loopFunc() {} }");
 
     assert_ne!(without, with, "Function in while should change fingerprint");
 }
@@ -404,7 +404,7 @@ fn test_function_in_while_block() {
 #[test]
 fn test_function_in_switch_case() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         switch ($x) {
             case 1:
                 function case1() {}
@@ -421,7 +421,7 @@ fn test_function_in_switch_case() {
 #[test]
 fn test_function_in_match_arms() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         match ($x) {
             1 => (function() { function foo() {} })(),
             default => null
@@ -433,30 +433,30 @@ fn test_function_in_match_arms() {
 
 #[test]
 fn test_anonymous_class_in_method_chain() {
-    let simple = get_fingerprint("<?php $obj->method(null);");
-    let with_anon = get_fingerprint("<?php $obj->method(new class {});");
+    let simple = get_fingerprint(b"<?php $obj->method(null);");
+    let with_anon = get_fingerprint(b"<?php $obj->method(new class {});");
 
     assert_ne!(simple, with_anon, "Anonymous class in method chain should change fingerprint");
 }
 
 #[test]
 fn test_anonymous_class_chained_calls() {
-    let fp = get_fingerprint("<?php (new class {})->method()->another();");
+    let fp = get_fingerprint(b"<?php (new class {})->method()->another();");
     assert_ne!(fp, 0, "Chained calls on anonymous class should have fingerprint");
 }
 
 #[test]
 fn test_multiple_anonymous_classes_in_function() {
-    let one = get_fingerprint("<?php function f() { $a = new class {}; }");
-    let two = get_fingerprint("<?php function f() { $a = new class {}; $b = new class {}; }");
+    let one = get_fingerprint(b"<?php function f() { $a = new class {}; }");
+    let two = get_fingerprint(b"<?php function f() { $a = new class {}; $b = new class {}; }");
 
     assert_ne!(one, two, "Adding anonymous class should change fingerprint");
 }
 
 #[test]
 fn test_different_anonymous_classes_same_function() {
-    let extends_a = get_fingerprint("<?php function f() { $a = new class extends A {}; $b = new class {}; }");
-    let extends_b = get_fingerprint("<?php function f() { $a = new class {}; $b = new class extends B {}; }");
+    let extends_a = get_fingerprint(b"<?php function f() { $a = new class extends A {}; $b = new class {}; }");
+    let extends_b = get_fingerprint(b"<?php function f() { $a = new class {}; $b = new class extends B {}; }");
 
     assert_ne!(extends_a, extends_b, "Different anonymous class extends should differ");
 }
@@ -464,7 +464,7 @@ fn test_different_anonymous_classes_same_function() {
 #[test]
 fn test_multiple_classes_same_name_different_namespaces() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         namespace A {
             class Foo {}
         }
@@ -479,7 +479,7 @@ fn test_multiple_classes_same_name_different_namespaces() {
 #[test]
 fn test_function_and_method_same_name() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         function foo() {}
         class A {
             public function foo() {}
@@ -492,7 +492,7 @@ fn test_function_and_method_same_name() {
 #[test]
 fn test_global_constant_and_class_constant() {
     let fp = get_fingerprint(
-        "<?php
+        b"<?php
         const X = 1;
         class A {
             const X = 2;
@@ -504,30 +504,30 @@ fn test_global_constant_and_class_constant() {
 
 #[test]
 fn test_nested_ternary_operators() {
-    let simple = get_fingerprint("<?php $x = $a ? $b : $c;");
-    let nested = get_fingerprint("<?php $x = $a ? ($b ? $c : $d) : ($e ? $f : $g);");
+    let simple = get_fingerprint(b"<?php $x = $a ? $b : $c;");
+    let nested = get_fingerprint(b"<?php $x = $a ? ($b ? $c : $d) : ($e ? $f : $g);");
 
     assert_ne!(simple, nested, "Nested ternary should change fingerprint");
 }
 
 #[test]
 fn test_anonymous_class_in_ternary() {
-    let simple = get_fingerprint("<?php $x = $a ? null : null;");
-    let with_anon = get_fingerprint("<?php $x = $a ? new class {} : null;");
+    let simple = get_fingerprint(b"<?php $x = $a ? null : null;");
+    let with_anon = get_fingerprint(b"<?php $x = $a ? new class {} : null;");
 
     assert_ne!(simple, with_anon, "Anonymous class in ternary should change fingerprint");
 }
 
 #[test]
 fn test_enum_single_case() {
-    let fp = get_fingerprint("<?php enum Single { case OnlyOne; }");
+    let fp = get_fingerprint(b"<?php enum Single { case OnlyOne; }");
     assert_ne!(fp, 0, "Enum with single case should have fingerprint");
 }
 
 #[test]
 fn test_enum_many_cases() {
     let fp = get_fingerprint(
-        "<?php enum Many {
+        b"<?php enum Many {
             case A; case B; case C; case D; case E;
             case F; case G; case H; case I; case J;
         }",
@@ -539,7 +539,7 @@ fn test_enum_many_cases() {
 #[test]
 fn test_backed_enum_negative_values() {
     let fp = get_fingerprint(
-        "<?php enum Status: int {
+        b"<?php enum Status: int {
             case Error = -1;
             case Unknown = 0;
             case Success = 1;
@@ -551,22 +551,22 @@ fn test_backed_enum_negative_values() {
 
 #[test]
 fn test_variadic_by_ref_parameter() {
-    let regular = get_fingerprint("<?php function foo(...$args) {}");
-    let by_ref = get_fingerprint("<?php function foo(&...$args) {}");
+    let regular = get_fingerprint(b"<?php function foo(...$args) {}");
+    let by_ref = get_fingerprint(b"<?php function foo(&...$args) {}");
 
     assert_ne!(regular, by_ref, "By-ref variadic should differ from regular variadic");
 }
 
 #[test]
 fn test_typed_variadic_parameter() {
-    let untyped = get_fingerprint("<?php function foo(...$args) {}");
-    let typed = get_fingerprint("<?php function foo(int ...$args) {}");
+    let untyped = get_fingerprint(b"<?php function foo(...$args) {}");
+    let typed = get_fingerprint(b"<?php function foo(int ...$args) {}");
 
     assert_ne!(untyped, typed, "Typed variadic should differ from untyped");
 }
 
 #[test]
 fn test_mixed_parameter_styles() {
-    let fp = get_fingerprint("<?php function foo($a, int $b, int &$c, int $d = 0, ...$rest) {}");
+    let fp = get_fingerprint(b"<?php function foo($a, int $b, int &$c, int $d = 0, ...$rest) {}");
     assert_ne!(fp, 0, "Mixed parameter styles should have fingerprint");
 }

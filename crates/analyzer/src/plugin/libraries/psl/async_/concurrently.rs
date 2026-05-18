@@ -40,7 +40,7 @@ impl Provider for ConcurrentlyProvider {
 
 impl FunctionReturnTypeProvider for ConcurrentlyProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("psl\\async\\concurrently")
+        FunctionTarget::Exact(b"psl\\async\\concurrently")
     }
 
     fn get_return_type(
@@ -48,7 +48,7 @@ impl FunctionReturnTypeProvider for ConcurrentlyProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let tasks_arg = invocation.get_argument(0, &["tasks"])?;
+        let tasks_arg = invocation.get_argument(0, &[b"tasks"])?;
         let tasks_type = context.get_expression_type(tasks_arg)?;
 
         let array = tasks_type.get_single_array()?;

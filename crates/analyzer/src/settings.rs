@@ -1,10 +1,10 @@
 use mago_algebra::AlgebraThresholds;
-use mago_atom::Atom;
-use mago_atom::AtomSet;
-use mago_atom::ascii_lowercase_atom;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_php_version::PHPVersion;
+use mago_word::Word;
+use mago_word::WordSet;
+use mago_word::ascii_lowercase_word;
 
 /// Default maximum logical formula size during conditional analysis.
 pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
@@ -63,13 +63,13 @@ pub struct Settings {
     ///
     /// For example, adding `LogicException` will ignore `LogicException`, `InvalidArgumentException`,
     /// `OutOfBoundsException`, and all other subclasses.
-    pub unchecked_exceptions: AtomSet,
+    pub unchecked_exceptions: WordSet,
 
     /// Exceptions to ignore (exact class match only, not subclasses).
     ///
     /// When an exception class is in this set, only that exact class will be ignored
     /// during `check_throws` analysis. Parent classes and subclasses are not affected.
-    pub unchecked_exception_classes: AtomSet,
+    pub unchecked_exception_classes: WordSet,
 
     /// Check for missing `#[Override]` attributes on overriding methods.
     ///
@@ -400,8 +400,8 @@ impl Settings {
             memoize_properties: true,
             allow_possibly_undefined_array_keys: true,
             check_throws: false,
-            unchecked_exceptions: AtomSet::default(),
-            unchecked_exception_classes: AtomSet::default(),
+            unchecked_exceptions: WordSet::default(),
+            unchecked_exception_classes: WordSet::default(),
             use_colors: true,
             check_missing_override: false,
             find_unused_parameters: false,
@@ -462,7 +462,7 @@ impl Settings {
     /// applicable to `meta` (either an unrestricted entry, or one whose class
     /// qualifier `meta` is a subclass/implementer of).
     #[must_use]
-    pub fn is_class_initializer_for(&self, meta: &ClassLikeMetadata, method_name: Atom) -> bool {
+    pub fn is_class_initializer_for(&self, meta: &ClassLikeMetadata, method_name: Word) -> bool {
         self.class_initializers.iter().any(|init| init.method == method_name && init.applies_to(meta))
     }
 
@@ -470,7 +470,7 @@ impl Settings {
     pub fn applicable_class_initializers<'cfg>(
         &'cfg self,
         meta: &'cfg ClassLikeMetadata,
-    ) -> impl Iterator<Item = Atom> + 'cfg {
+    ) -> impl Iterator<Item = Word> + 'cfg {
         self.class_initializers.iter().filter(move |init| init.applies_to(meta)).map(|init| init.method)
     }
 }
@@ -483,9 +483,9 @@ impl Settings {
 pub struct ClassInitializer {
     /// Lowercased FQN of the class/interface this entry is scoped to. `None`
     /// means the entry applies to any class that has the named method.
-    pub class: Option<Atom>,
+    pub class: Option<Word>,
     /// Lowercased method name.
-    pub method: Atom,
+    pub method: Word,
 }
 
 impl ClassInitializer {
@@ -501,14 +501,17 @@ impl ClassInitializer {
                     return None;
                 }
 
-                Some(Self { class: Some(ascii_lowercase_atom(class)), method: ascii_lowercase_atom(method) })
+                Some(Self {
+                    class: Some(ascii_lowercase_word(class.as_bytes())),
+                    method: ascii_lowercase_word(method.as_bytes()),
+                })
             }
             None => {
                 let method = raw.trim();
                 if method.is_empty() {
                     return None;
                 }
-                Some(Self { class: None, method: ascii_lowercase_atom(method) })
+                Some(Self { class: None, method: ascii_lowercase_word(method.as_bytes()) })
             }
         }
     }

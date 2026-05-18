@@ -4,10 +4,10 @@ use foldhash::HashSet;
 use foldhash::HashSetExt;
 use indexmap::IndexMap;
 
-use mago_atom::Atom;
-use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::WordSet;
 
 use crate::assertion_set::AssertionSet;
 use crate::clause::Clause;
@@ -15,8 +15,8 @@ use crate::clause::Clause;
 pub mod assertion_set;
 pub mod clause;
 
-pub type SatisfyingAssignments = IndexMap<Atom, AssertionSet>;
-pub type ActiveTruths = IndexMap<Atom, HashSet<usize>>;
+pub type SatisfyingAssignments = IndexMap<Word, AssertionSet>;
+pub type ActiveTruths = IndexMap<Word, HashSet<usize>>;
 
 /// Default maximum clauses during CNF saturation.
 pub const DEFAULT_SATURATION_COMPLEXITY: u16 = 8_192;
@@ -133,7 +133,7 @@ pub fn saturate_clauses<'clause>(
         // for every simple clause, which is the dominant O(N^2) cost on big
         // match expressions where every arm condition contributes a unit
         // clause that has no negation in the set.
-        let mut literal_index: HashSet<(Atom, u64)> = HashSet::with_capacity(unique_clauses_len * 2);
+        let mut literal_index: HashSet<(Word, u64)> = HashSet::with_capacity(unique_clauses_len * 2);
         for clause in &unique_clauses {
             if !clause.reconcilable || clause.wedge {
                 continue;
@@ -377,7 +377,7 @@ pub fn saturate_clauses<'clause>(
                         continue;
                     }
 
-                    let mut common_negated_keys: HashSet<Atom> = HashSet::default();
+                    let mut common_negated_keys: HashSet<Word> = HashSet::default();
                     for common_key in common_keys {
                         let a_possibilities = &clause_a.possibilities[&common_key];
                         let b_possibilities = &clause_b.possibilities[&common_key];
@@ -394,7 +394,7 @@ pub fn saturate_clauses<'clause>(
                     }
 
                     if !common_negated_keys.is_empty() {
-                        let mut new_possibilities: IndexMap<Atom, IndexMap<u64, Assertion>> = IndexMap::default();
+                        let mut new_possibilities: IndexMap<Word, IndexMap<u64, Assertion>> = IndexMap::default();
 
                         for (var_id, possibilities) in &clause_a.possibilities {
                             if !common_negated_keys.contains(var_id) {
@@ -471,17 +471,17 @@ pub fn saturate_clauses<'clause>(
 pub fn find_satisfying_assignments(
     clauses: &[Clause],
     creating_conditional_id: Option<Span>,
-    conditionally_referenced_var_ids: &mut AtomSet,
+    conditionally_referenced_var_ids: &mut WordSet,
 ) -> (SatisfyingAssignments, ActiveTruths) {
-    let mut truths: IndexMap<Atom, AssertionSet> = IndexMap::default();
-    let mut active_truths: IndexMap<Atom, HashSet<usize>> = IndexMap::default();
+    let mut truths: IndexMap<Word, AssertionSet> = IndexMap::default();
+    let mut active_truths: IndexMap<Word, HashSet<usize>> = IndexMap::default();
 
     for clause in clauses {
         // Populate referenced variables from all non-generated clauses.
         if !clause.generated {
             for var_id in clause.possibilities.keys() {
                 // We only care about actual variables, not temporary expression placeholders.
-                if !var_id.as_str().starts_with('*') {
+                if !var_id.as_bytes().starts_with(b"*") {
                     conditionally_referenced_var_ids.insert(*var_id);
                 }
             }
@@ -499,7 +499,7 @@ pub fn find_satisfying_assignments(
             continue;
         };
 
-        if variable_id.as_str().starts_with('*') {
+        if variable_id.as_bytes().starts_with(b"*") {
             continue;
         }
 
@@ -739,7 +739,7 @@ fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Opt
     while let Some(clause) = clauses.pop() {
         let mut new_clauses = Vec::with_capacity(seed_clauses.len() * 4);
 
-        let clause_negations: Vec<(Atom, Vec<(u64, Assertion)>)> = clause
+        let clause_negations: Vec<(Word, Vec<(u64, Assertion)>)> = clause
             .possibilities
             .iter()
             .map(|(var, possibility_map)| {

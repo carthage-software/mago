@@ -28,7 +28,7 @@ pub mod trivia;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Program<'arena> {
     pub file_id: FileId,
-    pub source_text: &'arena str,
+    pub source_text: &'arena [u8],
     pub trivia: Sequence<'arena, Trivia<'arena>>,
     pub statements: Sequence<'arena, Statement<'arena>>,
     pub errors: Vec<'arena, ParseError>,

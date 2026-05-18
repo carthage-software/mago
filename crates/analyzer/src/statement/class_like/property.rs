@@ -1,7 +1,5 @@
 use std::rc::Rc;
 
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_codex::context::ScopeContext;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -23,6 +21,8 @@ use mago_syntax::ast::PropertyHook;
 use mago_syntax::ast::PropertyHookBody;
 use mago_syntax::ast::PropertyHookConcreteBody;
 use mago_syntax::ast::PropertyItem;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -100,7 +100,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyConcreteItem<'arena> {
         self.value.analyze(context, block_context, artifacts)?;
 
         if let Some(class_metadata) = block_context.scope.get_class_like()
-            && let Some(property_metadata) = class_metadata.properties.get(&atom(self.variable.name))
+            && let Some(property_metadata) = class_metadata.properties.get(&word(self.variable.name))
             && let Some(declared_type_metadata) = property_metadata.type_metadata.as_ref()
             && !declared_type_metadata.type_union.is_mixed()
             && !declared_type_metadata.type_union.has_template_types()
@@ -136,7 +136,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyConcreteItem<'arena> {
                 let value_type_str = value_type.get_id();
                 let declared_type_str = declared_type.get_id();
                 let class_name = class_metadata.original_name;
-                let property_name = self.variable.name;
+                let property_name = mago_bytes::BytesDisplay(self.variable.name);
 
                 let issue = Issue::error(format!(
                     "Default value for property `{class_name}::{property_name}` is not assignable to its declared type."
@@ -176,7 +176,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for HookedProperty<'arena> {
         );
         self.item.analyze(context, block_context, artifacts)?;
 
-        let property_name = atom(self.item.variable().name);
+        let property_name = word(self.item.variable().name);
         for hook in &self.hook_list.hooks {
             analyze_property_hook(hook, property_name, context, block_context, artifacts)?;
         }
@@ -192,13 +192,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyHook<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        analyze_property_hook(self, atom(""), context, block_context, artifacts)
+        analyze_property_hook(self, word(""), context, block_context, artifacts)
     }
 }
 
 fn analyze_property_hook<'ctx, 'arena>(
     hook: &PropertyHook<'arena>,
-    property_name: mago_atom::Atom,
+    property_name: mago_word::Word,
     context: &mut Context<'ctx, 'arena>,
     parent_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
@@ -221,7 +221,7 @@ fn analyze_property_hook<'ctx, 'arena>(
 
     if let Some(class_like) = parent_block_context.scope.get_class_like()
         && let Some(property) = class_like.properties.get(&property_name)
-        && let Some(hook_meta) = property.hooks.get(&atom(hook.name.value))
+        && let Some(hook_meta) = property.hooks.get(&word(hook.name.value))
     {
         scope.set_property_hook(Some((property_name, hook_meta)));
 
@@ -243,20 +243,20 @@ fn analyze_property_hook<'ctx, 'arena>(
 
     if let Some(class_like_metadata) = parent_block_context.scope.get_class_like() {
         hook_block_context.locals.insert(
-            Atom::from("$this"),
+            Word::from("$this"),
             Rc::new(wrap_atomic(TAtomic::Object(get_this_type(context, class_like_metadata, None)))),
         );
 
         add_properties_to_context(context, &mut hook_block_context, class_like_metadata, None)?;
     }
 
-    if hook.name.value == "set" {
+    if hook.name.value == b"set" {
         let value_type = get_value_type_for_set_hook(property_name, parent_block_context);
         let param_name = hook
             .parameter_list
             .as_ref()
             .and_then(|p| p.parameters.first())
-            .map_or_else(|| Atom::from("$value"), |p| Atom::from(p.variable.name));
+            .map_or_else(|| word(b"$value"), |p| word(p.variable.name));
 
         hook_block_context.locals.insert(param_name, Rc::new(value_type));
     }
@@ -268,7 +268,7 @@ fn analyze_property_hook<'ctx, 'arena>(
         PropertyHookConcreteBody::Expression(expr_body) => {
             expr_body.expression.analyze(context, &mut hook_block_context, artifacts)?;
 
-            if hook.name.value == "get" {
+            if hook.name.value == b"get" {
                 let value_type = artifacts
                     .get_rc_expression_type(&expr_body.expression)
                     .cloned()
@@ -290,7 +290,7 @@ fn analyze_property_hook<'ctx, 'arena>(
 }
 
 fn get_value_type_for_set_hook(
-    property_name: mago_atom::Atom,
+    property_name: mago_word::Word,
     block_context: &BlockContext<'_>,
 ) -> mago_codex::ttype::union::TUnion {
     let Some(class_like) = block_context.scope.get_class_like() else {
@@ -300,7 +300,7 @@ fn get_value_type_for_set_hook(
         return get_mixed();
     };
 
-    if let Some(hook) = property.hooks.get(&atom("set"))
+    if let Some(hook) = property.hooks.get(&word("set"))
         && let Some(param) = &hook.parameter
         && let Some(type_metadata) = param.get_type_metadata()
     {

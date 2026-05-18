@@ -10,20 +10,21 @@ use mago_algebra::disjoin_clauses;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
-use mago_atom::Atom;
-use mago_atom::AtomSet;
-use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::WordSet;
+use mago_word::concat_word;
+use mago_word::usize_word;
 
 fn span(offset: u32) -> Span {
     Span::dummy(offset, offset.saturating_add(1))
 }
 
-fn variable(i: usize) -> Atom {
-    atom(&format!("$var{i}"))
+fn variable(i: usize) -> Word {
+    concat_word!(b"$var", usize_word(i))
 }
 
 fn assertion_int() -> Assertion {
@@ -52,7 +53,7 @@ fn single_assertion_clause(var_index: usize, span_offset: u32, assertion: Assert
     let mut type_map: IndexMap<u64, Assertion> = IndexMap::new();
     type_map.insert(assertion.to_hash(), assertion);
 
-    let mut possibilities: IndexMap<Atom, IndexMap<u64, Assertion>> = IndexMap::new();
+    let mut possibilities: IndexMap<Word, IndexMap<u64, Assertion>> = IndexMap::new();
     possibilities.insert(variable(var_index), type_map);
 
     let s = span(span_offset);
@@ -67,7 +68,7 @@ fn disjunctive_clause(var_index: usize, span_offset: u32, assertions: Vec<Assert
         type_map.insert(a.to_hash(), a);
     }
 
-    let mut possibilities: IndexMap<Atom, IndexMap<u64, Assertion>> = IndexMap::new();
+    let mut possibilities: IndexMap<Word, IndexMap<u64, Assertion>> = IndexMap::new();
     possibilities.insert(variable(var_index), type_map);
 
     let s = span(span_offset);
@@ -77,7 +78,7 @@ fn disjunctive_clause(var_index: usize, span_offset: u32, assertions: Vec<Assert
 /// Builds a clause covering multiple variables with one assertion each
 /// (matches the shape produced by `&&` over different variables).
 fn multi_var_clause(span_offset: u32, vars: &[(usize, Assertion)]) -> Clause {
-    let mut possibilities: IndexMap<Atom, IndexMap<u64, Assertion>> = IndexMap::new();
+    let mut possibilities: IndexMap<Word, IndexMap<u64, Assertion>> = IndexMap::new();
     for (var_index, assertion) in vars {
         let mut type_map: IndexMap<u64, Assertion> = IndexMap::new();
         type_map.insert(assertion.to_hash(), assertion.clone());
@@ -250,7 +251,7 @@ fn bench_find_satisfying_assignments(c: &mut Criterion) {
     let small = small_formula();
     c.bench_function("find_satisfying/small", |b| {
         b.iter(|| {
-            let mut referenced = AtomSet::default();
+            let mut referenced = WordSet::default();
             let result = find_satisfying_assignments(&small, None, &mut referenced);
             std::hint::black_box(result)
         });
@@ -259,7 +260,7 @@ fn bench_find_satisfying_assignments(c: &mut Criterion) {
     let medium = medium_formula();
     c.bench_function("find_satisfying/medium", |b| {
         b.iter(|| {
-            let mut referenced = AtomSet::default();
+            let mut referenced = WordSet::default();
             let result = find_satisfying_assignments(&medium, None, &mut referenced);
             std::hint::black_box(result)
         });
@@ -268,7 +269,7 @@ fn bench_find_satisfying_assignments(c: &mut Criterion) {
     let multi = multi_var_formula();
     c.bench_function("find_satisfying/multi_var", |b| {
         b.iter(|| {
-            let mut referenced = AtomSet::default();
+            let mut referenced = WordSet::default();
             let result = find_satisfying_assignments(&multi, None, &mut referenced);
             std::hint::black_box(result)
         });

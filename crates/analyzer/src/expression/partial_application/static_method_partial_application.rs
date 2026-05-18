@@ -1,5 +1,3 @@
-use mago_atom::AtomMap;
-use mago_atom::ascii_lowercase_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -10,6 +8,8 @@ use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_syntax::ast::StaticMethodPartialApplication;
+use mago_word::WordMap;
+use mago_word::ascii_lowercase_word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -36,7 +36,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
 
         let mut identifiers = vec![];
         for resolved_method in &method_resolution.resolved_methods {
-            let class_name = ascii_lowercase_atom(resolved_method.classname.as_ref());
+            let class_name = ascii_lowercase_word(resolved_method.classname.as_ref());
             let method_name = resolved_method.method_identifier.get_method_name();
             artifacts.symbol_references.add_reference_to_class_member(
                 &block_context.scope,
@@ -103,7 +103,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
                 );
 
                 let mut template_result = TemplateResult::default();
-                let mut parameter_types = AtomMap::default();
+                let mut parameter_types = WordMap::default();
 
                 analyze_invocation(
                     context,

@@ -28,7 +28,7 @@ use crate::settings::RuleSettings;
 
 const IS_OBJECT: &str = "is_object";
 const METHOD_EXISTS: &str = "method_exists";
-const TO_STRING_METHOD: &str = "__toString";
+const TO_STRING_METHOD: &[u8] = b"__toString";
 
 #[derive(Debug, Clone)]
 pub struct InstanceofStringableRule {

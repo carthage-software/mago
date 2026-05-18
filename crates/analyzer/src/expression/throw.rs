@@ -51,7 +51,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
 
         if let Some(exception_type) = artifacts.get_expression_type(self.exception) {
             for exception_atomic in exception_type.types.as_ref() {
-                if exception_atomic.extends_or_implements(context.codebase, "Throwable") {
+                if exception_atomic.extends_or_implements(context.codebase, b"Throwable") {
                     for object_name in exception_atomic.get_all_object_names() {
                         block_context.possibly_thrown_exceptions.entry(object_name).or_default().insert(self.span());
                     }

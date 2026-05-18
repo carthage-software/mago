@@ -1,5 +1,3 @@
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_database::file::File;
 use mago_fingerprint::FingerprintOptions;
 use mago_fingerprint::Fingerprintable;
@@ -20,6 +18,8 @@ use mago_syntax::ast::PropertyItem;
 use mago_syntax::ast::Trait;
 use mago_syntax::ast::Trivia;
 use mago_syntax::walker::MutWalker;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::signature::DefSignatureNode;
 use crate::signature::FileSignature;
@@ -77,7 +77,7 @@ impl<'file, 'arena> SignatureBuilder<'file, 'arena> {
     #[allow(clippy::too_many_arguments)]
     fn create_node(
         &self,
-        name: &str,
+        name: &[u8],
         is_function: bool,
         is_constant: bool,
         is_property: bool,
@@ -91,8 +91,8 @@ impl<'file, 'arena> SignatureBuilder<'file, 'arena> {
         let end_column = self.file.column_number(span.end.offset) as u16;
 
         let atom_name = match (is_constant, is_property) {
-            (true, _) | (_, true) => atom(name),
-            _ => ascii_lowercase_atom(name),
+            (true, _) | (_, true) => word(name),
+            _ => ascii_lowercase_word(name),
         };
 
         DefSignatureNode::new(

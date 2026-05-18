@@ -41,7 +41,7 @@ impl Provider for IteratorToArrayProvider {
 
 impl FunctionReturnTypeProvider for IteratorToArrayProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("iterator_to_array")
+        FunctionTarget::Exact(b"iterator_to_array")
     }
 
     fn get_return_type(
@@ -49,7 +49,7 @@ impl FunctionReturnTypeProvider for IteratorToArrayProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let preserve_keys = match invocation.get_argument(1, &["preserve_keys"]) {
+        let preserve_keys = match invocation.get_argument(1, &[b"preserve_keys"]) {
             Some(argument) => context.get_expression_type(argument).and_then(|argument_type| {
                 if argument_type.is_always_truthy() {
                     Some(true)
@@ -63,7 +63,7 @@ impl FunctionReturnTypeProvider for IteratorToArrayProvider {
         };
 
         let iterator_argument = invocation
-            .get_argument(0, &["iterator"])
+            .get_argument(0, &[b"iterator"])
             .and_then(|arg| context.get_rc_expression_type(arg))
             .cloned()
             .unwrap_or_else(|| Rc::new(get_mixed_iterable()));

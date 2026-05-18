@@ -30,7 +30,7 @@ impl Provider for StrProvider {
 
 impl FunctionReturnTypeProvider for StrProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Namespace("psl\\str")
+        FunctionTarget::Namespace(b"psl\\str")
     }
 
     fn get_return_type(
@@ -65,7 +65,7 @@ impl FunctionReturnTypeProvider for StrProvider {
             | "psl\\str\\grapheme\\before_ci"
             | "psl\\str\\grapheme\\before_last"
             | "psl\\str\\grapheme\\before_last_ci" => {
-                let haystack = invocation.get_argument(0, &["haystack"])?;
+                let haystack = invocation.get_argument(0, &[b"haystack"])?;
                 let haystack_type = context.get_expression_type(haystack)?.get_single_string()?;
 
                 Some(TUnion::from_vec(vec![
@@ -101,7 +101,7 @@ impl FunctionReturnTypeProvider for StrProvider {
             | "psl\\str\\grapheme\\trim"
             | "psl\\str\\grapheme\\trim_left"
             | "psl\\str\\grapheme\\trim_right" => {
-                let string = invocation.get_argument(0, &["string"])?;
+                let string = invocation.get_argument(0, &[b"string"])?;
                 let string_type = context.get_expression_type(string)?.get_single_string()?;
 
                 Some(if string_type.is_literal_origin() {
@@ -123,8 +123,8 @@ impl FunctionReturnTypeProvider for StrProvider {
                 })
             }
             "psl\\str\\splice" | "psl\\str\\byte\\splice" | "psl\\str\\grapheme\\splice" => {
-                let string = invocation.get_argument(0, &["string"])?;
-                let replacement = invocation.get_argument(1, &["replacement"])?;
+                let string = invocation.get_argument(0, &[b"string"])?;
+                let replacement = invocation.get_argument(1, &[b"replacement"])?;
 
                 let string_type = context.get_expression_type(string)?.get_single_string()?;
                 let replacement_type = context.get_expression_type(replacement)?.get_single_string()?;
@@ -156,7 +156,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                 })
             }
             "psl\\str\\lowercase" | "psl\\str\\byte\\lowercase" | "psl\\str\\grapheme\\lowercase" => {
-                let string = invocation.get_argument(0, &["string"])?;
+                let string = invocation.get_argument(0, &[b"string"])?;
                 let string_type = context.get_expression_type(string)?.get_single_string()?;
 
                 Some(match string_type.literal {
@@ -179,7 +179,7 @@ impl FunctionReturnTypeProvider for StrProvider {
                 })
             }
             "psl\\str\\uppercase" | "psl\\str\\byte\\uppercase" | "psl\\str\\grapheme\\uppercase" => {
-                let string = invocation.get_argument(0, &["string"])?;
+                let string = invocation.get_argument(0, &[b"string"])?;
                 let string_type = context.get_expression_type(string)?.get_single_string()?;
 
                 Some(match string_type.literal {

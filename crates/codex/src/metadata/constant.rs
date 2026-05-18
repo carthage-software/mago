@@ -3,10 +3,10 @@ use mago_php_version::PHPVersionRange;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_word::Word;
 
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
@@ -22,7 +22,7 @@ use crate::ttype::union::TUnion;
 #[non_exhaustive]
 pub struct ConstantMetadata {
     pub attributes: Vec<AttributeMetadata>,
-    pub name: Atom,
+    pub name: Word,
     pub span: Span,
     pub type_metadata: Option<TypeMetadata>,
     pub inferred_type: Option<TUnion>,
@@ -40,7 +40,7 @@ impl ConstantMetadata {
     /// * `span`: The source code location of this specific constant's definition item (`NAME = value`).
     #[inline]
     #[must_use]
-    pub fn new(name: Atom, span: Span, flags: MetadataFlags) -> Self {
+    pub fn new(name: Word, span: Span, flags: MetadataFlags) -> Self {
         Self {
             attributes: Vec::new(),
             name,

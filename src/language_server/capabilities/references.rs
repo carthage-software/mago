@@ -53,7 +53,11 @@ pub fn compute(
     let Some(cursor_analysis) = workspace.file_analysis_for(file.id) else { return Vec::new() };
     let Some((_, _, target_fqn, _)) = cursor_analysis.resolved().at_offset(offset) else { return Vec::new() };
 
-    let local_lower = target_fqn.rsplit('\\').next().unwrap_or(target_fqn).to_ascii_lowercase();
+    let local_slice = match memchr::memrchr(b'\\', target_fqn) {
+        Some(i) => &target_fqn[i + 1..],
+        None => target_fqn,
+    };
+    let local_lower = local_slice.to_ascii_lowercase();
 
     let declaration_span =
         if include_declaration { None } else { declaration_name_span(workspace.service.codebase(), target_fqn) };
@@ -62,7 +66,7 @@ pub fn compute(
         .database
         .files()
         .filter(|f| matches!(f.file_type, FileType::Host))
-        .filter(|f| contains_ascii_ci(f.contents.as_bytes(), local_lower.as_bytes()))
+        .filter(|f| contains_ascii_ci(f.contents.as_ref(), &local_lower))
         .collect();
 
     let mut out = Vec::new();
@@ -88,7 +92,7 @@ pub fn compute(
     out
 }
 
-fn declaration_name_span(codebase: &CodebaseMetadata, fqn: &str) -> Option<Span> {
+fn declaration_name_span(codebase: &CodebaseMetadata, fqn: &[u8]) -> Option<Span> {
     if let Some(meta) = codebase.get_class_like(fqn) {
         return meta.name_span;
     }
@@ -117,7 +121,7 @@ fn contains_ascii_ci(haystack: &[u8], needle: &[u8]) -> bool {
     false
 }
 
-fn same_file_variable_locations(file: &MagoFile, raw: &str) -> Vec<Location> {
+fn same_file_variable_locations(file: &MagoFile, raw: &[u8]) -> Vec<Location> {
     let Some(path) = file.path.as_ref() else {
         return Vec::new();
     };

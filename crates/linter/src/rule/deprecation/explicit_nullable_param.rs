@@ -116,7 +116,7 @@ impl LintRule for ExplicitNullableParamRule {
             return;
         };
 
-        let parameter_name = function_like_parameter.variable.name;
+        let parameter_name = mago_bytes::BytesDisplay(function_like_parameter.variable.name);
 
         let issue = Issue::new(
             self.cfg.level(),

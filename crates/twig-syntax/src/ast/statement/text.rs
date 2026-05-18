@@ -6,7 +6,7 @@ use mago_span::Span;
 /// Raw template text (including whitespace between tags).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Text<'arena> {
-    pub value: &'arena str,
+    pub value: &'arena [u8],
     pub span: Span,
 }
 

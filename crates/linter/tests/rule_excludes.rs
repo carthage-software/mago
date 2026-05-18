@@ -13,7 +13,7 @@ const CODE: &str = "<?php\n\n// comment with trailing space   \n";
 
 fn lint_with_excludes(filename: &'static str, excludes: &[&str]) -> usize {
     let arena = Bump::new();
-    let file = File::ephemeral(Cow::Borrowed(filename), Cow::Borrowed(CODE));
+    let file = File::ephemeral(Cow::Borrowed(filename.as_bytes()), Cow::Borrowed(CODE.as_bytes()));
     let program = parse_file(&arena, &file);
 
     let resolver = NameResolver::new(&arena);

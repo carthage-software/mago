@@ -117,15 +117,15 @@ impl LintRule for NoDbSchemaChangeRule {
             }
         };
 
-        let method_name_lower = method_name.to_lowercase();
-        if !matches!(method_name_lower.as_str(), "query" | "get_results" | "get_row" | "get_col" | "get_var") {
+        let method_name_lower = method_name.to_ascii_lowercase();
+        if !matches!(method_name_lower.as_slice(), b"query" | b"get_results" | b"get_row" | b"get_col" | b"get_var") {
             return;
         }
 
         if let Some(FunctionLikeScope::Function(function_name, _)) = ctx.scope.get_function_like_scope()
-            && (function_name.ends_with("activate")
-                || function_name.ends_with("activation")
-                || function_name.ends_with("hook"))
+            && (function_name.ends_with(b"activate")
+                || function_name.ends_with(b"activation")
+                || function_name.ends_with(b"hook"))
         {
             // We are in an activation hook, so we can skip this check.
             return;
@@ -155,7 +155,7 @@ impl LintRule for NoDbSchemaChangeRule {
 /// Check if an expression is a reference to the $wpdb variable
 fn is_wpdb_variable(expr: &Expression) -> bool {
     match expr {
-        Expression::Variable(Variable::Direct(var)) => var.name == "$wpdb",
+        Expression::Variable(Variable::Direct(var)) => var.name == b"$wpdb",
         _ => false,
     }
 }
@@ -190,15 +190,16 @@ fn contains_schema_change_keywords(expr: &Expression) -> bool {
     }
 }
 
-fn str_contains_schema_change_keywords(s: &str) -> bool {
-    let upper_s = s.to_uppercase();
-    upper_s.contains("CREATE TABLE")
-        || upper_s.contains("ALTER TABLE")
-        || upper_s.contains("DROP TABLE")
-        || upper_s.contains("CREATE INDEX")
-        || upper_s.contains("DROP INDEX")
-        || upper_s.contains("ADD COLUMN")
-        || upper_s.contains("DROP COLUMN")
-        || upper_s.contains("MODIFY COLUMN")
-        || upper_s.contains("RENAME TABLE")
+fn str_contains_schema_change_keywords(s: &[u8]) -> bool {
+    let upper_s = s.to_ascii_uppercase();
+    let h = upper_s.as_slice();
+    memchr::memmem::find(h, b"CREATE TABLE").is_some()
+        || memchr::memmem::find(h, b"ALTER TABLE").is_some()
+        || memchr::memmem::find(h, b"DROP TABLE").is_some()
+        || memchr::memmem::find(h, b"CREATE INDEX").is_some()
+        || memchr::memmem::find(h, b"DROP INDEX").is_some()
+        || memchr::memmem::find(h, b"ADD COLUMN").is_some()
+        || memchr::memmem::find(h, b"DROP COLUMN").is_some()
+        || memchr::memmem::find(h, b"MODIFY COLUMN").is_some()
+        || memchr::memmem::find(h, b"RENAME TABLE").is_some()
 }

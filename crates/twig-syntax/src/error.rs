@@ -45,19 +45,19 @@ impl SyntaxError {
 pub enum ParseError {
     SyntaxError(SyntaxError),
     /// Generic "unexpected token" with a human-readable expectation string.
-    UnexpectedToken(String, Span),
+    UnexpectedToken(Vec<u8>, Span),
     /// Reached end-of-input while still expecting something.
-    UnexpectedEof(FileId, String, Position),
+    UnexpectedEof(FileId, Vec<u8>, Position),
     /// A tag name that the parser does not know.
-    UnknownTag(String, Span),
+    UnknownTag(Vec<u8>, Span),
     /// A closing tag (e.g. `endif`) whose kind does not match the open tag.
     MismatchedEndTag {
-        expected: String,
-        got: String,
+        expected: Vec<u8>,
+        got: Vec<u8>,
         span: Span,
     },
     /// A generic syntax-level error produced by tag or expression parsers.
-    Message(String, Span),
+    Message(Vec<u8>, Span),
 }
 
 impl ParseError {
@@ -87,13 +87,22 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ParseError::SyntaxError(err) => write!(f, "{err}"),
-            ParseError::UnexpectedToken(msg, _) => write!(f, "Unexpected token: {msg}"),
-            ParseError::UnexpectedEof(_, msg, _) => write!(f, "Unexpected end of input: {msg}"),
-            ParseError::UnknownTag(name, _) => write!(f, "Unknown tag \"{name}\""),
-            ParseError::MismatchedEndTag { expected, got, .. } => {
-                write!(f, "Unexpected \"{got}\" tag (expecting \"{expected}\")")
+            ParseError::UnexpectedToken(msg, _) => {
+                write!(f, "Unexpected token: {}", String::from_utf8_lossy(msg))
             }
-            ParseError::Message(msg, _) => f.write_str(msg),
+            ParseError::UnexpectedEof(_, msg, _) => {
+                write!(f, "Unexpected end of input: {}", String::from_utf8_lossy(msg))
+            }
+            ParseError::UnknownTag(name, _) => write!(f, "Unknown tag \"{}\"", String::from_utf8_lossy(name)),
+            ParseError::MismatchedEndTag { expected, got, .. } => {
+                write!(
+                    f,
+                    "Unexpected \"{}\" tag (expecting \"{}\")",
+                    String::from_utf8_lossy(got),
+                    String::from_utf8_lossy(expected)
+                )
+            }
+            ParseError::Message(msg, _) => f.write_str(&String::from_utf8_lossy(msg)),
         }
     }
 }

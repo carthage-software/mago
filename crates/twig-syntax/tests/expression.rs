@@ -408,7 +408,7 @@ fn precedence_is_not_null() {
     match e {
         Expression::Test(t) => {
             assert!(t.not_keyword.is_some());
-            assert_eq!(t.name.value, "null");
+            assert_eq!(t.name.value, b"null".as_slice());
         }
         other => panic!("{other:?}"),
     }
@@ -487,7 +487,7 @@ fn attribute_null_safe() {
 fn method_call_no_args() {
     let arena = Bump::new();
     match print_expr(&arena, "{{ a.b() }}") {
-        Expression::MethodCall(m) => assert_eq!(m.method.value, "b"),
+        Expression::MethodCall(m) => assert_eq!(m.method.value, b"b".as_slice()),
         other => panic!("{other:?}"),
     }
 }
@@ -497,7 +497,7 @@ fn method_call_with_args() {
     let arena = Bump::new();
     match print_expr(&arena, "{{ a.b(1, 2) }}") {
         Expression::MethodCall(m) => {
-            assert_eq!(m.method.value, "b");
+            assert_eq!(m.method.value, b"b".as_slice());
             assert_eq!(m.argument_list.arguments.len(), 2);
         }
         other => panic!("{other:?}"),
@@ -625,7 +625,7 @@ fn filter_without_args() {
     let arena = Bump::new();
     match print_expr(&arena, "{{ x|upper }}") {
         Expression::Filter(f) => {
-            assert_eq!(f.name.value, "upper");
+            assert_eq!(f.name.value, b"upper".as_slice());
             assert_eq!(filter_argument_count(f), 0);
         }
         other => panic!("{other:?}"),
@@ -637,7 +637,7 @@ fn filter_with_positional_arg() {
     let arena = Bump::new();
     match print_expr(&arena, r#"{{ x|default("fallback") }}"#) {
         Expression::Filter(f) => {
-            assert_eq!(f.name.value, "default");
+            assert_eq!(f.name.value, b"default".as_slice());
             assert_eq!(filter_argument_count(f), 1);
         }
         other => panic!("{other:?}"),
@@ -654,9 +654,9 @@ fn filter_chained() {
     let arena = Bump::new();
     match print_expr(&arena, "{{ x|upper|title }}") {
         Expression::Filter(outer) => {
-            assert_eq!(outer.name.value, "title");
+            assert_eq!(outer.name.value, b"title".as_slice());
             match outer.operand {
-                Expression::Filter(inner) => assert_eq!(inner.name.value, "upper"),
+                Expression::Filter(inner) => assert_eq!(inner.name.value, b"upper".as_slice()),
                 other => panic!("{other:?}"),
             }
         }
@@ -675,7 +675,7 @@ fn test_is_null() {
     match print_expr(&arena, "{{ x is null }}") {
         Expression::Test(t) => {
             assert!(t.not_keyword.is_none());
-            assert_eq!(t.name.value, "null");
+            assert_eq!(t.name.value, b"null".as_slice());
         }
         _ => panic!(),
     }
@@ -687,7 +687,7 @@ fn test_is_not_null() {
     match print_expr(&arena, "{{ x is not null }}") {
         Expression::Test(t) => {
             assert!(t.not_keyword.is_some());
-            assert_eq!(t.name.value, "null");
+            assert_eq!(t.name.value, b"null".as_slice());
         }
         _ => panic!(),
     }
@@ -729,7 +729,7 @@ fn test_is_not_odd() {
     match print_expr(&arena, "{{ x is not odd }}") {
         Expression::Test(t) => {
             assert!(t.not_keyword.is_some());
-            assert_eq!(t.name.value, "odd");
+            assert_eq!(t.name.value, b"odd".as_slice());
         }
         _ => panic!(),
     }
@@ -741,7 +741,7 @@ fn arrow_single_param_no_parens() {
     match print_expr(&arena, "{{ v => v * 2 }}") {
         Expression::ArrowFunction(a) => {
             assert_eq!(a.parameters.len(), 1);
-            assert_eq!(a.parameters.as_slice()[0].value, "v");
+            assert_eq!(a.parameters.as_slice()[0].value, b"v".as_slice());
         }
         _ => panic!(),
     }
@@ -753,8 +753,8 @@ fn arrow_multi_param_in_parens() {
     match print_expr(&arena, "{{ (a, b) => a + b }}") {
         Expression::ArrowFunction(a) => {
             assert_eq!(a.parameters.len(), 2);
-            assert_eq!(a.parameters.as_slice()[0].value, "a");
-            assert_eq!(a.parameters.as_slice()[1].value, "b");
+            assert_eq!(a.parameters.as_slice()[0].value, b"a".as_slice());
+            assert_eq!(a.parameters.as_slice()[1].value, b"b".as_slice());
         }
         _ => panic!(),
     }

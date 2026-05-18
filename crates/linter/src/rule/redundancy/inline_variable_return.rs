@@ -181,7 +181,8 @@ impl LintRule for InlineVariableReturnRule {
                 continue;
             }
 
-            let rhs_text = &ctx.source_file.contents[assignment.rhs.span().to_range_usize()];
+            let rhs_bytes = &ctx.source_file.contents[assignment.rhs.span().to_range_usize()];
+            let Some(rhs_text) = std::str::from_utf8(rhs_bytes).ok().map(str::to_owned) else { continue };
 
             let issue = Issue::new(self.cfg.level(), "Variable assignment can be inlined into the return statement.")
                 .with_code(self.meta.code)
@@ -196,8 +197,7 @@ impl LintRule for InlineVariableReturnRule {
 
             ctx.collector.propose(issue, |edits| {
                 let assign_span = expr_stmt.span();
-                let delete_end =
-                    find_next_non_whitespace(ctx.source_file.contents.as_bytes(), assign_span.end_offset());
+                let delete_end = find_next_non_whitespace(ctx.source_file.contents.as_ref(), assign_span.end_offset());
                 let delete_range = assign_span.start_offset()..delete_end;
 
                 edits.push(TextEdit::delete(delete_range));
@@ -211,7 +211,7 @@ impl LintRule for InlineVariableReturnRule {
 
 /// Check if the expression is by reference,
 /// or has a reference capture of the given variable name.
-fn involves_references(expr: &Expression<'_>, var_name: &str) -> bool {
+fn involves_references(expr: &Expression<'_>, var_name: &[u8]) -> bool {
     if let Expression::Parenthesized(parenthesized) = expr {
         return involves_references(parenthesized.expression, var_name);
     }
@@ -221,7 +221,7 @@ fn involves_references(expr: &Expression<'_>, var_name: &str) -> bool {
     }
 
     struct RefCaptureChecker<'name> {
-        var_name: &'name str,
+        var_name: &'name [u8],
         found: bool,
     }
 

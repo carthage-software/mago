@@ -1,3 +1,4 @@
+use mago_bytes::BytesDisplay;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -39,11 +40,15 @@ mod property;
 
 #[inline]
 pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
-    let class_name = class.name.value;
-    let class_fqcn = context.get_name(class.name.span.start);
+    let class_name_bytes: &[u8] = class.name.value;
+    let class_fqcn_bytes: &[u8] = context.get_name(class.name.span.start);
+    let class_name = BytesDisplay(class_name_bytes);
+    let class_fqcn = BytesDisplay(class_fqcn_bytes);
 
-    if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_name))
-        || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_name))
+    if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_name_bytes))
+        || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED
+            .iter()
+            .any(|keyword| keyword.eq_ignore_ascii_case(class_name_bytes))
     {
         context.report(
             Issue::error(format!("Class `{class_name}` name cannot be a reserved keyword."))
@@ -83,7 +88,7 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
             | Modifier::PublicSet(keyword)
             | Modifier::ProtectedSet(keyword)
             | Modifier::PrivateSet(keyword) => {
-                let visibility_name = keyword.value;
+                let visibility_name = BytesDisplay(keyword.value);
 
                 context.report(
                     Issue::error(format!(
@@ -200,14 +205,14 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
     }
 
     if let Some(extends) = &class.extends {
-        check_extends(extends, class.span(), "class", class_name, class_fqcn, true, context);
+        check_extends(extends, class.span(), "class", class_name_bytes, class_fqcn_bytes, true, context);
     }
 
     if let Some(implements) = &class.implements {
-        check_implements(implements, class.span(), "class", class_name, class_fqcn, true, context);
+        check_implements(implements, class.span(), "class", class_name_bytes, class_fqcn_bytes, true, context);
     }
 
-    check_members(&class.members, class.span(), "class", class_name, class_fqcn, context);
+    check_members(&class.members, class.span(), "class", class_name_bytes, class_fqcn_bytes, context);
 
     for member in &class.members {
         match &member {
@@ -223,7 +228,8 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
                 );
             }
             ClassLikeMember::Method(method) => {
-                let method_name = &method.name.value;
+                let method_name_bytes: &[u8] = method.name.value;
+                let method_name = BytesDisplay(method_name_bytes);
 
                 if !class.modifiers.contains_abstract() && method.modifiers.contains_abstract() {
                     context.report(
@@ -243,11 +249,10 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
                     );
                 }
 
-                // Check for hooked promoted properties in readonly classes (inline check)
-                if last_readonly.is_some() && method_name.eq_ignore_ascii_case("__construct") {
+                if last_readonly.is_some() && method_name_bytes.eq_ignore_ascii_case(b"__construct") {
                     for parameter in &method.parameter_list.parameters {
                         if let Some(hooks) = &parameter.hooks {
-                            let param_name = parameter.variable.name;
+                            let param_name = BytesDisplay(parameter.variable.name);
                             context.report(
                                 Issue::error(format!(
                                     "Hooked property `{class_name}::{param_name}` cannot be readonly."
@@ -272,15 +277,24 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
                     }
                 }
 
-                check_method(method, method_name, class.span(), class_name, class_fqcn, "class", false, context);
+                check_method(
+                    method,
+                    method_name_bytes,
+                    class.span(),
+                    class_name_bytes,
+                    class_fqcn_bytes,
+                    "class",
+                    false,
+                    context,
+                );
             }
             ClassLikeMember::Property(property) => {
                 check_property(
                     property,
                     class.span(),
                     "class",
-                    class_name,
-                    class_fqcn,
+                    class_name_bytes,
+                    class_fqcn_bytes,
                     false,
                     class.modifiers.contains_abstract(),
                     last_readonly.is_some(),
@@ -288,7 +302,7 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
                 );
             }
             ClassLikeMember::Constant(constant) => {
-                check_class_like_constant(constant, class.span(), "class", class_name, class_fqcn, context);
+                check_class_like_constant(constant, class.span(), "class", class_name_bytes, class_fqcn_bytes, context);
             }
             _ => {}
         }
@@ -297,13 +311,15 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
 
 #[inline]
 pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
-    let interface_name = interface.name.value;
-    let interface_fqcn = context.get_name(interface.name.span.start);
+    let interface_name_bytes: &[u8] = interface.name.value;
+    let interface_fqcn_bytes: &[u8] = context.get_name(interface.name.span.start);
+    let interface_name = BytesDisplay(interface_name_bytes);
+    let interface_fqcn = BytesDisplay(interface_fqcn_bytes);
 
-    if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(interface_name))
+    if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(interface_name_bytes))
         || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED
             .iter()
-            .any(|keyword| keyword.eq_ignore_ascii_case(interface_name))
+            .any(|keyword| keyword.eq_ignore_ascii_case(interface_name_bytes))
     {
         context.report(
             Issue::error(format!("Interface `{interface_name}` name cannot be a reserved keyword."))
@@ -320,10 +336,25 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
     }
 
     if let Some(extends) = &interface.extends {
-        check_extends(extends, interface.span(), "interface", interface_name, interface_fqcn, false, context);
+        check_extends(
+            extends,
+            interface.span(),
+            "interface",
+            interface_name_bytes,
+            interface_fqcn_bytes,
+            false,
+            context,
+        );
     }
 
-    check_members(&interface.members, interface.span(), "interface", interface_name, interface_fqcn, context);
+    check_members(
+        &interface.members,
+        interface.span(),
+        "interface",
+        interface_name_bytes,
+        interface_fqcn_bytes,
+        context,
+    );
 
     for member in &interface.members {
         match &member {
@@ -352,8 +383,8 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                 );
             }
             ClassLikeMember::Method(method) => {
-                let method_name_id = method.name.value;
-                let method_name = &method_name_id;
+                let method_name_bytes: &[u8] = method.name.value;
+                let method_name = BytesDisplay(method_name_bytes);
 
                 let mut visibilities = vec![];
                 for modifier in &method.modifiers {
@@ -363,7 +394,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                 }
 
                 for visibility in visibilities {
-                    let visibility_name = visibility.get_keyword().value;
+                    let visibility_name = BytesDisplay(visibility.get_keyword().value);
 
                     context.report(
                         Issue::error(format!(
@@ -422,10 +453,10 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
 
                 check_method(
                     method,
-                    method_name,
+                    method_name_bytes,
                     interface.span(),
-                    interface_name,
-                    interface_fqcn,
+                    interface_name_bytes,
+                    interface_fqcn_bytes,
                     "interface",
                     true,
                     context,
@@ -451,7 +482,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                                 );
                     }
                     Property::Hooked(hooked_property) => {
-                        let property_name = hooked_property.item.variable().name;
+                        let property_name = BytesDisplay(hooked_property.item.variable().name);
 
                         let mut found_public = false;
                         let mut non_public_read_visibilities = vec![];
@@ -471,7 +502,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                         }
 
                         for visibility in write_visibilities {
-                            let visibility_name = visibility.get_keyword().value;
+                            let visibility_name = BytesDisplay(visibility.get_keyword().value);
 
                             context.report(
                                         Issue::error(format!(
@@ -492,7 +523,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                         }
 
                         for visibility in non_public_read_visibilities {
-                            let visibility_name = visibility.get_keyword().value;
+                            let visibility_name = BytesDisplay(visibility.get_keyword().value);
 
                             context.report(
                                 Issue::error(format!(
@@ -602,8 +633,8 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                     property,
                     interface.span(),
                     "interface",
-                    interface_name,
-                    interface_fqcn,
+                    interface_name_bytes,
+                    interface_fqcn_bytes,
                     true,
                     false,
                     false,
@@ -619,7 +650,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                 }
 
                 for visibility in &non_public_read_visibility {
-                    let visibility_name = visibility.get_keyword().value;
+                    let visibility_name = BytesDisplay(visibility.get_keyword().value);
 
                     context.report(
                         Issue::error(format!(
@@ -642,8 +673,8 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                     class_like_constant,
                     interface.span(),
                     "interface",
-                    interface_name,
-                    interface_fqcn,
+                    interface_name_bytes,
+                    interface_fqcn_bytes,
                     context,
                 );
             }
@@ -653,13 +684,15 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
 
 #[inline]
 pub fn check_trait<'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
-    let class_like_name = r#trait.name.value;
-    let class_like_fqcn = context.get_name(r#trait.name.span.start);
+    let class_like_name_bytes: &[u8] = r#trait.name.value;
+    let class_like_fqcn_bytes: &[u8] = context.get_name(r#trait.name.span.start);
+    let class_like_name = BytesDisplay(class_like_name_bytes);
+    let class_like_fqcn = BytesDisplay(class_like_fqcn_bytes);
 
-    if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_like_name))
+    if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_like_name_bytes))
         || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED
             .iter()
-            .any(|keyword| keyword.eq_ignore_ascii_case(class_like_name))
+            .any(|keyword| keyword.eq_ignore_ascii_case(class_like_name_bytes))
     {
         context.report(
             Issue::error(format!("Trait `{class_like_name}` name cannot be a reserved keyword."))
@@ -675,7 +708,7 @@ pub fn check_trait<'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Con
         );
     }
 
-    check_members(&r#trait.members, r#trait.span(), class_like_name, class_like_fqcn, "trait", context);
+    check_members(&r#trait.members, r#trait.span(), "trait", class_like_name_bytes, class_like_fqcn_bytes, context);
 
     for member in &r#trait.members {
         match &member {
@@ -695,8 +728,8 @@ pub fn check_trait<'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Con
                     method,
                     method.name.value,
                     r#trait.span(),
-                    class_like_name,
-                    class_like_fqcn,
+                    class_like_name_bytes,
+                    class_like_fqcn_bytes,
                     "trait",
                     false,
                     context,
@@ -707,8 +740,8 @@ pub fn check_trait<'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Con
                     property,
                     r#trait.span(),
                     "trait",
-                    class_like_name,
-                    class_like_fqcn,
+                    class_like_name_bytes,
+                    class_like_fqcn_bytes,
                     false,
                     false,
                     false,
@@ -734,8 +767,8 @@ pub fn check_trait<'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Con
                     class_like_constant,
                     r#trait.span(),
                     "trait",
-                    class_like_name,
-                    class_like_fqcn,
+                    class_like_name_bytes,
+                    class_like_fqcn_bytes,
                     context,
                 );
             }
@@ -755,12 +788,16 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
         return;
     }
 
-    let enum_name = r#enum.name.value;
-    let enum_fqcn = context.get_name(r#enum.name.span.start);
+    let enum_name_bytes: &[u8] = r#enum.name.value;
+    let enum_fqcn_bytes: &[u8] = context.get_name(r#enum.name.span.start);
+    let enum_name = BytesDisplay(enum_name_bytes);
+    let enum_fqcn = BytesDisplay(enum_fqcn_bytes);
     let enum_is_backed = r#enum.backing_type_hint.is_some();
 
-    if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(enum_name))
-        || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED.iter().any(|keyword| keyword.eq_ignore_ascii_case(enum_name))
+    if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(enum_name_bytes))
+        || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED
+            .iter()
+            .any(|keyword| keyword.eq_ignore_ascii_case(enum_name_bytes))
     {
         context.report(
             Issue::error(format!("Enum `{enum_name}` name cannot be a reserved keyword."))
@@ -778,7 +815,7 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
     if let Some(EnumBackingTypeHint { hint, .. }) = &r#enum.backing_type_hint
         && !matches!(hint, Hint::String(_) | Hint::Integer(_))
     {
-        let key = context.get_code_snippet(hint);
+        let key = BytesDisplay(context.get_code_snippet(hint));
 
         context.report(
             Issue::error(format!(
@@ -795,15 +832,15 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
     }
 
     if let Some(implements) = &r#enum.implements {
-        check_implements(implements, r#enum.span(), "enum", enum_name, enum_fqcn, true, context);
+        check_implements(implements, r#enum.span(), "enum", enum_name_bytes, enum_fqcn_bytes, true, context);
     }
 
-    check_members(&r#enum.members, r#enum.span(), enum_name, enum_fqcn, "enum", context);
+    check_members(&r#enum.members, r#enum.span(), "enum", enum_name_bytes, enum_fqcn_bytes, context);
 
     for member in &r#enum.members {
         match &member {
             ClassLikeMember::EnumCase(case) => {
-                let item_name = case.item.name().value;
+                let item_name = BytesDisplay(case.item.name().value);
 
                 match &case.item {
                     EnumCaseItem::Unit(_) => {
@@ -851,11 +888,13 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
                 }
             }
             ClassLikeMember::Method(method) => {
-                let method_name = method.name.value;
+                let method_name_bytes: &[u8] = method.name.value;
+                let method_name = BytesDisplay(method_name_bytes);
 
                 if let Some(magic_method) =
-                    MAGIC_METHODS.iter().find(|magic_method| magic_method.eq_ignore_ascii_case(method_name))
+                    MAGIC_METHODS.iter().find(|magic_method| magic_method.eq_ignore_ascii_case(method_name_bytes))
                 {
+                    let magic_method = BytesDisplay(magic_method);
                     context.report(
                         Issue::error(format!("Enum `{enum_name}` cannot contain magic method `{magic_method}`."))
                             .with_annotation(
@@ -889,7 +928,16 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
                     );
                 }
 
-                check_method(method, method_name, r#enum.span(), enum_name, enum_fqcn, "enum", false, context);
+                check_method(
+                    method,
+                    method_name_bytes,
+                    r#enum.span(),
+                    enum_name_bytes,
+                    enum_fqcn_bytes,
+                    "enum",
+                    false,
+                    context,
+                );
             }
             ClassLikeMember::Property(property) => {
                 context.report(
@@ -902,10 +950,27 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
                         .with_help(format!("Remove the property from the enum `{enum_name}`.")),
                 );
 
-                check_property(property, r#enum.span(), "enum", enum_name, enum_fqcn, false, false, false, context);
+                check_property(
+                    property,
+                    r#enum.span(),
+                    "enum",
+                    enum_name_bytes,
+                    enum_fqcn_bytes,
+                    false,
+                    false,
+                    false,
+                    context,
+                );
             }
             ClassLikeMember::Constant(class_like_constant) => {
-                check_class_like_constant(class_like_constant, r#enum.span(), "enum", enum_name, enum_fqcn, context);
+                check_class_like_constant(
+                    class_like_constant,
+                    r#enum.span(),
+                    "enum",
+                    enum_name_bytes,
+                    enum_fqcn_bytes,
+                    context,
+                );
             }
             _ => {}
         }
@@ -917,6 +982,7 @@ pub fn check_anonymous_class<'ast, 'arena>(
     anonymous_class: &'ast AnonymousClass<'arena>,
     context: &mut Context<'_, 'ast, 'arena>,
 ) {
+    let anonymous_class_name = BytesDisplay(ANONYMOUS_CLASS_NAME);
     let mut last_final = None;
     let mut last_readonly = None;
 
@@ -930,11 +996,11 @@ pub fn check_anonymous_class<'ast, 'arena>(
             | Modifier::Public(_)
             | Modifier::Protected(_)
             | Modifier::Private(_) => {
-                let modifier_name = modifier.get_keyword().value;
+                let modifier_name = BytesDisplay(modifier.get_keyword().value);
 
                 context.report(
                     Issue::error(format!(
-                        "Anonymous class `{ANONYMOUS_CLASS_NAME}` cannot have the `{modifier_name}` modifier."
+                        "Anonymous class `{anonymous_class_name}` cannot have the `{modifier_name}` modifier."
                     ))
                     .with_annotation(
                         Annotation::primary(modifier.span())
@@ -942,7 +1008,7 @@ pub fn check_anonymous_class<'ast, 'arena>(
                     )
                     .with_annotation(
                         Annotation::secondary(anonymous_class.span())
-                            .with_message(format!("Anonymous class `{ANONYMOUS_CLASS_NAME}` defined here.")),
+                            .with_message(format!("Anonymous class `{anonymous_class_name}` defined here.")),
                     )
                     .with_help(format!("Remove the `{modifier_name}` modifier from the class definition.")),
                 );
@@ -951,7 +1017,7 @@ pub fn check_anonymous_class<'ast, 'arena>(
                 if let Some(span) = last_final {
                     context.report(
                         Issue::error(format!(
-                            "Anonymous class `{ANONYMOUS_CLASS_NAME}` cannot have multiple `final` modifiers."
+                            "Anonymous class `{anonymous_class_name}` cannot have multiple `final` modifiers."
                         ))
                         .with_annotation(
                             Annotation::primary(keyword.span())
@@ -962,7 +1028,7 @@ pub fn check_anonymous_class<'ast, 'arena>(
                         )
                         .with_annotation(
                             Annotation::secondary(anonymous_class.span())
-                                .with_message(format!("Anonymous class `{ANONYMOUS_CLASS_NAME}` defined here.")),
+                                .with_message(format!("Anonymous class `{anonymous_class_name}` defined here.")),
                         )
                         .with_help("Remove the duplicate `final` modifier."),
                     );
@@ -974,14 +1040,14 @@ pub fn check_anonymous_class<'ast, 'arena>(
                 if let Some(span) = last_readonly {
                     context.report(
                         Issue::error(format!(
-                            "Anonymous class `{ANONYMOUS_CLASS_NAME}` cannot have multiple `readonly` modifiers."
+                            "Anonymous class `{anonymous_class_name}` cannot have multiple `readonly` modifiers."
                         ))
                         .with_annotations([
                             Annotation::primary(keyword.span)
                                 .with_message("Duplicate `readonly` modifier applied here."),
                             Annotation::secondary(span).with_message("Previous `readonly` modifier applied here."),
                             Annotation::secondary(anonymous_class.span())
-                                .with_message(format!("Anonymous class `{ANONYMOUS_CLASS_NAME}` defined here.")),
+                                .with_message(format!("Anonymous class `{anonymous_class_name}` defined here.")),
                         ])
                         .with_help("Remove the duplicate `readonly` modifier."),
                     );
@@ -997,7 +1063,7 @@ pub fn check_anonymous_class<'ast, 'arena>(
                             )
                             .with_annotation(
                                 Annotation::secondary(anonymous_class.span())
-                                    .with_message(format!("Anonymous class `{ANONYMOUS_CLASS_NAME}` defined here.")),
+                                    .with_message(format!("Anonymous class `{anonymous_class_name}` defined here.")),
                             ),
                     );
                 }
@@ -1042,28 +1108,29 @@ pub fn check_anonymous_class<'ast, 'arena>(
         match &member {
             ClassLikeMember::EnumCase(case) => {
                 context.report(
-                    Issue::error(format!("Anonymous class `{ANONYMOUS_CLASS_NAME}` cannot contain enum cases."))
+                    Issue::error(format!("Anonymous class `{anonymous_class_name}` cannot contain enum cases."))
                         .with_annotations([
                             Annotation::primary(case.span()).with_message("Enum case defined here."),
                             Annotation::secondary(anonymous_class.span())
-                                .with_message(format!("Anonymous class `{ANONYMOUS_CLASS_NAME}` defined here.")),
+                                .with_message(format!("Anonymous class `{anonymous_class_name}` defined here.")),
                         ])
                         .with_help("Remove the enum case from the anonymous class definition."),
                 );
             }
             ClassLikeMember::Method(method) => {
-                let method_name = method.name.value;
+                let method_name_bytes: &[u8] = method.name.value;
+                let method_name = BytesDisplay(method_name_bytes);
 
                 if let Some(abstract_modifier) = method.modifiers.get_abstract() {
                     context.report(
                         Issue::error(format!(
-                            "Method `{method_name}` in anonymous class `{ANONYMOUS_CLASS_NAME}` must not be abstract."
+                            "Method `{method_name}` in anonymous class `{anonymous_class_name}` must not be abstract."
                         ))
                         .with_annotations([
                             Annotation::primary(abstract_modifier.span())
                                 .with_message("Abstract modifier applied here."),
                             Annotation::secondary(anonymous_class.span())
-                                .with_message(format!("Anonymous class `{ANONYMOUS_CLASS_NAME}` defined here.")),
+                                .with_message(format!("Anonymous class `{anonymous_class_name}` defined here.")),
                             Annotation::secondary(method.span())
                                 .with_message(format!("Method `{method_name}` defined here.")),
                         ])
@@ -1073,7 +1140,7 @@ pub fn check_anonymous_class<'ast, 'arena>(
 
                 check_method(
                     method,
-                    method_name,
+                    method_name_bytes,
                     anonymous_class.span(),
                     ANONYMOUS_CLASS_NAME,
                     ANONYMOUS_CLASS_NAME,
@@ -1115,23 +1182,26 @@ pub fn check_members<'ast, 'arena>(
     members: &'ast Sequence<ClassLikeMember<'arena>>,
     class_like_span: Span,
     class_like_kind: &str,
-    class_like_name: &str,
-    class_like_fqcn: &str,
+    class_like_name: &[u8],
+    class_like_fqcn: &[u8],
     context: &mut Context<'_, 'ast, 'arena>,
 ) {
-    let mut method_names: Vec<(Span, String)> = vec![];
-    let mut constant_names: Vec<(bool, std::string::String, Span)> = vec![];
-    let mut property_names: Vec<(bool, &str, Span)> = vec![];
+    let class_like_name = BytesDisplay(class_like_name);
+    let class_like_fqcn = BytesDisplay(class_like_fqcn);
+    let mut method_names: Vec<(Span, Vec<u8>)> = vec![];
+    let mut constant_names: Vec<(bool, Vec<u8>, Span)> = vec![];
+    let mut property_names: Vec<(bool, &[u8], Span)> = vec![];
 
     for member in members {
         match &member {
             ClassLikeMember::Property(property) => match &property {
                 Property::Plain(plain_property) => {
                     for item in &plain_property.items {
-                        let item_name = item.variable().name;
+                        let item_name_bytes: &[u8] = item.variable().name;
+                        let item_name = BytesDisplay(item_name_bytes);
 
                         if let Some((is_promoted, _, span)) =
-                            property_names.iter().find(|(_, name, _)| item_name.eq(*name))
+                            property_names.iter().find(|(_, name, _)| item_name_bytes.eq(*name))
                         {
                             let message = if *is_promoted {
                                 format!(
@@ -1155,15 +1225,17 @@ pub fn check_members<'ast, 'arena>(
                                     .with_help("remove the duplicate property"),
                             );
                         } else {
-                            property_names.push((false, item_name, item.variable().span()));
+                            property_names.push((false, item_name_bytes, item.variable().span()));
                         }
                     }
                 }
                 Property::Hooked(hooked_property) => {
                     let item_variable = hooked_property.item.variable();
-                    let item_name = item_variable.name;
+                    let item_name_bytes: &[u8] = item_variable.name;
+                    let item_name = BytesDisplay(item_name_bytes);
 
-                    if let Some((is_promoted, _, span)) = property_names.iter().find(|(_, name, _)| item_name.eq(*name))
+                    if let Some((is_promoted, _, span)) =
+                        property_names.iter().find(|(_, name, _)| item_name_bytes.eq(*name))
                     {
                         let message = if *is_promoted {
                             format!(
@@ -1186,13 +1258,14 @@ pub fn check_members<'ast, 'arena>(
                                 .with_help("remove the duplicate property"),
                         );
                     } else {
-                        property_names.push((false, item_name, item_variable.span()));
+                        property_names.push((false, item_name_bytes, item_variable.span()));
                     }
                 }
             },
             ClassLikeMember::Method(method) => {
-                let method_name = method.name.value;
-                let lowercase_method_name = method_name.to_ascii_lowercase();
+                let method_name_bytes: &[u8] = method.name.value;
+                let method_name = BytesDisplay(method_name_bytes);
+                let lowercase_method_name = method_name_bytes.to_ascii_lowercase();
 
                 if let Some((previous, _)) =
                     method_names.iter().find(|(_, previous_name)| lowercase_method_name.eq(previous_name))
@@ -1212,13 +1285,14 @@ pub fn check_members<'ast, 'arena>(
                     method_names.push((method.name.span(), lowercase_method_name));
                 }
 
-                if method_name.eq_ignore_ascii_case(CONSTRUCTOR_MAGIC_METHOD) {
+                if method_name_bytes.eq_ignore_ascii_case(CONSTRUCTOR_MAGIC_METHOD) {
                     for parameter in &method.parameter_list.parameters {
                         if parameter.is_promoted_property() {
-                            let item_name = parameter.variable.name;
+                            let item_name_bytes: &[u8] = parameter.variable.name;
+                            let item_name = BytesDisplay(item_name_bytes);
 
                             if let Some((is_promoted, _, span)) =
-                                property_names.iter().find(|(_, name, _)| item_name.eq(*name))
+                                property_names.iter().find(|(_, name, _)| item_name_bytes.eq(*name))
                             {
                                 let message = if *is_promoted {
                                     format!(
@@ -1244,7 +1318,7 @@ pub fn check_members<'ast, 'arena>(
                                         .with_help("remove the duplicate property"),
                                 );
                             } else {
-                                property_names.push((true, item_name, parameter.variable.span()));
+                                property_names.push((true, item_name_bytes, parameter.variable.span()));
                             }
                         }
                     }
@@ -1252,9 +1326,12 @@ pub fn check_members<'ast, 'arena>(
             }
             ClassLikeMember::Constant(class_like_constant) => {
                 for item in &class_like_constant.items {
-                    let item_name = item.name.value;
+                    let item_name_bytes: &[u8] = item.name.value;
 
-                    if let Some((is_constant, name, span)) = constant_names.iter().find(|t| t.1.eq(&item_name)) {
+                    if let Some((is_constant, name, span)) =
+                        constant_names.iter().find(|t| t.1.as_slice() == item_name_bytes)
+                    {
+                        let name = BytesDisplay(name.as_slice());
                         if *is_constant {
                             context.report(
                                 Issue::error(format!(
@@ -1285,14 +1362,17 @@ pub fn check_members<'ast, 'arena>(
                             );
                         }
                     } else {
-                        constant_names.push((true, item_name.to_string(), item.name.span()));
+                        constant_names.push((true, item_name_bytes.to_vec(), item.name.span()));
                     }
                 }
             }
             ClassLikeMember::EnumCase(enum_case) => {
-                let case_name = enum_case.item.name().value;
+                let case_name_bytes: &[u8] = enum_case.item.name().value;
 
-                if let Some((is_constant, name, span)) = constant_names.iter().find(|t| t.1.eq(&case_name)) {
+                if let Some((is_constant, name, span)) =
+                    constant_names.iter().find(|t| t.1.as_slice() == case_name_bytes)
+                {
+                    let name = BytesDisplay(name.as_slice());
                     if *is_constant {
                         context.report(
                             Issue::error(format!(
@@ -1323,7 +1403,7 @@ pub fn check_members<'ast, 'arena>(
 
                     continue;
                 }
-                constant_names.push((false, case_name.to_string(), enum_case.item.name().span()));
+                constant_names.push((false, case_name_bytes.to_vec(), enum_case.item.name().span()));
             }
             _ => {}
         }

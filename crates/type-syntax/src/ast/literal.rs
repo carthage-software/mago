@@ -8,14 +8,14 @@ use mago_span::Span;
 pub struct LiteralIntType<'arena> {
     pub span: Span,
     pub value: u64,
-    pub raw: &'arena str,
+    pub raw: &'arena [u8],
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct LiteralFloatType<'arena> {
     pub span: Span,
     pub value: OrderedFloat<f64>,
-    pub raw: &'arena str,
+    pub raw: &'arena [u8],
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -27,8 +27,8 @@ pub enum LiteralIntOrFloatType<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct LiteralStringType<'arena> {
     pub span: Span,
-    pub value: &'arena str, // unquoted
-    pub raw: &'arena str,
+    pub value: &'arena [u8], // unquoted
+    pub raw: &'arena [u8],
 }
 
 impl HasSpan for LiteralFloatType<'_> {
@@ -60,13 +60,13 @@ impl HasSpan for LiteralStringType<'_> {
 
 impl std::fmt::Display for LiteralIntType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.raw)
+        f.write_str(&String::from_utf8_lossy(self.raw))
     }
 }
 
 impl std::fmt::Display for LiteralFloatType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.raw)
+        f.write_str(&String::from_utf8_lossy(self.raw))
     }
 }
 
@@ -81,6 +81,6 @@ impl std::fmt::Display for LiteralIntOrFloatType<'_> {
 
 impl std::fmt::Display for LiteralStringType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.raw)
+        f.write_str(&String::from_utf8_lossy(self.raw))
     }
 }

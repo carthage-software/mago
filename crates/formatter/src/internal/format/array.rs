@@ -66,8 +66,8 @@ impl<'arena> ArrayLike<'arena> {
     }
 
     #[inline]
-    pub const fn get_left_delimiter(&self) -> &'static str {
-        if matches!(self, Self::List(_) | Self::LegacyArray(_)) { "(" } else { "[" }
+    pub const fn get_left_delimiter(&self) -> &'static [u8] {
+        if matches!(self, Self::List(_) | Self::LegacyArray(_)) { b"(" } else { b"[" }
     }
 
     #[inline]
@@ -80,8 +80,8 @@ impl<'arena> ArrayLike<'arena> {
     }
 
     #[inline]
-    pub const fn get_right_delimiter(&self) -> &'static str {
-        if matches!(self, Self::List(_) | Self::LegacyArray(_)) { ")" } else { "]" }
+    pub const fn get_right_delimiter(&self) -> &'static [u8] {
+        if matches!(self, Self::List(_) | Self::LegacyArray(_)) { b")" } else { b"]" }
     }
 
     fn prefix(&self, f: &mut FormatterState<'_, 'arena>) -> Option<Document<'arena>> {
@@ -179,7 +179,7 @@ pub(super) fn print_array_like<'arena>(
                 }
 
                 indent_parts.push(format_row_with_alignment(f, formatted_element, &widths));
-                indent_parts.push(Document::String(","));
+                indent_parts.push(Document::String(b","));
                 indent_parts.push(Document::Line(Line::hard()));
                 if f.is_next_line_empty(element_span) {
                     indent_parts.push(Document::Line(Line::hard()));
@@ -207,7 +207,7 @@ pub(super) fn print_array_like<'arena>(
                     break;
                 }
 
-                indent_parts.push(Document::String(","));
+                indent_parts.push(Document::String(b","));
                 indent_parts.push(Document::Line(Line::default()));
                 if f.is_next_line_empty(element_span) {
                     indent_parts.push(Document::Line(Line::hard()));
@@ -221,7 +221,7 @@ pub(super) fn print_array_like<'arena>(
     f.set_alignment_context(outer_alignment);
 
     if f.settings.trailing_comma {
-        parts.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
+        parts.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
     }
 
     if let Some(dangling_comments) = f.print_dangling_comments(array_like.span(), true) {
@@ -291,7 +291,7 @@ fn inline_single_element<'arena>(
                 in f.arena;
                 key,
                 Document::space(),
-                Document::String("=>"),
+                Document::String(b"=>"),
                 Document::space(),
                 value,
             ])))
@@ -415,11 +415,11 @@ fn extract_array_elements<'arena>(
                 // Check if this array contains the left delimiter
                 for item in arr {
                     if let Document::String(s) = item {
-                        if *s == "[" || *s == "(" {
+                        if *s == b"[" || *s == b"(" {
                             opening_delimiter = Some(clone_in_arena(f.arena, doc));
                             in_elements = true;
                             break;
-                        } else if !in_elements && *s == "]" || *s == ")" {
+                        } else if !in_elements && *s == b"]" || *s == b")" {
                             closing_delimiter = Some(clone_in_arena(f.arena, doc));
                             break;
                         }
@@ -431,7 +431,7 @@ fn extract_array_elements<'arena>(
                 let mut element_start = 1;
                 for (i, item) in indent_docs.iter().enumerate() {
                     match item {
-                        Document::String(s) if *s == "," => {
+                        Document::String(s) if *s == b"," => {
                             if i > element_start {
                                 elements.push(clone_in_arena(f.arena, &indent_docs[element_start]));
                             }
@@ -482,18 +482,16 @@ fn format_elements_with_alignment<'arena>(
                 Document::Array(vec![
                     in f.arena;
                     element,
-                    Document::String(","),
+                    Document::String(b","),
                     Document::String({
                         let mut spaces = Vec::with_capacity_in(padding + 1, f.arena);
                         spaces.resize(padding + 1, b' ');
-
-                        // Safety: We only insert spaces (ASCII 0x20), which are valid UTF-8
-                        unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) }
+                        spaces.into_bump_slice()
                     })
                 ])
             } else {
                 // No padding needed
-                Document::Array(vec![in f.arena;element, Document::String(","), Document::space()])
+                Document::Array(vec![in f.arena;element, Document::String(b","), Document::space()])
             }
         } else {
             // Last element, no padding

@@ -207,19 +207,19 @@ fn is_escaping_function_call(ctx: &LintContext, function_call: &FunctionCall) ->
 }
 
 /// Check if a function name is a `WordPress` escaping function (fallback without context)
-fn is_escaping_function(name: &str) -> bool {
+fn is_escaping_function(name: &[u8]) -> bool {
     matches!(
         name,
-        "esc_html"
-            | "esc_attr"
-            | "esc_url"
-            | "esc_js"
-            | "esc_textarea"
-            | "esc_xml"
-            | "sanitize_text_field"
-            | "sanitize_email"
-            | "sanitize_url"
-            | "wp_kses"
-            | "wp_kses_post"
+        b"esc_html"
+            | b"esc_attr"
+            | b"esc_url"
+            | b"esc_js"
+            | b"esc_textarea"
+            | b"esc_xml"
+            | b"sanitize_text_field"
+            | b"sanitize_email"
+            | b"sanitize_url"
+            | b"wp_kses"
+            | b"wp_kses_post"
     )
 }

@@ -8,6 +8,7 @@ use mago_database::file::File;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
+use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Program;
 use mago_text_edit::TextEdit;
@@ -20,6 +21,28 @@ use crate::walk::attach_pragma_scopes;
 pub mod pragma;
 
 mod walk;
+
+#[inline]
+fn trim_start_byte(s: &[u8], byte: u8) -> &[u8] {
+    let mut i = 0;
+    while i < s.len() && s[i] == byte {
+        i += 1;
+    }
+    &s[i..]
+}
+
+#[inline]
+fn check_non_pragma_line(line: &[u8]) -> bool {
+    let trimmed = line.trim_ascii();
+    let without_marker = trim_start_byte(trimmed, b'*').trim_ascii();
+    if without_marker.is_empty() {
+        return false;
+    }
+    if without_marker.starts_with(b"@mago-ignore") || without_marker.starts_with(b"@mago-expect") {
+        return false;
+    }
+    true
+}
 
 /// A stateful collector for diagnostics (`Issue`s) within a specific category (e.g., "lint", "analysis").
 ///
@@ -384,7 +407,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
                 && let Some(count_span) = pragma.count_span
             {
                 Some(TextEdit::replace(
-                    TextRange::new(count_span.start.offset, count_span.end.offset),
+                    TextRange::new(count_span.start_offset(), count_span.end_offset()),
                     if pragma.matches == 1 { String::new() } else { format!("({})", pragma.matches) },
                 ))
             } else {
@@ -461,9 +484,9 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// Computes a `TextEdit` to delete a single code from a comma-separated list
     /// within a pragma directive (e.g., remove `bar` from `@mago-expect lint:foo,bar,baz`).
     fn compute_code_deletion(&self, pragma: &Pragma<'arena>) -> TextEdit {
-        let contents = self.file.contents.as_bytes();
-        let code_start = pragma.code_span.start.offset as usize;
-        let code_end = pragma.code_span.end.offset as usize;
+        let contents = self.file.contents.as_ref();
+        let code_start = pragma.code_span.start_offset() as usize;
+        let code_end = pragma.code_span.end_offset() as usize;
 
         let mut scan = code_start;
         while scan > 0 {
@@ -506,18 +529,18 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     fn compute_comment_deletion(&self, pragma: &Pragma<'arena>) -> TextEdit {
         if pragma.own_line {
             let line_start =
-                self.file.get_line_start_offset(pragma.start_line).unwrap_or(pragma.trivia_span.start.offset);
+                self.file.get_line_start_offset(pragma.start_line).unwrap_or(pragma.trivia_span.start_offset());
             let delete_end =
-                self.file.get_line_start_offset(pragma.end_line + 1).unwrap_or(pragma.trivia_span.end.offset);
+                self.file.get_line_start_offset(pragma.end_line + 1).unwrap_or(pragma.trivia_span.end_offset());
 
             TextEdit::delete(TextRange::new(line_start, delete_end))
         } else {
-            let mut start = pragma.trivia_span.start.offset as usize;
-            while start > 0 && matches!(self.file.contents.as_bytes()[start - 1], b' ' | b'\t') {
+            let mut start = pragma.trivia_span.start_offset() as usize;
+            while start > 0 && matches!(self.file.contents[start - 1], b' ' | b'\t') {
                 start -= 1;
             }
 
-            TextEdit::delete(TextRange::new(start as u32, pragma.trivia_span.end.offset))
+            TextEdit::delete(TextRange::new(start as u32, pragma.trivia_span.end_offset()))
         }
     }
 
@@ -529,28 +552,26 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// the comment also carries documentation or other tags).
     fn trivia_has_non_pragma_content(&self, pragma: &Pragma<'arena>) -> bool {
         let trivia_text =
-            &self.file.contents[pragma.trivia_span.start.offset as usize..pragma.trivia_span.end.offset as usize];
+            &self.file.contents[pragma.trivia_span.start_offset() as usize..pragma.trivia_span.end_offset() as usize];
 
         let inner = trivia_text
-            .strip_prefix("/**")
-            .or_else(|| trivia_text.strip_prefix("/*"))
-            .or_else(|| trivia_text.strip_prefix("//"))
-            .or_else(|| trivia_text.strip_prefix('#'))
+            .strip_prefix(b"/**")
+            .or_else(|| trivia_text.strip_prefix(b"/*"))
+            .or_else(|| trivia_text.strip_prefix(b"//"))
+            .or_else(|| trivia_text.strip_prefix(b"#"))
             .unwrap_or(trivia_text);
 
-        let inner = inner.strip_suffix("*/").unwrap_or(inner);
+        let inner = inner.strip_suffix(b"*/").unwrap_or(inner);
 
-        for line in inner.lines() {
-            let trimmed = line.trim();
-            let without_marker = trimmed.trim_start_matches('*').trim();
-            if without_marker.is_empty() {
-                continue;
+        let mut cursor = 0usize;
+        for nl in memchr::memchr_iter(b'\n', inner) {
+            let line = &inner[cursor..nl];
+            cursor = nl + 1;
+            if check_non_pragma_line(line) {
+                return true;
             }
-
-            if without_marker.starts_with("@mago-ignore") || without_marker.starts_with("@mago-expect") {
-                continue;
-            }
-
+        }
+        if cursor < inner.len() && check_non_pragma_line(&inner[cursor..]) {
             return true;
         }
 
@@ -559,9 +580,9 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
 
     /// Computes a `TextEdit` to delete a single pragma directive line from within a multi-line comment.
     fn compute_directive_deletion(&self, pragma: &Pragma<'arena>) -> TextEdit {
-        let pragma_line = self.file.line_number(pragma.span.start.offset);
-        let line_start = self.file.get_line_start_offset(pragma_line).unwrap_or(pragma.span.start.offset);
-        let delete_end = self.file.get_line_start_offset(pragma_line + 1).unwrap_or(pragma.span.end.offset);
+        let pragma_line = self.file.line_number(pragma.span.start_offset());
+        let line_start = self.file.get_line_start_offset(pragma_line).unwrap_or(pragma.span.start_offset());
+        let delete_end = self.file.get_line_start_offset(pragma_line + 1).unwrap_or(pragma.span.end_offset());
 
         TextEdit::delete(TextRange::new(line_start, delete_end))
     }
@@ -606,7 +627,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
             return None;
         }
 
-        let issue_start_line = self.file.line_number(issue_span.start.offset);
+        let issue_start_line = self.file.line_number(issue_span.start_offset());
 
         let mut best_match_index = None;
 
@@ -630,7 +651,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
             } else if pragma.own_line {
                 pragma.start_line < issue_start_line
             } else {
-                self.file.line_number(pragma.span.start.offset) == issue_start_line
+                self.file.line_number(pragma.span.start_offset()) == issue_start_line
             };
 
             if !is_applicable {

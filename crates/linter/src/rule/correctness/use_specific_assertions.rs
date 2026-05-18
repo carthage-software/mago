@@ -24,9 +24,10 @@ use crate::rule::LintRule;
 use crate::rule::utils::phpunit::find_all_assertion_references_in_method;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
+use mago_bytes::BytesDisplay;
 
-const GENERIC_ASSERTIONS: [&str; 4] = ["assertEquals", "assertNotEquals", "assertSame", "assertNotSame"];
-const EQUALITY_ASSERTIONS: [&str; 2] = ["assertEquals", "assertNotEquals"];
+const GENERIC_ASSERTIONS: [&[u8]; 4] = [b"assertEquals", b"assertNotEquals", b"assertSame", b"assertNotSame"];
+const EQUALITY_ASSERTIONS: [&[u8]; 2] = [b"assertEquals", b"assertNotEquals"];
 
 /// Position of the literal in the assertion call.
 #[derive(Debug, Clone, Copy)]
@@ -131,8 +132,8 @@ impl LintRule for UseSpecificAssertionsRule {
             return;
         };
 
-        if !method.name.value.starts_with("test")
-            || method.name.value.chars().nth(4).is_none_or(|c| c != '_' && !c.is_uppercase())
+        if !method.name.value.starts_with(b"test")
+            || method.name.value.get(4).is_none_or(|c| *c != b'_' && !c.is_ascii_uppercase())
         {
             return;
         }
@@ -142,7 +143,8 @@ impl LintRule for UseSpecificAssertionsRule {
                 continue;
             };
 
-            if !GENERIC_ASSERTIONS.contains(&identifier.value) {
+            let identifier_value: &[u8] = identifier.value;
+            if !GENERIC_ASSERTIONS.contains(&identifier_value) {
                 continue;
             }
 
@@ -159,17 +161,21 @@ impl LintRule for UseSpecificAssertionsRule {
             let first_expr = first_arg.value();
             let second_expr = second_arg.value();
 
-            let is_equality_assertion = EQUALITY_ASSERTIONS.contains(&identifier.value);
+            let is_equality_assertion = EQUALITY_ASSERTIONS.contains(&identifier_value);
+            let identifier_display = BytesDisplay(identifier_value);
 
             let Some((specific_assertion, literal_position)) =
-                get_specific_assertion(identifier.value, first_expr, second_expr)
+                get_specific_assertion(identifier_value, first_expr, second_expr)
             else {
                 continue;
             };
 
             let mut issue = Issue::new(
                 self.cfg.level(),
-                format!("Use `{}` instead of `{}` for clearer test assertions.", specific_assertion, identifier.value),
+                format!(
+                    "Use `{}` instead of `{}` for clearer test assertions.",
+                    specific_assertion, identifier_display
+                ),
             )
             .with_code(self.meta.code)
             .with_annotation(
@@ -178,13 +184,13 @@ impl LintRule for UseSpecificAssertionsRule {
             )
             .with_help(format!(
                 "Replace `{}(...)` with `{}(...)` for a more specific assertion.",
-                identifier.value, specific_assertion
+                identifier_display, specific_assertion
             ));
 
             if is_equality_assertion {
                 issue = issue.with_help(format!(
                     "`{}` performs a non-strict comparison, while `{specific_assertion}` performs a strict comparison.",
-                    identifier.value
+                    identifier_display
                 ));
 
                 issue = issue.with_help("Ensure that this change does not affect the test behavior.");
@@ -237,11 +243,11 @@ fn get_literal_kind(expr: &Expression<'_>) -> Option<LiteralKind> {
 
 /// Returns the specific assertion name and the position of the literal argument.
 fn get_specific_assertion(
-    assertion_name: &str,
+    assertion_name: &[u8],
     first_arg: &Expression<'_>,
     second_arg: &Expression<'_>,
 ) -> Option<(&'static str, LiteralPosition)> {
-    let is_not_assertion = assertion_name.contains("Not");
+    let is_not_assertion = memchr::memmem::find(assertion_name, b"Not").is_some();
 
     // Check first argument for literal
     if let Some(kind) = get_literal_kind(first_arg) {

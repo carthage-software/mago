@@ -21,7 +21,7 @@ pub enum Identifier<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct LocalIdentifier<'arena> {
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 /// Represents a qualified identifier.
@@ -30,7 +30,7 @@ pub struct LocalIdentifier<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct QualifiedIdentifier<'arena> {
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 /// Represents a fully qualified identifier.
@@ -39,7 +39,7 @@ pub struct QualifiedIdentifier<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct FullyQualifiedIdentifier<'arena> {
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 impl<'arena> Identifier<'arena> {
@@ -63,7 +63,7 @@ impl<'arena> Identifier<'arena> {
 
     #[inline]
     #[must_use]
-    pub const fn value(&self) -> &'arena str {
+    pub const fn value(&self) -> &'arena [u8] {
         match &self {
             Identifier::Local(local_identifier) => local_identifier.value,
             Identifier::Qualified(qualified_identifier) => qualified_identifier.value,
@@ -73,10 +73,10 @@ impl<'arena> Identifier<'arena> {
 
     #[inline]
     #[must_use]
-    pub fn last_segment(&self) -> &'arena str {
+    pub fn last_segment(&self) -> &'arena [u8] {
         let value = self.value();
 
-        match value.rfind('\\') {
+        match value.iter().position(|b| *b == b'\\') {
             Some(pos) => &value[pos + 1..],
             None => value,
         }

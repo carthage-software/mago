@@ -25,7 +25,7 @@ where
     T: Format<'arena> + HasSpan,
 {
     let length = nodes.len();
-    let mut contents = vec![in f.arena; Document::String("{")];
+    let mut contents = vec![in f.arena; Document::String(b"{")];
     if let Some(c) = f.print_trailing_comments(*left_brace) {
         contents.push(c);
     }
@@ -56,7 +56,7 @@ where
         contents.push(Document::Line(Line::hard()));
     }
 
-    contents.push(Document::String("}"));
+    contents.push(Document::String(b"}"));
     if let Some(comments) = f.print_trailing_comments(*right_brace) {
         contents.push(comments);
     }
@@ -71,7 +71,7 @@ pub(super) fn print_block<'arena>(
     right_brace: &'arena Span,
 ) -> Document<'arena> {
     let mut contents = vec![in f.arena];
-    contents.push(Document::String("{"));
+    contents.push(Document::String(b"{"));
     if let Some(c) = f.print_trailing_comments(*left_brace) {
         contents.push(c);
     }
@@ -103,7 +103,7 @@ pub(super) fn print_block<'arena>(
         match &parent {
             // functions, and methods
             Node::Method(method) => {
-                if method.name.value.eq_ignore_ascii_case("__construct") {
+                if method.name.value.eq_ignore_ascii_case(b"__construct") {
                     !f.settings.inline_empty_constructor_braces
                 } else {
                     !f.settings.inline_empty_method_braces
@@ -148,7 +148,7 @@ pub(super) fn print_block<'arena>(
         contents.push(Document::Line(Line::soft()));
     }
 
-    contents.push(Document::String("}"));
+    contents.push(Document::String(b"}"));
     if let Some(comments) = f.print_trailing_comments(*right_brace) {
         contents.push(comments);
     }
@@ -168,8 +168,8 @@ pub(super) fn print_block_body<'arena>(
 pub fn block_is_empty(f: &FormatterState<'_, '_>, left_brace: &Span, right_brace: &Span) -> bool {
     let content = &f.source_text[left_brace.end.offset as usize..right_brace.start.offset as usize];
 
-    for c in content.chars() {
-        if !c.is_whitespace() || matches!(c, ';') {
+    for &c in content {
+        if !c.is_ascii_whitespace() || c == b';' {
             return false;
         }
     }

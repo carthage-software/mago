@@ -3,9 +3,9 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::reference::ReferenceSource;
@@ -64,7 +64,7 @@ pub enum TAtomic {
     Resource(TResource),
     Reference(TReference),
     GenericParameter(TGenericParameter),
-    Variable(Atom),
+    Variable(Word),
     Conditional(TConditional),
     Derived(TDerived),
     Alias(TAlias),
@@ -222,7 +222,7 @@ impl TAtomic {
     }
 
     #[must_use]
-    pub fn get_object_or_enum_name(&self) -> Option<Atom> {
+    pub fn get_object_or_enum_name(&self) -> Option<Word> {
         match self {
             TAtomic::Object(object) => match object {
                 TObject::Named(named_object) => Some(named_object.get_name()),
@@ -234,7 +234,7 @@ impl TAtomic {
     }
 
     #[must_use]
-    pub fn get_all_object_names(&self) -> Vec<Atom> {
+    pub fn get_all_object_names(&self) -> Vec<Word> {
         let mut object_names = vec![];
 
         if let TAtomic::Object(object) = self {
@@ -255,14 +255,14 @@ impl TAtomic {
     #[must_use]
     pub fn is_stdclass(&self) -> bool {
         matches!(&self, TAtomic::Object(object) if {
-            object.get_name().is_some_and(|name| name.eq_ignore_ascii_case("stdClass"))
+            object.get_name().is_some_and(|name| name.as_bytes().eq_ignore_ascii_case(b"stdClass"))
         })
     }
 
     #[must_use]
     pub fn is_generator(&self) -> bool {
         matches!(&self, TAtomic::Object(object) if {
-            object.get_name().is_some_and(|name| name.eq_ignore_ascii_case("Generator"))
+            object.get_name().is_some_and(|name| name.as_bytes().eq_ignore_ascii_case(b"Generator"))
         })
     }
 
@@ -274,7 +274,7 @@ impl TAtomic {
             };
 
             let object_name = named_object.get_name();
-            if !object_name.eq_ignore_ascii_case("Generator") {
+            if !object_name.as_bytes().eq_ignore_ascii_case(b"Generator") {
                 break 'parameters None;
             }
 
@@ -365,7 +365,7 @@ impl TAtomic {
 
     #[inline]
     #[must_use]
-    pub fn extends_or_implements(&self, codebase: &CodebaseMetadata, interface: &str) -> bool {
+    pub fn extends_or_implements(&self, codebase: &CodebaseMetadata, interface: &[u8]) -> bool {
         let object = match self {
             TAtomic::Object(object) => object,
             TAtomic::GenericParameter(parameter) => {
@@ -402,11 +402,11 @@ impl TAtomic {
         };
 
         if let Some(object_name) = object.get_name() {
-            if object_name == interface {
+            if object_name.as_bytes() == interface {
                 return true;
             }
 
-            if codebase.is_instance_of(&object_name, interface) {
+            if codebase.is_instance_of(object_name.as_bytes(), interface) {
                 return true;
             }
         }
@@ -427,7 +427,7 @@ impl TAtomic {
     pub fn is_countable(&self, codebase: &CodebaseMetadata) -> bool {
         match self {
             TAtomic::Array(_) => true,
-            _ => self.extends_or_implements(codebase, "Countable"),
+            _ => self.extends_or_implements(codebase, b"Countable"),
         }
     }
 
@@ -440,10 +440,10 @@ impl TAtomic {
     #[inline]
     #[must_use]
     pub fn is_traversable(&self, codebase: &CodebaseMetadata) -> bool {
-        self.extends_or_implements(codebase, "Traversable")
-            || self.extends_or_implements(codebase, "Iterator")
-            || self.extends_or_implements(codebase, "IteratorAggregate")
-            || self.extends_or_implements(codebase, "Generator")
+        self.extends_or_implements(codebase, b"Traversable")
+            || self.extends_or_implements(codebase, b"Iterator")
+            || self.extends_or_implements(codebase, b"IteratorAggregate")
+            || self.extends_or_implements(codebase, b"Generator")
     }
 
     #[inline]
@@ -735,7 +735,7 @@ impl TAtomic {
 
     #[inline]
     #[must_use]
-    pub const fn get_generic_parameter_name(&self) -> Option<Atom> {
+    pub const fn get_generic_parameter_name(&self) -> Option<Word> {
         match self {
             TAtomic::GenericParameter(parameter) => Some(parameter.parameter_name),
             _ => None,
@@ -824,7 +824,7 @@ impl TAtomic {
             TAtomic::Object(TObject::Named(named_object)) => {
                 let name = named_object.get_name();
                 if let Some(type_parameters) = named_object.get_type_parameters_mut() {
-                    if name.eq_ignore_ascii_case("Traversable") {
+                    if name.as_bytes().eq_ignore_ascii_case(b"Traversable") {
                         let has_kv_pair = type_parameters.len() == 2;
 
                         if let Some(key_or_value_param) = type_parameters.get_mut(0)
@@ -853,7 +853,7 @@ impl TAtomic {
     }
 
     #[must_use]
-    pub fn get_literal_string_value(&self) -> Option<&str> {
+    pub fn get_literal_string_value(&self) -> Option<&[u8]> {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_known_literal_string_value(),
             _ => None,
@@ -861,7 +861,7 @@ impl TAtomic {
     }
 
     #[must_use]
-    pub fn get_class_string_value(&self) -> Option<Atom> {
+    pub fn get_class_string_value(&self) -> Option<Word> {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_literal_class_string_value(),
             _ => None,
@@ -1096,7 +1096,7 @@ impl TType for TAtomic {
         }
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_id(),
             TAtomic::Array(array) => array.get_id(),
@@ -1111,14 +1111,14 @@ impl TType for TAtomic {
             TAtomic::Alias(alias) => alias.get_id(),
             TAtomic::Derived(derived) => derived.get_id(),
             TAtomic::Variable(name) => *name,
-            TAtomic::Never => atom("never"),
-            TAtomic::Null => atom("null"),
-            TAtomic::Void => atom("void"),
-            TAtomic::Placeholder => atom("_"),
+            TAtomic::Never => word("never"),
+            TAtomic::Null => word("null"),
+            TAtomic::Void => word("void"),
+            TAtomic::Placeholder => word("_"),
         }
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         match self {
             TAtomic::Scalar(scalar) => scalar.get_pretty_id_with_indent(indent),
             TAtomic::Array(array) => array.get_pretty_id_with_indent(indent),
@@ -1133,10 +1133,10 @@ impl TType for TAtomic {
             TAtomic::Alias(alias) => alias.get_pretty_id_with_indent(indent),
             TAtomic::Derived(derived) => derived.get_pretty_id_with_indent(indent),
             TAtomic::Variable(name) => *name,
-            TAtomic::Never => atom("never"),
-            TAtomic::Null => atom("null"),
-            TAtomic::Void => atom("void"),
-            TAtomic::Placeholder => atom("_"),
+            TAtomic::Never => word("never"),
+            TAtomic::Null => word("null"),
+            TAtomic::Void => word("void"),
+            TAtomic::Placeholder => word("_"),
         }
     }
 }
@@ -1294,7 +1294,7 @@ pub fn populate_atomic_type(
                     }
                 }
 
-                if let Some(symbol_kind) = codebase_symbols.get_kind(ascii_lowercase_atom(name)) {
+                if let Some(symbol_kind) = codebase_symbols.get_kind(ascii_lowercase_word(name.as_bytes())) {
                     if symbol_kind == SymbolKind::Enum {
                         *unpopulated_atomic = TAtomic::Object(TObject::new_enum(*name));
                     } else {

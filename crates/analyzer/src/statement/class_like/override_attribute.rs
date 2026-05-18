@@ -1,4 +1,3 @@
-use mago_atom::ascii_lowercase_atom;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_php_version::PHPVersion;
 use mago_reporting::Annotation;
@@ -6,6 +5,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::ClassLikeMember;
 use mago_text_edit::TextEdit;
+use mago_word::ascii_lowercase_word;
 
 use crate::code::IssueCode;
 use crate::context::Context;
@@ -31,7 +31,7 @@ pub fn check_override_attribute<'ctx, 'arena>(
                 for attribute in &attribute_list.attributes {
                     let fqcn = context.resolved_names.get(&attribute.name);
 
-                    if fqcn.eq_ignore_ascii_case("Override") {
+                    if fqcn.eq_ignore_ascii_case(b"Override") {
                         break 'outer (Some(attribute), index);
                     }
                 }
@@ -40,8 +40,9 @@ pub fn check_override_attribute<'ctx, 'arena>(
             (None, 0)
         };
 
-        let name = method.name.value.to_lowercase();
-        if name.eq_ignore_ascii_case("__construct") {
+        let name_bytes = method.name.value.to_ascii_lowercase();
+        let name = mago_bytes::BytesDisplay(&name_bytes);
+        if name_bytes.eq_ignore_ascii_case(b"__construct") {
             if let Some(attribute) = override_attribute {
                 let issue = Issue::error("Invalid `#[Override]` attribute on constructor.")
                     .with_code(IssueCode::InvalidOverrideAttribute)
@@ -65,7 +66,7 @@ pub fn check_override_attribute<'ctx, 'arena>(
             continue;
         }
 
-        let lowercase_name = ascii_lowercase_atom(method.name.value);
+        let lowercase_name = ascii_lowercase_word(method.name.value);
         let Some(parent_class_names) = metadata.overridden_method_ids.get(&lowercase_name) else {
             if let Some(attribute) = override_attribute {
                 let mut issue = Issue::error(format!("Invalid `#[Override]` attribute on `{class_name}::{name}`."))
@@ -104,7 +105,7 @@ pub fn check_override_attribute<'ctx, 'arena>(
             let parent_class_name = parent_method_id.get_class_name();
             let method_name = parent_method_id.get_method_name();
 
-            context.codebase.get_class_like(&parent_class_name).is_some_and(|parent_metadata| {
+            context.codebase.get_class_like(parent_class_name.as_bytes()).is_some_and(|parent_metadata| {
                 !parent_metadata.pseudo_methods.contains(&method_name)
                     && !parent_metadata.static_pseudo_methods.contains(&method_name)
             })
@@ -116,14 +117,14 @@ pub fn check_override_attribute<'ctx, 'arena>(
 
         let Some(parents_metadata) = parent_class_names
             .values()
-            .find_map(|parent_method_id| context.codebase.get_class_like(&parent_method_id.get_class_name()))
+            .find_map(|parent_method_id| context.codebase.get_class_like(parent_method_id.get_class_name().as_bytes()))
         else {
             continue;
         };
 
         let parent_classname = parents_metadata.original_name;
 
-        let original_method_name = method.name.value;
+        let original_method_name = mago_bytes::BytesDisplay(method.name.value);
 
         let issue = Issue::error(format!(
             "Missing `#[Override]` attribute on overriding method `{class_name}::{original_method_name}`."
@@ -141,10 +142,9 @@ pub fn check_override_attribute<'ctx, 'arena>(
             let line_start_offset =
                 context.source_file.get_line_start_offset(context.source_file.line_number(offset)).unwrap_or(offset);
 
-            let indent = context.source_file.contents[line_start_offset as usize..offset as usize]
-                .chars()
-                .take_while(|c| c.is_whitespace())
-                .collect::<String>();
+            let line_slice = &context.source_file.contents[line_start_offset as usize..offset as usize];
+            let indent_end = line_slice.iter().take_while(|b| b.is_ascii_whitespace()).count();
+            let indent = std::str::from_utf8(&line_slice[..indent_end]).map(str::to_string).unwrap_or_default();
 
             edits.push(TextEdit::insert(method.start_offset(), format!("#[\\Override]\n{indent}")));
         });

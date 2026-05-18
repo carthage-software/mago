@@ -9,12 +9,12 @@
 
 use std::sync::Arc;
 
-use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::get_array_parameters;
+use mago_word::word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -39,7 +39,7 @@ impl Provider for ArrayAllAssertionProvider {
 
 impl FunctionAssertionProvider for ArrayAllAssertionProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("array_all")
+        FunctionTarget::Exact(b"array_all")
     }
 
     fn get_assertions(
@@ -47,10 +47,10 @@ impl FunctionAssertionProvider for ArrayAllAssertionProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<InvocationAssertions> {
-        let array_argument = invocation.get_argument(0, &["array"])?;
+        let array_argument = invocation.get_argument(0, &[b"array"])?;
         let array_type = context.get_expression_type(array_argument)?;
 
-        let callback_argument = invocation.get_argument(1, &["callback"])?;
+        let callback_argument = invocation.get_argument(1, &[b"callback"])?;
         let callback_metadata = context.get_callable_metadata(callback_argument)?;
         if callback_metadata.if_true_assertions.is_empty() {
             return None;
@@ -89,7 +89,7 @@ impl FunctionAssertionProvider for ArrayAllAssertionProvider {
         let assertion = Assertion::IsType(narrowed_atomic);
 
         let mut result = InvocationAssertions::new();
-        result.add_if_true(atom("$array"), vec![assertion]);
+        result.add_if_true(word("$array"), vec![assertion]);
         Some(result)
     }
 }

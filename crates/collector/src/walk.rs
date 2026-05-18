@@ -38,10 +38,10 @@ impl ScopeAttachmentWalker {
             }
 
             let is_applicable = if pragma.trivia_span.end <= node_span.start {
-                let between =
-                    &collector.file.contents[pragma.trivia_span.end.offset as usize..node_span.start.offset as usize];
+                let between = &collector.file.contents
+                    [pragma.trivia_span.end_offset() as usize..node_span.start_offset() as usize];
 
-                between.trim().is_empty()
+                between.trim_ascii().is_empty()
             } else {
                 false
             };

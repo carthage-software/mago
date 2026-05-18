@@ -36,7 +36,7 @@ impl<'arena> Parser<'_, 'arena> {
             TwigTokenKind::LeftParen => {
                 self.stream.consume()?;
                 let inner = self.parse_expression()?;
-                self.stream.expect_kind(TwigTokenKind::RightParen, "expected `)`")?;
+                self.stream.expect_kind(TwigTokenKind::RightParen, b"expected `)`")?;
                 (inner, None)
             }
             TwigTokenKind::Name => {
@@ -46,7 +46,7 @@ impl<'arena> Parser<'_, 'arena> {
             }
             TwigTokenKind::Number => {
                 self.stream.consume()?;
-                let is_float = token.value.contains('.');
+                let is_float = token.value.contains(&b'.');
                 (Expression::Number(Number { raw: token.value, is_float, span: self.stream.span_of(&token) }), None)
             }
             kind if is_keyword_usable_as_name(kind) && looks_like_identifier(token.value) => {
@@ -56,7 +56,7 @@ impl<'arena> Parser<'_, 'arena> {
             }
             _ => {
                 return Err(ParseError::UnexpectedToken(
-                    "expected attribute name or number after `.`".to_string(),
+                    b"expected attribute name or number after `.`".to_vec(),
                     self.stream.span_of(&token),
                 ));
             }
@@ -105,7 +105,7 @@ impl<'arena> Parser<'_, 'arena> {
         if let Some(c_tok) = self.stream.try_consume(TwigTokenKind::Colon)? {
             let colon = self.stream.span_of(&c_tok);
             let length = self.parse_optional_expression_until(TwigTokenKind::RightBracket)?;
-            let rb_tok = self.stream.expect_kind(TwigTokenKind::RightBracket, "expected `]`")?;
+            let rb_tok = self.stream.expect_kind(TwigTokenKind::RightBracket, b"expected `]`")?;
             let right_bracket = self.stream.span_of(&rb_tok);
             return Ok(Expression::Slice(Slice {
                 object: self.alloc(object),
@@ -122,7 +122,7 @@ impl<'arena> Parser<'_, 'arena> {
             let colon = self.stream.span_of(&c_tok);
             let start: &Expression<'arena> = self.alloc(first);
             let length = self.parse_optional_expression_until(TwigTokenKind::RightBracket)?;
-            let rb_tok = self.stream.expect_kind(TwigTokenKind::RightBracket, "expected `]`")?;
+            let rb_tok = self.stream.expect_kind(TwigTokenKind::RightBracket, b"expected `]`")?;
             let right_bracket = self.stream.span_of(&rb_tok);
             return Ok(Expression::Slice(Slice {
                 object: self.alloc(object),
@@ -134,7 +134,7 @@ impl<'arena> Parser<'_, 'arena> {
             }));
         }
 
-        let rb_tok = self.stream.expect_kind(TwigTokenKind::RightBracket, "expected `]`")?;
+        let rb_tok = self.stream.expect_kind(TwigTokenKind::RightBracket, b"expected `]`")?;
         let right_bracket = self.stream.span_of(&rb_tok);
         Ok(Expression::GetItem(GetItem {
             object: self.alloc(object),

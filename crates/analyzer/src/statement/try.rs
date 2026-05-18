@@ -1,12 +1,11 @@
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
-use std::hash::BuildHasherDefault;
 use std::rc::Rc;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
+use mago_word::word;
 
 use mago_codex::ttype;
 use mago_codex::ttype::atomic::TAtomic;
@@ -85,7 +84,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         let post_try_locals = std::mem::take(&mut block_context.locals);
 
-        let invalidated_during_try: Vec<Atom> = old_block_context_locals
+        let invalidated_during_try: Vec<Word> = old_block_context_locals
             .keys()
             .copied()
             .filter(|variable_id| !post_try_locals.contains_key(variable_id))
@@ -181,7 +180,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             let caught_classes = get_caught_classes(context, &catch_clause.hint);
 
             for caught in &caught_classes {
-                if context.codebase.is_instance_of(caught, &atom("Error")) {
+                if context.codebase.is_instance_of(caught.as_bytes(), b"Error") {
                     context.collector.report_with_code(
                         IssueCode::AvoidCatchingError,
                         Issue::warning("Avoid catching 'Error' class instances.")
@@ -201,8 +200,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             let possibly_thrown_exceptions = std::mem::take(&mut catch_block_context.possibly_thrown_exceptions);
             for caught_class in &caught_classes {
                 for possibly_thrown_exception in possibly_thrown_exceptions.keys() {
-                    if possibly_thrown_exception.eq_ignore_ascii_case(caught_class)
-                        || context.codebase.is_instance_of(possibly_thrown_exception, caught_class)
+                    if possibly_thrown_exception.as_bytes().eq_ignore_ascii_case(caught_class.as_bytes())
+                        || context
+                            .codebase
+                            .is_instance_of(possibly_thrown_exception.as_bytes(), caught_class.as_bytes())
                     {
                         original_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
                         block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
@@ -220,7 +221,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                         .collect(),
                 );
 
-                let catch_var_name = Atom::from(catch_variable.name);
+                let catch_var_name = Word::from(catch_variable.name);
                 catch_block_context.locals.insert(catch_var_name, Rc::new(exception_type));
                 catch_block_context.remove_variable_from_conflicting_clauses(context, catch_var_name, None);
                 catch_block_context.variables_possibly_in_scope.insert(catch_var_name);
@@ -324,8 +325,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             };
 
             let mut finally_block_context = block_context.clone();
-            finally_block_context.assigned_variable_ids = AtomMap::default();
-            finally_block_context.possibly_assigned_variable_ids = AtomSet::default();
+            finally_block_context.assigned_variable_ids = WordMap::default();
+            finally_block_context.possibly_assigned_variable_ids = WordSet::default();
             finally_block_context.locals = finally_scope.locals;
             finally_block_context.flags.set_has_returned(false);
 
@@ -398,14 +399,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
     }
 }
 
-fn get_caught_classes<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'arena>) -> AtomSet {
-    let mut caught_identifiers: AtomMap<Span> = AtomMap::default();
+fn get_caught_classes<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'arena>) -> WordSet {
+    let mut caught_identifiers: WordMap<Span> = WordMap::default();
 
-    fn walk<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'arena>, caught: &mut AtomMap<Span>) {
+    fn walk<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'arena>, caught: &mut WordMap<Span>) {
         match hint {
             Hint::Identifier(identifier) => {
-                let name = context.resolved_names.get(identifier);
-                let id = atom(name);
+                let name_bytes = context.resolved_names.get(identifier);
+                let name = mago_bytes::BytesDisplay(name_bytes);
+                let id = word(name_bytes);
 
                 if let Some(&first_span) = caught.get(&id) {
                     context.collector.report_with_code(
@@ -452,18 +454,19 @@ fn get_caught_classes<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'ar
 
     walk(context, hint, &mut caught_identifiers);
 
-    let throwable = atom("Throwable");
-    let mut caught_classes = AtomSet::with_capacity_and_hasher(caught_identifiers.len(), BuildHasherDefault::default());
+    let throwable = word(b"Throwable");
+    let mut caught_classes: WordSet =
+        WordSet::with_capacity_and_hasher(caught_identifiers.len(), foldhash::fast::FixedState::default());
     for (caught_type, caught_span) in caught_identifiers {
-        if caught_type.eq_ignore_ascii_case("throwable")
-            || caught_type.eq_ignore_ascii_case("exception")
-            || caught_type.eq_ignore_ascii_case("error")
+        if caught_type.as_bytes().eq_ignore_ascii_case(b"throwable")
+            || caught_type.as_bytes().eq_ignore_ascii_case(b"exception")
+            || caught_type.as_bytes().eq_ignore_ascii_case(b"error")
         {
             caught_classes.insert(caught_type);
             continue;
         }
 
-        let Some(class_like_metadata) = context.codebase.get_class_like(&caught_type) else {
+        let Some(class_like_metadata) = context.codebase.get_class_like(caught_type.as_bytes()) else {
             context.collector.report_with_code(
                 IssueCode::NonExistentCatchType,
                 Issue::error(format!("Attempting to catch an undefined class or interface: `{caught_type}`."))
@@ -506,7 +509,8 @@ fn get_caught_classes<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'ar
         }
 
         let is_interface = class_like_metadata.kind.is_interface();
-        let is_throwable = is_interface || context.codebase.is_instance_of(&caught_type, &throwable);
+        let is_throwable =
+            is_interface || context.codebase.is_instance_of(caught_type.as_bytes(), throwable.as_bytes());
         if !is_throwable {
             context.collector.report_with_code(
                 IssueCode::CatchTypeNotThrowable,

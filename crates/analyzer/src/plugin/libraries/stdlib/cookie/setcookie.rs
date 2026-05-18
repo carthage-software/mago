@@ -42,8 +42,9 @@ impl FunctionCallHook for SetCookieHook {
             return Ok(());
         };
 
-        let name = identifier.value();
-        if !name.eq_ignore_ascii_case("setcookie") && !name.eq_ignore_ascii_case("setrawcookie") {
+        let name_bytes = identifier.value();
+        let name = mago_bytes::BytesDisplay(name_bytes);
+        if !name_bytes.eq_ignore_ascii_case(b"setcookie") && !name_bytes.eq_ignore_ascii_case(b"setrawcookie") {
             return Ok(());
         }
 
@@ -61,7 +62,7 @@ impl FunctionCallHook for SetCookieHook {
             Argument::Positional(arg) => arg.value,
             Argument::Named(arg) => {
                 let param_name = arg.name.value;
-                if param_name != "expires_or_options" && param_name != "options" {
+                if param_name != b"expires_or_options" && param_name != b"options" {
                     return Ok(());
                 }
                 arg.value

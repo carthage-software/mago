@@ -16,16 +16,16 @@ impl<'arena> Parser<'_, 'arena> {
         let mut not_keyword = None;
         if let Some(token) = self.stream.lookahead(0)?
             && matches!(token.kind, TwigTokenKind::Not | TwigTokenKind::Name)
-            && token.value == "not"
+            && token.value == b"not"
         {
             let not_tok = self.stream.consume()?;
             not_keyword = Some(self.keyword_from(&not_tok));
         }
 
-        let name = self.expect_flexible_identifier("expected test name")?;
+        let name = self.expect_flexible_identifier(b"expected test name")?;
 
         let second_word = match self.stream.lookahead(0)? {
-            Some(token) if token.kind == TwigTokenKind::Name && !matches!(token.value, "and" | "or" | "xor") => {
+            Some(token) if token.kind == TwigTokenKind::Name && !matches!(token.value, b"and" | b"or" | b"xor") => {
                 let tok = self.stream.consume()?;
                 Some(self.keyword_from(&tok))
             }

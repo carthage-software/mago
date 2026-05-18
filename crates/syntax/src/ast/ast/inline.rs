@@ -26,7 +26,7 @@ pub enum InlineKind {
 pub struct Inline<'arena> {
     pub kind: InlineKind,
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 impl HasSpan for Inline<'_> {

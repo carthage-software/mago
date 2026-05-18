@@ -240,7 +240,8 @@ impl CyclomaticComplexityRule {
                 };
 
                 if method_complexity > method_threshold {
-                    let issue = Issue::new(self.cfg.level, format!("Method `{}` has high complexity.", method.name.value))
+                    let method_name_display = mago_bytes::BytesDisplay(method.name.value);
+                    let issue = Issue::new(self.cfg.level, format!("Method `{method_name_display}` has high complexity."))
                         .with_code(self.meta.code)
                         .with_annotation(Annotation::primary(method.name.span()).with_message(format!(
                             "Method has a cyclomatic complexity of {method_complexity}, which exceeds the threshold of {method_threshold}."

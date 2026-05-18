@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use mago_atom::atom;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
@@ -8,6 +7,7 @@ use mago_codex::ttype::get_null;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::StaticPropertyAccess;
 use mago_syntax::ast::Variable;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -97,14 +97,14 @@ fn add_memoized_static_property_reference<'ctx, 'ast, 'arena>(
     property: &'ast Variable<'arena>,
 ) -> Result<(), AnalysisError> {
     let property_name = match property {
-        Variable::Direct(var) => atom(var.name),
+        Variable::Direct(var) => word(var.name),
         _ => return Ok(()),
     };
 
     let class_name = match class.unparenthesized() {
-        Expression::Identifier(ident) => atom(context.resolved_names.get(ident)),
+        Expression::Identifier(ident) => word(context.resolved_names.get(ident)),
         Expression::Self_(_) | Expression::Parent(_) | Expression::Static(_) => {
-            block_context.scope.get_class_like_name().unwrap_or_else(|| atom(""))
+            block_context.scope.get_class_like_name().unwrap_or_else(|| word(""))
         }
         _ => return Ok(()),
     };
@@ -113,7 +113,9 @@ fn add_memoized_static_property_reference<'ctx, 'ast, 'arena>(
         return Ok(());
     }
 
-    if let Some(declaring_class) = context.codebase.get_declaring_property_class(&class_name, &property_name) {
+    if let Some(declaring_class) =
+        context.codebase.get_declaring_property_class(class_name.as_bytes(), property_name.as_bytes())
+    {
         artifacts.symbol_references.add_reference_for_property_read(
             &block_context.scope,
             declaring_class,

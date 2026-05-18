@@ -1,4 +1,4 @@
-use mago_atom::Atom;
+use mago_word::Word;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::class_like::ClassLikeMetadata;
@@ -11,7 +11,7 @@ use crate::reference::ReferenceSource;
 pub struct ScopeContext<'ctx> {
     pub(crate) function_like: Option<&'ctx FunctionLikeMetadata>,
     pub(crate) class_like: Option<&'ctx ClassLikeMetadata>,
-    pub(crate) property_hook: Option<(Atom, &'ctx PropertyHookMetadata)>,
+    pub(crate) property_hook: Option<(Word, &'ctx PropertyHookMetadata)>,
     pub(crate) is_static: bool,
 }
 
@@ -59,7 +59,7 @@ impl<'ctx> ScopeContext<'ctx> {
     /// Returns the calling class FQCN, if inside a class scope.
     #[inline]
     #[must_use]
-    pub fn get_class_like_name(&self) -> Option<Atom> {
+    pub fn get_class_like_name(&self) -> Option<Word> {
         self.class_like.map(|class| class.name)
     }
 
@@ -131,7 +131,7 @@ impl<'ctx> ScopeContext<'ctx> {
     /// Returns a tuple of (`property_name`, `hook_metadata`) when analyzing a property hook body.
     #[inline]
     #[must_use]
-    pub fn get_property_hook(&self) -> Option<(Atom, &'ctx PropertyHookMetadata)> {
+    pub fn get_property_hook(&self) -> Option<(Word, &'ctx PropertyHookMetadata)> {
         self.property_hook
     }
 
@@ -139,7 +139,7 @@ impl<'ctx> ScopeContext<'ctx> {
     ///
     /// Used when analyzing property hook bodies to enable proper return type validation.
     #[inline]
-    pub fn set_property_hook(&mut self, property_hook: Option<(Atom, &'ctx PropertyHookMetadata)>) {
+    pub fn set_property_hook(&mut self, property_hook: Option<(Word, &'ctx PropertyHookMetadata)>) {
         self.property_hook = property_hook;
     }
 

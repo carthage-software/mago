@@ -1,5 +1,5 @@
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
@@ -197,7 +197,7 @@ pub fn is_contained_by(
     if let TAtomic::Object(TObject::Enum(enum_container)) = container_type_part {
         return match input_type_part {
             TAtomic::Object(TObject::Enum(enum_input)) => {
-                if !codebase.is_instance_of(&enum_input.get_name(), &enum_container.get_name()) {
+                if !codebase.is_instance_of(enum_input.get_name().as_bytes(), enum_container.get_name().as_bytes()) {
                     return false;
                 }
 
@@ -211,7 +211,7 @@ pub fn is_contained_by(
                 true
             }
             TAtomic::Object(TObject::Named(named_object)) if enum_container.case.is_none() => {
-                if !codebase.is_instance_of(&named_object.get_name(), &enum_container.get_name()) {
+                if !codebase.is_instance_of(named_object.get_name().as_bytes(), enum_container.get_name().as_bytes()) {
                     return false;
                 }
 
@@ -332,14 +332,14 @@ pub fn is_contained_by(
             }
             TObject::Named(TNamedObject { name: input_object_name, .. })
             | TObject::Enum(TEnum { name: input_object_name, .. }) => {
-                let Some(class_like_metadata) = codebase.get_class_like(input_object_name) else {
+                let Some(class_like_metadata) = codebase.get_class_like(input_object_name.as_bytes()) else {
                     return false;
                 };
 
                 for (container_property_name, (container_property_indefinite, container_property_type)) in
                     &container_object_with_properties.known_properties
                 {
-                    let property_name = concat_atom!("$", container_property_name);
+                    let property_name = concat_word!(b"$", container_property_name);
 
                     let Some(declaring_class) = class_like_metadata.declaring_property_ids.get(&property_name) else {
                         if *container_property_indefinite {
@@ -348,7 +348,7 @@ pub fn is_contained_by(
                         return false;
                     };
 
-                    let Some(declaring_class_metadata) = codebase.get_class_like(declaring_class) else {
+                    let Some(declaring_class_metadata) = codebase.get_class_like(declaring_class.as_bytes()) else {
                         return false; // should not happen
                     };
 
@@ -383,7 +383,7 @@ pub fn is_contained_by(
                     // properties that aren't in the container type
                     for property_name in class_like_metadata.declaring_property_ids.keys() {
                         let actual_property_name =
-                            atom(property_name.as_str().strip_prefix('$').unwrap_or(property_name.as_str()));
+                            word(property_name.as_bytes().strip_prefix(b"$").unwrap_or(property_name.as_bytes()));
 
                         // Check if this property exists in our container's known properties
                         if !container_object_with_properties.known_properties.contains_key(&actual_property_name) {
@@ -580,7 +580,7 @@ pub(crate) fn can_be_identical(
         (first_part, second_part)
     {
         return match (class_string, string.get_known_literal_value()) {
-            (TClassLikeString::Literal { value }, Some(str_value)) => value.eq_ignore_ascii_case(str_value),
+            (TClassLikeString::Literal { value }, Some(str_value)) => value.as_bytes().eq_ignore_ascii_case(str_value),
             _ => true,
         };
     }
@@ -778,7 +778,7 @@ pub(crate) fn can_be_identical(
     if let (TAtomic::Object(first_object), TAtomic::Object(second_object)) = (first_part, second_part)
         && let (Some(first_name), Some(second_name)) = (first_object.get_name(), second_object.get_name())
     {
-        return match (codebase.get_class_like(&first_name), codebase.get_class_like(&second_name)) {
+        return match (codebase.get_class_like(first_name.as_bytes()), codebase.get_class_like(second_name.as_bytes())) {
             (Some(c1), Some(c2)) => c1.kind.is_interface() || c2.kind.is_interface(),
             _ => true,
         };
@@ -811,8 +811,8 @@ fn strings_can_be_identical(lhs: &TString, rhs: &TString) -> bool {
     }
 
     let literal_value = match (&lhs.literal, &rhs.literal) {
-        (Some(TStringLiteral::Value(v)), _) => Some((v.as_str(), rhs)),
-        (_, Some(TStringLiteral::Value(v))) => Some((v.as_str(), lhs)),
+        (Some(TStringLiteral::Value(v)), _) => Some((v.as_bytes(), rhs)),
+        (_, Some(TStringLiteral::Value(v))) => Some((v.as_bytes(), lhs)),
         _ => None,
     };
 
@@ -822,8 +822,8 @@ fn strings_can_be_identical(lhs: &TString, rhs: &TString) -> bool {
         }
 
         match constraints.casing {
-            TStringCasing::Lowercase if value.chars().any(|c| c.is_ascii_uppercase()) => return false,
-            TStringCasing::Uppercase if value.chars().any(|c| c.is_ascii_lowercase()) => return false,
+            TStringCasing::Lowercase if value.iter().any(u8::is_ascii_uppercase) => return false,
+            TStringCasing::Uppercase if value.iter().any(u8::is_ascii_lowercase) => return false,
             _ => {}
         }
 
@@ -981,7 +981,7 @@ fn keyed_arrays_can_be_identical(
 
 #[cfg(test)]
 mod tests {
-    use mago_atom::atom;
+    use mago_word::word;
 
     use crate::ttype::atomic::TAtomic;
     use crate::ttype::atomic::scalar::TScalar;
@@ -993,7 +993,7 @@ mod tests {
     use super::can_be_identical;
 
     fn class_string_literal(name: &str) -> TAtomic {
-        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(atom(name))))
+        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(word(name))))
     }
 
     fn class_string_any() -> TAtomic {
@@ -1001,7 +1001,7 @@ mod tests {
     }
 
     fn string_literal(value: &str) -> TAtomic {
-        TAtomic::Scalar(TScalar::String(TString::known_literal(atom(value))))
+        TAtomic::Scalar(TScalar::String(TString::known_literal(word(value))))
     }
 
     fn general_string() -> TAtomic {

@@ -16,20 +16,20 @@ impl<'arena> Parser<'_, 'arena> {
     ) -> Result<Statement<'arena>, ParseError> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let keyword = self.keyword_from(&keyword_tok);
-        let type_tok = self.stream.expect_name("expected `function`, `filter`, or `test`")?;
+        let type_tok = self.stream.expect_name(b"expected `function`, `filter`, or `test`")?;
         let kind = match type_tok.value {
-            "function" => GuardKind::Function,
-            "filter" => GuardKind::Filter,
-            "test" => GuardKind::Test,
+            b"function" => GuardKind::Function,
+            b"filter" => GuardKind::Filter,
+            b"test" => GuardKind::Test,
             other => {
                 return Err(ParseError::UnexpectedToken(
-                    format!("unsupported guard type `{}`", other),
+                    format!("unsupported guard type `{}`", String::from_utf8_lossy(other)).into_bytes(),
                     self.stream.span_of(&type_tok),
                 ));
             }
         };
         let kind_keyword = self.keyword_from(&type_tok);
-        let name = self.expect_flexible_identifier("expected callable name")?;
+        let name = self.expect_flexible_identifier(b"expected callable name")?;
         let second_word = if kind == GuardKind::Test && self.stream.peek_kind(0)? == Some(TwigTokenKind::Name) {
             let word_tok = self.stream.consume()?;
             Some(self.identifier_from(&word_tok))
@@ -37,16 +37,16 @@ impl<'arena> Parser<'_, 'arena> {
             None
         };
         let close_tag = self.stream.expect_block_end()?;
-        let body = self.parse_statements(&BlockTerminator { names: &["else", "endguard"] })?;
+        let body = self.parse_statements(&BlockTerminator { names: &[b"else", b"endguard"] })?;
 
         let next_open_tok = self.stream.expect_block_start()?;
         let next_open_tag = self.stream.span_of(&next_open_tok);
-        let next_name_tok = self.stream.expect_name("expected `else` or `endguard`")?;
+        let next_name_tok = self.stream.expect_name(b"expected `else` or `endguard`")?;
         let (else_branch, end_open_tag, end_keyword, end_close_tag) = match next_name_tok.value {
-            "else" => {
+            b"else" => {
                 let else_keyword = self.keyword_from(&next_name_tok);
                 let else_close_tag = self.stream.expect_block_end()?;
-                let else_body = self.parse_statements(&BlockTerminator { names: &["endguard"] })?;
+                let else_body = self.parse_statements(&BlockTerminator { names: &[b"endguard"] })?;
                 let else_branch = ElseBranch {
                     open_tag: next_open_tag,
                     keyword: else_keyword,
@@ -55,11 +55,11 @@ impl<'arena> Parser<'_, 'arena> {
                 };
                 let end_open_tok = self.stream.expect_block_start()?;
                 let end_open_tag = self.stream.span_of(&end_open_tok);
-                let end_kw_tok = self.stream.expect_name("expected `endguard`")?;
-                if end_kw_tok.value != "endguard" {
+                let end_kw_tok = self.stream.expect_name(b"expected `endguard`")?;
+                if end_kw_tok.value != b"endguard" {
                     return Err(ParseError::MismatchedEndTag {
-                        expected: "endguard".to_string(),
-                        got: end_kw_tok.value.to_string(),
+                        expected: b"endguard".to_vec(),
+                        got: end_kw_tok.value.to_vec(),
                         span: self.stream.span_of(&end_kw_tok),
                     });
                 }
@@ -67,15 +67,15 @@ impl<'arena> Parser<'_, 'arena> {
                 let end_close_tag = self.stream.expect_block_end()?;
                 (Some(else_branch), end_open_tag, end_keyword, end_close_tag)
             }
-            "endguard" => {
+            b"endguard" => {
                 let end_keyword = self.keyword_from(&next_name_tok);
                 let end_close_tag = self.stream.expect_block_end()?;
                 (None, next_open_tag, end_keyword, end_close_tag)
             }
             other => {
                 return Err(ParseError::MismatchedEndTag {
-                    expected: "endguard".to_string(),
-                    got: other.to_string(),
+                    expected: b"endguard".to_vec(),
+                    got: other.to_vec(),
                     span: self.stream.span_of(&next_name_tok),
                 });
             }

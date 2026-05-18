@@ -47,7 +47,7 @@ pub fn logical_name_for(workspace: &Path, path: &Path) -> String {
 /// Compute the [`FileId`] mago will use for a file at `path` in `workspace`.
 #[must_use]
 pub fn file_id_for(workspace: &Path, path: &Path) -> FileId {
-    FileId::new(&logical_name_for(workspace, path))
+    FileId::new(logical_name_for(workspace, path).as_bytes())
 }
 
 /// Convert a filesystem path to an LSP `file://` URL.

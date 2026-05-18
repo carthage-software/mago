@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -122,7 +122,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
-    method_name: Atom,
+    method_name: Word,
     class_span: Span,
     method_span: Span,
     classname: &ResolvedClassname,
@@ -131,14 +131,14 @@ fn resolve_method_from_classname<'ctx, 'arena>(
     access_span: Span,
 ) -> Vec<ResolvedMethod> {
     let mut resolve_method_from_class_id =
-        |fq_class_id: Atom,
+        |fq_class_id: Word,
          is_relative: bool,
          from_instance: bool,
          from_class_string: bool,
-         method_name: Atom,
+         method_name: Word,
          has_magic_static_call: bool,
          result: Option<&mut MethodResolutionResult>| {
-            let Some(defining_class_metadata) = context.codebase.get_class_like(&fq_class_id) else {
+            let Some(defining_class_metadata) = context.codebase.get_class_like(fq_class_id.as_bytes()) else {
                 return (false, None);
             };
 
@@ -203,7 +203,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
     let mut first_class_id = None;
     let mut magic_call_could_exist = false;
 
-    let magic_method_to_check = if classname.is_parent() { atom("__call") } else { atom("__callStatic") };
+    let magic_method_to_check = if classname.is_parent() { word("__call") } else { word("__callStatic") };
     if let Some(fq_class_id) = classname.fqcn {
         let (_, resolved_magic_call_method) = resolve_method_from_class_id(
             fq_class_id,
@@ -275,7 +275,7 @@ fn resolve_method_from_classname<'ctx, 'arena>(
     // If method not found, try to find in mixins
     if resolved_methods.is_empty()
         && let Some(fq_class_id) = first_class_id
-        && let Some(class_metadata) = context.codebase.get_class_like(&fq_class_id)
+        && let Some(class_metadata) = context.codebase.get_class_like(fq_class_id.as_bytes())
         && !class_metadata.mixins.is_empty()
         // Try to find method in mixin types
         && let Some(resolved_method) = find_static_method_in_mixins(
@@ -339,8 +339,8 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
-    method_name: Atom,
-    fq_class_id: Atom,
+    method_name: Word,
+    fq_class_id: Word,
     defining_class_metadata: &'ctx ClassLikeMetadata,
     classname: &ResolvedClassname,
     result: Option<&mut MethodResolutionResult>,
@@ -358,7 +358,7 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
             for required_class in
                 defining_class_metadata.require_extends.iter().chain(defining_class_metadata.require_implements.iter())
             {
-                let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+                let Some(required_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
                     continue;
                 };
                 let req_method_id = MethodIdentifier::new(required_metadata.original_name, method_name);
@@ -377,8 +377,8 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
         && !check_method_visibility(
             context,
             block_context,
-            &method_id.get_class_name(),
-            &method_id.get_method_name(),
+            method_id.get_class_name().as_bytes(),
+            method_id.get_method_name().as_bytes(),
             access_span,
             Some(selector.span()),
         )
@@ -429,7 +429,7 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     };
 
     // Get the class it was called on - need original name for callable creation
-    let called_on_class_metadata = context.codebase.get_class_like(&fq_class_id)?;
+    let called_on_class_metadata = context.codebase.get_class_like(fq_class_id.as_bytes())?;
 
     Some(ResolvedMethod {
         // Use the original name of the class it was called on
@@ -453,7 +453,7 @@ fn get_metadata_object<'ctx>(
 
     let mut intersections = vec![];
     for required_interface in &class_like_metadata.require_implements {
-        let Some(interface_metadata) = context.codebase.get_interface(required_interface) else {
+        let Some(interface_metadata) = context.codebase.get_interface(required_interface.as_bytes()) else {
             continue;
         };
 
@@ -474,7 +474,7 @@ fn get_metadata_object<'ctx>(
     }
 
     for required_class in &class_like_metadata.require_extends {
-        let Some(parent_class_metadata) = context.codebase.get_class_like(required_class) else {
+        let Some(parent_class_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
             continue;
         };
 
@@ -548,7 +548,7 @@ fn report_non_static_access(context: &mut Context, method_id: &MethodIdentifier,
     );
 }
 
-fn report_static_call_on_interface(context: &mut Context, name: Atom, span: Span, from_class_string: bool) {
+fn report_static_call_on_interface(context: &mut Context, name: Word, span: Span, from_class_string: bool) {
     let name = display_class_like_name(context, name);
     if from_class_string {
         context.collector.report_with_code(
@@ -576,7 +576,7 @@ fn report_static_call_on_interface(context: &mut Context, name: Atom, span: Span
     }
 }
 
-fn report_deprecated_static_access_on_trait(context: &mut Context, name: Atom, span: Span) {
+fn report_deprecated_static_access_on_trait(context: &mut Context, name: Word, span: Span) {
     let name = display_class_like_name(context, name);
     context.collector.report_with_code(
         IssueCode::DeprecatedFeature,
@@ -592,9 +592,9 @@ fn report_possibly_non_existent_mixin_static_method(
     context: &mut Context,
     class_span: Span,
     selector_span: Span,
-    classname: Atom,
-    method_name: Atom,
-    mixin_classname: Atom,
+    classname: Word,
+    method_name: Word,
+    mixin_classname: Word,
 ) {
     let mixin_classname = display_class_like_name(context, mixin_classname);
     let method_name = display_method_name(context, classname, method_name);
@@ -628,9 +628,9 @@ fn report_non_existent_mixin_static_method(
     context: &mut Context,
     class_span: Span,
     selector_span: Span,
-    classname: Atom,
-    method_name: Atom,
-    mixin_classname: Atom,
+    classname: Word,
+    method_name: Word,
+    mixin_classname: Word,
 ) {
     let mixin_classname = display_class_like_name(context, mixin_classname);
     let method_name = display_method_name(context, classname, method_name);
@@ -665,7 +665,7 @@ fn find_static_method_in_mixins<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
     mixins: &[TUnion],
-    method_name: Atom,
+    method_name: Word,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
 ) -> Option<ResolvedMethod> {
@@ -730,12 +730,12 @@ fn find_static_method_in_mixins<'ctx, 'arena>(
 fn find_static_method_in_single_mixin<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
-    mixin_class_name: Atom,
-    method_name: Atom,
+    mixin_class_name: Word,
+    method_name: Word,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
 ) -> Option<ResolvedMethod> {
-    let mixin_metadata = context.codebase.get_class_like(&mixin_class_name)?;
+    let mixin_metadata = context.codebase.get_class_like(mixin_class_name.as_bytes())?;
 
     let method_id = MethodIdentifier::new(mixin_metadata.original_name, method_name);
     let declaring_method_id = context.codebase.get_declaring_method_identifier(&method_id);
@@ -752,8 +752,8 @@ fn find_static_method_in_single_mixin<'ctx, 'arena>(
     if !check_method_visibility(
         context,
         block_context,
-        &method_id.get_class_name(),
-        &method_id.get_method_name(),
+        method_id.get_class_name().as_bytes(),
+        method_id.get_method_name().as_bytes(),
         access_span,
         Some(selector.span()),
     ) {

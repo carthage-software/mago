@@ -1,5 +1,5 @@
 use bumpalo::Bump;
-use mago_atom::Atom;
+use mago_word::Word;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::resolution::TypeResolutionContext;
@@ -99,14 +99,14 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
     ///
     /// Function names in PHP are case-insensitive; they are stored and looked up in lowercase
     /// within the codebase metadata.
-    pub fn resolve_function_name<'ast>(&self, identifier: &'ast Identifier<'arena>) -> &'arena str {
+    pub fn resolve_function_name<'ast>(&self, identifier: &'ast Identifier<'arena>) -> &'arena [u8] {
         if self.resolved_names.is_imported(identifier) {
             return self.resolved_names.get(identifier);
         }
 
         let name = identifier.value();
 
-        if let Some(stripped) = name.strip_prefix('\\') {
+        if let Some(stripped) = name.strip_prefix(b"\\") {
             return stripped;
         }
 
@@ -115,7 +115,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
             return fqfn;
         }
 
-        if !name.contains('\\') && self.codebase.function_exists(name) {
+        if !name.contains(&b'\\') && self.codebase.function_exists(name) {
             return name;
         }
 
@@ -130,7 +130,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
     }
 
     #[inline]
-    pub fn get_assertion_context(&self, this_class_name: Option<Atom>) -> AssertionContext<'ctx, 'arena> {
+    pub fn get_assertion_context(&self, this_class_name: Option<Word>) -> AssertionContext<'ctx, 'arena> {
         AssertionContext {
             arena: self.arena,
             resolved_names: self.resolved_names,

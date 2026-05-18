@@ -37,7 +37,7 @@ impl Provider for ArrayKeyExistsProvider {
 
 impl FunctionReturnTypeProvider for ArrayKeyExistsProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::ExactMultiple(&["array_key_exists", "key_exists"])
+        FunctionTarget::ExactMultiple(&[b"array_key_exists", b"key_exists"])
     }
 
     fn get_return_type(
@@ -45,8 +45,8 @@ impl FunctionReturnTypeProvider for ArrayKeyExistsProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let key_expr = invocation.get_argument(0, &["key"])?;
-        let array_expr = invocation.get_argument(1, &["array"])?;
+        let key_expr = invocation.get_argument(0, &[b"key"])?;
+        let array_expr = invocation.get_argument(1, &[b"array"])?;
 
         let literal_key = literal_array_key_from_expression(key_expr)?;
         let array_type = context.get_expression_type(array_expr)?;
@@ -96,7 +96,7 @@ impl FunctionReturnTypeProvider for ArrayKeyExistsProvider {
 
 fn literal_array_key_from_expression(expr: &Expression<'_>) -> Option<ArrayKey> {
     match expr {
-        Expression::Literal(Literal::String(s)) => s.value.map(|v| ArrayKey::String(mago_atom::atom(v))),
+        Expression::Literal(Literal::String(s)) => s.value.map(|v| ArrayKey::String(mago_word::word(v))),
         Expression::Literal(Literal::Integer(i)) => i.value.and_then(|v| i64::try_from(v).ok()).map(ArrayKey::Integer),
         _ => None,
     }

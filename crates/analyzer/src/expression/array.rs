@@ -5,10 +5,6 @@ use std::sync::Arc;
 
 use foldhash::HashSet;
 
-use mago_atom::AtomSet;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
-use mago_atom::empty_atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -45,6 +41,10 @@ use mago_syntax::ast::LegacyArray;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::VariadicArrayElement;
+use mago_word::WordSet;
+use mago_word::ascii_lowercase_word;
+use mago_word::empty_word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -99,7 +99,7 @@ struct ArrayCreationInfo {
     item_key_atomic_types: Vec<TAtomic>,
     item_value_atomic_types: Vec<TAtomic>,
     property_types: BTreeMap<ArrayKey, (bool, TUnion)>,
-    class_strings: AtomSet,
+    class_strings: WordSet,
     can_create_objectlike: bool,
     array_keys: HashSet<ArrayKey>,
     int_offset: i64,
@@ -125,7 +125,7 @@ fn analyze_array_elements<'ctx, 'arena>(
         item_key_atomic_types: Vec::new(),
         item_value_atomic_types: Vec::new(),
         property_types: BTreeMap::default(),
-        class_strings: AtomSet::default(),
+        class_strings: WordSet::default(),
         can_create_objectlike: true,
         array_keys: HashSet::default(),
         int_offset: -1,
@@ -146,7 +146,7 @@ fn analyze_array_elements<'ctx, 'arena>(
                     .get_expression_type(key_value_array_element.key)
                     .map_or((None, get_mixed()), |item_key_type| {
                         let key_type = if item_key_type.is_null() {
-                            get_literal_string(empty_atom())
+                            get_literal_string(empty_word())
                         } else if item_key_type.is_true() {
                             get_literal_int(1)
                         } else if item_key_type.is_false() {
@@ -183,7 +183,7 @@ fn analyze_array_elements<'ctx, 'arena>(
 
                                 Some(match string_to_int {
                                     Some(integer) => ArrayKey::Integer(integer),
-                                    None => ArrayKey::String(atom(item_key_literal_type)),
+                                    None => ArrayKey::String(word(item_key_literal_type)),
                                 })
                             } else if let Some(literal_integer) = key_type.get_single_literal_int_value() {
                                 // The most recent integer key becomes the next available integer key
@@ -370,7 +370,7 @@ fn analyze_array_elements<'ctx, 'arena>(
                 if let Some(class_name) = atomic.get_class_string_value() {
                     Some(class_name)
                 } else if let Some(literal_str) = atomic.get_literal_string_value() {
-                    Some(atom(literal_str))
+                    Some(word(literal_str))
                 } else if let TAtomic::Object(obj) = atomic {
                     match obj {
                         TObject::Named(named) => Some(named.name),
@@ -386,14 +386,14 @@ fn analyze_array_elements<'ctx, 'arena>(
         let method_names: Vec<_> = second_type
             .types
             .iter()
-            .filter_map(|atomic| atomic.get_literal_string_value().map(ascii_lowercase_atom))
+            .filter_map(|atomic| atomic.get_literal_string_value().map(ascii_lowercase_word))
             .collect();
 
         for class_name in &class_names {
             for method_name in &method_names {
                 artifacts.symbol_references.add_reference_to_class_member(
                     &block_context.scope,
-                    (ascii_lowercase_atom(class_name), *method_name),
+                    (ascii_lowercase_word(class_name.as_bytes()), *method_name),
                     false,
                 );
             }
@@ -487,16 +487,17 @@ fn analyze_array_elements<'ctx, 'arena>(
     Ok(())
 }
 
-fn get_numeric_key_from_string(key: &str) -> Option<i64> {
-    if key.starts_with('0') || key.starts_with('+') {
+fn get_numeric_key_from_string(key: &[u8]) -> Option<i64> {
+    if key.starts_with(b"0") || key.starts_with(b"+") {
         return None;
     }
 
-    if key.trim() != key {
+    let key_str = std::str::from_utf8(key).ok()?;
+    if key_str.trim() != key_str {
         return None;
     }
 
-    key.parse::<i64>().ok()
+    key_str.parse::<i64>().ok()
 }
 
 fn handle_variadic_array_element<'arena>(

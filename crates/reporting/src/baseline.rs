@@ -148,8 +148,8 @@ pub struct BaselineComparisonResult {
 /// Normalizes a file path to use forward slashes for cross-platform compatibility.
 ///
 /// This ensures that baselines created on Windows work on Linux and vice versa.
-fn normalize_path(path: &str) -> String {
-    path.replace('\\', "/")
+fn normalize_path(path: &[u8]) -> String {
+    String::from_utf8_lossy(path).replace('\\', "/")
 }
 
 impl StrictBaseline {
@@ -541,7 +541,7 @@ mod tests {
 
     fn create_test_database() -> (Database<'static>, FileId) {
         let file =
-            File::ephemeral(Cow::Borrowed("test.php"), Cow::Borrowed("<?php\n// Line 1\n// Line 2\n// Line 3\n"));
+            File::ephemeral(Cow::Borrowed(b"test.php"), Cow::Borrowed(b"<?php\n// Line 1\n// Line 2\n// Line 3\n"));
         let file_id = file.id;
         let config =
             mago_database::DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![])
@@ -574,9 +574,9 @@ mod tests {
 
     #[test]
     fn test_normalize_path() {
-        assert_eq!(normalize_path("foo/bar/baz.php"), "foo/bar/baz.php");
-        assert_eq!(normalize_path("foo\\bar\\baz.php"), "foo/bar/baz.php");
-        assert_eq!(normalize_path("C:\\Users\\test\\file.php"), "C:/Users/test/file.php");
+        assert_eq!(normalize_path(b"foo/bar/baz.php"), "foo/bar/baz.php");
+        assert_eq!(normalize_path(b"foo\\bar\\baz.php"), "foo/bar/baz.php");
+        assert_eq!(normalize_path(b"C:\\Users\\test\\file.php"), "C:/Users/test/file.php");
     }
 
     #[test]

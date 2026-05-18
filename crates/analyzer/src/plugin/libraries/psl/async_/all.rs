@@ -40,7 +40,7 @@ impl Provider for AllProvider {
 
 impl FunctionReturnTypeProvider for AllProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("psl\\async\\all")
+        FunctionTarget::Exact(b"psl\\async\\all")
     }
 
     fn get_return_type(
@@ -48,7 +48,7 @@ impl FunctionReturnTypeProvider for AllProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let awaitables_arg = invocation.get_argument(0, &["awaitables"])?;
+        let awaitables_arg = invocation.get_argument(0, &[b"awaitables"])?;
         let awaitables_type = context.get_expression_type(awaitables_arg)?;
 
         let array = awaitables_type.get_single_array()?;
@@ -125,11 +125,11 @@ fn unwrap_awaitable_type(union: &TUnion) -> Option<TUnion> {
     for atomic in union.types.as_ref() {
         match atomic {
             TAtomic::Object(TObject::Named(named))
-                if named
-                    .name
-                    .strip_prefix('\\')
-                    .unwrap_or(&named.name)
-                    .eq_ignore_ascii_case("Psl\\Async\\Awaitable") =>
+                if {
+                    let name_bytes = named.name.as_bytes();
+                    let stripped = name_bytes.strip_prefix(b"\\").unwrap_or(name_bytes);
+                    stripped.eq_ignore_ascii_case(b"Psl\\Async\\Awaitable")
+                } =>
             {
                 found_awaitable = true;
 

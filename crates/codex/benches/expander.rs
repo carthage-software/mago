@@ -5,8 +5,6 @@ use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
 
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -18,17 +16,19 @@ use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 fn make_self_object() -> TUnion {
-    TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))))
+    TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word("self")))))
 }
 
 fn make_named_object(name: &str) -> TUnion {
-    TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom(name)))))
+    TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(name.as_bytes())))))
 }
 
 fn options_with_self(self_class: &str) -> TypeExpansionOptions {
-    TypeExpansionOptions { self_class: Some(ascii_lowercase_atom(self_class)), ..Default::default() }
+    TypeExpansionOptions { self_class: Some(ascii_lowercase_word(self_class.as_bytes())), ..Default::default() }
 }
 
 fn bench_non_expandable(c: &mut Criterion) {
@@ -72,7 +72,7 @@ fn bench_union_expansion(c: &mut Criterion) {
     c.bench_function("union_3_types_with_self", |b| {
         b.iter(|| {
             let mut t = TUnion::from_vec(vec![
-                TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))),
+                TAtomic::Object(TObject::Named(TNamedObject::new(word("self")))),
                 get_int().types[0].clone(),
                 get_string().types[0].clone(),
             ]);
@@ -84,11 +84,11 @@ fn bench_union_expansion(c: &mut Criterion) {
     c.bench_function("union_5_types_with_self", |b| {
         b.iter(|| {
             let mut t = TUnion::from_vec(vec![
-                TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))),
+                TAtomic::Object(TObject::Named(TNamedObject::new(word("self")))),
                 get_int().types[0].clone(),
                 get_string().types[0].clone(),
-                TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("bar")))),
-                TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("baz")))),
+                TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"bar")))),
+                TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"baz")))),
             ]);
             expand_union(black_box(&codebase), black_box(&mut t), black_box(&options));
             t
@@ -128,7 +128,7 @@ fn bench_generic_object(c: &mut Criterion) {
     c.bench_function("generic_object_1_param", |b| {
         b.iter(|| {
             let named = TNamedObject::new_with_type_parameters(
-                ascii_lowercase_atom("container"),
+                ascii_lowercase_word(b"container"),
                 Some(vec![make_self_object()]),
             );
             let mut t = TUnion::from_atomic(TAtomic::Object(TObject::Named(named)));
@@ -140,7 +140,7 @@ fn bench_generic_object(c: &mut Criterion) {
     c.bench_function("generic_object_3_params", |b| {
         b.iter(|| {
             let named = TNamedObject::new_with_type_parameters(
-                ascii_lowercase_atom("container"),
+                ascii_lowercase_word(b"container"),
                 Some(vec![make_self_object(), get_int(), get_string()]),
             );
             let mut t = TUnion::from_atomic(TAtomic::Object(TObject::Named(named)));

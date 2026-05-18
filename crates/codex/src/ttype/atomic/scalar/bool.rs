@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::ttype::TType;
 
@@ -77,15 +77,15 @@ impl TType for TBool {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self.value {
-            Some(true) => atom("true"),
-            Some(false) => atom("false"),
-            None => atom("bool"),
+            Some(true) => word("true"),
+            Some(false) => word("false"),
+            None => word("bool"),
         }
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

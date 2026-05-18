@@ -15,24 +15,24 @@ impl<'arena> Parser<'_, 'arena> {
         let keyword = self.keyword_from(&keyword_tok);
         let close_tag = self.stream.expect_block_end()?;
 
-        let body = if let Some(body_tok) = self.stream.try_consume(TwigTokenKind::VerbatimText)? {
+        let body: &'arena [u8] = if let Some(body_tok) = self.stream.try_consume(TwigTokenKind::VerbatimText)? {
             body_tok.value
         } else {
-            ""
+            b""
         };
 
         let end_open_tok = self.stream.expect_block_start()?;
         let end_open_tag = self.stream.span_of(&end_open_tok);
-        let end_kw_tok = self.stream.expect_name("expected `endverbatim` or `endraw`")?;
-        let expected = match keyword_tok.value {
-            "verbatim" => "endverbatim",
-            "raw" => "endraw",
-            _ => "endverbatim",
+        let end_kw_tok = self.stream.expect_name(b"expected `endverbatim` or `endraw`")?;
+        let expected: &[u8] = match keyword_tok.value {
+            b"verbatim" => b"endverbatim",
+            b"raw" => b"endraw",
+            _ => b"endverbatim",
         };
         if end_kw_tok.value != expected {
             return Err(ParseError::MismatchedEndTag {
-                expected: expected.to_string(),
-                got: end_kw_tok.value.to_string(),
+                expected: expected.to_vec(),
+                got: end_kw_tok.value.to_vec(),
                 span: self.stream.span_of(&end_kw_tok),
             });
         }

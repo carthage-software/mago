@@ -4,9 +4,9 @@ use std::rc::Rc;
 use foldhash::HashSet;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
@@ -123,7 +123,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         });
 
         for clause in &mut if_clauses {
-            let keys: AtomSet = clause.possibilities.keys().copied().collect();
+            let keys: WordSet = clause.possibilities.keys().copied().collect();
             mixed_variables.retain(|i| !keys.contains(i));
 
             'outer: for key in keys.iter().copied() {
@@ -205,10 +205,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         );
 
         if_scope.negated_types =
-            find_satisfying_assignments(all_negated_clauses.iter().as_slice(), None, &mut AtomSet::default()).0;
+            find_satisfying_assignments(all_negated_clauses.iter().as_slice(), None, &mut WordSet::default()).0;
 
         let mut temporary_else_context = post_if_block_context.clone();
-        let mut changed_variable_ids: AtomSet = AtomSet::default();
+        let mut changed_variable_ids: WordSet = WordSet::default();
 
         if !if_scope.negated_types.is_empty() {
             reconcile_keyed_types(
@@ -217,15 +217,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                 IndexMap::new(),
                 &mut temporary_else_context,
                 &mut changed_variable_ids,
-                &AtomSet::default(),
+                &WordSet::default(),
                 &self.condition.span(),
                 false,
                 false,
             );
         }
 
-        let pre_assignment_else_redefined_locals: AtomMap<Rc<TUnion>> = temporary_else_context
-            .get_redefined_locals(&if_block_context.locals, true, &mut AtomSet::default())
+        let pre_assignment_else_redefined_locals: WordMap<Rc<TUnion>> = temporary_else_context
+            .get_redefined_locals(&if_block_context.locals, true, &mut WordSet::default())
             .into_iter()
             .filter(|(k, _)| changed_variable_ids.contains(k))
             .collect();
@@ -242,7 +242,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         )?;
 
         let if_body_assigned_ids = if_scope.assigned_variable_ids.clone().unwrap_or_default();
-        let mut if_body_redefined_snapshot: AtomMap<Rc<TUnion>> = AtomMap::default();
+        let mut if_body_redefined_snapshot: WordMap<Rc<TUnion>> = WordMap::default();
         if let Some(redefined) = &if_scope.redefined_variables {
             for (k, v) in redefined {
                 if if_body_assigned_ids.contains_key(k) {
@@ -316,10 +316,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             // the post-if code knows the keys exist. Remove empty array variants from base variables
             // since the array must be non-empty for the key to exist.
             for changed_var_id in &if_scope.conditionally_changed_variable_ids {
-                let key_str = changed_var_id.as_str();
-                if let Some(bracket_pos) = key_str.find('[') {
-                    let base_var = &key_str[..bracket_pos];
-                    let base_atom = mago_atom::atom(base_var);
+                let key_bytes = changed_var_id.as_bytes();
+                if let Some(bracket_pos) = memchr::memchr(b'[', key_bytes) {
+                    let base_var = &key_bytes[..bracket_pos];
+                    let base_atom = mago_word::word(base_var);
                     if let Some(var_type) = block_context.locals.get(&base_atom).cloned()
                         && var_type.types.iter().any(|t| matches!(t, TAtomic::Array(a) if a.is_empty()))
                     {
@@ -438,7 +438,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     mut if_block_context: BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    pre_assignment_else_redefined_locals: &AtomMap<Rc<TUnion>>,
+    pre_assignment_else_redefined_locals: &WordMap<Rc<TUnion>>,
     if_statement: &If<'arena>,
 ) -> Result<(), AnalysisError> {
     let mut conditionally_referenced_variable_ids = if_block_context.conditionally_referenced_variable_ids.clone();
@@ -449,7 +449,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     );
 
     if outer_block_context.clauses.iter().any(|clause| !clause.possibilities.is_empty()) {
-        let mut omit_keys = AtomSet::default();
+        let mut omit_keys = WordSet::default();
         for clause in &outer_block_context.clauses {
             omit_keys.extend(clause.possibilities.keys());
         }
@@ -457,7 +457,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
         let (outer_truthes, _) = find_satisfying_assignments(
             outer_block_context.clauses.iter().map(Rc::as_ref).cloned().collect_vec().as_slice(),
             None,
-            &mut AtomSet::default(),
+            &mut WordSet::default(),
         );
 
         omit_keys.retain(|key| !outer_truthes.contains_key(key));
@@ -465,7 +465,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     }
 
     if !reconcilable_if_types.is_empty() {
-        let mut changed_variable_ids = AtomSet::default();
+        let mut changed_variable_ids = WordSet::default();
 
         reconcile_keyed_types(
             context,
@@ -506,7 +506,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             }
 
             for variable_id in variables_to_remove {
-                if_block_context.remove_possible_reference(&variable_id);
+                if_block_context.remove_possible_reference(variable_id.as_bytes());
             }
         }
 
@@ -553,7 +553,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     inherit_branch_context_properties(context, outer_block_context, &if_block_context);
 
     if !has_leaving_statements {
-        let new_assigned_variable_ids_keys = new_assigned_variable_ids.keys().copied().collect::<Vec<Atom>>();
+        let new_assigned_variable_ids_keys = new_assigned_variable_ids.keys().copied().collect::<Vec<Word>>();
 
         update_if_scope(
             context,
@@ -602,7 +602,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             .keys()
             .filter(|key| pre_assignment_else_redefined_locals.contains_key(key))
             .copied()
-            .collect::<AtomSet>();
+            .collect::<WordSet>();
 
         outer_block_context.update(
             context,
@@ -620,7 +620,7 @@ fn analyze_if_statement_block<'ctx, 'arena>(
             .iter()
             .filter(|id| !outer_block_context.variables_possibly_in_scope.contains(*id))
             .copied()
-            .collect::<AtomSet>();
+            .collect::<WordSet>();
 
         if let Some(loop_scope) = artifacts.loop_scope.as_mut() {
             if !has_continue_statement && !has_break_statement {
@@ -705,7 +705,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     });
 
     for clause in &mut else_if_clauses {
-        let keys: AtomSet = clause.possibilities.keys().copied().collect();
+        let keys: WordSet = clause.possibilities.keys().copied().collect();
         mixed_variables.retain(|i| !keys.contains(i));
 
         'outer: for key in keys.iter().copied() {
@@ -785,15 +785,15 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
 
     if entry_clauses.iter().any(|clause| !clause.possibilities.is_empty()) {
         let omit_keys =
-            entry_clauses.iter().flat_map(|clause| clause.possibilities.keys()).copied().collect::<AtomSet>();
+            entry_clauses.iter().flat_map(|clause| clause.possibilities.keys()).copied().collect::<WordSet>();
 
         let (outer_truthes, _) = find_satisfying_assignments(
             outer_block_context.clauses.iter().map(Rc::as_ref).cloned().collect_vec().as_slice(),
             None,
-            &mut AtomSet::default(),
+            &mut WordSet::default(),
         );
 
-        let omit_keys = omit_keys.into_iter().filter(|key| !outer_truthes.contains_key(key)).collect::<AtomSet>();
+        let omit_keys = omit_keys.into_iter().filter(|key| !outer_truthes.contains_key(key)).collect::<WordSet>();
 
         conditionally_referenced_variable_ids.retain(|key| !omit_keys.contains(key));
     }
@@ -814,7 +814,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     );
 
     let (negated_else_if_types, _) =
-        find_satisfying_assignments(negated_if_clauses.as_slice(), None, &mut AtomSet::default());
+        find_satisfying_assignments(negated_if_clauses.as_slice(), None, &mut WordSet::default());
 
     let all_negated_variables =
         negated_else_if_types.keys().copied().chain(if_scope.negated_types.keys().copied()).collect::<HashSet<_>>();
@@ -832,7 +832,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
         }
     }
 
-    let mut newly_reconciled_variable_ids = AtomSet::default();
+    let mut newly_reconciled_variable_ids = WordSet::default();
     if !reconcilable_else_if_types.is_empty() {
         reconcile_keyed_types(
             context,
@@ -869,7 +869,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
             }
 
             for variable_id in variables_to_remove {
-                else_if_block_context.remove_possible_reference(&variable_id);
+                else_if_block_context.remove_possible_reference(variable_id.as_bytes());
             }
         }
     }
@@ -924,8 +924,8 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
                 &negated_else_if_types,
                 IndexMap::new(),
                 &mut implied_outer_context,
-                &mut AtomSet::default(),
-                &AtomSet::default(),
+                &mut WordSet::default(),
+                &WordSet::default(),
                 &else_if_clause.0.span(),
                 false,
                 false,
@@ -966,7 +966,7 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
             .iter()
             .filter(|id| !outer_block_context.variables_possibly_in_scope.contains(*id))
             .copied()
-            .collect::<AtomSet>();
+            .collect::<WordSet>();
 
         let possibly_assigned_variable_ids = new_possibly_assigned_variable_ids;
 
@@ -1044,13 +1044,13 @@ fn analyze_else_statements<'ctx, 'arena>(
     let (else_types, _) = find_satisfying_assignments(
         else_block_context.clauses.iter().map(Rc::deref).cloned().collect_vec().as_slice(),
         None,
-        &mut AtomSet::default(),
+        &mut WordSet::default(),
     );
 
     let mut original_context = else_block_context.clone();
 
     if !else_types.is_empty() {
-        let mut changed_variable_ids = AtomSet::default();
+        let mut changed_variable_ids = WordSet::default();
 
         reconcile_keyed_types(
             context,
@@ -1058,7 +1058,7 @@ fn analyze_else_statements<'ctx, 'arena>(
             IndexMap::new(),
             else_block_context,
             &mut changed_variable_ids,
-            &AtomSet::default(),
+            &WordSet::default(),
             &else_span,
             false,
             false,
@@ -1089,7 +1089,7 @@ fn analyze_else_statements<'ctx, 'arena>(
         }
 
         for variable_id in variables_to_remove {
-            else_block_context.remove_possible_reference(&variable_id);
+            else_block_context.remove_possible_reference(variable_id.as_bytes());
         }
     }
 
@@ -1188,7 +1188,7 @@ fn analyze_else_statements<'ctx, 'arena>(
             .keys()
             .copied()
             .filter(|var| outer_block_context.locals.contains_key(var))
-            .collect::<AtomSet>();
+            .collect::<WordSet>();
 
         outer_block_context.update(
             context,
@@ -1206,7 +1206,7 @@ fn analyze_else_statements<'ctx, 'arena>(
             .iter()
             .filter(|&id| !outer_block_context.variables_possibly_in_scope.contains(id))
             .copied()
-            .collect::<AtomSet>();
+            .collect::<WordSet>();
 
         if has_leaving_statements {
             if let Some(loop_scope) = artifacts.loop_scope.as_mut() {
@@ -1233,7 +1233,7 @@ fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
     post_leaving_if_block_context: &mut BlockContext<'ctx>,
     post_if_block_context: &mut BlockContext<'ctx>,
     condition: &Expression<'arena>,
-    assigned_in_conditional_variable_ids: &AtomMap<u32>,
+    assigned_in_conditional_variable_ids: &WordMap<u32>,
 ) -> Result<(), AnalysisError> {
     if assigned_in_conditional_variable_ids.is_empty() {
         return Ok(());
@@ -1276,9 +1276,9 @@ fn update_if_scope<'ctx>(
     if_scope: &mut IfScope<'ctx>,
     if_block_context: &mut BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
-    new_assigned_variable_ids: AtomMap<u32>,
-    new_possibly_assigned_variable_ids: AtomSet,
-    newly_reconciled_variable_ids: &AtomSet,
+    new_assigned_variable_ids: WordMap<u32>,
+    new_possibly_assigned_variable_ids: WordSet,
+    newly_reconciled_variable_ids: &WordSet,
     update_new_variables: bool,
 ) {
     // Handle definitely_initialized_properties with INTERSECTION semantics
@@ -1314,13 +1314,13 @@ fn update_if_scope<'ctx>(
         outer_block_context.called_methods.extend(if_block_context.called_methods.iter().copied());
     }
     let mut redefined_variables =
-        if_block_context.get_redefined_locals(&outer_block_context.locals, false, &mut AtomSet::default());
+        if_block_context.get_redefined_locals(&outer_block_context.locals, false, &mut WordSet::default());
 
     match &mut if_scope.new_variables {
         Some(new_variables) => {
             let mut to_remove = vec![];
             for (new_variable, new_variable_type) in new_variables.iter_mut() {
-                if !if_block_context.has_variable(new_variable) {
+                if !if_block_context.has_variable(new_variable.as_bytes()) {
                     to_remove.push(*new_variable);
                 } else {
                     *new_variable_type = Rc::new(combine_union_types(
@@ -1351,7 +1351,7 @@ fn update_if_scope<'ctx>(
         }
     }
 
-    let mut possibly_redefined_variables = AtomMap::default();
+    let mut possibly_redefined_variables = WordMap::default();
     for (variable_id, variable_type) in &redefined_variables {
         if new_possibly_assigned_variable_ids.contains(variable_id)
             || !newly_reconciled_variable_ids.contains(variable_id)
@@ -1372,7 +1372,7 @@ fn update_if_scope<'ctx>(
     if_scope.possibly_assigned_variable_ids.extend(new_possibly_assigned_variable_ids);
 
     if let Some(redefined_scope_variables) = &mut if_scope.redefined_variables {
-        let mut variables_to_remove: Vec<Atom> = vec![];
+        let mut variables_to_remove: Vec<Word> = vec![];
         for (redefined_variable, variable_type) in redefined_scope_variables.iter_mut() {
             let Some(redefined_type) = redefined_variables.remove(redefined_variable) else {
                 variables_to_remove.push(*redefined_variable);
@@ -1430,9 +1430,9 @@ fn get_definitely_evaluated_ored_expressions<'ast, 'arena>(
 
 fn synthesize_branch_discriminator_clauses<'ctx>(
     outer_block_context: &mut BlockContext<'ctx>,
-    if_body_redefined: &AtomMap<Rc<TUnion>>,
+    if_body_redefined: &WordMap<Rc<TUnion>>,
     else_block_context: &BlockContext<'ctx>,
-    else_assigned_ids: &AtomMap<u32>,
+    else_assigned_ids: &WordMap<u32>,
     if_clauses: &[mago_algebra::clause::Clause],
     negated_clauses: &[mago_algebra::clause::Clause],
     condition_span: Span,

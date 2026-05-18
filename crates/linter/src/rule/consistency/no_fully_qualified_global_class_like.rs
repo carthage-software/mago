@@ -58,14 +58,17 @@ impl NoFullyQualifiedGlobalClassLikeRule {
             return;
         }
 
-        let class_name = identifier.value().trim_start_matches('\\');
-        let short_name = class_name.split('\\').next_back().unwrap_or(class_name);
+        let class_name_bytes = mago_bytes::trim_start_byte(identifier.value(), b'\\');
+        let short_name = class_name_bytes.rsplit(|&b| b == b'\\').next().unwrap_or(class_name_bytes);
         let fqn_span = identifier.span();
 
-        let resolution = ctx.import_name(class_name);
+        let resolution = ctx.import_name(class_name_bytes);
+
+        let class_name = mago_bytes::BytesDisplay(class_name_bytes);
+        let short_name_display = mago_bytes::BytesDisplay(short_name);
 
         let (title, help) = match &resolution {
-            Some(res) if res.is_already_available() && res.local_name.as_str() != short_name => (
+            Some(res) if res.is_already_available() && res.local_name.as_bytes() != short_name => (
                 "Fully-qualified class-like reference can be replaced with an existing alias.",
                 format!("`{class_name}` is already imported as `{}`; replace the reference with it.", res.local_name),
             ),
@@ -75,11 +78,11 @@ impl NoFullyQualifiedGlobalClassLikeRule {
             ),
             Some(_) => (
                 "Fully-qualified class-like reference detected.",
-                format!("Add `use {class_name};` and reference `{short_name}` directly."),
+                format!("Add `use {class_name};` and reference `{short_name_display}` directly."),
             ),
             None => (
                 "Fully-qualified class-like reference detected.",
-                format!("Add `use {class_name};` and reference `{short_name}` directly."),
+                format!("Add `use {class_name};` and reference `{short_name_display}` directly."),
             ),
         };
 
@@ -95,7 +98,7 @@ impl NoFullyQualifiedGlobalClassLikeRule {
         match resolution {
             Some(resolution) => {
                 ctx.collector.propose(issue, |edits| {
-                    edits.push(TextEdit::replace(fqn_span, resolution.local_name.as_str()));
+                    edits.push(TextEdit::replace(fqn_span, resolution.local_name.as_bytes()));
 
                     if let Some(use_edit) = resolution.use_statement_edit {
                         edits.push(use_edit.with_safety(Safety::Safe));

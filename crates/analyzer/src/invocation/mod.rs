@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use mago_atom::Atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -25,6 +24,7 @@ use mago_syntax::ast::Pipe;
 use mago_syntax::ast::PlaceholderArgument;
 use mago_syntax::ast::PositionalArgument;
 use mago_syntax::ast::VariadicPlaceholderArgument;
+use mago_word::Word;
 
 use crate::context::Context;
 
@@ -235,7 +235,7 @@ impl<'ctx> InvocationTarget<'ctx> {
     /// If this target is a method, returns the fully qualified name of the class it belongs to.
     #[inline]
     #[allow(dead_code)]
-    pub const fn get_method_class_like_name(&self) -> Option<Atom> {
+    pub const fn get_method_class_like_name(&self) -> Option<Word> {
         match self.get_function_like_identifier() {
             Some(FunctionLikeIdentifier::Method(fq_class_like_name, _)) => Some(*fq_class_like_name),
             _ => None,
@@ -593,7 +593,7 @@ impl<'ast, 'arena> InvocationArgument<'ast, 'arena> {
     /// Returns the parameter name if this argument specifies one (named arguments and named placeholders).
     /// Returns `None` for positional arguments and positional placeholders.
     #[inline]
-    pub const fn get_parameter_name(&self) -> Option<&'arena str> {
+    pub const fn get_parameter_name(&self) -> Option<&'arena [u8]> {
         match self {
             InvocationArgument::Named(named_arg) => Some(named_arg.name.value),
             InvocationArgument::NamedPlaceholder(named_ph) => Some(named_ph.name.value),

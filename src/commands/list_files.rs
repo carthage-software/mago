@@ -123,7 +123,7 @@ impl ListFilesCommand {
         let database = orchestrator.load_database(&configuration.source.workspace, false, None, None)?;
 
         for file in database.files() {
-            print!("{}{}", file.name, if self.zero_terminate { '\0' } else { '\n' });
+            print!("{}{}", mago_bytes::BytesDisplay(&file.name), if self.zero_terminate { '\0' } else { '\n' });
         }
 
         Ok(ExitCode::SUCCESS)

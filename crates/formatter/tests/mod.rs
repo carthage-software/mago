@@ -22,22 +22,22 @@ macro_rules! test_case {
     ($name:ident, $version:expr) => {
         #[test]
         pub fn $name() {
-            let code = include_str!(concat!("cases/", stringify!($name), "/before.php"));
-            let expected = include_str!(concat!("cases/", stringify!($name), "/after.php"));
+            let code = include_bytes!(concat!("cases/", stringify!($name), "/before.php"));
+            let expected = include_bytes!(concat!("cases/", stringify!($name), "/after.php"));
             let settings = include!(concat!("cases/", stringify!($name), "/settings.inc"));
 
             let arena = Bump::new();
             let formatter = Formatter::new(&arena, $version, settings);
 
-            let formatted_code = formatter.format_code(Cow::Borrowed("code.php"), Cow::Borrowed(code)).unwrap();
+            let formatted_code = formatter.format_code(Cow::Borrowed(b"code.php"), Cow::Borrowed(code)).unwrap();
 
-            pretty_assertions::assert_eq!(expected, formatted_code, "Formatted code does not match expected");
+            pretty_assertions::assert_eq!(expected, formatted_code, "Formatted code does not match expected",);
 
             let reformatted_code = formatter
-                .format_code(Cow::Borrowed("formatted_code.php"), Cow::Owned(formatted_code.to_owned()))
+                .format_code(Cow::Borrowed(b"formatted_code.php"), Cow::Owned(formatted_code.to_vec()))
                 .unwrap();
 
-            pretty_assertions::assert_eq!(expected, reformatted_code, "Reformatted code does not match expected");
+            pretty_assertions::assert_eq!(expected, reformatted_code, "Reformatted code does not match expected",);
         }
     };
 }
@@ -432,6 +432,10 @@ test_case!(member_access_chain_keeps_breaks_with_comments);
 test_case!(issue_1562);
 test_case!(bare_cr_line_endings);
 
+// PHP identifiers may contain non-UTF-8 bytes; the formatter must round-trip
+// `before.php`/`after.php` byte-for-byte without lossy decoding.
+test_case!(non_utf8_identifiers);
+
 // Idempotency regressions found by the corpus smoke test.
 test_case!(idempotency_keyed_array_value_call);
 test_case!(idempotency_keyed_array_value_nested_array);
@@ -458,6 +462,64 @@ test_case!(idempotency_corpus_phparkitect_arch_rule);
 test_case!(idempotency_corpus_apiplatform_schema_property);
 test_case!(idempotency_corpus_apiplatform_type_factory);
 test_case!(idempotency_corpus_symfony_json_streamer);
+
+/// PHP identifiers are allowed to contain any byte ≥ 0x80, so a class name
+/// like `Café` is valid even when the source file is Latin-1 (or any other
+/// non-UTF-8 encoding). The formatter must pass these bytes through verbatim
+/// rather than lossy-converting them. This test stitches together a PHP
+/// snippet whose class/method/function names contain raw 0xC9 0xE9 0xFF —
+/// none of which form valid UTF-8 — and verifies that:
+///
+/// 1. parsing succeeds,
+/// 2. those exact bytes appear in the formatted output,
+/// 3. the second pass is idempotent (re-formatting yields the same bytes).
+#[test]
+fn preserves_non_utf8_identifiers() {
+    // Latin-1 `É` (0xC9), `é` (0xE9), and a stray 0xFF that is invalid in any
+    // UTF-8 sequence. Bundled into class / method / function / constant names
+    // and a property name so the formatter sees them across multiple AST
+    // positions.
+    let bad: &[u8] = &[0xC9, 0xE9, 0xFF];
+
+    let mut src: Vec<u8> = Vec::new();
+    src.extend_from_slice(b"<?php\n\nclass Caf");
+    src.extend_from_slice(bad);
+    src.extend_from_slice(b" {\n    public string $pr");
+    src.extend_from_slice(bad);
+    src.extend_from_slice(b" = '';\n\n    public function m");
+    src.extend_from_slice(bad);
+    src.extend_from_slice(b"(): void {}\n}\n\nfunction f");
+    src.extend_from_slice(bad);
+    src.extend_from_slice(b"(): void {}\n");
+
+    // Sanity-check that the input we just built is not valid UTF-8 — if it
+    // were, the test would not exercise the byte-fidelity contract we care
+    // about.
+    assert!(std::str::from_utf8(&src).is_err(), "test input must contain non-UTF-8 bytes");
+
+    let arena = Bump::new();
+    let formatter = Formatter::new(&arena, PHPVersion::PHP84, FormatSettings::default());
+
+    let Ok(formatted_pass1) = formatter.format_code(Cow::Borrowed(b"non_utf8.php"), Cow::Owned(src.clone())) else {
+        panic!("formatter must accept non-UTF-8 identifiers");
+    };
+
+    // The exact bytes must appear in every identifier position.
+    for needle in [&b"Caf\xC9\xE9\xFF"[..], &b"$pr\xC9\xE9\xFF"[..], &b"m\xC9\xE9\xFF"[..], &b"f\xC9\xE9\xFF"[..]] {
+        assert!(
+            memchr::memmem::find(formatted_pass1, needle).is_some(),
+            "formatted output must contain identifier {:02X?}",
+            needle,
+        );
+    }
+
+    // Idempotency: a second format pass must yield the same bytes.
+    let Ok(reformatted) = formatter.format_code(Cow::Borrowed(b"non_utf8.php"), Cow::Owned(formatted_pass1.to_vec()))
+    else {
+        panic!("second format pass must succeed");
+    };
+    assert_eq!(formatted_pass1, reformatted, "formatter is not idempotent on non-UTF-8 identifiers");
+}
 
 #[test]
 fn test_all_test_cases_are_ran() {

@@ -1,9 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_word::Word;
 
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
@@ -19,7 +19,7 @@ use crate::ttype::atomic::TAtomic;
 #[non_exhaustive]
 pub struct EnumCaseMetadata {
     pub attributes: Vec<AttributeMetadata>,
-    pub name: Atom,
+    pub name: Word,
     pub name_span: Span,
     pub span: Span,
     pub value_type: Option<TAtomic>,
@@ -42,7 +42,7 @@ impl EnumCaseMetadata {
     /// * `span`: The source code location of the entire case declaration.
     #[inline]
     #[must_use]
-    pub fn new(name: Atom, name_span: Span, span: Span, flags: MetadataFlags) -> Self {
+    pub fn new(name: Word, name_span: Span, span: Span, flags: MetadataFlags) -> Self {
         Self {
             attributes: Vec::new(),
             name,

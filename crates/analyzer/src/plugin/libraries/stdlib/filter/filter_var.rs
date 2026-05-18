@@ -31,7 +31,7 @@ impl Provider for FilterVarProvider {
 
 impl FunctionReturnTypeProvider for FilterVarProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("filter_var")
+        FunctionTarget::Exact(b"filter_var")
     }
 
     fn get_return_type(

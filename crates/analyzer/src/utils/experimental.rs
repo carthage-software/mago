@@ -1,8 +1,8 @@
-use mago_atom::Atom;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
+use mago_word::Word;
 
 use crate::code::IssueCode;
 use crate::context::Context;
@@ -12,14 +12,14 @@ use crate::context::block::BlockContext;
 pub fn check_experimental_class_like(
     context: &mut Context<'_, '_>,
     block_context: &BlockContext<'_>,
-    class_name: Atom,
+    class_name: Word,
     span: Span,
 ) {
     if !context.settings.check_experimental {
         return;
     }
 
-    let Some(metadata) = context.codebase.get_class_like(&class_name) else {
+    let Some(metadata) = context.codebase.get_class_like(class_name.as_bytes()) else {
         return;
     };
 
@@ -50,7 +50,7 @@ pub fn check_experimental_function_with_metadata(
     context: &mut Context<'_, '_>,
     block_context: &BlockContext<'_>,
     metadata: &FunctionLikeMetadata,
-    function_name: Atom,
+    function_name: Word,
     span: Span,
 ) {
     if !context.settings.check_experimental {
@@ -85,7 +85,7 @@ pub fn check_experimental_constant(
     context: &mut Context<'_, '_>,
     block_context: &BlockContext<'_>,
     flags: &mago_codex::metadata::flags::MetadataFlags,
-    constant_name: &str,
+    constant_name: &[u8],
     span: Span,
 ) {
     if !context.settings.check_experimental {
@@ -100,6 +100,7 @@ pub fn check_experimental_constant(
         return;
     }
 
+    let constant_name = mago_bytes::BytesDisplay(constant_name);
     context.collector.report_with_code(
         IssueCode::ExperimentalUsage,
         Issue::warning(format!("Usage of experimental constant `{constant_name}`."))

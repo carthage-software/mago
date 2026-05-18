@@ -18,7 +18,7 @@ use crate::service::pipeline::StatelessReducer;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FileFormatStatus {
     Unchanged,
-    Changed(String),
+    Changed(Vec<u8>),
     FailedToParse(ParseError),
 }
 
@@ -73,7 +73,7 @@ impl FormatService {
                 if file.contents == formatted_content {
                     Ok(FileFormatStatus::Unchanged)
                 } else {
-                    Ok(FileFormatStatus::Changed(formatted_content.to_string()))
+                    Ok(FileFormatStatus::Changed(formatted_content.to_vec()))
                 }
             }
             Err(parse_error) => Ok(FileFormatStatus::FailedToParse(parse_error)),
@@ -108,7 +108,7 @@ impl FormatService {
                     if file.contents == formatted_content {
                         FileFormatStatus::Unchanged
                     } else {
-                        FileFormatStatus::Changed(formatted_content.to_string())
+                        FileFormatStatus::Changed(formatted_content.to_vec())
                     }
                 }
                 Err(parse_error) => FileFormatStatus::FailedToParse(parse_error),
@@ -164,7 +164,7 @@ impl FormatService {
                     if file.contents == formatted_content {
                         FileFormatStatus::Unchanged
                     } else {
-                        FileFormatStatus::Changed(formatted_content.to_string())
+                        FileFormatStatus::Changed(formatted_content.to_vec())
                     }
                 }
                 Err(parse_error) => FileFormatStatus::FailedToParse(parse_error),
@@ -216,7 +216,7 @@ impl FormatResult {
         })
     }
 
-    pub fn changed_files(&self) -> impl Iterator<Item = (&FileId, &String)> {
+    pub fn changed_files(&self) -> impl Iterator<Item = (&FileId, &Vec<u8>)> {
         self.changed_files.iter().filter_map(|(file_id, status)| {
             if let FileFormatStatus::Changed(content) = status { Some((file_id, content)) } else { None }
         })

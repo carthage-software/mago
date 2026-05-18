@@ -43,7 +43,7 @@ impl Provider for SelectKeysProvider {
 
 impl FunctionReturnTypeProvider for SelectKeysProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("psl\\dict\\select_keys")
+        FunctionTarget::Exact(b"psl\\dict\\select_keys")
     }
 
     fn get_return_type(
@@ -51,8 +51,8 @@ impl FunctionReturnTypeProvider for SelectKeysProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let iterable_expr = invocation.get_argument(0, &["iterable"])?;
-        let keys_expr = invocation.get_argument(1, &["keys"])?;
+        let iterable_expr = invocation.get_argument(0, &[b"iterable"])?;
+        let keys_expr = invocation.get_argument(1, &[b"keys"])?;
 
         let iterable_type = context.get_expression_type(iterable_expr)?;
         let keys_type = context.get_expression_type(keys_expr)?;
@@ -166,7 +166,7 @@ fn union_to_array_key(union: &TUnion) -> Option<ArrayKey> {
 
     let atomic = union.get_single();
     if let Some(value) = atomic.get_literal_string_value() {
-        Some(ArrayKey::String(mago_atom::atom(value)))
+        Some(ArrayKey::String(mago_word::word(value)))
     } else {
         atomic.get_literal_int_value().map(ArrayKey::Integer)
     }

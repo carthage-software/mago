@@ -56,7 +56,17 @@ fn get_prelude_database() -> mago_database::Database<'static> {
             }
         };
 
-        db.add(File::new(filename, FileType::Builtin, None, content));
+        let name = match filename {
+            Cow::Borrowed(str) => Cow::Borrowed(str.as_bytes()),
+            Cow::Owned(str) => Cow::Owned(str.into_bytes()),
+        };
+
+        let content = match content {
+            Cow::Borrowed(s) => Cow::Borrowed(s.as_bytes()),
+            Cow::Owned(s) => Cow::Owned(s.into_bytes()),
+        };
+
+        db.add(File::new(name, FileType::Builtin, None, content));
     }
 
     db
@@ -78,7 +88,10 @@ fn get_prelude_metadata(arena: &mut Bump, database: &ReadDatabase) -> CodebaseMe
 fn scan_file_for_metadata(source_file: &File, arena: &Bump) -> CodebaseMetadata {
     let program = parse_file(arena, source_file);
     if program.has_errors() {
-        panic!("Prelude file '{}' has parse errors, which is not allowed.", source_file.name);
+        panic!(
+            "Prelude file '{}' has parse errors, which is not allowed.",
+            String::from_utf8_lossy(source_file.name.as_ref())
+        );
     }
 
     let resolver = NameResolver::new(arena);

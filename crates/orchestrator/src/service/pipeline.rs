@@ -11,12 +11,12 @@ use foldhash::HashSet;
 use mago_php_version::PHPVersion;
 use rayon::prelude::*;
 
-use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
 use mago_codex::signature_builder;
+use mago_word::WordSet;
 
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
@@ -231,7 +231,7 @@ where
                         tracing::warn!(
                             "Encountered {} parsing errors in file '{}'. Codebase analysis may be incomplete.",
                             program.errors.len(),
-                            file.name
+                            mago_bytes::BytesDisplay(&file.name)
                         );
                     }
 
@@ -264,7 +264,7 @@ where
         let mut symbol_references = self.symbol_references;
         let mut populate_duration = Duration::ZERO;
         measure!(trace_enabled, populate_duration, {
-            populate_codebase(&mut merged_codex, &mut symbol_references, AtomSet::default(), HashSet::default());
+            populate_codebase(&mut merged_codex, &mut symbol_references, WordSet::default(), HashSet::default());
         });
 
         if let Some(compiling_bar) = compiling_bar {

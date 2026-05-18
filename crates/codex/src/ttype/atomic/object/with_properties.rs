@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -18,8 +18,8 @@ use crate::ttype::union::TUnion;
 /// The `sealed` flag indicates whether the object is sealed (no additional properties will exist beyond those known).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct TObjectWithProperties {
-    /// Specific types known for certain keys (`Atom`). The bool indicates if the element is optional.
-    pub known_properties: BTreeMap<Atom, (bool, TUnion)>,
+    /// Specific types known for certain keys (`Word`). The bool indicates if the element is optional.
+    pub known_properties: BTreeMap<Word, (bool, TUnion)>,
     /// Whether the object is sealed (no additional properties will exist beyond those known).
     pub sealed: bool,
 }
@@ -34,7 +34,7 @@ impl TObjectWithProperties {
     /// Returns a reference to the map of known item types by key, if any.
     #[inline]
     #[must_use]
-    pub fn get_known_properties(&self) -> &BTreeMap<Atom, (bool, TUnion)> {
+    pub fn get_known_properties(&self) -> &BTreeMap<Word, (bool, TUnion)> {
         &self.known_properties
     }
 
@@ -75,68 +75,67 @@ impl TType for TObjectWithProperties {
         !self.known_properties.is_empty()
     }
 
-    fn get_id(&self) -> Atom {
-        let mut string = String::new();
-        string += "object{";
+    fn get_id(&self) -> Word {
+        let mut buf: Vec<u8> = Vec::new();
+        buf.extend_from_slice(b"object{");
         let mut first = true;
         for (key, (indefinite, item_type)) in &self.known_properties {
             if first {
                 first = false;
             } else {
-                string += ", ";
+                buf.extend_from_slice(b", ");
             }
 
-            string += key.as_ref();
+            buf.extend_from_slice(key.as_bytes());
             if *indefinite {
-                string += "?";
+                buf.extend_from_slice(b"?");
             }
 
-            string += ": ";
-            string += &item_type.get_id();
+            buf.extend_from_slice(b": ");
+            buf.extend_from_slice(item_type.get_id().as_bytes());
         }
 
         if !self.sealed {
             if !first {
-                string += ", ";
+                buf.extend_from_slice(b", ");
             }
 
-            string += "...";
+            buf.extend_from_slice(b"...");
         }
 
-        string += "}";
+        buf.extend_from_slice(b"}");
 
-        atom(&string)
+        word(&buf)
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         if self.known_properties.is_empty() {
-            return if self.sealed { atom("object{}") } else { atom("object{...}") };
+            return if self.sealed { word(b"object{}") } else { word(b"object{...}") };
         }
 
-        let mut string = String::new();
-        string += "object{\n";
+        let mut buf: Vec<u8> = Vec::new();
+        buf.extend_from_slice(b"object{\n");
         let property_indent = indent + 2;
-        let property_spaces = " ".repeat(property_indent);
 
         for (key, (indefinite, item_type)) in &self.known_properties {
-            string += &property_spaces;
-            string += key.as_ref();
+            buf.resize(buf.len() + property_indent, b' ');
+            buf.extend_from_slice(key.as_bytes());
             if *indefinite {
-                string += "?";
+                buf.extend_from_slice(b"?");
             }
-            string += ": ";
-            string += &item_type.get_pretty_id_with_indent(property_indent);
-            string += ",\n";
+            buf.extend_from_slice(b": ");
+            buf.extend_from_slice(item_type.get_pretty_id_with_indent(property_indent).as_bytes());
+            buf.extend_from_slice(b",\n");
         }
 
         if !self.sealed {
-            string += &property_spaces;
-            string += "...,\n";
+            buf.resize(buf.len() + property_indent, b' ');
+            buf.extend_from_slice(b"...,\n");
         }
 
-        string += &" ".repeat(indent);
-        string += "}";
+        buf.resize(buf.len() + indent, b' ');
+        buf.extend_from_slice(b"}");
 
-        atom(&string)
+        word(&buf)
     }
 }

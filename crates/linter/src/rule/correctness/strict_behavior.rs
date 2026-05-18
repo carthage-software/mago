@@ -122,7 +122,7 @@ impl LintRule for StrictBehaviorRule {
                     }
                 }
                 Argument::Named(argument) => {
-                    if argument.name.value != "strict" {
+                    if argument.name.value != b"strict" {
                         continue;
                     }
 

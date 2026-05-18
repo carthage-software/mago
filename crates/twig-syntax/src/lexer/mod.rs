@@ -138,7 +138,7 @@ impl<'input> TwigLexer<'input> {
             Ok(tok) => {
                 if !tok.kind.is_trivia()
                     && !tok.value.is_empty()
-                    && let Some(b) = tok.value.as_bytes().last()
+                    && let Some(b) = tok.value.last()
                 {
                     self.last_significant = Some(*b);
                 }
@@ -185,14 +185,6 @@ impl<'input> TwigLexer<'input> {
         self.input.slice_in_range(from as u32, to as u32)
     }
 
-    #[inline]
-    fn slice_str(&self, from: usize, to: usize) -> &'input str {
-        // SAFETY: every parser entry point takes a `&str`, so the underlying input is always
-        // valid UTF-8; `slice_in_range` returns a sub-slice on byte boundaries that the lexer
-        // chooses, so the resulting bytes still form a valid UTF-8 sequence.
-        unsafe { std::str::from_utf8_unchecked(self.slice_bytes(from, to)) }
-    }
-
     /// Find the next occurrence of any of `{%`, `{{`, `{#` starting at `from`.
     /// Returns `(offset, kind_byte)` where `kind_byte` is `b'%'`, `b'{'`, or
     /// `b'#'` identifying which introducer was matched.
@@ -221,14 +213,14 @@ impl<'input> TwigLexer<'input> {
         match self.find_next_introducer(start) {
             None => {
                 let end = self.total_len();
-                let value = self.slice_str(start, end);
+                let value = self.slice_bytes(start, end);
                 self.jump_forward_to(end);
                 debug_assert!(!value.is_empty(), "lex_data called at EOF");
                 Ok(TwigToken::new(TwigTokenKind::RawText, value, self.position_at(start)))
             }
             Some((at, kind_byte)) => {
                 if at > start {
-                    let value = self.slice_str(start, at);
+                    let value = self.slice_bytes(start, at);
                     self.jump_forward_to(at);
                     return Ok(TwigToken::new(TwigTokenKind::RawText, value, self.position_at(start)));
                 }
@@ -236,7 +228,7 @@ impl<'input> TwigLexer<'input> {
                 let trim_byte = self.byte_opt(introducer_start + 2);
                 let introducer_len = if matches!(trim_byte, Some(b'-') | Some(b'~')) { 3 } else { 2 };
                 let end = introducer_start + introducer_len;
-                let introducer_slice = self.slice_str(introducer_start, end);
+                let introducer_slice = self.slice_bytes(introducer_start, end);
 
                 match kind_byte {
                     b'%' => {
@@ -271,7 +263,7 @@ impl<'input> TwigLexer<'input> {
                     }
                     b'#' => {
                         self.jump_forward_to(end);
-                        self.lex_comment_body(introducer_start, introducer_slice)
+                        self.lex_comment_body(introducer_start)
                     }
                     // SAFETY: `find_introducer` only returns `b'%'`, `b'{'`, or `b'#'` by
                     // construction; the three explicit arms above are exhaustive, so this branch
@@ -327,8 +319,7 @@ impl<'input> TwigLexer<'input> {
         let start = self.cursor();
         if start < self.total_len() && is_whitespace_byte(self.byte_at(start)) {
             let consumed = self.input.consume_whitespaces();
-            let slice = unsafe { std::str::from_utf8_unchecked(consumed) };
-            return Ok(TwigToken::new(TwigTokenKind::Whitespace, slice, self.position_at(start)));
+            return Ok(TwigToken::new(TwigTokenKind::Whitespace, consumed, self.position_at(start)));
         }
         let total = self.total_len();
         let end = start + expected.len();
@@ -339,7 +330,7 @@ impl<'input> TwigLexer<'input> {
                 self.position_at(start),
             ));
         }
-        let slice = self.slice_str(start, end);
+        let slice = self.slice_bytes(start, end);
         self.jump_forward_to(end);
         self.mode = LexerMode::Verbatim(kind, next_stage);
         Ok(TwigToken::new(TwigTokenKind::Name, slice, self.position_at(start)))
@@ -355,8 +346,7 @@ impl<'input> TwigLexer<'input> {
         let start = self.cursor();
         if start < self.total_len() && is_whitespace_byte(self.byte_at(start)) {
             let consumed = self.input.consume_whitespaces();
-            let slice = unsafe { std::str::from_utf8_unchecked(consumed) };
-            return Ok(TwigToken::new(TwigTokenKind::Whitespace, slice, self.position_at(start)));
+            return Ok(TwigToken::new(TwigTokenKind::Whitespace, consumed, self.position_at(start)));
         }
         let total = self.total_len();
         let trim_byte = self.byte_opt(start);
@@ -372,7 +362,7 @@ impl<'input> TwigLexer<'input> {
                 return Err(SyntaxError::UnclosedTag(self.file_id(), "verbatim tag", self.position_at(start)));
             }
         };
-        let slice = self.slice_str(start, start + len);
+        let slice = self.slice_bytes(start, start + len);
         self.jump_forward_to(start + len);
         self.mode = LexerMode::Verbatim(kind, next_stage);
         Ok(TwigToken::new(close_kind, slice, self.position_at(start)))
@@ -387,7 +377,7 @@ impl<'input> TwigLexer<'input> {
         let start = self.cursor();
         let close_at = self.find_verbatim_close(start, kind.end_keyword())?;
         if close_at > start {
-            let slice = self.slice_str(start, close_at);
+            let slice = self.slice_bytes(start, close_at);
             self.jump_forward_to(close_at);
             self.mode = LexerMode::Verbatim(kind, VerbatimStage::EndingOpened);
             return Ok(TwigToken::new(TwigTokenKind::VerbatimText, slice, self.position_at(start)));
@@ -414,7 +404,7 @@ impl<'input> TwigLexer<'input> {
             Some(b'~') => (TwigTokenKind::OpenBlockTilde, 3),
             _ => (TwigTokenKind::OpenBlock, 2),
         };
-        let slice = self.slice_str(start, start + len);
+        let slice = self.slice_bytes(start, start + len);
         self.jump_forward_to(start + len);
         self.mode = LexerMode::Verbatim(kind, next_stage);
         Ok(TwigToken::new(open_kind, slice, self.position_at(start)))
@@ -426,8 +416,7 @@ impl<'input> TwigLexer<'input> {
         let start = self.cursor();
         if start < self.total_len() && is_whitespace_byte(self.byte_at(start)) {
             let consumed = self.input.consume_whitespaces();
-            let slice = unsafe { std::str::from_utf8_unchecked(consumed) };
-            return Ok(TwigToken::new(TwigTokenKind::Whitespace, slice, self.position_at(start)));
+            return Ok(TwigToken::new(TwigTokenKind::Whitespace, consumed, self.position_at(start)));
         }
         let total = self.total_len();
         let trim_byte = self.byte_opt(start);
@@ -443,7 +432,7 @@ impl<'input> TwigLexer<'input> {
                 return Err(SyntaxError::UnclosedTag(self.file_id(), "verbatim tag", self.position_at(start)));
             }
         };
-        let slice = self.slice_str(start, start + len);
+        let slice = self.slice_bytes(start, start + len);
         self.jump_forward_to(start + len);
         self.mode = self.mode_stack.pop().unwrap_or(LexerMode::Data);
         let _ = kind;
@@ -483,11 +472,7 @@ impl<'input> TwigLexer<'input> {
         Err(SyntaxError::UnclosedVerbatim(self.file_id(), self.position_at(from)))
     }
 
-    fn lex_comment_body(
-        &mut self,
-        introducer_start: usize,
-        _introducer_slice: &'input str,
-    ) -> Result<TwigToken<'input>, SyntaxError> {
+    fn lex_comment_body(&mut self, introducer_start: usize) -> Result<TwigToken<'input>, SyntaxError> {
         let search_from = self.cursor();
         let total = self.total_len();
         let haystack = self.slice_bytes(search_from, total);
@@ -501,7 +486,7 @@ impl<'input> TwigLexer<'input> {
             trim_len = 1;
         }
         let closer_end = close_start + 2 + trim_len;
-        let full_slice = self.slice_str(introducer_start, closer_end);
+        let full_slice = self.slice_bytes(introducer_start, closer_end);
 
         self.jump_forward_to(closer_end);
         Ok(TwigToken::new(TwigTokenKind::Comment, full_slice, self.position_at(introducer_start)))
@@ -547,7 +532,7 @@ impl<'input> TwigLexer<'input> {
             _ => (None, TwigTokenKind::CloseBlock),
         };
         if let Some(len) = matched_len {
-            let slice = self.slice_str(start, start + len);
+            let slice = self.slice_bytes(start, start + len);
             self.jump_forward_to(start + len);
             self.mode = self.mode_stack.pop().unwrap_or(LexerMode::Data);
             return Ok(Some(TwigToken::new(kind, slice, self.position_at(start))));
@@ -562,13 +547,12 @@ impl<'input> TwigLexer<'input> {
         match BYTE_CLASS[b as usize] {
             ByteClass::Whitespace => {
                 let consumed = self.input.consume_whitespaces();
-                let slice = unsafe { std::str::from_utf8_unchecked(consumed) };
-                Ok(TwigToken::new(TwigTokenKind::Whitespace, slice, self.position_at(start)))
+                Ok(TwigToken::new(TwigTokenKind::Whitespace, consumed, self.position_at(start)))
             }
             ByteClass::Hash => {
                 let bytes = self.input.read_remaining();
                 let end = start + memchr(b'\n', bytes).unwrap_or(bytes.len());
-                let slice = self.slice_str(start, end);
+                let slice = self.slice_bytes(start, end);
                 self.jump_forward_to(end);
                 Ok(TwigToken::new(TwigTokenKind::InlineComment, slice, self.position_at(start)))
             }
@@ -628,7 +612,7 @@ impl<'input> TwigLexer<'input> {
                 }
             }
         }
-        let slice = self.slice_str(start, end);
+        let slice = self.slice_bytes(start, end);
         self.jump_forward_to(end);
         Ok(TwigToken::new(TwigTokenKind::Number, slice, self.position_at(start)))
     }
@@ -656,7 +640,7 @@ impl<'input> TwigLexer<'input> {
 
             // Must be `'`: close the string.
             i += 1;
-            let slice = self.slice_str(start, i);
+            let slice = self.slice_bytes(start, i);
             self.jump_forward_to(i);
             return Ok(TwigToken::new(TwigTokenKind::StringSingleQuoted, slice, self.position_at(start)));
         }
@@ -694,14 +678,14 @@ impl<'input> TwigLexer<'input> {
             }
             // Must be `"`: close the string.
             i += 1;
-            let slice = self.slice_str(start, i);
+            let slice = self.slice_bytes(start, i);
             self.jump_forward_to(i);
             return Ok(TwigToken::new(TwigTokenKind::StringDoubleQuoted, slice, self.position_at(start)));
         }
         if !has_interp {
             return Err(SyntaxError::UnclosedString(self.file_id(), self.position_at(start)));
         }
-        let slice = self.slice_str(start, start + 1);
+        let slice = self.slice_bytes(start, start + 1);
         self.jump_forward_to(start + 1);
         self.brackets.push(Bracket { opener: b'"', position: self.position_at(start) });
         self.mode_stack.push(self.mode);
@@ -713,7 +697,7 @@ impl<'input> TwigLexer<'input> {
         let start = self.cursor();
         let total = self.total_len();
         if self.slice_bytes(start, (start + 2).min(total)) == b"#{" {
-            let slice = self.slice_str(start, start + 2);
+            let slice = self.slice_bytes(start, start + 2);
             self.jump_forward_to(start + 2);
             self.brackets.push(Bracket { opener: b'#', position: self.position_at(start) });
             self.mode_stack.push(self.mode);
@@ -721,7 +705,7 @@ impl<'input> TwigLexer<'input> {
             return Ok(TwigToken::new(TwigTokenKind::InterpolationStart, slice, self.position_at(start)));
         }
         if self.byte_at(start) == b'"' {
-            let slice = self.slice_str(start, start + 1);
+            let slice = self.slice_bytes(start, start + 1);
             self.jump_forward_to(start + 1);
             if !matches!(self.brackets.last(), Some(b) if b.opener == b'"') {
                 return Err(SyntaxError::UnmatchedBracket(self.file_id(), b'"', self.position_at(start)));
@@ -763,7 +747,7 @@ impl<'input> TwigLexer<'input> {
             return Err(SyntaxError::UnclosedString(self.file_id(), self.position_at(start)));
         }
 
-        let slice = self.slice_str(start, i);
+        let slice = self.slice_bytes(start, i);
         self.jump_forward_to(i);
         Ok(TwigToken::new(TwigTokenKind::StringPart, slice, self.position_at(start)))
     }
@@ -771,7 +755,7 @@ impl<'input> TwigLexer<'input> {
     fn lex_inside_interpolation(&mut self) -> Result<TwigToken<'input>, SyntaxError> {
         let start = self.cursor();
         if matches!(self.brackets.last(), Some(b) if b.opener == b'#') && self.byte_opt(start) == Some(b'}') {
-            let slice = self.slice_str(start, start + 1);
+            let slice = self.slice_bytes(start, start + 1);
             self.jump_forward_to(start + 1);
             self.brackets.pop();
             self.mode = self.mode_stack.pop().unwrap_or(LexerMode::Data);
@@ -799,7 +783,7 @@ impl<'input> TwigLexer<'input> {
                 if end + suffix.len() <= total && self.slice_bytes(end, end + suffix.len()) == suffix {
                     let after = end + suffix.len();
                     if after >= total || !matches!(self.byte_at(after), part_of_identifier!()) {
-                        let slice = self.slice_str(start, after);
+                        let slice = self.slice_bytes(start, after);
                         self.jump_forward_to(after);
                         return Ok(TwigToken::new(kind, slice, self.position_at(start)));
                     }
@@ -807,7 +791,7 @@ impl<'input> TwigLexer<'input> {
             }
         }
 
-        let name = self.slice_str(start, end);
+        let name = self.slice_bytes(start, end);
 
         // Context: if the previous significant byte was `.` or `|`, the word
         // is NOT a word operator regardless of its spelling.
@@ -838,11 +822,11 @@ impl<'input> TwigLexer<'input> {
         &self,
         first_start: usize,
         after_first: usize,
-        continuations: &[(&str, TwigTokenKind)],
-    ) -> Option<(usize, &'input str, TwigTokenKind)> {
+        continuations: &[(&[u8], TwigTokenKind)],
+    ) -> Option<(usize, &'input [u8], TwigTokenKind)> {
         for (cont, kind) in continuations {
             if let Some(end) = self.try_extend_word(after_first, cont) {
-                let slice = self.slice_str(first_start, end);
+                let slice = self.slice_bytes(first_start, end);
                 return Some((end, slice, *kind));
             }
         }
@@ -851,27 +835,31 @@ impl<'input> TwigLexer<'input> {
 
     /// If the current position is followed by whitespace and then `word` (on a
     /// word boundary), return the new end offset.  Otherwise `None`.
-    fn try_extend_word(&self, after_first: usize, word: &str) -> Option<usize> {
+    fn try_extend_word(&self, after_first: usize, word: &[u8]) -> Option<usize> {
         let total = self.total_len();
         let mut i = after_first;
         let ws_start = i;
         while i < total && is_whitespace_byte(self.byte_at(i)) {
             i += 1;
         }
+
         if i == ws_start {
             return None;
         }
-        let word_bytes = word.as_bytes();
-        if i + word_bytes.len() > total {
+
+        if i + word.len() > total {
             return None;
         }
-        if self.slice_bytes(i, i + word_bytes.len()) != word_bytes {
+
+        if self.slice_bytes(i, i + word.len()) != word {
             return None;
         }
-        let after_word = i + word_bytes.len();
+
+        let after_word = i + word.len();
         if after_word < total && matches!(self.byte_at(after_word), part_of_identifier!()) {
             return None;
         }
+
         Some(after_word)
     }
 
@@ -891,7 +879,7 @@ impl<'input> TwigLexer<'input> {
         if let Some(kind) = opener_kind(b0) {
             self.brackets.push(Bracket { opener: b0, position: self.position_at(start) });
             self.jump_forward_to(start + 1);
-            let slice = self.slice_str(start, start + 1);
+            let slice = self.slice_bytes(start, start + 1);
             return Ok(TwigToken::new(kind, slice, self.position_at(start)));
         }
         if let Some(kind) = closer_kind(b0) {
@@ -900,12 +888,12 @@ impl<'input> TwigLexer<'input> {
             }
             self.brackets.pop();
             self.jump_forward_to(start + 1);
-            let slice = self.slice_str(start, start + 1);
+            let slice = self.slice_bytes(start, start + 1);
             return Ok(TwigToken::new(kind, slice, self.position_at(start)));
         }
         if let Some(kind) = single_byte_symbol(b0) {
             self.jump_forward_to(start + 1);
-            let slice = self.slice_str(start, start + 1);
+            let slice = self.slice_bytes(start, start + 1);
             return Ok(TwigToken::new(kind, slice, self.position_at(start)));
         }
 
@@ -915,7 +903,7 @@ impl<'input> TwigLexer<'input> {
     #[inline]
     fn emit_fixed(&mut self, start: usize, len: usize, kind: TwigTokenKind) -> Result<TwigToken<'input>, SyntaxError> {
         self.jump_forward_to(start + len);
-        let slice = self.slice_str(start, start + len);
+        let slice = self.slice_bytes(start, start + len);
         Ok(TwigToken::new(kind, slice, self.position_at(start)))
     }
 }

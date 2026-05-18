@@ -5,7 +5,7 @@ use mago_span::Span;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Name<'arena> {
-    pub name: &'arena str,
+    pub name: &'arena [u8],
     pub span: Span,
 }
 

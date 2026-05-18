@@ -22,14 +22,14 @@ impl<'arena> Parser<'_, 'arena> {
         let mut current_keyword = first_keyword;
         let mut current_condition = self.parse_expression()?;
         let mut current_close_tag = self.stream.expect_block_end()?;
-        let mut current_body = self.parse_statements(&BlockTerminator { names: &["elseif", "else", "endif"] })?;
+        let mut current_body = self.parse_statements(&BlockTerminator { names: &[b"elseif", b"else", b"endif"] })?;
 
         loop {
             let next_open_tok = self.stream.expect_block_start()?;
             let next_open_tag = self.stream.span_of(&next_open_tok);
-            let name_tok = self.stream.expect_name("expected `elseif`, `else`, or `endif`")?;
+            let name_tok = self.stream.expect_name(b"expected `elseif`, `else`, or `endif`")?;
             match name_tok.value {
-                "elseif" => {
+                b"elseif" => {
                     branches.push(IfBranch {
                         open_tag: current_open_tag,
                         keyword: current_keyword,
@@ -41,9 +41,10 @@ impl<'arena> Parser<'_, 'arena> {
                     current_keyword = self.keyword_from(&name_tok);
                     current_condition = self.parse_expression()?;
                     current_close_tag = self.stream.expect_block_end()?;
-                    current_body = self.parse_statements(&BlockTerminator { names: &["elseif", "else", "endif"] })?;
+                    current_body =
+                        self.parse_statements(&BlockTerminator { names: &[b"elseif", b"else", b"endif"] })?;
                 }
-                "else" => {
+                b"else" => {
                     branches.push(IfBranch {
                         open_tag: current_open_tag,
                         keyword: current_keyword,
@@ -53,7 +54,7 @@ impl<'arena> Parser<'_, 'arena> {
                     });
                     let else_keyword = self.keyword_from(&name_tok);
                     let else_close_tag = self.stream.expect_block_end()?;
-                    let else_body = self.parse_statements(&BlockTerminator { names: &["endif"] })?;
+                    let else_body = self.parse_statements(&BlockTerminator { names: &[b"endif"] })?;
                     let else_branch = Some(ElseBranch {
                         open_tag: next_open_tag,
                         keyword: else_keyword,
@@ -63,11 +64,11 @@ impl<'arena> Parser<'_, 'arena> {
 
                     let end_open_tok = self.stream.expect_block_start()?;
                     let end_open_tag = self.stream.span_of(&end_open_tok);
-                    let end_kw_tok = self.stream.expect_name("expected `endif`")?;
-                    if end_kw_tok.value != "endif" {
+                    let end_kw_tok = self.stream.expect_name(b"expected `endif`")?;
+                    if end_kw_tok.value != b"endif" {
                         return Err(ParseError::MismatchedEndTag {
-                            expected: "endif".to_string(),
-                            got: end_kw_tok.value.to_string(),
+                            expected: b"endif".to_vec(),
+                            got: end_kw_tok.value.to_vec(),
                             span: self.stream.span_of(&end_kw_tok),
                         });
                     }
@@ -81,7 +82,7 @@ impl<'arena> Parser<'_, 'arena> {
                         end_close_tag,
                     }));
                 }
-                "endif" => {
+                b"endif" => {
                     branches.push(IfBranch {
                         open_tag: current_open_tag,
                         keyword: current_keyword,
@@ -101,7 +102,7 @@ impl<'arena> Parser<'_, 'arena> {
                 }
                 other => {
                     return Err(ParseError::UnexpectedToken(
-                        format!("unexpected separator `{other}` in `if`"),
+                        format!("unexpected separator `{}` in `if`", String::from_utf8_lossy(other)).into_bytes(),
                         self.stream.span_of(&name_tok),
                     ));
                 }

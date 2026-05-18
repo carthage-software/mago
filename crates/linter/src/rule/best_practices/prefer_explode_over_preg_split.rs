@@ -130,7 +130,12 @@ impl LintRule for PreferExplodeOverPregSplitRule {
         let Some(pattern_value) = pattern_literal.value else {
             return;
         };
-        let Some(separator) = try_extract_plain_separator(pattern_value) else {
+
+        let Some(pattern_str) = std::str::from_utf8(pattern_value).ok() else {
+            return;
+        };
+
+        let Some(separator) = try_extract_plain_separator(pattern_str) else {
             return;
         };
 
@@ -166,7 +171,7 @@ impl LintRule for PreferExplodeOverPregSplitRule {
             edits.push(TextEdit::replace(pattern_arg.value.span(), rewritten_separator));
 
             if let Some(Argument::Positional(flags_arg)) = arguments.get(3) {
-                let source = ctx.source_file.contents.as_bytes();
+                let source: &[u8] = ctx.source_file.contents.as_ref();
                 let mut comma_offset = flags_arg.start_offset() as usize;
                 let mut found_comma = false;
                 while comma_offset > 0 {

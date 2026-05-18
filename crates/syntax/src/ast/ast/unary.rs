@@ -11,27 +11,27 @@ use crate::token::Precedence;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(tag = "type", content = "value")]
 pub enum UnaryPrefixOperator<'arena> {
-    ErrorControl(Span),             // `@$expr`
-    Reference(Span),                // `&$expr`
-    ArrayCast(Span, &'arena str),   // `(array) $expr`
-    BoolCast(Span, &'arena str),    // `(bool) $expr`
-    BooleanCast(Span, &'arena str), // `(boolean) $expr`
-    DoubleCast(Span, &'arena str),  // `(double) $expr`
-    RealCast(Span, &'arena str),    // `(real) $expr`
-    FloatCast(Span, &'arena str),   // `(float) $expr`
-    IntCast(Span, &'arena str),     // `(int) $expr`
-    IntegerCast(Span, &'arena str), // `(integer) $expr`
-    ObjectCast(Span, &'arena str),  // `(object) $expr`
-    UnsetCast(Span, &'arena str),   // `(unset) $expr`
-    StringCast(Span, &'arena str),  // `(string) $expr`
-    BinaryCast(Span, &'arena str),  // `(binary) $expr`
-    VoidCast(Span, &'arena str),    // `(void) $expr`
-    BitwiseNot(Span),               // `~$expr`
-    Not(Span),                      // `!$expr`
-    PreIncrement(Span),             // `++$expr`
-    PreDecrement(Span),             // `--$expr`
-    Plus(Span),                     // `+$expr`
-    Negation(Span),                 // `-$expr`
+    ErrorControl(Span),              // `@$expr`
+    Reference(Span),                 // `&$expr`
+    ArrayCast(Span, &'arena [u8]),   // `(array) $expr`
+    BoolCast(Span, &'arena [u8]),    // `(bool) $expr`
+    BooleanCast(Span, &'arena [u8]), // `(boolean) $expr`
+    DoubleCast(Span, &'arena [u8]),  // `(double) $expr`
+    RealCast(Span, &'arena [u8]),    // `(real) $expr`
+    FloatCast(Span, &'arena [u8]),   // `(float) $expr`
+    IntCast(Span, &'arena [u8]),     // `(int) $expr`
+    IntegerCast(Span, &'arena [u8]), // `(integer) $expr`
+    ObjectCast(Span, &'arena [u8]),  // `(object) $expr`
+    UnsetCast(Span, &'arena [u8]),   // `(unset) $expr`
+    StringCast(Span, &'arena [u8]),  // `(string) $expr`
+    BinaryCast(Span, &'arena [u8]),  // `(binary) $expr`
+    VoidCast(Span, &'arena [u8]),    // `(void) $expr`
+    BitwiseNot(Span),                // `~$expr`
+    Not(Span),                       // `!$expr`
+    PreIncrement(Span),              // `++$expr`
+    PreDecrement(Span),              // `--$expr`
+    Plus(Span),                      // `+$expr`
+    Negation(Span),                  // `-$expr`
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
@@ -121,10 +121,10 @@ impl<'arena> UnaryPrefixOperator<'arena> {
 
     #[inline]
     #[must_use]
-    pub fn as_str(&self) -> &'arena str {
+    pub fn as_bytes(&self) -> &'arena [u8] {
         match self {
-            UnaryPrefixOperator::ErrorControl(_) => "@",
-            UnaryPrefixOperator::Reference(_) => "&",
+            UnaryPrefixOperator::ErrorControl(_) => b"@",
+            UnaryPrefixOperator::Reference(_) => b"&",
             UnaryPrefixOperator::ArrayCast(_, value)
             | UnaryPrefixOperator::BoolCast(_, value)
             | UnaryPrefixOperator::BooleanCast(_, value)
@@ -138,12 +138,12 @@ impl<'arena> UnaryPrefixOperator<'arena> {
             | UnaryPrefixOperator::StringCast(_, value)
             | UnaryPrefixOperator::BinaryCast(_, value)
             | UnaryPrefixOperator::VoidCast(_, value) => value,
-            UnaryPrefixOperator::BitwiseNot(_) => "~",
-            UnaryPrefixOperator::Not(_) => "!",
-            UnaryPrefixOperator::PreIncrement(_) => "++",
-            UnaryPrefixOperator::PreDecrement(_) => "--",
-            UnaryPrefixOperator::Plus(_) => "+",
-            UnaryPrefixOperator::Negation(_) => "-",
+            UnaryPrefixOperator::BitwiseNot(_) => b"~",
+            UnaryPrefixOperator::Not(_) => b"!",
+            UnaryPrefixOperator::PreIncrement(_) => b"++",
+            UnaryPrefixOperator::PreDecrement(_) => b"--",
+            UnaryPrefixOperator::Plus(_) => b"+",
+            UnaryPrefixOperator::Negation(_) => b"-",
         }
     }
 

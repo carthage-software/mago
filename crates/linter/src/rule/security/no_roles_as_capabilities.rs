@@ -103,9 +103,10 @@ impl LintRule for NoRolesAsCapabilitiesRule {
 
         // Check the first argument for WordPress roles
         if let Some(Argument::Positional(first_arg)) = argument_list.arguments.first()
-            && let Some(role_name) = extract_string_literal(first_arg.value)
-            && is_wordpress_role(role_name)
+            && let Some(role_name_bytes) = extract_string_literal(first_arg.value)
+            && is_wordpress_role(role_name_bytes)
         {
+            let role_name = mago_bytes::BytesDisplay(role_name_bytes);
             let issue = Issue::new(
                         self.cfg.level(),
                         "Use capabilities instead of roles in checks",
@@ -124,17 +125,17 @@ impl LintRule for NoRolesAsCapabilitiesRule {
 }
 
 /// Check if a string is a known `WordPress` role
-fn is_wordpress_role(role: &str) -> bool {
+fn is_wordpress_role(role: &[u8]) -> bool {
     matches!(
         role,
-        "administrator" | "editor" | "author" | "contributor" | "subscriber" |
-        "super_admin" | // Multisite
-        "shop_manager" | "customer" // WooCommerce common roles
+        b"administrator" | b"editor" | b"author" | b"contributor" | b"subscriber" |
+        b"super_admin" | // Multisite
+        b"shop_manager" | b"customer" // WooCommerce common roles
     )
 }
 
 /// Extract string literal value from an expression
-fn extract_string_literal<'arena>(expr: &Expression<'arena>) -> Option<&'arena str> {
+fn extract_string_literal<'arena>(expr: &Expression<'arena>) -> Option<&'arena [u8]> {
     match expr {
         Expression::Literal(Literal::String(string_literal)) => string_literal.value,
         _ => None,

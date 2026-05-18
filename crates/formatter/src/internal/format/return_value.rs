@@ -33,10 +33,10 @@ pub fn format_return_value<'arena>(
 
         return Document::Array(vec![
             in f.arena;
-            (Document::String("(")),
+            (Document::String(b"(")),
             (Document::Indent(vec![in f.arena; Document::Line(Line::hard()), value_doc])),
             (Document::Line(Line::hard())),
-            (Document::String(")")),
+            (Document::String(b")")),
         ]);
     }
 
@@ -51,13 +51,13 @@ pub fn format_return_value<'arena>(
         return Document::Group(
             Group::new(vec![
                 in f.arena;
-                Document::IfBreak(IfBreak::then(f.arena, Document::String("("))),
+                Document::IfBreak(IfBreak::then(f.arena, Document::String(b"("))),
                 Document::IndentIfBreak(IndentIfBreak::new(
                     group_id,
                     vec![in f.arena; Document::Line(Line::soft()), value_doc],
                 )),
                 Document::Line(Line::soft()),
-                Document::IfBreak(IfBreak::then(f.arena, Document::String(")"))),
+                Document::IfBreak(IfBreak::then(f.arena, Document::String(b")"))),
             ])
             .with_id(group_id),
         );

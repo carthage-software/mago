@@ -63,7 +63,7 @@ pub fn get_staged_file(workspace: &Path, path: &Path) -> Result<File, Error> {
         .output()
         .map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
-    Ok(File::ephemeral(Cow::Borrowed("<stdin>"), Cow::Owned(String::from_utf8_lossy(&output.stdout).into_owned())))
+    Ok(File::ephemeral(Cow::Borrowed(b"<stdin>"), Cow::Owned(output.stdout)))
 }
 
 /// Updates the contents of the staged file
@@ -73,7 +73,7 @@ pub fn get_staged_file(workspace: &Path, path: &Path) -> Result<File, Error> {
 /// * `workspace` - The git repository root directory
 /// * `path` - The path for which to get the file
 /// * `new_content` - The new content for the staged file
-pub fn update_staged_file(workspace: &Path, path: &Path, new_content: String) -> Result<(), Error> {
+pub fn update_staged_file(workspace: &Path, path: &Path, new_content: Vec<u8>) -> Result<(), Error> {
     let blob_id = create_blob(workspace, path, new_content)?;
     let mode = get_mode(workspace, path)?;
 
@@ -142,7 +142,7 @@ where
     let paths: Vec<PathBuf> = file_ids
         .into_iter()
         .filter_map(|id| database.get_ref(&id).ok())
-        .map(|file| PathBuf::from(&*file.name))
+        .map(|file| PathBuf::from(std::str::from_utf8(&file.name).unwrap_or("")))
         .collect();
 
     if paths.is_empty() {
@@ -244,7 +244,7 @@ fn get_files_with_unstaged_changes(workspace: &Path) -> Result<HashSet<PathBuf>,
 /// # Returns
 ///
 /// A string containing the id of the newly created blob
-fn create_blob(workspace: &Path, path: &Path, content: String) -> Result<String, Error> {
+fn create_blob(workspace: &Path, path: &Path, content: Vec<u8>) -> Result<String, Error> {
     let mut child = Command::new("git")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -256,7 +256,7 @@ fn create_blob(workspace: &Path, path: &Path, content: String) -> Result<String,
 
     let mut stdin = child.stdin.take().expect("failed to get stdin");
     std::thread::spawn(move || {
-        stdin.write_all(content.as_bytes()).expect("failed to write to stdin");
+        stdin.write_all(&content).expect("failed to write to stdin");
     });
 
     let output = child.wait_with_output().map_err(|e| Error::Database(DatabaseError::IOError(e)))?;

@@ -31,7 +31,7 @@ impl Provider for FilterInputProvider {
 
 impl FunctionReturnTypeProvider for FilterInputProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("filter_input")
+        FunctionTarget::Exact(b"filter_input")
     }
 
     fn get_return_type(

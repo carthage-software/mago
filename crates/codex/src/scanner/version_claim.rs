@@ -1,5 +1,3 @@
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_php_version::PHPVersion;
 use mago_syntax::ast::ArgumentList;
 use mago_syntax::ast::AttributeList;
@@ -10,6 +8,8 @@ use mago_syntax::ast::LiteralString;
 use mago_syntax::ast::Sequence;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::UnaryPrefixOperator;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::metadata::version_constraint::VersionConstraint;
 use crate::scanner::Context;
@@ -25,7 +25,7 @@ pub struct VersionVerdict {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeOverride {
-    Typed(Atom),
+    Typed(Word),
     Untyped,
 }
 
@@ -121,33 +121,32 @@ enum ClaimKind {
     UntypedUntil,
 }
 
-fn recognize(resolved_name: &str) -> Option<ClaimKind> {
-    let name = resolved_name.trim_start_matches('\\');
-    let bytes = name.as_bytes();
+fn recognize(resolved_name: &[u8]) -> Option<ClaimKind> {
+    let bytes = mago_bytes::trim_start_byte(resolved_name, b'\\');
     if bytes.len() < 5 || !bytes[..5].eq_ignore_ascii_case(b"Mago\\") {
         return None;
     }
 
-    let suffix = &name[5..];
-    if suffix.eq_ignore_ascii_case("AvailableSince") {
+    let suffix = &bytes[5..];
+    if suffix.eq_ignore_ascii_case(b"AvailableSince") {
         Some(ClaimKind::AvailableSince)
-    } else if suffix.eq_ignore_ascii_case("AvailableUntil") {
+    } else if suffix.eq_ignore_ascii_case(b"AvailableUntil") {
         Some(ClaimKind::AvailableUntil)
-    } else if suffix.eq_ignore_ascii_case("OptionalSince") {
+    } else if suffix.eq_ignore_ascii_case(b"OptionalSince") {
         Some(ClaimKind::OptionalSince)
-    } else if suffix.eq_ignore_ascii_case("OptionalUntil") {
+    } else if suffix.eq_ignore_ascii_case(b"OptionalUntil") {
         Some(ClaimKind::OptionalUntil)
-    } else if suffix.eq_ignore_ascii_case("RequiredSince") {
+    } else if suffix.eq_ignore_ascii_case(b"RequiredSince") {
         Some(ClaimKind::RequiredSince)
-    } else if suffix.eq_ignore_ascii_case("RequiredUntil") {
+    } else if suffix.eq_ignore_ascii_case(b"RequiredUntil") {
         Some(ClaimKind::RequiredUntil)
-    } else if suffix.eq_ignore_ascii_case("TypedWithSince") {
+    } else if suffix.eq_ignore_ascii_case(b"TypedWithSince") {
         Some(ClaimKind::TypedWithSince)
-    } else if suffix.eq_ignore_ascii_case("TypedWithUntil") {
+    } else if suffix.eq_ignore_ascii_case(b"TypedWithUntil") {
         Some(ClaimKind::TypedWithUntil)
-    } else if suffix.eq_ignore_ascii_case("UntypedSince") {
+    } else if suffix.eq_ignore_ascii_case(b"UntypedSince") {
         Some(ClaimKind::UntypedSince)
-    } else if suffix.eq_ignore_ascii_case("UntypedUntil") {
+    } else if suffix.eq_ignore_ascii_case(b"UntypedUntil") {
         Some(ClaimKind::UntypedUntil)
     } else {
         None
@@ -276,9 +275,9 @@ fn literal_u32(expression: &Expression<'_>) -> Option<u32> {
     }
 }
 
-fn literal_string(expression: &Expression<'_>) -> Option<Atom> {
+fn literal_string(expression: &Expression<'_>) -> Option<Word> {
     match expression.unparenthesized() {
-        Expression::Literal(Literal::String(LiteralString { value: Some(value), .. })) => Some(atom(value)),
+        Expression::Literal(Literal::String(LiteralString { value: Some(value), .. })) => Some(word(value)),
         _ => None,
     }
 }

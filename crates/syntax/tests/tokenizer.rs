@@ -1334,12 +1334,12 @@ fn test_lexer_with_settings(
         return Err(err);
     }
 
-    let mut found = String::new();
+    let mut found: Vec<u8> = Vec::new();
     for token in &tokens {
-        found.push_str(token.value);
+        found.extend_from_slice(token.value);
     }
 
-    assert_eq!(code, found.as_bytes());
+    assert_eq!(code, found.as_slice());
 
     Ok(())
 }

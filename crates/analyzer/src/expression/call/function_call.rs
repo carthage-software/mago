@@ -1,5 +1,3 @@
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -11,6 +9,8 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::FunctionCall;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -92,8 +92,8 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
     template_result: &mut TemplateResult,
 ) -> Result<(Vec<InvocationTarget<'ctx>>, bool), AnalysisError> {
     if let Expression::Identifier(function_name) = expression {
-        let name = atom(context.resolved_names.get(function_name));
-        let unqualified_name = atom(function_name.value());
+        let name = word(context.resolved_names.get(function_name));
+        let unqualified_name = word(function_name.value());
 
         let identifier = FunctionLikeIdentifier::Function(name);
         let alternative = if function_name.is_local() && unqualified_name != name {
@@ -102,7 +102,7 @@ pub(super) fn resolve_targets<'ctx, 'arena>(
             None
         };
 
-        let lowercased_name = ascii_lowercase_atom(&name);
+        let lowercased_name = ascii_lowercase_word(name.as_bytes());
         let skip_error = block_context.known_functions.contains(&lowercased_name);
 
         let target =

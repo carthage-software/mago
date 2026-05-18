@@ -13,6 +13,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use mago_bytes::BytesDisplay;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -53,9 +54,10 @@ pub fn analyze_attributes<'ctx, 'arena>(
 
     let mut used_attributes = HashMap::default();
     for attribute in attributes {
-        let attribute_name = context.resolved_names.get(&attribute.name);
+        let attribute_name_bytes = context.resolved_names.get(&attribute.name);
+        let attribute_name = BytesDisplay(attribute_name_bytes);
 
-        let Some(metadata) = context.codebase.get_class_like(attribute_name) else {
+        let Some(metadata) = context.codebase.get_class_like(attribute_name_bytes) else {
             context.collector.report_with_code(
                 IssueCode::NonExistentAttributeClass,
                 Issue::error(format!("Attribute class `{attribute_name}` not found or could not be autoloaded."))
@@ -137,7 +139,7 @@ pub fn analyze_attributes<'ctx, 'arena>(
             continue;
         };
 
-        if let Some(first_usage_span) = used_attributes.get(&attribute_name)
+        if let Some(first_usage_span) = used_attributes.get(&attribute_name_bytes)
             && !attribute_flags.is_repeatable()
         {
             context.collector.report_with_code(
@@ -162,7 +164,7 @@ pub fn analyze_attributes<'ctx, 'arena>(
             continue;
         }
 
-        used_attributes.insert(attribute_name, attribute.name.span());
+        used_attributes.insert(attribute_name_bytes, attribute.name.span());
 
         if let Some(flags) = metadata.attribute_flags {
             let is_valid_target = match target {
@@ -191,7 +193,12 @@ fn report_invalid_target<'ctx, 'arena>(
     flags: AttributeFlags,
 ) {
     let attribute_name = metadata.original_name;
-    let short_attribute_name = attribute_name.split('\\').next_back().unwrap_or(attribute_name.as_str());
+    let attribute_name_bytes = attribute_name.as_bytes();
+    let short_attribute_name = match memchr::memrchr(b'\\', attribute_name_bytes) {
+        Some(i) => &attribute_name_bytes[i + 1..],
+        None => attribute_name_bytes,
+    };
+    let short_attribute_name = BytesDisplay(short_attribute_name);
     let allowed_targets = flags.get_target_names().join(", ");
 
     context.collector.report_with_code(

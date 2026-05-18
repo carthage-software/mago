@@ -42,11 +42,11 @@ impl<'arena> NameResolutionContext<'arena> {
     /// * `namespace` - An `Option<&StringIdentifier>` representing the declared namespace name.
     ///   - `Some(id)`: Enters the namespace identified by `id`.
     ///   - `None`: Enters the global namespace (e.g., from `namespace;`).
-    pub fn enter_namespace(&mut self, namespace_name: Option<&str>) {
+    pub fn enter_namespace(&mut self, namespace_name: Option<&[u8]>) {
         match namespace_name {
             Some(namespace_name) => {
                 // Create a new scope specific to this namespace.
-                self.scope = NamespaceScope::for_namespace(namespace_name);
+                self.scope = NamespaceScope::for_namespace(namespace_name.to_vec());
             }
             None => {
                 // Reset to a fresh global scope.
@@ -81,15 +81,15 @@ impl<'arena> NameResolutionContext<'arena> {
     /// # Returns
     ///
     /// The `StringIdentifier` for the potentially qualified name.
-    pub fn qualify_name(&self, name: &str) -> &'arena str {
+    pub fn qualify_name(&self, name: &[u8]) -> &'arena [u8] {
         let qualified_str = self.scope.qualify_name(name);
 
-        self.arena.alloc_str(&qualified_str)
+        self.arena.alloc_slice_copy(&qualified_str)
     }
 
     /// Allocates `s` in the arena and returns a borrow with the arena lifetime.
-    pub fn intern(&self, s: &str) -> &'arena str {
-        self.arena.alloc_str(s)
+    pub fn intern(&self, s: &[u8]) -> &'arena [u8] {
+        self.arena.alloc_slice_copy(s)
     }
 
     /// Performs full name resolution for a given identifier within the current scope.
@@ -105,9 +105,9 @@ impl<'arena> NameResolutionContext<'arena> {
     ///  - The `bool` is `true` if resolution occurred via an explicit alias or construct
     ///    (like `\` or `namespace\`), and `false` otherwise (e.g., resolved relative
     ///    to the namespace or returned as-is).
-    pub fn resolve<'name>(&self, kind: NameKind, name_str: &'name str) -> (&'arena str, bool) {
+    pub fn resolve<'name>(&self, kind: NameKind, name_str: &'name [u8]) -> (&'arena [u8], bool) {
         let (cow, is_imported) = self.scope.resolve_str(kind, name_str);
 
-        (self.arena.alloc_str(&cow), is_imported)
+        (self.arena.alloc_slice_copy(&cow), is_imported)
     }
 }

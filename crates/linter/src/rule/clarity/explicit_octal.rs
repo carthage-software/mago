@@ -88,11 +88,11 @@ impl LintRule for ExplicitOctalRule {
         };
 
         let literal_text = literal_integer.raw;
-        if !literal_text.starts_with('0') {
+        if !literal_text.starts_with(b"0") {
             return;
         }
 
-        if !literal_text.as_bytes().get(1).copied().is_some_and(|c| {
+        if !literal_text.get(1).copied().is_some_and(|c| {
             // check for `0o`, `0x`, or `0b` prefix
             c != b'o' && c != b'O' && c != b'x' && c != b'X' && c != b'b' && c != b'B'
         }) {

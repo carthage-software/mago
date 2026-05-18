@@ -272,7 +272,7 @@ pub enum TokenKind {
 pub struct Token<'src> {
     pub kind: TokenKind,
     pub start: Position,
-    pub value: &'src str,
+    pub value: &'src [u8],
 }
 
 impl HasPosition for Token<'_> {
@@ -779,7 +779,7 @@ impl TokenKind {
 impl<'arena> Token<'arena> {
     #[inline]
     #[must_use]
-    pub const fn new(kind: TokenKind, value: &'arena str, start: Position) -> Self {
+    pub const fn new(kind: TokenKind, value: &'arena [u8], start: Position) -> Self {
         Self { kind, start, value }
     }
 
@@ -796,6 +796,6 @@ impl<'arena> Token<'arena> {
 
 impl std::fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}({})", self.kind, self.value)
+        write!(f, "{}({})", self.kind, String::from_utf8_lossy(self.value))
     }
 }

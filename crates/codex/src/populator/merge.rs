@@ -1,4 +1,4 @@
-use mago_atom::Atom;
+use mago_word::Word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
@@ -13,7 +13,7 @@ use crate::reference::SymbolReferences;
 pub fn merge_interface_metadata_from_parent_interface(
     metadata: &mut ClassLikeMetadata,
     codebase: &CodebaseMetadata,
-    parent_interface: Atom,
+    parent_interface: Word,
     symbol_references: &mut SymbolReferences,
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_interface, true);
@@ -46,7 +46,7 @@ pub fn merge_interface_metadata_from_parent_interface(
 pub fn merge_metadata_from_parent_class_like(
     metadata: &mut ClassLikeMetadata,
     codebase: &CodebaseMetadata,
-    parent_class: Atom,
+    parent_class: Word,
     symbol_references: &mut SymbolReferences,
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
@@ -87,7 +87,7 @@ pub fn merge_metadata_from_parent_class_like(
 pub fn merge_metadata_from_required_class_like(
     metadata: &mut ClassLikeMetadata,
     codebase: &CodebaseMetadata,
-    parent_class: Atom,
+    parent_class: Word,
     symbol_references: &mut SymbolReferences,
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
@@ -106,7 +106,7 @@ pub fn merge_metadata_from_required_class_like(
 pub fn merge_metadata_from_trait(
     metadata: &mut ClassLikeMetadata,
     codebase: &CodebaseMetadata,
-    trait_name: Atom,
+    trait_name: Word,
     symbol_references: &mut SymbolReferences,
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, trait_name, true);

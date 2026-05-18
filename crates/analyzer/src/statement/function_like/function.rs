@@ -1,10 +1,10 @@
-use mago_atom::atom;
 use mago_codex::context::ScopeContext;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Function;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -24,10 +24,11 @@ use crate::utils::missing_type_hints;
 /// Reports a duplicate function definition issue.
 fn report_duplicate_function_definition(
     context: &mut Context<'_, '_>,
-    name: &str,
+    name: &[u8],
     duplicate_span: Span,
     original_span: Span,
 ) {
+    let name = mago_bytes::BytesDisplay(name);
     context.collector.report_with_code(
         IssueCode::DuplicateDefinition,
         Issue::error(format!("Function `{name}` is already defined elsewhere."))
@@ -56,13 +57,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             AttributeTarget::Function,
         );
 
-        let function_name = atom(context.resolved_names.get(&self.name));
+        let function_name = word(context.resolved_names.get(&self.name));
 
         if context.settings.diff && context.codebase.safe_symbols.contains(&function_name) {
             return Ok(());
         }
 
-        let Some(function_metadata) = context.codebase.get_function(&function_name) else {
+        let Some(function_metadata) = context.codebase.get_function(function_name.as_bytes()) else {
             return Err(AnalysisError::InternalError(
                 format!("Function metadata for `{function_name}` not found."),
                 self.span(),

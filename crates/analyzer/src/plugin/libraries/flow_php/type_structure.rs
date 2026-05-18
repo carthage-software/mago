@@ -3,7 +3,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
@@ -12,6 +11,7 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
+use mago_word::word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -40,7 +40,7 @@ impl Provider for TypeStructureProvider {
 
 impl FunctionReturnTypeProvider for TypeStructureProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("flow\\types\\dsl\\type_structure")
+        FunctionTarget::Exact(b"flow\\types\\dsl\\type_structure")
     }
 
     fn get_return_type(
@@ -48,7 +48,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let elements = invocation.get_argument(0, &["elements"])?;
+        let elements = invocation.get_argument(0, &[b"elements"])?;
         let elements_type = context.get_expression_type(elements)?;
 
         let elements_array = if let Some(elements_array) = elements_type.get_single_array()
@@ -60,7 +60,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
         };
 
         let optional_elements_array =
-            if let Some(optional_elements) = invocation.get_argument(1, &["optional_elements"]) {
+            if let Some(optional_elements) = invocation.get_argument(1, &[b"optional_elements"]) {
                 let optional_elements_type = context.get_expression_type(optional_elements)?;
                 if let Some(optional_array) = optional_elements_type.get_single_array()
                     && optional_array.is_sealed()
@@ -73,7 +73,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
                 None
             };
 
-        let allows_extra_fields = if let Some(argument) = invocation.get_argument(2, &["allow_extra"]) {
+        let allows_extra_fields = if let Some(argument) = invocation.get_argument(2, &[b"allow_extra"]) {
             context
                 .get_expression_type(argument)
                 .and_then(|union| union.get_single_bool())
@@ -117,7 +117,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
         }
 
         Some(TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
-            atom("Flow\\Types\\Type"),
+            word("Flow\\Types\\Type"),
             Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                 parameters: if allows_extra_fields {
                     Some((Arc::new(get_arraykey()), Arc::new(get_mixed())))

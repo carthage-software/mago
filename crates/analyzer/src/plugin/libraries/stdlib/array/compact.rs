@@ -3,7 +3,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_atom::Atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -36,7 +35,7 @@ impl Provider for CompactProvider {
 
 impl FunctionReturnTypeProvider for CompactProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("compact")
+        FunctionTarget::Exact(b"compact")
     }
 
     fn get_return_type(
@@ -63,9 +62,9 @@ impl FunctionReturnTypeProvider for CompactProvider {
                 continue;
             };
 
-            let variable_id = format!("${variable_name}");
-            if let Some(variable_type) = context.get_variable_type(&variable_id) {
-                let key = ArrayKey::String(Atom::from(variable_name));
+            let variable_id_word = mago_word::concat_word!(b"$", variable_name);
+            if let Some(variable_type) = context.get_variable_type(variable_id_word.as_bytes()) {
+                let key = ArrayKey::String(mago_word::word(variable_name));
                 known_items.insert(key, (false, (**variable_type).clone()));
             } else {
                 has_unknown = true;

@@ -1,12 +1,12 @@
-use mago_atom::Atom;
-use mago_atom::AtomSet;
+use mago_word::Word;
+use mago_word::WordSet;
 
 use crate::metadata::CodebaseMetadata;
 
-pub fn sort_class_likes(codebase: &CodebaseMetadata, class_likes_to_repopulate: &AtomSet) -> Vec<Atom> {
+pub fn sort_class_likes(codebase: &CodebaseMetadata, class_likes_to_repopulate: &WordSet) -> Vec<Word> {
     let mut sorted = Vec::with_capacity(class_likes_to_repopulate.len());
-    let mut visited = AtomSet::default();
-    let mut visiting = AtomSet::default();
+    let mut visited = WordSet::default();
+    let mut visiting = WordSet::default();
 
     for class_like in class_likes_to_repopulate {
         visit(*class_like, codebase, class_likes_to_repopulate, &mut visited, &mut visiting, &mut sorted);
@@ -16,12 +16,12 @@ pub fn sort_class_likes(codebase: &CodebaseMetadata, class_likes_to_repopulate: 
 }
 
 fn visit(
-    class_like: Atom,
+    class_like: Word,
     codebase: &CodebaseMetadata,
-    class_likes_to_repopulate: &AtomSet,
-    visited: &mut AtomSet,
-    visiting: &mut AtomSet,
-    sorted: &mut Vec<Atom>,
+    class_likes_to_repopulate: &WordSet,
+    visited: &mut WordSet,
+    visiting: &mut WordSet,
+    sorted: &mut Vec<Word>,
 ) {
     if visited.contains(&class_like) {
         return;

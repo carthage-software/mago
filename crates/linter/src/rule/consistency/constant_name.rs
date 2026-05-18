@@ -100,7 +100,7 @@ impl LintRule for ConstantNameRule {
         match node {
             Node::Constant(constant) => {
                 for item in &constant.items {
-                    let name = item.name.value;
+                    let Some(name) = std::str::from_utf8(item.name.value).ok() else { continue };
                     if !is_constant_case(name) {
                         ctx.collector.report(
                             Issue::new(self.cfg.level(), format!("Constant name `{name}` should be in constant case."))
@@ -122,7 +122,7 @@ impl LintRule for ConstantNameRule {
             }
             Node::ClassLikeConstant(class_like_constant) => {
                 for item in &class_like_constant.items {
-                    let name = item.name.value;
+                    let Some(name) = std::str::from_utf8(item.name.value).ok() else { continue };
 
                     if !is_constant_case(name) {
                         ctx.collector.report(

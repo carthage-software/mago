@@ -127,7 +127,7 @@ impl SlowestFiles {
         let shown = guard.len().min(limit);
         tracing::trace!("Slowest {} of {} files during {}:", shown, guard.len(), phase);
         for (rank, (duration, file)) in guard.iter().take(shown).enumerate() {
-            tracing::trace!("  {:>2}. {} took {:?}.", rank + 1, file.name, duration);
+            tracing::trace!("  {:>2}. {} took {:?}.", rank + 1, mago_bytes::BytesDisplay(&file.name), duration);
         }
     }
 }
@@ -213,16 +213,17 @@ impl HangWatcher {
                 let elapsed = now - entry.started_at;
                 let secs = elapsed.as_secs();
 
+                let file_name = mago_bytes::BytesDisplay(&entry.file.name);
                 if entry.reported {
-                    tracing::trace!("{} is still being analyzed after {secs}s.", entry.file.name);
+                    tracing::trace!("{} is still being analyzed after {secs}s.", file_name);
                 } else {
-                    tracing::trace!("{} has been analyzing for {secs}s and has not finished.", entry.file.name);
+                    tracing::trace!("{} has been analyzing for {secs}s and has not finished.", file_name);
                     tracing::trace!(
                         "No file should take this long to analyze. This is almost certainly a bug in mago."
                     );
                     tracing::trace!(
                         "Please report it at https://github.com/carthage-software/mago/issues/new and attach {} if you can share it.",
-                        entry.file.name,
+                        file_name,
                     );
                     tracing::trace!(
                         "If the file is private, anonymize it (rename identifiers, remove sensitive literals) before attaching."

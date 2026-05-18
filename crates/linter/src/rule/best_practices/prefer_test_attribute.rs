@@ -107,17 +107,16 @@ impl LintRule for PreferTestAttributeRule {
             return;
         };
 
-        let name = method.name.value;
+        let name_bytes = method.name.value;
+        let Some(name) = std::str::from_utf8(name_bytes).ok() else { return };
 
-        // Must start with "test" or "Test"
-        if !name.starts_with("test") && !name.starts_with("Test") {
+        if !name_bytes.starts_with(b"test") && !name_bytes.starts_with(b"Test") {
             return;
         }
 
-        let after_test = &name[4..];
+        let after_test = &name_bytes[4..];
         if !after_test.is_empty() {
-            let first = after_test.as_bytes()[0];
-            // testfoo is not a test method — needs testFoo or test_foo
+            let first = after_test[0];
             if first != b'_' && !first.is_ascii_uppercase() {
                 return;
             }
@@ -141,7 +140,9 @@ impl LintRule for PreferTestAttributeRule {
         let indent = get_method_indent(ctx, method);
 
         ctx.collector.propose(issue, |edits| {
-            edits.push(TextEdit::replace(method.name.span(), new_name).with_safety(Safety::PotentiallyUnsafe));
+            edits.push(
+                TextEdit::replace(method.name.span(), new_name.into_owned()).with_safety(Safety::PotentiallyUnsafe),
+            );
 
             let attribute_text = format!("#[\\PHPUnit\\Framework\\Attributes\\Test]\n{indent}");
             edits.push(
@@ -155,7 +156,7 @@ fn has_test_attribute(ctx: &LintContext<'_, '_>, method: &Method<'_>) -> bool {
     for attribute_list in method.attribute_lists.iter() {
         for attribute in attribute_list.attributes.iter() {
             let resolved_name = ctx.resolved_names.get(&attribute.name);
-            if resolved_name.eq_ignore_ascii_case("PHPUnit\\Framework\\Attributes\\Test") {
+            if resolved_name.eq_ignore_ascii_case(b"PHPUnit\\Framework\\Attributes\\Test") {
                 return true;
             }
         }
@@ -173,27 +174,25 @@ fn compute_new_name(name: &str) -> Cow<'_, str> {
     }
 
     if let Some(new_name) = after_test.strip_prefix('_') {
-        // test_something_bad -> something_bad
         Cow::Borrowed(new_name)
     } else if prefix_was_lowercase {
-        // testSomethingBad -> somethingBad
         let mut chars = after_test.chars();
         let Some(first) = chars.next() else { return Cow::Borrowed(after_test) };
         Cow::Owned(format!("{}{}", first.to_ascii_lowercase(), chars.as_str()))
     } else {
-        // TestSomethingBad -> SomethingBad
         Cow::Borrowed(after_test)
     }
 }
 
 fn get_method_indent<'arena>(ctx: &LintContext<'_, 'arena>, method: &Method<'arena>) -> String {
-    let source = ctx.source_file.contents.as_ref();
+    let source: &[u8] = ctx.source_file.contents.as_ref();
     let start = method.span().start_offset() as usize;
-    let line_start = source[..start].rfind('\n').map_or(0, |pos| pos + 1);
+    let line_start = memchr::memrchr(b'\n', &source[..start]).map_or(0, |pos| pos + 1);
 
     source[line_start..start]
-        .chars()
-        .take_while(|c: &char| c.is_whitespace() && *c != '\n' && *c != '\r')
+        .iter()
+        .take_while(|&&b| (b == b' ' || b == b'\t') && b != b'\n' && b != b'\r')
+        .map(|&b| b as char)
         .collect::<String>()
 }
 

@@ -10,13 +10,13 @@
 
 use std::fmt::Write;
 
-use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::get_truthy_string;
 use mago_codex::ttype::union::TUnion;
+use mago_word::word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -39,7 +39,7 @@ impl Provider for SprintfProvider {
 
 impl FunctionReturnTypeProvider for SprintfProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("sprintf")
+        FunctionTarget::Exact(b"sprintf")
     }
 
     fn get_return_type(
@@ -59,12 +59,12 @@ pub fn resolve_sprintf(
     context: &ProviderContext<'_, '_, '_>,
     invocation: &InvocationInfo<'_, '_, '_>,
 ) -> Option<TUnion> {
-    let format_argument = invocation.get_argument(0, &["format"])?;
+    let format_argument = invocation.get_argument(0, &[b"format"])?;
     let format_type = context.get_expression_type(format_argument)?;
     let format_str = format_type.get_single_literal_string_value()?;
 
     if let Some(result) = resolve_literal(format_str, context, invocation) {
-        return Some(get_literal_string(atom(&result)));
+        return Some(get_literal_string(word(&result)));
     }
 
     let min_len = analyze_min_length(format_str, context, invocation);
@@ -91,7 +91,7 @@ fn argument_string_min_length(
     };
 
     if let Some(literal) = arg_type.get_single_literal_string_value() {
-        return literal.chars().count();
+        return literal.len();
     }
 
     let mut min_len = usize::MAX;
@@ -179,19 +179,19 @@ fn parse_precision(bytes: &[u8], i: &mut usize) -> Option<usize> {
 
 /// Try to fully resolve sprintf to a literal string when all arguments are known literals.
 fn resolve_literal(
-    format_str: &str,
+    format_str: &[u8],
     context: &ProviderContext<'_, '_, '_>,
     invocation: &InvocationInfo<'_, '_, '_>,
 ) -> Option<String> {
+    let format_str_utf8 = std::str::from_utf8(format_str).ok()?;
     let mut result = String::with_capacity(format_str.len());
     let mut buf = String::new();
-    let bytes = format_str.as_bytes();
+    let bytes = format_str;
     let len = bytes.len();
     let mut i = 0;
     let mut arg_index: usize = 1;
 
     while i < len {
-        // Batch consecutive literal characters.
         if bytes[i] != b'%' {
             let start = i;
             i += 1;
@@ -199,7 +199,7 @@ fn resolve_literal(
                 i += 1;
             }
 
-            result.push_str(&format_str[start..i]);
+            result.push_str(&format_str_utf8[start..i]);
             continue;
         }
 
@@ -240,10 +240,11 @@ fn resolve_literal(
         match specifier {
             b's' => {
                 let value = arg_type.get_single_literal_string_value()?;
+                let value_str = std::str::from_utf8(value).ok()?;
                 if let Some(prec) = precision {
-                    target.push_str(&value[..value.len().min(prec)]);
+                    target.push_str(&value_str[..value_str.len().min(prec)]);
                 } else {
-                    target.push_str(value);
+                    target.push_str(value_str);
                 }
             }
             b'd' => {
@@ -354,11 +355,11 @@ fn normalize_scientific_in_place(s: &mut String, start: usize) {
 }
 
 fn analyze_min_length(
-    format_str: &str,
+    format_str: &[u8],
     context: &ProviderContext<'_, '_, '_>,
     invocation: &InvocationInfo<'_, '_, '_>,
 ) -> usize {
-    let bytes = format_str.as_bytes();
+    let bytes = format_str;
     let len = bytes.len();
     let mut i = 0;
     let mut min_len: usize = 0;

@@ -11,12 +11,8 @@ use mago_span::Span;
 use mago_type_syntax::parse_str;
 
 fuzz_target!(|data: &[u8]| {
-    let Ok(src) = std::str::from_utf8(data) else {
-        return;
-    };
-
     let arena = Bump::new();
-    let span = Span::new(FileId::zero(), Position::new(0), Position::new(src.len() as u32));
-    let owned = bumpalo::collections::String::from_str_in(src, &arena).into_bump_str();
+    let span = Span::new(FileId::zero(), Position::new(0), Position::new(data.len() as u32));
+    let owned = arena.alloc_slice_copy(data);
     let _ = parse_str(&arena, span, owned);
 });

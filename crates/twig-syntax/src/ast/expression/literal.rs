@@ -8,20 +8,20 @@ use crate::ast::expression::Expression;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Number<'arena> {
-    pub raw: &'arena str,
+    pub raw: &'arena [u8],
     pub is_float: bool,
     pub span: Span,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct StringLiteral<'arena> {
-    pub raw: &'arena str,
+    pub raw: &'arena [u8],
     pub span: Span,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct InterpolatedLiteral<'arena> {
-    pub value: &'arena str,
+    pub value: &'arena [u8],
     pub span: Span,
 }
 

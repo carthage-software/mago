@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 
 use foldhash::HashMap;
-use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -24,6 +23,7 @@ use mago_codex::ttype::get_positive_int;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::get_truthy_string;
 use mago_codex::ttype::union::TUnion;
+use mago_word::word;
 
 std::thread_local! {
     static SUPERGLOBALS_MAP: LazyLock<HashMap<&'static str, Rc<TUnion>>> = LazyLock::new(|| {
@@ -56,9 +56,9 @@ std::thread_local! {
 
         map.insert("$GLOBALS", Rc::new({
             let mut known_items = BTreeMap::new();
-            known_items.insert(ArrayKey::String(atom("argc")), (true, get_positive_int()));
+            known_items.insert(ArrayKey::String(word("argc")), (true, get_positive_int()));
             known_items.insert(
-                ArrayKey::String(atom("argv")),
+                ArrayKey::String(word("argv")),
                 (true, TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_string())))))),
             );
 
@@ -112,105 +112,105 @@ std::thread_local! {
 
             let mut known_items = BTreeMap::new();
             // Standard CGI/1.1 and PHP variables
-            known_items.insert(ArrayKey::String(atom("PHP_SELF")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("GATEWAY_INTERFACE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SERVER_ADDR")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SERVER_NAME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SERVER_SOFTWARE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SERVER_PROTOCOL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("REQUEST_METHOD")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("REQUEST_TIME")), (true, get_int_range(Some(REQUEST_TIME_MIN), None)));
-            known_items.insert(ArrayKey::String(atom("REQUEST_TIME_FLOAT")), (true, get_float()));
-            known_items.insert(ArrayKey::String(atom("QUERY_STRING")), (true, get_string()));
-            known_items.insert(ArrayKey::String(atom("DOCUMENT_ROOT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_ACCEPT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_ACCEPT_CHARSET")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_ACCEPT_ENCODING")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_ACCEPT_LANGUAGE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_CONNECTION")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_HOST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_REFERER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_USER_AGENT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTPS")), (true, get_string()));
-            known_items.insert(ArrayKey::String(atom("REMOTE_ADDR")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("REMOTE_HOST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("REMOTE_PORT")), (true, get_string()));
-            known_items.insert(ArrayKey::String(atom("REMOTE_USER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("REDIRECT_REMOTE_USER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SCRIPT_FILENAME")), (false, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SERVER_ADMIN")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SERVER_PORT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SERVER_SIGNATURE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("PATH_TRANSLATED")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SCRIPT_NAME")), (false, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("REQUEST_URI")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("PHP_AUTH_DIGEST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("PHP_AUTH_USER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("PHP_AUTH_PW")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("AUTH_TYPE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("PATH_INFO")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("ORIG_PATH_INFO")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("CONTENT_LENGTH")), (true, get_string()));
-            known_items.insert(ArrayKey::String(atom("CONTENT_TYPE")), (true, get_string()));
+            known_items.insert(ArrayKey::String(word("PHP_SELF")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("GATEWAY_INTERFACE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SERVER_ADDR")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SERVER_NAME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SERVER_SOFTWARE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SERVER_PROTOCOL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("REQUEST_METHOD")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("REQUEST_TIME")), (true, get_int_range(Some(REQUEST_TIME_MIN), None)));
+            known_items.insert(ArrayKey::String(word("REQUEST_TIME_FLOAT")), (true, get_float()));
+            known_items.insert(ArrayKey::String(word("QUERY_STRING")), (true, get_string()));
+            known_items.insert(ArrayKey::String(word("DOCUMENT_ROOT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_ACCEPT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_ACCEPT_CHARSET")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_ACCEPT_ENCODING")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_ACCEPT_LANGUAGE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_CONNECTION")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_HOST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_REFERER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_USER_AGENT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTPS")), (true, get_string()));
+            known_items.insert(ArrayKey::String(word("REMOTE_ADDR")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("REMOTE_HOST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("REMOTE_PORT")), (true, get_string()));
+            known_items.insert(ArrayKey::String(word("REMOTE_USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("REDIRECT_REMOTE_USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SCRIPT_FILENAME")), (false, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SERVER_ADMIN")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SERVER_PORT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SERVER_SIGNATURE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("PATH_TRANSLATED")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SCRIPT_NAME")), (false, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("REQUEST_URI")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("PHP_AUTH_DIGEST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("PHP_AUTH_USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("PHP_AUTH_PW")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("AUTH_TYPE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("PATH_INFO")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("ORIG_PATH_INFO")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("CONTENT_LENGTH")), (true, get_string()));
+            known_items.insert(ArrayKey::String(word("CONTENT_TYPE")), (true, get_string()));
             // Common, miscellaneous variables
-            known_items.insert(ArrayKey::String(atom("FCGI_ROLE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HOME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_CACHE_CONTROL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_COOKIE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_PRIORITY")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("PATH")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("REDIRECT_STATUS")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("REQUEST_SCHEME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("FCGI_ROLE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HOME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_CACHE_CONTROL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_COOKIE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_PRIORITY")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("PATH")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("REDIRECT_STATUS")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("REQUEST_SCHEME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("USER")), (true, get_non_empty_string()));
             // Common proxy and CDN headers
             known_items.insert(
-                ArrayKey::String(atom("HTTP_UPGRADE_INSECURE_REQUESTS")),
+                ArrayKey::String(word("HTTP_UPGRADE_INSECURE_REQUESTS")),
                 (true, get_non_empty_string()),
             );
             known_items
-                .insert(ArrayKey::String(atom("HTTP_X_FORWARDED_PROTO")), (true, get_non_empty_string()));
-                known_items.insert(ArrayKey::String(atom("HTTP_CLIENT_IP")), (true, get_non_empty_string()));
-                known_items.insert(ArrayKey::String(atom("HTTP_X_REAL_IP")), (true, get_non_empty_string()));
-                known_items.insert(ArrayKey::String(atom("HTTP_X_FORWARDED_FOR")), (true, get_non_empty_string()));
+                .insert(ArrayKey::String(word("HTTP_X_FORWARDED_PROTO")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(word("HTTP_CLIENT_IP")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(word("HTTP_X_REAL_IP")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(word("HTTP_X_FORWARDED_FOR")), (true, get_non_empty_string()));
             known_items
-                .insert(ArrayKey::String(atom("HTTP_CF_CONNECTING_IP")), (true, get_non_empty_string()));
-                known_items.insert(ArrayKey::String(atom("HTTP_CF_IPCOUNTRY")), (true, get_non_empty_string()));
-                known_items.insert(ArrayKey::String(atom("HTTP_CF_VISITOR")), (true, get_non_empty_string()));
-                known_items.insert(ArrayKey::String(atom("HTTP_CDN_LOOP")), (true, get_non_empty_string()));
+                .insert(ArrayKey::String(word("HTTP_CF_CONNECTING_IP")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(word("HTTP_CF_IPCOUNTRY")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(word("HTTP_CF_VISITOR")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(word("HTTP_CDN_LOOP")), (true, get_non_empty_string()));
             // Common Sec-Fetch headers
-            known_items.insert(ArrayKey::String(atom("HTTP_DNT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_SEC_FETCH_DEST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_SEC_FETCH_USER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_SEC_FETCH_MODE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HTTP_SEC_FETCH_SITE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_DNT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_SEC_FETCH_DEST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_SEC_FETCH_USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_SEC_FETCH_MODE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HTTP_SEC_FETCH_SITE")), (true, get_non_empty_string()));
             known_items
-                .insert(ArrayKey::String(atom("HTTP_SEC_CH_UA_PLATFORM")), (true, get_non_empty_string()));
+                .insert(ArrayKey::String(word("HTTP_SEC_CH_UA_PLATFORM")), (true, get_non_empty_string()));
             known_items
-                .insert(ArrayKey::String(atom("HTTP_SEC_CH_UA_MOBILE")), (true, get_non_empty_string()));
-                known_items.insert(ArrayKey::String(atom("HTTP_SEC_CH_UA")), (true, get_non_empty_string()));
+                .insert(ArrayKey::String(word("HTTP_SEC_CH_UA_MOBILE")), (true, get_non_empty_string()));
+                known_items.insert(ArrayKey::String(word("HTTP_SEC_CH_UA")), (true, get_non_empty_string()));
 
             // Common framework and application variables (e.g., Symfony, PHPUnit, Laravel)
-            known_items.insert(ArrayKey::String(atom("APP_DEBUG")), (true, get_bool()));
-            known_items.insert(ArrayKey::String(atom("APP_ENV")), (true, get_string()));
-            known_items.insert(ArrayKey::String(atom("APP_NAME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("APP_URL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("APP_KEY")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("APP_SECRET")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SECRET")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("APP_LOCALE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("APP_FALLBACK_LOCALE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DATABASE_URL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("CACHE_DRIVER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_CONNECTION")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_HOST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_PORT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_DATABASE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_USERNAME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_PASSWORD")), (true, get_string()));
+            known_items.insert(ArrayKey::String(word("APP_DEBUG")), (true, get_bool()));
+            known_items.insert(ArrayKey::String(word("APP_ENV")), (true, get_string()));
+            known_items.insert(ArrayKey::String(word("APP_NAME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("APP_URL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("APP_KEY")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("APP_SECRET")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SECRET")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("APP_LOCALE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("APP_FALLBACK_LOCALE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DATABASE_URL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("CACHE_DRIVER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_CONNECTION")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_HOST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_PORT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_DATABASE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_USERNAME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_PASSWORD")), (true, get_string()));
 
-            known_items.insert(ArrayKey::String(atom("argc")), (true, get_positive_int()));
+            known_items.insert(ArrayKey::String(word("argc")), (true, get_positive_int()));
             known_items.insert(
-                ArrayKey::String(atom("argv")),
+                ArrayKey::String(word("argv")),
                 (true, TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_string())))))),
             );
 
@@ -225,29 +225,29 @@ std::thread_local! {
             let mut known_items = BTreeMap::new();
 
             // Standard environment variables
-            known_items.insert(ArrayKey::String(atom("PATH")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("HOME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("USER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SHELL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("PATH")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("HOME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("USER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SHELL")), (true, get_non_empty_string()));
 
             // Common framework and application variables (e.g., Symfony, PHPUnit, Laravel)
-            known_items.insert(ArrayKey::String(atom("APP_DEBUG")), (true, get_bool()));
-            known_items.insert(ArrayKey::String(atom("APP_ENV")), (true, get_string()));
-            known_items.insert(ArrayKey::String(atom("APP_NAME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("APP_URL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("APP_KEY")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("APP_SECRET")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("SECRET")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("APP_LOCALE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("APP_FALLBACK_LOCALE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DATABASE_URL")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("CACHE_DRIVER")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_CONNECTION")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_HOST")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_PORT")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_DATABASE")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_USERNAME")), (true, get_non_empty_string()));
-            known_items.insert(ArrayKey::String(atom("DB_PASSWORD")), (true, get_string()));
+            known_items.insert(ArrayKey::String(word("APP_DEBUG")), (true, get_bool()));
+            known_items.insert(ArrayKey::String(word("APP_ENV")), (true, get_string()));
+            known_items.insert(ArrayKey::String(word("APP_NAME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("APP_URL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("APP_KEY")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("APP_SECRET")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("SECRET")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("APP_LOCALE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("APP_FALLBACK_LOCALE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DATABASE_URL")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("CACHE_DRIVER")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_CONNECTION")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_HOST")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_PORT")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_DATABASE")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_USERNAME")), (true, get_non_empty_string()));
+            known_items.insert(ArrayKey::String(word("DB_PASSWORD")), (true, get_string()));
 
             TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                 known_items: Some(known_items),
@@ -263,7 +263,7 @@ std::thread_local! {
                 Arc::new(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                     known_items: Some(BTreeMap::from([
                         (
-                            ArrayKey::String(atom("name")),
+                            ArrayKey::String(word("name")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -275,7 +275,7 @@ std::thread_local! {
                             ),
                         ),
                         (
-                            ArrayKey::String(atom("type")),
+                            ArrayKey::String(word("type")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -287,7 +287,7 @@ std::thread_local! {
                             ),
                         ),
                         (
-                            ArrayKey::String(atom("tmp_name")),
+                            ArrayKey::String(word("tmp_name")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -299,7 +299,7 @@ std::thread_local! {
                             ),
                         ),
                         (
-                            ArrayKey::String(atom("full_path")),
+                            ArrayKey::String(word("full_path")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -311,7 +311,7 @@ std::thread_local! {
                             ),
                         ),
                         (
-                            ArrayKey::String(atom("error")),
+                            ArrayKey::String(word("error")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -323,7 +323,7 @@ std::thread_local! {
                             ),
                         ),
                         (
-                            ArrayKey::String(atom("size")),
+                            ArrayKey::String(word("size")),
                             (
                                 true,
                                 TUnion::from_vec(vec![
@@ -361,6 +361,7 @@ pub fn get_super_globals() -> impl Iterator<Item = (&'static str, Rc<TUnion>)> {
     SUPERGLOBALS_MAP.with(|map| map.iter().map(|(k, v)| (*k, Rc::clone(v))).collect::<Vec<_>>().into_iter())
 }
 
-pub fn get_global_variable_type(variable_name: &str) -> Option<Rc<TUnion>> {
-    SUPERGLOBALS_MAP.with(|map| map.get(variable_name).cloned())
+pub fn get_global_variable_type(variable_name: &[u8]) -> Option<Rc<TUnion>> {
+    let key = std::str::from_utf8(variable_name).ok()?;
+    SUPERGLOBALS_MAP.with(|map| map.get(key).cloned())
 }

@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use mago_atom::AtomMap;
-use mago_atom::empty_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_union_type;
@@ -19,6 +17,8 @@ use mago_codex::ttype::template::TemplateBound;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
+use mago_word::WordMap;
+use mago_word::empty_word;
 
 use crate::context::Context;
 use crate::invocation::Invocation;
@@ -28,7 +28,7 @@ pub fn resolve_invocation_type<'ctx, 'arena>(
     context: &Context<'ctx, 'arena>,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
-    parameters: &AtomMap<TUnion>,
+    parameters: &WordMap<TUnion>,
     invocation_type: TUnion,
 ) -> TUnion {
     let mut template_result = Cow::Borrowed(template_result);
@@ -37,7 +37,7 @@ pub fn resolve_invocation_type<'ctx, 'arena>(
         if let Some(function_like_identifier) = invocation.target.get_function_like_identifier() {
             let generic_parent = match function_like_identifier {
                 FunctionLikeIdentifier::Method(class, method) => GenericParent::FunctionLike((*class, *method)),
-                FunctionLikeIdentifier::Function(function) => GenericParent::FunctionLike((empty_atom(), *function)),
+                FunctionLikeIdentifier::Function(function) => GenericParent::FunctionLike((empty_word(), *function)),
                 _ => {
                     break 'populate_templates;
                 }
@@ -101,7 +101,7 @@ fn resolve_union<'ctx, 'arena>(
     context: &Context<'ctx, 'arena>,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
-    parameters: &AtomMap<TUnion>,
+    parameters: &WordMap<TUnion>,
     union_to_resolve: TUnion,
 ) -> TUnion {
     let mut resulting_union = union_to_resolve;
@@ -143,15 +143,15 @@ fn resolve_union<'ctx, 'arena>(
 
         if let Some(declaring_method_id) = &method_context.declaring_method_id {
             let declaring_class_name = declaring_method_id.get_class_name();
-            if *declaring_class_name != method_context.class_like_metadata.name
-                && let Some(declaring_class_meta) = context.codebase.get_class_like(&declaring_class_name)
+            if declaring_class_name != method_context.class_like_metadata.name
+                && let Some(declaring_class_meta) = context.codebase.get_class_like(declaring_class_name.as_bytes())
                 && declaring_class_meta.kind.is_trait()
             {
                 let mut new_atomics = Vec::with_capacity(resulting_union.types.len());
                 for atomic in resulting_union.types.as_ref() {
                     match atomic {
                         TAtomic::Object(TObject::Named(named_object))
-                            if named_object.name.eq_ignore_ascii_case(&declaring_class_name) =>
+                            if named_object.name.as_bytes().eq_ignore_ascii_case(declaring_class_name.as_bytes()) =>
                         {
                             let mut new_object = named_object.clone();
                             new_object.name = method_context.class_like_metadata.name;
@@ -192,11 +192,11 @@ fn resolve_atomic<'ctx, 'arena>(
     context: &Context<'ctx, 'arena>,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
-    parameters: &AtomMap<TUnion>,
+    parameters: &WordMap<TUnion>,
     atomic_to_resolve: TAtomic,
 ) -> Vec<TAtomic> {
     if let TAtomic::Variable(variable) = atomic_to_resolve {
-        if variable.eq_ignore_ascii_case("$this")
+        if variable.as_bytes().eq_ignore_ascii_case(b"$this")
             && let Some(method_context) = invocation.target.get_method_context()
             && let StaticClassType::Object(this_type) = &method_context.class_type
         {
