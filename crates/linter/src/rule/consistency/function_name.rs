@@ -21,6 +21,7 @@ use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
+use mago_bytes::BytesDisplay;
 
 #[derive(Debug, Clone)]
 pub struct FunctionNameRule {
@@ -93,8 +94,8 @@ impl LintRule for FunctionNameRule {
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Function(function) = node else { return };
 
-        let name = function.name.value;
-        let fqfn = ctx.lookup_name(&function.name);
+        let Some(name) = std::str::from_utf8(function.name.value).ok() else { return };
+        let fqfn = BytesDisplay(ctx.lookup_name(&function.name));
 
         if self.cfg.either {
             if !is_camel_case(name) && !is_snake_case(name) {

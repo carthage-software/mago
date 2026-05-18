@@ -9,7 +9,6 @@ use mago_analyzer::settings::ClassInitializer;
 use mago_analyzer::settings::DEFAULT_FORMULA_SIZE_THRESHOLD;
 use mago_analyzer::settings::DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD;
 use mago_analyzer::settings::Settings;
-use mago_atom::atom;
 use mago_codex::ttype::combiner::DEFAULT_ARRAY_COMBINATION_THRESHOLD;
 use mago_codex::ttype::combiner::DEFAULT_INTEGER_COMBINATION_THRESHOLD;
 use mago_codex::ttype::combiner::DEFAULT_STRING_COMBINATION_THRESHOLD;
@@ -459,8 +458,12 @@ impl AnalyzerConfiguration {
             memoize_properties: self.memoize_properties,
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
             check_throws: self.check_throws,
-            unchecked_exceptions: self.unchecked_exceptions.iter().map(|s| atom(s.as_str())).collect(),
-            unchecked_exception_classes: self.unchecked_exception_classes.iter().map(|s| atom(s.as_str())).collect(),
+            unchecked_exceptions: self.unchecked_exceptions.iter().map(|s| mago_word::word(s.as_bytes())).collect(),
+            unchecked_exception_classes: self
+                .unchecked_exception_classes
+                .iter()
+                .map(|s| mago_word::word(s.as_bytes()))
+                .collect(),
             check_missing_override,
             find_unused_parameters,
             strict_list_index_checks: self.strict_list_index_checks,

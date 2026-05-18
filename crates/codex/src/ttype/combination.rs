@@ -3,9 +3,9 @@ use std::collections::BTreeMap;
 use foldhash::HashSet;
 use ordered_float::OrderedFloat;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
@@ -139,10 +139,10 @@ impl CombinationFlags {
 #[derive(Debug)]
 pub struct TypeCombination {
     pub flags: CombinationFlags,
-    pub value_types: AtomMap<TAtomic>,
-    pub enum_names: HashSet<(Atom, Option<Atom>)>,
-    pub object_type_params: AtomMap<(Atom, Vec<TUnion>)>,
-    pub object_static: AtomMap<bool>,
+    pub value_types: WordMap<TAtomic>,
+    pub enum_names: HashSet<(Word, Option<Word>)>,
+    pub object_type_params: WordMap<(Word, Vec<TUnion>)>,
+    pub object_static: WordMap<bool>,
     pub list_array_counts: Option<HashSet<usize>>,
     pub keyed_array_entries: BTreeMap<ArrayKey, (bool, TUnion)>,
     pub list_array_entries: BTreeMap<usize, (bool, TUnion)>,
@@ -151,9 +151,9 @@ pub struct TypeCombination {
     pub sealed_arrays: Vec<TArray>,
     pub sealed_keyed_budget_exhausted: bool,
     pub integers: Vec<TInteger>,
-    pub literal_strings: AtomSet,
+    pub literal_strings: WordSet,
     pub literal_floats: Vec<OrderedFloat<f64>>,
-    pub class_string_types: AtomMap<TAtomic>,
+    pub class_string_types: WordMap<TAtomic>,
     pub derived_types: HashSet<TDerived>,
 }
 
@@ -170,9 +170,9 @@ impl TypeCombination {
 
         Self {
             flags,
-            value_types: AtomMap::default(),
-            object_type_params: AtomMap::default(),
-            object_static: AtomMap::default(),
+            value_types: WordMap::default(),
+            object_type_params: WordMap::default(),
+            object_static: WordMap::default(),
             list_array_counts: Some(HashSet::default()),
             keyed_array_entries: BTreeMap::new(),
             list_array_entries: BTreeMap::new(),
@@ -180,10 +180,10 @@ impl TypeCombination {
             list_array_parameter: None,
             sealed_arrays: Vec::new(),
             sealed_keyed_budget_exhausted: false,
-            literal_strings: AtomSet::default(),
+            literal_strings: WordSet::default(),
             integers: Vec::new(),
             literal_floats: Vec::new(),
-            class_string_types: AtomMap::default(),
+            class_string_types: WordMap::default(),
             enum_names: HashSet::default(),
             derived_types: HashSet::default(),
         }

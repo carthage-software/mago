@@ -28,18 +28,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
-name = "ahash"
-version = "0.8.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
-dependencies = [
- "cfg-if",
- "once_cell",
- "version_check",
- "zerocopy",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -296,12 +284,6 @@ checksum = "5d20789868f4b01b2f2caec9f5c4e0213b41e3e5702a50157d699ae31ced2fcb"
 dependencies = [
  "serde",
 ]
-
-[[package]]
-name = "byteorder"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
@@ -1558,7 +1540,7 @@ dependencies = [
  "libtest-mimic",
  "mago-algebra",
  "mago-analyzer",
- "mago-atom",
+ "mago-bytes",
  "mago-codex",
  "mago-composer",
  "mago-database",
@@ -1575,6 +1557,8 @@ dependencies = [
  "mago-syntax",
  "mago-syntax-core",
  "mago-text-edit",
+ "mago-word",
+ "memchr",
  "mimalloc",
  "notify",
  "pretty_assertions",
@@ -1608,9 +1592,9 @@ dependencies = [
  "codspeed-criterion-compat",
  "foldhash 0.2.0",
  "indexmap",
- "mago-atom",
  "mago-codex",
  "mago-span",
+ "mago-word",
 ]
 
 [[package]]
@@ -1625,7 +1609,7 @@ dependencies = [
  "indoc",
  "itertools 0.14.0",
  "mago-algebra",
- "mago-atom",
+ "mago-bytes",
  "mago-codex",
  "mago-collector",
  "mago-database",
@@ -1637,18 +1621,15 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "mago-text-edit",
+ "mago-word",
+ "memchr",
  "regex",
  "tracing",
 ]
 
 [[package]]
-name = "mago-atom"
+name = "mago-bytes"
 version = "1.27.1"
-dependencies = [
- "itoa",
- "ryu",
- "ustr",
-]
 
 [[package]]
 name = "mago-casing"
@@ -1665,7 +1646,7 @@ dependencies = [
  "codspeed-criterion-compat",
  "foldhash 0.2.0",
  "indexmap",
- "mago-atom",
+ "mago-bytes",
  "mago-database",
  "mago-docblock",
  "mago-fingerprint",
@@ -1675,6 +1656,8 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "mago-type-syntax",
+ "mago-word",
+ "memchr",
  "ordered-float",
  "proptest",
  "serde",
@@ -1693,6 +1676,7 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "mago-text-edit",
+ "memchr",
 ]
 
 [[package]]
@@ -1729,6 +1713,7 @@ dependencies = [
  "mago-database",
  "mago-span",
  "mago-syntax",
+ "memchr",
  "serde",
 ]
 
@@ -1760,11 +1745,11 @@ dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
  "indoc",
- "mago-atom",
  "mago-database",
  "mago-names",
  "mago-span",
  "mago-syntax",
+ "memchr",
  "pretty_assertions",
 ]
 
@@ -1775,10 +1760,12 @@ dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
  "indoc",
+ "mago-bytes",
  "mago-database",
  "mago-php-version",
  "mago-span",
  "mago-syntax",
+ "memchr",
  "pretty_assertions",
  "schemars",
  "serde",
@@ -1794,7 +1781,7 @@ dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
  "indoc",
- "mago-atom",
+ "mago-bytes",
  "mago-codex",
  "mago-collector",
  "mago-database",
@@ -1805,6 +1792,7 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "mago-syntax-core",
+ "mago-word",
  "schemars",
  "serde",
  "toml",
@@ -1817,7 +1805,7 @@ dependencies = [
  "bumpalo",
  "foldhash 0.2.0",
  "indoc",
- "mago-atom",
+ "mago-bytes",
  "mago-casing",
  "mago-collector",
  "mago-database",
@@ -1828,6 +1816,8 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "mago-text-edit",
+ "mago-word",
+ "memchr",
  "regex",
  "schemars",
  "serde",
@@ -1843,6 +1833,7 @@ dependencies = [
  "foldhash 0.2.0",
  "mago-span",
  "mago-syntax",
+ "memchr",
  "serde",
  "strum 0.28.0",
 ]
@@ -1855,7 +1846,7 @@ dependencies = [
  "foldhash 0.2.0",
  "indicatif",
  "mago-analyzer",
- "mago-atom",
+ "mago-bytes",
  "mago-codex",
  "mago-database",
  "mago-formatter",
@@ -1866,6 +1857,7 @@ dependencies = [
  "mago-reporting",
  "mago-semantics",
  "mago-syntax",
+ "mago-word",
  "rayon",
  "tracing",
  "xxhash-rust",
@@ -1920,6 +1912,7 @@ dependencies = [
 name = "mago-semantics"
 version = "1.27.1"
 dependencies = [
+ "mago-bytes",
  "mago-database",
  "mago-names",
  "mago-php-version",
@@ -2015,7 +2008,6 @@ version = "1.27.1"
 dependencies = [
  "bumpalo",
  "mago-analyzer",
- "mago-atom",
  "mago-database",
  "mago-formatter",
  "mago-linter",
@@ -2024,9 +2016,21 @@ dependencies = [
  "mago-prelude",
  "mago-reporting",
  "mago-syntax",
+ "mago-word",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "mago-word"
+version = "1.27.1"
+dependencies = [
+ "foldhash 0.2.0",
+ "itoa",
+ "mago-bytes",
+ "ryu",
+ "serde",
 ]
 
 [[package]]
@@ -3758,19 +3762,6 @@ dependencies = [
  "percent-encoding",
  "serde",
  "serde_derive",
-]
-
-[[package]]
-name = "ustr"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18b19e258aa08450f93369cf56dd78063586adf19e92a75b338a800f799a0208"
-dependencies = [
- "ahash",
- "byteorder",
- "lazy_static",
- "parking_lot",
- "serde",
 ]
 
 [[package]]

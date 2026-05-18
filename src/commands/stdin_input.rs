@@ -16,7 +16,7 @@ pub fn resolve_stdin_override(
     path: &[std::path::PathBuf],
     workspace: &Path,
     orchestrator: &mut Orchestrator,
-) -> Result<Option<(String, String)>, Error> {
+) -> Result<Option<(String, Vec<u8>)>, Error> {
     if !stdin_input {
         return Ok(None);
     }
@@ -27,8 +27,9 @@ pub fn resolve_stdin_override(
         ))));
     }
     let path = &path[0];
-    let mut content = String::new();
-    std::io::stdin().read_to_string(&mut content).map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
+    // PHP source is binary-safe, so read raw bytes: a buffer piped in may not be valid UTF-8.
+    let mut content = Vec::new();
+    std::io::stdin().read_to_end(&mut content).map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
     #[cfg(windows)]
     let mut logical_name = path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().replace('\\', "/");

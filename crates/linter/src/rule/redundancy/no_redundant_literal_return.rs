@@ -231,23 +231,22 @@ impl LintRule for NoRedundantLiteralReturnRule {
                 (if_stmt.span(), false)
             };
 
+            let var_name_display = mago_bytes::BytesDisplay(var_name);
             let issue = Issue::new(self.cfg.level(), "Redundant literal guard: the if statement can be removed.")
                 .with_code(self.meta.code)
                 .with_annotation(Annotation::primary(if_stmt.span()).with_message("This if statement is redundant"))
                 .with_note(format!(
-                    "If `{}` equals the literal, returning `{}` would return that literal anyway.",
-                    var_name, var_name
+                    "If `{var_name_display}` equals the literal, returning `{var_name_display}` would return that literal anyway."
                 ))
                 .with_help("Remove the if statement and just return the variable.");
 
             ctx.collector.propose(issue, |edits| {
                 if delete_includes_return {
-                    let replacement = format!("return {};", var_name);
+                    let replacement = format!("return {};", var_name_display);
                     edits.push(TextEdit::replace(return_span, replacement));
                 } else {
                     let if_span = if_stmt.span();
-                    let delete_end =
-                        find_next_non_whitespace(ctx.source_file.contents.as_bytes(), if_span.end_offset());
+                    let delete_end = find_next_non_whitespace(ctx.source_file.contents.as_ref(), if_span.end_offset());
                     edits.push(TextEdit::delete(if_span.start_offset()..delete_end));
                 }
             });
@@ -258,7 +257,7 @@ impl LintRule for NoRedundantLiteralReturnRule {
 /// Extract variable name and literal from a condition like `$var === literal` or `literal === $var`.
 fn extract_var_literal_check<'arena>(
     condition: &'arena Expression<'arena>,
-) -> Option<(&'arena str, &'arena Expression<'arena>)> {
+) -> Option<(&'arena [u8], &'arena Expression<'arena>)> {
     let Expression::Binary(binary) = condition else {
         return None;
     };
@@ -302,7 +301,7 @@ fn is_return_expression<'arena>(statements: &[Statement<'arena>], expected: &Exp
 }
 
 /// Check if statements consist of only `return $var;` where var matches the given name.
-fn is_return_variable(statements: &[Statement<'_>], var_name: &str) -> bool {
+fn is_return_variable(statements: &[Statement<'_>], var_name: &[u8]) -> bool {
     if statements.len() != 1 {
         return false;
     }

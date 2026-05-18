@@ -40,7 +40,7 @@ impl Fingerprintable for DeclareItem<'_> {
         H: std::hash::Hasher,
     {
         "declare_item".hash(hasher);
-        mago_atom::ascii_lowercase_atom(self.name.value).hash(hasher);
+        crate::hash_ascii_lowercase(self.name.value, hasher);
         self.value.fingerprint_with_hasher(hasher, resolved_names, options);
     }
 }

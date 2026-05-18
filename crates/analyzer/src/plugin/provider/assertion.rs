@@ -6,8 +6,8 @@
 use std::collections::BTreeMap;
 
 use mago_algebra::assertion_set::Conjunction;
-use mago_atom::Atom;
 use mago_codex::assertion::Assertion;
+use mago_word::Word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -26,17 +26,17 @@ pub struct InvocationAssertions {
     /// Assertions that apply unconditionally after the invocation.
     ///
     /// Keys are variable names (e.g., "$x"), values are assertion sets.
-    pub type_assertions: BTreeMap<Atom, Conjunction<Assertion>>,
+    pub type_assertions: BTreeMap<Word, Conjunction<Assertion>>,
 
     /// Assertions that hold when the invocation returns truthy.
     ///
     /// Keys are variable names (e.g., "$x"), values are assertion sets.
-    pub if_true: BTreeMap<Atom, Conjunction<Assertion>>,
+    pub if_true: BTreeMap<Word, Conjunction<Assertion>>,
 
     /// Assertions that hold when the invocation returns falsy.
     ///
     /// Keys are variable names (e.g., "$x"), values are assertion sets.
-    pub if_false: BTreeMap<Atom, Conjunction<Assertion>>,
+    pub if_false: BTreeMap<Word, Conjunction<Assertion>>,
 }
 
 impl InvocationAssertions {
@@ -55,17 +55,17 @@ impl InvocationAssertions {
     }
 
     /// Add an immediate assertion for a variable.
-    pub fn add_immediate(&mut self, variable: Atom, assertions: Conjunction<Assertion>) {
+    pub fn add_immediate(&mut self, variable: Word, assertions: Conjunction<Assertion>) {
         self.type_assertions.insert(variable, assertions);
     }
 
     /// Add an if-true assertion for a variable.
-    pub fn add_if_true(&mut self, variable: Atom, assertions: Conjunction<Assertion>) {
+    pub fn add_if_true(&mut self, variable: Word, assertions: Conjunction<Assertion>) {
         self.if_true.insert(variable, assertions);
     }
 
     /// Add an if-false assertion for a variable.
-    pub fn add_if_false(&mut self, variable: Atom, assertions: Conjunction<Assertion>) {
+    pub fn add_if_false(&mut self, variable: Word, assertions: Conjunction<Assertion>) {
         self.if_false.insert(variable, assertions);
     }
 }
@@ -110,8 +110,8 @@ pub trait MethodAssertionProvider: Provider {
     fn get_assertions(
         &self,
         context: &ProviderContext<'_, '_, '_>,
-        class_name: &str,
-        method_name: &str,
+        class_name: &[u8],
+        method_name: &[u8],
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<InvocationAssertions>;
 }

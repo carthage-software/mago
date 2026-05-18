@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::collections::HashSet;
 
 use foldhash::fast::FixedState;
-use mago_atom::Atom;
-use mago_atom::ascii_lowercase_atom;
+use mago_word::Word;
+use mago_word::ascii_lowercase_word;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::CodebaseMetadata;
@@ -45,15 +45,15 @@ use crate::ttype::union::TUnion;
 thread_local! {
     /// Thread-local set for tracking currently expanding aliases (cycle detection).
     /// Uses a HashSet for accurate tracking without false positives from hash collisions.
-    static EXPANDING_ALIASES: RefCell<HashSet<(Atom, Atom), FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
+    static EXPANDING_ALIASES: RefCell<HashSet<(Word, Word), FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
 
     /// Thread-local set for tracking objects whose type parameters are being expanded (cycle detection).
-    static EXPANDING_OBJECT_PARAMS: RefCell<HashSet<Atom, FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
+    static EXPANDING_OBJECT_PARAMS: RefCell<HashSet<Word, FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
 
     /// Thread-local set for tracking class constants whose inferred initializer is currently
     /// being expanded. Used to break cycles like `const int b = self::b;` where the inferred
     /// type of a constant is a reference to itself.
-    static EXPANDING_CONSTANTS: RefCell<HashSet<(Atom, Atom), FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
+    static EXPANDING_CONSTANTS: RefCell<HashSet<(Word, Word), FixedState>> = const { RefCell::new(HashSet::with_hasher(FixedState::with_seed(0))) };
 }
 
 /// Resets the thread-local alias expansion state.
@@ -70,13 +70,13 @@ pub fn reset_expansion_state() {
 /// RAII guard to ensure alias expansion state is properly cleaned up.
 /// This guarantees the alias is removed from the set even if the expansion panics.
 struct AliasExpansionGuard {
-    class_name: Atom,
-    alias_name: Atom,
+    class_name: Word,
+    alias_name: Word,
 }
 
 impl AliasExpansionGuard {
     #[must_use]
-    fn new(class_name: Atom, alias_name: Atom) -> Self {
+    fn new(class_name: Word, alias_name: Word) -> Self {
         EXPANDING_ALIASES.with(|set| set.borrow_mut().insert((class_name, alias_name)));
         Self { class_name, alias_name }
     }
@@ -90,12 +90,12 @@ impl Drop for AliasExpansionGuard {
 
 /// RAII guard for object type parameter expansion cycle detection.
 struct ObjectParamsExpansionGuard {
-    object_name: Atom,
+    object_name: Word,
 }
 
 impl ObjectParamsExpansionGuard {
     #[must_use]
-    fn try_new(object_name: Atom) -> Option<Self> {
+    fn try_new(object_name: Word) -> Option<Self> {
         EXPANDING_OBJECT_PARAMS.with(|set| {
             let mut set = set.borrow_mut();
             if set.contains(&object_name) {
@@ -121,13 +121,13 @@ impl Drop for ObjectParamsExpansionGuard {
 /// into infinite recursion. The guard tracks `(class_name, constant_name)` pairs that
 /// are currently being expanded and refuses re-entry.
 struct ConstantExpansionGuard {
-    class_name: Atom,
-    constant_name: Atom,
+    class_name: Word,
+    constant_name: Word,
 }
 
 impl ConstantExpansionGuard {
     #[must_use]
-    fn try_new(class_name: Atom, constant_name: Atom) -> Option<Self> {
+    fn try_new(class_name: Word, constant_name: Word) -> Option<Self> {
         EXPANDING_CONSTANTS.with(|set| {
             let mut set = set.borrow_mut();
             if set.contains(&(class_name, constant_name)) {
@@ -150,15 +150,15 @@ impl Drop for ConstantExpansionGuard {
 pub enum StaticClassType {
     #[default]
     None,
-    Name(Atom),
+    Name(Word),
     Object(TObject),
 }
 
 #[derive(Debug)]
 pub struct TypeExpansionOptions {
-    pub self_class: Option<Atom>,
+    pub self_class: Option<Word>,
     pub static_class_type: StaticClassType,
-    pub parent_class: Option<Atom>,
+    pub parent_class: Option<Word>,
     pub evaluate_class_constants: bool,
     pub evaluate_conditional_types: bool,
     pub function_is_final: bool,
@@ -380,19 +380,19 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
 
     // Resolve self/static/this/parent to the actual class name
     let resolved_class_name = {
-        let name_lc = ascii_lowercase_atom(&class_like_name);
-        match name_lc.as_str() {
-            "self" => options.self_class.unwrap_or(class_like_name),
-            "static" | "$this" => {
+        let name_lc = ascii_lowercase_word(class_like_name.as_bytes());
+        match name_lc.as_bytes() {
+            b"self" => options.self_class.unwrap_or(class_like_name),
+            b"static" | b"$this" => {
                 if let StaticClassType::Name(name) = &options.static_class_type {
                     *name
                 } else {
                     options.self_class.unwrap_or(class_like_name)
                 }
             }
-            "parent" => {
+            b"parent" => {
                 if let Some(self_class) = options.self_class
-                    && let Some(class_metadata) = codebase.get_class_like(&self_class)
+                    && let Some(class_metadata) = codebase.get_class_like(self_class.as_bytes())
                     && let Some(parent) = class_metadata.direct_parent_class
                 {
                     parent
@@ -404,7 +404,7 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
         }
     };
 
-    let Some(class_like) = codebase.get_class_like(&resolved_class_name) else {
+    let Some(class_like) = codebase.get_class_like(resolved_class_name.as_bytes()) else {
         return ArrayKey::ClassLikeConstant { class_like_name, constant_name };
     };
 
@@ -444,20 +444,20 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
 
 #[cold]
 fn expand_member_reference(
-    class_like_name: Atom,
+    class_like_name: Word,
     member_selector: &TReferenceMemberSelector,
     codebase: &CodebaseMetadata,
     options: &TypeExpansionOptions,
     new_return_type_parts: &mut Vec<TAtomic>,
 ) {
     if let TReferenceMemberSelector::Identifier(member_name) = member_selector
-        && member_name.eq_ignore_ascii_case("class")
+        && member_name.as_bytes().eq_ignore_ascii_case(b"class")
     {
         new_return_type_parts.push(TAtomic::Scalar(TScalar::literal_class_string(class_like_name)));
         return;
     }
 
-    let Some(class_like) = codebase.get_class_like(&class_like_name) else {
+    let Some(class_like) = codebase.get_class_like(class_like_name.as_bytes()) else {
         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
         return;
     };
@@ -546,7 +546,7 @@ fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &Ty
     };
 
     let has_params = named.type_parameters.as_ref().is_some_and(|p| !p.is_empty());
-    let class_metadata = codebase.get_class_like(&named.name);
+    let class_metadata = codebase.get_class_like(named.name.as_bytes());
     let has_required_intersections =
         class_metadata.map(|m| !m.require_extends.is_empty() || !m.require_implements.is_empty()).unwrap_or(false);
     let needs_default_params = !has_params && class_metadata.map(|m| !m.template_types.is_empty()).unwrap_or(false);
@@ -570,7 +570,7 @@ fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &Ty
 
 /// Classifies a class-like name as one of the PHP "special" tokens that require
 /// resolution against the expansion options. The check is case-insensitive but
-/// avoids the (relatively expensive) `ascii_lowercase_atom` interning step on
+/// avoids the (relatively expensive) `ascii_lowercase_word` interning step on
 /// the common path where the input is not a special name at all.
 #[derive(Copy, Clone, Eq, PartialEq)]
 enum SpecialClassName {
@@ -582,26 +582,26 @@ enum SpecialClassName {
 }
 
 #[inline]
-fn classify_special_class_name(name: &str) -> SpecialClassName {
+fn classify_special_class_name(name: &[u8]) -> SpecialClassName {
     match name.len() {
         4 => {
-            if name.eq_ignore_ascii_case("self") {
+            if name.eq_ignore_ascii_case(b"self") {
                 SpecialClassName::SelfType
             } else {
                 SpecialClassName::None
             }
         }
         5 => {
-            if name == "$this" || name.eq_ignore_ascii_case("$this") {
+            if name == b"$this" || name.eq_ignore_ascii_case(b"$this") {
                 SpecialClassName::This
             } else {
                 SpecialClassName::None
             }
         }
         6 => {
-            if name.eq_ignore_ascii_case("static") {
+            if name.eq_ignore_ascii_case(b"static") {
                 SpecialClassName::Static
-            } else if name.eq_ignore_ascii_case("parent") {
+            } else if name.eq_ignore_ascii_case(b"parent") {
                 SpecialClassName::Parent
             } else {
                 SpecialClassName::None
@@ -617,7 +617,7 @@ fn resolve_special_class_names(object: &mut TObject, codebase: &CodebaseMetadata
         return;
     };
 
-    let special = classify_special_class_name(named.name.as_str());
+    let special = classify_special_class_name(named.name.as_bytes());
     if matches!(special, SpecialClassName::None) && !named.is_static && !named.is_this {
         return;
     }
@@ -645,7 +645,7 @@ fn resolve_special_class_names(object: &mut TObject, codebase: &CodebaseMetadata
         }
         SpecialClassName::Parent => {
             if let Some(self_class) = options.self_class
-                && let Some(class_metadata) = codebase.get_class_like(&self_class)
+                && let Some(class_metadata) = codebase.get_class_like(self_class.as_bytes())
                 && let Some(parent) = class_metadata.direct_parent_class
             {
                 named.name = parent;
@@ -687,7 +687,7 @@ fn resolve_static_type(
             named.is_this = !effectively_final && is_this_type;
         }
         StaticClassType::Name(static_class)
-            if (!check_compatibility || codebase.is_instance_of(static_class, &named.name)) =>
+            if (!check_compatibility || codebase.is_instance_of(static_class.as_bytes(), named.name.as_bytes())) =>
         {
             named.name = *static_class;
             let effectively_final = is_effectively_final(static_class, codebase, options);
@@ -705,23 +705,23 @@ fn resolve_static_type(
 /// - The class is declared `final`
 /// - The class is anonymous
 /// - The method is declared `final`
-fn is_effectively_final(class_name: &Atom, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> bool {
+fn is_effectively_final(class_name: &Word, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> bool {
     if options.function_is_final {
         return true;
     }
 
-    codebase.get_class_like(class_name).is_some_and(|meta| meta.name_span.is_none() || meta.flags.is_final())
+    codebase.get_class_like(class_name.as_bytes()).is_some_and(|meta| meta.name_span.is_none() || meta.flags.is_final())
 }
 
 /// Checks if the static object type is compatible with a type that has is_this=true.
 fn is_static_type_compatible(named: &TNamedObject, static_obj: &TNamedObject, codebase: &CodebaseMetadata) -> bool {
-    codebase.is_instance_of(&static_obj.name, &named.name)
+    codebase.is_instance_of(static_obj.name.as_bytes(), named.name.as_bytes())
         || static_obj
             .intersection_types
             .iter()
             .flatten()
             .filter_map(|t| if let TAtomic::Object(obj) = t { obj.get_name() } else { None })
-            .any(|name| codebase.is_instance_of(&name, &named.name))
+            .any(|name| codebase.is_instance_of(name.as_bytes(), named.name.as_bytes()))
 }
 
 /// Returns true if we should use the static object's type parameters instead of the current ones.
@@ -731,7 +731,7 @@ fn should_use_static_type_params(named: &TNamedObject, static_obj: &TNamedObject
         return true;
     };
 
-    let Some(class_metadata) = codebase.get_class_like(&static_obj.name) else {
+    let Some(class_metadata) = codebase.get_class_like(static_obj.name.as_bytes()) else {
         return false;
     };
 
@@ -749,7 +749,7 @@ fn expand_or_fill_type_parameters(
     codebase: &CodebaseMetadata,
     options: &TypeExpansionOptions,
 ) {
-    if let Some(class_metadata) = codebase.get_class_like(&named.name) {
+    if let Some(class_metadata) = codebase.get_class_like(named.name.as_bytes()) {
         let template_count = class_metadata.template_types.len();
         let supplied_count = named.type_parameters.as_ref().map_or(0, Vec::len);
 
@@ -778,7 +778,7 @@ pub fn get_signature_of_function_like_identifier(
 ) -> Option<TCallableSignature> {
     Some(match function_like_identifier {
         FunctionLikeIdentifier::Function(name) => {
-            let function_like_metadata = codebase.get_function(name)?;
+            let function_like_metadata = codebase.get_function(name.as_bytes())?;
 
             get_signature_of_function_like_metadata(
                 function_like_identifier,
@@ -798,7 +798,8 @@ pub fn get_signature_of_function_like_identifier(
             )
         }
         FunctionLikeIdentifier::Method(classlike_name, method_name) => {
-            let function_like_metadata = codebase.get_declaring_method(classlike_name, method_name)?;
+            let function_like_metadata =
+                codebase.get_declaring_method(classlike_name.as_bytes(), method_name.as_bytes())?;
 
             get_signature_of_function_like_metadata(
                 function_like_identifier,
@@ -1052,8 +1053,6 @@ mod tests {
 
     use bumpalo::Bump;
 
-    use mago_atom::AtomSet;
-    use mago_atom::atom;
     use mago_database::Database;
     use mago_database::DatabaseReader;
     use mago_database::file::File;
@@ -1061,6 +1060,8 @@ mod tests {
     use mago_names::resolver::NameResolver;
     use mago_span::Position;
     use mago_syntax::parser::parse_file;
+    use mago_word::WordSet;
+    use mago_word::word;
 
     use crate::metadata::CodebaseMetadata;
     use crate::misc::GenericParent;
@@ -1096,7 +1097,7 @@ mod tests {
     use crate::ttype::get_void;
 
     fn create_test_codebase(code: &'static str) -> CodebaseMetadata {
-        let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Borrowed(code));
+        let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Borrowed(code.as_bytes()));
         let config =
             mago_database::DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![])
                 .into_static();
@@ -1114,19 +1115,19 @@ mod tests {
             codebase.extend(program_codebase);
         }
 
-        populate_codebase(&mut codebase, &mut SymbolReferences::new(), AtomSet::default(), HashSet::default());
+        populate_codebase(&mut codebase, &mut SymbolReferences::new(), WordSet::default(), HashSet::default());
 
         codebase
     }
 
     fn options_with_self(self_class: &str) -> TypeExpansionOptions {
-        TypeExpansionOptions { self_class: Some(ascii_lowercase_atom(self_class)), ..Default::default() }
+        TypeExpansionOptions { self_class: Some(ascii_lowercase_word(self_class.as_bytes())), ..Default::default() }
     }
 
     fn options_with_static(static_class: &str) -> TypeExpansionOptions {
         TypeExpansionOptions {
-            self_class: Some(ascii_lowercase_atom(static_class)),
-            static_class_type: StaticClassType::Name(ascii_lowercase_atom(static_class)),
+            self_class: Some(ascii_lowercase_word(static_class.as_bytes())),
+            static_class_type: StaticClassType::Name(ascii_lowercase_word(static_class.as_bytes())),
             ..Default::default()
         }
     }
@@ -1158,19 +1159,19 @@ mod tests {
     }
 
     fn make_self_object() -> TUnion {
-        TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))))
+        TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word("self")))))
     }
 
     fn make_static_object() -> TUnion {
-        TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(atom("static")))))
+        TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word("static")))))
     }
 
     fn make_parent_object() -> TUnion {
-        TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(atom("parent")))))
+        TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word("parent")))))
     }
 
     fn make_named_object(name: &str) -> TUnion {
-        TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom(name)))))
+        TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(name.as_bytes())))))
     }
 
     #[test]
@@ -1226,7 +1227,7 @@ mod tests {
         {
             assert!(key.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1252,7 +1253,7 @@ mod tests {
         {
             assert!(value.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1270,7 +1271,7 @@ mod tests {
 
         let mut keyed = TKeyedArray::new();
         let mut known_items = BTreeMap::new();
-        known_items.insert(ArrayKey::String(atom("key")), (false, make_self_object()));
+        known_items.insert(ArrayKey::String(word("key")), (false, make_self_object()));
         keyed.known_items = Some(known_items);
         let input = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
@@ -1281,10 +1282,10 @@ mod tests {
         if let TAtomic::Array(TArray::Keyed(keyed)) = &actual.types[0]
             && let Some(items) = &keyed.known_items
         {
-            let (_, item_type) = items.get(&ArrayKey::String(atom("key"))).unwrap();
+            let (_, item_type) = items.get(&ArrayKey::String(word("key"))).unwrap();
             assert!(item_type.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1307,7 +1308,7 @@ mod tests {
         if let TAtomic::Array(TArray::List(list)) = &actual.types[0] {
             assert!(list.element_type.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1338,7 +1339,7 @@ mod tests {
             let (_, element_type) = elements.get(&0).unwrap();
             assert!(element_type.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1367,7 +1368,7 @@ mod tests {
         {
             assert!(key.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1375,7 +1376,7 @@ mod tests {
             if let TAtomic::Array(TArray::List(inner)) = &value.types[0] {
                 assert!(inner.element_type.types.iter().any(|t| {
                     if let TAtomic::Object(TObject::Named(named)) = t {
-                        named.name == ascii_lowercase_atom("foo")
+                        named.name == ascii_lowercase_word(b"foo")
                     } else {
                         false
                     }
@@ -1410,7 +1411,7 @@ mod tests {
             assert!(list.non_empty);
             assert!(list.element_type.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1430,7 +1431,7 @@ mod tests {
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_atom("foo")
+                named.name == ascii_lowercase_word(b"foo")
             } else {
                 false
             }
@@ -1449,7 +1450,7 @@ mod tests {
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_atom("foo")
+                named.name == ascii_lowercase_word(b"foo")
             } else {
                 false
             }
@@ -1462,14 +1463,14 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let input = make_static_object();
-        let static_obj = TObject::Named(TNamedObject::new(ascii_lowercase_atom("foo")));
+        let static_obj = TObject::Named(TNamedObject::new(ascii_lowercase_word(b"foo")));
         let options = options_with_static_object(static_obj);
         let mut actual = input;
         expand_union(&codebase, &mut actual, &options);
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_atom("foo") && named.is_static && !named.is_this
+                named.name == ascii_lowercase_word(b"foo") && named.is_static && !named.is_this
             } else {
                 false
             }
@@ -1482,7 +1483,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let input = make_static_object();
-        let static_enum = TObject::Enum(TEnum::new(ascii_lowercase_atom("status")));
+        let static_enum = TObject::Enum(TEnum::new(ascii_lowercase_word(b"status")));
         let options = options_with_static_object(static_enum);
         let mut actual = input;
         expand_union(&codebase, &mut actual, &options);
@@ -1505,7 +1506,7 @@ mod tests {
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_atom("baseclass")
+                named.name == ascii_lowercase_word(b"baseclass")
             } else {
                 false
             }
@@ -1523,7 +1524,7 @@ mod tests {
         expand_union(&codebase, &mut actual, &options);
 
         assert!(actual.types.iter().any(|t| {
-            if let TAtomic::Object(TObject::Named(named)) = t { named.name == atom("parent") } else { false }
+            if let TAtomic::Object(TObject::Named(named)) = t { named.name == word("parent") } else { false }
         }));
     }
 
@@ -1532,14 +1533,14 @@ mod tests {
         let code = "<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let input = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_this(atom("$this")))));
+        let input = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_this(word("$this")))));
         let options = options_with_static("Foo");
         let mut actual = input;
         expand_union(&codebase, &mut actual, &options);
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_atom("foo")
+                named.name == ascii_lowercase_word(b"foo")
             } else {
                 false
             }
@@ -1553,8 +1554,8 @@ mod tests {
 
         let input = make_static_object();
         let options = TypeExpansionOptions {
-            self_class: Some(ascii_lowercase_atom("foo")),
-            static_class_type: StaticClassType::Name(ascii_lowercase_atom("foo")),
+            self_class: Some(ascii_lowercase_word(b"foo")),
+            static_class_type: StaticClassType::Name(ascii_lowercase_word(b"foo")),
             function_is_final: true,
             ..Default::default()
         };
@@ -1563,7 +1564,7 @@ mod tests {
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_atom("foo") && !named.is_this
+                named.name == ascii_lowercase_word(b"foo") && !named.is_this
             } else {
                 false
             }
@@ -1576,7 +1577,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let named =
-            TNamedObject::new_with_type_parameters(ascii_lowercase_atom("container"), Some(vec![make_self_object()]));
+            TNamedObject::new_with_type_parameters(ascii_lowercase_word(b"container"), Some(vec![make_self_object()]));
         let input = TUnion::from_atomic(TAtomic::Object(TObject::Named(named)));
 
         let options = options_with_self("Foo");
@@ -1588,7 +1589,7 @@ mod tests {
         {
             assert!(params[0].types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1604,7 +1605,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let named = TNamedObject::new(ascii_lowercase_atom("container"));
+        let named = TNamedObject::new(ascii_lowercase_word(b"container"));
         let input = TUnion::from_atomic(TAtomic::Object(TObject::Named(named)));
 
         let mut actual = input;
@@ -1625,9 +1626,9 @@ mod tests {
 
         let input = make_static_object();
 
-        let mut static_named = TNamedObject::new(ascii_lowercase_atom("foo"));
+        let mut static_named = TNamedObject::new(ascii_lowercase_word(b"foo"));
         static_named.intersection_types =
-            Some(vec![TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("stringable"))))]);
+            Some(vec![TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"stringable"))))]);
         let static_obj = TObject::Named(static_named);
         let options = options_with_static_object(static_obj);
 
@@ -1648,7 +1649,7 @@ mod tests {
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
         assert!(actual.types.iter().any(|t| {
-            if let TAtomic::Object(TObject::Named(named)) = t { named.name == atom("self") } else { false }
+            if let TAtomic::Object(TObject::Named(named)) = t { named.name == word("self") } else { false }
         }));
     }
 
@@ -1669,7 +1670,7 @@ mod tests {
         {
             assert!(ret.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1696,7 +1697,7 @@ mod tests {
         {
             assert!(param_type.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1711,7 +1712,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let alias = TCallable::Alias(FunctionLikeIdentifier::Function(ascii_lowercase_atom("myfunc")));
+        let alias = TCallable::Alias(FunctionLikeIdentifier::Function(ascii_lowercase_word(b"myfunc")));
         let input = TUnion::from_atomic(TAtomic::Callable(alias));
 
         let mut actual = input;
@@ -1729,8 +1730,10 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let alias =
-            TCallable::Alias(FunctionLikeIdentifier::Method(ascii_lowercase_atom("foo"), ascii_lowercase_atom("bar")));
+        let alias = TCallable::Alias(FunctionLikeIdentifier::Method(
+            ascii_lowercase_word(b"foo"),
+            ascii_lowercase_word(b"bar"),
+        ));
         let input = TUnion::from_atomic(TAtomic::Callable(alias));
 
         let mut actual = input;
@@ -1743,7 +1746,7 @@ mod tests {
     fn test_expand_callable_alias_unknown() {
         let codebase = CodebaseMetadata::new();
 
-        let alias = TCallable::Alias(FunctionLikeIdentifier::Function(atom("nonexistent")));
+        let alias = TCallable::Alias(FunctionLikeIdentifier::Function(word("nonexistent")));
         let input = TUnion::from_atomic(TAtomic::Callable(alias));
 
         let mut actual = input;
@@ -1769,7 +1772,7 @@ mod tests {
         {
             assert!(ret.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1783,9 +1786,9 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let generic = TGenericParameter::new(
-            atom("T"),
+            word("T"),
             Arc::new(make_self_object()),
-            GenericParent::ClassLike(ascii_lowercase_atom("foo")),
+            GenericParent::ClassLike(ascii_lowercase_word(b"foo")),
         );
         let input = TUnion::from_atomic(TAtomic::GenericParameter(generic));
 
@@ -1796,7 +1799,7 @@ mod tests {
         if let TAtomic::GenericParameter(param) = &actual.types[0] {
             assert!(param.constraint.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1810,13 +1813,13 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let container =
-            TNamedObject::new_with_type_parameters(ascii_lowercase_atom("container"), Some(vec![make_self_object()]));
+            TNamedObject::new_with_type_parameters(ascii_lowercase_word(b"container"), Some(vec![make_self_object()]));
         let constraint = TUnion::from_atomic(TAtomic::Object(TObject::Named(container)));
 
         let generic = TGenericParameter::new(
-            atom("T"),
+            word("T"),
             Arc::new(constraint),
-            GenericParent::ClassLike(ascii_lowercase_atom("bar")),
+            GenericParent::ClassLike(ascii_lowercase_word(b"bar")),
         );
         let input = TUnion::from_atomic(TAtomic::GenericParameter(generic));
 
@@ -1830,7 +1833,7 @@ mod tests {
         {
             assert!(params[0].types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1847,12 +1850,12 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let mut generic = TGenericParameter::new(
-            atom("T"),
+            word("T"),
             Arc::new(make_self_object()),
-            GenericParent::ClassLike(ascii_lowercase_atom("foo")),
+            GenericParent::ClassLike(ascii_lowercase_word(b"foo")),
         );
         generic.intersection_types =
-            Some(vec![TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_atom("stringable"))))]);
+            Some(vec![TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"stringable"))))]);
         let input = TUnion::from_atomic(TAtomic::GenericParameter(generic));
 
         let options = options_with_self("Foo");
@@ -1863,7 +1866,7 @@ mod tests {
             assert!(param.intersection_types.is_some());
             assert!(param.constraint.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -1876,7 +1879,7 @@ mod tests {
         let code = "<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
+        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(word("self")))));
         let class_string = TClassLikeString::OfType { kind: TClassLikeStringKind::Class, constraint };
         let input = TUnion::from_atomic(TAtomic::Scalar(TScalar::ClassLikeString(class_string)));
 
@@ -1887,7 +1890,7 @@ mod tests {
         if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) = &actual.types[0]
             && let TAtomic::Object(TObject::Named(named)) = constraint.as_ref()
         {
-            assert_eq!(named.name, ascii_lowercase_atom("foo"));
+            assert_eq!(named.name, ascii_lowercase_word(b"foo"));
         }
     }
 
@@ -1896,7 +1899,7 @@ mod tests {
         let code = "<?php class Foo {}";
         let codebase = create_test_codebase(code);
 
-        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("static")))));
+        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(word("static")))));
         let class_string = TClassLikeString::OfType { kind: TClassLikeStringKind::Class, constraint };
         let input = TUnion::from_atomic(TAtomic::Scalar(TScalar::ClassLikeString(class_string)));
 
@@ -1907,7 +1910,7 @@ mod tests {
         if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) = &actual.types[0]
             && let TAtomic::Object(TObject::Named(named)) = constraint.as_ref()
         {
-            assert_eq!(named.name, ascii_lowercase_atom("foo"));
+            assert_eq!(named.name, ascii_lowercase_word(b"foo"));
         }
     }
 
@@ -1916,7 +1919,7 @@ mod tests {
         let code = "<?php interface MyInterface {}";
         let codebase = create_test_codebase(code);
 
-        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))));
+        let constraint = Arc::new(TAtomic::Object(TObject::Named(TNamedObject::new(word("self")))));
         let class_string = TClassLikeString::OfType { kind: TClassLikeStringKind::Interface, constraint };
         let input = TUnion::from_atomic(TAtomic::Scalar(TScalar::ClassLikeString(class_string)));
 
@@ -1929,7 +1932,7 @@ mod tests {
         {
             assert!(matches!(kind, TClassLikeStringKind::Interface));
             if let TAtomic::Object(TObject::Named(named)) = constraint.as_ref() {
-                assert_eq!(named.name, ascii_lowercase_atom("myinterface"));
+                assert_eq!(named.name, ascii_lowercase_word(b"myinterface"));
             }
         }
     }
@@ -1944,7 +1947,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let reference = TReference::new_member(ascii_lowercase_atom("foo"), TReferenceMemberSelector::Wildcard);
+        let reference = TReference::new_member(ascii_lowercase_word(b"foo"), TReferenceMemberSelector::Wildcard);
         let input = TUnion::from_atomic(TAtomic::Reference(reference));
 
         let mut actual = input;
@@ -1963,7 +1966,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let reference = TReference::new_member(ascii_lowercase_atom("status"), TReferenceMemberSelector::Wildcard);
+        let reference = TReference::new_member(ascii_lowercase_word(b"status"), TReferenceMemberSelector::Wildcard);
         let input = TUnion::from_atomic(TAtomic::Reference(reference));
 
         let mut actual = input;
@@ -1985,7 +1988,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let reference =
-            TReference::new_member(ascii_lowercase_atom("foo"), TReferenceMemberSelector::StartsWith(atom("STATUS_")));
+            TReference::new_member(ascii_lowercase_word(b"foo"), TReferenceMemberSelector::StartsWith(word("STATUS_")));
         let input = TUnion::from_atomic(TAtomic::Reference(reference));
 
         let mut actual = input;
@@ -2006,7 +2009,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let reference =
-            TReference::new_member(ascii_lowercase_atom("foo"), TReferenceMemberSelector::EndsWith(atom("_ERROR")));
+            TReference::new_member(ascii_lowercase_word(b"foo"), TReferenceMemberSelector::EndsWith(word("_ERROR")));
         let input = TUnion::from_atomic(TAtomic::Reference(reference));
 
         let mut actual = input;
@@ -2025,7 +2028,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let reference =
-            TReference::new_member(ascii_lowercase_atom("foo"), TReferenceMemberSelector::Identifier(atom("BAR")));
+            TReference::new_member(ascii_lowercase_word(b"foo"), TReferenceMemberSelector::Identifier(word("BAR")));
         let input = TUnion::from_atomic(TAtomic::Reference(reference));
 
         let mut actual = input;
@@ -2044,8 +2047,8 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let reference = TReference::new_member(
-            ascii_lowercase_atom("status"),
-            TReferenceMemberSelector::Identifier(atom("Active")),
+            ascii_lowercase_word(b"status"),
+            TReferenceMemberSelector::Identifier(word("Active")),
         );
         let input = TUnion::from_atomic(TAtomic::Reference(reference));
 
@@ -2060,7 +2063,7 @@ mod tests {
     fn test_expand_member_reference_unknown_class() {
         let codebase = CodebaseMetadata::new();
 
-        let reference = TReference::new_member(atom("NonExistent"), TReferenceMemberSelector::Identifier(atom("FOO")));
+        let reference = TReference::new_member(word("NonExistent"), TReferenceMemberSelector::Identifier(word("FOO")));
         let input = TUnion::from_atomic(TAtomic::Reference(reference));
 
         let mut actual = input;
@@ -2075,8 +2078,8 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let reference = TReference::new_member(
-            ascii_lowercase_atom("foo"),
-            TReferenceMemberSelector::Identifier(atom("NONEXISTENT")),
+            ascii_lowercase_word(b"foo"),
+            TReferenceMemberSelector::Identifier(word("NONEXISTENT")),
         );
         let input = TUnion::from_atomic(TAtomic::Reference(reference));
 
@@ -2096,7 +2099,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let reference =
-            TReference::new_member(ascii_lowercase_atom("foo"), TReferenceMemberSelector::Identifier(atom("VALUE")));
+            TReference::new_member(ascii_lowercase_word(b"foo"), TReferenceMemberSelector::Identifier(word("VALUE")));
         let input = TUnion::from_atomic(TAtomic::Reference(reference));
 
         let mut actual = input;
@@ -2116,7 +2119,7 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let reference =
-            TReference::new_member(ascii_lowercase_atom("foo"), TReferenceMemberSelector::Identifier(atom("VALUE")));
+            TReference::new_member(ascii_lowercase_word(b"foo"), TReferenceMemberSelector::Identifier(word("VALUE")));
         let input = TUnion::from_atomic(TAtomic::Reference(reference));
 
         let mut actual = input;
@@ -2145,7 +2148,7 @@ mod tests {
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_atom("foo")
+                named.name == ascii_lowercase_word(b"foo")
             } else {
                 false
             }
@@ -2203,7 +2206,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let alias = TAlias::new(ascii_lowercase_atom("foo"), atom("MyInt"));
+        let alias = TAlias::new(ascii_lowercase_word(b"foo"), word("MyInt"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
         let mut actual = input;
@@ -2222,7 +2225,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let alias = TAlias::new(ascii_lowercase_atom("foo"), atom("Outer"));
+        let alias = TAlias::new(ascii_lowercase_word(b"foo"), word("Outer"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
         let mut actual = input;
@@ -2239,7 +2242,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let alias = TAlias::new(ascii_lowercase_atom("foo"), atom("SelfRef"));
+        let alias = TAlias::new(ascii_lowercase_word(b"foo"), word("SelfRef"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
         let mut actual = input;
@@ -2252,7 +2255,7 @@ mod tests {
     fn test_expand_alias_unknown() {
         let codebase = CodebaseMetadata::new();
 
-        let alias = TAlias::new(atom("NonExistent"), atom("Unknown"));
+        let alias = TAlias::new(word("NonExistent"), word("Unknown"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
         let mut actual = input;
@@ -2270,7 +2273,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let alias = TAlias::new(ascii_lowercase_atom("foo"), atom("MySelf"));
+        let alias = TAlias::new(ascii_lowercase_word(b"foo"), word("MySelf"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
         let options = options_with_self("Foo");
@@ -2343,7 +2346,8 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let enum_type = TUnion::from_atomic(TAtomic::Object(TObject::Enum(TEnum::new(ascii_lowercase_atom("status")))));
+        let enum_type =
+            TUnion::from_atomic(TAtomic::Object(TObject::Enum(TEnum::new(ascii_lowercase_word(b"status")))));
 
         let value_of = TValueOf::new(Arc::new(enum_type));
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(value_of)));
@@ -2363,12 +2367,12 @@ mod tests {
 
         let mut keyed = TKeyedArray::new();
         let mut known_items = BTreeMap::new();
-        known_items.insert(ArrayKey::String(atom("key")), (false, get_int()));
+        known_items.insert(ArrayKey::String(word("key")), (false, get_int()));
         keyed.known_items = Some(known_items);
         let array_type = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
         use crate::ttype::get_literal_string;
-        let index_type = get_literal_string(atom("key"));
+        let index_type = get_literal_string(word("key"));
 
         let index_access = TIndexAccess::new(array_type, index_type);
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::IndexAccess(index_access)));
@@ -2389,12 +2393,12 @@ mod tests {
 
         let mut keyed = TKeyedArray::new();
         let mut known_items = BTreeMap::new();
-        known_items.insert(ArrayKey::String(atom("key")), (false, make_self_object()));
+        known_items.insert(ArrayKey::String(word("key")), (false, make_self_object()));
         keyed.known_items = Some(known_items);
         let array_type = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
         use crate::ttype::get_literal_string;
-        let index_type = get_literal_string(atom("key"));
+        let index_type = get_literal_string(word("key"));
 
         let index_access = TIndexAccess::new(array_type, index_type);
         let input = TUnion::from_atomic(TAtomic::Derived(TDerived::IndexAccess(index_access)));
@@ -2421,7 +2425,7 @@ mod tests {
         if let TAtomic::Iterable(iter) = &actual.types[0] {
             assert!(iter.get_key_type().types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -2444,7 +2448,7 @@ mod tests {
         if let TAtomic::Iterable(iter) = &actual.types[0] {
             assert!(iter.get_value_type().types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -2459,7 +2463,7 @@ mod tests {
         "#;
         let codebase = create_test_codebase(code);
 
-        let id = FunctionLikeIdentifier::Function(ascii_lowercase_atom("myfunc"));
+        let id = FunctionLikeIdentifier::Function(ascii_lowercase_word(b"myfunc"));
 
         let sig = get_signature_of_function_like_identifier(&id, &codebase);
         assert!(sig.is_some());
@@ -2478,7 +2482,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let id = FunctionLikeIdentifier::Method(ascii_lowercase_atom("foo"), ascii_lowercase_atom("bar"));
+        let id = FunctionLikeIdentifier::Method(ascii_lowercase_word(b"foo"), ascii_lowercase_word(b"bar"));
 
         let sig = get_signature_of_function_like_identifier(&id, &codebase);
         assert!(sig.is_some());
@@ -2491,7 +2495,7 @@ mod tests {
     fn test_get_signature_of_closure() {
         let codebase = CodebaseMetadata::new();
 
-        let id = FunctionLikeIdentifier::Closure(FileId::new("test"), Position::new(0));
+        let id = FunctionLikeIdentifier::Closure(FileId::new(b"test"), Position::new(0));
         let sig = get_signature_of_function_like_identifier(&id, &codebase);
 
         assert!(sig.is_none());
@@ -2504,7 +2508,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let id = FunctionLikeIdentifier::Function(ascii_lowercase_atom("myfunc"));
+        let id = FunctionLikeIdentifier::Function(ascii_lowercase_word(b"myfunc"));
 
         let atomic = get_atomic_of_function_like_identifier(&id, &codebase);
         assert!(atomic.is_some());
@@ -2518,7 +2522,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let id = FunctionLikeIdentifier::Function(ascii_lowercase_atom("multiparam"));
+        let id = FunctionLikeIdentifier::Function(ascii_lowercase_word(b"multiparam"));
 
         let sig = get_signature_of_function_like_identifier(&id, &codebase);
         assert!(sig.is_some());
@@ -2566,8 +2570,8 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let input = TUnion::from_vec(vec![
-            TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))),
-            TAtomic::Object(TObject::Named(TNamedObject::new(atom("self")))),
+            TAtomic::Object(TObject::Named(TNamedObject::new(word("self")))),
+            TAtomic::Object(TObject::Named(TNamedObject::new(word("self")))),
         ]);
 
         let options = options_with_self("Foo");
@@ -2597,7 +2601,7 @@ mod tests {
         {
             assert!(inner.element_type.types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
@@ -2626,7 +2630,7 @@ mod tests {
         expand_union(&codebase, &mut actual, &options);
 
         assert!(actual.types.iter().any(|t| {
-            if let TAtomic::Object(TObject::Named(named)) = t { named.name == atom("self") } else { false }
+            if let TAtomic::Object(TObject::Named(named)) = t { named.name == word("self") } else { false }
         }));
     }
 
@@ -2659,14 +2663,14 @@ mod tests {
         let codebase = create_test_codebase(code);
 
         let named = TNamedObject::new_with_type_parameters(
-            ascii_lowercase_atom("container"),
+            ascii_lowercase_word(b"container"),
             Some(vec![make_self_object(), make_static_object()]),
         );
         let input = TUnion::from_atomic(TAtomic::Object(TObject::Named(named)));
 
         let options = TypeExpansionOptions {
-            self_class: Some(ascii_lowercase_atom("foo")),
-            static_class_type: StaticClassType::Name(ascii_lowercase_atom("bar")),
+            self_class: Some(ascii_lowercase_word(b"foo")),
+            static_class_type: StaticClassType::Name(ascii_lowercase_word(b"bar")),
             ..Default::default()
         };
 
@@ -2678,14 +2682,14 @@ mod tests {
         {
             assert!(params[0].types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("foo")
+                    named.name == ascii_lowercase_word(b"foo")
                 } else {
                     false
                 }
             }));
             assert!(params[1].types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
-                    named.name == ascii_lowercase_atom("bar")
+                    named.name == ascii_lowercase_word(b"bar")
                 } else {
                     false
                 }

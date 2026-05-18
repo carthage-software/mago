@@ -137,7 +137,8 @@ impl LintRule for NoIsNullRule {
         }
 
         ctx.collector.propose(issue, |edits| {
-            let arg_text = &ctx.source_file.contents[arguments[0].value().span().to_range_usize()];
+            let arg_text =
+                mago_bytes::BytesDisplay(&ctx.source_file.contents[arguments[0].value().span().to_range_usize()]);
             let operator = if context.negated { "!==" } else { "===" };
             edits.push(TextEdit::replace(context.span, format!("null {operator} {arg_text}")));
         });

@@ -1,4 +1,4 @@
-use mago_atom::Atom;
+use mago_word::Word;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
@@ -84,7 +84,7 @@ pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
         for selector_resolution in &selectors {
             // Handle `::class` magic constant
             if let ResolvedSelector::Identifier(const_name) = selector_resolution
-                && const_name.eq_ignore_ascii_case("class")
+                && const_name.as_bytes().eq_ignore_ascii_case(b"class")
             {
                 if let Some(const_type) = handle_class_magic_constant(
                     context,
@@ -119,7 +119,7 @@ pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
             };
 
             // Handle regular constants and enum cases
-            let Some(metadata) = context.codebase.get_class_like(&fq_class_id) else {
+            let Some(metadata) = context.codebase.get_class_like(fq_class_id.as_bytes()) else {
                 result.has_invalid_path = true;
                 report_non_existent_class(context, fq_class_id, class_expr.span());
                 continue;
@@ -175,7 +175,7 @@ fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
     let class_string = match class_resolution.fqcn {
         Some(fq_class_id) => {
             if matches!(class_resolution.origin, ResolutionOrigin::Named { is_self: false, is_parent: false })
-                && context.codebase.get_class_like(&fq_class_id).is_none()
+                && context.codebase.get_class_like(fq_class_id.as_bytes()).is_none()
             {
                 report_non_existent_class(context, fq_class_id, class_expr.span());
             }
@@ -244,7 +244,7 @@ fn is_valid_trait_constant_access(origin: &ResolutionOrigin) -> bool {
 fn find_constant_in_class<'ctx>(
     context: &mut Context<'ctx, '_>,
     metadata: &'ctx ClassLikeMetadata,
-    const_name: Atom,
+    const_name: Word,
     class_span: Span,
     const_span: Span,
     resolution_origin: &ResolutionOrigin,
@@ -315,7 +315,7 @@ fn find_constant_in_class<'ctx>(
     }
 
     for required_class in metadata.require_extends.iter().chain(metadata.require_implements.iter()) {
-        let Some(required_metadata) = context.codebase.get_class_like(required_class) else {
+        let Some(required_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
             continue;
         };
 
@@ -364,7 +364,7 @@ fn find_constant_in_class<'ctx>(
 }
 
 /// Reports an error for a class-like that cannot be found in the codebase.
-fn report_non_existent_class(context: &mut Context<'_, '_>, classname: Atom, class_span: Span) {
+fn report_non_existent_class(context: &mut Context<'_, '_>, classname: Word, class_span: Span) {
     let classname = display_class_like_name(context, classname);
 
     context.collector.report_with_code(
@@ -383,7 +383,7 @@ fn report_non_existent_class(context: &mut Context<'_, '_>, classname: Atom, cla
 fn report_non_existent_constant<'ctx>(
     context: &mut Context<'ctx, '_>,
     metadata: &'ctx ClassLikeMetadata,
-    const_name: Atom,
+    const_name: Word,
     class_span: Span,
     const_span: Span,
 ) {

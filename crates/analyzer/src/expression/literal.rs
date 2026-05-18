@@ -1,5 +1,3 @@
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_codex::ttype::get_empty_string;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_int_or_float;
@@ -10,6 +8,8 @@ use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_true;
 use mago_syntax::ast::Literal;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -26,23 +26,24 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Literal<'arena> {
     ) -> Result<(), AnalysisError> {
         if let Literal::String(literal_string) = self
             && let Some(value) = literal_string.value
-            && let Some((class_part, method_part)) = value.split_once("::")
-            && !class_part.is_empty()
-            && !method_part.is_empty()
-            && !method_part.contains("::")
+            && let Some(separator_idx) = memchr::memmem::find(value, b"::")
         {
-            artifacts.symbol_references.add_reference_to_class_member(
-                &block_context.scope,
-                (ascii_lowercase_atom(class_part), ascii_lowercase_atom(method_part)),
-                false,
-            );
+            let class_part = &value[..separator_idx];
+            let method_part = &value[separator_idx + 2..];
+            if !class_part.is_empty() && !method_part.is_empty() && memchr::memmem::find(method_part, b"::").is_none() {
+                artifacts.symbol_references.add_reference_to_class_member(
+                    &block_context.scope,
+                    (ascii_lowercase_word(class_part), ascii_lowercase_word(method_part)),
+                    false,
+                );
+            }
         }
 
         artifacts.set_expression_type(
             &self,
             match self {
                 Literal::String(literal_string) => match literal_string.value {
-                    Some(value) => get_literal_string(atom(value)),
+                    Some(value) => get_literal_string(word(value)),
                     None => {
                         if literal_string.raw.len() >= 3 {
                             get_non_empty_string()

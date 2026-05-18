@@ -4,9 +4,6 @@ use foldhash::HashMap;
 use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -24,6 +21,9 @@ use mago_syntax::ast::Switch;
 use mago_syntax::ast::SwitchCase;
 use mago_syntax::ast::SwitchCaseSeparator;
 use mago_syntax::ast::SwitchExpressionCase;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -67,14 +67,14 @@ struct SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
     context: &'anlyz mut Context<'ctx, 'arena>,
     block_context: &'anlyz mut BlockContext<'ctx>,
     artifacts: &'anlyz mut AnalysisArtifacts,
-    new_locals: Option<AtomMap<Rc<TUnion>>>,
-    redefined_variables: Option<AtomMap<Rc<TUnion>>>,
-    possibly_redefined_variables: Option<AtomMap<Rc<TUnion>>>,
+    new_locals: Option<WordMap<Rc<TUnion>>>,
+    redefined_variables: Option<WordMap<Rc<TUnion>>>,
+    possibly_redefined_variables: Option<WordMap<Rc<TUnion>>>,
     leftover_statements: Vec<Statement<'arena>>,
     leftover_case_equality_expression: Option<Expression<'arena>>,
     has_fallthrough: bool,
     negated_clauses: Vec<Clause>,
-    new_assigned_variable_ids: AtomMap<u32>,
+    new_assigned_variable_ids: WordMap<u32>,
     last_case_exit_type: ControlAction,
     case_exit_types: HashMap<usize, ControlAction>,
     case_actions: HashMap<usize, ControlActionSet>,
@@ -100,7 +100,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             leftover_case_equality_expression: None,
             has_fallthrough: false,
             negated_clauses: vec![],
-            new_assigned_variable_ids: AtomMap::default(),
+            new_assigned_variable_ids: WordMap::default(),
             last_case_exit_type: ControlAction::Break,
             case_exit_types: HashMap::default(),
             case_actions: HashMap::default(),
@@ -183,7 +183,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             let final_else_clauses: Vec<_> =
                 final_else_context.clauses.iter().map(|c| (**c).clone()).chain(self.negated_clauses).collect();
 
-            let mut final_else_referenced_ids = AtomSet::default();
+            let mut final_else_referenced_ids = WordSet::default();
             let (reconcilable_types, _) =
                 mago_algebra::find_satisfying_assignments(&final_else_clauses, None, &mut final_else_referenced_ids);
 
@@ -193,7 +193,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                     &reconcilable_types,
                     IndexMap::default(),
                     &mut final_else_context,
-                    &mut AtomSet::default(),
+                    &mut WordSet::default(),
                     &final_else_referenced_ids,
                     &switch.span(),
                     false,
@@ -251,7 +251,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         switch: &Switch,
         switch_condition: &'ast Expression<'arena>,
         condition_is_synthetic: bool,
-        switch_var_id: Atom,
+        switch_var_id: Word,
         switch_case: &'ast SwitchCase<'arena>,
         previous_empty_cases: &Vec<&'ast SwitchExpressionCase<'arena>>,
         original_block_context: &BlockContext<'ctx>,
@@ -536,11 +536,11 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         let (reconcilable_if_types, _) = mago_algebra::find_satisfying_assignments(
             &case_block_context.clauses.iter().map(|v| v.as_ref().clone()).collect::<Vec<_>>(),
             None,
-            &mut AtomSet::default(),
+            &mut WordSet::default(),
         );
 
         if !reconcilable_if_types.is_empty() {
-            let mut changed_var_ids = AtomSet::default();
+            let mut changed_var_ids = WordSet::default();
 
             reconcile_keyed_types(
                 self.context,
@@ -548,7 +548,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
                 IndexMap::new(),
                 &mut case_block_context,
                 &mut changed_var_ids,
-                &if switch_case.is_default() { AtomSet::default() } else { AtomSet::from_iter([switch_var_id]) },
+                &if switch_case.is_default() { WordSet::default() } else { WordSet::from_iter([switch_var_id]) },
                 &switch_case.span(),
                 true,
                 false,
@@ -715,7 +715,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
             return;
         }
 
-        let mut removed_var_ids = AtomSet::default();
+        let mut removed_var_ids = WordSet::default();
         let case_redefined_vars =
             case_block_context.get_redefined_locals(&original_block_context.locals, false, &mut removed_var_ids);
 
@@ -800,7 +800,7 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         &mut self,
         switch: &Switch<'arena>,
         subject_type: &Rc<TUnion>,
-    ) -> (bool, Atom, Option<Atom>, Expression<'arena>) {
+    ) -> (bool, Word, Option<Word>, Expression<'arena>) {
         if let Some(id) = get_expression_id(
             switch.expression,
             self.block_context.scope.get_class_like_name(),
@@ -809,11 +809,12 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         ) {
             (false, id, get_root_expression_id(switch.expression), switch.expression.clone())
         } else {
-            let subject_id =
-                Atom::from(&format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch.expression.span().start.offset));
+            let subject_id_str =
+                format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch.expression.span().start.offset);
+            let subject_id = mago_word::word(&subject_id_str);
             self.block_context.locals.insert(subject_id, Rc::clone(subject_type));
             let subject_for_conditions =
-                new_synthetic_variable(self.context.arena, subject_id.as_str(), switch.expression.span());
+                new_synthetic_variable(self.context.arena, subject_id_str.as_bytes(), switch.expression.span());
 
             (true, subject_id, None, subject_for_conditions)
         }

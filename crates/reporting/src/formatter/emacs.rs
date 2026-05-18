@@ -33,10 +33,11 @@ impl Formatter for EmacsFormatter {
                     let line = file.line_number(annotation.span.start.offset) + 1;
                     let column = file.column_number(annotation.span.start.offset) + 1;
 
+                    let name = String::from_utf8_lossy(&file.name);
                     let display = if let (Some(template), Some(path)) = (editor_url, file.path.as_ref()) {
-                        osc8_hyperlink(template, &path.display().to_string(), line, column, &file.name)
+                        osc8_hyperlink(template, &path.display().to_string(), line, column, &name)
                     } else {
-                        file.name.to_string()
+                        name.into_owned()
                     };
 
                     (display, line, column)

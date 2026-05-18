@@ -5,7 +5,7 @@ use crate::error::DatabaseError;
 
 #[derive(Debug)]
 pub(crate) enum FilesystemOperation {
-    Write(PathBuf, Cow<'static, str>),
+    Write(PathBuf, Cow<'static, [u8]>),
     Delete(PathBuf),
 }
 
@@ -14,7 +14,7 @@ impl FilesystemOperation {
     pub fn execute(self) -> Result<(), DatabaseError> {
         match self {
             Self::Write(path, content) => {
-                std::fs::write(path, content.as_bytes())?;
+                std::fs::write(path, content)?;
 
                 Ok(())
             }

@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::identifier::method::MethodIdentifier;
@@ -48,14 +48,16 @@ pub fn cast_atomic_to_callable<'atomic>(
 
     if let Some(literal_string) = atomic.get_literal_string_value() {
         // Check if this is a static method callable in the format "ClassName::methodName"
-        if let Some((class_part, method_part)) = literal_string.split_once("::") {
+        if let Some(idx) = memchr::memmem::find(literal_string, b"::") {
+            let (class_part, rest) = literal_string.split_at(idx);
+            let method_part = &rest[2..];
             return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(
-                atom(class_part),
-                atom(method_part),
+                word(class_part),
+                word(method_part),
             ))));
         }
 
-        return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Function(atom(literal_string)))));
+        return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Function(word(literal_string)))));
     }
 
     if let TAtomic::Scalar(TScalar::String(string_scalar)) = atomic
@@ -65,13 +67,16 @@ pub fn cast_atomic_to_callable<'atomic>(
     }
 
     if let TAtomic::Object(TObject::Named(named_object)) = atomic {
-        if named_object.get_name().as_str().eq_ignore_ascii_case("Closure") {
+        if named_object.get_name().as_bytes().eq_ignore_ascii_case(b"Closure") {
             return Some(Cow::Owned(TCallable::Signature(TCallableSignature::mixed(true))));
         }
 
-        let method_identifier = MethodIdentifier::new(named_object.get_name(), atom("__invoke"));
+        let method_identifier = MethodIdentifier::new(named_object.get_name(), word("__invoke"));
         let method_identifier = codebase.get_declaring_method_identifier(&method_identifier);
-        if codebase.method_exists(&method_identifier.get_class_name(), &method_identifier.get_method_name()) {
+        if codebase.method_exists(
+            method_identifier.get_class_name().as_bytes(),
+            method_identifier.get_method_name().as_bytes(),
+        ) {
             populate_template_result(
                 template_result.as_deref_mut(),
                 codebase,
@@ -116,11 +121,11 @@ fn handle_array_callable(
     }
 
     let class_or_object = class_or_object.get_single();
-    let method_name = atom(method.get_single_literal_string_value()?);
+    let method_name = word(method.get_single_literal_string_value()?);
 
     // Check if the first element is a literal string (e.g., 'ClassName')
     if let Some(class_name) = class_or_object.get_literal_string_value() {
-        return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(atom(class_name), method_name))));
+        return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(word(class_name), method_name))));
     }
 
     // Check if the first element is a class-string literal (e.g., ClassName::class)
@@ -158,7 +163,7 @@ fn collect_atomics_to_check(atomic: &TAtomic) -> Vec<&TAtomic> {
 
 fn try_object_method(
     atomic: &TAtomic,
-    method_name: Atom,
+    method_name: Word,
     codebase: &CodebaseMetadata,
     template_result: Option<&mut TemplateResult>,
 ) -> Option<Cow<'static, TCallable>> {
@@ -171,7 +176,9 @@ fn try_object_method(
     let method_identifier = MethodIdentifier::new(object_name, method_name);
     let method_identifier = codebase.get_declaring_method_identifier(&method_identifier);
 
-    if codebase.method_exists(&method_identifier.get_class_name(), &method_identifier.get_method_name()) {
+    if codebase
+        .method_exists(method_identifier.get_class_name().as_bytes(), method_identifier.get_method_name().as_bytes())
+    {
         populate_template_result(template_result, codebase, object_name, type_parameters);
         return Some(Cow::Owned(TCallable::Alias(method_identifier.into())));
     }
@@ -182,14 +189,14 @@ fn try_object_method(
 fn populate_template_result(
     template_result: Option<&mut TemplateResult>,
     codebase: &CodebaseMetadata,
-    object_name: Atom,
+    object_name: Word,
     type_parameters: Option<&[TUnion]>,
 ) {
     let Some(template_result) = template_result else {
         return;
     };
 
-    let Some(class_metadata) = codebase.get_class_like(&object_name) else {
+    let Some(class_metadata) = codebase.get_class_like(object_name.as_bytes()) else {
         return;
     };
 

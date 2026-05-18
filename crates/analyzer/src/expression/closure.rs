@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use foldhash::HashMap;
 
-use mago_atom::atom;
+use mago_word::word;
+
+use mago_bytes::BytesDisplay;
 use mago_codex::context::ScopeContext;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::add_optional_union_type;
@@ -46,7 +48,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             return Err(AnalysisError::InternalError(
                 format!(
                     "Metadata for closure defined in `{}` at offset {} not found.",
-                    context.source_file.name, s.start.offset
+                    BytesDisplay(&context.source_file.name),
+                    s.start.offset
                 ),
                 s,
             ));
@@ -56,7 +59,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         scope.set_function_like(Some(function_metadata));
         if let Some(bind_scope) = &artifacts.closure_bind_scope {
             if let Some(class_name) = bind_scope.class_name {
-                scope.set_class_like(context.codebase.get_class_like(&class_name));
+                scope.set_class_like(context.codebase.get_class_like(class_name.as_bytes()));
             } else {
                 scope.set_class_like(block_context.scope.get_class_like());
             }
@@ -71,11 +74,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         let mut variable_spans = HashMap::default();
         if let Some(use_clause) = self.use_clause.as_ref() {
             for use_variable in &use_clause.variables {
-                let variable = use_variable.variable.name;
+                let variable_bytes = use_variable.variable.name;
+                let variable = BytesDisplay(variable_bytes);
                 let is_by_reference = use_variable.ampersand.is_some();
 
                 // has_variable() has side effects, so use contains_key() directly.
-                if !is_by_reference || block_context.locals.contains_key(&atom(variable)) {
+                if !is_by_reference || block_context.locals.contains_key(&word(variable_bytes)) {
                     let was_inside_general_use = block_context.flags.inside_general_use();
                     block_context.flags.set_inside_general_use(true);
                     use_variable.variable.analyze(context, block_context, artifacts)?;
@@ -84,7 +88,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
 
                 let variable_span = use_variable.variable.span;
 
-                if let Some(previous_span) = variable_spans.get(&variable) {
+                if let Some(previous_span) = variable_spans.get(&variable_bytes) {
                     context.collector.report_with_code(
                         IssueCode::DuplicateClosureUseVariable,
                         Issue::error(format!("Variable `{variable}` is imported multiple times into the closure.",))
@@ -103,7 +107,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                     );
                 }
 
-                if !is_by_reference && !block_context.has_variable(variable) {
+                if !is_by_reference && !block_context.has_variable(variable_bytes) {
                     context.collector.report_with_code(
                         IssueCode::UndefinedVariableInClosureUse,
                         Issue::error(format!(
@@ -122,9 +126,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                     );
                 }
 
-                variable_spans.insert(variable, variable_span);
+                variable_spans.insert(variable_bytes, variable_span);
 
-                let variable_atom = atom(variable);
+                let variable_atom = word(variable_bytes);
                 let mut variable_type =
                     block_context.locals.get(&variable_atom).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
 
@@ -139,11 +143,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                 inner_block_context.variables_possibly_in_scope.insert(variable_atom);
 
                 for (variable_id, variable_type) in &block_context.locals {
-                    let Some(stripped_variable_id) = variable_id.strip_prefix(variable) else {
+                    let Some(stripped_variable_id) = variable_id.as_bytes().strip_prefix(variable_bytes) else {
                         continue;
                     };
 
-                    if stripped_variable_id.starts_with('[') || stripped_variable_id.starts_with('-') {
+                    if stripped_variable_id.starts_with(b"[") || stripped_variable_id.starts_with(b"-") {
                         inner_block_context.locals.insert(*variable_id, Rc::clone(variable_type));
                         inner_block_context.variables_possibly_in_scope.insert(*variable_id);
                     }
@@ -165,7 +169,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                 context,
                 block_context.scope.get_class_like(),
                 function_metadata,
-                "closure",
+                b"closure",
                 self.return_type_hint.as_ref(),
                 self.span(),
             );
@@ -184,7 +188,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         crate::utils::missing_type_hints::check_imprecise_return_type_hint(
             context,
             function_metadata,
-            "closure",
+            b"closure",
             self.return_type_hint.as_ref(),
         );
 
@@ -244,7 +248,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                 }
 
                 let generator = TNamedObject::new_with_type_parameters(
-                    atom("Generator"),
+                    word("Generator"),
                     Some(vec![
                         key_type.unwrap_or_else(get_mixed),
                         value_type.unwrap_or_else(get_mixed),

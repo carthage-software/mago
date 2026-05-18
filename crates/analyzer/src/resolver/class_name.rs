@@ -1,6 +1,6 @@
-use mago_atom::Atom;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -64,9 +64,9 @@ pub enum ResolutionOrigin {
 /// resolution was performed via `ResolutionOrigin`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ResolvedClassname {
-    /// The fully qualified class name (`Atom`) if a specific class could be identified.
+    /// The fully qualified class name (`Word`) if a specific class could be identified.
     /// This is `None` for ambiguous or generic types like `object`, `class-string`, or `mixed`.
-    pub fqcn: Option<Atom>,
+    pub fqcn: Option<Word>,
     /// Describes how the class name was resolved.
     pub origin: ResolutionOrigin,
     /// A list of other `ResolvedClassname` instances that this class name intersects with.
@@ -78,7 +78,7 @@ pub struct ResolvedClassname {
 impl ResolvedClassname {
     /// Creates a new `ResolvedClassname`.
     #[inline]
-    const fn new(fq_class_id: Option<Atom>, origin: ResolutionOrigin, is_final: bool) -> Self {
+    const fn new(fq_class_id: Option<Word>, origin: ResolutionOrigin, is_final: bool) -> Self {
         Self { fqcn: fq_class_id, origin, intersections: Vec::new(), is_final }
     }
 
@@ -183,7 +183,7 @@ impl ResolvedClassname {
 
         let mut object_atomic = TAtomic::Object(match self.fqcn {
             Some(fqcn) => {
-                let lowercase_fqcn = ascii_lowercase_atom(&fqcn);
+                let lowercase_fqcn = ascii_lowercase_word(fqcn.as_bytes());
 
                 if codebase.symbols.contains_enum(lowercase_fqcn) {
                     TObject::Enum(TEnum::new(fqcn))
@@ -221,7 +221,7 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
     let mut possible_types = vec![];
     match class_expression.unparenthesized() {
         Expression::Identifier(name_node) => {
-            let fqcn = atom(context.resolved_names.get(name_node));
+            let fqcn = word(context.resolved_names.get(name_node));
 
             crate::utils::casing::check_class_like_casing(context, fqcn, name_node.span());
             crate::utils::experimental::check_experimental_class_like(context, block_context, fqcn, name_node.span());
@@ -229,7 +229,7 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
             possible_types.push(ResolvedClassname::new(
                 Some(fqcn),
                 ResolutionOrigin::Named { is_parent: false, is_self: false },
-                context.codebase.is_enum_or_final_class(&fqcn),
+                context.codebase.is_enum_or_final_class(fqcn.as_bytes()),
             ));
         }
         Expression::Self_(self_keyword) => {
@@ -282,7 +282,7 @@ pub fn resolve_classnames_from_expression<'ctx, 'arena>(
                 let mut found_parent = false;
 
                 if let Some(parent_metadata) =
-                    self_meta.direct_parent_class.as_ref().and_then(|id| context.codebase.get_class_like(id))
+                    self_meta.direct_parent_class.as_ref().and_then(|id| context.codebase.get_class_like(id.as_bytes()))
                 {
                     let origin = ResolutionOrigin::Named { is_parent: true, is_self: false };
                     let mut classname = ResolvedClassname::new(Some(parent_metadata.original_name), origin, false);
@@ -448,7 +448,7 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
                     ResolvedClassname::new(
                         Some(named_object.name),
                         origin,
-                        codebase.is_enum_or_final_class(&named_object.name),
+                        codebase.is_enum_or_final_class(named_object.name.as_bytes()),
                     )
                 }
                 TObject::WithProperties(_) | TObject::HasMethod(_) | TObject::HasProperty(_) => {
@@ -473,7 +473,7 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
                     TClassLikeString::Literal { value } => ResolvedClassname::new(
                         Some(*value),
                         ResolutionOrigin::LiteralClassString,
-                        codebase.is_enum_or_final_class(value),
+                        codebase.is_enum_or_final_class(value.as_bytes()),
                     ),
                 }
             }
@@ -482,7 +482,7 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
                     // A literal string value is treated as a generic string because, while its value
                     // is known, it's not guaranteed to be a class name without further checks.
                     // It's different from `MyClass::class` which is guaranteed.
-                    let class_id = atom(literal_string);
+                    let class_id = word(literal_string);
 
                     ResolvedClassname::new(Some(class_id), ResolutionOrigin::AnyString, false)
                 } else if scalar.is_string() {
@@ -520,7 +520,7 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
 
     let mut intersections = vec![];
     for required_interface in &metadata.require_implements {
-        let Some(interface_metadata) = context.codebase.get_interface(required_interface) else {
+        let Some(interface_metadata) = context.codebase.get_interface(required_interface.as_bytes()) else {
             continue;
         };
 
@@ -533,7 +533,7 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
     }
 
     for required_class in &metadata.require_extends {
-        let Some(parent_class_metadata) = context.codebase.get_class_like(required_class) else {
+        let Some(parent_class_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
             continue;
         };
 
@@ -548,7 +548,7 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
     intersections
 }
 
-pub fn report_non_existent_class_like(context: &mut Context, span: Span, classname: Atom) {
+pub fn report_non_existent_class_like(context: &mut Context, span: Span, classname: Word) {
     let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
         IssueCode::NonExistentClassLike,

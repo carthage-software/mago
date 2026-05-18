@@ -3,9 +3,6 @@ use std::rc::Rc;
 
 use indexmap::IndexMap;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::union::TUnion;
@@ -15,6 +12,9 @@ use mago_span::HasSpan;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::UnaryPrefixOperator;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -42,7 +42,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
     if !if_scope.negated_clauses.is_empty() {
         entry_clauses.extend(if_scope.negated_clauses.iter().cloned());
 
-        let mut changed_var_ids = AtomSet::default();
+        let mut changed_var_ids = WordSet::default();
 
         if !if_scope.negated_types.is_empty() {
             let mut tmp_context = outer_context.clone();
@@ -53,7 +53,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
                 IndexMap::new(),
                 &mut tmp_context,
                 &mut changed_var_ids,
-                &AtomSet::default(),
+                &WordSet::default(),
                 &condition.span(),
                 check_for_paradoxes,
                 false,
@@ -105,7 +105,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
     let mut conditionally_referenced_variable_ids;
     let assigned_in_conditional_variable_ids;
     if internally_applied_if_cond_expr != condition || externally_applied_if_cond_expr != condition {
-        if_conditional_context.assigned_variable_ids = AtomMap::default();
+        if_conditional_context.assigned_variable_ids = WordMap::default();
         if_conditional_context.conditionally_referenced_variable_ids.clear();
 
         let was_inside_conditional = if_conditional_context.flags.inside_conditional();
@@ -131,7 +131,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
                 && !conditionally_referenced_variable_ids.contains(k)
                 && !assigned_in_conditional_variable_ids.contains_key(k)
         })
-        .collect::<AtomSet>();
+        .collect::<WordSet>();
 
     if check_for_paradoxes && let Some(condition_type) = artifacts.get_rc_expression_type(condition) {
         handle_paradoxical_condition(context, condition, condition_type);
@@ -154,27 +154,27 @@ pub(crate) fn analyze<'ctx, 'arena>(
     let condition_range = (condition_span.start_offset(), condition_span.end_offset());
     if let Some(assertions) = artifacts.if_true_assertions.get(&condition_range) {
         for (key, assertion_set) in assertions {
-            if key.ends_with("()") {
+            if key.as_bytes().ends_with(b"()") {
                 if_body_context.active_method_call_assertions.entry(*key).or_default().extend(assertion_set.clone());
             }
         }
     }
 
     if let Some(assertions) = artifacts.true_branch_only_assertions.get(&condition_range) {
-        let mut var_assertions: IndexMap<Atom, Vec<Vec<Assertion>>> = IndexMap::new();
+        let mut var_assertions: IndexMap<Word, Vec<Vec<Assertion>>> = IndexMap::new();
         for (key, assertion_set) in assertions {
             var_assertions.entry(*key).or_default().extend(assertion_set.clone());
         }
 
         if !var_assertions.is_empty() {
-            let mut changed_var_ids = AtomSet::default();
+            let mut changed_var_ids = WordSet::default();
             reconcile_keyed_types(
                 context,
                 &var_assertions,
                 IndexMap::new(),
                 &mut if_body_context,
                 &mut changed_var_ids,
-                &AtomSet::default(),
+                &WordSet::default(),
                 &condition_span,
                 false,
                 false,

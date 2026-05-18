@@ -138,7 +138,8 @@ impl PropertyNameRule {
         self.check_property_name(ctx, parameter.variable.name, parameter.variable.span());
     }
 
-    fn check_property_name(&self, ctx: &mut LintContext<'_, '_>, name: &str, span: Span) {
+    fn check_property_name(&self, ctx: &mut LintContext<'_, '_>, name_bytes: &[u8], span: Span) {
+        let Some(name) = std::str::from_utf8(name_bytes).ok() else { return };
         let name_without_dollar = name.strip_prefix('$').unwrap_or(name);
 
         if self.cfg.either {

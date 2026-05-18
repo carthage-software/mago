@@ -1,4 +1,3 @@
-use mago_atom::Atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::ttype::TType;
@@ -8,6 +7,7 @@ use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
 use mago_codex::visibility::Visibility;
+use mago_word::Word;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignatureCompatibilityIssue {
@@ -15,9 +15,9 @@ pub enum SignatureCompatibilityIssue {
     StaticModifierMismatch { child_is_static: bool, parent_is_static: bool },
     VisibilityNarrowed { child_visibility: Visibility, parent_visibility: Visibility },
     ParameterCountMismatch { child_required_count: usize, parent_required_count: usize },
-    IncompatibleParameterType { parameter_index: usize, child_type: Atom, parent_type: Atom },
-    IncompatibleReturnType { child_type: Atom, parent_type: Atom },
-    ParameterNameMismatch { parameter_index: usize, child_name: Atom, parent_name: Atom },
+    IncompatibleParameterType { parameter_index: usize, child_type: Word, parent_type: Word },
+    IncompatibleReturnType { child_type: Word, parent_type: Word },
+    ParameterNameMismatch { parameter_index: usize, child_name: Word, parent_name: Word },
 }
 
 /// Validates that a child method signature is compatible with a parent method signature.
@@ -43,7 +43,7 @@ pub enum SignatureCompatibilityIssue {
 /// Errors are returned first, then warnings.
 pub fn validate_method_signature_compatibility(
     codebase: &CodebaseMetadata,
-    child_class_name: Atom,
+    child_class_name: Word,
     child_method: &FunctionLikeMetadata,
     parent_method: &FunctionLikeMetadata,
 ) -> Vec<SignatureCompatibilityIssue> {

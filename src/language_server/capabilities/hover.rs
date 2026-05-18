@@ -3,6 +3,7 @@
 //! Resolves the identifier under the cursor via [`mago_names::ResolvedNames`]
 //! and renders a Markdown summary sourced from [`mago_codex::metadata::CodebaseMetadata`].
 
+use mago_bytes::BytesDisplay;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
@@ -36,13 +37,13 @@ pub fn compute(
     Some(Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
-            value: format!("```php\n${}\n```\n\n*variable*", var.name),
+            value: format!("```php\n${}\n```\n\n*variable*", BytesDisplay(var.name)),
         }),
         range: Some(range_at_offsets(file, var.start, var.end)),
     })
 }
 
-fn render(codebase: &CodebaseMetadata, fqcn: &str) -> Option<String> {
+fn render(codebase: &CodebaseMetadata, fqcn: &[u8]) -> Option<String> {
     if let Some(meta) = codebase.get_class_like(fqcn) {
         return Some(render_class_like(meta));
     }
@@ -50,7 +51,7 @@ fn render(codebase: &CodebaseMetadata, fqcn: &str) -> Option<String> {
         return Some(render_function_like(meta, None));
     }
     if let Some(meta) = codebase.get_constant(fqcn) {
-        return Some(format!("```php\nconst {}\n```", meta.name.as_str()));
+        return Some(format!("```php\nconst {}\n```", BytesDisplay(meta.name.as_bytes())));
     }
     None
 }
@@ -63,17 +64,18 @@ fn render_class_like(meta: &ClassLikeMetadata) -> String {
         SymbolKind::Enum => "enum",
     };
 
-    let mut out = format!("```php\n{kind} {}", meta.original_name.as_str());
+    let mut out = format!("```php\n{kind} {}", BytesDisplay(meta.original_name.as_bytes()));
 
     if let Some(parent) = meta.direct_parent_class {
         out.push_str(" extends ");
-        out.push_str(parent.as_str());
+        out.push_str(&String::from_utf8_lossy(parent.as_bytes()));
     }
 
     if !meta.direct_parent_interfaces.is_empty() {
         let keyword = if matches!(meta.kind, SymbolKind::Interface) { " extends " } else { " implements " };
         out.push_str(keyword);
-        let names: Vec<&str> = meta.direct_parent_interfaces.iter().map(|a| a.as_str()).collect();
+        let names: Vec<String> =
+            meta.direct_parent_interfaces.iter().map(|a| String::from_utf8_lossy(a.as_bytes()).into_owned()).collect();
         out.push_str(&names.join(", "));
     }
 
@@ -81,21 +83,23 @@ fn render_class_like(meta: &ClassLikeMetadata) -> String {
 
     if !meta.used_traits.is_empty() {
         out.push_str("\n\n**Uses traits:** ");
-        let names: Vec<&str> = meta.used_traits.iter().map(|a| a.as_str()).collect();
+        let names: Vec<String> =
+            meta.used_traits.iter().map(|a| String::from_utf8_lossy(a.as_bytes()).into_owned()).collect();
         out.push_str(&names.join(", "));
     }
 
     out
 }
 
-fn render_function_like(meta: &FunctionLikeMetadata, method_of: Option<&str>) -> String {
+fn render_function_like(meta: &FunctionLikeMetadata, method_of: Option<&[u8]>) -> String {
+    use std::fmt::Write;
     let mut signature = String::from("```php\nfunction ");
     if let Some(class) = method_of {
-        signature.push_str(class);
+        let _ = write!(signature, "{}", BytesDisplay(class));
         signature.push_str("::");
     }
     if let Some(name) = meta.original_name {
-        signature.push_str(name.as_str());
+        let _ = write!(signature, "{}", BytesDisplay(name.as_bytes()));
     }
     signature.push('(');
     let mut first = true;
@@ -105,16 +109,16 @@ fn render_function_like(meta: &FunctionLikeMetadata, method_of: Option<&str>) ->
         }
         first = false;
         if let Some(ty) = &param.type_metadata {
-            signature.push_str(ty.type_union.get_id().as_str());
+            let _ = write!(signature, "{}", BytesDisplay(ty.type_union.get_id().as_bytes()));
             signature.push(' ');
         }
-        signature.push_str(param.name.0.as_str());
+        let _ = write!(signature, "{}", BytesDisplay(param.name.0.as_bytes()));
     }
     signature.push(')');
 
     if let Some(rt) = &meta.return_type_metadata {
         signature.push_str(": ");
-        signature.push_str(rt.type_union.get_id().as_str());
+        let _ = write!(signature, "{}", BytesDisplay(rt.type_union.get_id().as_bytes()));
     }
 
     signature.push_str("\n```");

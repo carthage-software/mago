@@ -170,8 +170,8 @@ impl LintRule for NoRedundantMethodOverrideRule {
 }
 
 fn matches_method<'arena>(
-    method_name: &'arena str,
-    parameters: &[(bool, &'arena str)],
+    method_name: &'arena [u8],
+    parameters: &[(bool, &'arena [u8])],
     expression: &Expression<'arena>,
 ) -> bool {
     let Expression::Call(Call::StaticMethod(StaticMethodCall { class, method, argument_list: arguments, .. })) =

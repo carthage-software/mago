@@ -19,7 +19,6 @@ use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
-use mago_atom::AtomSet;
 use mago_codex::populator::populate_codebase;
 use mago_codex::scanner::scan_program;
 use mago_database::DatabaseReader;
@@ -27,6 +26,7 @@ use mago_database::file::File;
 use mago_names::resolver::NameResolver;
 use mago_prelude::Prelude;
 use mago_syntax::parser::parse_file;
+use mago_word::WordSet;
 
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
@@ -35,8 +35,8 @@ fn analyze_file(path: &Path, content: &str) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 
     let file = File::ephemeral(
-        Cow::Owned(path.file_name().unwrap().to_string_lossy().into_owned()),
-        Cow::Owned(content.to_string()),
+        Cow::Owned(path.file_name().unwrap().to_string_lossy().into_owned().into_bytes()),
+        Cow::Owned(content.as_bytes().to_vec()),
     );
     let file_id = database.add(file);
     let source_file = database.get_ref(&file_id).expect("file just added must exist");
@@ -61,7 +61,7 @@ fn analyze_file(path: &Path, content: &str) {
     };
 
     metadata.extend(scan_program(&arena, source_file, program, &resolved_names, settings.version));
-    populate_codebase(&mut metadata, &mut symbol_references, AtomSet::default(), HashSet::default());
+    populate_codebase(&mut metadata, &mut symbol_references, WordSet::default(), HashSet::default());
 
     let mut analysis_result = AnalysisResult::new(symbol_references);
     let analyzer = Analyzer::new(&arena, source_file, &resolved_names, &metadata, &PLUGIN_REGISTRY, settings);

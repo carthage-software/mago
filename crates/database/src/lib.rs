@@ -102,12 +102,12 @@ pub struct DatabaseConfiguration<'config> {
     pub workspace: Cow<'config, Path>,
     /// Paths or glob patterns for source files.
     /// Can be directory paths (e.g., "src") or glob patterns (e.g., "src/**/*.php")
-    pub paths: Vec<Cow<'config, str>>,
+    pub paths: Vec<Cow<'config, [u8]>>,
     /// Paths or glob patterns for included files.
     /// Can be directory paths (e.g., "vendor") or glob patterns (e.g., "vendor/**/*.php")
-    pub includes: Vec<Cow<'config, str>>,
+    pub includes: Vec<Cow<'config, [u8]>>,
     pub excludes: Vec<Exclusion<'config>>,
-    pub extensions: Vec<Cow<'config, str>>,
+    pub extensions: Vec<Cow<'config, [u8]>>,
     /// Settings for glob pattern matching behavior.
     pub glob: GlobSettings,
 }
@@ -154,10 +154,10 @@ impl<'config> DatabaseConfiguration<'config> {
     #[must_use]
     pub fn new(
         workspace: &'config Path,
-        paths: Vec<&'config str>,
-        includes: Vec<&'config str>,
+        paths: Vec<&'config [u8]>,
+        includes: Vec<&'config [u8]>,
         excludes: Vec<Exclusion<'config>>,
-        extensions: Vec<&'config str>,
+        extensions: Vec<&'config [u8]>,
     ) -> Self {
         let paths = paths.into_iter().map(Cow::Borrowed).collect();
         let includes = includes.into_iter().map(Cow::Borrowed).collect();
@@ -211,8 +211,8 @@ impl<'config> DatabaseConfiguration<'config> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct Database<'config> {
-    files: HashMap<Cow<'static, str>, Arc<File>>,
-    id_to_name: HashMap<FileId, Cow<'static, str>>,
+    files: HashMap<Cow<'static, [u8]>, Arc<File>>,
+    id_to_name: HashMap<FileId, Cow<'static, [u8]>>,
     pub(crate) configuration: DatabaseConfiguration<'config>,
 }
 
@@ -221,7 +221,7 @@ pub struct Database<'config> {
 pub struct ReadDatabase {
     files: Vec<Arc<File>>,
     id_to_index: HashMap<FileId, usize>,
-    name_to_index: HashMap<Cow<'static, str>, usize>,
+    name_to_index: HashMap<Cow<'static, [u8]>, usize>,
     path_to_index: HashMap<PathBuf, usize>,
 }
 
@@ -269,7 +269,7 @@ impl<'config> Database<'config> {
     ///
     /// Returns `true` if a file with the given ID was found and updated.
     #[inline]
-    pub fn update(&mut self, id: FileId, new_contents: Cow<'static, str>) -> bool {
+    pub fn update(&mut self, id: FileId, new_contents: Cow<'static, [u8]>) -> bool {
         let Some(name) = self.id_to_name.get(&id) else {
             return false;
         };
@@ -430,7 +430,7 @@ impl ReadDatabase {
 /// [`ReadDatabase`]. This allows for writing generic code that can operate on either.
 pub trait DatabaseReader {
     /// Retrieves a file's stable ID using its logical name.
-    fn get_id(&self, name: &str) -> Option<FileId>;
+    fn get_id(&self, name: &[u8]) -> Option<FileId>;
 
     /// Retrieves a reference to a file using its stable `FileId`.
     ///
@@ -451,7 +451,7 @@ pub trait DatabaseReader {
     /// # Errors
     ///
     /// Returns `DatabaseError::FileNotFound` if no file with the given name exists.
-    fn get_by_name(&self, name: &str) -> Result<Arc<File>, DatabaseError>;
+    fn get_by_name(&self, name: &[u8]) -> Result<Arc<File>, DatabaseError>;
 
     /// Retrieves a reference to a file by its absolute filesystem path.
     ///
@@ -508,7 +508,7 @@ pub trait DatabaseReader {
 
 impl DatabaseReader for Database<'_> {
     #[inline]
-    fn get_id(&self, name: &str) -> Option<FileId> {
+    fn get_id(&self, name: &[u8]) -> Option<FileId> {
         self.files.get(name).map(|f| f.id)
     }
 
@@ -527,7 +527,7 @@ impl DatabaseReader for Database<'_> {
     }
 
     #[inline]
-    fn get_by_name(&self, name: &str) -> Result<Arc<File>, DatabaseError> {
+    fn get_by_name(&self, name: &[u8]) -> Result<Arc<File>, DatabaseError> {
         self.files.get(name).cloned().ok_or(DatabaseError::FileNotFound)
     }
 
@@ -549,7 +549,7 @@ impl DatabaseReader for Database<'_> {
 
 impl DatabaseReader for ReadDatabase {
     #[inline]
-    fn get_id(&self, name: &str) -> Option<FileId> {
+    fn get_id(&self, name: &[u8]) -> Option<FileId> {
         self.name_to_index.get(name).and_then(|&i| self.files.get(i)).map(|f| f.id)
     }
 
@@ -568,7 +568,7 @@ impl DatabaseReader for ReadDatabase {
     }
 
     #[inline]
-    fn get_by_name(&self, name: &str) -> Result<Arc<File>, DatabaseError> {
+    fn get_by_name(&self, name: &[u8]) -> Result<Arc<File>, DatabaseError> {
         self.name_to_index.get(name).and_then(|&i| self.files.get(i)).cloned().ok_or(DatabaseError::FileNotFound)
     }
 

@@ -1,4 +1,3 @@
-use mago_atom::atom;
 use mago_codex::scanner::inference::get_literal_constant_type;
 use mago_codex::scanner::inference::get_platform_constant_type;
 use mago_codex::ttype::expander;
@@ -8,6 +7,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::ConstantAccess;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -15,6 +15,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use mago_bytes::BytesDisplay;
 
 impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
     fn analyze<'ctx>(
@@ -23,19 +24,20 @@ impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
-        let name = context.resolved_names.get(self);
+        let name_bytes = context.resolved_names.get(self);
+        let name = BytesDisplay(name_bytes);
         let unqualified_name = self.name.value();
 
         let constant_metadata =
-            context.codebase.get_constant(name).or_else(|| context.codebase.get_constant(unqualified_name));
+            context.codebase.get_constant(name_bytes).or_else(|| context.codebase.get_constant(unqualified_name));
 
         let Some(constant_metadata) = constant_metadata else {
-            if let Some(literal_type) = get_literal_constant_type(name) {
+            if let Some(literal_type) = get_literal_constant_type(name_bytes) {
                 artifacts.set_expression_type(self, literal_type);
                 return Ok(());
             }
 
-            let is_known = block_context.known_constants.contains(&atom(name));
+            let is_known = block_context.known_constants.contains(&word(name_bytes));
 
             if is_known {
                 artifacts.set_expression_type(self, get_mixed());
@@ -77,13 +79,13 @@ impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
             context,
             block_context,
             &constant_metadata.flags,
-            name,
+            name_bytes,
             self.span(),
         );
 
-        crate::utils::availability::check_constant_availability(context, constant_metadata, name, self.span());
+        crate::utils::availability::check_constant_availability(context, constant_metadata, &name, self.span());
 
-        let mut constant_type = if let Some(t) = get_platform_constant_type(name) {
+        let mut constant_type = if let Some(t) = get_platform_constant_type(name_bytes) {
             t
         } else {
             match &constant_metadata.type_metadata {

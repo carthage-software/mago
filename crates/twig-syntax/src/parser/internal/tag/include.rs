@@ -34,17 +34,17 @@ impl<'arena> Parser<'_, 'arena> {
 
     pub(super) fn parse_include_tail(&mut self) -> Result<IncludeTail<'arena>, ParseError> {
         let mut ignore_missing = None;
-        if let Some(ignore_keyword) = self.try_consume_name_keyword("ignore")? {
-            let missing_tok = self.stream.expect_name_value("missing")?;
+        if let Some(ignore_keyword) = self.try_consume_name_keyword(b"ignore")? {
+            let missing_tok = self.stream.expect_name_value(b"missing")?;
             let missing_keyword = self.keyword_from(&missing_tok);
             ignore_missing = Some(IgnoreMissingClause { ignore_keyword, missing_keyword });
         }
         let mut with_clause = None;
-        if let Some(with_keyword) = self.try_consume_name_keyword("with")? {
+        if let Some(with_keyword) = self.try_consume_name_keyword(b"with")? {
             let variables = self.parse_expression()?;
             with_clause = Some(WithExpressionClause { with_keyword, variables });
         }
-        let only_keyword = self.try_consume_name_keyword("only")?;
+        let only_keyword = self.try_consume_name_keyword(b"only")?;
         Ok((ignore_missing, with_clause, only_keyword))
     }
 }

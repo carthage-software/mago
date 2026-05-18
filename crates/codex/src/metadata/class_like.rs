@@ -5,11 +5,11 @@ use mago_php_version::PHPVersionRange;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
 use mago_reporting::Issue;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 
 use crate::flags::attribute::AttributeFlags;
 use crate::identifier::method::MethodIdentifier;
@@ -29,7 +29,7 @@ use crate::visibility::Visibility;
 
 /// Type alias for template types stored in metadata.
 /// Maps template parameter names to their defining entity and constraint type.
-pub type TemplateTypes = IndexMap<Atom, GenericTemplate, RandomState>;
+pub type TemplateTypes = IndexMap<Word, GenericTemplate, RandomState>;
 
 /// Contains comprehensive metadata for a PHP class-like structure (class, interface, trait, enum).
 ///
@@ -38,58 +38,58 @@ pub type TemplateTypes = IndexMap<Atom, GenericTemplate, RandomState>;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ClassLikeMetadata {
-    pub name: Atom,
-    pub original_name: Atom,
+    pub name: Word,
+    pub original_name: Word,
     pub span: Span,
-    pub direct_parent_interfaces: AtomSet,
-    pub all_parent_interfaces: AtomSet,
-    pub direct_parent_class: Option<Atom>,
-    pub require_extends: AtomSet,
-    pub require_implements: AtomSet,
-    pub all_parent_classes: AtomSet,
-    pub used_traits: AtomSet,
-    pub trait_alias_map: AtomMap<Atom>,
-    pub trait_visibility_map: AtomMap<Visibility>,
-    pub trait_final_map: AtomSet,
-    pub child_class_likes: Option<AtomSet>,
+    pub direct_parent_interfaces: WordSet,
+    pub all_parent_interfaces: WordSet,
+    pub direct_parent_class: Option<Word>,
+    pub require_extends: WordSet,
+    pub require_implements: WordSet,
+    pub all_parent_classes: WordSet,
+    pub used_traits: WordSet,
+    pub trait_alias_map: WordMap<Word>,
+    pub trait_visibility_map: WordMap<Visibility>,
+    pub trait_final_map: WordSet,
+    pub child_class_likes: Option<WordSet>,
     pub name_span: Option<Span>,
     pub kind: SymbolKind,
     pub template_types: TemplateTypes,
-    pub template_readonly: AtomSet,
+    pub template_readonly: WordSet,
     pub template_variance: Vec<Variance>,
-    pub template_extended_offsets: AtomMap<Vec<TUnion>>,
-    pub template_extended_parameters: AtomMap<IndexMap<Atom, TUnion, RandomState>>,
-    pub template_type_extends_count: AtomMap<usize>,
-    pub template_type_implements_count: AtomMap<usize>,
-    pub template_type_uses_count: AtomMap<usize>,
-    pub methods: AtomSet,
-    pub pseudo_methods: AtomSet,
-    pub static_pseudo_methods: AtomSet,
-    pub declaring_method_ids: AtomMap<MethodIdentifier>,
-    pub appearing_method_ids: AtomMap<MethodIdentifier>,
-    pub inheritable_method_ids: AtomMap<MethodIdentifier>,
-    pub overridden_method_ids: AtomMap<IndexMap<Atom, MethodIdentifier, RandomState>>,
-    pub properties: AtomMap<PropertyMetadata>,
-    pub appearing_property_ids: AtomMap<Atom>,
-    pub declaring_property_ids: AtomMap<Atom>,
-    pub inheritable_property_ids: AtomMap<Atom>,
-    pub overridden_property_ids: AtomMap<AtomSet>,
-    pub initialized_properties: AtomSet,
-    pub constants: AtomMap<ClassLikeConstantMetadata>,
-    pub trait_constant_ids: AtomMap<Atom>,
-    pub enum_cases: AtomMap<EnumCaseMetadata>,
-    pub invalid_dependencies: AtomSet,
+    pub template_extended_offsets: WordMap<Vec<TUnion>>,
+    pub template_extended_parameters: WordMap<IndexMap<Word, TUnion, RandomState>>,
+    pub template_type_extends_count: WordMap<usize>,
+    pub template_type_implements_count: WordMap<usize>,
+    pub template_type_uses_count: WordMap<usize>,
+    pub methods: WordSet,
+    pub pseudo_methods: WordSet,
+    pub static_pseudo_methods: WordSet,
+    pub declaring_method_ids: WordMap<MethodIdentifier>,
+    pub appearing_method_ids: WordMap<MethodIdentifier>,
+    pub inheritable_method_ids: WordMap<MethodIdentifier>,
+    pub overridden_method_ids: WordMap<IndexMap<Word, MethodIdentifier, RandomState>>,
+    pub properties: WordMap<PropertyMetadata>,
+    pub appearing_property_ids: WordMap<Word>,
+    pub declaring_property_ids: WordMap<Word>,
+    pub inheritable_property_ids: WordMap<Word>,
+    pub overridden_property_ids: WordMap<WordSet>,
+    pub initialized_properties: WordSet,
+    pub constants: WordMap<ClassLikeConstantMetadata>,
+    pub trait_constant_ids: WordMap<Word>,
+    pub enum_cases: WordMap<EnumCaseMetadata>,
+    pub invalid_dependencies: WordSet,
     pub attributes: Vec<AttributeMetadata>,
     pub enum_type: Option<TAtomic>,
     pub has_sealed_methods: Option<bool>,
     pub has_sealed_properties: Option<bool>,
-    pub permitted_inheritors: Option<AtomSet>,
+    pub permitted_inheritors: Option<WordSet>,
     pub issues: Vec<Issue>,
     pub attribute_flags: Option<AttributeFlags>,
     pub flags: MetadataFlags,
-    pub type_aliases: AtomMap<TypeMetadata>,
+    pub type_aliases: WordMap<TypeMetadata>,
     /// Imported type aliases in the form of (`from_fqcn`, `type_name`, span)
-    pub imported_type_aliases: AtomMap<(Atom, Atom, Span)>,
+    pub imported_type_aliases: WordMap<(Word, Word, Span)>,
     /// Mixin types from @mixin annotations - these types' methods/properties
     /// can be accessed via magic methods (__call, __get, __set, __callStatic)
     pub mixins: Vec<TUnion>,
@@ -99,64 +99,64 @@ pub struct ClassLikeMetadata {
 impl ClassLikeMetadata {
     #[must_use]
     pub fn new(
-        name: Atom,
-        original_name: Atom,
+        name: Word,
+        original_name: Word,
         span: Span,
         name_span: Option<Span>,
         flags: MetadataFlags,
     ) -> ClassLikeMetadata {
         ClassLikeMetadata {
-            constants: AtomMap::default(),
-            trait_constant_ids: AtomMap::default(),
-            enum_cases: AtomMap::default(),
+            constants: WordMap::default(),
+            trait_constant_ids: WordMap::default(),
+            enum_cases: WordMap::default(),
             flags,
             kind: SymbolKind::Class,
-            direct_parent_interfaces: AtomSet::default(),
-            all_parent_classes: AtomSet::default(),
-            appearing_method_ids: AtomMap::default(),
+            direct_parent_interfaces: WordSet::default(),
+            all_parent_classes: WordSet::default(),
+            appearing_method_ids: WordMap::default(),
             attributes: Vec::new(),
-            all_parent_interfaces: AtomSet::default(),
-            declaring_method_ids: AtomMap::default(),
-            appearing_property_ids: AtomMap::default(),
-            declaring_property_ids: AtomMap::default(),
+            all_parent_interfaces: WordSet::default(),
+            declaring_method_ids: WordMap::default(),
+            appearing_property_ids: WordMap::default(),
+            declaring_property_ids: WordMap::default(),
             direct_parent_class: None,
-            require_extends: AtomSet::default(),
-            require_implements: AtomSet::default(),
-            inheritable_method_ids: AtomMap::default(),
+            require_extends: WordSet::default(),
+            require_implements: WordSet::default(),
+            inheritable_method_ids: WordMap::default(),
             enum_type: None,
-            inheritable_property_ids: AtomMap::default(),
-            initialized_properties: AtomSet::default(),
-            invalid_dependencies: AtomSet::default(),
+            inheritable_property_ids: WordMap::default(),
+            initialized_properties: WordSet::default(),
+            invalid_dependencies: WordSet::default(),
             span,
             name_span,
-            methods: AtomSet::default(),
-            pseudo_methods: AtomSet::default(),
-            static_pseudo_methods: AtomSet::default(),
-            overridden_method_ids: AtomMap::default(),
-            overridden_property_ids: AtomMap::default(),
-            properties: AtomMap::default(),
+            methods: WordSet::default(),
+            pseudo_methods: WordSet::default(),
+            static_pseudo_methods: WordSet::default(),
+            overridden_method_ids: WordMap::default(),
+            overridden_property_ids: WordMap::default(),
+            properties: WordMap::default(),
             template_variance: Vec::new(),
-            template_type_extends_count: AtomMap::default(),
-            template_extended_parameters: AtomMap::default(),
-            template_extended_offsets: AtomMap::default(),
-            template_type_implements_count: AtomMap::default(),
-            template_type_uses_count: AtomMap::default(),
+            template_type_extends_count: WordMap::default(),
+            template_extended_parameters: WordMap::default(),
+            template_extended_offsets: WordMap::default(),
+            template_type_implements_count: WordMap::default(),
+            template_type_uses_count: WordMap::default(),
             template_types: TemplateTypes::default(),
-            used_traits: AtomSet::default(),
-            trait_alias_map: AtomMap::default(),
-            trait_visibility_map: AtomMap::default(),
-            trait_final_map: AtomSet::default(),
+            used_traits: WordSet::default(),
+            trait_alias_map: WordMap::default(),
+            trait_visibility_map: WordMap::default(),
+            trait_final_map: WordSet::default(),
             name,
             original_name,
             child_class_likes: None,
-            template_readonly: AtomSet::default(),
+            template_readonly: WordSet::default(),
             has_sealed_methods: None,
             has_sealed_properties: None,
             permitted_inheritors: None,
             issues: vec![],
             attribute_flags: None,
-            type_aliases: AtomMap::default(),
-            imported_type_aliases: AtomMap::default(),
+            type_aliases: WordMap::default(),
+            imported_type_aliases: WordMap::default(),
             mixins: Vec::default(),
             version_constraint: VersionConstraint::unconstrained(),
         }
@@ -181,85 +181,85 @@ impl ClassLikeMetadata {
     /// Returns a reference to the map of trait method aliases.
     #[inline]
     #[must_use]
-    pub fn get_trait_alias_map(&self) -> &AtomMap<Atom> {
+    pub fn get_trait_alias_map(&self) -> &WordMap<Word> {
         &self.trait_alias_map
     }
 
     /// Returns a vector of the generic type parameter names.
     #[inline]
     #[must_use]
-    pub fn get_template_type_names(&self) -> Vec<Atom> {
+    pub fn get_template_type_names(&self) -> Vec<Word> {
         self.template_types.keys().copied().collect()
     }
 
     /// Returns type parameters for a specific generic parameter name.
     #[inline]
     #[must_use]
-    pub fn get_template_type(&self, name: Atom) -> Option<&GenericTemplate> {
+    pub fn get_template_type(&self, name: Word) -> Option<&GenericTemplate> {
         self.template_types.get(&name)
     }
 
     /// Returns type parameters for a specific generic parameter name with its index.
     #[inline]
     #[must_use]
-    pub fn get_template_type_with_index(&self, name: Atom) -> Option<(usize, &GenericTemplate)> {
+    pub fn get_template_type_with_index(&self, name: Word) -> Option<(usize, &GenericTemplate)> {
         self.template_types.get_full(&name).map(|(index, _, types)| (index, types))
     }
 
     #[must_use]
-    pub fn get_template_for_index(&self, index: usize) -> Option<(Atom, &GenericTemplate)> {
+    pub fn get_template_for_index(&self, index: usize) -> Option<(Word, &GenericTemplate)> {
         self.template_types.get_index(index).map(|(name, types)| (*name, types))
     }
 
     #[must_use]
-    pub fn get_template_name_for_index(&self, index: usize) -> Option<Atom> {
+    pub fn get_template_name_for_index(&self, index: usize) -> Option<Word> {
         self.template_types.get_index(index).map(|(name, _)| *name)
     }
 
     #[must_use]
-    pub fn get_template_index_for_name(&self, name: Atom) -> Option<usize> {
+    pub fn get_template_index_for_name(&self, name: Word) -> Option<usize> {
         self.template_types.get_index_of(&name)
     }
 
     /// Checks if a specific parent is either a parent class or interface.
     #[inline]
     #[must_use]
-    pub fn has_parent(&self, parent: Atom) -> bool {
+    pub fn has_parent(&self, parent: Word) -> bool {
         self.all_parent_classes.contains(&parent) || self.all_parent_interfaces.contains(&parent)
     }
 
     /// Checks if a specific parent has template extended parameters.
     #[inline]
     #[must_use]
-    pub fn has_template_extended_parameter(&self, parent: Atom) -> bool {
+    pub fn has_template_extended_parameter(&self, parent: Word) -> bool {
         self.template_extended_parameters.contains_key(&parent)
     }
 
     /// Checks if a specific method appears in this class-like.
     #[inline]
     #[must_use]
-    pub fn has_appearing_method(&self, method: Atom) -> bool {
+    pub fn has_appearing_method(&self, method: Word) -> bool {
         self.appearing_method_ids.contains_key(&method)
     }
 
     /// Returns a vector of property names.
     #[inline]
     #[must_use]
-    pub fn get_property_names(&self) -> AtomSet {
+    pub fn get_property_names(&self) -> WordSet {
         self.properties.keys().copied().collect()
     }
 
     /// Checks if a specific property appears in this class-like.
     #[inline]
     #[must_use]
-    pub fn has_appearing_property(&self, name: Atom) -> bool {
+    pub fn has_appearing_property(&self, name: Word) -> bool {
         self.appearing_property_ids.contains_key(&name)
     }
 
     /// Checks if a specific property is declared in this class-like.
     #[inline]
     #[must_use]
-    pub fn has_declaring_property(&self, name: Atom) -> bool {
+    pub fn has_declaring_property(&self, name: Word) -> bool {
         self.declaring_property_ids.contains_key(&name)
     }
 
@@ -271,56 +271,56 @@ impl ClassLikeMetadata {
 
     /// Adds a single direct parent interface.
     #[inline]
-    pub fn add_direct_parent_interface(&mut self, interface: Atom) {
+    pub fn add_direct_parent_interface(&mut self, interface: Word) {
         self.direct_parent_interfaces.insert(interface);
         self.all_parent_interfaces.insert(interface);
     }
 
     /// Adds a single interface to the list of all parent interfaces. Use with caution, normally derived.
     #[inline]
-    pub fn add_all_parent_interface(&mut self, interface: Atom) {
+    pub fn add_all_parent_interface(&mut self, interface: Word) {
         self.all_parent_interfaces.insert(interface);
     }
 
     /// Adds multiple interfaces to the list of all parent interfaces. Use with caution.
     #[inline]
-    pub fn add_all_parent_interfaces(&mut self, interfaces: impl IntoIterator<Item = Atom>) {
+    pub fn add_all_parent_interfaces(&mut self, interfaces: impl IntoIterator<Item = Word>) {
         self.all_parent_interfaces.extend(interfaces);
     }
 
     /// Adds multiple ancestor classes. Use with caution.
     #[inline]
-    pub fn add_all_parent_classes(&mut self, classes: impl IntoIterator<Item = Atom>) {
+    pub fn add_all_parent_classes(&mut self, classes: impl IntoIterator<Item = Word>) {
         self.all_parent_classes.extend(classes);
     }
 
     /// Adds a single used trait. Returns `true` if the trait was not already present.
     #[inline]
-    pub fn add_used_trait(&mut self, trait_name: Atom) -> bool {
+    pub fn add_used_trait(&mut self, trait_name: Word) -> bool {
         self.used_traits.insert(trait_name)
     }
 
     /// Adds multiple used traits.
     #[inline]
-    pub fn add_used_traits(&mut self, traits: impl IntoIterator<Item = Atom>) {
+    pub fn add_used_traits(&mut self, traits: impl IntoIterator<Item = Word>) {
         self.used_traits.extend(traits);
     }
 
     /// Adds or updates a single trait alias. Returns the previous original name if one existed for the alias.
     #[inline]
-    pub fn add_trait_alias(&mut self, method: Atom, alias: Atom) -> Option<Atom> {
+    pub fn add_trait_alias(&mut self, method: Word, alias: Word) -> Option<Word> {
         self.trait_alias_map.insert(method, alias)
     }
 
     /// Adds or updates a single trait visibility override. Returns the previous visibility if one existed.
     #[inline]
-    pub fn add_trait_visibility(&mut self, method: Atom, visibility: Visibility) -> Option<Visibility> {
+    pub fn add_trait_visibility(&mut self, method: Word, visibility: Visibility) -> Option<Visibility> {
         self.trait_visibility_map.insert(method, visibility)
     }
 
     /// Adds a single template type definition.
     #[inline]
-    pub fn add_template_type(&mut self, name: Atom, constraint: GenericTemplate) {
+    pub fn add_template_type(&mut self, name: Word, constraint: GenericTemplate) {
         self.template_types.insert(name, constraint);
     }
 
@@ -332,7 +332,7 @@ impl ClassLikeMetadata {
 
     /// Adds or replaces the offset types for a specific template parameter name.
     #[inline]
-    pub fn add_template_extended_offset(&mut self, name: Atom, types: Vec<TUnion>) -> Option<Vec<TUnion>> {
+    pub fn add_template_extended_offset(&mut self, name: Word, types: Vec<TUnion>) -> Option<Vec<TUnion>> {
         self.template_extended_offsets.insert(name, types)
     }
 
@@ -340,7 +340,7 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn extend_template_extended_parameters(
         &mut self,
-        template_extended_parameters: AtomMap<IndexMap<Atom, TUnion, RandomState>>,
+        template_extended_parameters: WordMap<IndexMap<Word, TUnion, RandomState>>,
     ) {
         self.template_extended_parameters.extend(template_extended_parameters);
     }
@@ -349,8 +349,8 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn add_template_extended_parameter(
         &mut self,
-        parent_fqcn: Atom,
-        parameter_name: Atom,
+        parent_fqcn: Word,
+        parameter_name: Word,
         parameter_type: TUnion,
     ) -> Option<TUnion> {
         self.template_extended_parameters.entry(parent_fqcn).or_default().insert(parameter_name, parameter_type)
@@ -360,7 +360,7 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn add_declaring_method_id(
         &mut self,
-        method: Atom,
+        method: Word,
         declaring_method_id: MethodIdentifier,
     ) -> Option<MethodIdentifier> {
         self.add_appearing_method_id(method, declaring_method_id);
@@ -371,7 +371,7 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn add_appearing_method_id(
         &mut self,
-        method: Atom,
+        method: Word,
         appearing_method_id: MethodIdentifier,
     ) -> Option<MethodIdentifier> {
         self.appearing_method_ids.insert(method, appearing_method_id)
@@ -381,7 +381,7 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn add_overridden_method_parent(
         &mut self,
-        method: Atom,
+        method: Word,
         parent_method_id: MethodIdentifier,
     ) -> Option<MethodIdentifier> {
         self.overridden_method_ids
@@ -392,7 +392,7 @@ impl ClassLikeMetadata {
 
     /// Adds or updates a property's metadata. Returns the previous metadata if the property existed.
     #[inline]
-    pub fn add_property(&mut self, name: Atom, property_metadata: PropertyMetadata) -> Option<PropertyMetadata> {
+    pub fn add_property(&mut self, name: Word, property_metadata: PropertyMetadata) -> Option<PropertyMetadata> {
         let class_name = self.name;
 
         self.add_declaring_property_id(name, class_name);
@@ -417,13 +417,13 @@ impl ClassLikeMetadata {
 
     /// Adds or updates the declaring class FQCN for a property name.
     #[inline]
-    pub fn add_declaring_property_id(&mut self, prop: Atom, declaring_fqcn: Atom) -> Option<Atom> {
+    pub fn add_declaring_property_id(&mut self, prop: Word, declaring_fqcn: Word) -> Option<Word> {
         self.appearing_property_ids.insert(prop, declaring_fqcn);
         self.declaring_property_ids.insert(prop, declaring_fqcn)
     }
 
     #[must_use]
-    pub fn get_missing_required_interface<'meta>(&self, other: &'meta ClassLikeMetadata) -> Option<&'meta Atom> {
+    pub fn get_missing_required_interface<'meta>(&self, other: &'meta ClassLikeMetadata) -> Option<&'meta Word> {
         for required_interface in &other.require_implements {
             if self.all_parent_interfaces.contains(required_interface) {
                 continue;
@@ -442,7 +442,7 @@ impl ClassLikeMetadata {
     }
 
     #[must_use]
-    pub fn get_missing_required_extends<'meta>(&self, other: &'meta ClassLikeMetadata) -> Option<&'meta Atom> {
+    pub fn get_missing_required_extends<'meta>(&self, other: &'meta ClassLikeMetadata) -> Option<&'meta Word> {
         for required_extend in &other.require_extends {
             if self.all_parent_classes.contains(required_extend) {
                 continue;

@@ -11,6 +11,11 @@
 ///
 /// * `true` - If the string is numeric.
 /// * `false` - If the string is not numeric.
+pub fn str_is_numeric_bytes(input: &[u8]) -> bool {
+    let Ok(s) = std::str::from_utf8(input) else { return false };
+    str_is_numeric(s)
+}
+
 pub fn str_is_numeric(input: &str) -> bool {
     let mut maybe_numeric = input.trim();
     if maybe_numeric.is_empty() {
@@ -46,6 +51,10 @@ pub fn str_is_numeric(input: &str) -> bool {
 ///
 /// * `Some(String)` - The incremented string on success
 /// * `None` - If the input is empty or contains non-alphanumeric ASCII characters
+pub fn str_increment_bytes(input: &[u8]) -> Option<String> {
+    str_increment(std::str::from_utf8(input).ok()?)
+}
+
 pub fn str_increment(input: &str) -> Option<String> {
     if input.is_empty() {
         return None;

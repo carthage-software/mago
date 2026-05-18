@@ -44,7 +44,7 @@ pub fn check_for_clone_with(expr: &Expression, context: &mut Context<'_, '_, '_>
         return;
     };
 
-    if !clone_ident.value().eq_ignore_ascii_case("clone") {
+    if !clone_ident.value().eq_ignore_ascii_case(b"clone") {
         return;
     }
 

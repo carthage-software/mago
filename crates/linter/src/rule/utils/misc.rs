@@ -83,7 +83,7 @@ pub fn is_method_setter_or_getter(method: &Method<'_>) -> bool {
                             return false;
                         };
 
-                        is_variable_named(expression, "$this")
+                        is_variable_named(expression, b"$this")
                     }
                     _ => false,
                 },
@@ -103,10 +103,10 @@ fn is_accessing_property_of_this(expression: &Expression<'_>) -> bool {
         return false;
     };
 
-    is_variable_named(property_access.object, "$this")
+    is_variable_named(property_access.object, b"$this")
 }
 
-fn is_variable_named(expression: &Expression<'_>, name: &str) -> bool {
+fn is_variable_named(expression: &Expression<'_>, name: &[u8]) -> bool {
     let Expression::Variable(variable) = expression else {
         return false;
     };

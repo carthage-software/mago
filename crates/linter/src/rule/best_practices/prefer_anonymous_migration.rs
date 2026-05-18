@@ -134,7 +134,7 @@ impl LintRule for PreferAnonymousMigrationRule {
 
         let name = ctx.lookup_name(parent);
 
-        if !name.eq_ignore_ascii_case("Illuminate\\Database\\Migrations\\Migration") {
+        if !name.eq_ignore_ascii_case(b"Illuminate\\Database\\Migrations\\Migration") {
             return;
         }
 

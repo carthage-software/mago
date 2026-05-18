@@ -10,6 +10,7 @@ use ariadne::sources as ariadne_sources;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::HasFileId;
+use mago_span::HasSpan;
 
 use crate::IssueCollection;
 use crate::Level;
@@ -48,8 +49,8 @@ impl Formatter for AriadneFormatter {
                     let file = database.get(&annotation.span.file_id())?;
 
                     (
-                        file.name.clone().into_owned(),
-                        annotation.span.start.offset as usize..annotation.span.end.offset as usize,
+                        String::from_utf8_lossy(&file.name).into_owned(),
+                        annotation.span.start_offset() as usize..annotation.span.end_offset() as usize,
                     )
                 }
                 None => ("<unknown>".to_owned(), 0..0),
@@ -76,9 +77,9 @@ impl Formatter for AriadneFormatter {
             let mut relevant_sources = vec![];
             for annotation in &issue.annotations {
                 let file = database.get(&annotation.span.file_id())?;
-                let range = annotation.span.start.offset as usize..annotation.span.end.offset as usize;
+                let range = annotation.span.start_offset() as usize..annotation.span.end_offset() as usize;
 
-                let mut label = Label::new((file.name.clone().into_owned(), range));
+                let mut label = Label::new((String::from_utf8_lossy(&file.name).into_owned(), range));
                 if annotation.is_primary() {
                     label = label.with_color(color).with_priority(1);
                 }
@@ -89,7 +90,10 @@ impl Formatter for AriadneFormatter {
                     report = report.with_label(label);
                 }
 
-                relevant_sources.push((file.name.clone().into_owned(), file.contents.to_string()));
+                relevant_sources.push((
+                    String::from_utf8_lossy(&file.name).into_owned(),
+                    String::from_utf8_lossy(&file.contents).into_owned(),
+                ));
             }
 
             let config =

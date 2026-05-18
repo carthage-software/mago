@@ -39,7 +39,7 @@ impl FunctionCallHook for IntdivHook {
             return Ok(());
         };
 
-        if !identifier.value().eq_ignore_ascii_case("intdiv") {
+        if !identifier.value().eq_ignore_ascii_case(b"intdiv") {
             return Ok(());
         }
 
@@ -78,7 +78,7 @@ fn lookup_divisor_argument<'arena>(call: &FunctionCall<'arena>) -> Option<&'aren
                     return Some(arg.value);
                 }
             }
-            Argument::Named(arg) if arg.name.value == "divisor" => {
+            Argument::Named(arg) if arg.name.value == b"divisor" => {
                 return Some(arg.value);
             }
             Argument::Named(_) => {}

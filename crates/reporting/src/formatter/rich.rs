@@ -14,6 +14,8 @@ use codespan_reporting::files::Files;
 use codespan_reporting::term;
 use codespan_reporting::term::Config;
 use codespan_reporting::term::DisplayStyle;
+use foldhash::HashMap;
+use foldhash::HashSet;
 use mago_database::file::FileId;
 use termcolor::Buffer;
 
@@ -62,7 +64,7 @@ pub(super) fn codespan_format_with_config(
     let mut buffer = if use_colors { Buffer::ansi() } else { Buffer::no_color() };
 
     let editor_url = if use_colors { config.editor_url.as_deref() } else { None };
-    let files = DatabaseFiles { database, editor_url, line_hint: Cell::new(None), column_hint: Cell::new(None) };
+    let files = DatabaseFiles::new(database, editor_url, issues);
 
     let mut highest_level: Option<Level> = None;
     let mut errors = 0;
@@ -147,6 +149,27 @@ struct DatabaseFiles<'db> {
     editor_url: Option<&'db str>,
     line_hint: Cell<Option<u32>>,
     column_hint: Cell<Option<u32>>,
+    sources: HashMap<FileId, String>,
+}
+
+impl<'db> DatabaseFiles<'db> {
+    fn new(database: &'db ReadDatabase, editor_url: Option<&'db str>, issues: &IssueCollection) -> Self {
+        let mut referenced_ids: HashSet<FileId> = HashSet::default();
+        for issue in issues.iter() {
+            for annotation in &issue.annotations {
+                referenced_ids.insert(annotation.span.file_id);
+            }
+        }
+
+        let mut sources: HashMap<FileId, String> = HashMap::default();
+        for file_id in referenced_ids {
+            if let Ok(file) = database.get_ref(&file_id) {
+                sources.insert(file_id, String::from_utf8_lossy(file.contents.as_ref()).into_owned());
+            }
+        }
+
+        DatabaseFiles { database, editor_url, line_hint: Cell::new(None), column_hint: Cell::new(None), sources }
+    }
 }
 
 impl<'files> Files<'files> for DatabaseFiles<'_> {
@@ -156,21 +179,21 @@ impl<'files> Files<'files> for DatabaseFiles<'_> {
 
     fn name(&'files self, file_id: FileId) -> Result<Cow<'files, str>, Error> {
         let file = self.database.get_ref(&file_id).map_err(|_| Error::FileMissing)?;
-        let name = file.name.as_ref();
+        let name = String::from_utf8_lossy(&file.name).into_owned();
 
         if let (Some(template), Some(path)) = (self.editor_url, file.path.as_ref()) {
             let abs_path = path.display().to_string();
             let line = self.line_hint.get().unwrap_or(1);
             let column = self.column_hint.get().unwrap_or(1);
 
-            Ok(Cow::Owned(osc8_hyperlink(template, &abs_path, line, column, name)))
+            Ok(Cow::Owned(osc8_hyperlink(template, &abs_path, line, column, &name)))
         } else {
-            Ok(Cow::Borrowed(name))
+            Ok(Cow::Owned(name))
         }
     }
 
     fn source(&'files self, file_id: FileId) -> Result<&'files str, Error> {
-        self.database.get_ref(&file_id).map(|source| source.contents.as_ref()).map_err(|_| Error::FileMissing)
+        self.sources.get(&file_id).map(String::as_str).ok_or(Error::FileMissing)
     }
 
     fn line_index(&self, file_id: FileId, byte_index: usize) -> Result<usize, Error> {

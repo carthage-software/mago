@@ -1,0 +1,25 @@
+[package]
+name = "mago-word"
+description = "A byte-string interning library for the Mago ecosystem, with optional small-string optimization and zero-allocation utilities for case folding, concatenation, and number formatting."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["serde"]
+sso = []
+serde = ["dep:serde"]
+
+[dependencies]
+mago-bytes = { workspace = true }
+foldhash = { workspace = true }
+itoa = { workspace = true }
+ryu = { workspace = true }
+serde = { workspace = true, optional = true }

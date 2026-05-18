@@ -10,7 +10,7 @@ use crate::token::TypeTokenKind;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct VariableType<'arena> {
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 impl HasSpan for VariableType<'_> {
@@ -32,6 +32,6 @@ impl<'arena> VariableType<'arena> {
 
 impl std::fmt::Display for VariableType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
+        f.write_str(&String::from_utf8_lossy(self.value))
     }
 }

@@ -272,7 +272,7 @@ pub fn find_assertion_references_in_method<'ast, 'arena>(
         let class_or_object = reference.get_class_or_object();
 
         if let Expression::Variable(Variable::Direct(variable)) = class_or_object {
-            if !variable.name.eq("$this") {
+            if !variable.name.eq(b"$this") {
                 return false;
             }
         } else if !matches!(class_or_object, Expression::Static(_) | Expression::Parent(_) | Expression::Self_(_)) {
@@ -283,6 +283,6 @@ pub fn find_assertion_references_in_method<'ast, 'arena>(
             return false;
         };
 
-        method_names.iter().any(|&method_name| identifier.value.eq_ignore_ascii_case(method_name))
+        method_names.iter().any(|&method_name| identifier.value.eq_ignore_ascii_case(method_name.as_bytes()))
     })
 }

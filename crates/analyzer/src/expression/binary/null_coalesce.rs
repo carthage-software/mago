@@ -2,9 +2,6 @@ use std::borrow::Cow;
 use std::rc::Rc;
 
 use mago_algebra::find_satisfying_assignments;
-use mago_atom::Atom;
-use mago_atom::AtomSet;
-use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -19,6 +16,9 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Variable;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
+use mago_word::Word;
+use mago_word::WordSet;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -198,7 +198,7 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
             &mut conditionally_referenced_variable_ids,
         );
 
-        let mut changed_variable_ids = mago_atom::AtomSet::default();
+        let mut changed_variable_ids = mago_word::WordSet::default();
 
         reconcile_keyed_types(
             context,
@@ -216,16 +216,16 @@ pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
     Ok(())
 }
 
-fn get_variable_name(expr: &Expression<'_>) -> Option<Atom> {
+fn get_variable_name(expr: &Expression<'_>) -> Option<Word> {
     match unwrap_expression(expr) {
-        Expression::Variable(Variable::Direct(var)) => Some(atom(var.name)),
+        Expression::Variable(Variable::Direct(var)) => Some(word(var.name)),
         _ => None,
     }
 }
 
-fn is_rooted_in_static_local(expr: &Expression<'_>, static_locals: &AtomSet) -> bool {
+fn is_rooted_in_static_local(expr: &Expression<'_>, static_locals: &WordSet) -> bool {
     match unwrap_expression(expr) {
-        Expression::Variable(Variable::Direct(var)) => static_locals.contains(&atom(var.name)),
+        Expression::Variable(Variable::Direct(var)) => static_locals.contains(&word(var.name)),
         Expression::ArrayAccess(access) => is_rooted_in_static_local(access.array, static_locals),
         _ => false,
     }

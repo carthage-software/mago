@@ -57,7 +57,7 @@ pub fn is_contained_by(
                     if let Some(literal) = i.get_known_literal_value() {
                         // if it contains `::` - thats enough, no need to check class/method further
                         // unless we need to at some point..
-                        literal.contains("::") || codebase.function_exists(literal)
+                        memchr::memmem::find(literal, b"::").is_some() || codebase.function_exists(literal)
                     } else {
                         false
                     }
@@ -163,7 +163,7 @@ pub fn is_contained_by(
 
 #[cfg(test)]
 mod tests {
-    use mago_atom::atom;
+    use mago_word::word;
 
     use crate::ttype::atomic::TAtomic;
     use crate::ttype::atomic::scalar::TScalar;
@@ -176,11 +176,11 @@ mod tests {
     use super::is_contained_by;
 
     fn class_string_literal(name: &str) -> TAtomic {
-        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(atom(name))))
+        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(word(name))))
     }
 
     fn string_literal(value: &str) -> TAtomic {
-        TAtomic::Scalar(TScalar::String(TString::known_literal(atom(value))))
+        TAtomic::Scalar(TScalar::String(TString::known_literal(word(value))))
     }
 
     #[test]

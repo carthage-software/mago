@@ -1,6 +1,4 @@
 use bumpalo::Bump;
-use mago_atom::Atom;
-use mago_atom::ascii_lowercase_constant_name_atom;
 use mago_docblock::error::ParseError;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
@@ -10,6 +8,8 @@ use mago_syntax::ast::Constant;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::FunctionCall;
 use mago_syntax::ast::Literal;
+use mago_word::Word;
+use mago_word::ascii_lowercase_constant_name_word;
 
 use crate::issue::ScanningIssueKind;
 use crate::metadata::constant::ConstantMetadata;
@@ -40,7 +40,7 @@ pub fn scan_constant<'arena>(
         .items
         .iter()
         .map(|item| {
-            let name = ascii_lowercase_constant_name_atom(context.resolved_names.get(&item.name));
+            let name = ascii_lowercase_constant_name_word(context.resolved_names.get(&item.name));
 
             let mut metadata = ConstantMetadata::new(name, item.span(), flags);
             metadata.version_constraint = verdict.constraint.clone();
@@ -49,7 +49,7 @@ pub fn scan_constant<'arena>(
 
             process_constant_docblock(context.arena, &mut metadata, &docblock, None, type_context, scope);
 
-            if metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
+            if metadata.attributes.iter().any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"Deprecated")) {
                 metadata.flags |= MetadataFlags::DEPRECATED;
             }
 
@@ -70,7 +70,7 @@ pub fn scan_defined_constant<'arena>(
     };
 
     let function_name = identifier.value();
-    if function_name != "define" {
+    if function_name != b"define" {
         return None;
     }
 
@@ -84,7 +84,7 @@ pub fn scan_defined_constant<'arena>(
 
     let docblock = ConstantDocblockComment::create(context, define);
 
-    let name = ascii_lowercase_constant_name_atom(name_string.value?);
+    let name = ascii_lowercase_constant_name_word(name_string.value?);
     let flags = MetadataFlags::origin_flags(context.file.file_type);
 
     let mut metadata = ConstantMetadata::new(name, define.span(), flags);
@@ -100,7 +100,7 @@ fn process_constant_docblock(
     arena: &Bump,
     metadata: &mut ConstantMetadata,
     docblock: &Result<Option<ConstantDocblockComment>, ParseError>,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
 ) {

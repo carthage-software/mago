@@ -7,7 +7,6 @@ use bumpalo::Bump;
 use foldhash::HashSet;
 use indoc::indoc;
 
-use mago_atom::AtomSet;
 use mago_codex::populator::populate_codebase;
 use mago_codex::scanner::scan_program;
 use mago_database::DatabaseReader;
@@ -26,6 +25,7 @@ use mago_guard::settings::Settings;
 use mago_names::resolver::NameResolver;
 use mago_prelude::Prelude;
 use mago_syntax::parser::parse_file;
+use mago_word::WordSet;
 
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 
@@ -47,7 +47,7 @@ fn deny_all_settings() -> Settings {
 fn test_guard(name: &'static str, code: &'static str, settings: Settings) -> FortressReport {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 
-    let file = File::ephemeral(Cow::Borrowed(name), Cow::Borrowed(code));
+    let file = File::ephemeral(Cow::Borrowed(name.as_bytes()), Cow::Borrowed(code.as_bytes()));
     let file_id = database.add(file);
     let source_file = database.get_ref(&file_id).expect("File just added should exist");
 
@@ -62,7 +62,7 @@ fn test_guard(name: &'static str, code: &'static str, settings: Settings) -> For
 
     metadata.extend(scan_program(&arena, source_file, program, &resolved_names, mago_php_version::PHPVersion::LATEST));
 
-    populate_codebase(&mut metadata, &mut symbol_references, AtomSet::default(), HashSet::default());
+    populate_codebase(&mut metadata, &mut symbol_references, WordSet::default(), HashSet::default());
 
     let guard = ArchitecturalGuard::new(settings);
     guard.check(&metadata, program, &resolved_names)
@@ -308,8 +308,8 @@ pub fn test_union_type_violation() {
     };
     let result = test_guard("union_type_violation", code, settings);
     assert_eq!(result.boundary_breaches.len(), 2, "Expected 2 violations for Core\\A");
-    assert_eq!(result.boundary_breaches[0].dependency_fqn, "App\\Core\\A"); // `use`
-    assert_eq!(result.boundary_breaches[1].dependency_fqn, "App\\Core\\A"); // parameter type
+    assert_eq!(result.boundary_breaches[0].dependency_fqn, b"App\\Core\\A".as_slice()); // `use`
+    assert_eq!(result.boundary_breaches[1].dependency_fqn, b"App\\Core\\A".as_slice()); // parameter type
 }
 
 #[test]
@@ -346,7 +346,7 @@ pub fn test_intersection_type_violation() {
     };
     let result = test_guard("intersection_type_violation", code, settings);
     assert_eq!(result.boundary_breaches.len(), 1, "Expected 1 violation for Core\\A");
-    assert_eq!(result.boundary_breaches[0].dependency_fqn, "App\\Core\\A");
+    assert_eq!(result.boundary_breaches[0].dependency_fqn, b"App\\Core\\A".as_slice());
 }
 
 #[test]
@@ -389,7 +389,7 @@ pub fn test_multiple_allowed_types_rule() {
     };
     let result = test_guard("multiple_allowed_types_rule", code, settings);
     assert_eq!(result.boundary_breaches.len(), 1, "Expected 1 violation for some_function");
-    assert_eq!(result.boundary_breaches[0].dependency_fqn, "App\\Vendor\\some_function");
+    assert_eq!(result.boundary_breaches[0].dependency_fqn, b"App\\Vendor\\some_function".as_slice());
     assert_eq!(result.boundary_breaches[0].dependency_kind, PermittedDependencyKind::Function);
 }
 
@@ -418,7 +418,7 @@ pub fn test_global_namespace_dependency_violation() {
     };
     let result = test_guard("global_namespace_dependency_violation", code, settings);
     assert_eq!(result.boundary_breaches.len(), 1);
-    assert_eq!(result.boundary_breaches[0].dependency_fqn, "GlobalClass");
+    assert_eq!(result.boundary_breaches[0].dependency_fqn, b"GlobalClass".as_slice());
 }
 
 #[test]

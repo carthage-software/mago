@@ -8,7 +8,7 @@ use crate::ast::Trivia;
 /// The offsets are useful when a consumer wants to recover precise spans
 /// for pragmas or annotations embedded inside a comment body.
 #[must_use]
-pub fn comment_lines<'arena>(trivia: &Trivia<'arena>) -> Vec<(u32, &'arena str)> {
+pub fn comment_lines<'arena>(trivia: &Trivia<'arena>) -> Vec<(u32, &'arena [u8])> {
     if !trivia.kind.is_comment() {
         return Vec::new();
     }
@@ -16,8 +16,8 @@ pub fn comment_lines<'arena>(trivia: &Trivia<'arena>) -> Vec<(u32, &'arena str)>
     let body = trivia.value;
     let mut lines = Vec::new();
     let mut offset: u32 = 0;
-    for line in body.split_inclusive('\n') {
-        let trimmed = line.strip_suffix('\n').unwrap_or(line);
+    for line in body.split_inclusive(|&b| b == b'\n') {
+        let trimmed = line.strip_suffix(b"\n").unwrap_or(line);
         lines.push((offset, trimmed));
         offset += line.len() as u32;
     }

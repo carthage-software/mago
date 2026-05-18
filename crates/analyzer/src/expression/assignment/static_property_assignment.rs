@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use mago_atom::Atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
@@ -14,6 +13,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::StaticPropertyAccess;
+use mago_word::Word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -29,7 +29,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     property_access: &StaticPropertyAccess<'arena>,
     assigned_value_type: &TUnion,
-    property_access_id: Option<Atom>,
+    property_access_id: Option<Word>,
 ) -> Result<(), AnalysisError> {
     let property_resolution =
         resolve_static_properties(context, block_context, artifacts, property_access.class, &property_access.property)?;
@@ -59,10 +59,14 @@ pub(crate) fn analyze<'ctx, 'arena>(
         );
 
         if !type_match_found && union_comparison_result.type_coerced.is_none() {
+            let declaring_class_display: String = match resolved_property.declaring_class_id {
+                Some(w) => w.to_string(),
+                None => "<object>".to_string(),
+            };
             let mut issue = Issue::error("Invalid property assignment value").with_annotation(
                 Annotation::primary(property_access.class.span()).with_message(format!(
                     "{}::{} with declared type {}, cannot be assigned type {}",
-                    resolved_property.declaring_class_id.as_deref().unwrap_or("<object>"),
+                    declaring_class_display,
                     resolved_property.property_name,
                     resolved_property.property_type.get_id(),
                     assigned_value_type.get_id(),
@@ -83,7 +87,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
                     Issue::error("Mixed property type coercion").with_annotation(
                         Annotation::primary(property_access.class.span()).with_message(format!(
                             "{} expects {}, parent type {} provided",
-                            property_access_id.map_or("This property", |a| a.as_str()),
+                            property_access_id.map_or_else(|| "This property".to_string(), |a| a.to_string()),
                             resolved_property.property_type.get_id(),
                             assigned_value_type.get_id(),
                         )),
@@ -95,7 +99,7 @@ pub(crate) fn analyze<'ctx, 'arena>(
                     Issue::error("Property type coercion").with_annotation(
                         Annotation::primary(property_access.class.span()).with_message(format!(
                             "{} expects {}, parent type {} provided",
-                            property_access_id.map_or("This property", |a| a.as_str()),
+                            property_access_id.map_or_else(|| "This property".to_string(), |a| a.to_string()),
                             resolved_property.property_type.get_id(),
                             assigned_value_type.get_id(),
                         )),

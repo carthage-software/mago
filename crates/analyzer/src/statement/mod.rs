@@ -1,4 +1,3 @@
-use mago_atom::Atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_names::kind::NameKind;
@@ -11,6 +10,7 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::ExpressionStatement;
 use mago_syntax::ast::FunctionCall;
 use mago_syntax::ast::Statement;
+use mago_word::Word;
 
 use crate::Context;
 use crate::analyzable::Analyzable;
@@ -371,7 +371,7 @@ fn has_unused_must_use<'arena>(
     expression: &Expression<'arena>,
     context: &Context<'_, 'arena>,
     artifacts: &AnalysisArtifacts,
-) -> Option<(IssueCode, Atom)> {
+) -> Option<(IssueCode, Word)> {
     let Expression::Call(call_expression) = expression else {
         return None;
     };
@@ -381,10 +381,13 @@ fn has_unused_must_use<'arena>(
 
     match functionlike_id_from_call {
         FunctionLikeIdentifier::Function(function_id) => {
-            let function_metadata = context.codebase.get_function(&function_id)?;
+            let function_metadata = context.codebase.get_function(function_id.as_bytes())?;
 
             let must_use = function_metadata.flags.must_use()
-                || function_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("NoDiscard"));
+                || function_metadata
+                    .attributes
+                    .iter()
+                    .any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"NoDiscard"));
 
             if must_use { Some((IssueCode::UnusedFunctionCall, function_id)) } else { None }
         }
@@ -393,7 +396,10 @@ fn has_unused_must_use<'arena>(
                 context.codebase.get_method_by_id(&MethodIdentifier::new(method_class, method_name))?;
 
             let must_use = method_metadata.flags.must_use()
-                || method_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("NoDiscard"));
+                || method_metadata
+                    .attributes
+                    .iter()
+                    .any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"NoDiscard"));
 
             if must_use { Some((IssueCode::UnusedMethodCall, method_name)) } else { None }
         }

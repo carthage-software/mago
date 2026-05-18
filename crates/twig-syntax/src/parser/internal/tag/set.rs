@@ -21,10 +21,10 @@ impl<'arena> Parser<'_, 'arena> {
 
         let mut name_nodes = self.new_vec();
         let mut name_commas = self.new_vec();
-        name_nodes.push(self.expect_flexible_identifier("expected variable name")?);
+        name_nodes.push(self.expect_flexible_identifier(b"expected variable name")?);
         while let Some(comma) = self.stream.try_consume(TwigTokenKind::Comma)? {
             name_commas.push(comma);
-            name_nodes.push(self.expect_flexible_identifier("expected variable name")?);
+            name_nodes.push(self.expect_flexible_identifier(b"expected variable name")?);
         }
         let names = TokenSeparatedSequence::new(name_nodes, name_commas);
 
@@ -42,14 +42,14 @@ impl<'arena> Parser<'_, 'arena> {
             SetBody::Inline(SetInline { equal, values, close_tag })
         } else {
             let close_tag = self.stream.expect_block_end()?;
-            let body = self.parse_statements(&BlockTerminator { names: &["endset"] })?;
+            let body = self.parse_statements(&BlockTerminator { names: &[b"endset"] })?;
             let end_open_tok = self.stream.expect_block_start()?;
             let end_open_tag = self.stream.span_of(&end_open_tok);
-            let end_kw_tok = self.stream.expect_name("expected `endset`")?;
-            if end_kw_tok.value != "endset" {
+            let end_kw_tok = self.stream.expect_name(b"expected `endset`")?;
+            if end_kw_tok.value != b"endset" {
                 return Err(ParseError::MismatchedEndTag {
-                    expected: "endset".to_string(),
-                    got: end_kw_tok.value.to_string(),
+                    expected: b"endset".to_vec(),
+                    got: end_kw_tok.value.to_vec(),
                     span: self.stream.span_of(&end_kw_tok),
                 });
             }

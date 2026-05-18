@@ -5,11 +5,11 @@ use mago_php_version::PHPVersionRange;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
 use mago_reporting::Issue;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 
 use crate::assertion::Assertion;
 use crate::metadata::attribute::AttributeMetadata;
@@ -48,7 +48,7 @@ pub struct MethodMetadata {
     /// The key is the name of a class-level template parameter (e.g., `T`), and the value
     /// is the `TUnion` type constraint that `T` must satisfy for this specific method
     /// to be considered callable.
-    pub where_constraints: AtomMap<TypeMetadata>,
+    pub where_constraints: WordMap<TypeMetadata>,
 }
 
 /// Distinguishes between different kinds of callable constructs in PHP.
@@ -76,10 +76,10 @@ pub struct FunctionLikeMetadata {
     /// The name of the function or method, lowercased, if applicable.
     /// `None` for closures and arrow functions unless assigned to a variable later.
     /// Example: `processRequest`, `__construct`, `my_global_func`.
-    pub name: Option<Atom>,
+    pub name: Option<Word>,
 
     /// The original name of the function or method, in its original case.
-    pub original_name: Option<Atom>,
+    pub original_name: Option<Word>,
 
     /// The specific source code location (span) of the function or method name identifier.
     /// `None` if the function/method has no name (closures/arrow functions).
@@ -127,15 +127,15 @@ pub struct FunctionLikeMetadata {
     /// Assertions about parameter types or variable types that are guaranteed to be true
     /// *after* this function/method returns normally. From `@psalm-assert`, `@phpstan-assert`, etc.
     /// Maps variable/parameter name to a list of type assertions.
-    pub assertions: BTreeMap<Atom, Vec<Assertion>>,
+    pub assertions: BTreeMap<Word, Vec<Assertion>>,
 
     /// Assertions about parameter/variable types that are guaranteed to be true if this
     /// function/method returns `true`. From `@psalm-assert-if-true`, etc.
-    pub if_true_assertions: BTreeMap<Atom, Vec<Assertion>>,
+    pub if_true_assertions: BTreeMap<Word, Vec<Assertion>>,
 
     /// Assertions about parameter/variable types that are guaranteed to be true if this
     /// function/method returns `false`. From `@psalm-assert-if-false`, etc.
-    pub if_false_assertions: BTreeMap<Atom, Vec<Assertion>>,
+    pub if_false_assertions: BTreeMap<Word, Vec<Assertion>>,
 
     /// Set when the assertions in `if_true_assertions` / `if_false_assertions` were
     /// auto-inferred from the body rather than declared explicitly via docblock. The
@@ -147,7 +147,7 @@ pub struct FunctionLikeMetadata {
     /// `global $x;` statement anywhere in its body. Used by the invocation post-processor
     /// to invalidate caller-side narrowings of those globals on every call, since the
     /// callee can reassign them behind the caller's back.
-    pub globals_accessed: AtomSet,
+    pub globals_accessed: WordSet,
 
     /// Tracks whether this function/method has a docblock comment.
     /// Used to determine if docblock inheritance should occur implicitly.
@@ -217,7 +217,7 @@ impl FunctionLikeMetadata {
             if_true_assertions: BTreeMap::new(),
             if_false_assertions: BTreeMap::new(),
             assertions_inferred: false,
-            globals_accessed: AtomSet::default(),
+            globals_accessed: WordSet::default(),
             has_docblock: false,
             issues: vec![],
             version_constraint: VersionConstraint::unconstrained(),
@@ -256,13 +256,13 @@ impl FunctionLikeMetadata {
     /// Returns a reference to specific parameter metadata by name, if it exists.
     #[inline]
     #[must_use]
-    pub fn get_parameter(&self, name: Atom) -> Option<&FunctionLikeParameterMetadata> {
+    pub fn get_parameter(&self, name: Word) -> Option<&FunctionLikeParameterMetadata> {
         self.parameters.iter().find(|parameter| parameter.get_name().0 == name)
     }
 
     /// Returns a mutable reference to specific parameter metadata by name, if it exists.
     #[inline]
-    pub fn get_parameter_mut(&mut self, name: Atom) -> Option<&mut FunctionLikeParameterMetadata> {
+    pub fn get_parameter_mut(&mut self, name: Word) -> Option<&mut FunctionLikeParameterMetadata> {
         self.parameters.iter_mut().find(|parameter| parameter.get_name().0 == name)
     }
 
@@ -321,7 +321,7 @@ impl FunctionLikeMetadata {
 
     /// Adds a single template type definition.
     #[inline]
-    pub fn add_template_type(&mut self, name: Atom, constraint: GenericTemplate) {
+    pub fn add_template_type(&mut self, name: Word, constraint: GenericTemplate) {
         self.template_types.insert(name, constraint);
     }
 }

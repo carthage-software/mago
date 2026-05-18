@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
-use mago_atom::u32_atom;
-use mago_atom::u64_atom;
+use mago_word::u32_word;
+use mago_word::u64_word;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
 use mago_database::file::FileId;
 use mago_span::Position;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::ttype::TType;
@@ -281,60 +281,60 @@ impl TType for TCallable {
         }
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
             TCallable::Signature(signature) => {
-                let mut string = String::new();
-                string += "(";
+                let mut buf: Vec<u8> = Vec::new();
+                buf.extend_from_slice(b"(");
                 if signature.is_pure() {
-                    string += "pure-";
+                    buf.extend_from_slice(b"pure-");
                 }
 
-                string += if signature.is_closure() { "closure(" } else { "callable(" };
+                buf.extend_from_slice(if signature.is_closure() { b"closure(" } else { b"callable(" });
                 for (i, parameter) in signature.get_parameters().iter().enumerate() {
                     if i > 0 {
-                        string += ", ";
+                        buf.extend_from_slice(b", ");
                     }
 
                     if parameter.is_variadic() {
-                        string += "...";
+                        buf.extend_from_slice(b"...");
                     }
 
                     if let Some(parameter_type) = parameter.get_type_signature() {
-                        string += parameter_type.get_id().as_str();
+                        buf.extend_from_slice(parameter_type.get_id().as_bytes());
                     } else {
-                        string += "mixed";
+                        buf.extend_from_slice(b"mixed");
                     }
 
                     if parameter.has_default() {
-                        string += "=";
+                        buf.extend_from_slice(b"=");
                     }
                 }
 
-                string += "): ";
+                buf.extend_from_slice(b"): ");
                 if let Some(return_type) = signature.get_return_type() {
-                    string += return_type.get_id().as_str();
+                    buf.extend_from_slice(return_type.get_id().as_bytes());
                 } else {
-                    string += "mixed";
+                    buf.extend_from_slice(b"mixed");
                 }
 
-                string += ")";
+                buf.extend_from_slice(b")");
 
-                atom(&string)
+                word(&buf)
             }
             TCallable::Alias(id) => match id {
                 FunctionLikeIdentifier::Function(fn_name) => {
-                    concat_atom!("Closure<", fn_name.as_str(), ">(...)")
+                    concat_word!(b"Closure<", fn_name.as_bytes(), b">(...)")
                 }
                 FunctionLikeIdentifier::Method(fqcn, method_name) => {
-                    concat_atom!("Closure<", fqcn.as_str(), "::", method_name.as_str(), ">(...)")
+                    concat_word!(b"Closure<", fqcn.as_bytes(), b"::", method_name.as_bytes(), b">(...)")
                 }
                 FunctionLikeIdentifier::Closure(file_id, position) => {
-                    concat_atom!(
+                    concat_word!(
                         "Closure<anonymous@",
-                        u64_atom(file_id.as_u64()).as_str(),
+                        u64_word(file_id.as_u64()).as_bytes(),
                         "::",
-                        u32_atom(position.offset).as_str(),
+                        u32_word(position.offset).as_bytes(),
                         ">(...)"
                     )
                 }
@@ -342,55 +342,54 @@ impl TType for TCallable {
         }
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         match self {
             TCallable::Signature(signature) => {
                 let parameters = signature.get_parameters();
 
                 // Use multiline format if there are more than 2 parameters
                 if parameters.len() > 2 {
-                    let mut string = String::new();
-                    string += "(";
+                    let mut buf: Vec<u8> = Vec::new();
+                    buf.extend_from_slice(b"(");
                     if signature.is_pure() {
-                        string += "pure-";
+                        buf.extend_from_slice(b"pure-");
                     }
-                    string += if signature.is_closure() { "closure(\n" } else { "callable(\n" };
+                    buf.extend_from_slice(if signature.is_closure() { b"closure(\n" } else { b"callable(\n" });
 
                     let param_indent = indent + 2;
-                    let param_spaces = " ".repeat(param_indent);
 
                     for (i, parameter) in parameters.iter().enumerate() {
                         if i > 0 {
-                            string += ",\n";
+                            buf.extend_from_slice(b",\n");
                         }
 
-                        string += &param_spaces;
+                        buf.resize(buf.len() + param_indent, b' ');
                         if parameter.is_variadic() {
-                            string += "...";
+                            buf.extend_from_slice(b"...");
                         }
 
                         if let Some(parameter_type) = parameter.get_type_signature() {
-                            string += &parameter_type.get_pretty_id_with_indent(param_indent);
+                            buf.extend_from_slice(parameter_type.get_pretty_id_with_indent(param_indent).as_bytes());
                         } else {
-                            string += "mixed";
+                            buf.extend_from_slice(b"mixed");
                         }
 
                         if parameter.has_default() {
-                            string += "=";
+                            buf.extend_from_slice(b"=");
                         }
                     }
 
-                    string += "\n";
-                    string += &" ".repeat(indent);
-                    string += "): ";
+                    buf.extend_from_slice(b"\n");
+                    buf.resize(buf.len() + indent, b' ');
+                    buf.extend_from_slice(b"): ");
                     if let Some(return_type) = signature.get_return_type() {
-                        string += &return_type.get_pretty_id_with_indent(indent);
+                        buf.extend_from_slice(return_type.get_pretty_id_with_indent(indent).as_bytes());
                     } else {
-                        string += "mixed";
+                        buf.extend_from_slice(b"mixed");
                     }
-                    string += ")";
+                    buf.extend_from_slice(b")");
 
-                    atom(&string)
+                    word(&buf)
                 } else {
                     self.get_id()
                 }

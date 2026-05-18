@@ -24,12 +24,12 @@ pub(super) fn print_function_like_parameters<'arena>(
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
 ) -> Document<'arena> {
     if parameter_list.parameters.is_empty() {
-        let mut contents = vec![in f.arena; Document::String("(")];
+        let mut contents = vec![in f.arena; Document::String(b"(")];
         if let Some(comments) = f.print_inner_comment(parameter_list.span(), true) {
             contents.push(comments);
         }
 
-        contents.push(Document::String(")"));
+        contents.push(Document::String(b")"));
 
         return Document::Array(contents);
     }
@@ -53,7 +53,7 @@ pub(super) fn print_function_like_parameters<'arena>(
     };
 
     let left_parenthesis = {
-        let mut contents = vec![in f.arena; Document::String("(")];
+        let mut contents = vec![in f.arena; Document::String(b"(")];
 
         if parameter_list.parameters.len() == 1
             && let Some(parameter) = parameter_list.parameters.first()
@@ -98,7 +98,7 @@ pub(super) fn print_function_like_parameters<'arena>(
             break;
         }
 
-        printed.push(Document::String(","));
+        printed.push(Document::String(b","));
         printed.push(Document::Line(Line::default()));
 
         if f.is_next_line_empty(parameter.span()) {
@@ -110,7 +110,7 @@ pub(super) fn print_function_like_parameters<'arena>(
 
     if should_hug_the_parameters {
         parts.extend(printed);
-        parts.push(Document::String(")"));
+        parts.push(Document::String(b")"));
 
         return Document::Array(parts);
     }
@@ -121,7 +121,7 @@ pub(super) fn print_function_like_parameters<'arena>(
         parts.push(Document::Indent(contents));
 
         if f.settings.trailing_comma {
-            parts.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
+            parts.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
         }
     }
 
@@ -133,7 +133,7 @@ pub(super) fn print_function_like_parameters<'arena>(
         parts.push(Document::Line(Line::soft()));
     }
 
-    parts.push(Document::String(")"));
+    parts.push(Document::String(b")"));
 
     f.parameter_state.list_group_id = previous_list_group_id;
 
@@ -225,24 +225,21 @@ fn parameter_list_exceeds_print_width<'arena>(
     let source = &f.source_text[start as usize..end as usize];
     let mut flattened = Vec::with_capacity_in(source.len(), f.arena);
     let mut previous_was_whitespace = false;
-    for character in source.chars() {
-        if character.is_whitespace() {
+    for &byte in source {
+        if byte.is_ascii_whitespace() {
             if !previous_was_whitespace {
                 flattened.push(b' ');
                 previous_was_whitespace = true;
             }
         } else {
-            let mut buffer = [0; 4];
-            flattened.extend_from_slice(character.encode_utf8(&mut buffer).as_bytes());
+            flattened.push(byte);
             previous_was_whitespace = false;
         }
     }
 
-    // SAFETY: every byte pushed into `flattened` came from `char::encode_utf8`,
-    // so the buffer holds valid UTF-8.
-    let flattened = unsafe { std::str::from_utf8_unchecked(flattened.into_bump_slice()) };
+    let flattened: &[u8] = flattened.into_bump_slice();
 
-    string_width(flattened.trim()) > f.settings.print_width
+    string_width(flattened.trim_ascii()) > f.settings.print_width
 }
 
 fn get_max_parameter_prefix_width<'arena>(parameter_list: &'arena FunctionLikeParameterList<'arena>) -> usize {
@@ -268,11 +265,11 @@ fn get_parameter_prefix_width<'arena>(parameter: &'arena FunctionLikeParameter<'
     }
 
     if parameter.ampersand.is_some() {
-        width += string_width("&");
+        width += string_width(b"&");
     }
 
     if parameter.ellipsis.is_some() {
-        width += string_width("...");
+        width += string_width(b"...");
     }
 
     width

@@ -15,7 +15,6 @@ use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
 #[cfg(not(target_arch = "wasm32"))]
 use mago_analyzer::telemetry as analyzer_telemetry;
-use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
 use mago_codex::reference::SymbolReferences;
@@ -29,6 +28,7 @@ use mago_reporting::IssueCollection;
 use mago_semantics::SemanticsChecker;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::settings::ParserSettings;
+use mago_word::WordSet;
 
 use crate::error::OrchestratorError;
 use crate::service::pipeline::ParallelPipeline;
@@ -116,7 +116,7 @@ impl AnalysisService {
         let user_codebase = scan_program(&arena, file, program, &resolved_names, self.settings.version);
         self.codebase.extend(user_codebase);
 
-        populate_codebase(&mut self.codebase, &mut self.symbol_references, AtomSet::default(), HashSet::default());
+        populate_codebase(&mut self.codebase, &mut self.symbol_references, WordSet::default(), HashSet::default());
 
         // Run the analyzer
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
@@ -226,7 +226,7 @@ impl AnalysisService {
             if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
                 tracing::warn!(
                     "Analysis of source file '{}' took longer than {}s: {}s",
-                    source_file.name,
+                    mago_bytes::BytesDisplay(&source_file.name),
                     ANALYSIS_DURATION_THRESHOLD.as_secs_f32(),
                     analysis_result.time_in_analysis.as_secs_f32()
                 );

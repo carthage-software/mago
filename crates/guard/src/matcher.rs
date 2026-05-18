@@ -3,10 +3,10 @@
 //! This module provides a replacement for regex-based matching to improve performance
 //! by using a segment-based matching approach.
 
-use mago_atom::starts_with_ignore_case;
+use mago_word::starts_with_ignore_case;
 
 /// The separator for namespace segments.
-pub const SEPARATOR: char = '\\';
+pub const SEPARATOR: u8 = b'\\';
 
 /// Checks if a fully qualified name (`fqcn`) matches a given `pattern`.
 ///
@@ -24,34 +24,30 @@ pub const SEPARATOR: char = '\\';
 /// # Returns
 ///
 /// `true` if the `fqcn` matches the `pattern`, `false` otherwise.
-pub fn matches(fqcn: &str, pattern: &str, is_constant: bool, treat_as_namespace: bool) -> bool {
-    // If pattern contains brace expansion, expand and check each variant.
-    if pattern.contains('{') {
+pub fn matches(fqcn: &[u8], pattern: &[u8], is_constant: bool, treat_as_namespace: bool) -> bool {
+    if pattern.contains(&b'{') {
         return expand_braces(pattern).iter().any(|p| matches(fqcn, p, is_constant, treat_as_namespace));
     }
 
-    if !pattern.contains('*') {
-        let p = pattern.trim_matches(SEPARATOR);
-        let f = fqcn.trim_matches(SEPARATOR);
+    if !pattern.contains(&b'*') {
+        let p = trim_separator(pattern);
+        let f = trim_separator(fqcn);
 
         if p.is_empty() {
             return f.is_empty();
         }
 
-        // if pattern ends with separator, it's a namespace match
-        if treat_as_namespace || pattern.ends_with(SEPARATOR) {
+        if treat_as_namespace || pattern.last() == Some(&SEPARATOR) {
             if !starts_with_ignore_case(f, p) {
                 return false;
             }
 
-            // Check that it's a full segment match
-            return f.len() == p.len() || f.as_bytes().get(p.len()) == Some(&(SEPARATOR as u8));
+            return f.len() == p.len() || f.get(p.len()) == Some(&SEPARATOR);
         }
 
-        // Exact match
         if is_constant {
-            let f_last = f.rsplit_once(SEPARATOR);
-            let p_last = p.rsplit_once(SEPARATOR);
+            let f_last = rsplit_once_separator(f);
+            let p_last = rsplit_once_separator(p);
 
             return match (f_last, p_last) {
                 (Some((f_ns, f_name)), Some((p_ns, p_name))) => f_ns.eq_ignore_ascii_case(p_ns) && f_name == p_name,
@@ -62,49 +58,64 @@ pub fn matches(fqcn: &str, pattern: &str, is_constant: bool, treat_as_namespace:
         return f.eq_ignore_ascii_case(p);
     }
 
-    let fqcn = fqcn.trim_matches(SEPARATOR);
-    let pattern = pattern.trim_matches(SEPARATOR);
+    let fqcn = trim_separator(fqcn);
+    let pattern = trim_separator(pattern);
 
-    if pattern == "**" {
+    if pattern == b"**" {
         return true;
     }
 
-    if pattern == "*" {
-        return !fqcn.contains(SEPARATOR);
+    if pattern == b"*" {
+        return !fqcn.contains(&SEPARATOR);
     }
 
     if fqcn.is_empty() || pattern.is_empty() {
         return fqcn == pattern;
     }
 
-    let fqcn_parts: Vec<&str> = fqcn.split(SEPARATOR).collect();
-    let pattern_parts: Vec<&str> = pattern.split(SEPARATOR).collect();
+    let fqcn_parts: Vec<&[u8]> = split_separator(fqcn);
+    let pattern_parts: Vec<&[u8]> = split_separator(pattern);
 
     do_match(&fqcn_parts, &pattern_parts, is_constant)
 }
 
+fn trim_separator(s: &[u8]) -> &[u8] {
+    let mut start = 0;
+    let mut end = s.len();
+    while start < end && s[start] == SEPARATOR {
+        start += 1;
+    }
+    while end > start && s[end - 1] == SEPARATOR {
+        end -= 1;
+    }
+    &s[start..end]
+}
+
+fn split_separator(s: &[u8]) -> Vec<&[u8]> {
+    s.split(|&b| b == SEPARATOR).collect()
+}
+
+fn rsplit_once_separator(s: &[u8]) -> Option<(&[u8], &[u8])> {
+    let pos = s.iter().rposition(|&b| b == SEPARATOR)?;
+    Some((&s[..pos], &s[pos + 1..]))
+}
+
 /// The recursive matching engine.
-fn do_match(fqcn_parts: &[&str], pattern_parts: &[&str], is_constant: bool) -> bool {
+fn do_match(fqcn_parts: &[&[u8]], pattern_parts: &[&[u8]], is_constant: bool) -> bool {
     match (fqcn_parts.first(), pattern_parts.first()) {
-        (None, None) => true, // Both exhausted, it's a match.
-        (_, Some(&"**")) => {
-            // If `**` is the last pattern segment, it matches the rest of the FQN.
+        (None, None) => true,
+        (_, Some(p)) if *p == b"**" => {
             if pattern_parts.len() == 1 {
                 return true;
             }
-            // If FQN is exhausted, `**` can match an empty sequence.
             if fqcn_parts.is_empty() {
                 return do_match(fqcn_parts, &pattern_parts[1..], is_constant);
             }
-            // `**` can match one or more segments. We try both possibilities:
-            // 1. `**` matches nothing, so we match the rest of the pattern against the current FQN.
-            // 2. `**` matches one segment, so we match the same pattern against the rest of the FQN.
             do_match(fqcn_parts, &pattern_parts[1..], is_constant)
                 || do_match(&fqcn_parts[1..], pattern_parts, is_constant)
         }
         (Some(f_part), Some(p_part)) => {
             let is_last = fqcn_parts.len() == 1 && pattern_parts.len() == 1;
-            // Case-sensitive check is only for the last segment.
             let case_sensitive = is_constant && is_last;
 
             if segment_matches(f_part, p_part, case_sensitive) {
@@ -113,30 +124,24 @@ fn do_match(fqcn_parts: &[&str], pattern_parts: &[&str], is_constant: bool) -> b
                 false
             }
         }
-        (None, Some(_)) => {
-            // FQN is exhausted, but pattern is not.
-            // This is a match only if the rest of the pattern is `**`.
-            pattern_parts.len() == 1 && pattern_parts[0] == "**"
-        }
-        _ => false, // FQN has parts left, but pattern is exhausted.
+        (None, Some(_)) => pattern_parts.len() == 1 && pattern_parts[0] == b"**",
+        _ => false,
     }
 }
 
 /// Checks if a single FQN segment matches a single pattern segment.
-fn segment_matches(fqcn_part: &str, pattern_part: &str, case_sensitive: bool) -> bool {
-    if pattern_part == "*" {
+fn segment_matches(fqcn_part: &[u8], pattern_part: &[u8], case_sensitive: bool) -> bool {
+    if pattern_part == b"*" {
         return true;
     }
 
-    if !pattern_part.contains('*') {
+    if !pattern_part.contains(&b'*') {
         return if case_sensitive { fqcn_part == pattern_part } else { fqcn_part.eq_ignore_ascii_case(pattern_part) };
     }
 
-    // Handle partial wildcards like `*User`, `User*`, `*User*`.
-    let p_chunks: Vec<&str> = pattern_part.split('*').collect();
-    let mut remainder = fqcn_part;
+    let p_chunks: Vec<&[u8]> = pattern_part.split(|&b| b == b'*').collect();
+    let mut remainder: &[u8] = fqcn_part;
 
-    // Check first chunk (before the first `*`).
     if !p_chunks[0].is_empty() {
         if remainder.len() < p_chunks[0].len() {
             return false;
@@ -168,13 +173,13 @@ fn segment_matches(fqcn_part: &str, pattern_part: &str, case_sensitive: bool) ->
         remainder = &remainder[..remainder.len() - last_chunk.len()];
     }
 
-    // Check middle chunks.
     for chunk in &p_chunks[1..p_chunks.len() - 1] {
         if chunk.is_empty() {
             continue;
         }
 
-        let found = if case_sensitive { remainder.find(chunk) } else { find_ignore_ascii_case(remainder, chunk) };
+        let found =
+            if case_sensitive { find_subslice(remainder, chunk) } else { find_ignore_ascii_case(remainder, chunk) };
         if let Some(pos) = found {
             remainder = &remainder[pos + chunk.len()..];
         } else {
@@ -185,12 +190,18 @@ fn segment_matches(fqcn_part: &str, pattern_part: &str, case_sensitive: bool) ->
     true
 }
 
-/// A helper to find a substring ignoring ASCII case, without allocation.
-fn find_ignore_ascii_case(haystack: &str, needle: &str) -> Option<usize> {
+fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     if needle.is_empty() {
         return Some(0);
     }
-    haystack.as_bytes().windows(needle.len()).position(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+    haystack.windows(needle.len()).position(|window| window == needle)
+}
+
+fn find_ignore_ascii_case(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    haystack.windows(needle.len()).position(|window| window.eq_ignore_ascii_case(needle))
 }
 
 /// Expands brace expressions in a pattern into all possible variants.
@@ -200,17 +211,17 @@ fn find_ignore_ascii_case(haystack: &str, needle: &str) -> Option<usize> {
 /// - `App\Infrastructure\*`
 ///
 /// Supports nested and multiple brace groups.
-fn expand_braces(pattern: &str) -> Vec<String> {
-    let Some(open) = pattern.find('{') else {
-        return vec![pattern.to_string()];
+fn expand_braces(pattern: &[u8]) -> Vec<Vec<u8>> {
+    let Some(open) = pattern.iter().position(|&b| b == b'{') else {
+        return vec![pattern.to_vec()];
     };
 
-    let mut depth = 0;
+    let mut depth = 0i32;
     let mut close = None;
-    for (i, ch) in pattern[open..].char_indices() {
-        match ch {
-            '{' => depth += 1,
-            '}' => {
+    for (i, &b) in pattern[open..].iter().enumerate() {
+        match b {
+            b'{' => depth += 1,
+            b'}' => {
                 depth -= 1;
                 if depth == 0 {
                     close = Some(open + i);
@@ -222,21 +233,21 @@ fn expand_braces(pattern: &str) -> Vec<String> {
     }
 
     let Some(close) = close else {
-        return vec![pattern.to_string()];
+        return vec![pattern.to_vec()];
     };
 
     let prefix = &pattern[..open];
     let suffix = &pattern[close + 1..];
     let alternatives = &pattern[open + 1..close];
 
-    let mut parts = Vec::new();
-    let mut depth = 0;
+    let mut parts: Vec<&[u8]> = Vec::new();
+    let mut depth = 0i32;
     let mut start = 0;
-    for (i, ch) in alternatives.char_indices() {
-        match ch {
-            '{' => depth += 1,
-            '}' => depth -= 1,
-            ',' if depth == 0 => {
+    for (i, &b) in alternatives.iter().enumerate() {
+        match b {
+            b'{' => depth += 1,
+            b'}' => depth -= 1,
+            b',' if depth == 0 => {
                 parts.push(&alternatives[start..i]);
                 start = i + 1;
             }
@@ -248,7 +259,10 @@ fn expand_braces(pattern: &str) -> Vec<String> {
 
     let mut results = Vec::with_capacity(parts.len());
     for part in parts {
-        let expanded = format!("{prefix}{part}{suffix}");
+        let mut expanded = Vec::with_capacity(prefix.len() + part.len() + suffix.len());
+        expanded.extend_from_slice(prefix);
+        expanded.extend_from_slice(part);
+        expanded.extend_from_slice(suffix);
         results.extend(expand_braces(&expanded));
     }
 
@@ -261,137 +275,136 @@ mod tests {
 
     #[test]
     fn test_exact_match() {
-        assert!(matches("App\\User", "App\\User", false, false));
-        assert!(matches("App\\User", "app\\user", false, false));
-        assert!(!matches("App\\User", "App\\Role", false, false));
+        assert!(matches(b"App\\User", b"App\\User", false, false));
+        assert!(matches(b"App\\User", b"app\\user", false, false));
+        assert!(!matches(b"App\\User", b"App\\Role", false, false));
     }
 
     #[test]
     fn test_exact_match_constant() {
-        assert!(matches("App\\USER", "App\\USER", true, false));
-        assert!(matches("App\\USER", "app\\USER", true, false)); // NS is case-insensitive
-        assert!(!matches("App\\USER", "App\\User", true, false)); // Name is case-sensitive
-        assert!(!matches("App\\User", "App\\Role", true, false));
+        assert!(matches(b"App\\USER", b"App\\USER", true, false));
+        assert!(matches(b"App\\USER", b"app\\USER", true, false));
+        assert!(!matches(b"App\\USER", b"App\\User", true, false));
+        assert!(!matches(b"App\\User", b"App\\Role", true, false));
     }
 
     #[test]
     fn test_single_wildcard() {
-        assert!(matches("App\\User", "App\\*", false, false));
-        assert!(matches("App\\Role", "App\\*", false, false));
-        assert!(!matches("App\\User\\Profile", "App\\*", false, false));
-        assert!(matches("App\\User\\Profile", "App\\User\\*", false, false));
-        assert!(matches("App\\User", "*\\User", false, false));
-        assert!(!matches("App\\User", "*\\Role", false, false));
+        assert!(matches(b"App\\User", b"App\\*", false, false));
+        assert!(matches(b"App\\Role", b"App\\*", false, false));
+        assert!(!matches(b"App\\User\\Profile", b"App\\*", false, false));
+        assert!(matches(b"App\\User\\Profile", b"App\\User\\*", false, false));
+        assert!(matches(b"App\\User", b"*\\User", false, false));
+        assert!(!matches(b"App\\User", b"*\\Role", false, false));
     }
 
     #[test]
     fn test_double_wildcard() {
-        assert!(matches("App\\User", "App\\**", false, false));
-        assert!(matches("App\\User\\Role", "App\\**", false, false));
-        assert!(matches("App\\User\\Role\\Permission", "App\\**", false, false));
-        assert!(!matches("Domain\\User", "App\\**", false, false));
+        assert!(matches(b"App\\User", b"App\\**", false, false));
+        assert!(matches(b"App\\User\\Role", b"App\\**", false, false));
+        assert!(matches(b"App\\User\\Role\\Permission", b"App\\**", false, false));
+        assert!(!matches(b"Domain\\User", b"App\\**", false, false));
 
-        assert!(matches("User\\Role", "**\\Role", false, false));
-        assert!(matches("App\\User\\Role", "**\\Role", false, false));
-        assert!(!matches("App\\User\\Roles", "**\\Role", false, false));
+        assert!(matches(b"User\\Role", b"**\\Role", false, false));
+        assert!(matches(b"App\\User\\Role", b"**\\Role", false, false));
+        assert!(!matches(b"App\\User\\Roles", b"**\\Role", false, false));
 
-        assert!(matches("App\\Services\\Notifier", "App\\**\\Notifier", false, false));
-        assert!(matches("App\\Notifier", "App\\**\\Notifier", false, false));
-        assert!(matches("App\\Domain\\Services\\Notifier", "App\\**\\Services\\**", false, false));
+        assert!(matches(b"App\\Services\\Notifier", b"App\\**\\Notifier", false, false));
+        assert!(matches(b"App\\Notifier", b"App\\**\\Notifier", false, false));
+        assert!(matches(b"App\\Domain\\Services\\Notifier", b"App\\**\\Services\\**", false, false));
     }
 
     #[test]
     fn test_partial_wildcard_segment() {
-        assert!(matches("UserRepository", "*Repository", false, false));
-        assert!(matches("DoctrineUserRepository", "*Repository", false, false));
-        assert!(!matches("UserRepository", "*Repo", false, false));
+        assert!(matches(b"UserRepository", b"*Repository", false, false));
+        assert!(matches(b"DoctrineUserRepository", b"*Repository", false, false));
+        assert!(!matches(b"UserRepository", b"*Repo", false, false));
 
-        assert!(matches("UserModel", "User*", false, false));
-        assert!(matches("User", "User*", false, false));
-        assert!(!matches("RoleModel", "User*", false, false));
+        assert!(matches(b"UserModel", b"User*", false, false));
+        assert!(matches(b"User", b"User*", false, false));
+        assert!(!matches(b"RoleModel", b"User*", false, false));
 
-        assert!(matches("JsonUserRepository", "*User*", false, false));
-        assert!(matches("UserRepository", "*User*", false, false));
-        assert!(matches("UserModel", "*User*", false, false));
+        assert!(matches(b"JsonUserRepository", b"*User*", false, false));
+        assert!(matches(b"UserRepository", b"*User*", false, false));
+        assert!(matches(b"UserModel", b"*User*", false, false));
 
-        assert!(matches("MyUserRepository", "My*Repository", false, false));
-        assert!(matches("MyOtherRepository", "My*Repository", false, false));
+        assert!(matches(b"MyUserRepository", b"My*Repository", false, false));
+        assert!(matches(b"MyOtherRepository", b"My*Repository", false, false));
     }
 
     #[test]
     fn test_partial_wildcard_with_case() {
-        assert!(!matches("USER_REPOSITORY", "*Repository", true, false));
-        assert!(matches("USER_REPOSITORY", "*REPOSITORY", true, false));
-        assert!(!matches("USER_REPOSITORY", "*repository", true, false));
-        assert!(matches("USER_REPOSITORY", "*repository", false, false));
+        assert!(!matches(b"USER_REPOSITORY", b"*Repository", true, false));
+        assert!(matches(b"USER_REPOSITORY", b"*REPOSITORY", true, false));
+        assert!(!matches(b"USER_REPOSITORY", b"*repository", true, false));
+        assert!(matches(b"USER_REPOSITORY", b"*repository", false, false));
     }
 
     #[test]
     fn test_constant_with_wildcard() {
-        // The case-sensitive check for constants only applies when the last segment is NOT a wildcard.
-        assert!(matches("App\\USER", "App\\*", true, false));
-        assert!(matches("App\\Services\\USER", "App\\**\\*", true, false));
-        assert!(matches("App\\Services\\USER", "App\\**\\USER", true, false));
-        assert!(!matches("App\\Services\\USER", "App\\**\\User", true, false));
+        assert!(matches(b"App\\USER", b"App\\*", true, false));
+        assert!(matches(b"App\\Services\\USER", b"App\\**\\*", true, false));
+        assert!(matches(b"App\\Services\\USER", b"App\\**\\USER", true, false));
+        assert!(!matches(b"App\\Services\\USER", b"App\\**\\User", true, false));
     }
 
     #[test]
     fn test_edge_cases() {
-        assert!(matches("User", "*", false, false));
-        assert!(!matches("App\\User", "*", false, false));
-        assert!(matches("App\\User", "**", false, false));
-        assert!(matches("", "", false, false));
-        assert!(!matches("A", "", false, false));
-        assert!(!matches("", "A", false, false));
-        assert!(matches("A", "A", false, false));
-        assert!(matches("\\App\\User\\", "App\\User", false, false));
-        assert!(matches("App\\User", "\\App\\User\\", false, false));
+        assert!(matches(b"User", b"*", false, false));
+        assert!(!matches(b"App\\User", b"*", false, false));
+        assert!(matches(b"App\\User", b"**", false, false));
+        assert!(matches(b"", b"", false, false));
+        assert!(!matches(b"A", b"", false, false));
+        assert!(!matches(b"", b"A", false, false));
+        assert!(matches(b"A", b"A", false, false));
+        assert!(matches(b"\\App\\User\\", b"App\\User", false, false));
+        assert!(matches(b"App\\User", b"\\App\\User\\", false, false));
     }
 
     #[test]
     fn test_complex_middle_wildcard() {
-        assert!(matches("A\\B\\C\\D", "A\\**\\D", false, false));
-        assert!(matches("A\\D", "A\\**\\D", false, false));
-        assert!(!matches("A\\B\\C\\E", "A\\**\\D", false, false));
-        assert!(matches("A\\B\\C\\D\\E", "A\\**\\D\\**", false, false));
+        assert!(matches(b"A\\B\\C\\D", b"A\\**\\D", false, false));
+        assert!(matches(b"A\\D", b"A\\**\\D", false, false));
+        assert!(!matches(b"A\\B\\C\\E", b"A\\**\\D", false, false));
+        assert!(matches(b"A\\B\\C\\D\\E", b"A\\**\\D\\**", false, false));
     }
 
     #[test]
     fn test_namespace_match() {
-        assert!(matches("App\\Domain\\User", "App\\", false, false));
-        assert!(matches("App\\Domain\\User", "App\\Domain\\", false, false));
-        assert!(!matches("Apples\\Domain\\User", "App\\", false, false));
-        assert!(matches("App", "App\\", false, false));
-        assert!(matches("App\\", "App\\", false, false));
-        assert!(!matches("App", "Application\\", false, false));
+        assert!(matches(b"App\\Domain\\User", b"App\\", false, false));
+        assert!(matches(b"App\\Domain\\User", b"App\\Domain\\", false, false));
+        assert!(!matches(b"Apples\\Domain\\User", b"App\\", false, false));
+        assert!(matches(b"App", b"App\\", false, false));
+        assert!(matches(b"App\\", b"App\\", false, false));
+        assert!(!matches(b"App", b"Application\\", false, false));
     }
 
     #[test]
     fn test_brace_expansion() {
-        assert!(matches("App\\Domain\\User", "App\\{Domain,Infrastructure}\\User", false, false));
-        assert!(matches("App\\Infrastructure\\User", "App\\{Domain,Infrastructure}\\User", false, false));
-        assert!(!matches("App\\Application\\User", "App\\{Domain,Infrastructure}\\User", false, false));
+        assert!(matches(b"App\\Domain\\User", b"App\\{Domain,Infrastructure}\\User", false, false));
+        assert!(matches(b"App\\Infrastructure\\User", b"App\\{Domain,Infrastructure}\\User", false, false));
+        assert!(!matches(b"App\\Application\\User", b"App\\{Domain,Infrastructure}\\User", false, false));
     }
 
     #[test]
     fn test_brace_expansion_namespace() {
-        assert!(matches("App\\Gateway\\DTO\\Foo", "App\\Gateway\\{DTO,Doctrine}\\", false, false));
-        assert!(matches("App\\Gateway\\Doctrine\\Bar", "App\\Gateway\\{DTO,Doctrine}\\", false, false));
-        assert!(!matches("App\\Gateway\\Service\\Baz", "App\\Gateway\\{DTO,Doctrine}\\", false, false));
+        assert!(matches(b"App\\Gateway\\DTO\\Foo", b"App\\Gateway\\{DTO,Doctrine}\\", false, false));
+        assert!(matches(b"App\\Gateway\\Doctrine\\Bar", b"App\\Gateway\\{DTO,Doctrine}\\", false, false));
+        assert!(!matches(b"App\\Gateway\\Service\\Baz", b"App\\Gateway\\{DTO,Doctrine}\\", false, false));
     }
 
     #[test]
     fn test_brace_expansion_with_wildcards() {
-        assert!(matches("App\\Domain\\UserRepository", "App\\{Domain,Infrastructure}\\*Repository", false, false));
+        assert!(matches(b"App\\Domain\\UserRepository", b"App\\{Domain,Infrastructure}\\*Repository", false, false));
         assert!(matches(
-            "App\\Infrastructure\\OrderRepository",
-            "App\\{Domain,Infrastructure}\\*Repository",
+            b"App\\Infrastructure\\OrderRepository",
+            b"App\\{Domain,Infrastructure}\\*Repository",
             false,
             false
         ));
         assert!(!matches(
-            "App\\Application\\UserRepository",
-            "App\\{Domain,Infrastructure}\\*Repository",
+            b"App\\Application\\UserRepository",
+            b"App\\{Domain,Infrastructure}\\*Repository",
             false,
             false
         ));
@@ -399,32 +412,40 @@ mod tests {
 
     #[test]
     fn test_brace_expansion_multiple_groups() {
-        assert!(matches("App\\Domain\\User\\Query", "App\\{Domain,Infrastructure}\\{User,Order}\\*", false, false));
+        assert!(matches(b"App\\Domain\\User\\Query", b"App\\{Domain,Infrastructure}\\{User,Order}\\*", false, false));
         assert!(matches(
-            "App\\Infrastructure\\Order\\Command",
-            "App\\{Domain,Infrastructure}\\{User,Order}\\*",
+            b"App\\Infrastructure\\Order\\Command",
+            b"App\\{Domain,Infrastructure}\\{User,Order}\\*",
             false,
             false
         ));
-        assert!(!matches("App\\Domain\\Product\\Query", "App\\{Domain,Infrastructure}\\{User,Order}\\*", false, false));
+        assert!(!matches(
+            b"App\\Domain\\Product\\Query",
+            b"App\\{Domain,Infrastructure}\\{User,Order}\\*",
+            false,
+            false
+        ));
     }
 
     #[test]
     fn test_brace_expansion_single_alternative() {
-        assert!(matches("App\\Domain\\User", "App\\{Domain}\\User", false, false));
+        assert!(matches(b"App\\Domain\\User", b"App\\{Domain}\\User", false, false));
     }
 
     #[test]
     fn test_no_braces_unchanged() {
-        assert!(matches("App\\User", "App\\User", false, false));
-        assert!(matches("App\\User", "App\\*", false, false));
+        assert!(matches(b"App\\User", b"App\\User", false, false));
+        assert!(matches(b"App\\User", b"App\\*", false, false));
     }
 
     #[test]
     fn test_expand_braces_fn() {
-        assert_eq!(expand_braces("A\\{B,C}\\D"), vec!["A\\B\\D", "A\\C\\D"]);
-        assert_eq!(expand_braces("no-braces"), vec!["no-braces"]);
-        assert_eq!(expand_braces("{A,B}"), vec!["A", "B"]);
-        assert_eq!(expand_braces("{A,B}\\{C,D}"), vec!["A\\C", "A\\D", "B\\C", "B\\D"]);
+        assert_eq!(expand_braces(b"A\\{B,C}\\D"), vec![b"A\\B\\D".to_vec(), b"A\\C\\D".to_vec()]);
+        assert_eq!(expand_braces(b"no-braces"), vec![b"no-braces".to_vec()]);
+        assert_eq!(expand_braces(b"{A,B}"), vec![b"A".to_vec(), b"B".to_vec()]);
+        assert_eq!(
+            expand_braces(b"{A,B}\\{C,D}"),
+            vec![b"A\\C".to_vec(), b"A\\D".to_vec(), b"B\\C".to_vec(), b"B\\D".to_vec()]
+        );
     }
 }

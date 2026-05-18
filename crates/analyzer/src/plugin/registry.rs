@@ -1,9 +1,5 @@
 //! Plugin registry for managing and dispatching to providers and hooks.
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
-use mago_atom::ascii_lowercase_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -23,6 +19,11 @@ use mago_syntax::ast::Program;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::StaticMethodCall;
 use mago_syntax::ast::Trait;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
+use mago_word::ascii_lowercase_word;
+use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
@@ -69,11 +70,11 @@ pub struct ProviderResult {
 
 #[derive(Default)]
 pub struct PluginRegistry {
-    function_exact: AtomMap<Vec<usize>>,
-    function_prefix: Vec<(Atom, usize)>,
-    function_namespace: Vec<(Atom, usize)>,
+    function_exact: WordMap<Vec<usize>>,
+    function_prefix: Vec<(Word, usize)>,
+    function_namespace: Vec<(Word, usize)>,
     function_providers: Vec<Box<dyn FunctionReturnTypeProvider>>,
-    method_exact: AtomMap<Vec<usize>>,
+    method_exact: WordMap<Vec<usize>>,
     method_wildcard: Vec<(Vec<MethodTarget>, usize)>,
     method_providers: Vec<Box<dyn MethodReturnTypeProvider>>,
     program_hooks: Vec<Box<dyn ProgramHook>>,
@@ -90,19 +91,19 @@ pub struct PluginRegistry {
     function_decl_hooks: Vec<Box<dyn FunctionDeclarationHook>>,
     property_initialization_providers: Vec<Box<dyn PropertyInitializationProvider>>,
     issue_filter_hooks: Vec<Box<dyn IssueFilterHook>>,
-    function_assertion_exact: AtomMap<Vec<usize>>,
-    function_assertion_prefix: Vec<(Atom, usize)>,
-    function_assertion_namespace: Vec<(Atom, usize)>,
+    function_assertion_exact: WordMap<Vec<usize>>,
+    function_assertion_prefix: Vec<(Word, usize)>,
+    function_assertion_namespace: Vec<(Word, usize)>,
     function_assertion_providers: Vec<Box<dyn FunctionAssertionProvider>>,
-    method_assertion_exact: AtomMap<Vec<usize>>,
+    method_assertion_exact: WordMap<Vec<usize>>,
     method_assertion_wildcard: Vec<(Vec<MethodTarget>, usize)>,
     method_assertion_providers: Vec<Box<dyn MethodAssertionProvider>>,
     expression_throw_providers: Vec<Box<dyn ExpressionThrowTypeProvider>>,
-    function_throw_exact: AtomMap<Vec<usize>>,
-    function_throw_prefix: Vec<(Atom, usize)>,
-    function_throw_namespace: Vec<(Atom, usize)>,
+    function_throw_exact: WordMap<Vec<usize>>,
+    function_throw_prefix: Vec<(Word, usize)>,
+    function_throw_namespace: Vec<(Word, usize)>,
     function_throw_providers: Vec<Box<dyn FunctionThrowTypeProvider>>,
-    method_throw_exact: AtomMap<Vec<usize>>,
+    method_throw_exact: WordMap<Vec<usize>>,
     method_throw_wildcard: Vec<(Vec<MethodTarget>, usize)>,
     method_throw_providers: Vec<Box<dyn MethodThrowTypeProvider>>,
 }
@@ -156,20 +157,24 @@ impl PluginRegistry {
 
         match P::targets() {
             FunctionTarget::Exact(name) => {
-                self.function_exact.entry(ascii_lowercase_atom(name)).or_default().push(index);
+                self.function_exact.entry(ascii_lowercase_word(name)).or_default().push(index);
             }
             FunctionTarget::ExactMultiple(names) => {
                 for name in names {
-                    self.function_exact.entry(ascii_lowercase_atom(name)).or_default().push(index);
+                    self.function_exact.entry(ascii_lowercase_word(name)).or_default().push(index);
                 }
             }
             FunctionTarget::Prefix(prefix) => {
-                self.function_prefix.push((ascii_lowercase_atom(prefix), index));
+                self.function_prefix.push((ascii_lowercase_word(prefix), index));
             }
             FunctionTarget::Namespace(ns) => {
-                let ns_lower = ns.to_lowercase();
-                let ns_pattern = if ns_lower.ends_with('\\') { ns_lower } else { format!("{ns_lower}\\") };
-                self.function_namespace.push((ascii_lowercase_atom(&ns_pattern), index));
+                let ns_lower = ascii_lowercase_word(ns);
+                let ns_pattern = if ns_lower.as_bytes().last() == Some(&b'\\') {
+                    ns_lower
+                } else {
+                    concat_word!(ns_lower.as_bytes(), b"\\")
+                };
+                self.function_namespace.push((ns_pattern, index));
             }
         }
 
@@ -308,20 +313,24 @@ impl PluginRegistry {
 
         match P::targets() {
             FunctionTarget::Exact(name) => {
-                self.function_assertion_exact.entry(ascii_lowercase_atom(name)).or_default().push(index);
+                self.function_assertion_exact.entry(ascii_lowercase_word(name)).or_default().push(index);
             }
             FunctionTarget::ExactMultiple(names) => {
                 for name in names {
-                    self.function_assertion_exact.entry(ascii_lowercase_atom(name)).or_default().push(index);
+                    self.function_assertion_exact.entry(ascii_lowercase_word(name)).or_default().push(index);
                 }
             }
             FunctionTarget::Prefix(prefix) => {
-                self.function_assertion_prefix.push((ascii_lowercase_atom(prefix), index));
+                self.function_assertion_prefix.push((ascii_lowercase_word(prefix), index));
             }
             FunctionTarget::Namespace(ns) => {
-                let ns_lower = ns.to_lowercase();
-                let ns_pattern = if ns_lower.ends_with('\\') { ns_lower } else { format!("{ns_lower}\\") };
-                self.function_assertion_namespace.push((ascii_lowercase_atom(&ns_pattern), index));
+                let ns_lower = ascii_lowercase_word(ns);
+                let ns_pattern = if ns_lower.as_bytes().last() == Some(&b'\\') {
+                    ns_lower
+                } else {
+                    concat_word!(ns_lower.as_bytes(), b"\\")
+                };
+                self.function_assertion_namespace.push((ns_pattern, index));
             }
         }
 
@@ -369,20 +378,24 @@ impl PluginRegistry {
 
         match P::targets() {
             FunctionTarget::Exact(name) => {
-                self.function_throw_exact.entry(ascii_lowercase_atom(name)).or_default().push(index);
+                self.function_throw_exact.entry(ascii_lowercase_word(name)).or_default().push(index);
             }
             FunctionTarget::ExactMultiple(names) => {
                 for name in names {
-                    self.function_throw_exact.entry(ascii_lowercase_atom(name)).or_default().push(index);
+                    self.function_throw_exact.entry(ascii_lowercase_word(name)).or_default().push(index);
                 }
             }
             FunctionTarget::Prefix(prefix) => {
-                self.function_throw_prefix.push((ascii_lowercase_atom(prefix), index));
+                self.function_throw_prefix.push((ascii_lowercase_word(prefix), index));
             }
             FunctionTarget::Namespace(ns) => {
-                let ns_lower = ns.to_lowercase();
-                let ns_pattern = if ns_lower.ends_with('\\') { ns_lower } else { format!("{ns_lower}\\") };
-                self.function_throw_namespace.push((ascii_lowercase_atom(&ns_pattern), index));
+                let ns_lower = ascii_lowercase_word(ns);
+                let ns_pattern = if ns_lower.as_bytes().last() == Some(&b'\\') {
+                    ns_lower
+                } else {
+                    concat_word!(ns_lower.as_bytes(), b"\\")
+                };
+                self.function_throw_namespace.push((ns_pattern, index));
             }
         }
 
@@ -928,8 +941,8 @@ impl PluginRegistry {
         Ok(())
     }
 
-    fn get_function_provider_indices(&self, name: &str) -> Vec<usize> {
-        let lower_name = ascii_lowercase_atom(name);
+    fn get_function_provider_indices(&self, name: &[u8]) -> Vec<usize> {
+        let lower_name = ascii_lowercase_word(name);
         let mut indices = Vec::new();
 
         if let Some(idxs) = self.function_exact.get(&lower_name) {
@@ -937,13 +950,13 @@ impl PluginRegistry {
         }
 
         for (prefix, idx) in &self.function_prefix {
-            if lower_name.as_str().starts_with(prefix.as_str()) && !indices.contains(idx) {
+            if lower_name.as_bytes().starts_with(prefix.as_bytes()) && !indices.contains(idx) {
                 indices.push(*idx);
             }
         }
 
         for (ns, idx) in &self.function_namespace {
-            if lower_name.as_str().starts_with(ns.as_str()) && !indices.contains(idx) {
+            if lower_name.as_bytes().starts_with(ns.as_bytes()) && !indices.contains(idx) {
                 indices.push(*idx);
             }
         }
@@ -951,10 +964,9 @@ impl PluginRegistry {
         indices
     }
 
-    fn get_method_provider_indices(&self, class_name: &str, method_name: &str) -> Vec<usize> {
-        use mago_atom::concat_atom;
-        let key =
-            concat_atom!(ascii_lowercase_atom(class_name).as_str(), "::", ascii_lowercase_atom(method_name).as_str());
+    fn get_method_provider_indices(&self, class_name: &[u8], method_name: &[u8]) -> Vec<usize> {
+        use mago_word::concat_word;
+        let key = concat_word!(ascii_lowercase_word(class_name), b"::", ascii_lowercase_word(method_name));
         let mut indices = Vec::new();
 
         if let Some(idxs) = self.method_exact.get(&key) {
@@ -986,14 +998,14 @@ impl PluginRegistry {
     ) -> Option<ProviderResult> {
         match function_like {
             FunctionLikeIdentifier::Function(name) => {
-                Some(self.get_function_return_type(codebase, block_context, artifacts, name, invocation))
+                Some(self.get_function_return_type(codebase, block_context, artifacts, name.as_bytes(), invocation))
             }
             FunctionLikeIdentifier::Method(class_name, method_name) => Some(self.get_method_return_type(
                 codebase,
                 block_context,
                 artifacts,
-                class_name,
-                method_name,
+                class_name.as_bytes(),
+                method_name.as_bytes(),
                 invocation,
             )),
             _ => None,
@@ -1006,7 +1018,7 @@ impl PluginRegistry {
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
-        function_name: &str,
+        function_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
     ) -> ProviderResult {
         let indices = self.get_function_provider_indices(function_name);
@@ -1033,8 +1045,8 @@ impl PluginRegistry {
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
-        class_name: &str,
-        method_name: &str,
+        class_name: &[u8],
+        method_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
     ) -> ProviderResult {
         let indices = self.get_method_provider_indices(class_name, method_name);
@@ -1087,7 +1099,7 @@ impl PluginRegistry {
         false
     }
 
-    fn get_function_assertion_provider_indices(&self, name: &str) -> Vec<usize> {
+    fn get_function_assertion_provider_indices(&self, name: &[u8]) -> Vec<usize> {
         if self.function_assertion_exact.is_empty()
             && self.function_assertion_prefix.is_empty()
             && self.function_assertion_namespace.is_empty()
@@ -1095,7 +1107,7 @@ impl PluginRegistry {
             return Vec::new();
         }
 
-        let lower_name = ascii_lowercase_atom(name);
+        let lower_name = ascii_lowercase_word(name);
         let mut indices = Vec::new();
 
         if let Some(idxs) = self.function_assertion_exact.get(&lower_name) {
@@ -1103,13 +1115,13 @@ impl PluginRegistry {
         }
 
         for (prefix, idx) in &self.function_assertion_prefix {
-            if lower_name.as_str().starts_with(prefix.as_str()) && !indices.contains(idx) {
+            if lower_name.as_bytes().starts_with(prefix.as_bytes()) && !indices.contains(idx) {
                 indices.push(*idx);
             }
         }
 
         for (ns, idx) in &self.function_assertion_namespace {
-            if lower_name.as_str().starts_with(ns.as_str()) && !indices.contains(idx) {
+            if lower_name.as_bytes().starts_with(ns.as_bytes()) && !indices.contains(idx) {
                 indices.push(*idx);
             }
         }
@@ -1117,14 +1129,13 @@ impl PluginRegistry {
         indices
     }
 
-    fn get_method_assertion_provider_indices(&self, class_name: &str, method_name: &str) -> Vec<usize> {
+    fn get_method_assertion_provider_indices(&self, class_name: &[u8], method_name: &[u8]) -> Vec<usize> {
         if self.method_assertion_exact.is_empty() && self.method_assertion_wildcard.is_empty() {
             return Vec::new();
         }
 
-        use mago_atom::concat_atom;
-        let key =
-            concat_atom!(ascii_lowercase_atom(class_name).as_str(), "::", ascii_lowercase_atom(method_name).as_str());
+        use mago_word::concat_word;
+        let key = concat_word!(ascii_lowercase_word(class_name), b"::", ascii_lowercase_word(method_name));
         let mut indices = Vec::new();
 
         if let Some(idxs) = self.method_assertion_exact.get(&key) {
@@ -1156,11 +1167,16 @@ impl PluginRegistry {
     ) -> Option<InvocationAssertions> {
         match function_like {
             FunctionLikeIdentifier::Function(name) => {
-                self.get_function_assertions(codebase, block_context, artifacts, name, invocation)
+                self.get_function_assertions(codebase, block_context, artifacts, name.as_bytes(), invocation)
             }
-            FunctionLikeIdentifier::Method(class_name, method_name) => {
-                self.get_method_assertions(codebase, block_context, artifacts, class_name, method_name, invocation)
-            }
+            FunctionLikeIdentifier::Method(class_name, method_name) => self.get_method_assertions(
+                codebase,
+                block_context,
+                artifacts,
+                class_name.as_bytes(),
+                method_name.as_bytes(),
+                invocation,
+            ),
             _ => None,
         }
     }
@@ -1172,7 +1188,7 @@ impl PluginRegistry {
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
-        function_name: &str,
+        function_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
     ) -> Option<InvocationAssertions> {
         if self.function_assertion_providers.is_empty() {
@@ -1203,8 +1219,8 @@ impl PluginRegistry {
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
-        class_name: &str,
-        method_name: &str,
+        class_name: &[u8],
+        method_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
     ) -> Option<InvocationAssertions> {
         if self.method_assertion_providers.is_empty() {
@@ -1231,7 +1247,7 @@ impl PluginRegistry {
         None
     }
 
-    fn get_function_throw_provider_indices(&self, name: &str) -> Vec<usize> {
+    fn get_function_throw_provider_indices(&self, name: &[u8]) -> Vec<usize> {
         if self.function_throw_exact.is_empty()
             && self.function_throw_prefix.is_empty()
             && self.function_throw_namespace.is_empty()
@@ -1239,7 +1255,7 @@ impl PluginRegistry {
             return Vec::new();
         }
 
-        let lower_name = ascii_lowercase_atom(name);
+        let lower_name = ascii_lowercase_word(name);
         let mut indices = Vec::new();
 
         if let Some(idxs) = self.function_throw_exact.get(&lower_name) {
@@ -1247,13 +1263,13 @@ impl PluginRegistry {
         }
 
         for (prefix, idx) in &self.function_throw_prefix {
-            if lower_name.as_str().starts_with(prefix.as_str()) && !indices.contains(idx) {
+            if lower_name.as_bytes().starts_with(prefix.as_bytes()) && !indices.contains(idx) {
                 indices.push(*idx);
             }
         }
 
         for (ns, idx) in &self.function_throw_namespace {
-            if lower_name.as_str().starts_with(ns.as_str()) && !indices.contains(idx) {
+            if lower_name.as_bytes().starts_with(ns.as_bytes()) && !indices.contains(idx) {
                 indices.push(*idx);
             }
         }
@@ -1261,7 +1277,7 @@ impl PluginRegistry {
         indices
     }
 
-    fn get_method_throw_provider_indices(&self, class_name: &str, method_name: &str) -> Vec<usize> {
+    fn get_method_throw_provider_indices(&self, class_name: &[u8], method_name: &[u8]) -> Vec<usize> {
         if self.method_throw_providers.is_empty()
             && self.method_throw_exact.is_empty()
             && self.method_throw_wildcard.is_empty()
@@ -1269,9 +1285,8 @@ impl PluginRegistry {
             return Vec::new();
         }
 
-        use mago_atom::concat_atom;
-        let key =
-            concat_atom!(ascii_lowercase_atom(class_name).as_str(), "::", ascii_lowercase_atom(method_name).as_str());
+        use mago_word::concat_word;
+        let key = concat_word!(ascii_lowercase_word(class_name), b"::", ascii_lowercase_word(method_name));
         let mut indices = Vec::new();
 
         if let Some(idxs) = self.method_throw_exact.get(&key) {
@@ -1300,8 +1315,8 @@ impl PluginRegistry {
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         expression: &mago_syntax::ast::Expression<'_>,
-    ) -> AtomSet {
-        let mut exceptions = AtomSet::default();
+    ) -> WordSet {
+        let mut exceptions = WordSet::default();
 
         for provider in &self.expression_throw_providers {
             let provider_context = ProviderContext::new(codebase, block_context, artifacts);
@@ -1318,10 +1333,10 @@ impl PluginRegistry {
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
-        function_name: &str,
+        function_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
-    ) -> AtomSet {
-        let mut exceptions = AtomSet::default();
+    ) -> WordSet {
+        let mut exceptions = WordSet::default();
         let indices = self.get_function_throw_provider_indices(function_name);
 
         for idx in indices {
@@ -1341,11 +1356,11 @@ impl PluginRegistry {
         codebase: &'ctx CodebaseMetadata,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
-        class_name: &str,
-        method_name: &str,
+        class_name: &[u8],
+        method_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
-    ) -> AtomSet {
-        let mut exceptions = AtomSet::default();
+    ) -> WordSet {
+        let mut exceptions = WordSet::default();
         let indices = self.get_method_throw_provider_indices(class_name, method_name);
 
         for idx in indices {
@@ -1409,7 +1424,7 @@ mod tests {
 
     impl FunctionReturnTypeProvider for TestFunctionProvider {
         fn targets() -> FunctionTarget {
-            FunctionTarget::Exact("test_func")
+            FunctionTarget::Exact(b"test_func")
         }
 
         fn get_return_type(
@@ -1427,7 +1442,7 @@ mod tests {
         registry.register_function_provider(TestFunctionProvider);
 
         assert_eq!(registry.function_provider_count(), 1);
-        let indices = registry.get_function_provider_indices("test_func");
+        let indices = registry.get_function_provider_indices(b"test_func");
         assert_eq!(indices.len(), 1);
     }
 
@@ -1436,13 +1451,13 @@ mod tests {
         let mut registry = PluginRegistry::new();
         registry.register_function_provider(TestFunctionProvider);
 
-        let indices = registry.get_function_provider_indices("test_func");
+        let indices = registry.get_function_provider_indices(b"test_func");
         assert_eq!(indices.len(), 1);
 
-        let indices = registry.get_function_provider_indices("TEST_FUNC");
+        let indices = registry.get_function_provider_indices(b"TEST_FUNC");
         assert_eq!(indices.len(), 1);
 
-        let indices = registry.get_function_provider_indices("other_func");
+        let indices = registry.get_function_provider_indices(b"other_func");
         assert!(indices.is_empty());
     }
 }

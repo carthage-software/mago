@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
+use mago_word::Word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -362,14 +362,14 @@ impl TType for TArray {
         }
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
             TArray::List(list_data) => list_data.get_id(),
             TArray::Keyed(keyed_data) => keyed_data.get_id(),
         }
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         match self {
             TArray::List(list_data) => list_data.get_pretty_id_with_indent(indent),
             TArray::Keyed(keyed_data) => keyed_data.get_pretty_id_with_indent(indent),

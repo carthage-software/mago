@@ -3,8 +3,6 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use mago_atom::atom;
-use mago_atom::concat_atom;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -15,6 +13,8 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::union::TUnion;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -43,7 +43,7 @@ impl Provider for ArrayColumnProvider {
 
 impl FunctionReturnTypeProvider for ArrayColumnProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("array_column")
+        FunctionTarget::Exact(b"array_column")
     }
 
     fn get_return_type(
@@ -51,17 +51,17 @@ impl FunctionReturnTypeProvider for ArrayColumnProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let array_argument = invocation.get_argument(0, &["array"])?;
+        let array_argument = invocation.get_argument(0, &[b"array"])?;
         let array_type = context.get_expression_type(array_argument)?;
 
         let array = array_type.get_single_array()?;
         let codebase = context.codebase();
         let element_type = get_array_parameters(array, codebase).1;
 
-        let column_key_argument = invocation.get_argument(1, &["column_key"])?;
+        let column_key_argument = invocation.get_argument(1, &[b"column_key"])?;
         let column_key_type = context.get_expression_type(column_key_argument)?;
 
-        let index_key_argument = invocation.get_argument(2, &["index_key"]);
+        let index_key_argument = invocation.get_argument(2, &[b"index_key"]);
         let index_key_type = index_key_argument.and_then(|arg| context.get_expression_type(arg));
 
         if let Some(result) = try_resolve_from_named_object(&element_type, column_key_type, index_key_type, codebase) {
@@ -85,13 +85,13 @@ fn try_resolve_from_named_object(
     codebase: &mago_codex::metadata::CodebaseMetadata,
 ) -> Option<TUnion> {
     let obj = element_type.get_single_named_object()?;
-    let class_like = codebase.get_class_like(&obj.name)?;
+    let class_like = codebase.get_class_like(obj.name.as_bytes())?;
 
     let column_type = if column_key_type.is_null() {
         TUnion::from_atomic(TAtomic::Object(TObject::Named(obj.clone())))
     } else {
         let prop_name = column_key_type.get_single_literal_string_value()?;
-        let prop = class_like.properties.get(&concat_atom!("$", prop_name))?;
+        let prop = class_like.properties.get(&concat_word!(b"$", prop_name))?;
         prop.type_metadata.as_ref()?.type_union.clone()
     };
 
@@ -121,7 +121,7 @@ fn try_resolve_from_keyed_array(
         element_type.clone()
     } else {
         let key_str = column_key_type.get_single_literal_string_value()?;
-        let (_, value_type) = known_items.get(&ArrayKey::String(atom(key_str)))?;
+        let (_, value_type) = known_items.get(&ArrayKey::String(word(key_str)))?;
         value_type.clone()
     };
 
@@ -130,7 +130,7 @@ fn try_resolve_from_keyed_array(
             None
         } else {
             let key_str = index_key_type.get_single_literal_string_value()?;
-            let (_, value_type) = known_items.get(&ArrayKey::String(atom(key_str)))?;
+            let (_, value_type) = known_items.get(&ArrayKey::String(word(key_str)))?;
             extract_scalar_for_key(value_type)
         }
     } else {
@@ -164,7 +164,7 @@ fn resolve_index_type_from_property<'meta>(
     }
 
     let prop_name = index_key_type.get_single_literal_string_value()?;
-    let prop = class_like.properties.get(&concat_atom!("$", prop_name))?;
+    let prop = class_like.properties.get(&concat_word!("$", prop_name))?;
     let prop_type = &prop.type_metadata.as_ref()?.type_union;
 
     extract_scalar_for_key(prop_type)

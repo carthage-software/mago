@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use mago_atom::Atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::atomic::TAtomic;
@@ -23,11 +22,13 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Expression;
 use mago_syntax::comments::docblock::PrecedingDocblocks;
+use mago_word::Word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use mago_bytes::BytesDisplay;
 
 /// Populates the context with variable types defined in the docblock.
 ///
@@ -59,7 +60,7 @@ pub fn populate_docblock_variables_excluding<'ctx>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     override_existing: bool,
-    exclude_variable: Option<Atom>,
+    exclude_variable: Option<Word>,
 ) {
     if PrecedingDocblocks::new(context.comments, context.statement_span.start.offset).next().is_none() {
         return;
@@ -90,7 +91,7 @@ pub fn populate_docblock_variables_excluding<'ctx>(
         };
 
         // Skip if this variable should be excluded (handled by assignment analyzer)
-        if exclude_variable.is_some_and(|excluded| variable_name.as_str() == excluded) {
+        if exclude_variable.is_some_and(|excluded| variable_name == excluded) {
             continue;
         }
 
@@ -133,7 +134,7 @@ pub fn get_docblock_variables<'ctx>(
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     allow_tracing: bool,
-) -> Vec<(Option<mago_atom::Atom>, TUnion, Span)> {
+) -> Vec<(Option<mago_word::Word>, TUnion, Span)> {
     context.get_parsed_docblocks()
         .into_iter()
         // Filter out non-tag elements
@@ -143,8 +144,9 @@ pub fn get_docblock_variables<'ctx>(
         })
         .filter_map(|tag| {
             if allow_tracing && tag.kind == TagKind::PsalmTrace {
-                let variable_name = tag.description.trim();
-                let variable_atom = mago_atom::atom(variable_name);
+                let variable_name_bytes = tag.description.trim_ascii();
+                let variable_atom = mago_word::word(variable_name_bytes);
+                let variable_name = BytesDisplay(variable_name_bytes);
                 match block_context.locals.get(&variable_atom) {
                     Some(variable_type) => {
                         let variable_type_str = variable_type.get_id();
@@ -193,7 +195,7 @@ pub fn get_docblock_variables<'ctx>(
             let tag_content = tag.description;
 
             let var_tag = parse_var_tag(tag_content, tag.description_span).ok()?;
-            let variable_name = var_tag.variable.map(|v| mago_atom::Atom::from(&v.name));
+            let variable_name = var_tag.variable.map(|v| mago_word::word(&v.name));
             let type_string = var_tag.type_string;
 
             match get_type_from_string(
@@ -227,10 +229,10 @@ pub fn get_docblock_variables<'ctx>(
                 Err(type_error) => {
                     context.collector.report_with_code(
                         IssueCode::InvalidDocblock,
-                        Issue::error(format!(
-                            "Invalid type in `@var` tag for variable `{}`.",
-                            variable_name.as_deref().unwrap_or("expression")
-                        ))
+                        Issue::error(match variable_name {
+                            Some(w) => format!("Invalid type in `@var` tag for variable `{w}`."),
+                            None => "Invalid type in `@var` tag for variable `expression`.".to_string(),
+                        })
                         .with_annotation(Annotation::primary(type_error.span()).with_message(type_error.to_string()))
                         .with_note(type_error.note())
                         .with_help(type_error.help()),
@@ -266,7 +268,7 @@ pub fn get_type_from_var_docblock<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    value_expression_variable_id: Option<&str>,
+    value_expression_variable_id: Option<&[u8]>,
     mut allow_unnamed: bool,
 ) -> Option<(TUnion, Span)> {
     allow_unnamed =
@@ -276,7 +278,7 @@ pub fn get_type_from_var_docblock<'ctx>(
         .into_iter()
         .rfind(|(var_name, _, _)| match var_name {
             None if allow_unnamed => true,
-            Some(name) if Some(name.as_str()) == value_expression_variable_id => true,
+            Some(name) if Some(name.as_bytes()) == value_expression_variable_id => true,
             _ => false,
         })
         .map(|(_, variable_type, variable_type_span)| (variable_type, variable_type_span))
@@ -300,7 +302,7 @@ pub fn get_type_from_var_docblock<'ctx>(
 pub fn insert_variable_from_docblock<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
-    variable_name: mago_atom::Atom,
+    variable_name: mago_word::Word,
     variable_type: TUnion,
     variable_type_span: Span,
     override_existing: bool,
@@ -383,7 +385,7 @@ pub fn insert_variable_from_docblock<'ctx>(
 
 pub fn check_docblock_type_incompatibility(
     context: &mut Context<'_, '_>,
-    value_expression_variable_id: Option<&str>,
+    value_expression_variable_id: Option<&[u8]>,
     value_expression_span: Span,
     inferred_type: &TUnion,
     docblock_type: &TUnion,
@@ -429,6 +431,7 @@ pub fn check_docblock_type_incompatibility(
         let inferred_type_str = inferred_type.get_id();
 
         let mut issue = if let Some(value_expression_variable_id) = value_expression_variable_id {
+            let value_expression_variable_id = BytesDisplay(value_expression_variable_id);
             Issue::error(format!("Docblock type mismatch for variable `{value_expression_variable_id}`."))
                 .with_annotation(
                     Annotation::primary(dockblock_type_span)
@@ -442,6 +445,7 @@ pub fn check_docblock_type_incompatibility(
         };
 
         if let Some(value_expression_variable_id) = value_expression_variable_id {
+            let value_expression_variable_id = BytesDisplay(value_expression_variable_id);
             if let Some(source_expression) = source_expression {
                 issue = issue.with_annotation(Annotation::secondary(source_expression.span()).with_message(format!(
                     "...but this expression provides an incompatible type `{inferred_type_str}`."
@@ -480,6 +484,7 @@ pub fn check_docblock_type_incompatibility(
         let inferred_type_str = inferred_type.get_id();
 
         let mut issue = if let Some(value_expression_variable_id) = value_expression_variable_id {
+            let value_expression_variable_id = BytesDisplay(value_expression_variable_id);
             Issue::warning(format!("Redundant docblock type for variable `{value_expression_variable_id}`."))
                 .with_annotation(Annotation::primary(dockblock_type_span).with_message(format!(
                     "This docblock asserts the type should be `{docblock_type_str}`, which is identical to the inferred type."
@@ -493,6 +498,7 @@ pub fn check_docblock_type_incompatibility(
         };
 
         if let Some(value_expression_variable_id) = value_expression_variable_id {
+            let value_expression_variable_id = BytesDisplay(value_expression_variable_id);
             issue = issue
                 .with_annotation(Annotation::secondary(value_expression_span).with_message(format!(
                     "The variable `{value_expression_variable_id}` type is known to be `{inferred_type_str}` here."
@@ -524,7 +530,7 @@ fn unions_could_share_object_runtime_instance(inferred_type: &TUnion, docblock_t
                 continue;
             };
 
-            if inferred_named.name.eq_ignore_ascii_case(&docblock_named.name) {
+            if inferred_named.name.as_bytes().eq_ignore_ascii_case(docblock_named.name.as_bytes()) {
                 return true;
             }
         }

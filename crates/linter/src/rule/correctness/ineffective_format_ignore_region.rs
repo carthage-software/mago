@@ -169,8 +169,8 @@ fn build_ignore_regions(program: &Program<'_>) -> Vec<IgnoreRegion> {
             continue;
         }
 
-        let has_start = IGNORE_START_MARKERS.iter().any(|m| trivia.value.contains(m));
-        let has_end = IGNORE_END_MARKERS.iter().any(|m| trivia.value.contains(m));
+        let has_start = IGNORE_START_MARKERS.iter().any(|m| memchr::memmem::find(trivia.value, m.as_bytes()).is_some());
+        let has_end = IGNORE_END_MARKERS.iter().any(|m| memchr::memmem::find(trivia.value, m.as_bytes()).is_some());
 
         if has_start && current_start.is_none() {
             current_start = Some((trivia.span, trivia.span.start_offset()));

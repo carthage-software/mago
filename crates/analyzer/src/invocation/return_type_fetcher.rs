@@ -1,7 +1,7 @@
-use mago_atom::AtomMap;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
+use mago_word::WordMap;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
@@ -15,7 +15,7 @@ pub fn fetch_invocation_return_type<'ctx, 'arena>(
     artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
-    parameters: &AtomMap<TUnion>,
+    parameters: &WordMap<TUnion>,
 ) -> TUnion {
     // Try to get a custom return type from plugins
     if let Some(identifier) = invocation.target.get_function_like_identifier()

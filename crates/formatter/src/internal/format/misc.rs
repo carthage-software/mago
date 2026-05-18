@@ -51,8 +51,8 @@ use super::block::block_is_empty;
 
 /// Check if there is a newline character within a specified range of text.
 #[inline(always)]
-pub(super) fn has_new_line_in_range(text: &str, start: u32, end: u32) -> bool {
-    text[start as usize..end as usize].contains('\n')
+pub(super) fn has_new_line_in_range(text: &[u8], start: u32, end: u32) -> bool {
+    text[start as usize..end as usize].contains(&b'\n')
 }
 
 pub(crate) fn get_document_width(doc: &Document<'_>) -> usize {
@@ -553,7 +553,7 @@ fn is_simple_composite_string_argument(composite_string: &CompositeString<'_>, d
     }
 
     composite_string.parts().iter().all(|part| match part {
-        StringPart::Literal(literal) => !literal.value.contains(['\n', '\r']),
+        StringPart::Literal(literal) => !literal.value.contains(&b'\n') && !literal.value.contains(&b'\r'),
         StringPart::Expression(expression) => is_simple_call_argument(expression, depth),
         StringPart::BracedExpression(braced) => is_simple_call_argument(braced.expression, depth),
     })
@@ -566,12 +566,12 @@ pub(super) fn print_colon_delimited_body<'arena>(
     end_keyword: &'arena Keyword<'arena>,
     terminator: &'arena Terminator<'arena>,
 ) -> Document<'arena> {
-    let mut parts = vec![in f.arena;Document::String(":")];
+    let mut parts = vec![in f.arena;Document::String(b":")];
 
     let mut printed_statements = print_statement_sequence(f, statements);
     if !printed_statements.is_empty() {
         if let Some(Statement::ClosingTag(_)) = statements.first() {
-            printed_statements.insert(0, Document::String(" "));
+            printed_statements.insert(0, Document::String(b" "));
             parts.push(Document::Array(printed_statements));
         } else {
             printed_statements.insert(0, Document::Line(Line::hard()));
@@ -584,7 +584,7 @@ pub(super) fn print_colon_delimited_body<'arena>(
     } else if !matches!(statements.last(), Some(Statement::OpeningTag(_))) {
         parts.push(Document::Line(Line::hard()));
     } else {
-        parts.push(Document::String(" "));
+        parts.push(Document::String(b" "));
     }
 
     parts.push(end_keyword.format(f));
@@ -646,9 +646,9 @@ pub(super) fn print_attribute_list_sequence<'arena>(
         let last_index = flat.len().saturating_sub(1);
         for (index, attribute) in flat.into_iter().enumerate() {
             contents.push(Document::Group(Group::new(vec![in f.arena;
-                Document::String("#["),
+                Document::String(b"#["),
                 attribute.format(f),
-                Document::String("]"),
+                Document::String(b"]"),
             ])));
 
             if index != last_index {
@@ -823,9 +823,9 @@ pub(super) fn print_condition<'arena>(
         Document::Group(Group::new(vec![
             in f.arena;
             Document::space(),
-            format_token(f, left_parenthesis, "("),
+            format_token(f, left_parenthesis, b"("),
             condition.format(f),
-            format_token(f, right_parenthesis, ")"),
+            format_token(f, right_parenthesis, b")"),
         ]))
     } else {
         let group_id = f.next_id();
@@ -834,14 +834,14 @@ pub(super) fn print_condition<'arena>(
             Group::new(vec![
                 in f.arena;
                 Document::space(),
-                format_token(f, left_parenthesis, "("),
+                format_token(f, left_parenthesis, b"("),
                 Document::IndentIfBreak(IndentIfBreak::new(group_id, vec![
                     in f.arena;
                     Document::Line(if must_break { Line::hard() } else { Line::soft() }),
                     condition.format(f),
                 ])),
                 Document::Line(if must_break { Line::hard() } else { Line::soft() }),
-                format_token(f, right_parenthesis, ")"),
+                format_token(f, right_parenthesis, b")"),
             ])
             .with_id(group_id)
             .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
@@ -877,8 +877,8 @@ fn collect_attribute_list<'arena>(
     *has_new_line = *has_new_line || f.is_next_line_empty(attribute_list.span());
 }
 
-fn attribute_list_sort_key<'arena>(list: &'arena AttributeList<'arena>) -> &'arena str {
-    list.attributes.iter().next().map(|a| a.name.value()).unwrap_or("")
+fn attribute_list_sort_key<'arena>(list: &'arena AttributeList<'arena>) -> &'arena [u8] {
+    list.attributes.iter().next().map(|a| a.name.value()).unwrap_or(b"")
 }
 
 pub(super) fn sort_attribute_list_refs<'arena>(lists: &mut [&'arena AttributeList<'arena>], order: SortOrder) {
@@ -891,47 +891,39 @@ pub(super) fn sort_attribute_refs<'arena>(attributes: &mut [&'arena Attribute<'a
 
 fn sort_by_sort_order<T, F>(items: &mut [T], order: SortOrder, key: F)
 where
-    F: Fn(&T) -> &str,
+    F: Fn(&T) -> &[u8],
 {
     match order {
         SortOrder::Preserve => {}
         SortOrder::AlphanumericAscending => {
-            items.sort_by(|a, b| compare_case_insensitive_chars(key(a), key(b)));
+            items.sort_by(|a, b| compare_case_insensitive_bytes(key(a), key(b)));
         }
         SortOrder::AlphanumericDescending => {
-            items.sort_by(|a, b| compare_case_insensitive_chars(key(b), key(a)));
+            items.sort_by(|a, b| compare_case_insensitive_bytes(key(b), key(a)));
         }
         SortOrder::LengthAscending => {
             items.sort_by(|a, b| {
                 let a_key = key(a);
                 let b_key = key(b);
-                a_key
-                    .chars()
-                    .count()
-                    .cmp(&b_key.chars().count())
-                    .then_with(|| compare_case_insensitive_chars(a_key, b_key))
+                a_key.len().cmp(&b_key.len()).then_with(|| compare_case_insensitive_bytes(a_key, b_key))
             });
         }
         SortOrder::LengthDescending => {
             items.sort_by(|a, b| {
                 let a_key = key(a);
                 let b_key = key(b);
-                b_key
-                    .chars()
-                    .count()
-                    .cmp(&a_key.chars().count())
-                    .then_with(|| compare_case_insensitive_chars(a_key, b_key))
+                b_key.len().cmp(&a_key.len()).then_with(|| compare_case_insensitive_bytes(a_key, b_key))
             });
         }
     }
 }
 
-fn compare_case_insensitive_chars(a: &str, b: &str) -> Ordering {
-    let mut a_chars = a.chars().flat_map(char::to_lowercase);
-    let mut b_chars = b.chars().flat_map(char::to_lowercase);
+fn compare_case_insensitive_bytes(a: &[u8], b: &[u8]) -> Ordering {
+    let mut a_iter = a.iter().map(u8::to_ascii_lowercase);
+    let mut b_iter = b.iter().map(u8::to_ascii_lowercase);
 
     loop {
-        match (a_chars.next(), b_chars.next()) {
+        match (a_iter.next(), b_iter.next()) {
             (Some(ac), Some(bc)) => {
                 let ord = ac.cmp(&bc);
                 if ord != Ordering::Equal {

@@ -1,9 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -17,7 +17,7 @@ use crate::ttype::union::TUnion;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TNamedObject {
     /// The fully qualified class name (FQCN) of the primary type (e.g., `A` in `A&B<T>&S`).
-    pub name: Atom,
+    pub name: Word,
     /// Concrete types provided for generic type parameters, if any.
     pub type_parameters: Option<Vec<TUnion>>,
     /// `true` if this represents the `static` type (same class, possibly different instance).
@@ -37,7 +37,7 @@ impl TNamedObject {
     /// Creates metadata for a named object type with default flags and no generics/intersections.
     #[inline]
     #[must_use]
-    pub fn new(name: Atom) -> Self {
+    pub fn new(name: Word) -> Self {
         Self {
             name,
             type_parameters: None,
@@ -51,7 +51,7 @@ impl TNamedObject {
     /// Creates metadata for a named object type with specified type parameters.
     #[inline]
     #[must_use]
-    pub fn new_with_type_parameters(name: Atom, type_parameters: Option<Vec<TUnion>>) -> Self {
+    pub fn new_with_type_parameters(name: Word, type_parameters: Option<Vec<TUnion>>) -> Self {
         Self {
             name,
             type_parameters,
@@ -65,7 +65,7 @@ impl TNamedObject {
     /// Creates metadata representing the `static` type (same class, possibly different instance).
     #[inline]
     #[must_use]
-    pub fn new_static(name: Atom) -> Self {
+    pub fn new_static(name: Word) -> Self {
         Self {
             name,
             type_parameters: None,
@@ -79,7 +79,7 @@ impl TNamedObject {
     /// Creates metadata representing the `$this` variable (same instance).
     #[inline]
     #[must_use]
-    pub fn new_this(name: Atom) -> Self {
+    pub fn new_this(name: Word) -> Self {
         Self {
             name,
             type_parameters: None,
@@ -90,10 +90,10 @@ impl TNamedObject {
         }
     }
 
-    /// Returns the `Atom` for the primary class/interface name.
+    /// Returns the `Word` for the primary class/interface name.
     #[inline]
     #[must_use]
-    pub const fn get_name(&self) -> Atom {
+    pub const fn get_name(&self) -> Word {
         self.name
     }
 
@@ -223,19 +223,19 @@ impl TType for TNamedObject {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         let mut result = self.name;
         if let Some(parameters) = self.get_type_parameters() {
-            result = concat_atom!(result, "<");
+            result = concat_word!(result, b"<");
             for (i, atomic) in parameters.iter().enumerate() {
                 if i > 0 {
-                    result = concat_atom!(result, ", ");
+                    result = concat_word!(result, b", ");
                 }
 
-                result = concat_atom!(result, atomic.get_id());
+                result = concat_word!(result, atomic.get_id());
             }
 
-            result = concat_atom!(result, ">");
+            result = concat_word!(result, b">");
         }
 
         if let Some(intersection_types) = self.get_intersection_types() {
@@ -243,53 +243,52 @@ impl TType for TNamedObject {
                 let atomic_id = atomic.get_id();
 
                 result = if atomic.has_intersection_types() {
-                    concat_atom!(result, "&(", atomic_id, ")")
+                    concat_word!(result, b"&(", atomic_id, b")")
                 } else {
-                    concat_atom!(result, "&", atomic_id)
+                    concat_word!(result, b"&", atomic_id)
                 };
             }
         }
 
         if self.is_this {
-            concat_atom!("$this(", result, ")")
+            concat_word!(b"$this(", result, b")")
         } else if self.is_static {
-            concat_atom!(result, "&static")
+            concat_word!(result, b"&static")
         } else {
             result
         }
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         let mut result = self.name;
         if let Some(parameters) = self.get_type_parameters() {
             if parameters.iter().any(crate::ttype::TType::is_complex) {
                 // Use multiline format for complex type parameters
                 let param_indent = indent + 2;
-                let param_spaces = " ".repeat(param_indent);
-                let mut multiline_result = String::new();
-                multiline_result += &self.name;
-                multiline_result += "<\n";
+                let mut buf: Vec<u8> = Vec::new();
+                buf.extend_from_slice(self.name.as_bytes());
+                buf.extend_from_slice(b"<\n");
                 for (i, atomic) in parameters.iter().enumerate() {
                     if i > 0 {
-                        multiline_result += ",\n";
+                        buf.extend_from_slice(b",\n");
                     }
-                    multiline_result += &param_spaces;
-                    multiline_result += &atomic.get_pretty_id_with_indent(param_indent);
+                    buf.resize(buf.len() + param_indent, b' ');
+                    buf.extend_from_slice(atomic.get_pretty_id_with_indent(param_indent).as_bytes());
                 }
-                multiline_result += ",\n";
-                multiline_result += &" ".repeat(indent);
-                multiline_result += ">";
-                result = atom(&multiline_result);
+                buf.extend_from_slice(b",\n");
+                buf.resize(buf.len() + indent, b' ');
+                buf.extend_from_slice(b">");
+                result = word(&buf);
             } else {
                 // Use inline format for simple type parameters
-                result = concat_atom!(result, "<");
+                result = concat_word!(result, b"<");
                 for (i, atomic) in parameters.iter().enumerate() {
                     if i > 0 {
-                        result = concat_atom!(result, ", ");
+                        result = concat_word!(result, b", ");
                     }
-                    result = concat_atom!(result, atomic.get_pretty_id_with_indent(indent));
+                    result = concat_word!(result, atomic.get_pretty_id_with_indent(indent));
                 }
-                result = concat_atom!(result, ">");
+                result = concat_word!(result, b">");
             }
         }
 
@@ -298,17 +297,17 @@ impl TType for TNamedObject {
                 let atomic_id = atomic.get_pretty_id_with_indent(indent);
 
                 result = if atomic.has_intersection_types() {
-                    concat_atom!(result, "&(", atomic_id, ")")
+                    concat_word!(result, b"&(", atomic_id, b")")
                 } else {
-                    concat_atom!(result, "&", atomic_id)
+                    concat_word!(result, b"&", atomic_id)
                 };
             }
         }
 
         if self.is_this {
-            concat_atom!("$this(", result, ")")
+            concat_word!(b"$this(", result, b")")
         } else if self.is_static {
-            concat_atom!(result, "&static")
+            concat_word!(result, b"&static")
         } else {
             result
         }

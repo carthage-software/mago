@@ -12,6 +12,7 @@ use mago_database::Database;
 use mago_database::DatabaseReader;
 use mago_database::file::FileType;
 use mago_span::Span;
+use mago_word::Word;
 use tower_lsp::lsp_types::Location;
 use tower_lsp::lsp_types::SymbolInformation;
 use tower_lsp::lsp_types::SymbolKind as LspSymbolKind;
@@ -22,7 +23,7 @@ use crate::language_server::position::range_at_offsets;
 const MAX_RESULTS: usize = 256;
 
 pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str) -> Vec<SymbolInformation> {
-    let needle = query.to_ascii_lowercase();
+    let needle = query.as_bytes().to_ascii_lowercase();
     let mut out = Vec::new();
 
     for meta in codebase.class_likes.values() {
@@ -35,7 +36,7 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str
         if let Some(location) = span_to_location(database, meta.span) {
             #[allow(deprecated)]
             out.push(SymbolInformation {
-                name: meta.original_name.as_str().to_string(),
+                name: String::from_utf8_lossy(meta.original_name.as_bytes()).into_owned(),
                 kind: classlike_kind(meta.kind),
                 tags: None,
                 deprecated: None,
@@ -61,7 +62,10 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str
         if let Some(location) = span_to_location(database, meta.span) {
             #[allow(deprecated)]
             out.push(SymbolInformation {
-                name: meta.original_name.map(|n| n.as_str().to_string()).unwrap_or_else(|| name.as_str().to_string()),
+                name: meta
+                    .original_name
+                    .map(|n| String::from_utf8_lossy(n.as_bytes()).into_owned())
+                    .unwrap_or_else(|| String::from_utf8_lossy(name.as_bytes()).into_owned()),
                 kind: LspSymbolKind::FUNCTION,
                 tags: None,
                 deprecated: None,
@@ -84,7 +88,7 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str
         if let Some(location) = span_to_location(database, meta.span) {
             #[allow(deprecated)]
             out.push(SymbolInformation {
-                name: meta.name.as_str().to_string(),
+                name: String::from_utf8_lossy(meta.name.as_bytes()).into_owned(),
                 kind: LspSymbolKind::CONSTANT,
                 tags: None,
                 deprecated: None,
@@ -101,11 +105,11 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str
 }
 
 /// Substring match against the lowercased FQCN/FQN.
-fn matches(haystack: &mago_atom::Atom, needle: &str) -> bool {
+fn matches(haystack: &Word, needle: &[u8]) -> bool {
     if needle.is_empty() {
         return true;
     }
-    haystack.as_str().contains(needle)
+    memchr::memmem::find(haystack.as_bytes(), needle).is_some()
 }
 
 /// Skip prelude builtins; the user almost always wants their own code, and

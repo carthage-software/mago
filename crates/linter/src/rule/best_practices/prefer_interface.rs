@@ -105,7 +105,7 @@ impl LintRule for PreferInterfaceRule {
 
         let fqcn = ctx.lookup_name(identifier);
         for (implementation, interface) in &IMPLEMENTATION_TO_INTERFACE {
-            if fqcn == *implementation {
+            if fqcn == implementation.as_bytes() {
                 let issue = Issue::new(
                     self.cfg.level(),
                     format!("Use the interface `{interface}` instead of the implementation `{implementation}`."),

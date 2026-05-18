@@ -24,9 +24,9 @@ pub struct ResolvedNames<'arena> {
     /// Internal map: start offset -> (end offset, (resolved FQN, imported flag)).
     ///
     /// The inner pair is kept as a nested tuple (not flattened) so that [`all`](Self::all)
-    /// can return `&(&'arena str, bool)` references — preserving the original signature
+    /// can return `&(&'arena [u8], bool)` references — preserving the original signature
     /// for backward compatibility.
-    names: HashMap<u32, (u32, (&'arena str, bool))>,
+    names: HashMap<u32, (u32, (&'arena [u8], bool))>,
 }
 
 impl<'arena> ResolvedNames<'arena> {
@@ -55,7 +55,7 @@ impl<'arena> ResolvedNames<'arena> {
     /// Panics if no resolved name is found at the specified `position`.
     /// Use `contains` first if unsure.
     #[allow(clippy::expect_used)]
-    pub fn get<T>(&self, position: &T) -> &'arena str
+    pub fn get<T>(&self, position: &T) -> &'arena [u8]
     where
         T: HasPosition,
     {
@@ -65,7 +65,7 @@ impl<'arena> ResolvedNames<'arena> {
     /// Attempts to resolve the name at the given source position.
     ///
     /// Returns `Some(&str)` if a resolved name exists at the position, or `None` otherwise.
-    pub fn resolve<T>(&self, position: &T) -> Option<&'arena str>
+    pub fn resolve<T>(&self, position: &T) -> Option<&'arena [u8]>
     where
         T: HasPosition,
     {
@@ -90,14 +90,14 @@ impl<'arena> ResolvedNames<'arena> {
     /// match. Returns `Some((start, end, fqn, imported))` for the covering entry, or
     /// `None` if the offset falls outside every tracked identifier.
     #[must_use]
-    pub fn at_offset(&self, offset: u32) -> Option<(u32, u32, &'arena str, bool)> {
+    pub fn at_offset(&self, offset: u32) -> Option<(u32, u32, &'arena [u8], bool)> {
         self.names.iter().find_map(|(&start, &(end, (name, imported)))| {
             if start <= offset && offset < end { Some((start, end, name, imported)) } else { None }
         })
     }
 
     /// Iterates over every resolved entry as `(start, end, fqn, imported)`.
-    pub fn iter(&self) -> impl Iterator<Item = (u32, u32, &'arena str, bool)> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = (u32, u32, &'arena [u8], bool)> + '_ {
         self.names.iter().map(|(&start, &(end, (name, imported)))| (start, end, name, imported))
     }
 
@@ -105,7 +105,7 @@ impl<'arena> ResolvedNames<'arena> {
     ///
     /// The full source span of the identifier is stored, so [`at_offset`](Self::at_offset)
     /// and other range-based lookups work without re-scanning the source.
-    pub(crate) fn insert_at(&mut self, span: Span, name: &'arena str, imported: bool) {
+    pub(crate) fn insert_at(&mut self, span: Span, name: &'arena [u8], imported: bool) {
         self.names.insert(span.start.offset, (span.end.offset, (name, imported)));
     }
 
@@ -114,7 +114,7 @@ impl<'arena> ResolvedNames<'arena> {
         note = "Allocates a HashSet for no good reason. Prefer `iter()` for allocation-free iteration, or `at_offset()` for cursor lookups."
     )]
     #[must_use]
-    pub fn all(&self) -> HashSet<(&u32, &(&'arena str, bool))> {
+    pub fn all(&self) -> HashSet<(&u32, &(&'arena [u8], bool))> {
         self.names.iter().map(|(k, (_, inner))| (k, inner)).collect()
     }
 }

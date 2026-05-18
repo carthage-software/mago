@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::misc::GenericParent;
 use crate::ttype::TType;
@@ -16,7 +16,7 @@ use crate::ttype::union::TUnion;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TGenericParameter {
     /// The name of the template parameter (e.g., `T` in `@template T`).
-    pub parameter_name: Atom,
+    pub parameter_name: Word,
     /// The upper bound or constraint (`Bound` in `T of Bound`), represented as a type union.
     pub constraint: Arc<TUnion>,
     /// The scope (class-like or function-like) where this template parameter was defined.
@@ -37,14 +37,14 @@ impl TGenericParameter {
     /// * `defining_entity`: The scope (`GenericParent`) where it was defined.
     #[inline]
     #[must_use]
-    pub fn new(parameter_name: Atom, constraint: Arc<TUnion>, defining_entity: GenericParent) -> Self {
+    pub fn new(parameter_name: Word, constraint: Arc<TUnion>, defining_entity: GenericParent) -> Self {
         Self { parameter_name, constraint, defining_entity, intersection_types: None }
     }
 
     /// Returns the name identifier of the template parameter.
     #[inline]
     #[must_use]
-    pub const fn get_parameter_name(&self) -> Atom {
+    pub const fn get_parameter_name(&self) -> Word {
         self.parameter_name
     }
 
@@ -152,35 +152,35 @@ impl TType for TGenericParameter {
         self.constraint.is_complex()
     }
 
-    fn get_id(&self) -> Atom {
-        let base_id = concat_atom!(
-            "'",
-            self.parameter_name.as_str(),
-            ".",
-            self.defining_entity.to_string().as_str(),
-            " extends ",
-            self.constraint.get_id().as_str()
+    fn get_id(&self) -> Word {
+        let base_id = concat_word!(
+            b"'",
+            self.parameter_name.as_bytes(),
+            b".",
+            self.defining_entity.id_word().as_bytes(),
+            b" extends ",
+            self.constraint.get_id().as_bytes()
         );
 
         let Some(intersection_types) = &self.intersection_types else {
             return base_id;
         };
 
-        let mut result = concat_atom!("(", base_id.as_str(), ")");
+        let mut result = concat_word!(b"(", base_id.as_bytes(), b")");
 
         for atomic in intersection_types {
             let atomic_id = atomic.get_id();
             if atomic.has_intersection_types() {
-                result = concat_atom!(result.as_str(), "&(", atomic_id.as_str(), ")");
+                result = concat_word!(result.as_bytes(), b"&(", atomic_id.as_bytes(), b")");
             } else {
-                result = concat_atom!(result.as_str(), "&", atomic_id.as_str());
+                result = concat_word!(result.as_bytes(), b"&", atomic_id.as_bytes());
             }
         }
 
         result
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

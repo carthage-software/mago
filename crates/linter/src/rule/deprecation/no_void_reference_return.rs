@@ -152,7 +152,7 @@ impl LintRule for NoVoidReferenceReturnRule {
                 self.report(ctx, "arrow function", arrow_function.span(), amperstand, false);
             }
             Node::PropertyHook(property_hook) => {
-                if "set" != property_hook.name.value {
+                if b"set" != property_hook.name.value {
                     return;
                 }
 

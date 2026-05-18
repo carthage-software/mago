@@ -6,10 +6,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::AtomSet;
-use mago_atom::atom;
-use mago_atom::starts_with_ignore_case;
 use mago_database::file::HasFileId;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -25,6 +21,7 @@ use mago_syntax::ast::Statement;
 use mago_syntax::ast::UseItem;
 use mago_syntax::ast::UseItems;
 use mago_text_edit::TextEdit;
+use mago_word::starts_with_ignore_case;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -34,6 +31,8 @@ use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
+use mago_bytes::BytesDisplay;
+use mago_bytes::trim_start_byte;
 
 #[derive(Debug, Clone)]
 pub struct NoRedundantUseRule {
@@ -110,16 +109,15 @@ impl LintRule for NoRedundantUseRule {
 
         // If `tempest` integration is enabled, and this file ends with `.view.php`,
         // check inline mentions as well.
-        if ctx.registry.is_integration_enabled(Integration::Tempest)
-            && ctx
-                .source_file
-                .path
-                .as_ref()
-                .and_then(|p| p.to_str())
-                .unwrap_or(ctx.source_file.name.as_ref())
-                .ends_with(".view.php")
-        {
-            check_inline_mentions = true;
+        if ctx.registry.is_integration_enabled(Integration::Tempest) {
+            let path_str = ctx.source_file.path.as_ref().and_then(|p| p.to_str());
+            let ends_with_view = match path_str {
+                Some(p) => p.ends_with(".view.php"),
+                None => ctx.source_file.name.as_ref().ends_with(b".view.php"),
+            };
+            if ends_with_view {
+                check_inline_mentions = true;
+            }
         }
 
         let use_declarations = utils::collect_use_declarations(program);
@@ -140,16 +138,22 @@ impl LintRule for NoRedundantUseRule {
                 let Statement::Use(use_stmt) = decl.parent_stmt else { continue };
                 same_namespace_spans.insert(decl.item.span());
 
+                let alias_display = BytesDisplay(alias.as_bytes());
                 let message = match &decl.namespace {
-                    Some(ns) => format!("Redundant import: `{alias}` is already in the current namespace `{ns}`."),
-                    None => format!("Redundant import: `{alias}` is already available in the root namespace."),
+                    Some(ns) => format!(
+                        "Redundant import: `{alias_display}` is already in the current namespace `{}`.",
+                        BytesDisplay(ns.as_bytes())
+                    ),
+                    None => {
+                        format!("Redundant import: `{alias_display}` is already available in the root namespace.")
+                    }
                 };
 
                 let issue = Issue::new(self.cfg.level(), message)
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(decl.item.name.span())
-                            .with_message(format!("`{alias}` does not need to be imported.")),
+                            .with_message(format!("`{alias_display}` does not need to be imported.")),
                     )
                     .with_annotation(
                         Annotation::secondary(use_stmt.r#use.span()).with_message("Redundant `use` statement."),
@@ -194,11 +198,12 @@ impl LintRule for NoRedundantUseRule {
                 if total_items == 1 {
                     let unused_decl = unused_items[0];
                     let alias = utils::get_alias(unused_decl.item);
-                    let issue = Issue::new(self.cfg.level(), format!("Unused import: `{alias}`."))
+                    let alias_display = BytesDisplay(alias.as_bytes());
+                    let issue = Issue::new(self.cfg.level(), format!("Unused import: `{alias_display}`."))
                         .with_code(self.meta.code)
                         .with_annotation(
                             Annotation::primary(unused_decl.item.name.span())
-                                .with_message(format!("`{alias}` is imported but never used.")),
+                                .with_message(format!("`{alias_display}` is imported but never used.")),
                         )
                         .with_annotation(
                             Annotation::secondary(use_stmt.r#use.span()).with_message("Unused `use` statement."),
@@ -231,9 +236,10 @@ impl LintRule for NoRedundantUseRule {
 
                 for unused_decl in &unused_items {
                     let alias = utils::get_alias(unused_decl.item);
+                    let alias_display = BytesDisplay(alias.as_bytes());
                     issue = issue.with_annotation(
                         Annotation::primary(unused_decl.item.span())
-                            .with_message(format!("`{alias}` is imported but never used.")),
+                            .with_message(format!("`{alias_display}` is imported but never used.")),
                     );
                 }
 
@@ -255,13 +261,14 @@ impl LintRule for NoRedundantUseRule {
 
 mod utils {
     use foldhash::HashSet;
-    use mago_atom::concat_atom;
     use mago_database::file::FileId;
     use mago_span::Span;
     use mago_syntax::walker::MutWalker;
+    use mago_word::Word;
+    use mago_word::WordSet;
+    use mago_word::concat_word;
+    use mago_word::word;
 
-    use super::Atom;
-    use super::AtomSet;
     use super::HasSpan;
     use super::Inline;
     use super::LintContext;
@@ -270,8 +277,8 @@ mod utils {
     use super::Statement;
     use super::UseItem;
     use super::UseItems;
-    use super::atom;
     use super::starts_with_ignore_case;
+    use super::trim_start_byte;
 
     #[derive(Debug, PartialEq, Eq, Clone, Copy)]
     pub(super) enum ImportType {
@@ -285,15 +292,15 @@ mod utils {
         pub parent_stmt: &'ast Statement<'ast>,
         pub item: &'ast UseItem<'ast>,
         pub import_type: ImportType,
-        pub fqn: Atom,
-        pub namespace: Option<Atom>,
+        pub fqn: Word,
+        pub namespace: Option<Word>,
     }
 
     pub(super) fn collect_use_declarations<'ast>(program: &'ast Program<'ast>) -> Vec<UseDeclaration<'ast>> {
         let mut declarations = Vec::new();
         for stmt in &program.statements {
             if let Statement::Namespace(ns) = stmt {
-                let namespace = ns.name.as_ref().map(|n| atom(n.value()));
+                let namespace = ns.name.as_ref().map(|n| word(n.value()));
                 for ns_stmt in ns.statements() {
                     collect_from_statement(ns_stmt, namespace, &mut declarations);
                 }
@@ -306,7 +313,7 @@ mod utils {
 
     fn collect_from_statement<'ast>(
         stmt: &'ast Statement<'ast>,
-        namespace: Option<Atom>,
+        namespace: Option<Word>,
         declarations: &mut Vec<UseDeclaration<'ast>>,
     ) {
         if let Statement::Use(use_stmt) = stmt {
@@ -318,7 +325,7 @@ mod utils {
                             parent_stmt: stmt,
                             item,
                             import_type,
-                            fqn: atom(item.name.value().trim_start_matches('\\')),
+                            fqn: word(trim_start_byte(item.name.value(), b'\\')),
                             namespace,
                         });
                     }
@@ -330,20 +337,20 @@ mod utils {
                             parent_stmt: stmt,
                             item,
                             import_type,
-                            fqn: atom(item.name.value().trim_start_matches('\\')),
+                            fqn: word(trim_start_byte(item.name.value(), b'\\')),
                             namespace,
                         });
                     }
                 }
                 UseItems::MixedList(list) => {
-                    let prefix = list.namespace.value().trim_start_matches('\\');
+                    let prefix = trim_start_byte(list.namespace.value(), b'\\');
                     for i in &list.items.nodes {
                         let import_type = match i.r#type.as_ref() {
                             Some(t) if t.is_function() => ImportType::Function,
                             Some(t) if t.is_const() => ImportType::Constant,
                             _ => ImportType::ClassOrNamespace,
                         };
-                        let fqn = concat_atom!(prefix, "\\", i.item.name.value());
+                        let fqn = concat_word!(prefix, b"\\", i.item.name.value());
                         declarations.push(UseDeclaration {
                             parent_stmt: stmt,
                             item: &i.item,
@@ -354,11 +361,11 @@ mod utils {
                     }
                 }
                 UseItems::TypedList(list) => {
-                    let prefix = list.namespace.value().trim_start_matches('\\');
+                    let prefix = trim_start_byte(list.namespace.value(), b'\\');
                     let import_type =
                         if list.r#type.is_function() { ImportType::Function } else { ImportType::Constant };
                     for item in &list.items.nodes {
-                        let fqn = concat_atom!(prefix, "\\", item.name.value());
+                        let fqn = concat_word!(prefix, b"\\", item.name.value());
                         declarations.push(UseDeclaration { parent_stmt: stmt, item, import_type, fqn, namespace });
                     }
                 }
@@ -368,27 +375,27 @@ mod utils {
 
     pub(super) fn is_item_used(
         decl: &UseDeclaration<'_>,
-        used_fqns: &AtomSet,
-        docblocks: &Vec<&str>,
-        inline_contents: &Vec<&str>,
+        used_fqns: &WordSet,
+        docblocks: &Vec<&[u8]>,
+        inline_contents: &Vec<&[u8]>,
     ) -> bool {
         let alias = get_alias(decl.item);
 
-        if docblocks.iter().any(|doc| contains_word(doc, alias.as_str())) {
+        if docblocks.iter().any(|doc| contains_word(doc, alias.as_bytes())) {
             return true;
         }
 
-        if inline_contents.iter().any(|content| contains_word(content, alias.as_str())) {
+        if inline_contents.iter().any(|content| contains_word(content, alias.as_bytes())) {
             return true;
         }
 
-        if used_fqns.iter().any(|used| used.eq_ignore_ascii_case(decl.fqn.as_str())) {
+        if used_fqns.iter().any(|used| used.as_bytes().eq_ignore_ascii_case(decl.fqn.as_bytes())) {
             return true;
         }
 
         if decl.import_type == ImportType::ClassOrNamespace {
-            let prefix = concat_atom!(decl.fqn, "\\");
-            if used_fqns.iter().any(|used| starts_with_ignore_case(used.as_str(), prefix.as_str())) {
+            let prefix = concat_word!(decl.fqn, b"\\");
+            if used_fqns.iter().any(|used| starts_with_ignore_case(used.as_bytes(), prefix.as_bytes())) {
                 return true;
             }
         }
@@ -398,24 +405,26 @@ mod utils {
 
     /// Checks if `haystack` contains `needle` as a whole word (not as a substring of a larger identifier).
     ///
-    /// A match is considered a whole word if the characters immediately before and after the match
-    /// are not ASCII alphanumeric or underscore (i.e., not PHP identifier characters).
-    fn contains_word(haystack: &str, needle: &str) -> bool {
+    /// A match is considered a whole word if the bytes immediately before and after the match
+    /// are not ASCII alphanumeric or underscore (i.e., not PHP identifier bytes).
+    fn contains_word(haystack: &[u8], needle: &[u8]) -> bool {
         let needle_len = needle.len();
-        let haystack_bytes = haystack.as_bytes();
+        if needle_len == 0 || haystack.len() < needle_len {
+            return false;
+        }
 
-        for (pos, _) in haystack.match_indices(needle) {
-            let before_ok =
-                pos == 0 || !haystack_bytes[pos - 1].is_ascii_alphanumeric() && haystack_bytes[pos - 1] != b'_';
+        let mut start = 0;
+        while let Some(pos) = memchr::memmem::find(&haystack[start..], needle) {
+            let pos = start + pos;
+            let before_ok = pos == 0 || !haystack[pos - 1].is_ascii_alphanumeric() && haystack[pos - 1] != b'_';
             let after_pos = pos + needle_len;
-            let after_ok = after_pos >= haystack_bytes.len()
-                || !haystack_bytes[after_pos].is_ascii_alphanumeric() && haystack_bytes[after_pos] != b'_';
-
+            let after_ok = after_pos >= haystack.len()
+                || !haystack[after_pos].is_ascii_alphanumeric() && haystack[after_pos] != b'_';
             if before_ok && after_ok {
                 return true;
             }
+            start = pos + 1;
         }
-
         false
     }
 
@@ -425,17 +434,13 @@ mod utils {
     /// - Both are in root namespace (import has no backslash, current namespace is None)
     /// - Import's parent namespace matches the current namespace
     pub(super) fn is_same_namespace_import(decl: &UseDeclaration<'_>) -> bool {
-        let fqn = decl.fqn.as_str();
+        let fqn = decl.fqn.as_bytes();
 
-        // Get the namespace part of the FQN (everything before the last segment)
-        let import_namespace = fqn.rfind('\\').map(|pos| &fqn[..pos]);
+        let import_namespace = memchr::memrchr(b'\\', fqn).map(|pos| &fqn[..pos]);
 
         let is_same_namespace = match (&decl.namespace, import_namespace) {
-            // Both in root namespace
             (None, None) => true,
-            // Current namespace matches import's parent namespace (case-insensitive)
-            (Some(ns), Some(import_ns)) => ns.as_str().eq_ignore_ascii_case(import_ns),
-            // One is root, other is not
+            (Some(ns), Some(import_ns)) => ns.as_bytes().eq_ignore_ascii_case(import_ns),
             _ => false,
         };
 
@@ -444,18 +449,22 @@ mod utils {
         }
 
         match &decl.item.alias {
-            Some(alias) => alias.identifier.value.eq_ignore_ascii_case(decl.item.name.last_segment()),
+            Some(alias) => {
+                let name_bytes = decl.item.name.value();
+                let last_segment = memchr::memrchr(b'\\', name_bytes).map_or(name_bytes, |i| &name_bytes[i + 1..]);
+                alias.identifier.value.eq_ignore_ascii_case(last_segment)
+            }
             None => true,
         }
     }
 
-    pub(super) fn get_docblocks<'arena>(program: &Program<'arena>) -> Vec<&'arena str> {
+    pub(super) fn get_docblocks<'arena>(program: &Program<'arena>) -> Vec<&'arena [u8]> {
         program.trivia.iter().filter(|t| t.kind.is_docblock()).map(|t| t.value).collect()
     }
 
-    pub(super) fn get_inline_contents<'arena>(program: &Program<'arena>) -> Vec<&'arena str> {
+    pub(super) fn get_inline_contents<'arena>(program: &Program<'arena>) -> Vec<&'arena [u8]> {
         struct InlineWalker<'arena> {
-            contents: Vec<&'arena str>,
+            contents: Vec<&'arena [u8]>,
         }
 
         impl<'arena> MutWalker<'_, 'arena, ()> for InlineWalker<'arena> {
@@ -469,18 +478,25 @@ mod utils {
         walker.contents
     }
 
-    pub(super) fn build_used_fqn_set(ctx: &LintContext<'_, '_>, declarations: &[UseDeclaration<'_>]) -> AtomSet {
+    pub(super) fn build_used_fqn_set(ctx: &LintContext<'_, '_>, declarations: &[UseDeclaration<'_>]) -> WordSet {
         let import_starts: HashSet<u32> = declarations.iter().map(|d| d.item.name.span().start.offset).collect();
 
         ctx.resolved_names
             .iter()
             .filter(|(start, _, _, _)| !import_starts.contains(start))
-            .map(|(_, _, fqn, _)| atom(fqn))
+            .map(|(_, _, fqn, _)| word(fqn))
             .collect()
     }
 
-    pub(super) fn get_alias(item: &UseItem) -> Atom {
-        atom(item.alias.as_ref().map_or_else(|| item.name.last_segment(), |alias| alias.identifier.value))
+    pub(super) fn get_alias(item: &UseItem) -> Word {
+        let bytes = item.alias.as_ref().map_or_else(
+            || {
+                let name_bytes = item.name.value();
+                memchr::memrchr(b'\\', name_bytes).map_or(name_bytes, |i| &name_bytes[i + 1..])
+            },
+            |alias| alias.identifier.value,
+        );
+        word(bytes)
     }
 
     pub(super) fn calculate_delete_range_for_item(

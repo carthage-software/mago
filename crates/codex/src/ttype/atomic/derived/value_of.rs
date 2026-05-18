@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -56,7 +55,7 @@ impl TValueOf {
                     value_types.extend(iterable.get_value_type().types.iter().cloned());
                 }
                 TAtomic::Object(TObject::Enum(TEnum { name: enum_name, case: Some(case_name) })) => {
-                    let Some(metadata) = codebase.get_enum(enum_name) else {
+                    let Some(metadata) = codebase.get_enum(enum_name.as_bytes()) else {
                         continue;
                     };
 
@@ -73,7 +72,7 @@ impl TValueOf {
                         continue;
                     };
 
-                    let Some(class_like_metadata) = codebase.get_class_like(&name) else {
+                    let Some(class_like_metadata) = codebase.get_class_like(name.as_bytes()) else {
                         continue;
                     };
 
@@ -92,20 +91,21 @@ impl TValueOf {
                     }
 
                     let is_enum_interface = class_like_metadata.flags.is_enum_interface()
-                        || codebase.is_instance_of(&class_like_metadata.name, &atom("unitenum"));
+                        || codebase.is_instance_of(class_like_metadata.name.as_bytes(), b"unitenum");
 
                     if !is_enum_interface {
                         continue;
                     }
 
                     if codebase
-                        .is_instance_of(&class_like_metadata.name, &atom("__internal_do_not_use__stringbackedenum"))
+                        .is_instance_of(class_like_metadata.name.as_bytes(), b"__internal_do_not_use__stringbackedenum")
                     {
                         value_types.push(TAtomic::Scalar(TScalar::string()));
                         continue;
                     }
 
-                    if codebase.is_instance_of(&class_like_metadata.name, &atom("__internal_do_not_use__intbackedenum"))
+                    if codebase
+                        .is_instance_of(class_like_metadata.name.as_bytes(), b"__internal_do_not_use__intbackedenum")
                     {
                         value_types.push(TAtomic::Scalar(TScalar::int()));
                         continue;
@@ -148,11 +148,11 @@ impl TType for TValueOf {
         false
     }
 
-    fn get_id(&self) -> Atom {
-        concat_atom!("value-of<", self.0.get_id().as_str(), ">")
+    fn get_id(&self) -> Word {
+        concat_word!(b"value-of<", self.0.get_id(), b">")
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

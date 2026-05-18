@@ -113,7 +113,7 @@ impl LintRule for LiteralNamedArgumentRule {
             return;
         }
 
-        let mut literal_args: Vec<(&Literal<'arena>, &'arena str)> = Vec::new();
+        let mut literal_args: Vec<(&Literal<'arena>, &'arena [u8])> = Vec::new();
 
         for (index, argument) in function_call.argument_list.arguments.iter().enumerate() {
             if index == 0 && !self.cfg.check_first_argument {
@@ -128,13 +128,13 @@ impl LintRule for LiteralNamedArgumentRule {
                 continue;
             };
 
-            let literal_value = match literal {
+            let literal_value: &[u8] = match literal {
                 Literal::String(lit_str) => lit_str.raw,
                 Literal::Integer(lit_int) => lit_int.raw,
                 Literal::Float(lit_float) => lit_float.raw,
-                Literal::True(_) => "true",
-                Literal::False(_) => "false",
-                Literal::Null(_) => "null",
+                Literal::True(_) => b"true",
+                Literal::False(_) => b"false",
+                Literal::Null(_) => b"null",
             };
 
             literal_args.push((literal, literal_value));
@@ -145,10 +145,13 @@ impl LintRule for LiteralNamedArgumentRule {
         }
 
         for (literal, literal_value) in literal_args {
+            let literal_display = mago_bytes::BytesDisplay(literal_value);
             ctx.collector.report(
                 Issue::new(
                     self.cfg.level,
-                    format!("Literal argument `{literal_value}` should be passed as a named argument for clarity."),
+                    format!(
+                        "Literal argument `{literal_display}` should be passed as a named argument for clarity."
+                    ),
                 )
                 .with_code(self.meta.code)
                 .with_annotation(
@@ -157,7 +160,7 @@ impl LintRule for LiteralNamedArgumentRule {
                 .with_note(
                     "Passing literals positionally can make code less clear, especially with booleans, numbers, or `null`.",
                 )
-                .with_help(format!("Consider using a named argument instead: `function_name(param: {literal_value})`.")),
+                .with_help(format!("Consider using a named argument instead: `function_name(param: {literal_display})`.")),
             );
         }
     }

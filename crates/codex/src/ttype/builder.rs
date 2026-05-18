@@ -3,11 +3,6 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use bumpalo::Bump;
-use mago_atom::Atom;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
-use mago_atom::i64_atom;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
@@ -30,6 +25,11 @@ use mago_type_syntax::ast::SingleGenericParameter;
 use mago_type_syntax::ast::Type;
 use mago_type_syntax::ast::UnionType;
 use mago_type_syntax::ast::object::ObjectType;
+use mago_word::Word;
+use mago_word::ascii_lowercase_word;
+use mago_word::concat_word;
+use mago_word::i64_word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -132,7 +132,7 @@ use crate::ttype::wrap_atomic;
 /// * `type_context` - The context providing information about currently defined
 ///   template parameters (e.g., from `@template` tags). Needed
 ///   during conversion to resolve template parameter references.
-/// * `classname` - An optional `Atom` representing the fully qualified name
+/// * `classname` - An optional `Word` representing the fully qualified name
 ///   of the current class context. Used during conversion to resolve
 ///   `self` type references. Should be `None` if not in a class context.
 ///
@@ -150,11 +150,11 @@ use crate::ttype::wrap_atomic;
 /// - Invalid type combinations are used (e.g., incompatible intersection types)
 pub fn get_type_from_string<'arena>(
     arena: &'arena Bump,
-    type_string: &'arena str,
+    type_string: &'arena [u8],
     span: Span,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
-    classname: Option<Atom>,
+    classname: Option<Word>,
 ) -> Result<TUnion, TypeError> {
     let ast = mago_type_syntax::parse_str(arena, span, type_string)?;
 
@@ -175,7 +175,7 @@ pub fn get_union_from_type_ast(
     ttype: &Type<'_>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
-    classname: Option<Atom>,
+    classname: Option<Word>,
 ) -> Result<TUnion, TypeError> {
     Ok(match ttype {
         Type::Parenthesized(parenthesized_type) => {
@@ -356,10 +356,10 @@ pub fn get_union_from_type_ast(
             classname,
         )?,
         Type::MemberReference(member_reference) => {
-            let class_like_name = if member_reference.class.value.eq_ignore_ascii_case("self")
-                || member_reference.class.value.eq_ignore_ascii_case("static")
-                || member_reference.class.value.eq("this")
-                || member_reference.class.value.eq("$this")
+            let class_like_name = if member_reference.class.value.eq_ignore_ascii_case(b"self")
+                || member_reference.class.value.eq_ignore_ascii_case(b"static")
+                || member_reference.class.value.eq(b"this")
+                || member_reference.class.value.eq(b"$this")
             {
                 let Some(classname) = classname else {
                     return Err(TypeError::InvalidType(
@@ -370,24 +370,24 @@ pub fn get_union_from_type_ast(
                 };
 
                 classname
-            } else if member_reference.class.value.eq_ignore_ascii_case("parent") {
-                atom("parent")
+            } else if member_reference.class.value.eq_ignore_ascii_case(b"parent") {
+                word("parent")
             } else {
                 let (class_like_name, _) = scope.resolve(NameKind::Default, member_reference.class.value);
 
-                atom(&class_like_name)
+                word(&class_like_name)
             };
 
             let member_selector = match member_reference.member {
                 MemberReferenceSelector::Wildcard(_) => TReferenceMemberSelector::Wildcard,
                 MemberReferenceSelector::Identifier(identifier) => {
-                    TReferenceMemberSelector::Identifier(atom(identifier.value))
+                    TReferenceMemberSelector::Identifier(word(identifier.value))
                 }
                 MemberReferenceSelector::StartsWith(identifier, _) => {
-                    TReferenceMemberSelector::StartsWith(atom(identifier.value))
+                    TReferenceMemberSelector::StartsWith(word(identifier.value))
                 }
                 MemberReferenceSelector::EndsWith(_, identifier) => {
-                    TReferenceMemberSelector::EndsWith(atom(identifier.value))
+                    TReferenceMemberSelector::EndsWith(word(identifier.value))
                 }
             };
 
@@ -396,20 +396,20 @@ pub fn get_union_from_type_ast(
         Type::GlobalWildcardReference(global_wildcard) => {
             let selector = match global_wildcard.selector {
                 GlobalWildcardSelector::StartsWith(identifier, _) => {
-                    TGlobalReferenceSelector::StartsWith(atom(identifier.value))
+                    TGlobalReferenceSelector::StartsWith(word(identifier.value))
                 }
                 GlobalWildcardSelector::EndsWith(_, identifier) => {
-                    TGlobalReferenceSelector::EndsWith(atom(identifier.value))
+                    TGlobalReferenceSelector::EndsWith(word(identifier.value))
                 }
             };
 
             wrap_atomic(TAtomic::Reference(TReference::Global { selector }))
         }
         Type::AliasReference(alias_reference) => {
-            let class_like_name = if alias_reference.class.value.eq_ignore_ascii_case("self")
-                || alias_reference.class.value.eq_ignore_ascii_case("static")
-                || alias_reference.class.value.eq("this")
-                || alias_reference.class.value.eq("$this")
+            let class_like_name = if alias_reference.class.value.eq_ignore_ascii_case(b"self")
+                || alias_reference.class.value.eq_ignore_ascii_case(b"static")
+                || alias_reference.class.value.eq(b"this")
+                || alias_reference.class.value.eq(b"$this")
             {
                 let Some(classname) = classname else {
                     return Err(TypeError::InvalidType(
@@ -420,17 +420,17 @@ pub fn get_union_from_type_ast(
                 };
 
                 classname
-            } else if alias_reference.class.value.eq_ignore_ascii_case("parent") {
-                atom("parent")
+            } else if alias_reference.class.value.eq_ignore_ascii_case(b"parent") {
+                word("parent")
             } else {
                 let (class_like_name, _) = scope.resolve(NameKind::Default, alias_reference.class.value);
 
-                ascii_lowercase_atom(&class_like_name)
+                ascii_lowercase_word(&class_like_name)
             };
 
             let alias_name = match alias_reference.alias {
-                AliasName::Identifier(identifier) => atom(identifier.value),
-                AliasName::Keyword(keyword) => atom(keyword.value),
+                AliasName::Identifier(identifier) => word(identifier.value),
+                AliasName::Keyword(keyword) => word(keyword.value),
             };
 
             wrap_atomic(TAtomic::Alias(TAlias::new(class_like_name, alias_name)))
@@ -441,7 +441,7 @@ pub fn get_union_from_type_ast(
             wrap_atomic(get_callable_from_ast(callable_type, scope, type_context, classname)?)
         }
         Type::Reference(reference_type) => {
-            let reference_name_atom = atom(reference_type.identifier.value);
+            let reference_name_atom = word(reference_type.identifier.value);
 
             if let Some((source_class, original_name)) = type_context.get_imported_type_alias(reference_name_atom) {
                 return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(*source_class, *original_name))));
@@ -494,7 +494,7 @@ pub fn get_union_from_type_ast(
         Type::UnspecifiedLiteralFloat(_) => get_unspecified_literal_float(),
         Type::LiteralFloat(lit) => get_literal_float(*lit.value),
         Type::LiteralInt(lit) => get_literal_int(lit.value as i64),
-        Type::LiteralString(lit) => get_literal_string(atom(lit.value)),
+        Type::LiteralString(lit) => get_literal_string(word(lit.value)),
         Type::Negated(negated) => match negated.number {
             LiteralIntOrFloatType::Int(lit) => get_literal_int(-(lit.value as i64)),
             LiteralIntOrFloatType::Float(lit) => get_literal_float(-(*lit.value)),
@@ -563,10 +563,10 @@ pub fn get_union_from_type_ast(
             conditional.is_negated(),
         )))),
         Type::Variable(variable_type) => {
-            if variable_type.value == "$this" {
-                TUnion::from_single(Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new_this(atom("$this"))))))
+            if variable_type.value == b"$this" {
+                TUnion::from_single(Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new_this(word("$this"))))))
             } else {
-                TUnion::from_single(Cow::Owned(TAtomic::Variable(atom(variable_type.value))))
+                TUnion::from_single(Cow::Owned(TAtomic::Variable(word(variable_type.value))))
             }
         }
         Type::KeyOf(key_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(TKeyOf::new(Arc::new(
@@ -658,7 +658,7 @@ fn get_object_from_ast(
     object: &ObjectType<'_>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
-    classname: Option<Atom>,
+    classname: Option<Word>,
 ) -> Result<TAtomic, TypeError> {
     let Some(properties) = object.properties.as_ref() else {
         return Ok(TAtomic::Object(TObject::Any));
@@ -673,10 +673,10 @@ fn get_object_from_ast(
         };
 
         let key = match field_key.key {
-            ShapeKey::String { value, .. } => atom(value),
-            ShapeKey::Integer { value, .. } => i64_atom(value),
+            ShapeKey::String { value, .. } => word(value),
+            ShapeKey::Integer { value, .. } => i64_word(value),
             ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
-                concat_atom!(class_name.value, "::", constant_name.value)
+                concat_word!(class_name.value, b"::", constant_name.value)
             }
         };
 
@@ -693,7 +693,7 @@ fn get_shape_from_ast(
     shape: &ShapeType<'_>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
-    classname: Option<Atom>,
+    classname: Option<Word>,
 ) -> Result<TAtomic, TypeError> {
     if shape.kind.is_list() {
         let mut list = TList::new(match &shape.additional_fields {
@@ -717,23 +717,23 @@ fn get_shape_from_ast(
 
                 let offset = if let Some(field_key) = field.key.as_ref() {
                     let array_key = match field_key.key {
-                        ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
+                        ShapeKey::String { value, .. } => ArrayKey::String(word(value)),
                         ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
                         ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
-                            let class_like_name = if class_name.value.eq_ignore_ascii_case("self")
-                                || class_name.value.eq_ignore_ascii_case("static")
-                                || class_name.value.eq("this")
-                                || class_name.value.eq("$this")
+                            let class_like_name = if class_name.value.eq_ignore_ascii_case(b"self")
+                                || class_name.value.eq_ignore_ascii_case(b"static")
+                                || class_name.value.eq(b"this")
+                                || class_name.value.eq(b"$this")
                             {
-                                classname.unwrap_or_else(|| atom(class_name.value))
-                            } else if class_name.value.eq_ignore_ascii_case("parent") {
-                                atom("parent")
+                                classname.unwrap_or_else(|| word(class_name.value))
+                            } else if class_name.value.eq_ignore_ascii_case(b"parent") {
+                                word("parent")
                             } else {
                                 let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
-                                atom(&resolved)
+                                word(&resolved)
                             };
 
-                            ArrayKey::ClassLikeConstant { class_like_name, constant_name: atom(constant_name.value) }
+                            ArrayKey::ClassLikeConstant { class_like_name, constant_name: word(constant_name.value) }
                         }
                     };
 
@@ -809,23 +809,23 @@ fn get_shape_from_ast(
 
                 let array_key = if let Some(field_key) = field.key.as_ref() {
                     let array_key = match field_key.key {
-                        ShapeKey::String { value, .. } => ArrayKey::String(atom(value)),
+                        ShapeKey::String { value, .. } => ArrayKey::String(word(value)),
                         ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
                         ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
-                            let class_like_name = if class_name.value.eq_ignore_ascii_case("self")
-                                || class_name.value.eq_ignore_ascii_case("static")
-                                || class_name.value.eq("this")
-                                || class_name.value.eq("$this")
+                            let class_like_name = if class_name.value.eq_ignore_ascii_case(b"self")
+                                || class_name.value.eq_ignore_ascii_case(b"static")
+                                || class_name.value.eq(b"this")
+                                || class_name.value.eq(b"$this")
                             {
-                                classname.unwrap_or_else(|| atom(class_name.value))
-                            } else if class_name.value.eq_ignore_ascii_case("parent") {
-                                atom("parent")
+                                classname.unwrap_or_else(|| word(class_name.value))
+                            } else if class_name.value.eq_ignore_ascii_case(b"parent") {
+                                word("parent")
                             } else {
                                 let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
-                                atom(&resolved)
+                                word(&resolved)
                             };
 
-                            ArrayKey::ClassLikeConstant { class_like_name, constant_name: atom(constant_name.value) }
+                            ArrayKey::ClassLikeConstant { class_like_name, constant_name: word(constant_name.value) }
                         }
                     };
 
@@ -866,7 +866,7 @@ fn get_callable_from_ast(
     callable: &CallableType<'_>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
-    classname: Option<Atom>,
+    classname: Option<Word>,
 ) -> Result<TAtomic, TypeError> {
     let mut parameters = vec![];
     let mut return_type = None;
@@ -910,25 +910,26 @@ fn get_reference_from_ast(
     generics: Option<&GenericParameters<'_>>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
-    classname: Option<Atom>,
+    classname: Option<Word>,
 ) -> Result<TAtomic, TypeError> {
     let reference_name = reference_identifier.value;
 
     let mut is_this = false;
     let mut is_static = false;
     let mut is_named_object = false;
-    let fq_reference_name_id = if reference_name == "this" || reference_name == "static" || reference_name == "self" {
+    let fq_reference_name_id = if reference_name == b"this" || reference_name == b"static" || reference_name == b"self"
+    {
         is_named_object = true;
-        is_this = reference_name == "this";
-        is_static = reference_name != "self";
+        is_this = reference_name == b"this";
+        is_static = reference_name != b"self";
 
-        classname.unwrap_or_else(|| atom("static"))
-    } else if reference_name == "parent" {
+        classname.unwrap_or_else(|| word("static"))
+    } else if reference_name == b"parent" {
         is_named_object = true;
 
-        atom("parent")
+        word("parent")
     } else {
-        let reference_name_atom = atom(reference_name);
+        let reference_name_atom = word(reference_name);
         if let Some(defining_entities) = type_context.get_template_definition(reference_name_atom)
             && generics.is_none()
         {
@@ -938,7 +939,7 @@ fn get_reference_from_ast(
         let (fq_reference_name, _) = scope.resolve(NameKind::Default, reference_name);
 
         // `Closure` -> `Closure(mixed...): mixed`
-        if fq_reference_name.eq_ignore_ascii_case("Closure") && generics.is_none() {
+        if fq_reference_name.eq_ignore_ascii_case(b"Closure") && generics.is_none() {
             return Ok(TAtomic::Callable(TCallable::Signature(
                 TCallableSignature::new(false, true)
                     .with_parameters(vec![TCallableParameter::new(Some(Arc::new(get_mixed())), false, true, false)])
@@ -946,7 +947,7 @@ fn get_reference_from_ast(
             )));
         }
 
-        atom(&fq_reference_name)
+        word(&fq_reference_name)
     };
 
     let mut type_parameters = None;
@@ -961,12 +962,12 @@ fn get_reference_from_ast(
         type_parameters = Some(parameters);
     }
 
-    let is_generator = fq_reference_name_id.eq_ignore_ascii_case("Generator");
+    let is_generator = fq_reference_name_id.as_bytes().eq_ignore_ascii_case(b"Generator");
 
     let is_iterator = is_generator
-        || fq_reference_name_id.eq_ignore_ascii_case("Iterator")
-        || fq_reference_name_id.eq_ignore_ascii_case("IteratorAggregate")
-        || fq_reference_name_id.eq_ignore_ascii_case("Traversable");
+        || fq_reference_name_id.as_bytes().eq_ignore_ascii_case(b"Iterator")
+        || fq_reference_name_id.as_bytes().eq_ignore_ascii_case(b"IteratorAggregate")
+        || fq_reference_name_id.as_bytes().eq_ignore_ascii_case(b"Traversable");
 
     let mixed_default = || {
         let mut union = get_mixed();
@@ -1026,7 +1027,7 @@ fn get_array_type_from_ast<'src>(
     non_empty: bool,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
-    classname: Option<Atom>,
+    classname: Option<Word>,
 ) -> Result<TAtomic, TypeError> {
     if key.is_some() && value.is_none() {
         std::mem::swap(&mut key, &mut value);
@@ -1056,7 +1057,7 @@ fn get_list_type_from_ast(
     non_empty: bool,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
-    classname: Option<Atom>,
+    classname: Option<Word>,
 ) -> Result<TAtomic, TypeError> {
     Ok(TAtomic::Array(TArray::List(TList {
         element_type: Arc::new(if let Some(v) = value {
@@ -1077,7 +1078,7 @@ fn get_class_string_type_from_ast(
     parameter: Option<&SingleGenericParameter<'_>>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
-    classname: Option<Atom>,
+    classname: Option<Word>,
 ) -> Result<TUnion, TypeError> {
     Ok(match parameter {
         Some(parameter) => {
@@ -1125,7 +1126,7 @@ fn get_class_string_type_from_ast(
 }
 
 #[inline]
-fn get_template_atomic(defining_entities: &[GenericTemplate], parameter_name: Atom) -> TAtomic {
+fn get_template_atomic(defining_entities: &[GenericTemplate], parameter_name: Word) -> TAtomic {
     let GenericTemplate { defining_entity: template_source, constraint: template_type, .. } = &defining_entities[0];
 
     TAtomic::GenericParameter(TGenericParameter {

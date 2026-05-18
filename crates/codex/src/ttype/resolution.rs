@@ -1,6 +1,6 @@
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -15,18 +15,18 @@ use crate::ttype::union::TUnion;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TypeResolutionContext {
     /// Definitions of template types available in this context, including their constraints.
-    template_definitions: AtomMap<Vec<GenericTemplate>>,
+    template_definitions: WordMap<Vec<GenericTemplate>>,
 
     /// Concrete types that template parameters (often from an outer scope) resolve to
     /// within this specific context.
-    resolved_template_types: AtomMap<TUnion>,
+    resolved_template_types: WordMap<TUnion>,
 
     /// Type aliases defined in the current class scope (from @type tags).
-    type_aliases: AtomSet,
+    type_aliases: WordSet,
 
     /// Imported type aliases (from @import-type tags).
     /// Maps local alias name to (source class FQCN, original type name).
-    imported_type_aliases: AtomMap<(Atom, Atom)>,
+    imported_type_aliases: WordMap<(Word, Word)>,
 }
 
 /// Provides a default, empty type resolution context.
@@ -41,10 +41,10 @@ impl TypeResolutionContext {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            template_definitions: AtomMap::default(),
-            resolved_template_types: AtomMap::default(),
-            type_aliases: AtomSet::default(),
-            imported_type_aliases: AtomMap::default(),
+            template_definitions: WordMap::default(),
+            resolved_template_types: WordMap::default(),
+            type_aliases: WordSet::default(),
+            imported_type_aliases: WordMap::default(),
         }
     }
 
@@ -65,7 +65,7 @@ impl TypeResolutionContext {
     /// * `name`: The name of the template parameter (e.g., `"T"`).
     /// * `constraints`: A list of constraints for the template parameter.
     #[must_use]
-    pub fn with_template_definition(mut self, name: Atom, constraints: Vec<GenericTemplate>) -> Self {
+    pub fn with_template_definition(mut self, name: Word, constraints: Vec<GenericTemplate>) -> Self {
         self.template_definitions.insert(name, constraints);
         self
     }
@@ -78,7 +78,7 @@ impl TypeResolutionContext {
     /// * `name`: The name of the template parameter (e.g., `"T"`).
     /// * `resolved_type`: The concrete `TUnion` type that `name` resolves to here.
     #[must_use]
-    pub fn with_resolved_template_type(mut self, name: Atom, resolved_type: TUnion) -> Self {
+    pub fn with_resolved_template_type(mut self, name: Word, resolved_type: TUnion) -> Self {
         self.resolved_template_types.insert(name, resolved_type);
         self
     }
@@ -86,26 +86,26 @@ impl TypeResolutionContext {
     /// Returns a reference to the template definitions map.
     #[inline]
     #[must_use]
-    pub fn get_template_definitions(&self) -> &AtomMap<Vec<GenericTemplate>> {
+    pub fn get_template_definitions(&self) -> &WordMap<Vec<GenericTemplate>> {
         &self.template_definitions
     }
 
     /// Returns a mutable reference to the template definitions map.
     #[inline]
-    pub fn get_template_definitions_mut(&mut self) -> &mut AtomMap<Vec<GenericTemplate>> {
+    pub fn get_template_definitions_mut(&mut self) -> &mut WordMap<Vec<GenericTemplate>> {
         &mut self.template_definitions
     }
 
     /// Returns a reference to the resolved template types map.
     #[inline]
     #[must_use]
-    pub fn get_resolved_template_types(&self) -> &AtomMap<TUnion> {
+    pub fn get_resolved_template_types(&self) -> &WordMap<TUnion> {
         &self.resolved_template_types
     }
 
     /// Returns a mutable reference to the resolved template types map.
     #[inline]
-    pub fn get_resolved_template_types_mut(&mut self) -> &mut AtomMap<TUnion> {
+    pub fn get_resolved_template_types_mut(&mut self) -> &mut WordMap<TUnion> {
         &mut self.resolved_template_types
     }
 
@@ -119,7 +119,7 @@ impl TypeResolutionContext {
     ///
     /// `Some` containing a reference to the vector of constraints if the template is defined, `None` otherwise.
     #[must_use]
-    pub fn get_template_definition(&self, name: Atom) -> Option<&Vec<GenericTemplate>> {
+    pub fn get_template_definition(&self, name: Word) -> Option<&Vec<GenericTemplate>> {
         self.template_definitions.get(&name)
     }
 
@@ -133,7 +133,7 @@ impl TypeResolutionContext {
     ///
     /// `true` if the template parameter is defined, `false` otherwise.
     #[must_use]
-    pub fn has_template_definition(&self, name: Atom) -> bool {
+    pub fn has_template_definition(&self, name: Word) -> bool {
         self.template_definitions.contains_key(&name)
     }
 
@@ -143,7 +143,7 @@ impl TypeResolutionContext {
     ///
     /// * `aliases`: A set of type alias names.
     #[must_use]
-    pub fn with_type_aliases(mut self, aliases: AtomSet) -> Self {
+    pub fn with_type_aliases(mut self, aliases: WordSet) -> Self {
         self.type_aliases = aliases;
         self
     }
@@ -154,7 +154,7 @@ impl TypeResolutionContext {
     ///
     /// * `name`: The name of the type alias to add.
     #[must_use]
-    pub fn with_type_alias(mut self, name: Atom) -> Self {
+    pub fn with_type_alias(mut self, name: Word) -> Self {
         self.type_aliases.insert(name);
         self
     }
@@ -165,7 +165,7 @@ impl TypeResolutionContext {
     ///
     /// * `name`: The name of the type alias to check.
     #[must_use]
-    pub fn has_type_alias(&self, name: Atom) -> bool {
+    pub fn has_type_alias(&self, name: Word) -> bool {
         self.type_aliases.contains(&name)
     }
 
@@ -177,7 +177,7 @@ impl TypeResolutionContext {
     /// * `source_class`: The FQCN of the class where the type alias is defined.
     /// * `original_name`: The original name of the type alias in the source class.
     #[must_use]
-    pub fn with_imported_type_alias(mut self, local_name: Atom, source_class: Atom, original_name: Atom) -> Self {
+    pub fn with_imported_type_alias(mut self, local_name: Word, source_class: Word, original_name: Word) -> Self {
         self.imported_type_aliases.insert(local_name, (source_class, original_name));
         self
     }
@@ -192,7 +192,7 @@ impl TypeResolutionContext {
     ///
     /// `Some` containing a reference to (`source_class`, `original_name`) if found, `None` otherwise.
     #[must_use]
-    pub fn get_imported_type_alias(&self, name: Atom) -> Option<&(Atom, Atom)> {
+    pub fn get_imported_type_alias(&self, name: Word) -> Option<&(Word, Word)> {
         self.imported_type_aliases.get(&name)
     }
 
@@ -202,7 +202,7 @@ impl TypeResolutionContext {
     ///
     /// * `name`: The local name of the imported alias to check.
     #[must_use]
-    pub fn has_imported_type_alias(&self, name: Atom) -> bool {
+    pub fn has_imported_type_alias(&self, name: Word) -> bool {
         self.imported_type_aliases.contains_key(&name)
     }
 
@@ -216,7 +216,7 @@ impl TypeResolutionContext {
     ///
     /// `Some` containing a reference to the resolved `TUnion` type if found, `None` otherwise.
     #[must_use]
-    pub fn get_resolved_template_type(&self, name: Atom) -> Option<&TUnion> {
+    pub fn get_resolved_template_type(&self, name: Word) -> Option<&TUnion> {
         self.resolved_template_types.get(&name)
     }
 
@@ -230,7 +230,7 @@ impl TypeResolutionContext {
     /// Checks if a specific template parameter has a concrete resolved type in this context.
     #[inline]
     #[must_use]
-    pub fn is_template_resolved(&self, name: Atom) -> bool {
+    pub fn is_template_resolved(&self, name: Word) -> bool {
         self.resolved_template_types.contains_key(&name)
     }
 

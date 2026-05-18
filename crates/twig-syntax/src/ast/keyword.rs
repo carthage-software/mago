@@ -8,7 +8,7 @@ use mago_span::Span;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Keyword<'arena> {
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 /// A plain identifier (loop target, macro argument name, block name,
@@ -16,7 +16,7 @@ pub struct Keyword<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Identifier<'arena> {
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 impl HasSpan for Keyword<'_> {

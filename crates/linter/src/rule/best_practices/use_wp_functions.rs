@@ -176,7 +176,7 @@ fn is_http_url_in_args(function_call: &FunctionCall) -> bool {
     for argument in &argument_list.arguments {
         if let Expression::Literal(Literal::String(string_literal)) = &argument.value()
             && let Some(value) = extract_string_value(string_literal)
-            && (value.starts_with("http://") || value.starts_with("https://"))
+            && (value.starts_with(b"http://") || value.starts_with(b"https://"))
         {
             return true;
         }
@@ -186,6 +186,6 @@ fn is_http_url_in_args(function_call: &FunctionCall) -> bool {
 }
 
 /// Extract string value from a literal string
-fn extract_string_value<'arena>(string_literal: &LiteralString<'arena>) -> Option<&'arena str> {
+fn extract_string_value<'arena>(string_literal: &LiteralString<'arena>) -> Option<&'arena [u8]> {
     string_literal.value
 }

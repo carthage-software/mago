@@ -12,7 +12,7 @@ use mago_text_edit::TextEditor;
 
 fn lint_and_fix(code: &str) -> String {
     let arena = Bump::new();
-    let file = File::ephemeral(Cow::Owned("test.php".to_string()), Cow::Owned(code.to_string()));
+    let file = File::ephemeral(Cow::Owned(b"test.php".to_vec()), Cow::Owned(code.as_bytes().to_vec()));
     let program = parse_file(&arena, &file);
 
     let resolver = NameResolver::new(&arena);
@@ -23,14 +23,14 @@ fn lint_and_fix(code: &str) -> String {
     let linter = Linter::from_registry(&arena, Arc::new(registry), settings.php_version);
     let mut issues = linter.lint(&file, program, &resolved_names);
 
-    let mut editor = TextEditor::new(code);
+    let mut editor = TextEditor::new(code.as_bytes());
     for (_, edits) in issues.take_edits() {
         for edit in edits {
-            editor.apply(edit, None::<fn(&str) -> bool>);
+            editor.apply(edit, None::<fn(&[u8]) -> bool>);
         }
     }
 
-    editor.finish()
+    String::from_utf8_lossy(&editor.finish()).into_owned()
 }
 
 #[test]

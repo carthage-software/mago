@@ -1,7 +1,9 @@
 use std::fmt::Write as _;
 use std::rc::Rc;
 
-use mago_atom::atom;
+use mago_word::word;
+
+use mago_bytes::BytesDisplay;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::union::TUnion;
@@ -65,9 +67,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IndirectVariable<'arena> {
             Some(expression_type) if expression_type.is_single() => {
                 match expression_type.get_single_literal_string_value() {
                     Some(value) => {
-                        let variable_name = format!("${value}");
+                        let variable_name = format!("${}", BytesDisplay(value));
 
-                        read_variable(context, block_context, artifacts, &variable_name, self.span())
+                        read_variable(context, block_context, artifacts, variable_name.as_bytes(), self.span())
                     }
                     _ => Rc::new(get_mixed()),
                 }
@@ -94,9 +96,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NestedVariable<'arena> {
             Some(expression_type) if expression_type.is_single() => {
                 match expression_type.get_single_literal_string_value() {
                     Some(value) => {
-                        let variable_name = format!("${value}");
+                        let variable_name = format!("${}", BytesDisplay(value));
 
-                        read_variable(context, block_context, artifacts, &variable_name, self.span())
+                        read_variable(context, block_context, artifacts, variable_name.as_bytes(), self.span())
                     }
                     _ => Rc::new(get_mixed()),
                 }
@@ -114,11 +116,12 @@ fn read_variable<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    variable_name: &str,
+    variable_name_bytes: &[u8],
     variable_span: Span,
 ) -> Rc<TUnion> {
-    let variable_atom = atom(variable_name);
-    block_context.add_conditionally_referenced_variable_atom(variable_name, variable_atom);
+    let variable_atom = word(variable_name_bytes);
+    let variable_name = BytesDisplay(variable_name_bytes);
+    block_context.add_conditionally_referenced_variable_atom(variable_name_bytes, variable_atom);
 
     let variable_type = match block_context.locals.get(&variable_atom) {
         Some(variable_type) => Rc::clone(variable_type),
@@ -185,12 +188,12 @@ fn read_variable<'ctx>(
                 );
 
                 let mut has_confusable_characters = false;
-                if let Some(confusable_note) = generate_confusable_character_note(variable_name) {
+                if let Some(confusable_note) = generate_confusable_character_note(variable_name_bytes) {
                     has_confusable_characters = true;
                     issue = issue.with_note(confusable_note);
                 }
 
-                let similar_suggestions = find_similar_variable_names(block_context, variable_name);
+                let similar_suggestions = find_similar_variable_names(block_context, variable_name_bytes);
 
                 let mut help_message =
                     format!("Ensure `{variable_name}` is assigned a value before this use, or check its scope.");
@@ -244,8 +247,8 @@ fn read_variable<'ctx>(
     variable_type
 }
 
-fn find_similar_variable_names(context: &BlockContext<'_>, target: &str) -> Vec<String> {
-    fn levenshtein_distance(s1: &str, s2: &str) -> usize {
+fn find_similar_variable_names(context: &BlockContext<'_>, target: &[u8]) -> Vec<String> {
+    fn levenshtein_distance(s1: &[u8], s2: &[u8]) -> usize {
         const MAX_LEN: usize = 128;
 
         if s1 == s2 {
@@ -253,40 +256,32 @@ fn find_similar_variable_names(context: &BlockContext<'_>, target: &str) -> Vec<
         }
 
         if s1.is_empty() {
-            return s2.chars().count();
+            return s2.len();
         }
 
         if s2.is_empty() {
-            return s1.chars().count();
+            return s1.len();
         }
 
-        let mut s2_buf = ['\0'; MAX_LEN];
-        let mut s2_len = 0;
-
-        for c in s2.chars() {
-            if s2_len >= MAX_LEN {
-                return usize::MAX;
-            }
-
-            s2_buf[s2_len] = c;
-            s2_len += 1;
+        if s2.len() > MAX_LEN {
+            return usize::MAX;
         }
 
         let mut row = [0usize; MAX_LEN + 1];
-        for (i, c) in row.iter_mut().enumerate().take(s2_len + 1) {
+        for (i, c) in row.iter_mut().enumerate().take(s2.len() + 1) {
             *c = i;
         }
 
-        for (i, c1) in s1.chars().enumerate() {
+        for (i, c1) in s1.iter().enumerate() {
             let mut prev_sub = row[0];
             row[0] = i + 1;
 
             let mut row_min = row[0];
-            for j in 0..s2_len {
-                let c2 = s2_buf[j];
+            for j in 0..s2.len() {
+                let c2 = s2[j];
                 let prev_val = row[j + 1];
 
-                let substitution = prev_sub + usize::from(c1 != c2);
+                let substitution = prev_sub + usize::from(*c1 != c2);
                 let deletion = prev_val + 1;
                 let insertion = row[j] + 1;
 
@@ -305,13 +300,13 @@ fn find_similar_variable_names(context: &BlockContext<'_>, target: &str) -> Vec<
             }
         }
 
-        row[s2_len]
+        row[s2.len()]
     }
 
-    let mut suggestions: Vec<(usize, &str)> = Vec::new();
+    let mut suggestions: Vec<(usize, &[u8])> = Vec::new();
 
     for local in context.locals.keys() {
-        let local_str = local.as_str();
+        let local_str = local.as_bytes();
         if local_str.is_empty() {
             continue;
         }
@@ -324,14 +319,15 @@ fn find_similar_variable_names(context: &BlockContext<'_>, target: &str) -> Vec<
     }
 
     suggestions.sort_by_key(|k| k.0);
-    suggestions.into_iter().map(|(_, name)| name.to_owned()).collect()
+    suggestions.into_iter().map(|(_, name)| BytesDisplay(name).to_string()).collect()
 }
 
-fn generate_confusable_character_note(variable_name: &str) -> Option<String> {
+fn generate_confusable_character_note(variable_name_bytes: &[u8]) -> Option<String> {
     let mut has_non_std_ascii_alphanumeric = false;
     let mut confusable_examples = Vec::new();
 
-    for c in variable_name.chars().skip(1) {
+    let s = std::str::from_utf8(variable_name_bytes).ok()?;
+    for c in s.chars().skip(1) {
         if !c.is_ascii_alphanumeric() && c != '_' {
             if c.is_alphabetic() {
                 has_non_std_ascii_alphanumeric = true;
@@ -339,18 +335,15 @@ fn generate_confusable_character_note(variable_name: &str) -> Option<String> {
                     confusable_examples.push("'а' (Cyrillic 'a')");
                 } else if c == '\u{03BF}' {
                     confusable_examples.push("'ο' (Greek 'o')");
-                } else {
-                    // some other non-ASCII alphabetic; flagged but no concrete confusable example to surface
                 }
             } else if c > '\x7F' {
                 has_non_std_ascii_alphanumeric = true;
-            } else {
-                // ASCII non-alphanumeric character that isn't underscore; no further action
             }
         }
     }
 
     if has_non_std_ascii_alphanumeric {
+        let variable_name = BytesDisplay(variable_name_bytes);
         let mut note = format!("Variable name `{variable_name}` contains non-standard ASCII alphanumeric characters.");
         if !confusable_examples.is_empty() {
             let _ = write!(note, " For example, it might contain {}.", confusable_examples.join(" or "));

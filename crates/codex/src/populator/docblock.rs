@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 
 use crate::assertion::Assertion;
 use crate::metadata::CodebaseMetadata;
@@ -203,10 +203,10 @@ fn should_inherit_docblock_type(
 /// are considered — O(dirty + descendants) instead of O(all classes).
 pub fn inherit_method_docblocks(
     codebase: &mut CodebaseMetadata,
-    safe_symbols: &mago_atom::AtomSet,
-    dirty_classes: Option<&AtomSet>,
+    safe_symbols: &mago_word::WordSet,
+    dirty_classes: Option<&WordSet>,
 ) {
-    let mut inheritance_work: Vec<(Atom, Atom, Atom, Atom)> = Vec::new();
+    let mut inheritance_work: Vec<(Word, Word, Word, Word)> = Vec::new();
 
     // When dirty_classes is provided, expand to include descendants,
     // then use targeted lookups instead of iterating all class_likes.
@@ -244,10 +244,10 @@ pub fn inherit_method_docblocks(
 
 /// Collects inheritance work items for a single class.
 fn collect_inheritance_work(
-    class_name: Atom,
+    class_name: Word,
     class_metadata: &crate::metadata::class_like::ClassLikeMetadata,
-    class_likes: &AtomMap<crate::metadata::class_like::ClassLikeMetadata>,
-    inheritance_work: &mut Vec<(Atom, Atom, Atom, Atom)>,
+    class_likes: &WordMap<crate::metadata::class_like::ClassLikeMetadata>,
+    inheritance_work: &mut Vec<(Word, Word, Word, Word)>,
 ) {
     for (method_name, method_ids) in &class_metadata.overridden_method_ids {
         let mut parent_method_id = None;
@@ -292,7 +292,7 @@ fn collect_inheritance_work(
 }
 
 /// Sorts and applies docblock inheritance work items.
-fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work: Vec<(Atom, Atom, Atom, Atom)>) {
+fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work: Vec<(Word, Word, Word, Word)>) {
     inheritance_work.sort_by_key(|(class_name, _, _, _)| {
         codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
     });
@@ -423,7 +423,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             let child_assertions_are_inferred = child_method.assertions_inferred;
 
             let child_assertions_overridable =
-                |child: &BTreeMap<Atom, Vec<Assertion>>| -> bool { child.is_empty() || child_assertions_are_inferred };
+                |child: &BTreeMap<Word, Vec<Assertion>>| -> bool { child.is_empty() || child_assertions_are_inferred };
 
             let should_inherit_assertions =
                 child_assertions_overridable(&child_method.assertions) && !parent_assertions.is_empty();
@@ -450,7 +450,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             if should_inherit_templates { Some(parent_template_types.clone()) } else { None };
         let parent_thrown_to_apply = if should_inherit_thrown { Some(substituted_thrown_types) } else { None };
 
-        let resolve_assertions = |assertions: &BTreeMap<Atom, Vec<Assertion>>| {
+        let resolve_assertions = |assertions: &BTreeMap<Word, Vec<Assertion>>| {
             assertions
                 .iter()
                 .map(|(name, assertions)| {

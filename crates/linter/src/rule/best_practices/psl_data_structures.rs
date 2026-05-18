@@ -101,8 +101,11 @@ impl LintRule for PslDataStructuresRule {
             return;
         };
 
-        let class_name = ctx.lookup_name(identifier).to_lowercase();
-        if let Some(replacements) = DATA_STRUCTURE_REPLACEMENTS.get(class_name.as_str()) {
+        let class_name = ctx.lookup_name(identifier).to_ascii_lowercase();
+        let Some(class_name_str) = std::str::from_utf8(&class_name).ok() else {
+            return;
+        };
+        if let Some(replacements) = DATA_STRUCTURE_REPLACEMENTS.get(class_name_str) {
             ctx.collector.report(
                 Issue::new(
                     self.cfg.level(),

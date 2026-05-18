@@ -13,7 +13,6 @@
 
 use foldhash::HashSet;
 
-use mago_atom::Atom;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::symbol::SymbolIdentifier;
@@ -23,6 +22,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
+use mago_word::Word;
 
 use crate::code::IssueCode;
 use crate::context::Context;
@@ -44,7 +44,7 @@ struct CheckableMember {
 /// Reports private members (and protected members in final classes) that are unused.
 /// Returns the set of unused member symbol IDs for use by other checks.
 pub fn check_unused_members_with_transitivity(
-    class_name: Atom,
+    class_name: Word,
     class_span: Span,
     class_like_metadata: &ClassLikeMetadata,
     symbol_references: &SymbolReferences,
@@ -76,7 +76,7 @@ pub fn check_unused_members_with_transitivity(
             continue;
         }
 
-        if property_name.starts_with("$_") {
+        if property_name.as_bytes().starts_with(b"$_") {
             continue;
         }
 
@@ -93,7 +93,7 @@ pub fn check_unused_members_with_transitivity(
         if class_like_metadata
             .used_traits
             .iter()
-            .any(|trait_name| context.codebase.property_exists(trait_name, property_name))
+            .any(|trait_name| context.codebase.property_exists(trait_name.as_bytes(), property_name.as_bytes()))
         {
             // trait property override, could be used in the trait itself.
             continue;
@@ -110,7 +110,7 @@ pub fn check_unused_members_with_transitivity(
 
     for method_name in &class_like_metadata.methods {
         if let Some(declaring_method_id) = class_like_metadata.declaring_method_ids.get(method_name)
-            && *declaring_method_id.get_class_name() != class_name
+            && declaring_method_id.get_class_name() != class_name
         {
             continue;
         }
@@ -131,7 +131,7 @@ pub fn check_unused_members_with_transitivity(
             continue;
         }
 
-        if method_name.starts_with('_') {
+        if method_name.as_bytes().starts_with(b"_") {
             continue;
         }
 
@@ -146,7 +146,7 @@ pub fn check_unused_members_with_transitivity(
         if class_like_metadata
             .used_traits
             .iter()
-            .any(|trait_name| context.codebase.method_exists(trait_name, method_name))
+            .any(|trait_name| context.codebase.method_exists(trait_name.as_bytes(), method_name.as_bytes()))
         {
             // non-abstract trait method override, could be used in the trait itself.
             continue;
@@ -243,7 +243,7 @@ fn all_references_from_unused(
 /// The `unused_members` set contains property symbols that were already reported
 /// as unused (via transitive analysis) and should be skipped.
 pub fn check_write_only_properties(
-    class_name: Atom,
+    class_name: Word,
     class_span: Span,
     class_like_metadata: &ClassLikeMetadata,
     symbol_references: &SymbolReferences,
@@ -275,7 +275,7 @@ pub fn check_write_only_properties(
             continue;
         }
 
-        if property_name.starts_with("$_") {
+        if property_name.as_bytes().starts_with(b"$_") {
             continue;
         }
 
@@ -312,7 +312,7 @@ fn is_member_referenced(symbol_references: &SymbolReferences, symbol_id: &Symbol
 }
 
 /// Reports an unused property.
-fn report_unused_property(context: &mut Context<'_, '_>, class_span: Span, property_name: Atom, property_span: Span) {
+fn report_unused_property(context: &mut Context<'_, '_>, class_span: Span, property_name: Word, property_span: Span) {
     let issue = Issue::help(format!("Property `{property_name}` is never used."))
         .with_code(IssueCode::UnusedProperty)
         .with_annotations([
@@ -333,7 +333,7 @@ fn report_unused_property(context: &mut Context<'_, '_>, class_span: Span, prope
 fn report_write_only_property(
     context: &mut Context<'_, '_>,
     class_span: Span,
-    property_name: Atom,
+    property_name: Word,
     property_span: Span,
 ) {
     let issue = Issue::help(format!("Property `{property_name}` is written to but never read."))
@@ -351,7 +351,7 @@ fn report_write_only_property(
 }
 
 /// Reports an unused method.
-fn report_unused_method(context: &mut Context<'_, '_>, class_span: Span, method_name: Atom, method_span: Span) {
+fn report_unused_method(context: &mut Context<'_, '_>, class_span: Span, method_name: Word, method_span: Span) {
     let issue = Issue::help(format!("Method `{method_name}()` is never used."))
         .with_code(IssueCode::UnusedMethod)
         .with_annotations([

@@ -1,4 +1,4 @@
-use mago_atom::Atom;
+use mago_word::Word;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -135,7 +135,7 @@ impl TType for TDerived {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
             TDerived::KeyOf(key_of) => key_of.get_id(),
             TDerived::ValueOf(value_of) => value_of.get_id(),
@@ -148,7 +148,7 @@ impl TType for TDerived {
         }
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

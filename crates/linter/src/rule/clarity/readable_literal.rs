@@ -92,11 +92,13 @@ impl LintRule for ReadableLiteralRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        let (raw, span) = match node {
+        let (raw_bytes, span) = match node {
             Node::LiteralInteger(integer) => (integer.raw, integer.span()),
             Node::LiteralFloat(float) => (float.raw, float.span()),
             _ => return,
         };
+
+        let Some(raw) = std::str::from_utf8(raw_bytes).ok() else { return };
 
         if raw.contains('_') {
             return;

@@ -11,7 +11,6 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_atom::Atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -25,6 +24,7 @@ use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_word::Word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -47,7 +47,7 @@ impl Provider for ArrayMapProvider {
 
 impl FunctionReturnTypeProvider for ArrayMapProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("array_map")
+        FunctionTarget::Exact(b"array_map")
     }
 
     fn get_return_type(
@@ -61,12 +61,12 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
             return None;
         }
 
-        let callback_arg = invocation.get_argument(0, &["callback"])?;
+        let callback_arg = invocation.get_argument(0, &[b"callback"])?;
         let callback_type = context.get_expression_type(callback_arg)?;
         let callback_is_null = callback_type.is_null();
 
         if callback_is_null && argument_count == 2 {
-            let array_arg = invocation.get_argument(1, &["array"])?;
+            let array_arg = invocation.get_argument(1, &[b"array"])?;
             return context.get_expression_type(array_arg).cloned();
         }
 
@@ -78,7 +78,7 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
             return None;
         }
 
-        let array_arg = invocation.get_argument(1, &["array"])?;
+        let array_arg = invocation.get_argument(1, &[b"array"])?;
         let callback_metadata = context.get_callable_metadata(callback_arg)?;
         let raw_return_type = &callback_metadata.return_type_metadata.as_ref()?.type_union;
 
@@ -141,7 +141,7 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
 fn resolve_conditionals_in_return(
     codebase: &CodebaseMetadata,
     return_type: &TUnion,
-    parameter_name: Atom,
+    parameter_name: Word,
     argument_type: &TUnion,
 ) -> TUnion {
     let mut new_atomics: Vec<TAtomic> = Vec::with_capacity(return_type.types.len());
@@ -157,7 +157,7 @@ fn resolve_conditionals_in_return(
 fn resolve_atomic_with_argument(
     codebase: &CodebaseMetadata,
     atomic: &TAtomic,
-    parameter_name: Atom,
+    parameter_name: Word,
     argument_type: &TUnion,
 ) -> Vec<TAtomic> {
     let TAtomic::Conditional(conditional) = atomic else {
@@ -205,7 +205,7 @@ fn resolve_atomic_with_argument(
     add_union_type(then, &otherwise, codebase, CombinerOptions::default()).types.into_owned()
 }
 
-fn substitute_parameter_in_union(union: &TUnion, parameter_name: Atom, argument_type: &TUnion) -> TUnion {
+fn substitute_parameter_in_union(union: &TUnion, parameter_name: Word, argument_type: &TUnion) -> TUnion {
     let mut new_atomics: Vec<TAtomic> = Vec::with_capacity(union.types.len());
     let mut changed = false;
 

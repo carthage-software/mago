@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::ttype::TType;
 
@@ -57,15 +57,15 @@ impl TType for TResource {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self.closed {
-            Some(true) => atom("closed-resource"),
-            Some(false) => atom("open-resource"),
-            None => atom("resource"),
+            Some(true) => word("closed-resource"),
+            Some(false) => word("open-resource"),
+            None => word("resource"),
         }
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

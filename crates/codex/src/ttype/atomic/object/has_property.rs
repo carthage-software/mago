@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -15,7 +15,7 @@ use crate::ttype::atomic::TAtomic;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TObjectHasProperty {
     /// The name of the property that is known to exist.
-    pub property: Atom,
+    pub property: Word,
     /// Additional intersection types (e.g., other `HasMethod` or `HasProperty` assertions).
     pub intersection_types: Option<Vec<TAtomic>>,
 }
@@ -24,21 +24,21 @@ impl TObjectHasProperty {
     /// Creates a new `TObjectHasProperty` with the given property name.
     #[inline]
     #[must_use]
-    pub const fn new(property: Atom) -> Self {
+    pub const fn new(property: Word) -> Self {
         Self { property, intersection_types: None }
     }
 
     /// Returns the property name.
     #[inline]
     #[must_use]
-    pub const fn get_property(&self) -> Atom {
+    pub const fn get_property(&self) -> Word {
         self.property
     }
 
     /// Checks if this property name matches the given name.
     #[inline]
     #[must_use]
-    pub fn has_property(&self, property_name: Atom) -> bool {
+    pub fn has_property(&self, property_name: Word) -> bool {
         self.property == property_name
     }
 }
@@ -86,17 +86,17 @@ impl TType for TObjectHasProperty {
         false
     }
 
-    fn get_id(&self) -> Atom {
-        let mut result = concat_atom!("has-property<'", self.property, "'>");
+    fn get_id(&self) -> Word {
+        let mut result = concat_word!(b"has-property<'", self.property, b"'>");
 
         if let Some(intersection_types) = self.get_intersection_types() {
             for atomic in intersection_types {
                 let atomic_id = atomic.get_id();
 
                 result = if atomic.has_intersection_types() {
-                    concat_atom!(result, "&(", atomic_id, ")")
+                    concat_word!(result, b"&(", atomic_id, b")")
                 } else {
-                    concat_atom!(result, "&", atomic_id)
+                    concat_word!(result, b"&", atomic_id)
                 };
             }
         }
@@ -104,17 +104,17 @@ impl TType for TObjectHasProperty {
         result
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
-        let mut result = concat_atom!("has-property<'", self.property, "'>");
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
+        let mut result = concat_word!(b"has-property<'", self.property, b"'>");
 
         if let Some(intersection_types) = self.get_intersection_types() {
             for atomic in intersection_types {
                 let atomic_id = atomic.get_pretty_id_with_indent(indent);
 
                 result = if atomic.has_intersection_types() {
-                    concat_atom!(result, "&(", atomic_id, ")")
+                    concat_word!(result, b"&(", atomic_id, b")")
                 } else {
-                    concat_atom!(result, "&", atomic_id)
+                    concat_word!(result, b"&", atomic_id)
                 };
             }
         }

@@ -21,9 +21,9 @@ impl<'arena> Parser<'_, 'arena> {
         let mut ttl = None;
         let mut tags = None;
         loop {
-            if let Some(option_keyword) = self.try_consume_name_keyword("ttl")? {
+            if let Some(option_keyword) = self.try_consume_name_keyword(b"ttl")? {
                 ttl = Some(self.parse_cache_option(option_keyword)?);
-            } else if let Some(option_keyword) = self.try_consume_name_keyword("tags")? {
+            } else if let Some(option_keyword) = self.try_consume_name_keyword(b"tags")? {
                 tags = Some(self.parse_cache_option(option_keyword)?);
             } else {
                 break;
@@ -31,14 +31,14 @@ impl<'arena> Parser<'_, 'arena> {
         }
 
         let close_tag = self.stream.expect_block_end()?;
-        let body = self.parse_statements(&BlockTerminator { names: &["endcache"] })?;
+        let body = self.parse_statements(&BlockTerminator { names: &[b"endcache"] })?;
         let end_open_tok = self.stream.expect_block_start()?;
         let end_open_tag = self.stream.span_of(&end_open_tok);
-        let end_kw_tok = self.stream.expect_name("expected `endcache`")?;
-        if end_kw_tok.value != "endcache" {
+        let end_kw_tok = self.stream.expect_name(b"expected `endcache`")?;
+        if end_kw_tok.value != b"endcache" {
             return Err(ParseError::MismatchedEndTag {
-                expected: "endcache".to_string(),
-                got: end_kw_tok.value.to_string(),
+                expected: b"endcache".to_vec(),
+                got: end_kw_tok.value.to_vec(),
                 span: self.stream.span_of(&end_kw_tok),
             });
         }
@@ -60,10 +60,10 @@ impl<'arena> Parser<'_, 'arena> {
     }
 
     fn parse_cache_option(&mut self, keyword: Keyword<'arena>) -> Result<CacheOption<'arena>, ParseError> {
-        let lp_tok = self.stream.expect_kind(TwigTokenKind::LeftParen, "expected `(`")?;
+        let lp_tok = self.stream.expect_kind(TwigTokenKind::LeftParen, b"expected `(`")?;
         let left_parenthesis = self.stream.span_of(&lp_tok);
         let value = self.parse_expression()?;
-        let rp_tok = self.stream.expect_kind(TwigTokenKind::RightParen, "expected `)`")?;
+        let rp_tok = self.stream.expect_kind(TwigTokenKind::RightParen, b"expected `)`")?;
         let right_parenthesis = self.stream.span_of(&rp_tok);
         Ok(CacheOption { keyword, left_parenthesis, value, right_parenthesis })
     }

@@ -53,7 +53,7 @@ pub struct DocumentString<'arena> {
     pub open: Span,
     pub kind: DocumentKind,
     pub indentation: DocumentIndentation,
-    pub label: &'arena str,
+    pub label: &'arena [u8],
     pub parts: Sequence<'arena, StringPart<'arena>>,
     pub close: Span,
 }
@@ -69,7 +69,7 @@ pub enum StringPart<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct LiteralStringPart<'arena> {
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]

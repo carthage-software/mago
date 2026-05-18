@@ -19,7 +19,7 @@ static META: ProviderMeta = ProviderMeta::new(
 );
 
 // Use wildcard for class since many classes implement ContainerInterface
-static TARGETS: [MethodTarget; 1] = [MethodTarget::any_class("get")];
+static TARGETS: [MethodTarget; 1] = [MethodTarget::any_class(b"get")];
 
 /// Provider for the `Psr\Container\ContainerInterface::get()` method.
 ///
@@ -42,17 +42,15 @@ impl MethodReturnTypeProvider for ContainerGetProvider {
     fn get_return_type(
         &self,
         context: &ProviderContext<'_, '_, '_>,
-        class_name: &str,
-        _method_name: &str,
+        class_name: &[u8],
+        _method_name: &[u8],
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        // Only handle classes that implement ContainerInterface
-        if !context.is_instance_of(class_name, "Psr\\Container\\ContainerInterface") {
+        if !context.is_instance_of(class_name, b"Psr\\Container\\ContainerInterface") {
             return None;
         }
 
-        // Get the first argument (the service ID)
-        let id_arg = invocation.get_argument(0, &["id"])?;
+        let id_arg = invocation.get_argument(0, &[b"id"])?;
         let id_type = context.get_expression_type(id_arg)?;
 
         // Extract class-string value (handles SomeClass::class)

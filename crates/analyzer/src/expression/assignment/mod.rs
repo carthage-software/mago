@@ -4,8 +4,6 @@ use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
-use mago_atom::Atom;
-use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
@@ -36,6 +34,8 @@ use mago_syntax::ast::List;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::Variable;
+use mago_word::Word;
+use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -196,7 +196,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
         && !block_context.flags.inside_assignment_operation()
         && let Some(Expression::Clone(clone_expression)) = source_expression
         && let Expression::Variable(Variable::Direct(cloned_var)) = clone_expression.object
-        && cloned_var.name == target_variable_id
+        && cloned_var.name == target_variable_id.as_bytes()
         && let Some(assignment_span) = assignment_span
     {
         context.collector.report_with_code(
@@ -289,7 +289,7 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     target_expression: &'ast Expression<'arena>,
-    target_expression_id: Option<Atom>,
+    target_expression_id: Option<Word>,
     source_expression: Option<&'ast Expression<'arena>>,
     mut source_type: Rc<TUnion>,
     destructuring: bool,
@@ -401,17 +401,16 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
     block_context.locals.entry(referenced_variable_id).or_insert_with(|| Rc::new(get_mixed()));
 
     if block_context.references_in_scope.contains_key(&target_variable_id) {
-        block_context.decrement_reference_count(&target_variable_id);
+        block_context.decrement_reference_count(target_variable_id.as_bytes());
     }
 
-    // When assigning an existing reference as a reference it removes the
-    // old reference, so it's no longer potentially from a confusing scope.
     block_context.references_possibly_from_confusing_scope.remove(&target_variable_id);
-    block_context.add_conditionally_referenced_variable(&target_variable_id);
+    block_context.add_conditionally_referenced_variable(target_variable_id.as_bytes());
     block_context.references_in_scope.insert(target_variable_id, referenced_variable_id);
     block_context.referenced_counts.entry(referenced_variable_id).and_modify(|count| *count += 1).or_insert(1);
 
-    if referenced_variable_id.contains('[') || referenced_variable_id.contains("->") {
+    let referenced_bytes = referenced_variable_id.as_bytes();
+    if memchr::memchr(b'[', referenced_bytes).is_some() || memchr::memmem::find(referenced_bytes, b"->").is_some() {
         block_context.references_to_external_scope.insert(target_variable_id);
     }
 }
@@ -423,7 +422,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
     variable_span: Span,
     source_expression: Option<&Expression<'arena>>,
     mut assigned_type: Rc<TUnion>,
-    variable_id: Atom,
+    variable_id: Word,
     destructuring: bool,
 ) {
     if let Some(constraint) = block_context.by_reference_constraints.get(&variable_id) {
@@ -535,7 +534,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
         );
     }
 
-    if variable_id.eq("$this") {
+    if variable_id.as_bytes() == b"$this" {
         context.collector.report_with_code(
             IssueCode::AssignmentToThis,
             Issue::error("Cannot assign to `$this`.")
@@ -576,11 +575,11 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
 
     let mut from_docblock = false;
     if let Some((variable_type, variable_type_span)) =
-        get_type_from_var_docblock(context, block_context, artifacts, Some(variable_id.as_str()), !destructuring)
+        get_type_from_var_docblock(context, block_context, artifacts, Some(variable_id.as_bytes()), !destructuring)
     {
         check_docblock_type_incompatibility(
             context,
-            Some(variable_id.as_str()),
+            Some(variable_id.as_bytes()),
             variable_span,
             &assigned_type,
             &variable_type,
@@ -592,7 +591,7 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
         from_docblock = true;
     }
 
-    if !from_docblock && assigned_type.is_mixed() && !variable_id.starts_with("$_") {
+    if !from_docblock && assigned_type.is_mixed() && !variable_id.as_bytes().starts_with(b"$_") {
         let assigned_type_str = assigned_type.get_id();
 
         let mut issue = Issue::warning(format!(
@@ -651,7 +650,7 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
     let can_be_destructured = array_type
         .types
         .iter()
-        .all(|atomic| atomic.is_array() || atomic.extends_or_implements(context.codebase, "ArrayAccess"));
+        .all(|atomic| atomic.is_array() || atomic.extends_or_implements(context.codebase, b"ArrayAccess"));
 
     if !can_be_destructured {
         let assigned_type_str = array_type.get_id();
@@ -1047,7 +1046,7 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
     artifacts: &AnalysisArtifacts,
     variable_expression_id: Span,
     source_expression: &Expression<'arena>,
-    variable_id: Atom,
+    variable_id: Word,
 ) {
     let Some(right_clauses) = get_formula(
         source_expression.span(),
@@ -1065,7 +1064,7 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
     let right_clauses =
         BlockContext::filter_clauses(context, variable_id, right_clauses.into_iter().map(Rc::new).collect(), None);
 
-    let mut covered_variable_ids: AtomSet = AtomSet::default();
+    let mut covered_variable_ids: WordSet = WordSet::default();
     covered_variable_ids.insert(variable_id);
     for clause in &right_clauses {
         for var in clause.possibilities.keys() {

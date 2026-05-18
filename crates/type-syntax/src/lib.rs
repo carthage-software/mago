@@ -37,8 +37,8 @@ pub mod token;
 /// # Errors
 ///
 /// Returns a [`ParseError`] if any lexing or parsing error occurs.
-pub fn parse_str<'arena>(arena: &'arena Bump, span: Span, input: &'arena str) -> Result<Type<'arena>, ParseError> {
-    let input = Input::anchored_at(span.file_id, input.as_bytes(), span.start);
+pub fn parse_str<'arena>(arena: &'arena Bump, span: Span, input: &'arena [u8]) -> Result<Type<'arena>, ParseError> {
+    let input = Input::anchored_at(span.file_id, input, span.start);
     let lexer = TypeLexer::new(input);
     parser::construct(arena, lexer)
 }
@@ -66,9 +66,9 @@ pub fn parse_str<'arena>(arena: &'arena Bump, span: Span, input: &'arena str) ->
 pub fn parse_prefix<'arena>(
     arena: &'arena Bump,
     span: Span,
-    input: &'arena str,
+    input: &'arena [u8],
 ) -> Result<(Type<'arena>, Position), ParseError> {
-    let input_obj = Input::anchored_at(span.file_id, input.as_bytes(), span.start);
+    let input_obj = Input::anchored_at(span.file_id, input, span.start);
     let lexer = TypeLexer::new(input_obj);
     parser::construct_prefix(arena, lexer)
 }
@@ -94,7 +94,7 @@ mod tests {
     /// match the pre-arena API.
     fn do_parse(input: &str) -> Result<Type<'static>, ParseError> {
         let arena: &'static Bump = Box::leak(Box::new(Bump::new()));
-        let owned: &'static str = arena.alloc_str(input);
+        let owned: &'static [u8] = arena.alloc_slice_copy(input.as_bytes());
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(owned.len() as u32));
         parse_str(arena, span, owned)
     }
@@ -104,7 +104,7 @@ mod tests {
         let result = do_parse("int");
         assert!(result.is_ok());
         match result.unwrap() {
-            Type::Int(k) => assert_eq!(k.value, "int"),
+            Type::Int(k) => assert_eq!(k.value, b"int".as_slice()),
             _ => panic!("Expected Type::Int"),
         }
     }
@@ -114,7 +114,7 @@ mod tests {
         let result = do_parse("non-empty-string");
         assert!(result.is_ok());
         match result.unwrap() {
-            Type::NonEmptyString(k) => assert_eq!(k.value, "non-empty-string"),
+            Type::NonEmptyString(k) => assert_eq!(k.value, b"non-empty-string".as_slice()),
             _ => panic!("Expected Type::NonEmptyString"),
         }
     }
@@ -172,7 +172,7 @@ mod tests {
         match do_parse("3.") {
             Ok(Type::LiteralFloat(LiteralFloatType { value, raw, .. })) => {
                 assert_eq!(*value, 3.0);
-                assert_eq!(raw, "3.");
+                assert_eq!(raw, b"3.".as_slice());
             }
             other => panic!("expected `3.` to parse as LiteralFloat 3.0, got: {other:?}"),
         }
@@ -307,12 +307,12 @@ mod tests {
         };
 
         assert_eq!(shape.kind, ShapeTypeKind::Array);
-        assert_eq!(shape.keyword.value, "array");
+        assert_eq!(shape.keyword.value, b"array".as_slice());
         assert_eq!(shape.fields.len(), 1);
         assert!(shape.additional_fields.is_none());
 
         let field = &shape.fields[0];
-        assert!(matches!(field.key.as_ref().map(|k| &k.key), Some(ShapeKey::String { value: "name", .. })));
+        assert!(matches!(field.key.as_ref().map(|k| &k.key), Some(ShapeKey::String { value: b"name", .. })));
         assert!(matches!(field.value, Type::String(_)));
     }
 
@@ -364,13 +364,13 @@ mod tests {
                 assert_eq!(shape.fields.len(), 2);
 
                 if let Some(ShapeKey::String { value: s, .. }) = shape.fields[0].key.as_ref().map(|k| &k.key) {
-                    assert_eq!(*s, "key-with-dash");
+                    assert_eq!(*s, b"key-with-dash".as_slice());
                 } else {
                     panic!("Expected key to be a ShapeKey::String");
                 }
 
                 if let Some(ShapeKey::String { value: s, .. }) = shape.fields[1].key.as_ref().map(|k| &k.key) {
-                    assert_eq!(*s, "key-with---multiple-dashes");
+                    assert_eq!(*s, b"key-with---multiple-dashes".as_slice());
                 } else {
                     panic!("Expected key to be a ShapeKey::String");
                 }
@@ -386,25 +386,25 @@ mod tests {
                 assert_eq!(shape.fields.len(), 4);
 
                 if let Some(ShapeKey::String { value: s, .. }) = shape.fields[0].key.as_ref().map(|k| &k.key) {
-                    assert_eq!(*s, "list");
+                    assert_eq!(*s, b"list".as_slice());
                 } else {
                     panic!("Expected key to be a ShapeKey::String");
                 }
 
                 if let Some(ShapeKey::String { value: s, .. }) = shape.fields[1].key.as_ref().map(|k| &k.key) {
-                    assert_eq!(*s, "int");
+                    assert_eq!(*s, b"int".as_slice());
                 } else {
                     panic!("Expected key to be a ShapeKey::String");
                 }
 
                 if let Some(ShapeKey::String { value: s, .. }) = shape.fields[2].key.as_ref().map(|k| &k.key) {
-                    assert_eq!(*s, "string");
+                    assert_eq!(*s, b"string".as_slice());
                 } else {
                     panic!("Expected key to be a ShapeKey::String");
                 }
 
                 if let Some(ShapeKey::String { value: s, .. }) = shape.fields[3].key.as_ref().map(|k| &k.key) {
-                    assert_eq!(*s, "bool");
+                    assert_eq!(*s, b"bool".as_slice());
                 } else {
                     panic!("Expected key to be a ShapeKey::String");
                 }
@@ -441,7 +441,7 @@ mod tests {
                 assert_eq!(shape.fields.len(), 1);
                 let key = shape.fields[0].key.as_ref().expect("expected a keyed field");
                 match &key.key {
-                    ShapeKey::String { value, .. } => assert_eq!(*value, "foo"),
+                    ShapeKey::String { value, .. } => assert_eq!(*value, b"foo".as_slice()),
                     other => panic!("expected identifier key, got {other:?}"),
                 }
                 match shape.fields[0].value {
@@ -496,7 +496,7 @@ mod tests {
         match do_parse(input) {
             Ok(Type::Shape(shape)) => {
                 assert_eq!(shape.fields.len(), 6);
-                for (i, expected_key) in ["a", "b", "c", "d", "e", "f"].iter().enumerate() {
+                for (i, expected_key) in [b"a".as_slice(), b"b", b"c", b"d", b"e", b"f"].iter().enumerate() {
                     let key = shape.fields[i].key.as_ref().expect("expected a keyed field");
                     match &key.key {
                         ShapeKey::String { value, .. } => assert_eq!(value, expected_key),
@@ -610,13 +610,13 @@ mod tests {
                 assert!(matches!(i.right, Type::Reference(_)));
 
                 if let Type::Reference(r) = i.left {
-                    assert_eq!(r.identifier.value, "Countable");
+                    assert_eq!(r.identifier.value, b"Countable".as_slice());
                 } else {
                     panic!();
                 }
 
                 if let Type::Reference(r) = i.right {
-                    assert_eq!(r.identifier.value, "Traversable");
+                    assert_eq!(r.identifier.value, b"Traversable".as_slice());
                 } else {
                     panic!();
                 }
@@ -629,7 +629,7 @@ mod tests {
     fn test_parse_member_ref() {
         match do_parse("MyClass::MY_CONST") {
             Ok(Type::MemberReference(m)) => {
-                assert_eq!(m.class.value, "MyClass");
+                assert_eq!(m.class.value, b"MyClass".as_slice());
                 assert_eq!(m.member.to_string(), "MY_CONST");
             }
             res => panic!("Expected Ok(Type::MemberReference), got {res:?}"),
@@ -637,7 +637,7 @@ mod tests {
 
         match do_parse("\\Fully\\Qualified::class") {
             Ok(Type::MemberReference(m)) => {
-                assert_eq!(m.class.value, "\\Fully\\Qualified"); // Check if lexer keeps leading \
+                assert_eq!(m.class.value, b"\\Fully\\Qualified".as_slice()); // Check if lexer keeps leading \
                 assert_eq!(m.member.to_string(), "class");
             }
             res => panic!("Expected Ok(Type::MemberReference), got {res:?}"),
@@ -648,7 +648,7 @@ mod tests {
     fn test_parse_member_ref_named_new() {
         match do_parse("Action::NEW") {
             Ok(Type::MemberReference(m)) => {
-                assert_eq!(m.class.value, "Action");
+                assert_eq!(m.class.value, b"Action".as_slice());
                 assert_eq!(m.member.to_string(), "NEW");
             }
             res => panic!("Expected Ok(Type::MemberReference) for Action::NEW, got {res:?}"),
@@ -656,7 +656,7 @@ mod tests {
 
         match do_parse("Action::new") {
             Ok(Type::MemberReference(m)) => {
-                assert_eq!(m.class.value, "Action");
+                assert_eq!(m.class.value, b"Action".as_slice());
                 assert_eq!(m.member.to_string(), "new");
             }
             res => panic!("Expected Ok(Type::MemberReference) for Action::new, got {res:?}"),
@@ -689,7 +689,7 @@ mod tests {
 
         match do_parse("Action::new*") {
             Ok(Type::MemberReference(m)) => {
-                assert_eq!(m.class.value, "Action");
+                assert_eq!(m.class.value, b"Action".as_slice());
                 assert!(matches!(m.member, MemberReferenceSelector::StartsWith(..)));
             }
             res => panic!("Expected Ok(Type::MemberReference) for Action::new*, got {res:?}"),
@@ -697,7 +697,7 @@ mod tests {
 
         match do_parse("Action::*new") {
             Ok(Type::MemberReference(m)) => {
-                assert_eq!(m.class.value, "Action");
+                assert_eq!(m.class.value, b"Action".as_slice());
                 assert!(matches!(m.member, MemberReferenceSelector::EndsWith(..)));
             }
             res => panic!("Expected Ok(Type::MemberReference) for Action::*new, got {res:?}"),
@@ -854,7 +854,7 @@ mod tests {
                     }
 
                     if let Type::String(s) = inner_union.right {
-                        assert_eq!(s.value, "string");
+                        assert_eq!(s.value, b"string".as_slice());
                     } else {
                         panic!("Expected right side of inner union to be Type::String");
                     }
@@ -926,7 +926,7 @@ mod tests {
         match do_parse("Closure(string): bool") {
             Ok(Type::Callable(c)) => {
                 assert_eq!(c.kind, CallableTypeKind::Closure);
-                assert_eq!(c.keyword.value, "Closure");
+                assert_eq!(c.keyword.value, b"Closure".as_slice());
                 let spec = c.specification.expect("Expected callable specification");
                 assert_eq!(spec.parameters.entries.len(), 1);
                 assert!(matches!(spec.parameters.entries[0].parameter_type, Some(Type::String(_))));
@@ -1072,9 +1072,9 @@ mod tests {
     fn test_keyof() {
         match do_parse("key-of<MyArray>") {
             Ok(Type::KeyOf(k)) => {
-                assert_eq!(k.keyword.value, "key-of");
+                assert_eq!(k.keyword.value, b"key-of".as_slice());
                 match &k.parameter.entry.inner {
-                    Type::Reference(r) => assert_eq!(r.identifier.value, "MyArray"),
+                    Type::Reference(r) => assert_eq!(r.identifier.value, b"MyArray".as_slice()),
                     _ => panic!("Expected Type::Reference"),
                 }
             }
@@ -1086,9 +1086,9 @@ mod tests {
     fn test_valueof() {
         match do_parse("value-of<MyArray>") {
             Ok(Type::ValueOf(v)) => {
-                assert_eq!(v.keyword.value, "value-of");
+                assert_eq!(v.keyword.value, b"value-of".as_slice());
                 match &v.parameter.entry.inner {
-                    Type::Reference(r) => assert_eq!(r.identifier.value, "MyArray"),
+                    Type::Reference(r) => assert_eq!(r.identifier.value, b"MyArray".as_slice()),
                     _ => panic!("Expected Type::Reference"),
                 }
             }
@@ -1101,11 +1101,11 @@ mod tests {
         match do_parse("MyArray[MyKey]") {
             Ok(Type::IndexAccess(i)) => {
                 match i.target {
-                    Type::Reference(r) => assert_eq!(r.identifier.value, "MyArray"),
+                    Type::Reference(r) => assert_eq!(r.identifier.value, b"MyArray".as_slice()),
                     _ => panic!("Expected Type::Reference"),
                 }
                 match i.index {
-                    Type::Reference(r) => assert_eq!(r.identifier.value, "MyKey"),
+                    Type::Reference(r) => assert_eq!(r.identifier.value, b"MyKey".as_slice()),
                     _ => panic!("Expected Type::Reference"),
                 }
             }
@@ -1147,7 +1147,7 @@ mod tests {
     fn test_int_range() {
         match do_parse("int<0, 100>") {
             Ok(Type::IntRange(r)) => {
-                assert_eq!(r.keyword.value, "int");
+                assert_eq!(r.keyword.value, b"int".as_slice());
 
                 match r.min {
                     IntOrKeyword::Int(literal_int_type) => {
@@ -1174,7 +1174,7 @@ mod tests {
             Ok(Type::IntRange(r)) => {
                 match r.min {
                     IntOrKeyword::Keyword(keyword) => {
-                        assert_eq!(keyword.value, "min");
+                        assert_eq!(keyword.value, b"min".as_slice());
                     }
                     _ => {
                         panic!("Expected min to be a Keyword, got `{}`", r.min)
@@ -1197,7 +1197,7 @@ mod tests {
             Ok(Type::IntRange(r)) => {
                 match r.min {
                     IntOrKeyword::Keyword(keyword) => {
-                        assert_eq!(keyword.value, "min");
+                        assert_eq!(keyword.value, b"min".as_slice());
                     }
                     _ => {
                         panic!("Expected min to be a Keyword, got `{}`", r.min)
@@ -1206,7 +1206,7 @@ mod tests {
 
                 match r.max {
                     IntOrKeyword::Keyword(keyword) => {
-                        assert_eq!(keyword.value, "max");
+                        assert_eq!(keyword.value, b"max".as_slice());
                     }
                     _ => {
                         panic!("Expected max to be a Keyword, got `{}`", r.max)
@@ -1221,10 +1221,10 @@ mod tests {
     fn test_properties_of() {
         match do_parse("properties-of<MyClass>") {
             Ok(Type::PropertiesOf(p)) => {
-                assert_eq!(p.keyword.value, "properties-of");
+                assert_eq!(p.keyword.value, b"properties-of".as_slice());
                 assert_eq!(p.filter, PropertiesOfFilter::All);
                 match &p.parameter.entry.inner {
-                    Type::Reference(r) => assert_eq!(r.identifier.value, "MyClass"),
+                    Type::Reference(r) => assert_eq!(r.identifier.value, b"MyClass".as_slice()),
                     _ => panic!(),
                 }
             }
@@ -1233,10 +1233,10 @@ mod tests {
 
         match do_parse("protected-properties-of<T>") {
             Ok(Type::PropertiesOf(p)) => {
-                assert_eq!(p.keyword.value, "protected-properties-of");
+                assert_eq!(p.keyword.value, b"protected-properties-of".as_slice());
                 assert_eq!(p.filter, PropertiesOfFilter::Protected);
                 match &p.parameter.entry.inner {
-                    Type::Reference(r) => assert_eq!(r.identifier.value, "T"),
+                    Type::Reference(r) => assert_eq!(r.identifier.value, b"T".as_slice()),
                     _ => panic!(),
                 }
             }
@@ -1245,10 +1245,10 @@ mod tests {
 
         match do_parse("private-properties-of<T>") {
             Ok(Type::PropertiesOf(p)) => {
-                assert_eq!(p.keyword.value, "private-properties-of");
+                assert_eq!(p.keyword.value, b"private-properties-of".as_slice());
                 assert_eq!(p.filter, PropertiesOfFilter::Private);
                 match &p.parameter.entry.inner {
-                    Type::Reference(r) => assert_eq!(r.identifier.value, "T"),
+                    Type::Reference(r) => assert_eq!(r.identifier.value, b"T".as_slice()),
                     _ => panic!(),
                 }
             }
@@ -1257,10 +1257,10 @@ mod tests {
 
         match do_parse("public-properties-of<T>") {
             Ok(Type::PropertiesOf(p)) => {
-                assert_eq!(p.keyword.value, "public-properties-of");
+                assert_eq!(p.keyword.value, b"public-properties-of".as_slice());
                 assert_eq!(p.filter, PropertiesOfFilter::Public);
                 match &p.parameter.entry.inner {
-                    Type::Reference(r) => assert_eq!(r.identifier.value, "T"),
+                    Type::Reference(r) => assert_eq!(r.identifier.value, b"T".as_slice()),
                     _ => panic!(),
                 }
             }
@@ -1272,7 +1272,7 @@ mod tests {
     fn test_variable() {
         match do_parse("$myVar") {
             Ok(Type::Variable(v)) => {
-                assert_eq!(v.value, "$myVar");
+                assert_eq!(v.value, b"$myVar".as_slice());
             }
             res => panic!("Expected Ok(Type::Variable), got {res:?}"),
         }
@@ -1283,10 +1283,10 @@ mod tests {
         // Nullable applies only to the rightmost element of an intersection before parens
         match do_parse("Countable&?Traversable") {
             Ok(Type::Intersection(i)) => {
-                assert!(matches!(i.left, Type::Reference(r) if r.identifier.value == "Countable"));
+                assert!(matches!(i.left, Type::Reference(r) if r.identifier.value == b"Countable".as_slice()));
                 assert!(matches!(i.right, Type::Nullable(_)));
                 if let Type::Nullable(n) = i.right {
-                    assert!(matches!(n.inner, Type::Reference(r) if r.identifier.value == "Traversable"));
+                    assert!(matches!(n.inner, Type::Reference(r) if r.identifier.value == b"Traversable".as_slice()));
                 } else {
                     panic!();
                 }
@@ -1325,21 +1325,21 @@ mod tests {
     fn test_parse_float_alias() {
         match do_parse("double") {
             Ok(Type::Float(f)) => {
-                assert_eq!(f.value, "double");
+                assert_eq!(f.value, b"double".as_slice());
             }
             res => panic!("Expected Ok(Type::Float), got {res:?}"),
         }
 
         match do_parse("real") {
             Ok(Type::Float(f)) => {
-                assert_eq!(f.value, "real");
+                assert_eq!(f.value, b"real".as_slice());
             }
             res => panic!("Expected Ok(Type::Float), got {res:?}"),
         }
 
         match do_parse("float") {
             Ok(Type::Float(f)) => {
-                assert_eq!(f.value, "float");
+                assert_eq!(f.value, b"float".as_slice());
             }
             res => panic!("Expected Ok(Type::Float), got {res:?}"),
         }
@@ -1349,14 +1349,14 @@ mod tests {
     fn test_parse_bool_alias() {
         match do_parse("boolean") {
             Ok(Type::Bool(b)) => {
-                assert_eq!(b.value, "boolean");
+                assert_eq!(b.value, b"boolean".as_slice());
             }
             res => panic!("Expected Ok(Type::Bool), got {res:?}"),
         }
 
         match do_parse("bool") {
             Ok(Type::Bool(b)) => {
-                assert_eq!(b.value, "bool");
+                assert_eq!(b.value, b"bool".as_slice());
             }
             res => panic!("Expected Ok(Type::Bool), got {res:?}"),
         }
@@ -1366,14 +1366,14 @@ mod tests {
     fn test_parse_integer_alias() {
         match do_parse("integer") {
             Ok(Type::Int(i)) => {
-                assert_eq!(i.value, "integer");
+                assert_eq!(i.value, b"integer".as_slice());
             }
             res => panic!("Expected Ok(Type::Int), got {res:?}"),
         }
 
         match do_parse("int") {
             Ok(Type::Int(i)) => {
-                assert_eq!(i.value, "int");
+                assert_eq!(i.value, b"int".as_slice());
             }
             res => panic!("Expected Ok(Type::Int), got {res:?}"),
         }
@@ -1383,7 +1383,7 @@ mod tests {
     fn test_parse_callable_with_variables() {
         match do_parse("callable(string ...$names)") {
             Ok(Type::Callable(callable)) => {
-                assert_eq!(callable.keyword.value, "callable");
+                assert_eq!(callable.keyword.value, b"callable".as_slice());
                 assert!(callable.specification.is_some());
 
                 let specification = callable.specification.unwrap();
@@ -1396,7 +1396,7 @@ mod tests {
                 assert!(first_parameter.ellipsis.is_some());
 
                 let variable = first_parameter.variable.unwrap();
-                assert_eq!(variable.value, "$names");
+                assert_eq!(variable.value, b"$names".as_slice());
             }
             res => panic!("Expected Ok(Type::Callable), got {res:?}"),
         }
@@ -1424,7 +1424,7 @@ mod tests {
                 assert!(first_field.is_optional());
                 assert!(matches!(
                     first_field.key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "salt", .. })
+                    Some(ShapeKey::String { value: b"salt", .. })
                 ));
                 assert!(matches!(first_field.value, Type::Int(_)));
 
@@ -1432,7 +1432,7 @@ mod tests {
                 assert!(second_field.is_optional());
                 assert!(matches!(
                     second_field.key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "cost", .. })
+                    Some(ShapeKey::String { value: b"cost", .. })
                 ));
                 assert!(matches!(second_field.value, Type::Int(_)));
             }
@@ -1448,19 +1448,19 @@ mod tests {
 
                 assert!(matches!(
                     shape.fields[0].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "string", .. })
+                    Some(ShapeKey::String { value: b"string", .. })
                 ));
                 assert!(matches!(
                     shape.fields[1].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "bool", .. })
+                    Some(ShapeKey::String { value: b"bool", .. })
                 ));
                 assert!(matches!(
                     shape.fields[2].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "int", .. })
+                    Some(ShapeKey::String { value: b"int", .. })
                 ));
                 assert!(matches!(
                     shape.fields[3].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "mixed", .. })
+                    Some(ShapeKey::String { value: b"mixed", .. })
                 ));
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -1498,15 +1498,15 @@ mod tests {
 
                 assert!(matches!(
                     shape.fields[0].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "123.4", .. })
+                    Some(ShapeKey::String { value: b"123.4", .. })
                 ));
                 assert!(matches!(
                     shape.fields[1].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "-1.2", .. })
+                    Some(ShapeKey::String { value: b"-1.2", .. })
                 ));
                 assert!(matches!(
                     shape.fields[2].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "+0.5", .. })
+                    Some(ShapeKey::String { value: b"+0.5", .. })
                 ));
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -1523,27 +1523,27 @@ mod tests {
 
                 assert!(matches!(
                     shape.fields[0].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "key_with_underscore", .. })
+                    Some(ShapeKey::String { value: b"key_with_underscore", .. })
                 ));
                 assert!(matches!(
                     shape.fields[1].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "key-with-dash", .. })
+                    Some(ShapeKey::String { value: b"key-with-dash", .. })
                 ));
                 assert!(matches!(
                     shape.fields[2].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "key\\with\\backslash", .. })
+                    Some(ShapeKey::String { value: b"key\\with\\backslash", .. })
                 ));
                 assert!(matches!(
                     shape.fields[3].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "+key", .. })
+                    Some(ShapeKey::String { value: b"+key", .. })
                 ));
                 assert!(matches!(
                     shape.fields[4].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "-key", .. })
+                    Some(ShapeKey::String { value: b"-key", .. })
                 ));
                 assert!(matches!(
                     shape.fields[5].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "\\leading_backslash", .. })
+                    Some(ShapeKey::String { value: b"\\leading_backslash", .. })
                 ));
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -1559,13 +1559,13 @@ mod tests {
                 assert!(!shape.fields[0].is_optional());
                 assert!(matches!(
                     shape.fields[0].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "key?name", .. })
+                    Some(ShapeKey::String { value: b"key?name", .. })
                 ));
 
                 assert!(shape.fields[1].is_optional());
                 assert!(matches!(
                     shape.fields[1].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "regular", .. })
+                    Some(ShapeKey::String { value: b"regular", .. })
                 ));
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -1607,15 +1607,15 @@ mod tests {
 
                 assert!(matches!(
                     shape.fields[0].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "string", .. })
+                    Some(ShapeKey::String { value: b"string", .. })
                 ));
                 assert!(matches!(
                     shape.fields[1].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "double", .. })
+                    Some(ShapeKey::String { value: b"double", .. })
                 ));
                 assert!(matches!(
                     shape.fields[2].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "unquoted", .. })
+                    Some(ShapeKey::String { value: b"unquoted", .. })
                 ));
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -1638,7 +1638,7 @@ mod tests {
                     assert!(
                         matches!(
                             shape.fields[0].key.as_ref().map(|k| &k.key),
-                            Some(ShapeKey::String { value, .. }) if *value == keyword
+                            Some(ShapeKey::String { value, .. }) if *value == keyword.as_bytes()
                         ),
                         "Failed for keyword: {keyword}"
                     );
@@ -1656,23 +1656,23 @@ mod tests {
 
                 assert!(matches!(
                     shape.fields[0].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "self", .. })
+                    Some(ShapeKey::String { value: b"self", .. })
                 ));
                 assert!(matches!(
                     shape.fields[1].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "static", .. })
+                    Some(ShapeKey::String { value: b"static", .. })
                 ));
                 assert!(matches!(
                     shape.fields[2].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "parent", .. })
+                    Some(ShapeKey::String { value: b"parent", .. })
                 ));
                 assert!(matches!(
                     shape.fields[3].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "class", .. })
+                    Some(ShapeKey::String { value: b"class", .. })
                 ));
                 assert!(matches!(
                     shape.fields[4].key.as_ref().map(|k| &k.key),
-                    Some(ShapeKey::String { value: "__CLASS__", .. })
+                    Some(ShapeKey::String { value: b"__CLASS__", .. })
                 ));
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -1708,7 +1708,7 @@ mod tests {
                     let span = key.key.span();
                     assert_eq!(span.end.offset - span.start.offset, 7, "Span should cover 'hello' including quotes");
 
-                    assert!(matches!(&key.key, ShapeKey::String { value: "hello", .. }));
+                    assert!(matches!(&key.key, ShapeKey::String { value: b"hello", .. }));
                 }
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -1766,7 +1766,7 @@ mod tests {
                         "Span should cover 'complex-key_name' (16 characters)"
                     );
 
-                    assert!(matches!(&key.key, ShapeKey::String { value: "complex-key_name", .. }));
+                    assert!(matches!(&key.key, ShapeKey::String { value: b"complex-key_name", .. }));
                 }
             }
             res => panic!("Expected Ok(Type::Shape), got {res:?}"),
@@ -1823,7 +1823,7 @@ mod tests {
     #[test]
     fn test_parse_non_zero_int() {
         match do_parse("non-zero-int") {
-            Ok(Type::NonZeroInt(k)) => assert_eq!(k.value, "non-zero-int"),
+            Ok(Type::NonZeroInt(k)) => assert_eq!(k.value, b"non-zero-int".as_slice()),
             other => panic!("Expected Type::NonZeroInt, got: {other:?}"),
         }
     }
@@ -1834,7 +1834,7 @@ mod tests {
             Ok(Type::IntRange(range)) => {
                 assert!(matches!(range.min, IntOrKeyword::Int(LiteralIntType { value: 0, .. })));
                 match range.max {
-                    IntOrKeyword::Keyword(keyword) => assert!(keyword.value.eq_ignore_ascii_case("int")),
+                    IntOrKeyword::Keyword(keyword) => assert!(keyword.value.eq_ignore_ascii_case(b"int")),
                     other => panic!("Expected IntOrKeyword::Keyword, got: {other:?}"),
                 }
             }
@@ -1847,7 +1847,7 @@ mod tests {
         match do_parse("int<int, 0>") {
             Ok(Type::IntRange(range)) => {
                 match range.min {
-                    IntOrKeyword::Keyword(keyword) => assert!(keyword.value.eq_ignore_ascii_case("int")),
+                    IntOrKeyword::Keyword(keyword) => assert!(keyword.value.eq_ignore_ascii_case(b"int")),
                     other => panic!("Expected IntOrKeyword::Keyword, got: {other:?}"),
                 }
                 assert!(matches!(range.max, IntOrKeyword::Int(LiteralIntType { value: 0, .. })));
@@ -1867,9 +1867,9 @@ mod tests {
                 Ok(Type::MemberReference(r)) => match r.member {
                     MemberReferenceSelector::Identifier(ident) => {
                         assert!(
-                            ident.value.eq_ignore_ascii_case(name),
+                            ident.value.eq_ignore_ascii_case(name.as_bytes()),
                             "Expected member name {name}, got {}",
-                            ident.value,
+                            String::from_utf8_lossy(ident.value),
                         );
                     }
                     other => panic!("Expected Identifier selector for {input}, got {other:?}"),
@@ -1884,7 +1884,11 @@ mod tests {
         match do_parse("Foo::INT*") {
             Ok(Type::MemberReference(r)) => match r.member {
                 MemberReferenceSelector::StartsWith(ident, _) => {
-                    assert!(ident.value.eq_ignore_ascii_case("INT"), "expected INT prefix, got {}", ident.value);
+                    assert!(
+                        ident.value.eq_ignore_ascii_case(b"INT"),
+                        "expected INT prefix, got {}",
+                        String::from_utf8_lossy(ident.value)
+                    );
                 }
                 other => panic!("Expected StartsWith selector, got {other:?}"),
             },
@@ -1973,7 +1977,7 @@ mod tests {
         match do_parse("FILTER_FLAG_*") {
             Ok(Type::GlobalWildcardReference(g)) => match g.selector {
                 GlobalWildcardSelector::StartsWith(identifier, _) => {
-                    assert_eq!(identifier.value, "FILTER_FLAG_");
+                    assert_eq!(identifier.value, b"FILTER_FLAG_".as_slice());
                 }
                 other @ GlobalWildcardSelector::EndsWith(..) => {
                     panic!("Expected StartsWith selector, got {other:?}")
@@ -1988,7 +1992,7 @@ mod tests {
         match do_parse("*_SUFFIX") {
             Ok(Type::GlobalWildcardReference(g)) => match g.selector {
                 GlobalWildcardSelector::EndsWith(_, identifier) => {
-                    assert_eq!(identifier.value, "_SUFFIX");
+                    assert_eq!(identifier.value, b"_SUFFIX".as_slice());
                 }
                 other @ GlobalWildcardSelector::StartsWith(..) => {
                     panic!("Expected EndsWith selector, got {other:?}")

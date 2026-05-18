@@ -49,7 +49,7 @@ pub struct File {
     pub id: FileId,
 
     /// The logical name of the file, typically the path relative to the root of the project.
-    pub name: Cow<'static, str>,
+    pub name: Cow<'static, [u8]>,
 
     /// The absolute path of the file on the host's filesystem, if it exists there.
     /// This will be `None` for vendored files that don't have a physical counterpart.
@@ -59,7 +59,7 @@ pub struct File {
     pub file_type: FileType,
 
     /// The contents of the file, if available.
-    pub contents: Cow<'static, str>,
+    pub contents: Cow<'static, [u8]>,
 
     /// The size of the file's contents in bytes.
     pub size: u32,
@@ -82,10 +82,10 @@ impl File {
     #[inline]
     #[must_use]
     pub fn new(
-        name: Cow<'static, str>,
+        name: Cow<'static, [u8]>,
         file_type: FileType,
         path: Option<PathBuf>,
-        contents: Cow<'static, str>,
+        contents: Cow<'static, [u8]>,
     ) -> Self {
         let id = FileId::new(&name);
         let size = contents.len() as u32;
@@ -121,7 +121,7 @@ impl File {
     /// `FileType::Host` and a `path` of `None`.
     #[inline]
     #[must_use]
-    pub fn ephemeral(name: Cow<'static, str>, contents: Cow<'static, str>) -> Self {
+    pub fn ephemeral(name: Cow<'static, [u8]>, contents: Cow<'static, [u8]>) -> Self {
         Self::new(name, FileType::Host, None, contents)
     }
 
@@ -218,7 +218,7 @@ impl FileType {
 impl FileId {
     #[inline]
     #[must_use]
-    pub fn new(logical_name: &str) -> Self {
+    pub fn new(logical_name: &[u8]) -> Self {
         let mut hasher = DefaultHasher::new();
         logical_name.hash(&mut hasher);
         Self(hasher.finish())
@@ -259,32 +259,30 @@ impl std::fmt::Display for FileId {
 
 /// Returns a vec over the starting byte offsets of each line in `source`.
 #[inline]
-pub(crate) fn line_starts(source: &str) -> Vec<u32> {
+pub(crate) fn line_starts(source: &[u8]) -> Vec<u32> {
     // Heuristic: On the test corpus, the mean length is about 30 bytes, the median is 23.
     // Since the whole vec will be small, we prefer slight over-allocation to avoid re-allocations
     // in the common case
     const LINE_WIDTH_HEURISTIC: usize = 20;
 
-    let bytes = source.as_bytes();
-
     // Pre-allocate to avoid calling `realloc` thousands of times per file.
-    let mut lines = Vec::with_capacity(bytes.len() / LINE_WIDTH_HEURISTIC);
+    let mut lines = Vec::with_capacity(source.len() / LINE_WIDTH_HEURISTIC);
     lines.push(0);
 
     // Detect line ending style from the first \r or \n.  Real files use one
     // convention throughout, so we never need to handle mixed \r\n / bare \r.
-    match memchr::memchr2(b'\r', b'\n', bytes) {
+    match memchr::memchr2(b'\r', b'\n', source) {
         // No line endings: single-line file, nothing more to push.
         None => {}
         // Old Mac (\r only): first line-ending char is a bare \r.
-        Some(cr) if bytes[cr] == b'\r' && bytes.get(cr + 1) != Some(&b'\n') => {
-            for pos in memchr::memchr_iter(b'\r', bytes) {
+        Some(cr) if source[cr] == b'\r' && source.get(cr + 1) != Some(&b'\n') => {
+            for pos in memchr::memchr_iter(b'\r', source) {
                 lines.push((pos + 1) as u32);
             }
         }
         // Unix (\n only) or Windows (\r\n): \n marks every line start.
         _ => {
-            for pos in memchr::memchr_iter(b'\n', bytes) {
+            for pos in memchr::memchr_iter(b'\n', source) {
                 lines.push((pos + 1) as u32);
             }
         }

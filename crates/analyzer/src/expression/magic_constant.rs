@@ -1,4 +1,3 @@
-use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
@@ -13,6 +12,7 @@ use mago_codex::ttype::union::TUnion;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_syntax::ast::MagicConstant;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -33,7 +33,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MagicConstant<'arena> {
             }
             MagicConstant::File(_) => {
                 if let Some(path) = context.source_file.path.as_deref().and_then(|p| p.to_str()) {
-                    get_literal_string(atom(path))
+                    get_literal_string(word(path))
                 } else {
                     get_non_empty_string()
                 }
@@ -42,14 +42,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MagicConstant<'arena> {
                 if let Some(path) =
                     context.source_file.path.as_deref().and_then(|p| p.parent()).and_then(|p| p.to_str())
                 {
-                    get_literal_string(atom(path))
+                    get_literal_string(word(path))
                 } else {
                     get_non_empty_string()
                 }
             }
             MagicConstant::Namespace(_) => {
                 if let Some(namespace_name) = context.scope.namespace_name() {
-                    TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::from(namespace_name.to_owned()))))
+                    TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::known_literal(word(namespace_name)))))
                 } else {
                     get_empty_string()
                 }
@@ -85,9 +85,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MagicConstant<'arena> {
             }
             MagicConstant::Property(_) => {
                 if let Some((property_name, _)) = block_context.scope.get_property_hook() {
-                    let property_name = &property_name[1..];
+                    let property_name = &property_name.as_bytes()[1..];
 
-                    get_literal_string(atom(property_name))
+                    get_literal_string(word(property_name))
                 } else {
                     get_empty_string()
                 }

@@ -1,5 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
+use mago_bytes::BytesDisplay;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -17,14 +18,18 @@ use crate::internal::context::Context;
 #[inline]
 pub fn check_method<'ast, 'arena>(
     method: &'ast Method<'arena>,
-    method_name: &str,
+    method_name: &[u8],
     class_like_span: Span,
-    class_like_name: &str,
-    class_like_fqcn: &str,
+    class_like_name: &[u8],
+    class_like_fqcn: &[u8],
     class_like_kind: &str,
     class_like_is_interface: bool,
     context: &mut Context<'_, 'ast, 'arena>,
 ) {
+    let method_name_bytes = method_name;
+    let method_name = BytesDisplay(method_name);
+    let class_like_name = BytesDisplay(class_like_name);
+    let class_like_fqcn = BytesDisplay(class_like_fqcn);
     let mut last_static: Option<Span> = None;
     let mut last_final: Option<Span> = None;
     let mut last_abstract: Option<Span> = None;
@@ -183,7 +188,7 @@ pub fn check_method<'ast, 'arena>(
                 }
             }
             Modifier::PrivateSet(k) | Modifier::ProtectedSet(k) | Modifier::PublicSet(k) => {
-                let modifier_name = k.value;
+                let modifier_name = BytesDisplay(k.value);
 
                 context.report(
                     Issue::error(format!("`{modifier_name}` modifier is not allowed on methods"))
@@ -205,7 +210,7 @@ pub fn check_method<'ast, 'arena>(
 
     for (magic_method, parameter_count, must_be_public, must_be_static, can_have_return_type) in MAGIC_METHOD_SEMANTICS
     {
-        if method_name.eq_ignore_ascii_case(magic_method) {
+        if method_name_bytes.eq_ignore_ascii_case(magic_method) {
             if let Some(count) = parameter_count {
                 let mut found_count = 0;
                 let mut found_variadic = false;
@@ -442,7 +447,7 @@ pub fn check_method<'ast, 'arena>(
         }
     }
 
-    if !method_name.eq_ignore_ascii_case("__construct") {
+    if !method_name_bytes.eq_ignore_ascii_case(b"__construct") {
         check_for_promoted_properties_outside_constructor(&method.parameter_list, context);
     } else if is_abstract {
         for parameter in &method.parameter_list.parameters {

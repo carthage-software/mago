@@ -5,8 +5,8 @@ use std::sync::Arc;
 use foldhash::HashMap;
 
 use foldhash::HashSet;
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -59,12 +59,12 @@ pub struct InferenceOptions {
 
 #[derive(Debug)]
 pub struct TemplateInferenceViolation {
-    pub template_name: Atom,
+    pub template_name: Word,
     pub inferred_bound: TUnion,
     pub constraint: TUnion,
 }
 
-fn resolve_self_class(defining_entity: &GenericParent) -> Option<Atom> {
+fn resolve_self_class(defining_entity: &GenericParent) -> Option<Word> {
     match defining_entity {
         GenericParent::ClassLike(name) => Some(*name),
         GenericParent::FunctionLike((class_name, method_name)) if !method_name.is_empty() => Some(*class_name),
@@ -75,7 +75,7 @@ fn resolve_self_class(defining_entity: &GenericParent) -> Option<Atom> {
 fn expand_template_constraint<'ty>(
     codebase: &CodebaseMetadata,
     constraint: &'ty TUnion,
-    self_class: Option<Atom>,
+    self_class: Option<Word>,
 ) -> Cow<'ty, TUnion> {
     if !constraint.is_expandable() {
         return Cow::Borrowed(constraint);
@@ -632,7 +632,7 @@ fn infer_templates_from_input_and_container_types(
                     continue;
                 };
 
-                let Some(container_meta) = context.codebase.get_class_like(&container_obj.name) else {
+                let Some(container_meta) = context.codebase.get_class_like(container_obj.name.as_bytes()) else {
                     continue;
                 };
 
@@ -641,11 +641,11 @@ fn infer_templates_from_input_and_container_types(
                         continue;
                     };
 
-                    let Some(input_meta) = context.codebase.get_class_like(&input_obj.name) else {
+                    let Some(input_meta) = context.codebase.get_class_like(input_obj.name.as_bytes()) else {
                         continue;
                     };
 
-                    if !context.codebase.is_instance_of(&input_obj.name, &container_obj.name) {
+                    if !context.codebase.is_instance_of(input_obj.name.as_bytes(), container_obj.name.as_bytes()) {
                         continue;
                     }
 
@@ -757,7 +757,7 @@ fn infer_templates_from_input_and_container_types(
                                 && context.codebase.class_like_exists(literal)
                             {
                                 input_objects
-                                    .push(TClassLikeString::literal(atom(literal)).get_object_type(context.codebase));
+                                    .push(TClassLikeString::literal(word(literal)).get_object_type(context.codebase));
                             }
                         }
                         _ => {}

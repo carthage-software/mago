@@ -1,3 +1,4 @@
+use mago_bytes::BytesDisplay;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -18,7 +19,7 @@ pub fn check_attribute_list(attribute_list: &AttributeList, context: &mut Contex
     }
 
     for attr in &attribute_list.attributes {
-        let name = attr.name.value();
+        let name = BytesDisplay(attr.name.value());
 
         if let Some(list) = &attr.argument_list {
             for argument in &list.arguments {

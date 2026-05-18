@@ -2,8 +2,8 @@ use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
-use mago_atom::AtomSet;
-use mago_atom::atom;
+use mago_word::WordSet;
+use mago_word::word;
 
 use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_named_object;
@@ -189,7 +189,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
                 Ok(())
             }
             Expression::Self_(keyword) | Expression::Static(keyword) | Expression::Parent(keyword) => {
-                let keyword_str = keyword.value;
+                let keyword_str = mago_bytes::BytesDisplay(keyword.value);
 
                 context.collector.report_with_code(
                     IssueCode::InvalidScopeKeywordContext,
@@ -214,13 +214,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
                 if !identifier.is_local() {
                     unreachable!(
                         "Parser should not produce a bare `Identifier` as a standalone expression in this context. \nIf you see this, it indicates a bug in the parser or the analysis logic. \nPlease report this issue with the following identifier: `{}` line `{}`, column `{}`.",
-                        context.source_file.name,
+                        mago_bytes::BytesDisplay(&context.source_file.name),
                         context.source_file.line_number(self.offset()),
                         context.source_file.column_number(self.offset()),
                     );
                 }
 
-                artifacts.set_expression_type(&self, get_literal_string(atom(identifier.value())));
+                artifacts.set_expression_type(&self, get_literal_string(word(identifier.value())));
 
                 Ok(())
             }
@@ -325,7 +325,7 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
     expression_clauses = expression_clauses
         .into_iter()
         .map(|c| {
-            let keys: AtomSet = c.possibilities.keys().copied().collect();
+            let keys: WordSet = c.possibilities.keys().copied().collect();
 
             mixed_var_ids.retain(|i| !keys.contains(i));
 
@@ -372,7 +372,7 @@ pub fn find_expression_logic_issues<'ctx, 'arena>(
         &reconcilable_if_types,
         active_if_types,
         &mut if_block_context,
-        &mut mago_atom::AtomSet::default(),
+        &mut mago_word::WordSet::default(),
         &cond_referenced_var_ids,
         &expression_span,
         true,

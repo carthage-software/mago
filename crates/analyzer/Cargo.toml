@@ -17,7 +17,8 @@ mago-codex = { workspace = true }
 mago-reporting = { workspace = true }
 mago-text-edit = { workspace = true }
 mago-syntax = { workspace = true }
-mago-atom = { workspace = true }
+mago-bytes = { workspace = true }
+mago-word = { workspace = true }
 mago-span = { workspace = true }
 mago-names = { workspace = true }
 mago-database = { workspace = true }
@@ -32,6 +33,7 @@ itertools = { workspace = true }
 indexmap = { workspace = true }
 bumpalo = { workspace = true }
 diffy = { workspace = true }
+memchr = { workspace = true }
 
 [dev-dependencies]
 mago-prelude = { workspace = true, features = ["build"] }

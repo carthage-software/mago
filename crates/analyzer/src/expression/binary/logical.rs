@@ -4,7 +4,6 @@ use foldhash::HashSet;
 
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
-use mago_atom::AtomSet;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combine_union_types_rc;
 use mago_codex::ttype::get_bool;
@@ -20,6 +19,7 @@ use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
+use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -34,6 +34,7 @@ use crate::formula::negate_or_synthesize;
 use crate::reconciler;
 use crate::utils::conditional;
 use crate::utils::symbol_existence::extract_function_constant_existence;
+use mago_bytes::BytesDisplay;
 
 #[inline]
 pub fn analyze_logical_and_operation<'ctx, 'arena>(
@@ -113,7 +114,7 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
         left_assertions.retain(|var_id, _| !left_block_context.parent_conflicting_clause_variables.contains(var_id));
     }
 
-    let mut changed_var_ids = AtomSet::default();
+    let mut changed_var_ids = WordSet::default();
     let mut right_block_context;
     if left_assertions.is_empty() {
         right_block_context = left_block_context.clone();
@@ -123,7 +124,7 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
         right_block_context.known_functions.extend(left_block_context.known_functions.iter().copied());
         right_block_context.known_constants.extend(left_block_context.known_constants.iter().copied());
 
-        let empty_referenced_vars = AtomSet::default();
+        let empty_referenced_vars = WordSet::default();
 
         reconciler::reconcile_keyed_types(
             context,
@@ -386,7 +387,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         &mut left_referenced_var_ids,
     );
 
-    let mut changed_var_ids = AtomSet::default();
+    let mut changed_var_ids = WordSet::default();
     let mut right_block_context = block_context.clone();
 
     let result_type: TUnion;
@@ -505,7 +506,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
 
         let mut clauses_for_right_analysis = BlockContext::remove_reconciled_clauses(
             &clauses_for_right_analysis,
-            &right_assigned_var_ids.into_keys().collect::<AtomSet>(),
+            &right_assigned_var_ids.into_keys().collect::<WordSet>(),
         )
         .0;
 
@@ -521,7 +522,7 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
         );
 
         if !right_type_assertions.is_empty() {
-            let mut right_changed_var_ids = AtomSet::default();
+            let mut right_changed_var_ids = WordSet::default();
 
             reconciler::reconcile_keyed_types(
                 context,
@@ -725,7 +726,7 @@ fn report_redundant_logical_operation<'arena>(
 
     let issue = Issue::help(format!(
         "Redundant `{}` operation: left operand is {} and right operand is {}.",
-        binary.operator.as_str(),
+        BytesDisplay(binary.operator.as_bytes()),
         lhs_description,
         rhs_description
     ))
@@ -735,7 +736,7 @@ fn report_redundant_logical_operation<'arena>(
     )
     .with_note(format!(
         "The `{}` operator will always return {} in this case.",
-        binary.operator.as_str(),
+        BytesDisplay(binary.operator.as_bytes()),
         result_value_str
     ))
     .with_help(if side_to_remove.is_some() {

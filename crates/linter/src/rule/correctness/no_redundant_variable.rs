@@ -130,19 +130,21 @@ impl LintRule for NoRedundantVariableRule {
                 continue;
             };
 
-            let bare = name.strip_prefix('$').unwrap_or(name);
+            let bare = name.strip_prefix(b"$").unwrap_or(name);
+            let name_display = mago_bytes::BytesDisplay(name);
+            let bare_display = mago_bytes::BytesDisplay(bare);
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Variable `{name}` is assigned but never used."))
+                Issue::new(self.cfg.level(), format!("Variable `{name_display}` is assigned but never used."))
                     .with_code(self.meta.code)
                     .with_annotation(
                         Annotation::primary(span)
-                            .with_message(format!("`{name}` is written here but its value is never observed")),
+                            .with_message(format!("`{name_display}` is written here but its value is never observed")),
                     )
                     .with_note(
                         "If this is intentional (e.g. a discarded by-reference output), rename to `$_` or `$_<name>`.",
                     )
                     .with_help(format!(
-                        "Remove the assignment, or rename the variable to `$_{bare}` to silence this rule."
+                        "Remove the assignment, or rename the variable to `$_{bare_display}` to silence this rule."
                     )),
             );
         }

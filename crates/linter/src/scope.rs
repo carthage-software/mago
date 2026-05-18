@@ -11,13 +11,13 @@ use crate::context::LintContext;
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ClassLikeScope<'arena> {
     /// A `class` scope, containing the class name.
-    Class(&'arena str),
+    Class(&'arena [u8]),
     /// An `interface` scope, containing the interface name.
-    Interface(&'arena str),
+    Interface(&'arena [u8]),
     /// A `trait` scope, containing the trait name.
-    Trait(&'arena str),
+    Trait(&'arena [u8]),
     /// An `enum` scope, containing the enum name.
-    Enum(&'arena str),
+    Enum(&'arena [u8]),
     /// An anonymous `class` scope, containing the span of the `new class` expression.
     AnonymousClass(Span),
 }
@@ -26,9 +26,9 @@ pub enum ClassLikeScope<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum FunctionLikeScope<'arena> {
     /// A `function` scope, containing the function name, and if the function returns by-ref.
-    Function(&'arena str, bool),
+    Function(&'arena [u8], bool),
     /// A `method` scope, containing the method name, and if the method returns by-ref.
-    Method(&'arena str, bool),
+    Method(&'arena [u8], bool),
     /// An `fn()` arrow function scope, containing its span, and if it returns by-ref.
     ArrowFunction(Span, bool),
     /// A `function()` closure scope, containing its span, and if it returns by-ref.
@@ -39,7 +39,7 @@ pub enum FunctionLikeScope<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Scope<'arena> {
     /// A `namespace` scope.
-    Namespace(&'arena str),
+    Namespace(&'arena [u8]),
     /// Any class-like scope (`class`, `interface`, `trait`, `enum`).
     ClassLike(ClassLikeScope<'arena>),
     /// Any function-like scope (`function`, `method`, `closure`).
@@ -79,7 +79,7 @@ impl<'arena> Scope<'arena> {
                     .name
                     .as_ref()
                     .map(mago_syntax::ast::Identifier::value)
-                    .map_or("", |n| if let Some(n) = n.strip_prefix('\\') { n } else { n });
+                    .map_or(&b""[..], |n| if let Some(n) = n.strip_prefix(b"\\") { n } else { n });
 
                 Scope::Namespace(namespace_name)
             }
@@ -154,7 +154,7 @@ impl<'arena> ScopeStack<'arena> {
     ///
     /// Returns an empty string if in the global scope.
     #[must_use]
-    pub fn get_namespace(&self) -> &'arena str {
+    pub fn get_namespace(&self) -> &'arena [u8] {
         self.stack
             .iter()
             .rev()
@@ -162,7 +162,7 @@ impl<'arena> ScopeStack<'arena> {
                 Scope::Namespace(namespace) => Some(*namespace),
                 _ => None,
             })
-            .unwrap_or("")
+            .unwrap_or(b"")
     }
 
     /// Searches the stack and returns the innermost `ClassLikeScope`.

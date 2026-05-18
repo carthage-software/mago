@@ -4,9 +4,9 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -246,136 +246,135 @@ impl TType for TKeyedArray {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         if let Some(items) = &self.known_items {
-            let mut string = String::new();
-            string += "array{";
+            let mut buf: Vec<u8> = Vec::new();
+            buf.extend_from_slice(b"array{");
             let mut first = true;
             for (key, (indefinite, item_type)) in items {
                 if first {
                     first = false;
                 } else {
-                    string += ", ";
+                    buf.extend_from_slice(b", ");
                 }
 
-                string += &key.to_string();
+                buf.extend_from_slice(key.id_word().as_bytes());
                 if *indefinite {
-                    string += "?";
+                    buf.extend_from_slice(b"?");
                 }
 
-                string += ": ";
-                string += &item_type.get_id();
+                buf.extend_from_slice(b": ");
+                buf.extend_from_slice(item_type.get_id().as_bytes());
             }
 
             if let Some((key_type, value_type)) = &self.parameters {
                 if !first {
-                    string += ", ";
+                    buf.extend_from_slice(b", ");
                 }
 
-                string += "...";
+                buf.extend_from_slice(b"...");
                 if !key_type.is_array_key() || !value_type.is_mixed() {
-                    string += "<";
-                    string += &key_type.get_id();
-                    string += ", ";
-                    string += &value_type.get_id();
-                    string += ">";
+                    buf.extend_from_slice(b"<");
+                    buf.extend_from_slice(key_type.get_id().as_bytes());
+                    buf.extend_from_slice(b", ");
+                    buf.extend_from_slice(value_type.get_id().as_bytes());
+                    buf.extend_from_slice(b">");
                 }
             }
 
-            string += "}";
+            buf.extend_from_slice(b"}");
 
-            atom(&string)
+            word(&buf)
         } else if let Some((key_type, value_type)) = &self.parameters {
-            concat_atom!(
-                if self.is_non_empty() { "non-empty-array" } else { "array" },
-                "<",
-                key_type.get_id().as_str(),
-                ", ",
-                value_type.get_id().as_str(),
-                ">",
+            concat_word!(
+                if self.is_non_empty() { b"non-empty-array".as_slice() } else { b"array".as_slice() },
+                b"<",
+                key_type.get_id(),
+                b", ",
+                value_type.get_id(),
+                b">",
             )
         } else {
-            atom("array{}")
+            word(b"array{}")
         }
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         if let Some(items) = &self.known_items {
             if items.is_empty() && self.parameters.is_none() {
-                return atom("array{}");
+                return word(b"array{}");
             }
 
-            let mut string = String::new();
-            string += "array{\n";
+            let mut buf: Vec<u8> = Vec::new();
+            buf.extend_from_slice(b"array{\n");
             let item_indent = indent + 2;
-            let item_spaces = " ".repeat(item_indent);
 
             for (key, (indefinite, item_type)) in items {
-                string += &item_spaces;
-                string += &key.to_string();
+                buf.resize(buf.len() + item_indent, b' ');
+                buf.extend_from_slice(key.id_word().as_bytes());
                 if *indefinite {
-                    string += "?";
+                    buf.push(b'?');
                 }
-                string += ": ";
-                string += &item_type.get_pretty_id_with_indent(item_indent);
-                string += ",\n";
+                buf.extend_from_slice(b": ");
+                buf.extend_from_slice(item_type.get_pretty_id_with_indent(item_indent).as_bytes());
+                buf.extend_from_slice(b",\n");
             }
 
             if let Some((key_type, value_type)) = &self.parameters {
-                string += &item_spaces;
-                string += "...";
+                buf.resize(buf.len() + item_indent, b' ');
+                buf.extend_from_slice(b"...");
                 if !key_type.is_array_key() || !value_type.is_mixed() {
                     if key_type.is_complex() || value_type.is_complex() {
-                        string += "<\n";
-                        string += &" ".repeat(item_indent + 2);
-                        string += &key_type.get_pretty_id_with_indent(item_indent + 2);
-                        string += ",\n";
-                        string += &" ".repeat(item_indent + 2);
-                        string += &value_type.get_pretty_id_with_indent(item_indent + 2);
-                        string += ",\n";
-                        string += &item_spaces;
-                        string += ">";
+                        buf.extend_from_slice(b"<\n");
+                        buf.resize(buf.len() + item_indent + 2, b' ');
+                        buf.extend_from_slice(key_type.get_pretty_id_with_indent(item_indent + 2).as_bytes());
+                        buf.extend_from_slice(b",\n");
+                        buf.resize(buf.len() + item_indent + 2, b' ');
+                        buf.extend_from_slice(value_type.get_pretty_id_with_indent(item_indent + 2).as_bytes());
+                        buf.extend_from_slice(b",\n");
+                        buf.resize(buf.len() + item_indent, b' ');
+                        buf.push(b'>');
                     } else {
-                        string += "<";
-                        string += &key_type.get_pretty_id_with_indent(item_indent);
-                        string += ", ";
-                        string += &value_type.get_pretty_id_with_indent(item_indent);
-                        string += ">";
+                        buf.push(b'<');
+                        buf.extend_from_slice(key_type.get_pretty_id_with_indent(item_indent).as_bytes());
+                        buf.extend_from_slice(b", ");
+                        buf.extend_from_slice(value_type.get_pretty_id_with_indent(item_indent).as_bytes());
+                        buf.push(b'>');
                     }
                 }
-                string += ",\n";
+                buf.extend_from_slice(b",\n");
             }
 
-            string += &" ".repeat(indent);
-            string += "}";
+            buf.resize(buf.len() + indent, b' ');
+            buf.push(b'}');
 
-            atom(&string)
+            word(&buf)
         } else if let Some((key_type, value_type)) = &self.parameters {
             if key_type.is_complex() || value_type.is_complex() {
-                let mut string = String::new();
-                string += if self.is_non_empty() { "non-empty-array" } else { "array" };
-                string += "<\n";
-                string += &" ".repeat(indent + 2);
-                string += &key_type.get_pretty_id_with_indent(indent + 2);
-                string += ",\n";
-                string += &" ".repeat(indent + 2);
-                string += &value_type.get_pretty_id_with_indent(indent + 2);
-                string += ",\n";
-                string += &" ".repeat(indent);
-                string += ">";
-                atom(&string)
+                let mut buf: Vec<u8> = Vec::new();
+                buf.extend_from_slice(if self.is_non_empty() { b"non-empty-array" } else { b"array" });
+                buf.extend_from_slice(b"<\n");
+                buf.resize(buf.len() + indent + 2, b' ');
+                buf.extend_from_slice(key_type.get_pretty_id_with_indent(indent + 2).as_bytes());
+                buf.extend_from_slice(b",\n");
+                buf.resize(buf.len() + indent + 2, b' ');
+                buf.extend_from_slice(value_type.get_pretty_id_with_indent(indent + 2).as_bytes());
+                buf.extend_from_slice(b",\n");
+                buf.resize(buf.len() + indent, b' ');
+                buf.push(b'>');
+                word(&buf)
             } else {
-                concat_atom!(
-                    if self.is_non_empty() { "non-empty-array" } else { "array" },
-                    "<",
-                    key_type.get_pretty_id_with_indent(indent).as_str(),
-                    ", ",
-                    value_type.get_pretty_id_with_indent(indent).as_str(),
-                    ">",
+                concat_word!(
+                    if self.is_non_empty() { b"non-empty-array".as_slice() } else { b"array".as_slice() },
+                    b"<",
+                    key_type.get_pretty_id_with_indent(indent),
+                    b", ",
+                    value_type.get_pretty_id_with_indent(indent),
+                    b">",
                 )
             }
         } else {
-            atom("array{}")
+            word(b"array{}")
         }
     }
 }

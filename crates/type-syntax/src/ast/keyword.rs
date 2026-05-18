@@ -9,7 +9,7 @@ use crate::token::TypeToken;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Keyword<'arena> {
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 impl HasSpan for Keyword<'_> {
@@ -25,10 +25,10 @@ impl<'arena> Keyword<'arena> {
     pub fn from_token(token: TypeToken<'arena>, file_id: FileId) -> Self {
         debug_assert!(
             token.kind.is_keyword()
-                || (token.kind.is_identifier() && token.value.to_ascii_lowercase().ends_with("closure")),
+                || (token.kind.is_identifier() && token.value.to_ascii_lowercase().ends_with(b"closure")),
             "Expected a keyword or identifier, found: {:?} ( `{}` )",
             token.kind,
-            token.value
+            String::from_utf8_lossy(token.value),
         );
 
         Keyword { span: token.span_for(file_id), value: token.value }
@@ -37,6 +37,6 @@ impl<'arena> Keyword<'arena> {
 
 impl std::fmt::Display for Keyword<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
+        f.write_str(&String::from_utf8_lossy(self.value))
     }
 }

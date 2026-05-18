@@ -111,7 +111,7 @@ impl LintRule for NoParameterShadowingRule {
             return;
         }
 
-        let params: HashMap<&str, Span> =
+        let params: HashMap<&[u8], Span> =
             parameter_list.parameters.iter().map(|p| (p.variable.name, p.variable.span)).collect();
 
         let mut collector = ShadowCollector { params: &params, shadows: HashMap::default() };
@@ -120,20 +120,22 @@ impl LintRule for NoParameterShadowingRule {
 
         for (param_name, shadow_spans) in &collector.shadows {
             let param_span = params[param_name];
+            let name_display = mago_bytes::BytesDisplay(param_name);
 
             let mut issue = Issue::new(
                 self.cfg.level(),
-                format!("Parameter `{param_name}` is shadowed by a loop or catch variable."),
+                format!("Parameter `{name_display}` is shadowed by a loop or catch variable."),
             )
             .with_code(self.meta.code)
             .with_annotation(
-                Annotation::primary(param_span).with_message(format!("`{param_name}` is defined as a parameter here")),
+                Annotation::primary(param_span)
+                    .with_message(format!("`{name_display}` is defined as a parameter here")),
             );
 
             for shadow_span in shadow_spans {
                 issue = issue.with_annotation(
                     Annotation::secondary(*shadow_span)
-                        .with_message(format!("`{param_name}` is overwritten here, shadowing the parameter")),
+                        .with_message(format!("`{name_display}` is overwritten here, shadowing the parameter")),
                 );
             }
 
@@ -141,7 +143,7 @@ impl LintRule for NoParameterShadowingRule {
                 .with_note(
                     "Reusing a parameter name as a loop or catch variable makes the original value inaccessible.",
                 )
-                .with_help(format!("Rename the variable to avoid shadowing the `{param_name}` parameter."));
+                .with_help(format!("Rename the variable to avoid shadowing the `{name_display}` parameter."));
 
             ctx.collector.report(issue);
         }
@@ -149,12 +151,12 @@ impl LintRule for NoParameterShadowingRule {
 }
 
 struct ShadowCollector<'rule, 'arena> {
-    params: &'rule HashMap<&'arena str, Span>,
-    shadows: HashMap<&'arena str, Vec<Span>>,
+    params: &'rule HashMap<&'arena [u8], Span>,
+    shadows: HashMap<&'arena [u8], Vec<Span>>,
 }
 
 impl<'arena> ShadowCollector<'_, 'arena> {
-    fn check_variable(&mut self, name: &'arena str, span: Span) {
+    fn check_variable(&mut self, name: &'arena [u8], span: Span) {
         if self.params.contains_key(name) {
             self.shadows.entry(name).or_default().push(span);
         }

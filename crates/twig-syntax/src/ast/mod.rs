@@ -47,7 +47,7 @@ use crate::error::ParseError;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Template<'arena> {
     pub file_id: FileId,
-    pub source_text: &'arena str,
+    pub source_text: &'arena [u8],
     pub trivia: Sequence<'arena, Trivia<'arena>>,
     pub statements: Sequence<'arena, Statement<'arena>>,
     pub errors: BVec<'arena, ParseError>,

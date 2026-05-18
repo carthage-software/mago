@@ -1,10 +1,6 @@
-use mago_atom::Atom;
+use mago_word::Word;
 use std::collections::BTreeMap;
 
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_docblock::tag::Visibility as DocblockVisibility;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
@@ -29,6 +25,10 @@ use mago_syntax::ast::Trait;
 use mago_syntax::ast::TraitUseAdaptation;
 use mago_syntax::ast::TraitUseMethodReference;
 use mago_syntax::ast::TraitUseSpecification;
+use mago_word::WordMap;
+use mago_word::WordSet;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
 use crate::get_anonymous_class_name;
@@ -78,7 +78,7 @@ use crate::visibility::Visibility;
 
 /// Return type for class-like registration functions.
 /// Returns the name, template constraints, local type aliases, and imported type aliases.
-type ClassLikeRegistration = Option<(Atom, TemplateConstraintList, AtomSet, AtomMap<(Atom, Atom)>)>;
+type ClassLikeRegistration = Option<(Word, TemplateConstraintList, WordSet, WordMap<(Word, Word)>)>;
 
 #[inline]
 pub fn register_anonymous_class<'arena>(
@@ -112,12 +112,12 @@ pub fn register_anonymous_class<'arena>(
         .map(|(name, definition)| (*name, definition.clone()))
         .collect::<TemplateConstraintList>();
 
-    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<AtomSet>();
+    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<WordSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases
         .iter()
         .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
-        .collect::<AtomMap<(Atom, Atom)>>();
+        .collect::<WordMap<(Word, Word)>>();
 
     codebase.class_likes.insert(name, class_like_metadata);
 
@@ -133,7 +133,7 @@ pub fn register_class<'arena>(
 ) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
         codebase,
-        atom(context.resolved_names.get(&class.name)),
+        word(context.resolved_names.get(&class.name)),
         SymbolKind::Class,
         Some(class.name.span),
         class.span(),
@@ -154,12 +154,12 @@ pub fn register_class<'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<AtomSet>();
+    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<WordSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases
         .iter()
         .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
-        .collect::<AtomMap<(Atom, Atom)>>();
+        .collect::<WordMap<(Word, Word)>>();
 
     codebase.class_likes.insert(name, class_like_metadata);
 
@@ -175,7 +175,7 @@ pub fn register_interface<'arena>(
 ) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
         codebase,
-        atom(context.resolved_names.get(&interface.name)),
+        word(context.resolved_names.get(&interface.name)),
         SymbolKind::Interface,
         Some(interface.name.span),
         interface.span(),
@@ -196,12 +196,12 @@ pub fn register_interface<'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<AtomSet>();
+    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<WordSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases
         .iter()
         .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
-        .collect::<AtomMap<(Atom, Atom)>>();
+        .collect::<WordMap<(Word, Word)>>();
 
     codebase.class_likes.insert(name, class_like_metadata);
 
@@ -217,7 +217,7 @@ pub fn register_trait<'arena>(
 ) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
         codebase,
-        atom(context.resolved_names.get(&r#trait.name)),
+        word(context.resolved_names.get(&r#trait.name)),
         SymbolKind::Trait,
         Some(r#trait.name.span),
         r#trait.span(),
@@ -238,12 +238,12 @@ pub fn register_trait<'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<AtomSet>();
+    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<WordSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases
         .iter()
         .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
-        .collect::<AtomMap<(Atom, Atom)>>();
+        .collect::<WordMap<(Word, Word)>>();
 
     codebase.class_likes.insert(name, class_like_metadata);
 
@@ -259,7 +259,7 @@ pub fn register_enum<'arena>(
 ) -> ClassLikeRegistration {
     let class_like_metadata = scan_class_like(
         codebase,
-        atom(context.resolved_names.get(&r#enum.name)),
+        word(context.resolved_names.get(&r#enum.name)),
         SymbolKind::Enum,
         Some(r#enum.name.span),
         r#enum.span(),
@@ -280,12 +280,12 @@ pub fn register_enum<'arena>(
         .collect::<TemplateConstraintList>();
 
     let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<AtomSet>();
+    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<WordSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases
         .iter()
         .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
-        .collect::<AtomMap<(Atom, Atom)>>();
+        .collect::<WordMap<(Word, Word)>>();
 
     codebase.class_likes.insert(name, class_like_metadata);
 
@@ -296,7 +296,7 @@ pub fn register_enum<'arena>(
 #[allow(clippy::too_many_arguments)]
 fn scan_class_like<'arena>(
     codebase: &mut CodebaseMetadata,
-    name: Atom,
+    name: Word,
     kind: SymbolKind,
     name_span: Option<Span>,
     span: Span,
@@ -310,7 +310,7 @@ fn scan_class_like<'arena>(
     scope: &mut NamespaceScope,
 ) -> Option<ClassLikeMetadata> {
     let original_name = name;
-    let name = ascii_lowercase_atom(&original_name);
+    let name = ascii_lowercase_word(original_name.as_bytes());
 
     if codebase.class_likes.contains_key(&name) {
         return None;
@@ -354,7 +354,7 @@ fn scan_class_like<'arena>(
 
             if let Some(extended_class) = extends.and_then(|e| e.types.first()) {
                 let parent_name = context.resolved_names.get(extended_class);
-                let parent_name = ascii_lowercase_atom(parent_name);
+                let parent_name = ascii_lowercase_word(parent_name);
 
                 class_like_metadata.direct_parent_class = Some(parent_name);
                 class_like_metadata.all_parent_classes.insert(parent_name);
@@ -367,15 +367,15 @@ fn scan_class_like<'arena>(
                 Some(backing_type) => {
                     if backing_type.hint.is_string() {
                         class_like_metadata
-                            .add_direct_parent_interface(atom("__internal_do_not_use__stringbackedenum"));
+                            .add_direct_parent_interface(word("__internal_do_not_use__stringbackedenum"));
                     } else if backing_type.hint.is_int() {
-                        class_like_metadata.add_direct_parent_interface(atom("__internal_do_not_use__intbackedenum"));
+                        class_like_metadata.add_direct_parent_interface(word("__internal_do_not_use__intbackedenum"));
                     } else {
-                        class_like_metadata.add_direct_parent_interface(atom("backedenum"));
+                        class_like_metadata.add_direct_parent_interface(word("backedenum"));
                     }
                 }
                 None => {
-                    class_like_metadata.add_direct_parent_interface(atom("unitenum"));
+                    class_like_metadata.add_direct_parent_interface(word("unitenum"));
                 }
             }
 
@@ -394,7 +394,7 @@ fn scan_class_like<'arena>(
             if let Some(extends) = extends {
                 for extended_interface in &extends.types {
                     let parent_name = context.resolved_names.get(extended_interface);
-                    let parent_name = ascii_lowercase_atom(parent_name);
+                    let parent_name = ascii_lowercase_word(parent_name);
 
                     class_like_metadata.add_direct_parent_interface(parent_name);
                 }
@@ -407,7 +407,7 @@ fn scan_class_like<'arena>(
     {
         for interface_name in &implemented_interfaces.types {
             let interface_name = context.resolved_names.get(interface_name);
-            let interface_name = ascii_lowercase_atom(interface_name);
+            let interface_name = ascii_lowercase_word(interface_name);
 
             class_like_metadata.add_direct_parent_interface(interface_name);
         }
@@ -466,9 +466,9 @@ fn scan_class_like<'arena>(
         class_like_metadata.has_sealed_properties = docblock.has_sealed_properties;
 
         for imported_type_alias in &docblock.imported_type_aliases {
-            let fqcn = ascii_lowercase_atom(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
-            let type_name = atom(&imported_type_alias.name);
-            let alias = imported_type_alias.alias.as_deref().map_or(type_name, atom);
+            let fqcn = ascii_lowercase_word(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
+            let type_name = word(&imported_type_alias.name);
+            let alias = imported_type_alias.alias.as_ref().map_or(type_name, |a| word(&a.0));
 
             if fqcn == name {
                 continue;
@@ -478,12 +478,12 @@ fn scan_class_like<'arena>(
         }
 
         for type_alias in &docblock.type_aliases {
-            type_context = type_context.with_type_alias(atom(&type_alias.name));
+            type_context = type_context.with_type_alias(word(&type_alias.name));
         }
 
         let mut template_variance = Vec::new();
         for template in &docblock.templates {
-            let template_name = atom(&template.name);
+            let template_name = word(&template.name);
             let template_as_type = if let Some(type_string) = &template.type_string {
                 match builder::get_type_from_string(
                     context.arena,
@@ -566,9 +566,9 @@ fn scan_class_like<'arena>(
         // Aliases were already registered in `type_context` above; here we
         // record them on the class metadata and report any diagnostics.
         for imported_type_alias in docblock.imported_type_aliases {
-            let fqcn = ascii_lowercase_atom(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
-            let type_name = atom(&imported_type_alias.name);
-            let alias = imported_type_alias.alias.as_deref().map_or(type_name, atom);
+            let fqcn = ascii_lowercase_word(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
+            let type_name = word(&imported_type_alias.name);
+            let alias = imported_type_alias.alias.as_ref().map_or(type_name, |a| word(&a.0));
 
             if fqcn == name {
                 class_like_metadata.issues.push(
@@ -588,7 +588,7 @@ fn scan_class_like<'arena>(
         }
 
         for type_alias in &docblock.type_aliases {
-            let alias_name = atom(&type_alias.name);
+            let alias_name = word(&type_alias.name);
             match get_type_metadata_from_type_string(
                 context.arena,
                 &type_alias.type_string,
@@ -674,7 +674,7 @@ fn scan_class_like<'arena>(
                 continue;
             };
 
-            let lowercase_parent_name = ascii_lowercase_atom(&parent_name);
+            let lowercase_parent_name = ascii_lowercase_word(parent_name.as_bytes());
 
             let has_parent = if class_like_metadata.kind.is_interface() {
                 class_like_metadata.all_parent_interfaces.contains(&lowercase_parent_name)
@@ -765,7 +765,7 @@ fn scan_class_like<'arena>(
                 }
             };
 
-            let lowercase_parent_name = ascii_lowercase_atom(&parent_name);
+            let lowercase_parent_name = ascii_lowercase_word(parent_name.as_bytes());
 
             if !class_like_metadata.all_parent_interfaces.contains(&lowercase_parent_name) {
                 class_like_metadata.issues.push(
@@ -866,7 +866,7 @@ fn scan_class_like<'arena>(
                 continue;
             };
 
-            class_like_metadata.require_extends.insert(ascii_lowercase_atom(&required_name));
+            class_like_metadata.require_extends.insert(ascii_lowercase_word(required_name.as_bytes()));
             if let Some(required_params) = required_params {
                 class_like_metadata.add_template_extended_offset(required_name, required_params);
             }
@@ -949,7 +949,7 @@ fn scan_class_like<'arena>(
                 continue;
             };
 
-            class_like_metadata.require_implements.insert(ascii_lowercase_atom(&required_name));
+            class_like_metadata.require_implements.insert(ascii_lowercase_word(required_name.as_bytes()));
             if let Some(required_parameters) = required_parameters {
                 class_like_metadata.add_template_extended_offset(required_name, required_parameters);
             }
@@ -971,7 +971,7 @@ fn scan_class_like<'arena>(
                                 class_like_metadata
                                     .permitted_inheritors
                                     .get_or_insert_default()
-                                    .insert(ascii_lowercase_atom(name));
+                                    .insert(ascii_lowercase_word(name.as_bytes()));
                             }
                             _ => {
                                 class_like_metadata.issues.push(
@@ -1027,7 +1027,7 @@ fn scan_class_like<'arena>(
         }
 
         for method_tag in &docblock.methods {
-            let method_name = ascii_lowercase_atom(&method_tag.method.name);
+            let method_name = ascii_lowercase_word(&method_tag.method.name);
             class_like_metadata.methods.insert(method_name);
             class_like_metadata.pseudo_methods.insert(method_name);
             class_like_metadata
@@ -1040,7 +1040,7 @@ fn scan_class_like<'arena>(
                 FunctionLikeMetadata::new(FunctionLikeKind::Method, method_tag.span, MetadataFlags::empty());
 
             function_like_metadata.name = Some(method_name);
-            function_like_metadata.original_name = Some(atom(&method_tag.method.name));
+            function_like_metadata.original_name = Some(word(&method_tag.method.name));
 
             let Some(method_metadata) = function_like_metadata.method_metadata.as_mut() else {
                 continue;
@@ -1058,7 +1058,7 @@ fn scan_class_like<'arena>(
 
             for argument in &method_tag.method.argument_list {
                 let mut function_parameter_metadata = FunctionLikeParameterMetadata::new(
-                    VariableIdentifier(atom(&argument.variable.name)),
+                    VariableIdentifier(word(&argument.variable.name)),
                     argument.argument_span,
                     argument.variable_span,
                     MetadataFlags::empty(),
@@ -1099,7 +1099,7 @@ fn scan_class_like<'arena>(
         }
 
         for property in &docblock.properties {
-            let property_name = atom(&property.variable.name);
+            let property_name = word(&property.variable.name);
             let type_metadata = if let Some(type_string) = &property.type_string {
                 match get_type_metadata_from_type_string(context.arena, type_string, Some(name), &type_context, scope) {
                     Ok(type_metadata) => Some(type_metadata),
@@ -1205,7 +1205,7 @@ fn scan_class_like<'arena>(
             value_types.push(enum_backing_type.clone());
         }
 
-        let name = atom("$name");
+        let name = word("$name");
         let flags = MetadataFlags::READONLY | MetadataFlags::HAS_DEFAULT;
         let mut property_metadata = PropertyMetadata::new(VariableIdentifier(name), flags);
         property_metadata.type_declaration_metadata = Some(TypeMetadata::new(get_string(), enum_name_span));
@@ -1214,7 +1214,7 @@ fn scan_class_like<'arena>(
         class_like_metadata.add_property_metadata(property_metadata);
 
         if let Some(enum_backing_type) = backing_type {
-            let value = atom("$value");
+            let value = word("$value");
 
             let flags = MetadataFlags::READONLY | MetadataFlags::HAS_DEFAULT;
             let mut property_metadata = PropertyMetadata::new(VariableIdentifier(value), flags);
@@ -1239,7 +1239,7 @@ fn scan_class_like<'arena>(
                 for trait_use in &trait_use.trait_names {
                     let trait_name = context.resolved_names.get(trait_use);
 
-                    class_like_metadata.add_used_trait(ascii_lowercase_atom(trait_name));
+                    class_like_metadata.add_used_trait(ascii_lowercase_word(trait_name));
                 }
 
                 if let TraitUseSpecification::Concrete(specification) = &trait_use.specification {
@@ -1247,13 +1247,13 @@ fn scan_class_like<'arena>(
                         match adaptation {
                             TraitUseAdaptation::Precedence(_) => {}
                             TraitUseAdaptation::Alias(adaptation) => {
-                                let method_name = ascii_lowercase_atom(match &adaptation.method_reference {
+                                let method_name = ascii_lowercase_word(match &adaptation.method_reference {
                                     TraitUseMethodReference::Identifier(local_identifier) => local_identifier.value,
                                     TraitUseMethodReference::Absolute(reference) => reference.method_name.value,
                                 });
 
                                 let method_alias =
-                                    adaptation.alias.as_ref().map(|alias| ascii_lowercase_atom(alias.value));
+                                    adaptation.alias.as_ref().map(|alias| ascii_lowercase_word(alias.value));
 
                                 if let Some(alias) = method_alias {
                                     class_like_metadata.add_trait_alias(method_name, alias);
@@ -1371,7 +1371,7 @@ fn scan_class_like<'arena>(
                         continue;
                     };
 
-                    let lowercase_trait_name = ascii_lowercase_atom(&trait_name);
+                    let lowercase_trait_name = ascii_lowercase_word(trait_name.as_bytes());
                     if !class_like_metadata.used_traits.contains(&lowercase_trait_name) {
                         class_like_metadata.issues.push(
                             Issue::error("The `@use` tag must refer to a trait that is used.")
@@ -1463,13 +1463,13 @@ fn scan_class_like<'arena>(
     }
 
     if !class_like_metadata.kind.is_trait() {
-        let to_string_method = atom("__tostring");
+        let to_string_method = word("__tostring");
         if class_like_metadata.methods.contains(&to_string_method) {
-            class_like_metadata.add_direct_parent_interface(atom("stringable"));
+            class_like_metadata.add_direct_parent_interface(word("stringable"));
         }
     }
 
-    if class_like_metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
+    if class_like_metadata.attributes.iter().any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"Deprecated")) {
         class_like_metadata.flags |= MetadataFlags::DEPRECATED;
     }
 
@@ -1478,8 +1478,8 @@ fn scan_class_like<'arena>(
 
 fn create_enum_methods(codebase: &mut CodebaseMetadata, class_like: &mut ClassLikeMetadata, span: Span) {
     let mut add_method =
-        |name: &str, class_like_metadata: &mut ClassLikeMetadata, function_like_metadata: FunctionLikeMetadata| {
-            let name = ascii_lowercase_atom(name);
+        |name: &[u8], class_like_metadata: &mut ClassLikeMetadata, function_like_metadata: FunctionLikeMetadata| {
+            let name = ascii_lowercase_word(name);
             let method_id = (class_like_metadata.name, name);
 
             let method_identifier = MethodIdentifier::new(class_like_metadata.name, name);
@@ -1490,32 +1490,32 @@ fn create_enum_methods(codebase: &mut CodebaseMetadata, class_like: &mut ClassLi
             codebase.function_likes.insert(method_id, function_like_metadata);
         };
 
-    let enum_name = class_like.name.as_str();
+    let enum_name_word = class_like.name;
     let backing_type = class_like.enum_type.clone();
 
     if let Some(backing_type) = backing_type {
-        let from_method = create_enum_from_method(enum_name, span, backing_type.clone());
-        add_method("from", class_like, from_method);
+        let from_method = create_enum_from_method(enum_name_word.as_bytes(), span, backing_type.clone());
+        add_method(b"from", class_like, from_method);
 
-        let try_from_method = create_enum_try_from_method(enum_name, span, backing_type);
-        add_method("tryFrom", class_like, try_from_method);
+        let try_from_method = create_enum_try_from_method(enum_name_word.as_bytes(), span, backing_type);
+        add_method(b"tryFrom", class_like, try_from_method);
     }
 
     let has_cases = !class_like.enum_cases.is_empty();
-    let cases_method = create_enum_cases_method(enum_name, span, has_cases);
-    add_method("cases", class_like, cases_method);
+    let cases_method = create_enum_cases_method(enum_name_word.as_bytes(), span, has_cases);
+    add_method(b"cases", class_like, cases_method);
 }
 
-fn create_enum_from_method(enum_name: &str, enum_method_span: Span, backing_type: TAtomic) -> FunctionLikeMetadata {
+fn create_enum_from_method(enum_name: &[u8], enum_method_span: Span, backing_type: TAtomic) -> FunctionLikeMetadata {
     FunctionLikeMetadata {
         kind: FunctionLikeKind::Method,
         span: enum_method_span,
-        name: Some(atom("from")),
-        original_name: Some(atom("from")),
+        name: Some(word("from")),
+        original_name: Some(word("from")),
         name_span: Some(enum_method_span),
         parameters: vec![FunctionLikeParameterMetadata {
             attributes: vec![],
-            name: VariableIdentifier(atom("$value")),
+            name: VariableIdentifier(word("$value")),
             type_declaration_metadata: Some(TypeMetadata::new(
                 TUnion::from_vec(vec![backing_type.clone()]),
                 enum_method_span,
@@ -1528,11 +1528,11 @@ fn create_enum_from_method(enum_name: &str, enum_method_span: Span, backing_type
             flags: MetadataFlags::empty(),
         }],
         return_type_declaration_metadata: Some(TypeMetadata::new(
-            TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name: atom(enum_name), case: None }))]),
+            TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name: word(enum_name), case: None }))]),
             enum_method_span,
         )),
         return_type_metadata: Some(TypeMetadata::new(
-            TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name: atom(enum_name), case: None }))]),
+            TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name: word(enum_name), case: None }))]),
             enum_method_span,
         )),
         template_types: TemplateTypes::default(),
@@ -1543,32 +1543,36 @@ fn create_enum_from_method(enum_name: &str, enum_method_span: Span, backing_type
             is_static: true,
             is_constructor: false,
             visibility: Visibility::Public,
-            where_constraints: AtomMap::default(),
+            where_constraints: WordMap::default(),
         }),
         type_resolution_context: None,
-        thrown_types: vec![TypeMetadata::new(get_named_object(atom("ValueError"), None), enum_method_span)],
+        thrown_types: vec![TypeMetadata::new(get_named_object(word("ValueError"), None), enum_method_span)],
         issues: Vec::default(),
         assertions: BTreeMap::default(),
         if_true_assertions: BTreeMap::default(),
         if_false_assertions: BTreeMap::default(),
         assertions_inferred: false,
-        globals_accessed: AtomSet::default(),
+        globals_accessed: WordSet::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
         version_constraint: crate::metadata::version_constraint::VersionConstraint::unconstrained(),
     }
 }
 
-fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_type: TAtomic) -> FunctionLikeMetadata {
+fn create_enum_try_from_method(
+    enum_name: &[u8],
+    enum_method_span: Span,
+    backing_type: TAtomic,
+) -> FunctionLikeMetadata {
     FunctionLikeMetadata {
         kind: FunctionLikeKind::Method,
         span: enum_method_span,
-        name: Some(atom("tryFrom")),
-        original_name: Some(atom("tryFrom")),
+        name: Some(word("tryFrom")),
+        original_name: Some(word("tryFrom")),
         name_span: Some(enum_method_span),
         parameters: vec![FunctionLikeParameterMetadata {
             attributes: vec![],
-            name: VariableIdentifier(atom("$value")),
+            name: VariableIdentifier(word("$value")),
             type_declaration_metadata: Some(TypeMetadata::new(
                 TUnion::from_vec(vec![backing_type.clone()]),
                 enum_method_span,
@@ -1582,14 +1586,14 @@ fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_
         }],
         return_type_declaration_metadata: Some(TypeMetadata::new(
             TUnion::from_vec(vec![
-                TAtomic::Object(TObject::Enum(TEnum { name: atom(enum_name), case: None })),
+                TAtomic::Object(TObject::Enum(TEnum { name: word(enum_name), case: None })),
                 TAtomic::Null,
             ]),
             enum_method_span,
         )),
         return_type_metadata: Some(TypeMetadata::new(
             TUnion::from_vec(vec![
-                TAtomic::Object(TObject::Enum(TEnum { name: atom(enum_name), case: None })),
+                TAtomic::Object(TObject::Enum(TEnum { name: word(enum_name), case: None })),
                 TAtomic::Null,
             ]),
             enum_method_span,
@@ -1602,7 +1606,7 @@ fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_
             is_static: true,
             is_constructor: false,
             visibility: Visibility::Public,
-            where_constraints: AtomMap::default(),
+            where_constraints: WordMap::default(),
         }),
         type_resolution_context: None,
         thrown_types: vec![],
@@ -1611,30 +1615,30 @@ fn create_enum_try_from_method(enum_name: &str, enum_method_span: Span, backing_
         if_true_assertions: BTreeMap::default(),
         if_false_assertions: BTreeMap::default(),
         assertions_inferred: false,
-        globals_accessed: AtomSet::default(),
+        globals_accessed: WordSet::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
         version_constraint: crate::metadata::version_constraint::VersionConstraint::unconstrained(),
     }
 }
 
-fn create_enum_cases_method(enum_name: &str, enum_method_span: Span, has_cases: bool) -> FunctionLikeMetadata {
+fn create_enum_cases_method(enum_name: &[u8], enum_method_span: Span, has_cases: bool) -> FunctionLikeMetadata {
     FunctionLikeMetadata {
         kind: FunctionLikeKind::Method,
         span: enum_method_span,
-        name: Some(atom("cases")),
-        original_name: Some(atom("cases")),
+        name: Some(word("cases")),
+        original_name: Some(word("cases")),
         name_span: Some(enum_method_span),
         parameters: vec![],
         return_type_declaration_metadata: Some(TypeMetadata::new(
             if has_cases {
                 get_non_empty_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
-                    name: atom(enum_name),
+                    name: word(enum_name),
                     case: None,
                 }))]))
             } else {
                 get_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
-                    name: atom(enum_name),
+                    name: word(enum_name),
                     case: None,
                 }))]))
             },
@@ -1643,12 +1647,12 @@ fn create_enum_cases_method(enum_name: &str, enum_method_span: Span, has_cases: 
         return_type_metadata: Some(TypeMetadata::new(
             if has_cases {
                 get_non_empty_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
-                    name: atom(enum_name),
+                    name: word(enum_name),
                     case: None,
                 }))]))
             } else {
                 get_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
-                    name: atom(enum_name),
+                    name: word(enum_name),
                     case: None,
                 }))]))
             },
@@ -1662,7 +1666,7 @@ fn create_enum_cases_method(enum_name: &str, enum_method_span: Span, has_cases: 
             is_static: true,
             is_constructor: false,
             visibility: Visibility::Public,
-            where_constraints: AtomMap::default(),
+            where_constraints: WordMap::default(),
         }),
         type_resolution_context: None,
         thrown_types: vec![],
@@ -1671,7 +1675,7 @@ fn create_enum_cases_method(enum_name: &str, enum_method_span: Span, has_cases: 
         if_true_assertions: BTreeMap::default(),
         if_false_assertions: BTreeMap::default(),
         assertions_inferred: false,
-        globals_accessed: AtomSet::default(),
+        globals_accessed: WordSet::default(),
         has_docblock: false,
         flags: MetadataFlags::POPULATED,
         version_constraint: crate::metadata::version_constraint::VersionConstraint::unconstrained(),

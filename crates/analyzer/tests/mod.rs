@@ -22,14 +22,14 @@ macro_rules! test_case {
     ($test_name:ident, $settings:expr) => {
         #[test]
         fn $test_name() {
-            let content = include_str!(concat!("cases/", stringify!($test_name), ".php"));
+            let content = include_bytes!(concat!("cases/", stringify!($test_name), ".php"));
             $crate::framework::TestCase::new(stringify!($test_name), content).settings($settings).run();
         }
     };
     ($test_name:ident) => {
         #[test]
         fn $test_name() {
-            let content = include_str!(concat!("cases/", stringify!($test_name), ".php"));
+            let content = include_bytes!(concat!("cases/", stringify!($test_name), ".php"));
             $crate::framework::TestCase::new(stringify!($test_name), content).run();
         }
     };
@@ -386,6 +386,10 @@ test_case!(iterable_array_comparison);
 test_case!(iterable_count);
 test_case!(iterable_reconciliation);
 test_case!(non_empty_string_magic_constant);
+test_case!(non_utf8_method_names);
+test_case!(non_utf8_class_names);
+test_case!(non_utf8_function_names);
+test_case!(non_utf8_property_names);
 test_case!(numeric_reconciliation);
 test_case!(priority_queue_implementation);
 test_case!(psl_integration);

@@ -2,10 +2,6 @@ use std::cmp::Ordering;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::assertion_set::negate_assertion_set;
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -33,6 +29,10 @@ use mago_syntax::ast::Literal;
 use mago_syntax::ast::LocalIdentifier;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::UnaryPrefixOperator;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::assertion::AssertionContext;
@@ -50,10 +50,10 @@ pub fn scrape_assertions(
     mut expression: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
-) -> Vec<AtomMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>> {
     expression = unwrap_expression(expression);
 
-    let mut if_types = AtomMap::default();
+    let mut if_types = WordMap::default();
 
     if let Some(var_name) = get_expression_id(
         expression,
@@ -67,7 +67,7 @@ pub fn scrape_assertions(
     match expression {
         Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Not(_), operand }) => {
             let assertions = scrape_assertions(operand, artifacts, assertion_context);
-            let mut negated_assertions = AtomMap::default();
+            let mut negated_assertions = WordMap::default();
             for assertion in assertions {
                 for (var_name, assertion_set) in assertion {
                     negated_assertions
@@ -108,12 +108,12 @@ pub fn scrape_assertions(
             {
                 if is_count_or_size_of_call(expression, assertion_context) {
                     if_types.insert(first_argument_expression_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
-                } else if is_function_call_to(expression, assertion_context, "function_exists") {
+                } else if is_function_call_to(expression, assertion_context, b"function_exists") {
                     if_types.insert(
                         first_argument_expression_id,
                         vec![vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::callable())))]],
                     );
-                } else if is_function_call_to(expression, assertion_context, "is_callable")
+                } else if is_function_call_to(expression, assertion_context, b"is_callable")
                     && let Some(first_argument_type) = artifacts.get_expression_type(first_argument.value())
                 {
                     let mut callables = vec![];
@@ -244,21 +244,21 @@ pub fn scrape_assertions(
     if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
-fn process_custom_assertions(expression_span: Span, artifacts: &AnalysisArtifacts) -> AtomMap<AssertionSet> {
+fn process_custom_assertions(expression_span: Span, artifacts: &AnalysisArtifacts) -> WordMap<AssertionSet> {
     let mut if_true_assertions = artifacts
         .if_true_assertions
         .get(&(expression_span.start.offset, expression_span.end.offset))
         .cloned()
-        .unwrap_or(AtomMap::default());
+        .unwrap_or(WordMap::default());
 
     let if_false_assertions = artifacts
         .if_false_assertions
         .get(&(expression_span.start.offset, expression_span.end.offset))
         .cloned()
-        .unwrap_or(AtomMap::default());
+        .unwrap_or(WordMap::default());
 
     if if_true_assertions.is_empty() && if_false_assertions.is_empty() {
-        return AtomMap::default();
+        return WordMap::default();
     }
 
     for if_false_assertion in if_false_assertions {
@@ -275,20 +275,23 @@ fn scrape_special_function_call_assertions(
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
     function_call: &FunctionCall,
-) -> AtomMap<AssertionSet> {
-    let mut if_types = AtomMap::default();
+) -> WordMap<AssertionSet> {
+    let mut if_types = WordMap::default();
 
     let Expression::Identifier(function_identifier) = function_call.function else {
         return if_types;
     };
 
-    let function_name = ascii_lowercase_atom(function_identifier.value());
-    let resolved_function_name = ascii_lowercase_atom(assertion_context.resolved_names.get(function_identifier));
+    let function_name = ascii_lowercase_word(function_identifier.value());
+    let resolved_function_name = ascii_lowercase_word(assertion_context.resolved_names.get(function_identifier));
     let should_check_against_unresolved = { function_identifier.is_local() };
 
-    let (argument_variable_id_position, function_assertions) = if resolved_function_name.starts_with("psl\\") {
-        match resolved_function_name.as_str() {
-            "psl\\iter\\contains_key" => {
+    let (argument_variable_id_position, function_assertions) = if resolved_function_name
+        .as_bytes()
+        .starts_with(b"psl\\")
+    {
+        match resolved_function_name.as_bytes() {
+            b"psl\\iter\\contains_key" => {
                 if let Some(array_key) = function_call
                     .argument_list
                     .arguments
@@ -301,7 +304,7 @@ fn scrape_special_function_call_assertions(
                     return if_types;
                 }
             }
-            "psl\\iter\\contains" => {
+            b"psl\\iter\\contains" => {
                 let Some(checked_iterable) = function_call
                     .argument_list
                     .arguments
@@ -336,16 +339,16 @@ fn scrape_special_function_call_assertions(
             _ => return if_types,
         }
     } else {
-        let get_builtin_assertion = |name: &str| match name {
-            "array_key_exists" | "key_exists" => function_call
+        let get_builtin_assertion = |name: &[u8]| match name {
+            b"array_key_exists" | b"key_exists" => function_call
                 .argument_list
                 .arguments
                 .first()
                 .map(mago_syntax::ast::Argument::value)
                 .and_then(|array_key| get_expression_array_key(artifacts, array_key))
                 .map(|key| (1, vec![Assertion::HasArrayKey(key)])),
-            "is_countable" => Some((0, vec![Assertion::Countable])),
-            "ctype_digit" => Some((
+            b"is_countable" => Some((0, vec![Assertion::Countable])),
+            b"ctype_digit" => Some((
                 0,
                 vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
                     true,
@@ -355,7 +358,7 @@ fn scrape_special_function_call_assertions(
                     TStringCasing::Unspecified,
                 ))))],
             )),
-            "ctype_lower" => Some((
+            b"ctype_lower" => Some((
                 0,
                 vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
                     false,
@@ -365,7 +368,7 @@ fn scrape_special_function_call_assertions(
                     TStringCasing::Lowercase,
                 ))))],
             )),
-            "ctype_upper" => Some((
+            b"ctype_upper" => Some((
                 0,
                 vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
                     false,
@@ -375,11 +378,11 @@ fn scrape_special_function_call_assertions(
                     TStringCasing::Uppercase,
                 ))))],
             )),
-            "count" => Some((0, vec![Assertion::HasAtLeastCount(1)])),
-            "function_exists" => {
+            b"count" => Some((0, vec![Assertion::HasAtLeastCount(1)])),
+            b"function_exists" => {
                 Some((0, vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::callable())))]))
             }
-            "method_exists" if assertion_context.trust_existence_checks => {
+            b"method_exists" if assertion_context.trust_existence_checks => {
                 let method_name = function_call
                     .argument_list
                     .arguments
@@ -388,9 +391,9 @@ fn scrape_special_function_call_assertions(
                     .and_then(|expr| artifacts.get_expression_type(expr))
                     .and_then(|ty| ty.get_single_literal_string_value())?;
 
-                Some((0, vec![Assertion::IsType(TAtomic::Object(TObject::new_has_method(atom(method_name))))]))
+                Some((0, vec![Assertion::IsType(TAtomic::Object(TObject::new_has_method(word(method_name))))]))
             }
-            "property_exists" if assertion_context.trust_existence_checks => {
+            b"property_exists" if assertion_context.trust_existence_checks => {
                 let property_name = function_call
                     .argument_list
                     .arguments
@@ -399,9 +402,9 @@ fn scrape_special_function_call_assertions(
                     .and_then(|expr| artifacts.get_expression_type(expr))
                     .and_then(|ty| ty.get_single_literal_string_value())?;
 
-                Some((0, vec![Assertion::IsType(TAtomic::Object(TObject::new_has_property(atom(property_name))))]))
+                Some((0, vec![Assertion::IsType(TAtomic::Object(TObject::new_has_property(word(property_name))))]))
             }
-            "is_a" | "is_subclass_of" => {
+            b"is_a" | b"is_subclass_of" => {
                 let class_name_type = function_call
                     .argument_list
                     .arguments
@@ -409,7 +412,7 @@ fn scrape_special_function_call_assertions(
                     .map(mago_syntax::ast::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))?;
 
-                let is_subclass_of_call = name == "is_subclass_of";
+                let is_subclass_of_call = name == b"is_subclass_of";
                 let allow_string = function_call
                     .argument_list
                     .arguments
@@ -440,7 +443,7 @@ fn scrape_special_function_call_assertions(
 
                 Some((0, assertions))
             }
-            "in_array" => {
+            b"in_array" => {
                 let should_strict_check = function_call
                     .argument_list
                     .arguments
@@ -484,11 +487,11 @@ fn scrape_special_function_call_assertions(
 
         let mut result = None;
         if should_check_against_unresolved {
-            result = get_builtin_assertion(&function_name);
+            result = get_builtin_assertion(function_name.as_bytes());
         }
 
         if result.is_none() {
-            result = get_builtin_assertion(&resolved_function_name);
+            result = get_builtin_assertion(resolved_function_name.as_bytes());
         }
 
         let Some(found_assertions) = result else {
@@ -545,7 +548,7 @@ pub(super) fn scrape_equality_assertions(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
-) -> Vec<AtomMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>> {
     if let Some(assertions) = scrape_class_constant_equality_assertions(
         left,
         right,
@@ -558,7 +561,7 @@ pub(super) fn scrape_equality_assertions(
 
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
-            let mut if_types = AtomMap::default();
+            let mut if_types = WordMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 if number_on_right == 0 {
@@ -571,7 +574,7 @@ pub(super) fn scrape_equality_assertions(
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         (Some(number_on_left), None) => {
-            let mut if_types = AtomMap::default();
+            let mut if_types = WordMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 if number_on_left == 0 {
@@ -628,7 +631,7 @@ fn scrape_inequality_assertions(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
-) -> Vec<AtomMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>> {
     if let Some(assertions) = scrape_class_constant_equality_assertions(
         left,
         right,
@@ -641,7 +644,7 @@ fn scrape_inequality_assertions(
 
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
-            let mut if_types = AtomMap::default();
+            let mut if_types = WordMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 if number_on_right == 0 {
@@ -657,7 +660,7 @@ fn scrape_inequality_assertions(
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         (Some(number_on_left), None) => {
-            let mut if_types = AtomMap::default();
+            let mut if_types = WordMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 if number_on_left == 0 {
@@ -719,7 +722,7 @@ fn scrape_class_constant_equality_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
     negated: bool,
-) -> Option<Vec<AtomMap<AssertionSet>>> {
+) -> Option<Vec<WordMap<AssertionSet>>> {
     let left_class_part = is_class_constant_access(left);
     let right_class_part = is_class_constant_access(right);
 
@@ -781,7 +784,7 @@ fn scrape_class_constant_equality_assertions(
         return None;
     }
 
-    let mut if_types = AtomMap::default();
+    let mut if_types = WordMap::default();
     if_types.insert(variable_id, vec![assertions]);
     Some(vec![if_types])
 }
@@ -792,7 +795,7 @@ fn scrape_class_constant_equality_assertions(
 fn is_class_constant_access<'arena>(expr: &'arena Expression<'arena>) -> Option<&'arena Expression<'arena>> {
     if let Expression::Access(Access::ClassConstant(ClassConstantAccess {
         class,
-        constant: ClassLikeConstantSelector::Identifier(LocalIdentifier { value: "class", .. }),
+        constant: ClassLikeConstantSelector::Identifier(LocalIdentifier { value: b"class", .. }),
         ..
     })) = unwrap_expression(expr)
     {
@@ -817,8 +820,8 @@ fn get_empty_array_equality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -848,8 +851,8 @@ fn get_empty_array_inequality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -879,7 +882,7 @@ fn get_enum_case_equality_assertions(
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
     enum_case_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>> {
     let (variable_expression, Some(enum_case_type)) = (match enum_case_position {
         OtherValuePosition::Left => (right, artifacts.get_expression_type(left)),
         OtherValuePosition::Right => (left, artifacts.get_expression_type(right)),
@@ -887,7 +890,7 @@ fn get_enum_case_equality_assertions(
         return vec![];
     };
 
-    let mut if_types = AtomMap::default();
+    let mut if_types = WordMap::default();
 
     let var_name = get_expression_id(
         variable_expression,
@@ -909,7 +912,7 @@ fn get_enum_case_inequality_assertions(
     assertion_context: AssertionContext<'_, '_>,
     artifacts: &AnalysisArtifacts,
     enum_case_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>> {
     let (variable_expression, Some(enum_case_type)) = (match enum_case_position {
         OtherValuePosition::Left => (right, artifacts.get_expression_type(left)),
         OtherValuePosition::Right => (left, artifacts.get_expression_type(right)),
@@ -917,7 +920,7 @@ fn get_enum_case_inequality_assertions(
         return vec![];
     };
 
-    let mut if_types = AtomMap::default();
+    let mut if_types = WordMap::default();
 
     let var_name = get_expression_id(
         variable_expression,
@@ -938,8 +941,8 @@ fn get_null_equality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -980,8 +983,8 @@ fn get_null_inequality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     null_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -1033,8 +1036,8 @@ fn get_false_inquality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     false_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
     let base_conditional = match false_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -1059,8 +1062,8 @@ fn get_true_inquality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     true_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
     let base_conditional = match true_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -1086,10 +1089,10 @@ fn scrape_lesser_than_assertions(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
-) -> Vec<AtomMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>> {
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
-            let mut if_types = AtomMap::default();
+            let mut if_types = WordMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 let maximum_count = if matches!(operator, BinaryOperator::LessThan(_)) {
@@ -1117,7 +1120,7 @@ fn scrape_lesser_than_assertions(
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         (Some(number_on_left), None) => {
-            let mut if_types = AtomMap::default();
+            let mut if_types = WordMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 let minimum_count = if matches!(operator, BinaryOperator::LessThan(_)) {
@@ -1148,7 +1151,7 @@ fn scrape_lesser_than_assertions(
         return vec![];
     }
 
-    let mut if_types = AtomMap::default();
+    let mut if_types = WordMap::default();
 
     let left_id = get_expression_id(
         left,
@@ -1275,10 +1278,10 @@ fn scrape_greater_than_assertions(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
-) -> Vec<AtomMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>> {
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
-            let mut if_types = AtomMap::default();
+            let mut if_types = WordMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 let minimum_count = if matches!(operator, BinaryOperator::GreaterThan(_)) {
@@ -1299,7 +1302,7 @@ fn scrape_greater_than_assertions(
             return if if_types.is_empty() { vec![] } else { vec![if_types] };
         }
         (Some(number_on_left), None) => {
-            let mut if_types = AtomMap::default();
+            let mut if_types = WordMap::default();
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 let maximum_count = if matches!(operator, BinaryOperator::GreaterThan(_)) {
@@ -1337,7 +1340,7 @@ fn scrape_greater_than_assertions(
         return vec![];
     }
 
-    let mut if_types = AtomMap::default();
+    let mut if_types = WordMap::default();
 
     // Generate assertions for the left variable based on the right variable's type.
     // For an expression `$a > $b`, this asserts `$a` is greater than the lower bound of `$b`.
@@ -1472,8 +1475,8 @@ fn scrape_instanceof_assertions(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
     context: AssertionContext<'_, '_>,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
 
     let variable_id = get_expression_id(left, context.this_class_name, context.resolved_names, Some(context.codebase));
 
@@ -1484,7 +1487,7 @@ fn scrape_instanceof_assertions(
 
                 if_types.insert(
                     counter_variable_id,
-                    vec![vec![Assertion::IsType(TAtomic::Object(TObject::Named(TNamedObject::new(atom(
+                    vec![vec![Assertion::IsType(TAtomic::Object(TObject::Named(TNamedObject::new(word(
                         resolved_name,
                     )))))]],
                 );
@@ -1511,7 +1514,7 @@ fn scrape_instanceof_assertions(
             }
             Expression::Parent(_) => {
                 if let Some(self_class) = context.this_class_name
-                    && let Some(self_meta) = context.codebase.get_class_like(&self_class)
+                    && let Some(self_meta) = context.codebase.get_class_like(self_class.as_bytes())
                     && let Some(parent_id_ref) = self_meta.direct_parent_class.as_ref()
                 {
                     if_types.insert(
@@ -1613,13 +1616,13 @@ fn get_expression_array_key(artifacts: &AnalysisArtifacts, expression: &Expressi
 }
 
 fn is_count_or_size_of_call(expression: &Expression, assertion_context: AssertionContext<'_, '_>) -> bool {
-    is_function_call_to_one_of(expression, assertion_context, &["count", "sizeof", "Psl\\Iter\\count"])
+    is_function_call_to_one_of(expression, assertion_context, &[b"count", b"sizeof", b"Psl\\Iter\\count"])
 }
 
 fn is_function_call_to(
     expression: &Expression,
     assertion_context: AssertionContext<'_, '_>,
-    function_name: &str,
+    function_name: &[u8],
 ) -> bool {
     is_function_call_to_one_of(expression, assertion_context, &[function_name])
 }
@@ -1628,7 +1631,7 @@ fn is_function_call_to(
 fn is_function_call_to_one_of(
     expression: &Expression,
     assertion_context: AssertionContext<'_, '_>,
-    functions: &[&str],
+    functions: &[&[u8]],
 ) -> bool {
     let Expression::Call(Call::Function(FunctionCall { function, argument_list })) = expression else {
         return false;
@@ -1658,8 +1661,8 @@ fn get_true_equality_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
     true_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
     let base_conditional = match true_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -1706,8 +1709,9 @@ pub fn has_typed_value_comparison(
         Some(assertion_context.codebase),
     );
 
-    let left_is_class_constant = left_var_id.as_ref().is_some_and(|id| id.contains("::"));
-    let right_is_simple_var = right_var_id.as_ref().is_some_and(|id| id.starts_with('$'));
+    let left_is_class_constant =
+        left_var_id.as_ref().is_some_and(|id| memchr::memmem::find(id.as_bytes(), b"::").is_some());
+    let right_is_simple_var = right_var_id.as_ref().is_some_and(|id| id.as_bytes().starts_with(b"$"));
 
     if left_is_class_constant
         && right_is_simple_var
@@ -1742,8 +1746,8 @@ fn get_false_equality_assertions(
     right: &Expression,
     assertion_context: AssertionContext<'_, '_>,
     false_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
     let base_conditional = match false_position {
         OtherValuePosition::Left => right,
         OtherValuePosition::Right => left,
@@ -1776,8 +1780,8 @@ fn get_typed_value_equality_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
     typed_value_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
 
     let var_name;
     let other_value_var_name;
@@ -1866,8 +1870,8 @@ fn get_typed_value_inequality_assertions(
     artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_>,
     typed_value_position: OtherValuePosition,
-) -> Vec<AtomMap<AssertionSet>> {
-    let mut if_types = AtomMap::default();
+) -> Vec<WordMap<AssertionSet>> {
+    let mut if_types = WordMap::default();
 
     let var_name;
     let other_value_var_name;
@@ -1946,7 +1950,7 @@ fn get_typed_value_inequality_assertions(
 fn get_first_argument_expression_id(
     assertion_context: AssertionContext<'_, '_>,
     expression: &Expression,
-) -> Option<Atom> {
+) -> Option<Word> {
     let Expression::Call(Call::Function(FunctionCall { argument_list, .. })) = expression else {
         return None;
     };

@@ -217,7 +217,6 @@ mod tests {
 
     use foldhash::HashSet;
 
-    use mago_atom::AtomSet;
     use mago_codex::metadata::CodebaseMetadata;
     use mago_codex::populator::populate_codebase;
     use mago_codex::reference::SymbolReferences;
@@ -225,6 +224,7 @@ mod tests {
     use mago_database::file::File;
     use mago_names::resolver::NameResolver;
     use mago_syntax::parser::parse_file;
+    use mago_word::WordSet;
 
     use crate::Analyzer;
     use crate::analysis_result::AnalysisResult;
@@ -276,7 +276,8 @@ mod tests {
 
     fn run_test_case_inner(config: TestCase) {
         let arena = bumpalo::Bump::new();
-        let source_file = File::ephemeral(Cow::Borrowed(config.name), Cow::Borrowed(config.content));
+        let source_file =
+            File::ephemeral(Cow::Borrowed(config.name.as_bytes()), Cow::Borrowed(config.content.as_bytes()));
 
         let program = parse_file(&arena, &source_file);
         assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
@@ -286,7 +287,7 @@ mod tests {
         let mut codebase = scan_program(&arena, &source_file, program, &resolved_names, config.settings.version);
         let mut symbol_references = SymbolReferences::new();
 
-        populate_codebase(&mut codebase, &mut symbol_references, AtomSet::default(), HashSet::default());
+        populate_codebase(&mut codebase, &mut symbol_references, WordSet::default(), HashSet::default());
 
         let plugin_registry = PluginRegistry::with_library_providers();
 

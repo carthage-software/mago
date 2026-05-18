@@ -1,9 +1,9 @@
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::EnumCase;
 use mago_syntax::ast::EnumCaseItem;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;
@@ -16,7 +16,7 @@ use super::super::ttype::union::TUnion;
 
 #[inline]
 pub fn scan_enum_case<'arena>(
-    enum_name: Atom,
+    enum_name: Word,
     case: &'arena EnumCase<'arena>,
     context: &Context<'_, 'arena>,
     scope: &NamespaceScope,
@@ -30,7 +30,7 @@ pub fn scan_enum_case<'arena>(
             let mut flags = MetadataFlags::UNIT_ENUM_CASE;
             flags |= MetadataFlags::origin_flags(context.file.file_type);
 
-            let mut meta = EnumCaseMetadata::new(atom(item.name.value), item.name.span, span, flags);
+            let mut meta = EnumCaseMetadata::new(word(item.name.value), item.name.span, span, flags);
 
             meta.attributes = attributes;
             meta.value_type = None;
@@ -41,7 +41,7 @@ pub fn scan_enum_case<'arena>(
             let mut flags = MetadataFlags::BACKED_ENUM_CASE;
             flags |= MetadataFlags::origin_flags(context.file.file_type);
 
-            let mut meta = EnumCaseMetadata::new(atom(item.name.value), item.name.span, span, flags);
+            let mut meta = EnumCaseMetadata::new(word(item.name.value), item.name.span, span, flags);
 
             meta.attributes = attributes;
             meta.value_type = infer(context, scope, item.value, Some(enum_name)).map(TUnion::get_single_owned);

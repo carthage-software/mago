@@ -24,7 +24,7 @@ impl Provider for StrlenProvider {
 
 impl FunctionReturnTypeProvider for StrlenProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("strlen")
+        FunctionTarget::Exact(b"strlen")
     }
 
     fn get_return_type(
@@ -32,7 +32,7 @@ impl FunctionReturnTypeProvider for StrlenProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let string_argument = invocation.get_argument(0, &["string"])?;
+        let string_argument = invocation.get_argument(0, &[b"string"])?;
         let string_argument_type = context.get_expression_type(string_argument)?;
         let string_literal = string_argument_type.get_single_literal_string_value()?;
 

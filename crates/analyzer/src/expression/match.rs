@@ -5,9 +5,6 @@ use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::saturate_clauses;
-use mago_atom::Atom;
-use mago_atom::AtomSet;
-use mago_atom::atom;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
@@ -23,6 +20,9 @@ use mago_syntax::ast::Match;
 use mago_syntax::ast::MatchArm;
 use mago_syntax::ast::MatchDefaultArm;
 use mago_syntax::ast::MatchExpressionArm;
+use mago_word::Word;
+use mago_word::WordSet;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -132,7 +132,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         let last_expression_arm_index = expression_arms.len().saturating_sub(1);
         let mut previous_arms_executed = ArmExecutionStatus::Never;
 
-        let mut changed_variables = AtomSet::default();
+        let mut changed_variables = WordSet::default();
         let mut is_exhaustive = false;
         for (i, expression_arm) in expression_arms.iter().enumerate() {
             is_exhaustive = is_exhaustive || {
@@ -173,7 +173,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             // the full clause set every iteration; but the per-iteration
             // cost stops being O(K) in arm count.
             if !new_else_clauses.is_empty() {
-                let mut else_referenced_ids = AtomSet::default();
+                let mut else_referenced_ids = WordSet::default();
                 let (reconcilable_else_types, _) =
                     mago_algebra::find_satisfying_assignments(&new_else_clauses, None, &mut else_referenced_ids);
 
@@ -246,7 +246,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         Ok(())
     }
 
-    fn get_subject_info(&mut self, subject_type: &Rc<TUnion>) -> (bool, Atom, Expression<'arena>) {
+    fn get_subject_info(&mut self, subject_type: &Rc<TUnion>) -> (bool, Word, Expression<'arena>) {
         if let Some(id) = get_expression_id(
             self.stmt.expression,
             self.block_context.scope.get_class_like_name(),
@@ -257,10 +257,10 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         } else {
             let subject_id_str =
                 format!("{}{}", Self::SYNTHETIC_MATCH_VAR_PREFIX, self.stmt.expression.span().start.offset);
-            let subject_id = Atom::from(&subject_id_str);
+            let subject_id = mago_word::word(&subject_id_str);
             self.block_context.locals.insert(subject_id, Rc::clone(subject_type));
             let subject_for_conditions =
-                new_synthetic_variable(self.context.arena, &subject_id_str, self.stmt.expression.span());
+                new_synthetic_variable(self.context.arena, subject_id_str.as_bytes(), self.stmt.expression.span());
 
             (true, subject_id, subject_for_conditions)
         }
@@ -343,7 +343,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
         .map(Rc::new)
         .collect();
 
-        let mut arm_referenced_ids = AtomSet::default();
+        let mut arm_referenced_ids = WordSet::default();
         let (reconcilable_types, active_types) = mago_algebra::find_satisfying_assignments(
             &combined_clauses.iter().map(|c| (**c).clone()).collect::<Vec<_>>(),
             None,
@@ -356,7 +356,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
                 &reconcilable_types,
                 active_types,
                 &mut arm_body_context,
-                &mut AtomSet::default(),
+                &mut WordSet::default(),
                 &arm_referenced_ids,
                 &arm_condition.span(),
                 false,
@@ -439,7 +439,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
     ) {
         let block_context = block_context.unwrap_or(self.block_context);
 
-        block_context.possibly_thrown_exceptions.entry(atom("UnhandledMatchError")).or_default().insert(span);
+        block_context.possibly_thrown_exceptions.entry(word("UnhandledMatchError")).or_default().insert(span);
 
         if always_throws {
             block_context.flags.set_has_returned(true);
@@ -454,12 +454,12 @@ impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
             return;
         }
 
-        let mut all_redefined_vars: AtomSet = AtomSet::default();
+        let mut all_redefined_vars: WordSet = WordSet::default();
         for ctx in &reachable_contexts {
             inherit_branch_context_properties(self.context, self.block_context, ctx);
 
             all_redefined_vars.extend(
-                ctx.get_redefined_locals(&self.block_context.locals, false, &mut AtomSet::default()).keys().copied(),
+                ctx.get_redefined_locals(&self.block_context.locals, false, &mut WordSet::default()).keys().copied(),
             );
         }
 

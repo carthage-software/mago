@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
@@ -85,11 +85,11 @@ impl TType for TKeyOf {
         false
     }
 
-    fn get_id(&self) -> Atom {
-        concat_atom!("key-of<", self.0.get_id().as_str(), ">")
+    fn get_id(&self) -> Word {
+        concat_word!(b"key-of<", self.0.get_id(), b">")
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

@@ -12,7 +12,7 @@ mod runner {
 
     pub fn smoke_test(name: &'static str, code: &'static str) {
         let arena = Bump::new();
-        let file = File::ephemeral(Cow::Borrowed(name), Cow::Borrowed(code));
+        let file = File::ephemeral(Cow::Borrowed(name.as_bytes()), Cow::Borrowed(code.as_bytes()));
         let program = parse_file(&arena, &file);
         if !program.errors.is_empty() {
             panic!("Test case '{name}' failed to parse. Errors: {:?}", program.errors);
@@ -21,7 +21,7 @@ mod runner {
 
     pub fn parse_error_test(name: &'static str, code: &'static str) {
         let arena = Bump::new();
-        let file = File::ephemeral(Cow::Borrowed(name), Cow::Borrowed(code));
+        let file = File::ephemeral(Cow::Borrowed(name.as_bytes()), Cow::Borrowed(code.as_bytes()));
         let program = parse_file(&arena, &file);
         if program.errors.is_empty() {
             panic!("Test case '{name}' parsed without errors, but a parse error was expected.");
@@ -29,9 +29,13 @@ mod runner {
     }
 
     pub fn run_expression_test(name: &'static str, expression: &'static str, expected: &'static str) {
+        fn bytes_to_string(b: &[u8]) -> String {
+            String::from_utf8_lossy(b).into_owned()
+        }
+
         fn format_variable(var: &Variable<'_>) -> String {
             match var {
-                Variable::Direct(direct_variable) => direct_variable.name.to_string(),
+                Variable::Direct(direct_variable) => bytes_to_string(direct_variable.name),
                 Variable::Indirect(indirect_variable) => {
                     format!("${{{}}}", format_expression(indirect_variable.expression))
                 }
@@ -43,7 +47,7 @@ mod runner {
 
         fn format_member_selector(selector: &ClassLikeMemberSelector) -> String {
             match selector {
-                ClassLikeMemberSelector::Identifier(identifier) => identifier.value.to_string(),
+                ClassLikeMemberSelector::Identifier(identifier) => bytes_to_string(identifier.value),
                 ClassLikeMemberSelector::Variable(variable) => format_variable(variable),
                 ClassLikeMemberSelector::Expression(s) => {
                     format!("{{{}}}", format_expression(s.expression))
@@ -54,7 +58,7 @@ mod runner {
 
         fn format_constant_selector(selector: &ClassLikeConstantSelector) -> String {
             match selector {
-                ClassLikeConstantSelector::Identifier(local_identifier) => local_identifier.value.to_string(),
+                ClassLikeConstantSelector::Identifier(local_identifier) => bytes_to_string(local_identifier.value),
                 ClassLikeConstantSelector::Expression(s) => {
                     format!("{{{}}}", format_expression(s.expression))
                 }
@@ -70,20 +74,24 @@ mod runner {
                     format!(
                         "({} {} {})",
                         format_expression(binary.lhs),
-                        binary.operator.as_str(),
+                        bytes_to_string(binary.operator.as_bytes()),
                         format_expression(binary.rhs)
                     )
                 }
                 Expression::UnaryPrefix(unary_prefix) => {
-                    format!("({} {})", unary_prefix.operator.as_str(), format_expression(unary_prefix.operand))
+                    format!(
+                        "({} {})",
+                        bytes_to_string(unary_prefix.operator.as_bytes()),
+                        format_expression(unary_prefix.operand)
+                    )
                 }
                 Expression::UnaryPostfix(unary_postfix) => {
                     format!("({} {})", format_expression(unary_postfix.operand), unary_postfix.operator.as_str())
                 }
                 Expression::Literal(literal) => match literal {
-                    Literal::String(s) => s.raw.to_string(),
-                    Literal::Integer(i) => i.raw.to_string(),
-                    Literal::Float(f) => f.raw.to_string(),
+                    Literal::String(s) => bytes_to_string(s.raw),
+                    Literal::Integer(i) => bytes_to_string(i.raw),
+                    Literal::Float(f) => bytes_to_string(f.raw),
                     Literal::True(_) => "true".to_string(),
                     Literal::False(_) => "false".to_string(),
                     Literal::Null(_) => "null".to_string(),
@@ -109,8 +117,8 @@ mod runner {
                         format_expression(conditional.r#else)
                     ),
                 },
-                Expression::ConstantAccess(ConstantAccess { name }) => name.value().to_string(),
-                Expression::Identifier(identifier) => identifier.value().to_string(),
+                Expression::ConstantAccess(ConstantAccess { name }) => bytes_to_string(name.value()),
+                Expression::Identifier(identifier) => bytes_to_string(identifier.value()),
                 Expression::Construct(Construct::Print(construct)) => {
                     format!("(print {})", format_expression(construct.value))
                 }
@@ -215,7 +223,7 @@ mod runner {
 
         let code = format!("<?php {expression};");
         let arena = Bump::new();
-        let file = File::ephemeral(Cow::Borrowed(name), Cow::Owned(code));
+        let file = File::ephemeral(Cow::Borrowed(name.as_bytes()), Cow::Owned(code.into_bytes()));
 
         let program = parse_file(&arena, &file);
         if !program.errors.is_empty() {

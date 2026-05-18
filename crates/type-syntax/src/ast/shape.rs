@@ -33,7 +33,7 @@ pub struct ShapeType<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub enum ShapeKey<'arena> {
     String {
-        value: &'arena str,
+        value: &'arena [u8],
         span: Span,
     },
     Integer {
@@ -159,7 +159,7 @@ impl HasSpan for ShapeAdditionalFields<'_> {
 impl std::fmt::Display for ShapeKey<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ShapeKey::String { value, .. } => write!(f, "{value}"),
+            ShapeKey::String { value, .. } => f.write_str(&String::from_utf8_lossy(value)),
             ShapeKey::Integer { value, .. } => write!(f, "{value}"),
             ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
                 write!(f, "{}::{}", class_name, constant_name)

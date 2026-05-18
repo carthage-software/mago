@@ -1,9 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::utils::str_is_numeric;
@@ -21,7 +21,7 @@ pub enum TStringLiteral {
     /// The string originates from a literal, but its specific value isn't tracked here.
     Unspecified,
     /// The string originates from a literal, and its value is known.
-    Value(Atom),
+    Value(Word),
 }
 
 /// Represents a PHP string type, tracking literal origin and guaranteed properties.
@@ -53,21 +53,21 @@ impl TStringLiteral {
     #[inline]
     #[must_use]
     pub fn value(value: &str) -> Self {
-        TStringLiteral::Value(atom(value))
+        TStringLiteral::Value(word(value))
     }
 
     /// Creates the 'Value' literal state from a static string slice.
     #[inline]
     #[must_use]
     pub fn value_from_static_str(value: &'static str) -> Self {
-        TStringLiteral::Value(atom(value))
+        TStringLiteral::Value(word(value))
     }
 
     /// Creates the 'Value' literal state from a string slice.
     #[inline]
     #[must_use]
     pub fn value_from_str(value: &str) -> Self {
-        TStringLiteral::Value(atom(value))
+        TStringLiteral::Value(word(value))
     }
 
     /// Checks if this represents an unspecified literal value.
@@ -87,9 +87,9 @@ impl TStringLiteral {
     /// Returns the known literal string value, if available.
     #[inline]
     #[must_use]
-    pub fn get_value(&self) -> Option<&str> {
+    pub fn get_value(&self) -> Option<&[u8]> {
         match self {
-            TStringLiteral::Value(s) => Some(s),
+            TStringLiteral::Value(s) => Some(s.as_bytes()),
             TStringLiteral::Unspecified => None,
         }
     }
@@ -232,12 +232,13 @@ impl TString {
     /// Properties (`is_numeric`, `is_truthy`, `is_non_empty`) are derived from the value.
     #[inline]
     #[must_use]
-    pub fn known_literal(value: Atom) -> Self {
-        let is_numeric = str_is_numeric(&value);
+    pub fn known_literal(value: Word) -> Self {
+        let bytes = value.as_bytes();
+        let is_numeric = str_is_numeric(bytes);
         let is_non_empty = is_numeric || !value.is_empty();
-        let is_truthy = is_non_empty && value.as_str() != "0";
-        let has_lowercase = value.chars().any(|c| c.is_lowercase());
-        let has_uppercase = value.chars().any(|c| c.is_uppercase());
+        let is_truthy = is_non_empty && bytes != b"0";
+        let has_lowercase = bytes.iter().any(u8::is_ascii_lowercase);
+        let has_uppercase = bytes.iter().any(u8::is_ascii_uppercase);
         let casing = if has_lowercase && !has_uppercase {
             TStringCasing::Lowercase
         } else if has_uppercase && !has_lowercase {
@@ -282,9 +283,9 @@ impl TString {
     /// Returns `true` if the string is a known literal and matches the provided value.
     #[inline]
     #[must_use]
-    pub fn is_specific_literal(&self, value: &str) -> bool {
+    pub fn is_specific_literal(&self, value: &[u8]) -> bool {
         match &self.literal {
-            Some(TStringLiteral::Value(s)) => s == value,
+            Some(TStringLiteral::Value(s)) => s.as_bytes() == value,
             _ => false,
         }
     }
@@ -292,19 +293,19 @@ impl TString {
     /// Returns the known literal string value, if available.
     #[inline]
     #[must_use]
-    pub fn get_known_literal_value(&self) -> Option<&str> {
+    pub fn get_known_literal_value(&self) -> Option<&[u8]> {
         match &self.literal {
-            Some(TStringLiteral::Value(s)) => Some(s),
+            Some(TStringLiteral::Value(s)) => Some(s.as_bytes()),
             _ => None,
         }
     }
 
-    /// Returns the known literal string value as an Atom, if available.
-    /// This is more efficient than `get_known_literal_value()` when the Atom is needed,
+    /// Returns the known literal string value as an Word, if available.
+    /// This is more efficient than `get_known_literal_value()` when the Word is needed,
     /// as it avoids re-interning the string.
     #[inline]
     #[must_use]
-    pub fn get_known_literal_atom(&self) -> Option<Atom> {
+    pub fn get_known_literal_atom(&self) -> Option<Word> {
         match &self.literal {
             Some(TStringLiteral::Value(s)) => Some(*s),
             _ => None,
@@ -351,7 +352,7 @@ impl TString {
             TStringCasing::Uppercase => false,
             TStringCasing::Unspecified => {
                 if let Some(TStringLiteral::Value(s)) = &self.literal {
-                    s.chars().all(|c| !c.is_uppercase())
+                    s.as_bytes().iter().all(|b| !b.is_ascii_uppercase())
                 } else {
                     false
                 }
@@ -368,7 +369,7 @@ impl TString {
             TStringCasing::Lowercase => false,
             TStringCasing::Unspecified => {
                 if let Some(TStringLiteral::Value(s)) = &self.literal {
-                    s.chars().all(|c| !c.is_lowercase())
+                    s.as_bytes().iter().all(|b| !b.is_ascii_lowercase())
                 } else {
                     false
                 }
@@ -430,6 +431,7 @@ impl TType for TString {
         false
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         false
     }
@@ -438,9 +440,9 @@ impl TType for TString {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         let s = match &self.literal {
-            Some(TStringLiteral::Value(s)) => return concat_atom!("string('", s, "')"),
+            Some(TStringLiteral::Value(s)) => return concat_word!(b"string('", s, b"')"),
             Some(_) => {
                 if self.is_truthy {
                     if self.is_numeric {
@@ -470,7 +472,7 @@ impl TType for TString {
             }
             None => {
                 if self.is_callable {
-                    return atom(match self.casing {
+                    return word(match self.casing {
                         TStringCasing::Lowercase => "lowercase-callable-string",
                         TStringCasing::Uppercase => "uppercase-callable-string",
                         TStringCasing::Unspecified => "callable-string",
@@ -505,10 +507,10 @@ impl TType for TString {
             }
         };
 
-        atom(s)
+        word(s)
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }
@@ -550,6 +552,6 @@ where
     /// Converts any type that can be referenced as a string slice into a `known_literal` `StringScalar`.
     /// Derives properties from the literal value.
     fn from(value: T) -> Self {
-        Self::known_literal(atom(value.as_ref()))
+        Self::known_literal(word(value.as_ref()))
     }
 }

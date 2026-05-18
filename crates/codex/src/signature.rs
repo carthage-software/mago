@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
+use mago_word::Word;
 
 /// Represents a signature node for a definition (function, class, method, constant, etc.).
 ///
@@ -11,7 +11,7 @@ use mago_atom::Atom;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DefSignatureNode {
     /// The name of the symbol (e.g., "Foo" for class Foo, "bar" for method bar)
-    pub name: Atom,
+    pub name: Word,
 
     /// Whether this node represents a function or method
     pub is_function: bool,
@@ -57,7 +57,7 @@ impl DefSignatureNode {
     #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn new(
-        name: Atom,
+        name: Word,
         is_function: bool,
         is_constant: bool,
         start_offset: u32,

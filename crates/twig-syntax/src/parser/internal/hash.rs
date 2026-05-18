@@ -55,14 +55,14 @@ impl<'arena> Parser<'_, 'arena> {
             }
             TwigTokenKind::Number => {
                 self.stream.consume()?;
-                let is_float = key_tok.value.contains('.');
+                let is_float = key_tok.value.contains(&b'.');
                 Expression::Number(Number { raw: key_tok.value, is_float, span: self.stream.span_of(&key_tok) })
             }
             TwigTokenKind::LeftParen => {
                 let lp_tok = self.stream.consume()?;
                 let left_parenthesis = self.stream.span_of(&lp_tok);
                 let inner = self.parse_expression()?;
-                let rp_tok = self.stream.expect_kind(TwigTokenKind::RightParen, "expected `)`")?;
+                let rp_tok = self.stream.expect_kind(TwigTokenKind::RightParen, b"expected `)`")?;
                 let right_parenthesis = self.stream.span_of(&rp_tok);
                 Expression::Parenthesized(Parenthesized {
                     left_parenthesis,
@@ -72,13 +72,14 @@ impl<'arena> Parser<'_, 'arena> {
             }
             _ => {
                 return Err(ParseError::UnexpectedToken(
-                    format!("invalid hash key: {:?} {:?}", key_tok.kind, key_tok.value),
+                    format!("invalid hash key: {:?} {:?}", key_tok.kind, String::from_utf8_lossy(key_tok.value))
+                        .into_bytes(),
                     self.stream.span_of(&key_tok),
                 ));
             }
         };
 
-        let colon_tok = self.stream.expect_kind(TwigTokenKind::Colon, "expected `:`")?;
+        let colon_tok = self.stream.expect_kind(TwigTokenKind::Colon, b"expected `:`")?;
         let colon = Some(self.stream.span_of(&colon_tok));
         let value = self.parse_expression()?;
         Ok(HashMapEntry { ellipsis: None, key: Some(key), colon, value })

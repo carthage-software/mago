@@ -38,16 +38,13 @@ impl Formatter for GithubFormatter {
                     let start_col = file.column_number(annotation.span.start.offset) + 1;
                     let end_col = file.column_number(annotation.span.end.offset) + 1;
 
+                    let name = String::from_utf8_lossy(&file.name);
                     if let Some(code) = issue.code.as_ref() {
                         format!(
-                            "file={},line={start_line},endLine={end_line},col={start_col},endColumn={end_col},title={code}",
-                            file.name
+                            "file={name},line={start_line},endLine={end_line},col={start_col},endColumn={end_col},title={code}"
                         )
                     } else {
-                        format!(
-                            "file={},line={start_line},endLine={end_line},col={start_col},endColumn={end_col}",
-                            file.name
-                        )
+                        format!("file={name},line={start_line},endLine={end_line},col={start_col},endColumn={end_col}")
                     }
                 }
                 None => {

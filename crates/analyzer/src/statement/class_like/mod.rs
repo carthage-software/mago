@@ -4,10 +4,10 @@ use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
-use mago_atom::Atom;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_codex::context::ScopeContext;
+use mago_word::Word;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -58,6 +58,7 @@ use crate::statement::attributes::analyze_attributes;
 use crate::statement::class_like::method_signature::SignatureCompatibilityIssue;
 use crate::statement::function_like::report_undefined_type_references;
 use crate::utils::missing_type_hints;
+use mago_bytes::BytesDisplay;
 
 pub mod constant;
 pub mod enum_case;
@@ -73,10 +74,11 @@ fn report_duplicate_definition(
     context: &mut Context<'_, '_>,
     title: &str,
     kind: &str,
-    name: &str,
+    name: &[u8],
     duplicate_span: Span,
     original_span: Span,
 ) {
+    let name = BytesDisplay(name);
     context.collector.report_with_code(
         IssueCode::DuplicateDefinition,
         Issue::error(format!("{title} `{name}` is already defined elsewhere."))
@@ -187,7 +189,7 @@ impl PropertyConflict {
 }
 
 /// Checks if a type union contains a reference to a specific template parameter.
-fn type_contains_template_param(type_union: &TUnion, param_name: Atom, defining_class: Atom) -> bool {
+fn type_contains_template_param(type_union: &TUnion, param_name: Word, defining_class: Word) -> bool {
     use mago_codex::ttype::TypeRef;
 
     type_union.types.iter().any(|atomic| {
@@ -257,7 +259,7 @@ fn check_unused_template_parameters<'ctx>(
     let class_name_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
     for (template_name, _) in &class_like_metadata.template_types {
-        if template_name.as_str().starts_with('_') {
+        if template_name.as_bytes().starts_with(b"_") {
             continue;
         }
 
@@ -294,8 +296,9 @@ fn check_unused_template_parameters<'ctx>(
         }
 
         for method_id in class_like_metadata.declaring_method_ids.values() {
-            let Some(function_like) =
-                context.codebase.get_method(&method_id.get_class_name(), &method_id.get_method_name())
+            let Some(function_like) = context
+                .codebase
+                .get_method(method_id.get_class_name().as_bytes(), method_id.get_method_name().as_bytes())
             else {
                 continue;
             };
@@ -361,7 +364,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
-            tracing::warn!("Class {} not found in codebase", name);
+            tracing::warn!("Class {} not found in codebase", BytesDisplay(name));
 
             return Ok(());
         };
@@ -500,7 +503,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
-            tracing::warn!("Interface {name} not found in codebase");
+            tracing::warn!("Interface {} not found in codebase", BytesDisplay(name));
 
             return Ok(());
         };
@@ -584,7 +587,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
-            tracing::warn!("Trait {} not found in codebase", name);
+            tracing::warn!("Trait {} not found in codebase", BytesDisplay(name));
 
             return Ok(());
         };
@@ -668,7 +671,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
-            tracing::warn!("Enum {} not found in codebase", name);
+            tracing::warn!("Enum {} not found in codebase", BytesDisplay(name));
 
             return Ok(());
         };
@@ -730,10 +733,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
 fn check_duplicate_enum_case_values<'arena>(
     context: &mut Context<'_, 'arena>,
     artifacts: &AnalysisArtifacts,
-    enum_name: &str,
+    enum_name: &[u8],
     r#enum: &Enum<'arena>,
 ) {
-    let mut seen: Vec<(Atom, &str, Span)> = Vec::new();
+    let enum_name = BytesDisplay(enum_name);
+    let mut seen: Vec<(Word, &[u8], Span)> = Vec::new();
 
     for member in &r#enum.members {
         let ClassLikeMember::EnumCase(case) = member else {
@@ -768,17 +772,19 @@ fn check_duplicate_enum_case_values<'arena>(
         let value_span = item.value.span();
 
         if let Some((_, prev_case_name, prev_span)) = seen.iter().find(|(id, _, _)| *id == value_id) {
+            let case_name_disp = BytesDisplay(case_name);
+            let prev_case_name_disp = BytesDisplay(prev_case_name);
             context.collector.report_with_code(
                 IssueCode::DuplicateEnumCaseValue,
                 Issue::error(format!(
-                    "Duplicate value in enum `{enum_name}`: case `{case_name}` has the same value as case `{prev_case_name}`."
+                    "Duplicate value in enum `{enum_name}`: case `{case_name_disp}` has the same value as case `{prev_case_name_disp}`."
                 ))
                 .with_annotation(
                     Annotation::primary(value_span).with_message("This value is a duplicate"),
                 )
                 .with_annotation(
                     Annotation::secondary(*prev_span)
-                        .with_message(format!("Case `{prev_case_name}` already uses this value")),
+                        .with_message(format!("Case `{prev_case_name_disp}` already uses this value")),
                 )
                 .with_help("Each case in a backed enum must have a unique value."),
             );
@@ -820,7 +826,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
 
     let name = &class_like_metadata.original_name;
 
-    let mut checked_signatures: HashSet<(Atom, Atom)> = HashSet::default();
+    let mut checked_signatures: HashSet<(Word, Word)> = HashSet::default();
 
     check_class_like_extends(context, class_like_metadata, extends_ast);
     check_class_like_implements(context, class_like_metadata, implements_ast, &mut checked_signatures);
@@ -838,24 +844,27 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     if !class_like_metadata.kind.is_trait() && !class_like_metadata.flags.is_abstract() {
         for (method_name, method_id) in &class_like_metadata.declaring_method_ids {
             if class_like_metadata.kind.is_enum() {
-                if method_name.eq_ignore_ascii_case("cases") {
+                if method_name.as_bytes().eq_ignore_ascii_case(b"cases") {
                     continue;
                 }
 
                 if class_like_metadata.enum_type.is_some()
-                    && (method_name.eq_ignore_ascii_case("from") || method_name.eq_ignore_ascii_case("tryFrom"))
+                    && (method_name.as_bytes().eq_ignore_ascii_case(b"from")
+                        || method_name.as_bytes().eq_ignore_ascii_case(b"tryFrom"))
                 {
                     continue;
                 }
             }
 
-            let Some(declaring_class_like_metadata) = context.codebase.get_class_like(&method_id.get_class_name())
+            let Some(declaring_class_like_metadata) =
+                context.codebase.get_class_like(method_id.get_class_name().as_bytes())
             else {
                 continue;
             };
 
-            let Some(function_like) =
-                context.codebase.get_method(&method_id.get_class_name(), &method_id.get_method_name())
+            let Some(function_like) = context
+                .codebase
+                .get_method(method_id.get_class_name().as_bytes(), method_id.get_method_name().as_bytes())
             else {
                 continue;
             };
@@ -899,7 +908,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                 .chain(class_like_metadata.all_parent_interfaces.iter())
                 .chain(class_like_metadata.used_traits.iter())
             {
-                let Some(parent_metadata) = context.codebase.get_class_like(parent_fqcn) else {
+                let Some(parent_metadata) = context.codebase.get_class_like(parent_fqcn.as_bytes()) else {
                     continue;
                 };
 
@@ -934,7 +943,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                             all_parent_class.any(|parent_class_fqcn| {
                                 context
                                     .codebase
-                                    .get_class_like(parent_class_fqcn)
+                                    .get_class_like(parent_class_fqcn.as_bytes())
                                     .and_then(|parent| parent.properties.get(property_name))
                                     .is_some_and(|prop| {
                                         if prop.hooks.get(hook_name).is_some_and(|h| !h.is_abstract) {
@@ -1027,7 +1036,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
                 if context.settings.diff
                     && let Some(item) = class_like_constant.items.first()
                 {
-                    let constant_name = atom(item.name.value);
+                    let constant_name = word(item.name.value);
                     if context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, constant_name)) {
                         continue;
                     }
@@ -1040,8 +1049,8 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
             ClassLikeMember::Property(property) => {
                 if context.settings.diff {
                     let first_var_name = match property {
-                        Property::Plain(plain) => plain.items.first().map(|item| atom(item.variable().name)),
-                        Property::Hooked(hooked) => Some(atom(hooked.item.variable().name)),
+                        Property::Plain(plain) => plain.items.first().map(|item| word(item.variable().name)),
+                        Property::Hooked(hooked) => Some(word(hooked.item.variable().name)),
                     };
 
                     if let Some(var_name) = first_var_name
@@ -1055,17 +1064,17 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
 
                 // Check for imprecise type hints (bare `array` or `iterable`)
                 let first_property_name = match property {
-                    Property::Plain(plain) => plain.items.first().map(|item| atom(item.variable().name)),
-                    Property::Hooked(hooked) => Some(atom(hooked.item.variable().name)),
+                    Property::Plain(plain) => plain.items.first().map(|item| word(item.variable().name)),
+                    Property::Hooked(hooked) => Some(word(hooked.item.variable().name)),
                 };
 
                 let prop_meta = first_property_name.and_then(|name| class_like_metadata.properties.get(&name));
                 missing_type_hints::check_imprecise_property_type_hint(context, property, prop_meta);
 
-                let property_names: Vec<Atom> = match property {
-                    Property::Plain(plain) => plain.items.iter().map(|item| atom(item.variable().name)).collect(),
+                let property_names: Vec<Word> = match property {
+                    Property::Plain(plain) => plain.items.iter().map(|item| word(item.variable().name)).collect(),
                     Property::Hooked(hooked) => {
-                        vec![atom(hooked.item.variable().name)]
+                        vec![word(hooked.item.variable().name)]
                     }
                 };
 
@@ -1087,7 +1096,7 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
             }
             ClassLikeMember::EnumCase(enum_case) => {
                 if context.settings.diff {
-                    let case_name = atom(enum_case.item.name().value);
+                    let case_name = word(enum_case.item.name().value);
                     if context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, case_name)) {
                         continue;
                     }
@@ -1138,7 +1147,7 @@ fn check_class_like_extends<'ctx, 'arena>(
 
         // Case: The extended type does not exist.
         let Some(extended_class_metadata) = extended_class_metadata else {
-            let extended_name = extended_type.value();
+            let extended_name = BytesDisplay(extended_type.value());
 
             context.collector.report_with_code(
                 IssueCode::NonExistentClassLike,
@@ -1309,7 +1318,7 @@ fn check_class_like_implements<'ctx, 'arena>(
     context: &mut Context<'ctx, 'arena>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     implements_ast: Option<&Implements<'arena>>,
-    checked_signatures: &mut HashSet<(Atom, Atom)>,
+    checked_signatures: &mut HashSet<(Word, Word)>,
 ) {
     // This check only applies to classes and enums, which can use `implements`.
     if !class_like_metadata.kind.is_class() && !class_like_metadata.kind.is_enum() {
@@ -1409,7 +1418,7 @@ fn check_class_like_implements<'ctx, 'arena>(
 
             check_interface_method_signatures(context, class_like_metadata, implemented_metadata, checked_signatures);
         } else {
-            let implemented_name = implemented_type.value();
+            let implemented_name = BytesDisplay(implemented_type.value());
 
             context.collector.report_with_code(
                 IssueCode::NonExistentClassLike,
@@ -1439,7 +1448,7 @@ fn check_class_like_use<'ctx, 'arena>(
         let used_trait_metadata = context.codebase.get_class_like(used_type_str);
 
         let Some(used_trait_metadata) = used_trait_metadata else {
-            let used_name = used_type.value();
+            let used_name = BytesDisplay(used_type.value());
 
             context.collector.report_with_code(
                 IssueCode::NonExistentClassLike,
@@ -1667,7 +1676,7 @@ fn check_template_parameters<'ctx>(
         && let Some(extended_parameters) = class_like_metadata.template_extended_parameters.get(&parent_metadata.name)
     {
         let mut i = 0;
-        let mut previous_extended_types: IndexMap<Atom, Vec<GenericTemplate>, RandomState> = IndexMap::default();
+        let mut previous_extended_types: IndexMap<Word, Vec<GenericTemplate>, RandomState> = IndexMap::default();
 
         for (template_name, _) in &parent_metadata.template_types {
             if let Some(extended_type) = extended_parameters.get(template_name) {
@@ -1824,7 +1833,7 @@ fn check_template_parameters<'ctx>(
 /// Checks if this is the same method that was inherited (not overridden).
 /// Example: `StringBox` extends Box and inherits `Box::setValue` without overriding it.
 #[inline]
-fn should_skip_same_method(appearing_fqcn: &str, overridden_fqcn: &str) -> bool {
+fn should_skip_same_method(appearing_fqcn: &[u8], overridden_fqcn: &[u8]) -> bool {
     appearing_fqcn.eq_ignore_ascii_case(overridden_fqcn)
 }
 
@@ -1854,8 +1863,8 @@ fn should_skip_trait_to_trait_conflict(
         return false;
     }
 
-    let appearing_lowercase = ascii_lowercase_atom(&appearing_class.name);
-    let overridden_lowercase = ascii_lowercase_atom(&overridden_class.name);
+    let appearing_lowercase = ascii_lowercase_word(appearing_class.name.as_bytes());
+    let overridden_lowercase = ascii_lowercase_word(overridden_class.name.as_bytes());
 
     if !class_like_metadata.used_traits.contains(&appearing_lowercase)
         || !class_like_metadata.used_traits.contains(&overridden_lowercase)
@@ -1869,14 +1878,14 @@ fn should_skip_trait_to_trait_conflict(
 /// Checks if this is an enum implementing BackedEnum/UnitEnum, which is allowed
 /// to narrow the method signatures (e.g., `from(string)` instead of `from(int|string)`).
 #[inline]
-fn should_skip_enum_builtin_interface(class_like_metadata: &ClassLikeMetadata, interface_fqcn: &str) -> bool {
-    class_like_metadata.kind.is_enum() && (interface_fqcn == "backedenum" || interface_fqcn == "unitenum")
+fn should_skip_enum_builtin_interface(class_like_metadata: &ClassLikeMetadata, interface_fqcn: &[u8]) -> bool {
+    class_like_metadata.kind.is_enum() && (interface_fqcn == b"backedenum" || interface_fqcn == b"unitenum")
 }
 
 fn check_abstract_method_signatures<'ctx>(
     context: &mut Context<'ctx, '_>,
     class_like_metadata: &'ctx ClassLikeMetadata,
-    checked_signatures: &mut HashSet<(Atom, Atom)>,
+    checked_signatures: &mut HashSet<(Word, Word)>,
 ) {
     for (method_name_atom, overridden_method_ids) in &class_like_metadata.overridden_method_ids {
         let method_name_str = method_name_atom.as_ref();
@@ -1885,18 +1894,18 @@ fn check_abstract_method_signatures<'ctx>(
             continue;
         };
 
-        let declaring_fqcn_str = declaring_method_id.get_class_name().as_str();
-        let declaring_method_opt = context.codebase.get_method(declaring_fqcn_str, method_name_str);
+        let declaring_fqcn = declaring_method_id.get_class_name();
+        let declaring_method_opt = context.codebase.get_method(declaring_fqcn.as_bytes(), method_name_str);
 
-        let (method_fqcn_str, appearing_method) = if let Some(method) = declaring_method_opt {
-            (declaring_fqcn_str, method)
+        let (method_fqcn, appearing_method) = if let Some(method) = declaring_method_opt {
+            (declaring_fqcn, method)
         } else if let Some(appearing_method_id) = class_like_metadata.appearing_method_ids.get(method_name_atom) {
-            let appearing_fqcn_str = appearing_method_id.get_class_name().as_str();
-            let Some(method) = context.codebase.get_method(appearing_fqcn_str, method_name_str) else {
+            let appearing_fqcn = appearing_method_id.get_class_name();
+            let Some(method) = context.codebase.get_method(appearing_fqcn.as_bytes(), method_name_str) else {
                 continue;
             };
 
-            (appearing_fqcn_str, method)
+            (appearing_fqcn, method)
         } else {
             continue;
         };
@@ -1907,7 +1916,7 @@ fn check_abstract_method_signatures<'ctx>(
             let declaring_class_name = parent_declaring_method_id.get_class_name();
             let declaring_class_name_str = declaring_class_name.as_ref();
 
-            if should_skip_same_method(method_fqcn_str, parent_fqcn_str) {
+            if should_skip_same_method(method_fqcn.as_bytes(), parent_fqcn_str) {
                 continue;
             }
 
@@ -1925,7 +1934,7 @@ fn check_abstract_method_signatures<'ctx>(
                 continue;
             };
 
-            let Some(appearing_class) = context.codebase.get_class_like(method_fqcn_str) else {
+            let Some(appearing_class) = context.codebase.get_class_like(method_fqcn.as_bytes()) else {
                 continue;
             };
 
@@ -1947,7 +1956,7 @@ fn check_abstract_method_signatures<'ctx>(
                 get_substituted_method(overridden_method, class_like_metadata, declaring_class_name, context.codebase);
 
             let substituted_appearing_method =
-                get_substituted_method(appearing_method, class_like_metadata, atom(method_fqcn_str), context.codebase);
+                get_substituted_method(appearing_method, class_like_metadata, method_fqcn, context.codebase);
 
             let issues = method_signature::validate_method_signature_compatibility(
                 context.codebase,
@@ -1986,14 +1995,14 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena>(
     class_like_metadata: &'ctx ClassLikeMetadata,
     members: &'ast [ClassLikeMember<'arena>],
 ) {
-    let mut trait_uses: Vec<(&'ast TraitUse<'arena>, Vec<Atom>)> = Vec::new();
+    let mut trait_uses: Vec<(&'ast TraitUse<'arena>, Vec<Word>)> = Vec::new();
 
     for member in members {
         if let ClassLikeMember::TraitUse(trait_use) = member {
             let mut trait_names = Vec::new();
             for trait_name_id in &trait_use.trait_names {
                 let (trait_fqcn, _) = context.scope.resolve(NameKind::Default, trait_name_id.value());
-                trait_names.push(Atom::from(trait_fqcn.as_str()));
+                trait_names.push(word(&trait_fqcn));
             }
             trait_uses.push((trait_use, trait_names));
         }
@@ -2128,20 +2137,20 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
     class_like_metadata: &'ctx ClassLikeMetadata,
     members: &'ast [ClassLikeMember<'arena>],
 ) {
-    let mut trait_uses: Vec<(&'ast TraitUse<'arena>, Vec<Atom>)> = Vec::new();
+    let mut trait_uses: Vec<(&'ast TraitUse<'arena>, Vec<Word>)> = Vec::new();
 
     for member in members {
         if let ClassLikeMember::TraitUse(trait_use) = member {
             let mut trait_names = Vec::new();
             for trait_name_id in &trait_use.trait_names {
                 let (trait_fqcn, _) = context.scope.resolve(NameKind::Default, trait_name_id.value());
-                trait_names.push(Atom::from(trait_fqcn.as_str()));
+                trait_names.push(word(&trait_fqcn));
             }
             trait_uses.push((trait_use, trait_names));
         }
     }
 
-    let mut class_properties: IndexMap<Atom, &PropertyMetadata> = IndexMap::new();
+    let mut class_properties: IndexMap<Word, &PropertyMetadata> = IndexMap::new();
     for (property_name, property_metadata) in class_like_metadata.properties.iter().sorted_by_key(|(k, _)| *k) {
         if let Some(declaring_class) = class_like_metadata.declaring_property_ids.get(property_name)
             && declaring_class == &class_like_metadata.name
@@ -2248,14 +2257,14 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
                             match prop {
                                 Property::Plain(plain_prop) => {
                                     for item in &plain_prop.items {
-                                        let var_name = Atom::from(item.variable().name);
+                                        let var_name = Word::from(item.variable().name);
                                         if var_name == *property_name {
                                             return Some(prop.span());
                                         }
                                     }
                                 }
                                 Property::Hooked(hooked_prop) => {
-                                    let var_name = Atom::from(hooked_prop.item.variable().name);
+                                    let var_name = Word::from(hooked_prop.item.variable().name);
                                     if var_name == *property_name {
                                         return Some(prop.span());
                                     }
@@ -2390,10 +2399,10 @@ fn check_property_compatibility(prop1: &PropertyMetadata, prop2: &PropertyMetada
 
 fn report_trait_property_conflict(
     context: &mut Context,
-    class_name: Atom,
-    property_name: Atom,
-    trait1_name: Atom,
-    trait2_name: Atom,
+    class_name: Word,
+    property_name: Word,
+    trait1_name: Word,
+    trait2_name: Word,
     conflict_span: Span,
     prop1: &PropertyMetadata,
     prop2: &PropertyMetadata,
@@ -2431,7 +2440,7 @@ fn report_trait_property_conflict(
 fn get_substituted_method(
     method: &FunctionLikeMetadata,
     class_like_metadata: &ClassLikeMetadata,
-    parent_class_name: Atom,
+    parent_class_name: Word,
     codebase: &CodebaseMetadata,
 ) -> FunctionLikeMetadata {
     let template_mapping =
@@ -2474,16 +2483,17 @@ fn check_interface_method_signatures<'ctx>(
     context: &mut Context<'ctx, '_>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     interface_metadata: &'ctx ClassLikeMetadata,
-    checked_signatures: &mut HashSet<(Atom, Atom)>,
+    checked_signatures: &mut HashSet<(Word, Word)>,
 ) {
-    let interface_fqcn_str: &str = interface_metadata.name.as_ref();
+    let interface_fqcn_str: &[u8] = interface_metadata.name.as_ref();
     if should_skip_enum_builtin_interface(class_like_metadata, interface_fqcn_str) {
         return;
     }
 
     for (method_name_atom, interface_method_id) in &interface_metadata.declaring_method_ids {
         let method_name_str = method_name_atom.as_ref();
-        let interface_fqcn_str = interface_method_id.get_class_name().as_str();
+        let interface_fqcn_word = interface_method_id.get_class_name();
+        let interface_fqcn_str = interface_fqcn_word.as_bytes();
 
         let Some(interface_method) = context.codebase.get_declaring_method(interface_fqcn_str, method_name_str) else {
             continue;
@@ -2493,7 +2503,8 @@ fn check_interface_method_signatures<'ctx>(
             continue;
         };
 
-        let class_fqcn_str = class_method_id.get_class_name().as_str();
+        let class_fqcn_word = class_method_id.get_class_name();
+        let class_fqcn_str = class_fqcn_word.as_bytes();
         let Some(class_method) = context.codebase.get_declaring_method(class_fqcn_str, method_name_str) else {
             continue;
         };
@@ -2551,7 +2562,7 @@ fn report_signature_compatibility_issue<'ctx>(
     context: &mut Context<'ctx, '_>,
     child_class: &'ctx ClassLikeMetadata,
     parent_class: &'ctx ClassLikeMetadata,
-    method_name: Atom,
+    method_name: Word,
     parent_method: &FunctionLikeMetadata,
     incompatibility: SignatureCompatibilityIssue,
     primary_span: Span,
@@ -2646,7 +2657,10 @@ fn report_signature_compatibility_issue<'ctx>(
             );
         }
         SignatureCompatibilityIssue::IncompatibleParameterType { parameter_index, child_type, parent_type } => {
-            let param_name = parent_method.parameters.get(parameter_index).map_or("unknown", |p| p.name.0.as_ref());
+            let param_name: String = parent_method
+                .parameters
+                .get(parameter_index)
+                .map_or_else(|| "unknown".to_string(), |p| p.name.0.to_string());
 
             context.collector.report_with_code(
                 IssueCode::IncompatibleParameterType,
@@ -2742,7 +2756,7 @@ fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like
         }
 
         // Validate set hook parameter type is supertype of property type
-        if let Some(set_hook) = property_metadata.hooks.get(&atom("set"))
+        if let Some(set_hook) = property_metadata.hooks.get(&word("set"))
             && let Some(param) = &set_hook.parameter
             && let Some(param_type) = param.type_declaration_metadata.as_ref()
             && let Some(property_type) = property_metadata.type_metadata.as_ref()
@@ -2774,7 +2788,7 @@ fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like
         }
 
         // Validate docblock param type >= native param type
-        if let Some(set_hook) = property_metadata.hooks.get(&atom("set"))
+        if let Some(set_hook) = property_metadata.hooks.get(&word("set"))
             && let Some(param) = &set_hook.parameter
             && let Some(native_type) = param.type_declaration_metadata.as_ref()
             && let Some(effective_type) = param.type_metadata.as_ref()
@@ -2870,9 +2884,9 @@ fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like
 
             // Backed property with by-ref get + set hook is invalid
             if parent_property.hooks.is_empty()
-                && let Some(get_hook) = property_metadata.hooks.get(&atom("get"))
+                && let Some(get_hook) = property_metadata.hooks.get(&word("get"))
                 && get_hook.returns_by_ref
-                && property_metadata.hooks.contains_key(&atom("set"))
+                && property_metadata.hooks.contains_key(&word("set"))
             {
                 context.collector.report_with_code(
                     IssueCode::BackedPropertyReferenceHook,
@@ -2906,11 +2920,11 @@ fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like
                         ))
                         .with_annotation(
                             Annotation::primary(property_span)
-                                .with_message(format!("This property is declared as `{}`", property_metadata.read_visibility.as_str())),
+                                .with_message(format!("This property is declared as `{}`", property_metadata.read_visibility)),
                         )
                         .with_annotation(
                             Annotation::secondary(parent_property_span)
-                                .with_message(format!("Parent property is declared as `{}`", parent_property.read_visibility.as_str())),
+                                .with_message(format!("Parent property is declared as `{}`", parent_property.read_visibility)),
                         )
                         .with_note("The access level of an overridden property must not be more restrictive than the parent property.")
                         .with_help("Adjust the access level of the property in the child class to match or be less restrictive than the parent class."),
@@ -2934,11 +2948,11 @@ fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like
                         ))
                         .with_annotation(
                             Annotation::primary(property_span)
-                                .with_message(format!("This property is declared as `{}(set)`", property_metadata.write_visibility.as_str())),
+                                .with_message(format!("This property is declared as `{}(set)`", property_metadata.write_visibility)),
                         )
                         .with_annotation(
                             Annotation::secondary(parent_property_span)
-                                .with_message(format!("Parent property is declared as `{}(set)`", parent_property.write_visibility.as_str())),
+                                .with_message(format!("Parent property is declared as `{}(set)`", parent_property.write_visibility)),
                         )
                         .with_note("The access level of an overridden property must not be more restrictive than the parent property.")
                         .with_help("Adjust the access level of the property in the child class to match or be less restrictive than the parent class."),
@@ -3014,8 +3028,8 @@ fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like
             //   is safe because consumers only write, so accepting a wider type upholds the contract.
             // - Otherwise, invariance is required.
             let parent_is_virtual = parent_property.flags.is_virtual_property();
-            let parent_has_get_hook = parent_property.hooks.contains_key(&atom("get"));
-            let parent_has_set_hook = parent_property.hooks.contains_key(&atom("set"));
+            let parent_has_get_hook = parent_property.hooks.contains_key(&word("get"));
+            let parent_has_set_hook = parent_property.hooks.contains_key(&word("set"));
             let parent_only_get = parent_is_virtual && parent_has_get_hook && !parent_has_set_hook;
             let parent_only_set = parent_is_virtual && parent_has_set_hook && !parent_has_get_hook;
 
@@ -3151,7 +3165,7 @@ fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like
 
         // Check interface hook by-ref signature compatibility
         for interface_fqcn in &class_like_metadata.all_parent_interfaces {
-            let Some(interface_metadata) = context.codebase.get_class_like(interface_fqcn) else {
+            let Some(interface_metadata) = context.codebase.get_class_like(interface_fqcn.as_bytes()) else {
                 continue;
             };
 
@@ -3207,13 +3221,13 @@ fn check_class_like_constants<'ctx, 'arena>(
         };
 
         for item in &constant.items {
-            let constant_name = atom(item.name.value);
+            let constant_name = word(item.name.value);
 
             let Some(trait_fqcn) = class_like_metadata.trait_constant_ids.get(&constant_name) else {
                 continue;
             };
 
-            let Some(trait_metadata) = context.codebase.get_class_like(trait_fqcn) else {
+            let Some(trait_metadata) = context.codebase.get_class_like(trait_fqcn.as_bytes()) else {
                 continue;
             };
 
@@ -3285,7 +3299,7 @@ fn check_class_like_constants<'ctx, 'arena>(
         };
 
         for item in &constant.items {
-            let constant_name = atom(item.name.value);
+            let constant_name = word(item.name.value);
 
             let Some(child_constant) = class_like_metadata.constants.get(&constant_name) else {
                 continue;
@@ -3391,7 +3405,7 @@ fn check_class_like_constants<'ctx, 'arena>(
         };
 
         for item in &constant.items {
-            let constant_name = atom(item.name.value);
+            let constant_name = word(item.name.value);
 
             let Some(child_constant) = class_like_metadata.constants.get(&constant_name) else {
                 continue;
@@ -3480,7 +3494,7 @@ fn check_readonly_class_trait_properties<'ctx, 'arena>(
         if let ClassLikeMember::TraitUse(trait_use) = member {
             for trait_name_id in &trait_use.trait_names {
                 let (trait_fqcn, _) = context.scope.resolve(NameKind::Default, trait_name_id.value());
-                let trait_fqcn = Atom::from(trait_fqcn.as_str());
+                let trait_fqcn = word(&trait_fqcn);
 
                 let Some(trait_metadata) = context.codebase.get_class_like(trait_fqcn.as_ref()) else {
                     continue;

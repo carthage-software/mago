@@ -24,11 +24,11 @@ pub fn parse_document<'arena>(
     while i < tokens.len() {
         match &tokens[i] {
             Token::Line { content, .. } => {
-                if content.starts_with('@') {
+                if content.starts_with(b"@") {
                     let (tag, new_i) = parse_tag(tokens, i, arena)?;
                     elements.push(Element::Tag(tag));
                     i = new_i;
-                } else if content.starts_with("```") {
+                } else if content.starts_with(b"```") {
                     let (code, new_i) = parse_code_block(tokens, i, arena)?;
                     elements.push(Element::Code(code));
                     i = new_i;
@@ -52,8 +52,8 @@ pub fn parse_document<'arena>(
     Ok(Document { span, elements })
 }
 
-fn is_indented_line(content: &str) -> bool {
-    content.starts_with(' ') || content.starts_with('\t')
+fn is_indented_line(content: &[u8]) -> bool {
+    content.starts_with(b" ") || content.starts_with(b"\t")
 }
 
 fn parse_tag<'arena>(
@@ -67,9 +67,9 @@ fn parse_tag<'arena>(
     };
 
     let mut name_end = None;
-    for (byte_pos, ch) in content[1..].char_indices() {
-        if ch.is_whitespace() || ch == '(' {
-            name_end = Some(1 + byte_pos);
+    for (offset, &b) in content[1..].iter().enumerate() {
+        if b.is_ascii_whitespace() || b == b'(' {
+            name_end = Some(1 + offset);
             break;
         }
     }
@@ -78,23 +78,23 @@ fn parse_tag<'arena>(
 
     if tag_name.is_empty()
         || !tag_name
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-' || b == b':' || b == b'\\' || b >= 0x80)
+            .iter()
+            .all(|&b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-' || b == b':' || b == b'\\' || b >= 0x80)
     {
         return Err(ParseError::InvalidTagName(span.subspan(0, tag_name.len() as u32 + 1)));
     }
 
     let after_name = &content[1 + tag_name.len()..];
 
-    let mut metadata: Option<&'arena str> = None;
+    let mut metadata: Option<&'arena [u8]> = None;
     let mut after_metadata = after_name;
-    if after_name.starts_with('(') {
+    if after_name.starts_with(b"(") {
         let mut depth: usize = 0;
         let mut close_pos = None;
-        for (pos, ch) in after_name.char_indices() {
-            match ch {
-                '(' => depth += 1,
-                ')' => {
+        for (pos, &b) in after_name.iter().enumerate() {
+            match b {
+                b'(' => depth += 1,
+                b')' => {
                     depth -= 1;
                     if depth == 0 {
                         close_pos = Some(pos);
@@ -106,16 +106,16 @@ fn parse_tag<'arena>(
         }
 
         if let Some(close) = close_pos {
-            metadata = Some(arena.alloc_str(&after_name[..=close]));
+            metadata = Some(arena.alloc_slice_copy(&after_name[..=close]));
             after_metadata = &after_name[close + 1..];
         }
     }
 
     let description_part;
     let description_start;
-    let trimmed = after_metadata.trim_start();
+    let trimmed = after_metadata.trim_ascii_start();
     if trimmed.is_empty() {
-        description_part = "";
+        description_part = b"" as &[u8];
         description_start = span.start.forward(content.len() as u32);
     } else {
         let offset = content.len() - trimmed.len();
@@ -123,7 +123,7 @@ fn parse_tag<'arena>(
         description_start = span.start.forward(offset as u32);
     }
 
-    let mut description = String::from(description_part);
+    let mut description: std::vec::Vec<u8> = description_part.to_vec();
     let mut end_span = *span;
 
     i += 1;
@@ -131,14 +131,14 @@ fn parse_tag<'arena>(
         match &tokens[i] {
             Token::Line { content, span } => {
                 if content.is_empty()
-                    || content.trim().is_empty()
-                    || content.starts_with('@')
-                    || content.starts_with("```")
+                    || content.trim_ascii().is_empty()
+                    || content.starts_with(b"@")
+                    || content.starts_with(b"```")
                 {
                     break;
                 }
-                description.push('\n');
-                description.push_str(content);
+                description.push(b'\n');
+                description.extend_from_slice(content);
                 end_span = *span;
                 i += 1;
             }
@@ -157,7 +157,7 @@ fn parse_tag<'arena>(
         name: tag_name,
         kind,
         metadata,
-        description: arena.alloc_str(&description),
+        description: arena.alloc_slice_copy(&description),
         description_span: Span::new(span.file_id, description_start, end_span.end),
     };
 
@@ -175,12 +175,12 @@ fn parse_code_block<'arena>(
     };
 
     let mut directives = Vec::new_in(arena);
-    let rest = &content[3..].trim();
+    let rest = content[3..].trim_ascii();
     if !rest.is_empty() {
-        directives = Vec::from_iter_in(rest.split(',').map(str::trim), arena);
+        directives = Vec::from_iter_in(rest.split(|&b| b == b',').map(<[u8]>::trim_ascii), arena);
     }
 
-    let mut code_content = String::new();
+    let mut code_content: std::vec::Vec<u8> = std::vec::Vec::new();
     let mut end_span = *span;
     i += 1;
 
@@ -188,21 +188,21 @@ fn parse_code_block<'arena>(
     while i < tokens.len() {
         match &tokens[i] {
             Token::Line { content, span } => {
-                if content.starts_with("```") {
+                if content.starts_with(b"```") {
                     found_closing = true;
                     end_span = *span;
                     i += 1;
                     break;
                 }
                 if !code_content.is_empty() {
-                    code_content.push('\n');
+                    code_content.push(b'\n');
                 }
-                code_content.push_str(content);
+                code_content.extend_from_slice(content);
                 end_span = *span;
                 i += 1;
             }
             Token::EmptyLine { span } => {
-                code_content.push('\n');
+                code_content.push(b'\n');
                 end_span = *span;
                 i += 1;
             }
@@ -214,7 +214,7 @@ fn parse_code_block<'arena>(
         return Err(ParseError::UnclosedCodeBlock(code_span));
     }
 
-    Ok((Code { span: code_span, directives, content: arena.alloc_str(&code_content) }, i))
+    Ok((Code { span: code_span, directives, content: arena.alloc_slice_copy(&code_content) }, i))
 }
 
 fn parse_indented_code<'arena>(
@@ -227,34 +227,32 @@ fn parse_indented_code<'arena>(
         return Err(ParseError::ExpectedLine(tokens[i].span()));
     };
 
-    let indent_len = content.chars().take_while(|c| c.is_whitespace()).count();
+    let indent_len = content.iter().take_while(|b| b.is_ascii_whitespace()).count();
 
-    let mut code_content = String::new();
+    let mut code_content: std::vec::Vec<u8> = std::vec::Vec::new();
     let mut end_span = *span;
 
     while i < tokens.len() {
         match &tokens[i] {
             Token::Line { content, span } => {
-                if content.starts_with('@') || content.starts_with("```") {
+                if content.starts_with(b"@") || content.starts_with(b"```") {
                     break;
                 }
-                let current_indent_len = content.chars().take_while(|c| c.is_whitespace()).count();
+                let current_indent_len = content.iter().take_while(|b| b.is_ascii_whitespace()).count();
                 if current_indent_len < indent_len {
                     break;
                 }
 
-                // Calculate byte offset from original indent character count
-                let current_indent_bytes: usize = content.chars().take(indent_len).map(|c| c.len_utf8()).sum();
-                let line_content = &content[current_indent_bytes..];
+                let line_content = &content[indent_len..];
                 if !code_content.is_empty() {
-                    code_content.push('\n');
+                    code_content.push(b'\n');
                 }
-                code_content.push_str(line_content);
+                code_content.extend_from_slice(line_content);
                 end_span = *span;
                 i += 1;
             }
             Token::EmptyLine { span } => {
-                code_content.push('\n');
+                code_content.push(b'\n');
                 end_span = *span;
                 i += 1;
             }
@@ -265,7 +263,7 @@ fn parse_indented_code<'arena>(
         Code {
             span: Span::new(span.file_id, span.start, end_span.end),
             directives: Vec::new_in(arena),
-            content: arena.alloc_str(&code_content),
+            content: arena.alloc_slice_copy(&code_content),
         },
         i,
     ))
@@ -277,7 +275,7 @@ fn parse_text<'arena>(
     arena: &'arena Bump,
 ) -> Result<(Text<'arena>, usize), ParseError> {
     let mut i = start_index;
-    let mut text_content = String::new();
+    let mut text_content: std::vec::Vec<u8> = std::vec::Vec::new();
     let start_span = tokens[start_index].span();
 
     let mut end_span = start_span;
@@ -288,26 +286,26 @@ fn parse_text<'arena>(
             Token::Line { content, span } => {
                 if open_braces == 0
                     && (content.is_empty()
-                        || content.trim().is_empty()
-                        || content.starts_with('@')
-                        || content.starts_with("```")
+                        || content.trim_ascii().is_empty()
+                        || content.starts_with(b"@")
+                        || content.starts_with(b"```")
                         || is_indented_line(content))
                 {
                     break;
                 }
 
                 if !text_content.is_empty() {
-                    text_content.push('\n');
+                    text_content.push(b'\n');
                 }
 
-                text_content.push_str(content);
+                text_content.extend_from_slice(content);
                 end_span = *span;
                 i += 1;
 
-                for ch in content.chars() {
-                    match ch {
-                        '{' => open_braces += 1,
-                        '}' => open_braces = open_braces.saturating_sub(1),
+                for &b in *content {
+                    match b {
+                        b'{' => open_braces += 1,
+                        b'}' => open_braces = open_braces.saturating_sub(1),
                         _ => {}
                     }
                 }
@@ -315,7 +313,7 @@ fn parse_text<'arena>(
             Token::EmptyLine { .. } => {
                 if open_braces > 0 {
                     if !text_content.is_empty() {
-                        text_content.push('\n');
+                        text_content.push(b'\n');
                     }
                     end_span = tokens[i].span();
                     i += 1;
@@ -326,9 +324,8 @@ fn parse_text<'arena>(
         }
     }
 
-    // Now parse text_content into TextSegments
     let text_span = Span::new(start_span.file_id, start_span.start, end_span.end);
-    let segments = parse_text_segments(arena.alloc_str(&text_content), text_span, arena)?;
+    let segments = parse_text_segments(arena.alloc_slice_copy(&text_content), text_span, arena)?;
 
     let text = Text { span: text_span, segments };
 
@@ -336,147 +333,128 @@ fn parse_text<'arena>(
 }
 
 fn parse_text_segments<'arena>(
-    text_content: &'arena str,
+    text_content: &'arena [u8],
     base_span: Span,
     arena: &'arena Bump,
 ) -> Result<Vec<'arena, TextSegment<'arena>>, ParseError> {
     let mut segments = Vec::new_in(arena);
-    let mut char_indices = text_content.char_indices().peekable();
+    let mut i = 0usize;
+    let len = text_content.len();
 
-    while let Some((start_pos, ch)) = char_indices.peek().copied() {
-        if ch == '`' {
-            let is_start = start_pos == 0;
-            let is_prev_whitespace = if start_pos > 0 {
-                text_content[..start_pos].chars().next_back().is_some_and(|c| c.is_ascii_whitespace())
-            } else {
-                false
-            };
+    while i < len {
+        let ch = text_content[i];
+
+        if ch == b'`' {
+            let is_start = i == 0;
+            let is_prev_whitespace = i > 0 && text_content[i - 1].is_ascii_whitespace();
 
             if is_start || is_prev_whitespace {
                 let mut backtick_count = 0;
-                let mut end_pos = start_pos;
+                let mut end_pos = i;
 
-                while let Some((idx, ch)) = char_indices.peek() {
-                    if *ch == '`' {
-                        backtick_count += 1;
-                        end_pos = *idx + ch.len_utf8();
-                        char_indices.next();
-                    } else {
-                        break;
-                    }
+                while end_pos < len && text_content[end_pos] == b'`' {
+                    backtick_count += 1;
+                    end_pos += 1;
                 }
 
-                let backticks = "`".repeat(backtick_count);
                 let code_start_pos = end_pos;
+                let backticks_slice = &text_content[i..end_pos];
 
+                let mut search_pos = end_pos;
                 let mut code_end_pos = None;
-                while let Some((idx, _)) = char_indices.peek() {
-                    if text_content[*idx..].starts_with(&backticks) {
-                        code_end_pos = Some(*idx);
-                        for _ in 0..backtick_count {
-                            char_indices.next();
-                        }
+                while search_pos < len {
+                    if text_content[search_pos..].starts_with(backticks_slice) {
+                        code_end_pos = Some(search_pos);
                         break;
                     }
-                    char_indices.next();
+                    search_pos += 1;
                 }
 
-                if let Some(code_end_pos) = code_end_pos {
-                    let code_content = &text_content[code_start_pos..code_end_pos];
-                    let code_span = base_span.subspan(start_pos as u32, code_end_pos as u32 + backtick_count as u32);
+                if let Some(code_end) = code_end_pos {
+                    let code_content = &text_content[code_start_pos..code_end];
+                    let code_span = base_span.subspan(i as u32, code_end as u32 + backtick_count as u32);
 
                     let code = Code { span: code_span, directives: Vec::new_in(arena), content: code_content };
 
                     segments.push(TextSegment::InlineCode(code));
+                    i = code_end + backtick_count;
                 } else {
-                    return Err(ParseError::UnclosedInlineCode(
-                        base_span.subspan(start_pos as u32, base_span.length()),
-                    ));
+                    return Err(ParseError::UnclosedInlineCode(base_span.subspan(i as u32, base_span.length())));
                 }
                 continue;
             }
         }
 
-        if text_content[start_pos..].starts_with("{@") {
-            let is_start = start_pos == 0;
-            let is_prev_whitespace = if start_pos > 0 {
-                text_content[..start_pos].chars().next_back().is_some_and(|c| c.is_ascii_whitespace())
-            } else {
-                false
-            };
+        if text_content[i..].starts_with(b"{@") {
+            let is_start = i == 0;
+            let is_prev_whitespace = i > 0 && text_content[i - 1].is_ascii_whitespace();
 
             if is_start || is_prev_whitespace {
-                let tag_start_pos = start_pos;
-                char_indices.next(); // Skip '{'
-                char_indices.next(); // Skip '@'
-
+                let tag_start_pos = i;
                 let tag_content_start = tag_start_pos + 2;
+                let mut search_pos = tag_content_start;
                 let mut tag_end_pos = None;
-                for (idx, ch) in char_indices.by_ref() {
-                    if ch == '}' {
-                        tag_end_pos = Some(idx);
+                while search_pos < len {
+                    if text_content[search_pos] == b'}' {
+                        tag_end_pos = Some(search_pos);
                         break;
                     }
+                    search_pos += 1;
                 }
 
-                if let Some(tag_end_pos) = tag_end_pos {
-                    let tag_content = &text_content[tag_content_start..tag_end_pos];
-                    let tag_span = base_span.subspan(tag_start_pos as u32, tag_end_pos as u32 + 1);
+                if let Some(tag_end) = tag_end_pos {
+                    let tag_content = &text_content[tag_content_start..tag_end];
+                    let tag_span = base_span.subspan(tag_start_pos as u32, tag_end as u32 + 1);
                     let tag = parse_inline_tag(tag_content, tag_span);
                     segments.push(TextSegment::InlineTag(tag));
+                    i = tag_end + 1;
                 } else {
-                    // Unclosed inline tag
-                    return Err(ParseError::UnclosedInlineTag(base_span.subspan(start_pos as u32, base_span.length())));
+                    return Err(ParseError::UnclosedInlineTag(base_span.subspan(i as u32, base_span.length())));
                 }
                 continue;
             }
         }
 
-        let paragraph_start_pos = start_pos;
-        let mut paragraph_end_pos = start_pos;
+        let paragraph_start_pos = i;
+        let mut paragraph_end_pos = i;
 
-        while let Some((idx, ch)) = char_indices.peek().copied() {
-            let is_code_start = ch == '`' && {
+        while paragraph_end_pos < len {
+            let idx = paragraph_end_pos;
+            let cur = text_content[idx];
+
+            let is_code_start = cur == b'`' && {
                 let is_start = idx == 0;
-                let is_prev_whitespace = if idx > 0 {
-                    text_content[..idx].chars().next_back().is_some_and(|c| c.is_ascii_whitespace())
-                } else {
-                    false
-                };
-
+                let is_prev_whitespace = idx > 0 && text_content[idx - 1].is_ascii_whitespace();
                 is_start || is_prev_whitespace
             };
 
-            let is_tag_start = text_content[idx..].starts_with("{@") && {
+            let is_tag_start = text_content[idx..].starts_with(b"{@") && {
                 let is_start = idx == 0;
-                let is_prev_whitespace = if idx > 0 {
-                    text_content[..idx].chars().next_back().is_some_and(|c| c.is_ascii_whitespace())
-                } else {
-                    false
-                };
-
+                let is_prev_whitespace = idx > 0 && text_content[idx - 1].is_ascii_whitespace();
                 is_start || is_prev_whitespace
             };
 
             if is_code_start || is_tag_start {
                 break;
             }
-            char_indices.next();
-            paragraph_end_pos = idx + ch.len_utf8();
+            paragraph_end_pos += 1;
         }
 
         let paragraph_content = &text_content[paragraph_start_pos..paragraph_end_pos];
 
         segments.push(TextSegment::Paragraph { span: base_span, content: paragraph_content });
+        i = paragraph_end_pos;
     }
 
     Ok(segments)
 }
 
-fn parse_inline_tag(tag_content: &str, span: Span) -> Tag<'_> {
-    let mut parts = tag_content.trim().splitn(2, char::is_whitespace);
-    let name = parts.next().unwrap_or("");
-    let description = parts.next().unwrap_or("");
+fn parse_inline_tag(tag_content: &[u8], span: Span) -> Tag<'_> {
+    let trimmed = tag_content.trim_ascii();
+    let (name, description) = match trimmed.iter().position(|b| b.is_ascii_whitespace()) {
+        Some(idx) => (&trimmed[..idx], trimmed[idx + 1..].trim_ascii_start()),
+        None => (trimmed, b"" as &[u8]),
+    };
 
     Tag {
         span,

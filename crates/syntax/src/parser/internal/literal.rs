@@ -37,9 +37,9 @@ impl<'arena> Parser<'_, 'arena> {
             T!["false"] => Literal::False(Keyword { span: token.span_for(self.stream.file_id()), value: token.value }),
             T!["null"] => Literal::Null(Keyword { span: token.span_for(self.stream.file_id()), value: token.value }),
             T![LiteralString] => Literal::String(LiteralString {
-                kind: if token.value.starts_with('"')
-                    || token.value.starts_with("b\"")
-                    || token.value.starts_with("B\"")
+                kind: if token.value.starts_with(b"\"")
+                    || token.value.starts_with(b"b\"")
+                    || token.value.starts_with(b"B\"")
                 {
                     LiteralStringKind::DoubleQuoted
                 } else {
@@ -50,13 +50,14 @@ impl<'arena> Parser<'_, 'arena> {
                 value: parse_literal_string_in(self.arena, token.value, None, true),
             }),
             T![PartialLiteralString] => {
-                let kind =
-                    if token.value.starts_with('"') || token.value.starts_with("b\"") || token.value.starts_with("B\"")
-                    {
-                        LiteralStringKind::DoubleQuoted
-                    } else {
-                        LiteralStringKind::SingleQuoted
-                    };
+                let kind = if token.value.starts_with(b"\"")
+                    || token.value.starts_with(b"b\"")
+                    || token.value.starts_with(b"B\"")
+                {
+                    LiteralStringKind::DoubleQuoted
+                } else {
+                    LiteralStringKind::SingleQuoted
+                };
 
                 return Err(ParseError::UnclosedLiteralString(kind, token.span_for(self.stream.file_id())));
             }

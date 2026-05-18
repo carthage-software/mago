@@ -18,7 +18,7 @@ pub fn check_literal(literal: &Literal, context: &mut Context<'_, '_, '_>) {
         _ => return,
     };
 
-    if !value.contains('_') {
+    if !value.contains(&b'_') {
         return;
     }
 

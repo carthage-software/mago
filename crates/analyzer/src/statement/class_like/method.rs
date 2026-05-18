@@ -1,7 +1,7 @@
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
 use mago_codex::context::ScopeContext;
+use mago_word::ascii_lowercase_word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use mago_codex::identifier::method::MethodIdentifier;
 
@@ -32,13 +32,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
         analyze_attributes(context, block_context, artifacts, self.attribute_lists.as_slice(), AttributeTarget::Method);
 
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {
-            tracing::error!("Attempted to analyze method `{}` without class-like context.", self.name.value);
+            tracing::error!(
+                "Attempted to analyze method `{}` without class-like context.",
+                mago_bytes::BytesDisplay(self.name.value)
+            );
 
             return Ok(());
         };
 
-        let method_name = atom(self.name.value);
-        let lowercase_method_name = ascii_lowercase_atom(self.name.value);
+        let method_name = word(self.name.value);
+        let lowercase_method_name = ascii_lowercase_word(self.name.value);
         if context.settings.diff
             && context.codebase.safe_symbol_members.contains(&(class_like_metadata.name, lowercase_method_name))
         {
@@ -50,7 +53,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
         else {
             tracing::error!(
                 "Failed to find method metadata for `{}` in class `{}`.",
-                self.name.value,
+                mago_bytes::BytesDisplay(self.name.value),
                 class_like_metadata.original_name
             );
 
@@ -101,7 +104,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             }
 
             if context.settings.find_unused_parameters
-                && !context.codebase.method_is_overriding(&class_like_metadata.name, &method_name)
+                && !context.codebase.method_is_overriding(class_like_metadata.name.as_bytes(), method_name.as_bytes())
             {
                 unused_parameter::check_unused_params(
                     method_metadata,
@@ -117,7 +120,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
             method_metadata,
             self.name.span(),
             "method",
-            concat_atom!(&class_like_metadata.original_name, "::", &method_name),
+            concat_word!(&class_like_metadata.original_name, "::", &method_name),
         );
 
         // Check for missing type hints

@@ -53,13 +53,13 @@ fn function_name_matches_any<'arena, 'name>(
     if context.is_name_imported(function_identifier) {
         let fqn = context.lookup_name(function_identifier);
 
-        return names.iter().find(|&name| fqn.eq_ignore_ascii_case(name)).copied();
+        return names.iter().find(|&name| fqn.eq_ignore_ascii_case(name.as_bytes())).copied();
     }
 
     // Case 2: Unqualified name. This matches calls in the global namespace
     // or provides a match for the global fallback.
     let unqualified_name = function_identifier.value();
-    if let Some(matched) = names.iter().find(|&name| unqualified_name.eq_ignore_ascii_case(name)) {
+    if let Some(matched) = names.iter().find(|&name| unqualified_name.eq_ignore_ascii_case(name.as_bytes())) {
         return Some(matched);
     }
 
@@ -68,14 +68,14 @@ fn function_name_matches_any<'arena, 'name>(
     if !context.scope.get_namespace().is_empty() {
         let fqn_in_namespace = context.lookup_name(function_identifier);
 
-        return names.iter().find(|&name| fqn_in_namespace.eq_ignore_ascii_case(name)).copied();
+        return names.iter().find(|&name| fqn_in_namespace.eq_ignore_ascii_case(name.as_bytes())).copied();
     }
 
     None
 }
 
 /// Gets the method name from a method call.
-pub fn get_method_name<'arena>(method_call: &MethodCall<'arena>) -> Option<&'arena str> {
+pub fn get_method_name<'arena>(method_call: &MethodCall<'arena>) -> Option<&'arena [u8]> {
     match &method_call.method {
         ClassLikeMemberSelector::Identifier(identifier) => Some(identifier.value),
         _ => None,
@@ -84,12 +84,12 @@ pub fn get_method_name<'arena>(method_call: &MethodCall<'arena>) -> Option<&'are
 
 /// Case-insensitive method name check (PHP methods are case-insensitive).
 pub fn method_name_equals(method_call: &MethodCall<'_>, name: &str) -> bool {
-    get_method_name(method_call).is_some_and(|n| n.eq_ignore_ascii_case(name))
+    get_method_name(method_call).is_some_and(|n| n.eq_ignore_ascii_case(name.as_bytes()))
 }
 
 /// Case-insensitive check against multiple method names.
 /// Returns the matched name from the list if found.
 pub fn method_name_matches_any<'name>(method_call: &MethodCall<'_>, names: &[&'name str]) -> Option<&'name str> {
     let method_name = get_method_name(method_call)?;
-    names.iter().find(|&n| method_name.eq_ignore_ascii_case(n)).copied()
+    names.iter().find(|&n| method_name.eq_ignore_ascii_case(n.as_bytes())).copied()
 }

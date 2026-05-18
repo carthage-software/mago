@@ -41,12 +41,12 @@ impl<'ctx, 'ast, 'arena> Context<'ctx, 'ast, 'arena> {
     }
 
     #[inline]
-    pub fn get_name(&self, position: Position) -> &'arena str {
+    pub fn get_name(&self, position: Position) -> &'arena [u8] {
         self.names.get(&position)
     }
 
     #[inline]
-    pub fn get_code_snippet(&self, span: impl HasSpan) -> &'ctx str {
+    pub fn get_code_snippet(&self, span: impl HasSpan) -> &'ctx [u8] {
         let s = span.span();
 
         &self.source_file.contents[s.start.offset as usize..s.end.offset as usize]

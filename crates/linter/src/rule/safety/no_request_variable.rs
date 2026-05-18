@@ -17,7 +17,7 @@ use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
-const REQUEST_VARIABLE: &str = "$_REQUEST";
+const REQUEST_VARIABLE: &[u8] = b"$_REQUEST";
 
 #[derive(Debug, Clone)]
 pub struct NoRequestVariableRule {

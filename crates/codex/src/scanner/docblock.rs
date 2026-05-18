@@ -270,11 +270,10 @@ impl ClassLikeDocblockComment {
                     has_consistent_templates = true;
                 }
                 TagKind::RequireExtends | TagKind::PhpstanRequireExtends | TagKind::PsalmRequireExtends => {
-                    require_extends.push(TypeString { value: tag.description.to_string(), span: tag.description_span });
+                    require_extends.push(TypeString { value: tag.description.to_vec(), span: tag.description_span });
                 }
                 TagKind::RequireImplements | TagKind::PhpstanRequireImplements | TagKind::PsalmRequireImplements => {
-                    require_implements
-                        .push(TypeString { value: tag.description.to_string(), span: tag.description_span });
+                    require_implements.push(TypeString { value: tag.description.to_vec(), span: tag.description_span });
                 }
                 TagKind::Method | TagKind::PsalmMethod => {
                     let method = parse_method_tag(tag.description, tag.description_span)?;

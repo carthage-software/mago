@@ -18,17 +18,17 @@ impl<'arena> Parser<'_, 'arena> {
         let mut only_keyword = None;
         if !self.stream.is_block_end()? {
             variables = Some(self.parse_expression()?);
-            only_keyword = self.try_consume_name_keyword("only")?;
+            only_keyword = self.try_consume_name_keyword(b"only")?;
         }
         let close_tag = self.stream.expect_block_end()?;
-        let body = self.parse_statements(&BlockTerminator { names: &["endwith"] })?;
+        let body = self.parse_statements(&BlockTerminator { names: &[b"endwith"] })?;
         let end_open_tok = self.stream.expect_block_start()?;
         let end_open_tag = self.stream.span_of(&end_open_tok);
-        let end_kw_tok = self.stream.expect_name("expected `endwith`")?;
-        if end_kw_tok.value != "endwith" {
+        let end_kw_tok = self.stream.expect_name(b"expected `endwith`")?;
+        if end_kw_tok.value != b"endwith" {
             return Err(ParseError::MismatchedEndTag {
-                expected: "endwith".to_string(),
-                got: end_kw_tok.value.to_string(),
+                expected: b"endwith".to_vec(),
+                got: end_kw_tok.value.to_vec(),
                 span: self.stream.span_of(&end_kw_tok),
             });
         }

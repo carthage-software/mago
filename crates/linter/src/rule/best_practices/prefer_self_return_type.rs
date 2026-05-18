@@ -134,12 +134,12 @@ impl LintRule for PreferSelfReturnTypeRule {
 }
 
 impl PreferSelfReturnTypeRule {
-    fn check_hint<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, class_fqn: &str, hint: &Hint<'arena>) {
+    fn check_hint<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, class_fqn: &[u8], hint: &Hint<'arena>) {
         match hint {
             Hint::Identifier(identifier) => {
                 let resolved = ctx.lookup_name(identifier);
                 if resolved.eq_ignore_ascii_case(class_fqn) {
-                    let used = identifier.value();
+                    let used = mago_bytes::BytesDisplay(identifier.value());
                     let issue = Issue::new(
                         self.cfg.level(),
                         format!("Return type `{used}` refers to the enclosing class; use `self` instead."),

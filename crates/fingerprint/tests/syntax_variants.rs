@@ -5,9 +5,9 @@ use mago_fingerprint::Fingerprintable;
 use mago_names::resolver::NameResolver;
 use mago_syntax::parser::parse_file;
 
-fn fingerprint_code(code: &'static str) -> u64 {
+fn fingerprint_code(code: &'static [u8]) -> u64 {
     let arena = Bump::new();
-    let file = File::ephemeral("test.php".into(), code.into());
+    let file = File::ephemeral(b"test.php".into(), code.into());
     let program = parse_file(&arena, &file);
     assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
     let resolved_names = NameResolver::new(&arena).resolve(program);
@@ -17,8 +17,8 @@ fn fingerprint_code(code: &'static str) -> u64 {
 
 #[test]
 fn test_anonymous_class_with_without_parens_normalized() {
-    let without_parens = fingerprint_code("<?php $a = new class {};");
-    let with_parens = fingerprint_code("<?php $a = new class() {};");
+    let without_parens = fingerprint_code(b"<?php $a = new class {};");
+    let with_parens = fingerprint_code(b"<?php $a = new class() {};");
 
     assert_eq!(
         without_parens, with_parens,
@@ -28,8 +28,8 @@ fn test_anonymous_class_with_without_parens_normalized() {
 
 #[test]
 fn test_regular_instantiation_with_without_parens_normalized() {
-    let without_parens = fingerprint_code("<?php $a = new Foo;");
-    let with_empty_parens = fingerprint_code("<?php $a = new Foo();");
+    let without_parens = fingerprint_code(b"<?php $a = new Foo;");
+    let with_empty_parens = fingerprint_code(b"<?php $a = new Foo();");
 
     assert_eq!(
         without_parens, with_empty_parens,
@@ -39,16 +39,16 @@ fn test_regular_instantiation_with_without_parens_normalized() {
 
 #[test]
 fn test_array_syntax_normalized() {
-    let short = fingerprint_code("<?php $a = [1, 2, 3];");
-    let legacy = fingerprint_code("<?php $a = array(1, 2, 3);");
+    let short = fingerprint_code(b"<?php $a = [1, 2, 3];");
+    let legacy = fingerprint_code(b"<?php $a = array(1, 2, 3);");
 
     assert_eq!(short, legacy, "Short array and legacy array syntax should have same fingerprint");
 }
 
 #[test]
 fn test_attribute_with_without_parens() {
-    let without_parens = fingerprint_code("<?php #[Foo] function bar() {}");
-    let with_empty_parens = fingerprint_code("<?php #[Foo()] function bar() {}");
+    let without_parens = fingerprint_code(b"<?php #[Foo] function bar() {}");
+    let with_empty_parens = fingerprint_code(b"<?php #[Foo()] function bar() {}");
 
     assert_eq!(
         without_parens, with_empty_parens,
@@ -58,24 +58,24 @@ fn test_attribute_with_without_parens() {
 
 #[test]
 fn test_attribute_with_args_vs_without() {
-    let without_args = fingerprint_code("<?php #[Foo()] function bar() {}");
-    let with_args = fingerprint_code("<?php #[Foo(1)] function bar() {}");
+    let without_args = fingerprint_code(b"<?php #[Foo()] function bar() {}");
+    let with_args = fingerprint_code(b"<?php #[Foo(1)] function bar() {}");
 
     assert_ne!(without_args, with_args, "Attributes with different arguments should have different fingerprints");
 }
 
 #[test]
 fn test_instantiation_with_args_vs_empty_parens() {
-    let empty_parens = fingerprint_code("<?php $a = new Foo();");
-    let with_args = fingerprint_code("<?php $a = new Foo(1);");
+    let empty_parens = fingerprint_code(b"<?php $a = new Foo();");
+    let with_args = fingerprint_code(b"<?php $a = new Foo(1);");
 
     assert_ne!(empty_parens, with_args, "Instantiation with arguments should differ from empty parentheses");
 }
 
 #[test]
 fn test_instantiation_no_parens_vs_with_args() {
-    let no_parens = fingerprint_code("<?php $a = new Foo;");
-    let with_args = fingerprint_code("<?php $a = new Foo(1);");
+    let no_parens = fingerprint_code(b"<?php $a = new Foo;");
+    let with_args = fingerprint_code(b"<?php $a = new Foo(1);");
 
     assert_ne!(no_parens, with_args, "Instantiation without parens should differ from instantiation with arguments");
 }

@@ -95,10 +95,10 @@ impl LintRule for NoTrailingSpaceRule {
             let comment_span = trivia.span();
             let value = trivia.value;
 
-            for line in value.lines() {
-                let offset = (line.as_ptr() as usize) - (value.as_ptr() as usize);
-                let trimmed = line.trim_end();
-                let trimmed_length = trimmed.len();
+            for raw_line in value.split(|&b| b == b'\n') {
+                let offset = (raw_line.as_ptr() as usize) - (value.as_ptr() as usize);
+                let line = if raw_line.last() == Some(&b'\r') { &raw_line[..raw_line.len() - 1] } else { raw_line };
+                let trimmed_length = line.iter().rposition(|&b| !matches!(b, b' ' | b'\t')).map_or(0, |i| i + 1);
                 let trailing_whitespace_length = line.len() - trimmed_length;
                 if trailing_whitespace_length > 0 {
                     let whitespace_start = offset + trimmed_length;

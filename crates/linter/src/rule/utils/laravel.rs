@@ -10,12 +10,12 @@ pub fn is_within_controller(context: &LintContext<'_, '_>) -> bool {
         return false;
     };
 
-    classname.ends_with("Controller")
+    classname.ends_with(b"Controller")
 }
 
 pub fn is_this(expression: &Expression<'_>) -> bool {
     if let Expression::Variable(Variable::Direct(var)) = expression {
-        var.name.eq_ignore_ascii_case("$this")
+        var.name.eq_ignore_ascii_case(b"$this")
     } else {
         false
     }
@@ -23,7 +23,7 @@ pub fn is_this(expression: &Expression<'_>) -> bool {
 
 pub fn is_method_named(member: &ClassLikeMemberSelector<'_>, name: &str) -> bool {
     match member {
-        ClassLikeMemberSelector::Identifier(method) => method.value.eq_ignore_ascii_case(name),
+        ClassLikeMemberSelector::Identifier(method) => method.value.eq_ignore_ascii_case(name.as_bytes()),
         _ => false,
     }
 }

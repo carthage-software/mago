@@ -30,7 +30,7 @@ use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
-const STRICT_TYPES_DIRECTIVE: &str = "strict_types";
+const STRICT_TYPES_DIRECTIVE: &[u8] = b"strict_types";
 
 #[derive(Debug, Clone)]
 pub struct StrictTypesRule {
@@ -178,7 +178,7 @@ impl LintRule for StrictTypesRule {
                     first_statement = if let Some(statement) = program.statements.get(1) {
                         statement
                     } else {
-                        let ends_in_newline = value.ends_with('\n');
+                        let ends_in_newline = value.ends_with(b"\n");
 
                         // If there are no statements after the shebang, insert an opening tag and declare statement.
                         let content = if ends_in_newline {
@@ -197,7 +197,7 @@ impl LintRule for StrictTypesRule {
                 match first_statement {
                     Statement::Inline(inline) => {
                         // If the first statement is an inline statement, insert the declare statement before it.
-                        let starts_with_newline = inline.value.starts_with('\n');
+                        let starts_with_newline = inline.value.starts_with(b"\n");
                         let content = if starts_with_newline {
                             "<?php\n\ndeclare(strict_types=1);\n\n?>"
                         } else {

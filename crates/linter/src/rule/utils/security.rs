@@ -43,13 +43,13 @@ pub fn is_variable_user_input(variable: &Variable<'_>) -> bool {
         Variable::Direct(direct_variable) => {
             let name = direct_variable.name;
 
-            name.eq_ignore_ascii_case("$_GET")
-                || name.eq_ignore_ascii_case("$_POST")
-                || name.eq_ignore_ascii_case("$_REQUEST")
-                || name.eq_ignore_ascii_case("$_COOKIE")
-                || name.eq_ignore_ascii_case("$_FILES")
-                || name.eq_ignore_ascii_case("$_SERVER")
-                || name.eq_ignore_ascii_case("$_SESSION")
+            name.eq_ignore_ascii_case(b"$_GET")
+                || name.eq_ignore_ascii_case(b"$_POST")
+                || name.eq_ignore_ascii_case(b"$_REQUEST")
+                || name.eq_ignore_ascii_case(b"$_COOKIE")
+                || name.eq_ignore_ascii_case(b"$_FILES")
+                || name.eq_ignore_ascii_case(b"$_SERVER")
+                || name.eq_ignore_ascii_case(b"$_SESSION")
         }
         Variable::Indirect(indirect_variable) => is_user_input(indirect_variable.expression),
         Variable::Nested(nested_variable) => is_variable_user_input(nested_variable.variable),
@@ -160,31 +160,30 @@ pub fn is_password_literal<'arena>(literal: &'arena LiteralString<'arena>) -> bo
 
 #[inline]
 #[must_use]
-pub fn is_password(mut str: &str) -> bool {
-    // cli flags, e.g `$foo === '--password'` -> ignore
-    if str.starts_with("--") {
+pub fn is_password(mut str: &[u8]) -> bool {
+    if str.starts_with(b"--") {
         return false;
     }
 
-    if str.starts_with('$') {
+    if str.starts_with(b"$") {
         str = &str[1..];
     }
 
-    if str.starts_with("get") {
+    if str.starts_with(b"get") {
         str = &str[3..];
 
-        if str.starts_with('_') {
+        if str.starts_with(b"_") {
             str = &str[1..];
         }
     }
 
-    let lower = str.to_lowercase();
+    let lower = str.to_ascii_lowercase();
 
-    if lower.ends_with("password")
-        || lower.ends_with("token")
-        || lower.ends_with("secret")
-        || lower.ends_with("apikey")
-        || lower.ends_with("api_key")
+    if lower.ends_with(b"password")
+        || lower.ends_with(b"token")
+        || lower.ends_with(b"secret")
+        || lower.ends_with(b"apikey")
+        || lower.ends_with(b"api_key")
     {
         return true;
     }

@@ -1,3 +1,4 @@
+use mago_bytes::BytesDisplay;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -18,15 +19,17 @@ pub fn check_property(
     property: &Property,
     class_like_span: Span,
     class_like_kind: &str,
-    class_like_name: &str,
-    class_like_fqcn: &str,
+    class_like_name: &[u8],
+    class_like_fqcn: &[u8],
     class_like_is_interface: bool,
     class_like_is_abstract: bool,
     class_like_is_readonly: bool,
     context: &mut Context<'_, '_, '_>,
 ) {
+    let class_like_name = BytesDisplay(class_like_name);
+    let class_like_fqcn = BytesDisplay(class_like_fqcn);
     let first_variable = property.first_variable();
-    let first_variable_name = first_variable.name;
+    let first_variable_name = BytesDisplay(first_variable.name);
 
     let modifiers = property.modifiers();
     let mut last_final: Option<Span> = None;
@@ -424,7 +427,7 @@ pub fn check_property(
         }
 
         if hint.is_bottom() {
-            let hint_name = context.get_code_snippet(hint);
+            let hint_name = BytesDisplay(context.get_code_snippet(hint));
             context.report(
                 Issue::error(format!(
                     "Property `{class_like_name}::{first_variable_name}` cannot have type `{hint_name}`."
@@ -474,7 +477,7 @@ pub fn check_property(
 
             for item in &plain_property.items {
                 if let PropertyItem::Concrete(property_concrete_item) = &item {
-                    let item_name = property_concrete_item.variable.name;
+                    let item_name = BytesDisplay(property_concrete_item.variable.name);
 
                     if !property_concrete_item.value.is_constant(&context.version, false) {
                         context.report(
@@ -530,7 +533,7 @@ pub fn check_property(
                 context.report(issue);
             }
 
-            let item_name = hooked_property.item.variable().name;
+            let item_name = BytesDisplay(hooked_property.item.variable().name);
 
             if let Some(readonly) = last_readonly {
                 context.report(
@@ -648,10 +651,10 @@ pub fn check_property(
                 && let PropertyItem::Concrete(concrete_item) = &hooked_property.item
             {
                 let has_concrete_get = hooked_property.hook_list.hooks.iter().any(|hook| {
-                    hook.name.value.eq_ignore_ascii_case("get") && !matches!(hook.body, PropertyHookBody::Abstract(_))
+                    hook.name.value.eq_ignore_ascii_case(b"get") && !matches!(hook.body, PropertyHookBody::Abstract(_))
                 });
                 let has_concrete_set = hooked_property.hook_list.hooks.iter().any(|hook| {
-                    hook.name.value.eq_ignore_ascii_case("set") && !matches!(hook.body, PropertyHookBody::Abstract(_))
+                    hook.name.value.eq_ignore_ascii_case(b"set") && !matches!(hook.body, PropertyHookBody::Abstract(_))
                 });
 
                 if has_concrete_get && has_concrete_set {
@@ -681,10 +684,10 @@ pub fn check_property(
                 }
             }
 
-            let mut hook_names: Vec<(std::string::String, Span)> = vec![];
+            let mut hook_names: Vec<(Vec<u8>, Span)> = vec![];
             for hook in &hooked_property.hook_list.hooks {
-                let name = hook.name.value;
-                let lowered_name = name.to_ascii_lowercase();
+                let name = BytesDisplay(hook.name.value);
+                let lowered_name = hook.name.value.to_ascii_lowercase();
 
                 let invalid_modifiers: Vec<_> =
                     hook.modifiers.iter().filter(|m| !matches!(m, Modifier::Final(_))).collect();
@@ -765,10 +768,10 @@ pub fn check_property(
                 if let Some(parameter_list) = &hook.parameter_list {
                     check_for_promoted_properties_outside_constructor(parameter_list, context);
 
-                    match lowered_name.as_str() {
-                        "set" => {
+                    match lowered_name.as_slice() {
+                        b"set" => {
                             if let [first_parameter] = parameter_list.parameters.as_slice() {
-                                let first_parameter_name = first_parameter.variable.name;
+                                let first_parameter_name = BytesDisplay(first_parameter.variable.name);
 
                                 let property_has_type = hooked_property.hint.is_some();
 
@@ -942,7 +945,7 @@ pub fn check_property(
                                 );
                             }
                         }
-                        "get" => {
+                        b"get" => {
                             context.report(
                                 Issue::error(format!(
                                     "Hook `{name}` of property `{class_like_name}::{item_name}` must not have a parameters list."
@@ -970,7 +973,7 @@ pub fn check_property(
                     }
                 }
 
-                if !lowered_name.as_str().eq("set") && !lowered_name.as_str().eq("get") {
+                if !lowered_name.as_slice().eq(b"set") && !lowered_name.as_slice().eq(b"get") {
                     context.report(
                         Issue::error(format!(
                             "Hooked property `{class_like_name}::{item_name}` contains an unknown hook `{name}`, expected `set` or `get`."

@@ -88,7 +88,7 @@ impl LintRule for NoRedundantBinaryStringPrefixRule {
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let prefix_span = match node {
-            Node::LiteralString(literal) if (literal.raw.starts_with('b') || literal.raw.starts_with('B')) => {
+            Node::LiteralString(literal) if (literal.raw.starts_with(b"b") || literal.raw.starts_with(b"B")) => {
                 let span = literal.span();
                 Span { start: span.start, end: span.start.forward(1), ..span }
             }

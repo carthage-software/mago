@@ -51,15 +51,15 @@ impl<'arena> Parser<'_, 'arena> {
                 Hint::Identifier(self.parse_identifier()?)
             }
             T![Identifier] => match token.value {
-                val if val.eq_ignore_ascii_case("void") => Hint::Void(self.parse_local_identifier()?),
-                val if val.eq_ignore_ascii_case("never") => Hint::Never(self.parse_local_identifier()?),
-                val if val.eq_ignore_ascii_case("float") => Hint::Float(self.parse_local_identifier()?),
-                val if val.eq_ignore_ascii_case("bool") => Hint::Bool(self.parse_local_identifier()?),
-                val if val.eq_ignore_ascii_case("int") => Hint::Integer(self.parse_local_identifier()?),
-                val if val.eq_ignore_ascii_case("string") => Hint::String(self.parse_local_identifier()?),
-                val if val.eq_ignore_ascii_case("object") => Hint::Object(self.parse_local_identifier()?),
-                val if val.eq_ignore_ascii_case("mixed") => Hint::Mixed(self.parse_local_identifier()?),
-                val if val.eq_ignore_ascii_case("iterable") => Hint::Iterable(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case(b"void") => Hint::Void(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case(b"never") => Hint::Never(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case(b"float") => Hint::Float(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case(b"bool") => Hint::Bool(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case(b"int") => Hint::Integer(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case(b"string") => Hint::String(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case(b"object") => Hint::Object(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case(b"mixed") => Hint::Mixed(self.parse_local_identifier()?),
+                val if val.eq_ignore_ascii_case(b"iterable") => Hint::Iterable(self.parse_local_identifier()?),
                 _ => Hint::Identifier(self.parse_identifier()?),
             },
             _ => {

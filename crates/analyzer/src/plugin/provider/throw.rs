@@ -5,8 +5,8 @@
 
 use foldhash::HashSet;
 
-use mago_atom::Atom;
 use mago_syntax::ast::Expression;
+use mago_word::Word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -27,7 +27,7 @@ pub trait ExpressionThrowTypeProvider: Provider {
         &self,
         context: &ProviderContext<'_, '_, '_>,
         expression: &Expression<'_>,
-    ) -> HashSet<Atom>;
+    ) -> HashSet<Word>;
 }
 
 /// Provider for getting thrown exception class names from function calls.
@@ -45,7 +45,7 @@ pub trait FunctionThrowTypeProvider: Provider {
         &self,
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
-    ) -> HashSet<Atom>;
+    ) -> HashSet<Word>;
 }
 
 /// Provider for getting thrown exception class names from method calls.
@@ -62,8 +62,8 @@ pub trait MethodThrowTypeProvider: Provider {
     fn get_thrown_exceptions(
         &self,
         context: &ProviderContext<'_, '_, '_>,
-        class_name: &str,
-        method_name: &str,
+        class_name: &[u8],
+        method_name: &[u8],
         invocation: &InvocationInfo<'_, '_, '_>,
-    ) -> HashSet<Atom>;
+    ) -> HashSet<Word>;
 }

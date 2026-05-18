@@ -10,7 +10,7 @@ pub struct Verbatim<'arena> {
     pub open_tag: Span,
     pub keyword: Keyword<'arena>,
     pub close_tag: Span,
-    pub body: &'arena str,
+    pub body: &'arena [u8],
     pub end_open_tag: Span,
     pub end_keyword: Keyword<'arena>,
     pub end_close_tag: Span,

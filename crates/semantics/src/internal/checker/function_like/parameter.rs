@@ -1,3 +1,4 @@
+use mago_bytes::BytesDisplay;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -13,8 +14,8 @@ pub fn check_parameter_list(
     function_like_parameter_list: &FunctionLikeParameterList,
     context: &mut Context<'_, '_, '_>,
 ) {
-    let mut last_variadic = None;
-    let mut parameters_seen: Vec<(&str, Span)> = vec![];
+    let mut last_variadic: Option<(&[u8], Span)> = None;
+    let mut parameters_seen: Vec<(&[u8], Span)> = vec![];
     for parameter in &function_like_parameter_list.parameters {
         if parameter.is_promoted_property() && !context.version.is_supported(Feature::PromotedProperties) {
             context.report(
@@ -24,9 +25,10 @@ pub fn check_parameter_list(
             );
         }
 
-        let name = parameter.variable.name;
+        let name_bytes = parameter.variable.name;
+        let name = BytesDisplay(name_bytes);
         if let Some(prev_span) =
-            parameters_seen.iter().find_map(|(n, s)| if parameter.variable.name.eq(*n) { Some(s) } else { None })
+            parameters_seen.iter().find_map(|(n, s)| if name_bytes.eq(*n) { Some(s) } else { None })
         {
             context.report(
                 Issue::error(format!("Parameter `{name}` is already defined."))
@@ -40,7 +42,7 @@ pub fn check_parameter_list(
                     .with_help("Ensure all parameter names are unique within the parameter list."),
             );
         } else if !parameter.is_promoted_property() {
-            parameters_seen.push((parameter.variable.name, parameter.variable.span()));
+            parameters_seen.push((name_bytes, parameter.variable.span()));
         }
 
         let mut last_readonly = None;
@@ -49,11 +51,12 @@ pub fn check_parameter_list(
         for modifier in &parameter.modifiers {
             match &modifier {
                 Modifier::Static(keyword) | Modifier::Final(keyword) | Modifier::Abstract(keyword) => {
+                    let kw = BytesDisplay(keyword.value);
                     context.report(
-                        Issue::error(format!("Parameter `{}` cannot have the `{}` modifier.", name, keyword.value))
+                        Issue::error(format!("Parameter `{name}` cannot have the `{kw}` modifier."))
                             .with_annotation(
                                 Annotation::primary(modifier.span())
-                                    .with_message(format!("Invalid `{}` modifier used here.", keyword.value)),
+                                    .with_message(format!("Invalid `{kw}` modifier used here.")),
                             )
                             .with_annotation(
                                 Annotation::secondary(parameter.variable.span)
@@ -119,6 +122,7 @@ pub fn check_parameter_list(
         }
 
         if let Some((n, s)) = last_variadic {
+            let n = BytesDisplay(n);
             context.report(
                 Issue::error(format!(
                     "Invalid parameter order: parameter `{name}` is defined after variadic parameter `{n}`.",
@@ -152,13 +156,13 @@ pub fn check_parameter_list(
                 );
             }
 
-            last_variadic = Some((parameter.variable.name, parameter.span()));
+            last_variadic = Some((name_bytes, parameter.span()));
             continue;
         }
 
         if let Some(hint) = &parameter.hint {
             if hint.is_bottom() {
-                let hint_name = context.get_code_snippet(hint);
+                let hint_name = BytesDisplay(context.get_code_snippet(hint));
 
                 context.report(
                     Issue::error(format!(

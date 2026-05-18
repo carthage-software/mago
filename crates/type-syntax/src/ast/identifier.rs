@@ -9,7 +9,7 @@ use crate::token::TypeToken;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Identifier<'arena> {
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 impl HasSpan for Identifier<'_> {
@@ -29,6 +29,6 @@ impl<'arena> Identifier<'arena> {
 
 impl std::fmt::Display for Identifier<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value)
+        f.write_str(&String::from_utf8_lossy(self.value))
     }
 }

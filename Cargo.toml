@@ -162,7 +162,8 @@ mago-docblock = { path = "crates/docblock", version = "1.27.1" }
 mago-text-edit = { path = "crates/text-edit", version = "1.27.1" }
 mago-formatter = { path = "crates/formatter", version = "1.27.1" }
 mago-fingerprint = { path = "crates/fingerprint", version = "1.27.1" }
-mago-atom = { path = "crates/atom", version = "1.27.1" }
+mago-word = { path = "crates/word", version = "1.27.1" }
+mago-bytes = { path = "crates/bytes", version = "1.27.1" }
 mago-linter = { path = "crates/linter", version = "1.27.1" }
 mago-names = { path = "crates/names", version = "1.27.1" }
 mago-reporting = { path = "crates/reporting", version = "1.27.1" }
@@ -243,7 +244,8 @@ pulldown-cmark = "0.13"
 tera = "1.20"
 
 [dependencies]
-mago-atom = { workspace = true }
+mago-word = { workspace = true }
+mago-bytes = { workspace = true }
 mago-syntax = { workspace = true }
 mago-syntax-core = { workspace = true }
 mago-reporting = { workspace = true }
@@ -292,6 +294,7 @@ dhat = { workspace = true, optional = true }
 schemars = { workspace = true }
 foldhash = { workspace = true, optional = true }
 xxhash-rust = { workspace = true, optional = true }
+memchr = { workspace = true, optional = true }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-util", "sync", "time", "signal"], optional = true }
 tower-lsp = { version = "0.20", optional = true }
 
@@ -319,6 +322,7 @@ language-server = [
     "dep:tokio",
     "dep:foldhash",
     "dep:xxhash-rust",
+    "dep:memchr",
     "dep:mago-semantics",
     "dep:mago-span",
 ]

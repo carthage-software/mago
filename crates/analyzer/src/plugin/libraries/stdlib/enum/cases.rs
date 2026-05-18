@@ -20,7 +20,7 @@ static META: ProviderMeta =
     ProviderMeta::new("php::enum::cases", "UnitEnum::cases", "Returns non-empty-list for enums with at least one case");
 
 // Use wildcard for class since all enums implement UnitEnum
-static TARGETS: [MethodTarget; 1] = [MethodTarget::any_class("cases")];
+static TARGETS: [MethodTarget; 1] = [MethodTarget::any_class(b"cases")];
 
 /// Provider for the `UnitEnum::cases()` method.
 ///
@@ -43,8 +43,8 @@ impl MethodReturnTypeProvider for EnumCasesProvider {
     fn get_return_type(
         &self,
         _context: &ProviderContext<'_, '_, '_>,
-        _class_name: &str,
-        _method_name: &str,
+        _class_name: &[u8],
+        _method_name: &[u8],
         invocation_info: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
         let class_metadata = invocation_info.invocation.target.get_method_context()?.class_like_metadata;

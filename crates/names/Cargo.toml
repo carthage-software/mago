@@ -19,3 +19,4 @@ serde = { workspace = true }
 strum = { workspace = true }
 foldhash = { workspace = true }
 bumpalo = { workspace = true }
+memchr = { workspace = true }

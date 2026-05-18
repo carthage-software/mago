@@ -1,7 +1,7 @@
 use foldhash::HashMap;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
@@ -17,9 +17,9 @@ pub fn inherit_methods_from_parent(
     let class_like_name = metadata.name;
     let parent_is_trait = parent_metadata.kind.is_trait();
 
-    let reverse_alias_map: Option<HashMap<Atom, Vec<Atom>>> = if parent_is_trait && !metadata.trait_alias_map.is_empty()
+    let reverse_alias_map: Option<HashMap<Word, Vec<Word>>> = if parent_is_trait && !metadata.trait_alias_map.is_empty()
     {
-        let mut map: HashMap<Atom, Vec<Atom>> = HashMap::default();
+        let mut map: HashMap<Word, Vec<Word>> = HashMap::default();
         for (original, alias) in metadata.get_trait_alias_map() {
             map.entry(*original).or_default().push(*alias);
         }
@@ -29,7 +29,7 @@ pub fn inherit_methods_from_parent(
     };
 
     for (method_name_lc, appearing_method_id) in &parent_metadata.appearing_method_ids {
-        let mut process_name = |aliased_method_name: Atom| {
+        let mut process_name = |aliased_method_name: Word| {
             if metadata.has_appearing_method(aliased_method_name) {
                 return;
             }
@@ -51,7 +51,7 @@ pub fn inherit_methods_from_parent(
     }
 
     for (method_name_lc, declaring_method_id) in &parent_metadata.inheritable_method_ids {
-        if !method_name_lc.eq(&atom("__construct")) || parent_metadata.flags.has_consistent_constructor() {
+        if !method_name_lc.eq(&word("__construct")) || parent_metadata.flags.has_consistent_constructor() {
             if parent_is_trait {
                 let declaring_class = declaring_method_id.get_class_name();
 
@@ -74,7 +74,7 @@ pub fn inherit_methods_from_parent(
             }
         }
 
-        let process_name = |aliased_method_name: Atom, metadata: &mut ClassLikeMetadata| {
+        let process_name = |aliased_method_name: Word, metadata: &mut ClassLikeMetadata| {
             if let Some(implementing_method_id) = metadata.declaring_method_ids.get(&aliased_method_name) {
                 let implementing_class = implementing_method_id.get_class_name();
                 let implementing_method_name = implementing_method_id.get_method_name();
@@ -87,8 +87,9 @@ pub fn inherit_methods_from_parent(
                         .is_some_and(|m| m.flags.is_magic_method());
 
                 if !is_existing_pseudo_from_trait
-                    && (!codebase.method_is_abstract(&implementing_class, &implementing_method_name)
-                        || *implementing_class == class_like_name)
+                    && (!codebase
+                        .method_is_abstract(implementing_class.as_bytes(), implementing_method_name.as_bytes())
+                        || implementing_class == class_like_name)
                 {
                     return;
                 }

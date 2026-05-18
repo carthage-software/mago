@@ -269,7 +269,7 @@ fn gather_and_compute_halstead(node: Node<'_, '_>) -> HalsteadMetrics {
 struct Operator(NodeKind);
 
 #[derive(Debug, Hash, Eq, PartialEq)]
-struct Operand<'arena>(&'arena str);
+struct Operand<'arena>(&'arena [u8]);
 
 #[inline]
 fn gather_operators_and_operands<'arena>(node: Node<'_, 'arena>) -> (Vec<Operator>, Vec<Operand<'arena>>) {

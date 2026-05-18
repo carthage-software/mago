@@ -10,9 +10,6 @@ use mago_algebra::assertion_set::add_and_assertion;
 use mago_algebra::assertion_set::add_and_clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
@@ -33,6 +30,9 @@ use mago_syntax::ast::Argument;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Literal;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -57,9 +57,9 @@ pub fn post_invocation_process<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invoication: &Invocation<'ctx, '_, 'arena>,
-    this_variable: Option<&str>,
+    this_variable: Option<&[u8]>,
     template_result: &TemplateResult,
-    parameters: &AtomMap<TUnion>,
+    parameters: &WordMap<TUnion>,
     apply_assertions: bool,
 ) -> Result<(), AnalysisError> {
     update_by_reference_argument_types(context, block_context, artifacts, invoication, template_result, parameters)?;
@@ -81,7 +81,7 @@ pub fn post_invocation_process<'ctx, 'arena>(
         }
         FunctionLikeIdentifier::Method(class_name, method_name) => {
             let class_display =
-                context.codebase.get_class_like(class_name).map(|m| m.original_name).unwrap_or(*class_name);
+                context.codebase.get_class_like(class_name.as_bytes()).map(|m| m.original_name).unwrap_or(*class_name);
             let method_display = metadata.original_name.unwrap_or(*method_name);
 
             ("method", format!("`{class_display}::{method_display}`"))
@@ -91,7 +91,7 @@ pub fn post_invocation_process<'ctx, 'arena>(
             format!(
                 "defined at `{}:{}:{}`",
                 if *file_id == context.source_file.id {
-                    context.source_file.name.to_string()
+                    format!("{}", mago_bytes::BytesDisplay(&context.source_file.name))
                 } else {
                     format!("<file:{file_id}>")
                 },
@@ -238,10 +238,10 @@ fn apply_assertion_to_call_context<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
-    this_variable: Option<&str>,
-    assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
+    this_variable: Option<&[u8]>,
+    assertions: &BTreeMap<Word, Conjunction<Assertion>>,
     template_result: &TemplateResult,
-    parameters: &AtomMap<TUnion>,
+    parameters: &WordMap<TUnion>,
 ) {
     let type_assertions = resolve_invocation_assertion(
         context,
@@ -259,8 +259,8 @@ fn apply_assertion_to_call_context<'ctx, 'arena>(
         return;
     }
 
-    let referenced_variable_ids: AtomSet = type_assertions.keys().copied().collect();
-    let mut changed_variable_ids: AtomSet = AtomSet::default();
+    let referenced_variable_ids: WordSet = type_assertions.keys().copied().collect();
+    let mut changed_variable_ids: WordSet = WordSet::default();
     let mut active_type_assertions = IndexMap::new();
     for (variable, type_assertion) in &type_assertions {
         active_type_assertions.insert(*variable, (1..type_assertion.len()).collect());
@@ -285,7 +285,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
-    parameters: &AtomMap<TUnion>,
+    parameters: &WordMap<TUnion>,
 ) -> Result<(), AnalysisError> {
     let constraint_type = invocation.target.is_method_call();
 
@@ -397,7 +397,7 @@ fn update_by_reference_argument_types<'ctx, 'arena>(
 
 /// Records a by-reference mutation in the enclosing loop scope so the multi-pass
 /// analysis widens the variable's type on the next pass.
-fn record_by_reference_mutation_in_loop(artifacts: &mut AnalysisArtifacts, variable_id: Atom, new_type: Rc<TUnion>) {
+fn record_by_reference_mutation_in_loop(artifacts: &mut AnalysisArtifacts, variable_id: Word, new_type: Rc<TUnion>) {
     let Some(loop_scope) = artifacts.get_loop_scope_mut() else {
         return;
     };
@@ -419,7 +419,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
     context: &Context<'ctx, 'arena>,
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, '_, 'arena>,
-    receiver_variable: Option<&str>,
+    receiver_variable: Option<&[u8]>,
 ) {
     let metadata = invocation.target.get_function_like_metadata();
 
@@ -432,7 +432,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         return;
     }
 
-    let this_property_is_readonly = |property_name: &str| -> bool {
+    let this_property_is_readonly = |property_name: &[u8]| -> bool {
         let Some(class_metadata) = block_context.scope.get_class_like() else {
             return false;
         };
@@ -441,20 +441,20 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
             return true;
         }
 
-        let Some(property_metadata) = class_metadata.properties.get(&Atom::from(property_name)) else {
+        let Some(property_metadata) = class_metadata.properties.get(&Word::new(property_name)) else {
             return false;
         };
 
         property_metadata.flags.is_readonly()
     };
 
-    let preserves_this_property = |var_id: Atom| -> bool {
-        let s = var_id.as_str();
-        let Some(rest) = s.strip_prefix("$this->") else {
+    let preserves_this_property = |var_id: Word| -> bool {
+        let s = var_id.as_bytes();
+        let Some(rest) = s.strip_prefix(b"$this->") else {
             return false;
         };
 
-        if rest.contains("->") || rest.contains('[') {
+        if memchr::memmem::find(rest, b"->").is_some() || rest.contains(&b'[') {
             return false;
         }
 
@@ -471,7 +471,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
             .locals
             .keys()
             .copied()
-            .filter(|var_id| var_id.as_str().starts_with("$this->") && !preserves_this_property(*var_id))
+            .filter(|var_id| var_id.as_bytes().starts_with(b"$this->") && !preserves_this_property(*var_id))
             .collect();
 
         for key in &keys_to_remove {
@@ -484,7 +484,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
                     .possibilities
                     .keys()
                     .copied()
-                    .any(|k| k.as_str().starts_with("$this->") && !preserves_this_property(k))
+                    .any(|k| k.as_bytes().starts_with(b"$this->") && !preserves_this_property(k))
         });
 
         block_context.reconciled_expression_clauses.retain(|clause| {
@@ -493,16 +493,16 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
                     .possibilities
                     .keys()
                     .copied()
-                    .any(|k| k.as_str().starts_with("$this->") && !preserves_this_property(k))
+                    .any(|k| k.as_bytes().starts_with(b"$this->") && !preserves_this_property(k))
         });
     }
 
-    let is_self_method_call = matches!(receiver_variable, Some("$this"))
+    let is_self_method_call = matches!(receiver_variable, Some(v) if v == b"$this")
         && match invocation.target.get_function_like_identifier() {
             Some(FunctionLikeIdentifier::Method(class_name, _)) => block_context
                 .scope
                 .get_class_like_name()
-                .is_some_and(|current_class| current_class.as_str().eq_ignore_ascii_case(class_name.as_str())),
+                .is_some_and(|current_class| current_class.as_bytes().eq_ignore_ascii_case(class_name.as_bytes())),
             _ => false,
         };
 
@@ -511,7 +511,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
             .locals
             .keys()
             .copied()
-            .filter(|var_id| var_id.as_str().starts_with("$this->") && !preserves_this_property(*var_id))
+            .filter(|var_id| var_id.as_bytes().starts_with(b"$this->") && !preserves_this_property(*var_id))
             .collect();
 
         for key in &keys_to_remove {
@@ -524,7 +524,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
                     .possibilities
                     .keys()
                     .copied()
-                    .any(|k| k.as_str().starts_with("$this->") && !preserves_this_property(k))
+                    .any(|k| k.as_bytes().starts_with(b"$this->") && !preserves_this_property(k))
         });
 
         block_context.reconciled_expression_clauses.retain(|clause| {
@@ -533,7 +533,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
                     .possibilities
                     .keys()
                     .copied()
-                    .any(|k| k.as_str().starts_with("$this->") && !preserves_this_property(k))
+                    .any(|k| k.as_bytes().starts_with(b"$this->") && !preserves_this_property(k))
         });
     }
 
@@ -547,8 +547,8 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
             return false;
         }
 
-        if is_superglobal_name(var_id.as_str()) {
-            if let Some(declared) = crate::common::global::get_global_variable_type(var_id.as_str()) {
+        if is_superglobal_name(var_id.as_bytes()) {
+            if let Some(declared) = crate::common::global::get_global_variable_type(var_id.as_bytes()) {
                 *current_type = declared;
                 return true;
             }
@@ -559,8 +559,8 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         true
     });
 
-    let touches_superglobal = |var: Atom| {
-        let s = var.as_str();
+    let touches_superglobal = |var: Word| {
+        let s = var.as_bytes();
         is_superglobal_index_key(var) || is_superglobal_name(s)
     };
     block_context
@@ -576,7 +576,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
     if let Some(metadata) = metadata
         && !metadata.globals_accessed.is_empty()
     {
-        let mut touched_globals: foldhash::HashSet<Atom> = foldhash::HashSet::default();
+        let mut touched_globals: foldhash::HashSet<Word> = foldhash::HashSet::default();
         for name in &metadata.globals_accessed {
             if let Some(existing) = block_context.locals.get(name).cloned() {
                 let mut widened = (*existing).clone();
@@ -596,7 +596,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         }
     }
 
-    let mut this_escapes = matches!(receiver_variable, Some("$this"));
+    let mut this_escapes = matches!(receiver_variable, Some(v) if v == b"$this");
     let mut has_object_argument = false;
     for argument in invocation.arguments_source.iter_arguments() {
         let Some(expression) = argument.value() else {
@@ -612,7 +612,7 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
             continue;
         };
 
-        if argument_id.as_str() == "$this" {
+        if argument_id.as_bytes() == b"$this" {
             this_escapes = true;
         }
 
@@ -625,12 +625,12 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         return;
     }
 
-    let should_wipe = |var_id: Atom| -> bool {
+    let should_wipe = |var_id: Word| -> bool {
         if !is_property_or_index_key(var_id) {
             return false;
         }
 
-        if !this_escapes && var_id.as_str().starts_with("$this->") {
+        if !this_escapes && var_id.as_bytes().starts_with(b"$this->") {
             return false;
         }
 
@@ -645,27 +645,35 @@ fn clear_object_property_narrowings<'ctx, 'arena>(
         .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(should_wipe));
 }
 
-fn is_property_or_index_key(var_id: Atom) -> bool {
-    let s = var_id.as_str();
-    s.contains("->") || (s.starts_with('$') && s.contains('['))
+fn is_property_or_index_key(var_id: Word) -> bool {
+    let s = var_id.as_bytes();
+    memchr::memmem::find(s, b"->").is_some() || (s.starts_with(b"$") && s.contains(&b'['))
 }
 
 /// A variable ID like `$_SESSION['user_id']` - an index access rooted at a PHP
 /// superglobal. These are reachable from any function body, so a non-pure call
 /// might mutate them regardless of its arguments.
-fn is_superglobal_index_key(var_id: Atom) -> bool {
-    let s = var_id.as_str();
-    let Some(bracket_pos) = s.find('[') else {
+fn is_superglobal_index_key(var_id: Word) -> bool {
+    let s = var_id.as_bytes();
+    let Some(bracket_pos) = memchr::memchr(b'[', s) else {
         return false;
     };
 
     is_superglobal_name(&s[..bracket_pos])
 }
 
-fn is_superglobal_name(name: &str) -> bool {
+fn is_superglobal_name(name: &[u8]) -> bool {
     matches!(
         name,
-        "$_SESSION" | "$_GET" | "$_POST" | "$_COOKIE" | "$_SERVER" | "$_ENV" | "$_FILES" | "$_REQUEST" | "$GLOBALS"
+        b"$_SESSION"
+            | b"$_GET"
+            | b"$_POST"
+            | b"$_COOKIE"
+            | b"$_SERVER"
+            | b"$_ENV"
+            | b"$_FILES"
+            | b"$_REQUEST"
+            | b"$GLOBALS"
     )
 }
 
@@ -674,13 +682,13 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
-    this_variable: Option<&str>,
-    assertions: &BTreeMap<Atom, Conjunction<Assertion>>,
+    this_variable: Option<&[u8]>,
+    assertions: &BTreeMap<Word, Conjunction<Assertion>>,
     template_result: &TemplateResult,
-    parameters: &AtomMap<TUnion>,
+    parameters: &WordMap<TUnion>,
     is_unconditional_assert: bool,
-) -> IndexMap<Atom, AssertionSet> {
-    let mut type_assertions: IndexMap<Atom, AssertionSet> = IndexMap::new();
+) -> IndexMap<Word, AssertionSet> {
+    let mut type_assertions: IndexMap<Word, AssertionSet> = IndexMap::new();
     if assertions.is_empty() {
         return type_assertions;
     }
@@ -978,7 +986,7 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                         &context.settings.algebra_thresholds(),
                     );
 
-                    let (truths, _) = find_satisfying_assignments(&clauses, None, &mut AtomSet::default());
+                    let (truths, _) = find_satisfying_assignments(&clauses, None, &mut WordSet::default());
                     for (variable, assertions) in truths {
                         type_assertions.entry(variable).or_default().extend(assertions);
                     }
@@ -1011,7 +1019,7 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
 /// * `this_variable`: The name of the variable holding the object instance (`$this`), if any.
 ///
 /// # Returns
-/// A tuple `(Option<&'a Expression>, Option<Atom>)`.
+/// A tuple `(Option<&'a Expression>, Option<Word>)`.
 /// * If a special target is resolved, the tuple is `(None, Some(resolved_id))`.
 /// * If a regular argument is found, it returns the result from `get_argument_for_parameter`.
 /// * If nothing is found, it returns `(None, None)`.
@@ -1019,9 +1027,9 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
     context: &Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
-    parameter_name: Atom,
-    this_variable: Option<&str>,
-) -> (Option<&'ast Expression<'arena>>, Option<Atom>) {
+    parameter_name: Word,
+    this_variable: Option<&[u8]>,
+) -> (Option<&'ast Expression<'arena>>, Option<Word>) {
     // First, check if the name refers to a special assertion target like `$this->...`
     if let Some(resolved_id) = resolve_special_assertion_target(block_context, parameter_name, this_variable) {
         return (None, Some(resolved_id));
@@ -1045,23 +1053,31 @@ fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
 /// * `this_variable`: The name of the variable holding the object instance (`$this`), if any.
 ///
 /// # Returns
-/// * `Some(Atom)`: If the target is a special `$this` or `self` reference, containing the resolved variable ID.
+/// * `Some(Word)`: If the target is a special `$this` or `self` reference, containing the resolved variable ID.
 /// * `None`: If the target is not a special reference and should be treated as a regular parameter.
 fn resolve_special_assertion_target(
     block_context: &BlockContext<'_>,
-    target_name: Atom,
-    this_variable: Option<&str>,
-) -> Option<Atom> {
+    target_name: Word,
+    this_variable: Option<&[u8]>,
+) -> Option<Word> {
+    let target_bytes = target_name.as_bytes();
     if let Some(this_variable) = this_variable
-        && target_name.starts_with("$this")
+        && target_bytes.starts_with(b"$this")
     {
-        return Some(Atom::from(&target_name.replacen("$this", this_variable, 1)));
+        let mut out: Vec<u8> = Vec::with_capacity(target_bytes.len() - 5 + this_variable.len());
+        out.extend_from_slice(this_variable);
+        out.extend_from_slice(&target_bytes[5..]);
+        return Some(Word::from(out.as_slice()));
     }
 
     if let Some(class) = block_context.scope.get_class_like_name()
-        && target_name.starts_with("self::")
+        && target_bytes.starts_with(b"self::")
     {
-        return Some(Atom::from(&target_name.replacen("self::", class.as_str(), 1)));
+        let class_bytes = class.as_bytes();
+        let mut out: Vec<u8> = Vec::with_capacity(target_bytes.len() - 6 + class_bytes.len());
+        out.extend_from_slice(class_bytes);
+        out.extend_from_slice(&target_bytes[6..]);
+        return Some(Word::from(out.as_slice()));
     }
 
     None
@@ -1085,14 +1101,14 @@ fn resolve_special_assertion_target(
 /// # Returns
 /// A tuple containing:
 /// * `Option<&'a Expression>`: The argument's expression AST node, if found.
-/// * `Option<Atom>`: The unique ID of the argument expression (e.g., a variable name), if it can be determined.
+/// * `Option<Word>`: The unique ID of the argument expression (e.g., a variable name), if it can be determined.
 fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
     context: &Context<'ctx, 'arena>,
     block_context: &BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     mut parameter_offset: Option<usize>,
-    mut parameter_name: Option<Atom>,
-) -> (Option<&'ast Expression<'arena>>, Option<Atom>) {
+    mut parameter_name: Option<Word>,
+) -> (Option<&'ast Expression<'arena>>, Option<Word>) {
     // If neither name nor offset is provided, we can't do anything.
     if parameter_name.is_none() && parameter_offset.is_none() {
         return (None, None);
@@ -1126,7 +1142,9 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
     // a. Look for a named argument first.
     let find_by_name = || {
         let variable = parameter_name?;
-        let variable_name = if let Some(variable) = variable.strip_prefix('$') { variable } else { variable.as_str() };
+        let variable_bytes = variable.as_bytes();
+        let variable_name: &[u8] =
+            if let Some(stripped) = variable_bytes.strip_prefix(b"$") { stripped } else { variable_bytes };
 
         arguments.iter_arguments().find(|argument| {
             if let Some(named_argument) = argument.get_named_argument() {
@@ -1194,7 +1212,7 @@ fn collect_plugin_throw_types<'ctx, 'arena>(
             context.codebase,
             block_context,
             artifacts,
-            name,
+            name.as_bytes(),
             invocation,
         ),
         FunctionLikeIdentifier::Method(class_name, method_name) => {
@@ -1202,8 +1220,8 @@ fn collect_plugin_throw_types<'ctx, 'arena>(
                 context.codebase,
                 block_context,
                 artifacts,
-                class_name,
-                method_name,
+                class_name.as_bytes(),
+                method_name.as_bytes(),
                 invocation,
             )
         }
@@ -1221,9 +1239,9 @@ fn apply_plugin_assertions<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     identifier: &FunctionLikeIdentifier,
-    this_variable: Option<&str>,
+    this_variable: Option<&[u8]>,
     template_result: &TemplateResult,
-    parameters: &AtomMap<TUnion>,
+    parameters: &WordMap<TUnion>,
     range: (u32, u32),
 ) {
     let Some(assertions) = context.plugin_registry.get_function_like_assertions(

@@ -23,9 +23,9 @@ use mago_syntax_core::input::Input;
 #[derive(Debug, Clone, Copy)]
 pub struct VarAtCursor<'a> {
     /// Identifier text including the leading `$`.
-    pub raw: &'a str,
+    pub raw: &'a [u8],
     /// Identifier text without the leading `$`.
-    pub name: &'a str,
+    pub name: &'a [u8],
     pub start: u32,
     pub end: u32,
 }
@@ -34,7 +34,7 @@ pub struct VarAtCursor<'a> {
 /// on file bytes directly: walks back from the cursor to the `$` and
 /// forward to the end of the identifier. No lex required.
 pub fn variable_at_offset(file: &MagoFile, offset: u32) -> Option<VarAtCursor<'_>> {
-    let bytes = file.contents.as_bytes();
+    let bytes = file.contents.as_ref();
     let off = offset as usize;
     if off >= bytes.len() {
         return None;
@@ -65,8 +65,8 @@ pub fn variable_at_offset(file: &MagoFile, offset: u32) -> Option<VarAtCursor<'_
         end += 1;
     }
 
-    let raw = &file.contents[dollar..end];
-    let name = &file.contents[name_start..end];
+    let raw = &bytes[dollar..end];
+    let name = &bytes[name_start..end];
     Some(VarAtCursor { raw, name, start: dollar as u32, end: end as u32 })
 }
 
@@ -84,9 +84,9 @@ fn is_var_char(b: u8) -> bool {
 /// Backed by the same content-hash-keyed cache as [`lex`]: namespace
 /// ranges are extracted once during the initial token scan and reused
 /// across every capability call until the file changes.
-pub fn namespace_at_offset(file: &MagoFile, offset: u32) -> Option<String> {
+pub fn namespace_at_offset(file: &MagoFile, offset: u32) -> Option<Vec<u8>> {
     let entry = cached_entry(file);
-    entry.namespaces.iter().find(|r| r.start <= offset && offset < r.end).map(|r| r.name.to_string())
+    entry.namespaces.iter().find(|r| r.start <= offset && offset < r.end).map(|r| r.name.clone().into_vec())
 }
 
 /// Lex `file` into a token vector. Backed by the per-file [`CacheEntry`]
@@ -95,13 +95,14 @@ pub fn namespace_at_offset(file: &MagoFile, offset: u32) -> Option<String> {
 /// reconstruction from cached offsets.
 pub fn lex(file: &MagoFile) -> Vec<Token<'_>> {
     let entry = cached_entry(file);
+    let bytes = file.contents.as_ref();
     entry
         .tokens
         .iter()
         .map(|r| Token {
             kind: r.kind,
             start: Position { offset: r.start },
-            value: &file.contents[r.start as usize..r.end as usize],
+            value: &bytes[r.start as usize..r.end as usize],
         })
         .collect()
 }
@@ -141,7 +142,7 @@ struct RawToken {
 struct NamespaceRange {
     start: u32,
     end: u32,
-    name: Box<str>,
+    name: Box<[u8]>,
 }
 
 #[derive(Debug)]
@@ -160,7 +161,7 @@ fn cache() -> &'static LexCache {
 }
 
 fn cached_entry(file: &MagoFile) -> Arc<CacheEntry> {
-    let hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_bytes());
+    let hash = xxhash_rust::xxh3::xxh3_64(&file.contents);
     if let Ok(guard) = cache().lock()
         && let Some((h, t)) = guard.get(&file.id)
         && *h == hash
@@ -187,7 +188,7 @@ fn build_entry(file: &MagoFile) -> CacheEntry {
 }
 
 fn lex_uncached(file: &MagoFile) -> Vec<RawToken> {
-    let input = Input::new(file.id, file.contents.as_bytes());
+    let input = Input::new(file.id, file.contents.as_ref());
     let mut lexer = Lexer::new(input, LexerSettings::default());
     let mut out = Vec::new();
     while let Some(result) = lexer.advance() {
@@ -200,7 +201,7 @@ fn lex_uncached(file: &MagoFile) -> Vec<RawToken> {
 }
 
 fn collect_namespaces(file: &MagoFile, tokens: &[RawToken]) -> Vec<NamespaceRange> {
-    let bytes = file.contents.as_bytes();
+    let bytes = file.contents.as_ref();
     let file_size = file.size;
     let mut out: Vec<NamespaceRange> = Vec::new();
     let mut i = 0;
@@ -217,7 +218,7 @@ fn collect_namespaces(file: &MagoFile, tokens: &[RawToken]) -> Vec<NamespaceRang
             j += 1;
         }
 
-        let mut name = String::new();
+        let mut name: Vec<u8> = Vec::new();
         while j < tokens.len()
             && matches!(
                 tokens[j].kind,
@@ -226,8 +227,7 @@ fn collect_namespaces(file: &MagoFile, tokens: &[RawToken]) -> Vec<NamespaceRang
         {
             let s = tokens[j].start as usize;
             let e = tokens[j].end as usize;
-            let value = std::str::from_utf8(&bytes[s..e]).unwrap_or_default();
-            name.push_str(value.trim_start_matches('\\'));
+            name.extend_from_slice(mago_bytes::trim_start_byte(&bytes[s..e], b'\\'));
             j += 1;
         }
 

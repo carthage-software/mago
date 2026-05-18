@@ -1,3 +1,4 @@
+use mago_bytes::BytesDisplay;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -13,12 +14,14 @@ pub fn check_class_like_constant<'ast, 'arena>(
     class_like_constant: &'ast ClassLikeConstant<'arena>,
     class_like_span: Span,
     class_like_kind: &str,
-    class_like_name: &str,
-    class_like_fqcn: &str,
+    class_like_name: &[u8],
+    class_like_fqcn: &[u8],
     context: &mut Context<'_, 'ast, 'arena>,
 ) {
+    let class_like_name = BytesDisplay(class_like_name);
+    let class_like_fqcn = BytesDisplay(class_like_fqcn);
     let first_item = class_like_constant.first_item();
-    let first_item_name = first_item.name.value;
+    let first_item_name = BytesDisplay(first_item.name.value);
 
     let mut last_final: Option<Span> = None;
     let mut last_visibility: Option<Span> = None;
@@ -31,7 +34,7 @@ pub fn check_class_like_constant<'ast, 'arena>(
             | Modifier::ProtectedSet(k)
             | Modifier::PublicSet(k) => {
                 context.report(
-                    Issue::error(format!("`{}` modifier is not allowed on constants", k.value))
+                    Issue::error(format!("`{}` modifier is not allowed on constants", BytesDisplay(k.value)))
                         .with_annotation(Annotation::primary(modifier.span()))
                         .with_annotations([
                             Annotation::secondary(first_item.span()).with_message(format!(
@@ -112,7 +115,7 @@ pub fn check_class_like_constant<'ast, 'arena>(
     }
 
     for item in &class_like_constant.items {
-        let item_name = item.name.value;
+        let item_name = BytesDisplay(item.name.value);
 
         if !item.value.is_constant(&context.version, false) {
             context.report(

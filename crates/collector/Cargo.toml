@@ -20,3 +20,4 @@ mago-reporting = { workspace = true }
 mago-syntax = { workspace = true }
 foldhash = { workspace = true }
 bumpalo = { workspace = true }
+memchr = { workspace = true }

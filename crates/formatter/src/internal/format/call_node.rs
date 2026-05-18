@@ -40,8 +40,8 @@ impl<'arena> CallLikeNode<'arena> {
             CallLikeNode::Call(Call::Method(MethodCall { object, method, .. })) => {
                 if let Expression::Variable(Variable::Direct(var)) = object
                     && let ClassLikeMemberSelector::Identifier(method_id) = method
-                    && var.name.eq_ignore_ascii_case("$this")
-                    && method_id.value.starts_with("assert")
+                    && var.name.eq_ignore_ascii_case(b"$this")
+                    && method_id.value.starts_with(b"assert")
                 {
                     true
                 } else {
@@ -51,7 +51,7 @@ impl<'arena> CallLikeNode<'arena> {
             CallLikeNode::Call(Call::StaticMethod(StaticMethodCall { class, method, .. })) => {
                 if matches!(class, Expression::Static(_) | Expression::Parent(_) | Expression::Self_(_))
                     && let ClassLikeMemberSelector::Identifier(method_id) = method
-                    && method_id.value.starts_with("assert")
+                    && method_id.value.starts_with(b"assert")
                 {
                     true
                 } else {
@@ -113,7 +113,7 @@ pub(super) fn print_call_like_node<'arena>(
     let mut parts = match node {
         CallLikeNode::Call(c) => match c {
             Call::Function(c) => vec![in f.arena; c.function.format(f)],
-            Call::StaticMethod(c) => vec![in f.arena; c.class.format(f), Document::String("::"), c.method.format(f)],
+            Call::StaticMethod(c) => vec![in f.arena; c.class.format(f), Document::String(b"::"), c.method.format(f)],
             _ => {
                 return print_access_call_node(f, c);
             }
@@ -131,11 +131,11 @@ pub(super) fn print_call_like_node<'arena>(
 
 fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'arena Call<'arena>) -> Document<'arena> {
     let (base, operator, operator_str, selector) = match node {
-        Call::Method(method_call) => (&method_call.object, method_call.arrow, "->", &method_call.method),
+        Call::Method(method_call) => (&method_call.object, method_call.arrow, b"->" as &[u8], &method_call.method),
         Call::NullSafeMethod(null_safe_method_call) => (
             &null_safe_method_call.object,
             null_safe_method_call.question_mark_arrow,
-            "?->",
+            b"?->" as &[u8],
             &null_safe_method_call.method,
         ),
         #[allow(clippy::unreachable)]

@@ -2,14 +2,14 @@ use std::rc::Rc;
 
 use foldhash::HashMap;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::union::TUnion;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use mago_names::ResolvedNames;
 use mago_span::HasSpan;
@@ -70,7 +70,7 @@ pub const fn expression_has_logic(expression: &Expression<'_>) -> bool {
     }
 }
 
-pub fn get_variable_id<'arena>(variable: &Variable<'arena>) -> Option<&'arena str> {
+pub fn get_variable_id<'arena>(variable: &Variable<'arena>) -> Option<&'arena [u8]> {
     match variable {
         Variable::Direct(direct_variable) => Some(direct_variable.name),
         _ => None,
@@ -79,13 +79,13 @@ pub fn get_variable_id<'arena>(variable: &Variable<'arena>) -> Option<&'arena st
 
 pub fn get_member_selector_id<'ast, 'arena>(
     selector: &'ast ClassLikeMemberSelector<'arena>,
-    this_class_name: Option<Atom>,
+    this_class_name: Option<Word>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<Atom> {
+) -> Option<Word> {
     match selector {
-        ClassLikeMemberSelector::Identifier(local_identifier) => Some(atom(local_identifier.value)),
-        ClassLikeMemberSelector::Variable(variable) => get_variable_id(variable).map(atom),
+        ClassLikeMemberSelector::Identifier(local_identifier) => Some(word(local_identifier.value)),
+        ClassLikeMemberSelector::Variable(variable) => get_variable_id(variable).map(word),
         ClassLikeMemberSelector::Expression(class_like_member_expression_selector) => {
             let expr_id = get_expression_id(
                 class_like_member_expression_selector.expression,
@@ -93,7 +93,7 @@ pub fn get_member_selector_id<'ast, 'arena>(
                 resolved_names,
                 codebase,
             )?;
-            Some(concat_atom!("{", expr_id.as_str(), "}"))
+            Some(concat_word!(b"{", expr_id.as_bytes(), b"}"))
         }
         ClassLikeMemberSelector::Missing(_) => None,
     }
@@ -101,12 +101,12 @@ pub fn get_member_selector_id<'ast, 'arena>(
 
 pub fn get_constant_selector_id<'ast, 'arena>(
     selector: &'ast ClassLikeConstantSelector<'arena>,
-    this_class_name: Option<Atom>,
+    this_class_name: Option<Word>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<Atom> {
+) -> Option<Word> {
     match selector {
-        ClassLikeConstantSelector::Identifier(local_identifier) => Some(atom(local_identifier.value)),
+        ClassLikeConstantSelector::Identifier(local_identifier) => Some(word(local_identifier.value)),
         ClassLikeConstantSelector::Expression(class_like_member_expression_selector) => {
             let expr_id = get_expression_id(
                 class_like_member_expression_selector.expression,
@@ -114,7 +114,7 @@ pub fn get_constant_selector_id<'ast, 'arena>(
                 resolved_names,
                 codebase,
             )?;
-            Some(concat_atom!("{", expr_id.as_str(), "}"))
+            Some(concat_word!(b"{", expr_id.as_bytes(), b"}"))
         }
         ClassLikeConstantSelector::Missing(_) => None,
     }
@@ -123,20 +123,20 @@ pub fn get_constant_selector_id<'ast, 'arena>(
 /** Gets the identifier for a simple variable */
 pub fn get_expression_id<'ast, 'arena>(
     expression: &'ast Expression<'arena>,
-    this_class_name: Option<Atom>,
+    this_class_name: Option<Word>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<Atom> {
+) -> Option<Word> {
     get_extended_expression_id(expression, this_class_name, resolved_names, codebase, false)
 }
 
 fn get_extended_expression_id<'ast, 'arena>(
     expression: &'ast Expression<'arena>,
-    this_class_name: Option<Atom>,
+    this_class_name: Option<Word>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
     solve_identifiers: bool,
-) -> Option<Atom> {
+) -> Option<Word> {
     let expression = unwrap_expression(expression);
 
     if let Expression::Assignment(assignment) = expression {
@@ -147,7 +147,7 @@ fn get_extended_expression_id<'ast, 'arena>(
         Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Reference(_), operand }) => {
             return get_expression_id(operand, this_class_name, resolved_names, codebase);
         }
-        Expression::Variable(variable) => atom(get_variable_id(variable)?),
+        Expression::Variable(variable) => word(get_variable_id(variable)?),
         Expression::Access(access) => match access {
             Access::Property(property_access) => get_property_access_expression_id(
                 property_access.object,
@@ -188,7 +188,7 @@ fn get_extended_expression_id<'ast, 'arena>(
                     codebase,
                 )?;
 
-                concat_atom!(class.as_str(), "::", constant.as_str())
+                concat_word!(class.as_bytes(), b"::", constant.as_bytes())
             }
         },
         Expression::ArrayAccess(array_access) => {
@@ -198,27 +198,27 @@ fn get_extended_expression_id<'ast, 'arena>(
             if let Some(class_name) = this_class_name {
                 class_name
             } else {
-                atom("self")
+                word(b"self")
             }
         }
         Expression::Parent(_) if solve_identifiers => {
             if let Some(class_name) = this_class_name {
                 class_name
             } else {
-                atom("parent")
+                word(b"parent")
             }
         }
         Expression::Static(_) if solve_identifiers => {
             if let Some(class_name) = this_class_name {
                 class_name
             } else {
-                atom("static")
+                word(b"static")
             }
         }
         Expression::Identifier(identifier) if solve_identifiers => {
             let identifier_id = resolved_names.get(&identifier);
 
-            atom(identifier_id)
+            word(identifier_id)
         }
         _ => return None,
     })
@@ -228,51 +228,51 @@ pub fn get_property_access_expression_id<'ast, 'arena>(
     object_expression: &'ast Expression<'arena>,
     selector: &ClassLikeMemberSelector,
     is_null_safe: bool,
-    this_class_name: Option<Atom>,
+    this_class_name: Option<Word>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<Atom> {
+) -> Option<Word> {
     let object = get_expression_id(object_expression, this_class_name, resolved_names, codebase)?;
     let property = get_member_selector_id(selector, this_class_name, resolved_names, codebase)?;
 
     Some(if is_null_safe {
-        concat_atom!(object.as_str(), "?->", property.as_str())
+        concat_word!(object.as_bytes(), b"?->", property.as_bytes())
     } else {
-        concat_atom!(object.as_str(), "->", property.as_str())
+        concat_word!(object.as_bytes(), b"->", property.as_bytes())
     })
 }
 
 pub fn get_static_property_access_expression_id<'ast, 'arena>(
     class_expr: &'ast Expression<'arena>,
     property: &'ast Variable<'arena>,
-    this_class_name: Option<Atom>,
+    this_class_name: Option<Word>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<Atom> {
+) -> Option<Word> {
     let class = get_extended_expression_id(class_expr, this_class_name, resolved_names, codebase, true)?;
     let property = get_variable_id(property)?;
 
-    Some(concat_atom!(class.as_str(), "::", property))
+    Some(concat_word!(class.as_bytes(), b"::", property))
 }
 
 #[inline]
 pub fn get_array_access_id<'ast, 'arena>(
     array_access: &'ast ArrayAccess<'arena>,
-    this_class_name: Option<Atom>,
+    this_class_name: Option<Word>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<Atom> {
+) -> Option<Word> {
     let array = get_expression_id(array_access.array, this_class_name, resolved_names, codebase)?;
     let index = get_index_id(array_access.index, this_class_name, resolved_names, codebase)?;
 
-    Some(concat_atom!(array.as_str(), "[", index.as_str(), "]"))
+    Some(concat_word!(array.as_bytes(), b"[", index.as_bytes(), b"]"))
 }
 
-pub fn get_root_expression_id(expression: &Expression<'_>) -> Option<Atom> {
+pub fn get_root_expression_id(expression: &Expression<'_>) -> Option<Word> {
     let expression = unwrap_expression(expression);
 
     match expression {
-        Expression::Variable(Variable::Direct(variable)) => Some(atom(variable.name)),
+        Expression::Variable(Variable::Direct(variable)) => Some(word(variable.name)),
         Expression::ArrayAccess(array_access) => get_root_expression_id(array_access.array),
         Expression::Access(access) => match access {
             Access::Property(access) => get_root_expression_id(access.object),
@@ -286,13 +286,13 @@ pub fn get_root_expression_id(expression: &Expression<'_>) -> Option<Atom> {
 
 pub fn get_index_id<'ast, 'arena>(
     expression: &'ast Expression<'arena>,
-    this_class_name: Option<Atom>,
+    this_class_name: Option<Word>,
     resolved_names: &'ast ResolvedNames<'arena>,
     codebase: Option<&CodebaseMetadata>,
-) -> Option<Atom> {
+) -> Option<Word> {
     Some(match expression {
-        Expression::Literal(Literal::String(literal_string)) => atom(literal_string.raw),
-        Expression::Literal(Literal::Integer(literal_integer)) => atom(literal_integer.raw),
+        Expression::Literal(Literal::String(literal_string)) => word(literal_string.raw),
+        Expression::Literal(Literal::Integer(literal_integer)) => word(literal_integer.raw),
         Expression::UnaryPostfix(unary_postfix) => {
             return get_index_id(unary_postfix.operand, this_class_name, resolved_names, codebase);
         }
@@ -317,7 +317,7 @@ pub fn get_static_functionlike_id_from_call<'ast, 'arena>(
         Call::Function(FunctionCall { function: Expression::Identifier(identifier), .. }) => {
             let function_name = resolved_names.get(&identifier);
 
-            Some(FunctionLikeIdentifier::Function(atom(function_name)))
+            Some(FunctionLikeIdentifier::Function(word(function_name)))
         }
         Call::StaticMethod(StaticMethodCall {
             class: Expression::Identifier(class_identifier),
@@ -326,8 +326,8 @@ pub fn get_static_functionlike_id_from_call<'ast, 'arena>(
         }) => {
             let class_name = resolved_names.get(&class_identifier);
 
-            let class_id = atom(class_name);
-            let method_id = atom(method.value);
+            let class_id = word(class_name);
+            let method_id = word(method.value);
 
             Some(FunctionLikeIdentifier::Method(class_id, method_id))
         }
@@ -352,7 +352,7 @@ pub fn get_method_id_from_call(
                 return None;
             };
 
-            let method_id = atom(method.value);
+            let method_id = word(method.value);
 
             Some(FunctionLikeIdentifier::Method(named_object.get_name(), method_id))
         }
@@ -372,7 +372,8 @@ pub fn get_method_id_from_call(
 ///   or if it does but is not followed by a recognized access operator character,
 ///   or if `derived_path` is identical to `base_path`).
 #[inline]
-pub fn is_derived_access_path(derived_path: Atom, base_path: Atom) -> bool {
-    derived_path.as_str().starts_with(base_path.as_str())
-        && derived_path.as_str().chars().nth(base_path.len()).is_some_and(|c| c == ':' || c == '-' || c == '[')
+pub fn is_derived_access_path(derived_path: Word, base_path: Word) -> bool {
+    let derived = derived_path.as_bytes();
+    let base = base_path.as_bytes();
+    derived.starts_with(base) && derived.get(base.len()).is_some_and(|&b| b == b':' || b == b'-' || b == b'[')
 }

@@ -27,7 +27,7 @@ impl Provider for AbsProvider {
 
 impl FunctionReturnTypeProvider for AbsProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::ExactMultiple(&["abs", "psl\\math\\abs"])
+        FunctionTarget::ExactMultiple(&[b"abs", b"psl\\math\\abs"])
     }
 
     #[allow(clippy::similar_names)]
@@ -36,7 +36,7 @@ impl FunctionReturnTypeProvider for AbsProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let arg = invocation.get_argument(0, &["num"])?;
+        let arg = invocation.get_argument(0, &[b"num"])?;
         let arg_type = context.get_expression_type(arg)?;
         let integer = get_integer_from_type(arg_type)?;
 

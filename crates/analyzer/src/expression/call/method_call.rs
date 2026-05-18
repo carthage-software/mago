@@ -1,5 +1,5 @@
-use mago_atom::Atom;
-use mago_atom::AtomMap;
+use mago_word::Word;
+use mago_word::WordMap;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
@@ -175,7 +175,7 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     object_type: &TObject,
-    object_variable: Option<&str>,
+    object_variable: Option<&[u8]>,
     method_identifier: MethodIdentifier,
     class_like_metadata: &'ctx ClassLikeMetadata,
     method_metadata: &'ctx FunctionLikeMetadata,
@@ -185,8 +185,8 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
     if !check_method_visibility(
         context,
         block_context,
-        &method_identifier.get_class_name(),
-        &method_identifier.get_method_name(),
+        method_identifier.get_class_name().as_bytes(),
+        method_identifier.get_method_name().as_bytes(),
         span,
         None,
     ) {
@@ -224,7 +224,7 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
         artifacts,
         &invocation,
         &template_result,
-        &AtomMap::default(),
+        &WordMap::default(),
     );
 
     post_invocation_process(
@@ -234,7 +234,7 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
         &invocation,
         object_variable,
         &template_result,
-        &AtomMap::default(),
+        &WordMap::default(),
         false,
     )?;
 
@@ -256,7 +256,7 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         && let ClassLikeMemberSelector::Identifier(method_ident) = selector
         && is_this_or_self_returning_chain(object, context, block_context)
     {
-        let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
+        let method_name = mago_word::ascii_lowercase_word(method_ident.value);
         block_context.definitely_called_methods.insert(method_name);
         block_context.called_methods.insert(method_name);
     }
@@ -268,7 +268,7 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
     for resolved_method in method_resolution.resolved_methods {
         let metadata = context
             .codebase
-            .get_class_like(&resolved_method.classname)
+            .get_class_like(resolved_method.classname.as_bytes())
             .expect("class-like metadata should exist for resolved method");
 
         let method_metadata = context
@@ -326,7 +326,7 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         invocation_targets,
         InvocationArgumentsSource::ArgumentList(argument_list),
         span,
-        this_variable.as_deref(),
+        this_variable.as_ref().map(|w| w.as_bytes()),
         method_resolution.has_invalid_target,
         method_resolution.encountered_mixed,
         is_null_safe && method_resolution.encountered_null,
@@ -346,7 +346,7 @@ fn is_this_or_self_returning_chain<'ctx, 'arena>(
     block_context: &BlockContext<'ctx>,
 ) -> bool {
     match expr {
-        Expression::Variable(Variable::Direct(var)) if var.name == "$this" => true,
+        Expression::Variable(Variable::Direct(var)) if var.name == b"$this" => true,
         Expression::Call(Call::Method(method_call)) => {
             if !is_this_or_self_returning_chain(method_call.object, context, block_context) {
                 return false;
@@ -360,7 +360,7 @@ fn is_this_or_self_returning_chain<'ctx, 'arena>(
                 return false;
             };
 
-            let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
+            let method_name = mago_word::ascii_lowercase_word(method_ident.value);
             method_returns_self_or_static(context, class_like.name, method_name)
         }
         Expression::Call(Call::NullSafeMethod(method_call)) => {
@@ -376,7 +376,7 @@ fn is_this_or_self_returning_chain<'ctx, 'arena>(
                 return false;
             };
 
-            let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
+            let method_name = mago_word::ascii_lowercase_word(method_ident.value);
             method_returns_self_or_static(context, class_like.name, method_name)
         }
         Expression::Parenthesized(paren) => is_this_or_self_returning_chain(paren.expression, context, block_context),
@@ -385,7 +385,7 @@ fn is_this_or_self_returning_chain<'ctx, 'arena>(
 }
 
 /// Checks if a method returns `self`, `static`, or the same class type.
-fn method_returns_self_or_static(context: &Context<'_, '_>, class_name: Atom, method_name: Atom) -> bool {
+fn method_returns_self_or_static(context: &Context<'_, '_>, class_name: Word, method_name: Word) -> bool {
     let method_id = MethodIdentifier::new(class_name, method_name);
     let Some(method_meta) = context.codebase.get_method_by_id(&method_id) else {
         return false;
@@ -395,7 +395,9 @@ fn method_returns_self_or_static(context: &Context<'_, '_>, class_name: Atom, me
         for atomic in return_type_meta.type_union.types.iter() {
             match atomic {
                 TAtomic::Object(TObject::Named(named_obj)) if named_obj.is_static => return true,
-                TAtomic::Object(TObject::Named(named_obj)) if named_obj.name.eq_ignore_ascii_case(&class_name) => {
+                TAtomic::Object(TObject::Named(named_obj))
+                    if named_obj.name.as_bytes().eq_ignore_ascii_case(class_name.as_bytes()) =>
+                {
                     return true;
                 }
                 _ => {}

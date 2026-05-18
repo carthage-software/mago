@@ -1,7 +1,5 @@
 use std::rc::Rc;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -18,6 +16,8 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::NullSafePropertyAccess;
 use mago_syntax::ast::PropertyAccess;
 use mago_syntax::ast::Variable;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -221,16 +221,17 @@ fn add_memoized_property_reference<'ctx, 'ast, 'arena>(
     property_selector: &'ast ClassLikeMemberSelector<'arena>,
 ) -> Result<(), AnalysisError> {
     let property_name = match property_selector {
-        ClassLikeMemberSelector::Identifier(ident) => concat_atom!("$", ident.value),
+        ClassLikeMemberSelector::Identifier(ident) => concat_word!(b"$", ident.value),
         _ => return Ok(()),
     };
 
-    let is_this = matches!(object, Expression::Variable(Variable::Direct(var)) if var.name == "$this");
-    let mut declaring_classes: Vec<Atom> = Vec::new();
+    let is_this = matches!(object, Expression::Variable(Variable::Direct(var)) if var.name == b"$this");
+    let mut declaring_classes: Vec<Word> = Vec::new();
 
     if is_this {
         if let Some(class_name) = block_context.scope.get_class_like_name()
-            && let Some(declaring_class) = context.codebase.get_declaring_property_class(&class_name, &property_name)
+            && let Some(declaring_class) =
+                context.codebase.get_declaring_property_class(class_name.as_bytes(), property_name.as_bytes())
         {
             declaring_classes.push(declaring_class);
         }
@@ -238,7 +239,7 @@ fn add_memoized_property_reference<'ctx, 'ast, 'arena>(
         for atomic in object_type.types.iter() {
             for class_name in atomic.get_all_object_names() {
                 if let Some(declaring_class) =
-                    context.codebase.get_declaring_property_class(&class_name, &property_name)
+                    context.codebase.get_declaring_property_class(class_name.as_bytes(), property_name.as_bytes())
                 {
                     declaring_classes.push(declaring_class);
                 }

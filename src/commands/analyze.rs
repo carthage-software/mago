@@ -305,7 +305,7 @@ impl AnalyzeCommand {
         issues.filter_out_ignored(
             &configuration.analyzer.ignore,
             configuration.source.glob.to_database_settings(),
-            |file_id| read_db.get_ref(&file_id).ok().map(|f| f.name.to_string()),
+            |file_id| read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned()),
         );
 
         let baseline = configuration.analyzer.baseline.as_deref();
@@ -442,7 +442,7 @@ impl AnalyzeCommand {
         issues.filter_out_ignored(
             &configuration.analyzer.ignore,
             configuration.source.glob.to_database_settings(),
-            |file_id| read_db.get_ref(&file_id).ok().map(|f| f.name.to_string()),
+            |file_id| read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned()),
         );
 
         let baseline = configuration.analyzer.baseline.as_deref();
@@ -484,7 +484,7 @@ impl AnalyzeCommand {
             issues.filter_out_ignored(
                 &configuration.analyzer.ignore,
                 configuration.source.glob.to_database_settings(),
-                |file_id| read_db.get_ref(&file_id).ok().map(|f| f.name.to_string()),
+                |file_id| read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned()),
             );
 
             watcher.with_database_mut(|database| {

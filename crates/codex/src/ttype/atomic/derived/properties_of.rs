@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -99,7 +99,7 @@ impl TPropertiesOf {
         for target in target_types {
             match target {
                 TAtomic::Object(TObject::Named(named)) => {
-                    let Some(class_like_metadata) = codebase.get_class_like(&named.name) else {
+                    let Some(class_like_metadata) = codebase.get_class_like(named.name.as_bytes()) else {
                         continue;
                     };
 
@@ -120,9 +120,9 @@ impl TPropertiesOf {
                         // Get the property type
                         if let Some(type_metadata) = &property_metadata.type_metadata {
                             // Property name without the leading '$'
-                            let name_str = prop_name.as_str();
-                            let stripped_name = name_str.strip_prefix('$').unwrap_or(name_str);
-                            let key = ArrayKey::String(Atom::from(stripped_name));
+                            let name_str = prop_name.as_bytes();
+                            let stripped_name = name_str.strip_prefix(b"$").unwrap_or(name_str);
+                            let key = ArrayKey::String(Word::from(stripped_name));
                             let is_optional = false; // Class properties are not optional in the shape
 
                             // Merge with existing entry if present (for union types)
@@ -145,7 +145,7 @@ impl TPropertiesOf {
                     // - `name`: always present (the case name as a literal string)
                     // - `value`: only for backed enums (the backing value)
                     // Note: Enums are always final in PHP, so we don't need to make the array unsealed
-                    let Some(class_like_metadata) = codebase.get_class_like(enum_name) else {
+                    let Some(class_like_metadata) = codebase.get_class_like(enum_name.as_bytes()) else {
                         continue;
                     };
 
@@ -173,7 +173,7 @@ impl TPropertiesOf {
 
                     // Add `name` property (all enums have this)
                     if !name_types.is_empty() {
-                        let name_key = ArrayKey::String(atom("name"));
+                        let name_key = ArrayKey::String(word("name"));
                         if let Some((_, existing_union)) = known_items.get_mut(&name_key) {
                             let mut types = existing_union.types.to_vec();
                             types.extend(name_types);
@@ -185,7 +185,7 @@ impl TPropertiesOf {
 
                     // Add `value` property (only backed enums have this)
                     if !value_types.is_empty() {
-                        let value_key = ArrayKey::String(atom("value"));
+                        let value_key = ArrayKey::String(word("value"));
                         if let Some((_, existing_union)) = known_items.get_mut(&value_key) {
                             let mut types = existing_union.types.to_vec();
                             types.extend(value_types);
@@ -238,15 +238,15 @@ impl TType for TPropertiesOf {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         if let Some(visibility) = &self.visibility {
-            concat_atom!(visibility.as_str(), "-properties-of<", self.target_type.get_id().as_str(), ">")
+            concat_word!(visibility.as_bytes(), b"-properties-of<", self.target_type.get_id(), b">")
         } else {
-            concat_atom!("properties-of<", self.target_type.get_id().as_str(), ">")
+            concat_word!(b"properties-of<", self.target_type.get_id(), b">")
         }
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

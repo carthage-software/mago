@@ -181,7 +181,7 @@ impl<'cfg> Orchestrator<'cfg> {
         workspace: &'cfg Path,
         include_externals: bool,
         prelude_database: Option<Database<'static>>,
-        stdin_override: Option<(String, String)>,
+        stdin_override: Option<(String, Vec<u8>)>,
     ) -> Result<Database<'cfg>, OrchestratorError>
     where
         'borrow: 'cfg,
@@ -209,7 +209,7 @@ impl<'cfg> Orchestrator<'cfg> {
                 .collect()
         }
 
-        let includes = if include_externals {
+        let includes: Vec<Cow<'cfg, [u8]>> = if include_externals {
             let active_paths: HashSet<&str> = self.config.paths.iter().map(std::string::String::as_str).collect();
 
             self.config
@@ -217,8 +217,8 @@ impl<'cfg> Orchestrator<'cfg> {
                 .iter()
                 .map(std::string::String::as_str)
                 .chain(self.context_paths.iter().map(std::string::String::as_str).filter(|p| !active_paths.contains(p)))
-                .map(Cow::Borrowed)
-                .collect::<Vec<Cow<'cfg, str>>>()
+                .map(|s| Cow::Borrowed(s.as_bytes()))
+                .collect()
         } else {
             Vec::new()
         };
@@ -231,10 +231,10 @@ impl<'cfg> Orchestrator<'cfg> {
 
         let configuration: DatabaseConfiguration<'cfg> = DatabaseConfiguration {
             workspace: Cow::Borrowed(workspace),
-            paths: self.config.paths.iter().map(|s| Cow::Borrowed(s.as_ref())).collect(),
+            paths: self.config.paths.iter().map(|s| Cow::Borrowed(s.as_bytes())).collect(),
             includes,
             excludes,
-            extensions: self.config.extensions.iter().map(|s| Cow::Borrowed(*s)).collect(),
+            extensions: self.config.extensions.iter().map(|s| Cow::Borrowed(s.as_bytes())).collect(),
             glob: self.config.glob,
         };
 

@@ -10,6 +10,35 @@ use mago_syntax::ast::UseType;
 
 use crate::kind::NameKind;
 
+#[inline]
+pub(crate) fn trim_start_byte(s: &[u8], byte: u8) -> &[u8] {
+    let mut i = 0;
+    while i < s.len() && s[i] == byte {
+        i += 1;
+    }
+
+    &s[i..]
+}
+
+#[inline]
+pub(crate) fn rfind_byte(s: &[u8], byte: u8) -> Option<usize> {
+    memchr::memrchr(byte, s)
+}
+
+pub(crate) fn concat_with_sep(parts: &[&[u8]], sep: u8) -> Vec<u8> {
+    let total: usize = parts.iter().map(|p| p.len()).sum::<usize>() + parts.len().saturating_sub(1);
+    let mut out = Vec::with_capacity(total);
+    for (i, part) in parts.iter().enumerate() {
+        if i > 0 {
+            out.push(sep);
+        }
+
+        out.extend_from_slice(part);
+    }
+
+    out
+}
+
 /// Represents the scope for resolving PHP names, holding the current namespace
 /// and any 'use' aliases defined within it.
 ///
@@ -24,25 +53,25 @@ use crate::kind::NameKind;
 pub struct NamespaceScope {
     /// The fully qualified name of the current namespace context (e.g., "App\\Http\\Controllers").
     /// `None` indicates the global namespace.
-    namespace_name: Option<String>,
+    namespace_name: Option<Vec<u8>>,
 
     /// Stores aliases for classes, interfaces, traits, and namespaces.
     /// Key: Lowercase alias name. Value: FQN.
-    default_aliases: HashMap<String, String>,
+    default_aliases: HashMap<Vec<u8>, Vec<u8>>,
 
     /// Stores aliases for functions.
     /// Key: Lowercase alias name. Value: FQN.
-    function_aliases: HashMap<String, String>,
+    function_aliases: HashMap<Vec<u8>, Vec<u8>>,
 
     /// Stores aliases for constants.
     /// Key: Lowercase alias name. Value: FQN.
-    constant_aliases: HashMap<String, String>,
+    constant_aliases: HashMap<Vec<u8>, Vec<u8>>,
 }
 
 impl NamespaceScope {
     /// Creates a new, empty scope, optionally associated with a namespace.
     #[must_use]
-    pub fn new(namespace_name: Option<String>) -> Self {
+    pub fn new(namespace_name: Option<Vec<u8>>) -> Self {
         NamespaceScope {
             namespace_name,
             default_aliases: HashMap::default(),
@@ -64,7 +93,7 @@ impl NamespaceScope {
 
     /// Creates a new, empty scope representing the given namespace.
     #[inline]
-    pub fn for_namespace(namespace: impl Into<String>) -> Self {
+    pub fn for_namespace(namespace: impl Into<Vec<u8>>) -> Self {
         NamespaceScope {
             namespace_name: Some(namespace.into()),
             default_aliases: HashMap::default(),
@@ -82,25 +111,25 @@ impl NamespaceScope {
 
     /// Returns the name of the current namespace, if this scope represents one.
     #[must_use]
-    pub fn namespace_name(&self) -> Option<&str> {
+    pub fn namespace_name(&self) -> Option<&[u8]> {
         self.namespace_name.as_deref()
     }
 
     /// Returns a reference to the map of default (class/namespace) aliases.
     #[must_use]
-    pub fn default_aliases(&self) -> &HashMap<String, String> {
+    pub fn default_aliases(&self) -> &HashMap<Vec<u8>, Vec<u8>> {
         &self.default_aliases
     }
 
     /// Returns a reference to the map of function aliases.
     #[must_use]
-    pub fn function_aliases(&self) -> &HashMap<String, String> {
+    pub fn function_aliases(&self) -> &HashMap<Vec<u8>, Vec<u8>> {
         &self.function_aliases
     }
 
     /// Returns a reference to the map of constant aliases.
     #[must_use]
-    pub fn constant_aliases(&self) -> &HashMap<String, String> {
+    pub fn constant_aliases(&self) -> &HashMap<Vec<u8>, Vec<u8>> {
         &self.constant_aliases
     }
 
@@ -114,14 +143,14 @@ impl NamespaceScope {
     /// # Arguments
     ///
     /// * `interner` - A string interner used to resolve identifiers/names from the AST nodes
-    ///   into actual string (`&str`) representations.
+    ///   into actual string (`&[u8]`) representations.
     /// * `r#use` - A reference to the `Use` AST node representing the `use` statement.
     ///   (Parameter is named `r#use` because `use` is a Rust keyword).
     pub fn populate_from_use(&mut self, r#use: &Use<'_>) {
         match &r#use.items {
             UseItems::Sequence(use_item_sequence) => {
                 for use_item in &use_item_sequence.items {
-                    let name = use_item.name.value().trim_start_matches('\\');
+                    let name = trim_start_byte(use_item.name.value(), b'\\');
                     let alias = use_item.alias.as_ref().map(|alias_node| alias_node.identifier.value);
 
                     // Add as a default (class/namespace) alias
@@ -136,7 +165,7 @@ impl NamespaceScope {
                 };
 
                 for use_item in &typed_use_item_sequence.items {
-                    let name = use_item.name.value().trim_start_matches('\\');
+                    let name = trim_start_byte(use_item.name.value(), b'\\');
                     let alias = use_item.alias.as_ref().map(|alias_node| alias_node.identifier.value);
 
                     // Add with the determined kind (Function or Constant)
@@ -151,14 +180,14 @@ impl NamespaceScope {
                 };
 
                 // Get the common namespace prefix for the group
-                let prefix = (typed_use_item_list.namespace.value()).trim_start_matches('\\');
+                let prefix = trim_start_byte(typed_use_item_list.namespace.value(), b'\\');
 
                 for use_item in &typed_use_item_list.items {
                     let name_part = use_item.name.value();
-                    let alias = use_item.alias.as_ref().map(|alias_node| &alias_node.identifier.value);
+                    let alias = use_item.alias.as_ref().map(|alias_node| alias_node.identifier.value);
 
                     // Construct the full FQN by combining prefix and name part
-                    let fully_qualified_name = format!("{prefix}\\{name_part}");
+                    let fully_qualified_name = concat_with_sep(&[prefix, name_part], b'\\');
 
                     // Add the alias for the fully constructed name
                     self.add(name_kind, fully_qualified_name, &alias);
@@ -166,7 +195,7 @@ impl NamespaceScope {
             }
             UseItems::MixedList(mixed_use_item_list) => {
                 // Get the common namespace prefix for the group
-                let prefix = (mixed_use_item_list.namespace.value()).trim_start_matches('\\');
+                let prefix = trim_start_byte(mixed_use_item_list.namespace.value(), b'\\');
 
                 for mixed_use_item in &mixed_use_item_list.items {
                     // Determine the kind for *this specific item* within the mixed list
@@ -178,10 +207,10 @@ impl NamespaceScope {
 
                     // Extract name/alias from the nested item structure (assuming `item` field)
                     let name_part = mixed_use_item.item.name.value();
-                    let alias = mixed_use_item.item.alias.as_ref().map(|alias_node| &alias_node.identifier.value);
+                    let alias = mixed_use_item.item.alias.as_ref().map(|alias_node| alias_node.identifier.value);
 
                     // Construct the full FQN: prefix\name_part
-                    let fully_qualified_name = format!("{prefix}\\{name_part}");
+                    let fully_qualified_name = concat_with_sep(&[prefix, name_part], b'\\');
 
                     // Add the alias with its specific kind
                     self.add(name_kind, fully_qualified_name, &alias);
@@ -201,16 +230,16 @@ impl NamespaceScope {
     ///
     /// The alias name (explicit or derived) is stored lowercase as the key.
     #[inline]
-    pub fn add(&mut self, kind: NameKind, name: impl AsRef<str>, alias: &Option<impl AsRef<str>>) {
+    pub fn add(&mut self, kind: NameKind, name: impl AsRef<[u8]>, alias: &Option<impl AsRef<[u8]>>) {
         self.add_str(kind, name.as_ref(), alias.as_ref().map(std::convert::AsRef::as_ref));
     }
 
     /// non-generic version of `add` that takes a string slice.
-    fn add_str(&mut self, kind: NameKind, name_ref: &str, alias: Option<&str>) {
+    fn add_str(&mut self, kind: NameKind, name_ref: &[u8], alias: Option<&[u8]>) {
         let alias_key = match alias {
             Some(alias) => alias.to_ascii_lowercase(),
             None => {
-                if let Some(last_backslash_pos) = name_ref.rfind('\\') {
+                if let Some(last_backslash_pos) = rfind_byte(name_ref, b'\\') {
                     name_ref[last_backslash_pos + 1..].to_ascii_lowercase()
                 } else {
                     name_ref.to_ascii_lowercase()
@@ -241,15 +270,15 @@ impl NamespaceScope {
     /// The qualified name (e.g., "App\\Models\\User") or the original name if
     /// in the global scope, the namespace is empty, or the input name was not simple.
     #[inline]
-    pub fn qualify_name(&self, name: impl AsRef<str>) -> String {
+    pub fn qualify_name(&self, name: impl AsRef<[u8]>) -> Vec<u8> {
         self.qualify_name_str(name.as_ref()).into_owned()
     }
 
-    /// non-generic version of `qualify_name` that takes a string slice.
-    fn qualify_name_str<'name>(&self, name_ref: &'name str) -> Cow<'name, str> {
+    /// non-generic version of `qualify_name` that takes a Vec<u8> slice.
+    fn qualify_name_str<'name>(&self, name_ref: &'name [u8]) -> Cow<'name, [u8]> {
         match &self.namespace_name {
             // If we have a non-empty namespace, prepend it.
-            Some(ns) if !ns.is_empty() => Cow::Owned(format!("{ns}\\{name_ref}")),
+            Some(ns) if !ns.is_empty() => Cow::Owned(concat_with_sep(&[ns, name_ref], b'\\')),
             // Otherwise (no namespace, or empty namespace), return the name as is.
             _ => Cow::Borrowed(name_ref),
         }
@@ -267,7 +296,7 @@ impl NamespaceScope {
     ///  - The resolved or qualified name.
     ///  - `true` if resolved via explicit alias/construct (step 1), `false` otherwise.
     #[inline]
-    pub fn resolve(&self, kind: NameKind, name: impl AsRef<str>) -> (String, bool) {
+    pub fn resolve(&self, kind: NameKind, name: impl AsRef<[u8]>) -> (Vec<u8>, bool) {
         let (cow, imported) = self.resolve_str(kind, name.as_ref());
 
         (cow.into_owned(), imported)
@@ -276,9 +305,9 @@ impl NamespaceScope {
     /// non-generic version of `resolve` that takes a string slice.
     #[inline]
     #[must_use]
-    pub fn resolve_str<'name>(&self, kind: NameKind, name_ref: &'name str) -> (Cow<'name, str>, bool) {
+    pub fn resolve_str<'name>(&self, kind: NameKind, name_ref: &'name [u8]) -> (Cow<'name, [u8]>, bool) {
         // Try resolving using explicit aliases and constructs
-        if let Some(resolved_name) = self.resolve_alias_str(kind, name_ref) {
+        if let Some(resolved_name) = self.resolve_alias_bytes(kind, name_ref) {
             return (resolved_name, true); // Resolved via alias or explicit construct
         }
 
@@ -293,53 +322,54 @@ impl NamespaceScope {
     /// # Arguments
     ///
     /// * `kind` - The context (`Default`, `Function`, `Constant`).
-    /// * `name` - The name string to resolve.
+    /// * `name` - The name bytes to resolve.
     ///
     /// # Returns
     ///
-    /// * `Some(String)` containing the resolved FQN if an explicit rule applies.
+    /// * `Some(Vec<u8>)` containing the resolved FQN if an explicit rule applies.
     /// * `None` if no explicit rule resolves the name.
     #[inline]
-    pub fn resolve_alias(&self, kind: NameKind, name: impl AsRef<str>) -> Option<String> {
-        self.resolve_alias_str(kind, name.as_ref()).map(std::borrow::Cow::into_owned)
+    pub fn resolve_alias(&self, kind: NameKind, name: impl AsRef<[u8]>) -> Option<Vec<u8>> {
+        self.resolve_alias_bytes(kind, name.as_ref()).map(std::borrow::Cow::into_owned)
     }
 
     /// non-generic version of `resolve_alias` that takes a string slice.
-    fn resolve_alias_str<'name>(&self, kind: NameKind, name_ref: &'name str) -> Option<Cow<'name, str>> {
+    fn resolve_alias_bytes<'name>(&self, kind: NameKind, name_ref: &'name [u8]) -> Option<Cow<'name, [u8]>> {
         if name_ref.is_empty() {
             return None;
         }
 
         // Handle `\FQN`
-        if let Some(fqn) = name_ref.strip_prefix('\\') {
+        if let Some(fqn) = name_ref.strip_prefix(b"\\") {
             return Some(Cow::Borrowed(fqn));
         }
 
-        let parts = name_ref.split('\\').collect::<Vec<_>>();
-        let first_part = parts[0];
+        // Split into `first_part` and `suffix` at the first backslash (memchr).
+        let (first_part, suffix) = match memchr::memchr(b'\\', name_ref) {
+            Some(i) => (&name_ref[..i], Some(&name_ref[i + 1..])),
+            None => (name_ref, None),
+        };
         let first_part_lower = first_part.to_ascii_lowercase();
 
-        if parts.len() > 1 {
-            let suffix = parts[1..].join("\\");
-
+        if let Some(suffix) = suffix {
             // Handle `namespace\Suffix`
-            if first_part_lower == "namespace" {
+            if first_part_lower == b"namespace" {
                 match &self.namespace_name {
                     Some(namespace_prefix) => {
                         let mut resolved = namespace_prefix.clone();
-                        resolved.push('\\');
-                        resolved.push_str(&suffix);
+                        resolved.push(b'\\');
+                        resolved.extend_from_slice(suffix);
                         Some(Cow::Owned(resolved))
                     }
-                    None => Some(Cow::Owned(suffix)), // Relative to global "" namespace
+                    None => Some(Cow::Owned(suffix.to_vec())), // Relative to global "" namespace
                 }
             } else {
                 // Handle `Alias\Suffix`
-                match self.default_aliases.get(&first_part_lower) {
+                match self.default_aliases.get(first_part_lower.as_slice()) {
                     Some(resolved_alias_fqn) => {
                         let mut resolved = resolved_alias_fqn.clone();
-                        resolved.push('\\');
-                        resolved.push_str(&suffix);
+                        resolved.push(b'\\');
+                        resolved.extend_from_slice(suffix);
                         Some(Cow::Owned(resolved))
                     }
                     None => None, // Alias not found
@@ -348,9 +378,9 @@ impl NamespaceScope {
         } else {
             // Handle single-part alias lookup
             (match kind {
-                NameKind::Default => self.default_aliases.get(&first_part_lower).cloned(),
-                NameKind::Function => self.function_aliases.get(&first_part_lower).cloned(),
-                NameKind::Constant => self.constant_aliases.get(&first_part_lower).cloned(),
+                NameKind::Default => self.default_aliases.get(first_part_lower.as_slice()).cloned(),
+                NameKind::Function => self.function_aliases.get(first_part_lower.as_slice()).cloned(),
+                NameKind::Constant => self.constant_aliases.get(first_part_lower.as_slice()).cloned(),
             })
             .map(Cow::Owned)
         }

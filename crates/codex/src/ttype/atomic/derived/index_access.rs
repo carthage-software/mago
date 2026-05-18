@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -150,11 +150,11 @@ impl TType for TIndexAccess {
         false
     }
 
-    fn get_id(&self) -> Atom {
-        concat_atom!(self.target_type.get_id().as_str(), "[", self.index_type.get_id().as_str(), "]")
+    fn get_id(&self) -> Word {
+        concat_word!(self.target_type.get_id(), b"[", self.index_type.get_id(), b"]")
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

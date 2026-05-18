@@ -5,141 +5,127 @@ use mago_syntax::ast::LiteralStringKind;
 
 use crate::internal::FormatterState;
 
-pub(super) fn print_lowercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, keyword: &'arena str) -> &'arena str {
-    if keyword.chars().all(|c| c.is_ascii_lowercase()) {
+pub(super) fn print_lowercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, keyword: &'arena [u8]) -> &'arena [u8] {
+    if keyword.iter().all(u8::is_ascii_lowercase) {
         return keyword;
     }
 
     let mut lowercase_bytes = Vec::with_capacity_in(keyword.len(), f.arena);
-    for c in keyword.chars() {
-        for lower_c in c.to_lowercase() {
-            let mut buf = [0; 4];
-            lowercase_bytes.extend_from_slice(lower_c.encode_utf8(&mut buf).as_bytes());
-        }
+    for &byte in keyword {
+        lowercase_bytes.push(byte.to_ascii_lowercase());
     }
 
-    // SAFETY: every byte pushed into `lowercase_bytes` came from `char::encode_utf8`,
-    // so the buffer holds valid UTF-8.
-    unsafe { std::str::from_utf8_unchecked(lowercase_bytes.into_bump_slice()) }
+    lowercase_bytes.into_bump_slice()
 }
 
-pub(super) fn print_uppercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, keyword: &'arena str) -> &'arena str {
-    if keyword.chars().all(|c| c.is_ascii_uppercase()) {
+pub(super) fn print_uppercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, keyword: &'arena [u8]) -> &'arena [u8] {
+    if keyword.iter().all(u8::is_ascii_uppercase) {
         return keyword;
     }
 
     let mut uppercase_bytes = Vec::with_capacity_in(keyword.len(), f.arena);
-    for c in keyword.chars() {
-        for upper_c in c.to_uppercase() {
-            let mut buf = [0; 4];
-            uppercase_bytes.extend_from_slice(upper_c.encode_utf8(&mut buf).as_bytes());
-        }
+    for &byte in keyword {
+        uppercase_bytes.push(byte.to_ascii_uppercase());
     }
 
-    // SAFETY: every byte pushed into `uppercase_bytes` came from `char::encode_utf8`,
-    // so the buffer holds valid UTF-8.
-    unsafe { std::str::from_utf8_unchecked(uppercase_bytes.into_bump_slice()) }
+    uppercase_bytes.into_bump_slice()
 }
 
 pub(super) fn print_string<'arena>(
     f: &FormatterState<'_, 'arena>,
     kind: LiteralStringKind,
-    text: &'arena str,
-) -> &'arena str {
+    text: &'arena [u8],
+) -> &'arena [u8] {
     // Strip binary string prefix (b/B) if present
-    let (prefix, text_without_prefix) =
-        if text.starts_with('b') || text.starts_with('B') { (&text[..1], &text[1..]) } else { ("", text) };
+    let (prefix, text_without_prefix): (&[u8], &[u8]) =
+        if text.starts_with(b"b") || text.starts_with(b"B") { (&text[..1], &text[1..]) } else { (&[], text) };
 
     // SAFETY: callers always pass a non-empty string-literal token starting with a quote,
-    // so the iterator yields at least one character.
-    let quote = unsafe { text_without_prefix.chars().next().unwrap_unchecked() };
+    // so the slice has at least one byte.
+    let quote = unsafe { *text_without_prefix.first().unwrap_unchecked() };
     let raw_text = &text_without_prefix[1..text_without_prefix.len() - 1];
     let enclosing_quote = get_preferred_quote(raw_text, quote, f.settings.single_quote);
 
     match kind {
-        LiteralStringKind::SingleQuoted if enclosing_quote == '\'' => text,
-        LiteralStringKind::DoubleQuoted if enclosing_quote == '"' => text,
+        LiteralStringKind::SingleQuoted if enclosing_quote == b'\'' => text,
+        LiteralStringKind::DoubleQuoted if enclosing_quote == b'"' => text,
         _ if prefix.is_empty() => make_string_in(f.arena, raw_text, enclosing_quote),
         _ => {
             let inner = make_string_in(f.arena, raw_text, enclosing_quote);
             let mut result = Vec::with_capacity_in(inner.len() + 1, f.arena);
-            result.extend_from_slice(prefix.as_bytes());
-            result.extend_from_slice(inner.as_bytes());
-            // SAFETY: `prefix` is ASCII (`b`/`B`) and `inner` is UTF-8 from `make_string_in`,
-            // so the concatenated bytes remain valid UTF-8.
-            unsafe { std::str::from_utf8_unchecked(result.into_bump_slice()) }
+            result.extend_from_slice(prefix);
+            result.extend_from_slice(inner);
+            result.into_bump_slice()
         }
     }
 }
 
-fn get_preferred_quote(raw: &str, enclosing_quote: char, prefer_single_quote: bool) -> char {
-    let (preferred_quote_char, alternate_quote_char) = if prefer_single_quote { ('\'', '"') } else { ('"', '\'') };
+fn get_preferred_quote(raw: &[u8], enclosing_quote: u8, prefer_single_quote: bool) -> u8 {
+    let (preferred_quote_char, alternate_quote_char) = if prefer_single_quote { (b'\'', b'"') } else { (b'"', b'\'') };
 
     let mut preferred_quote_count = 0;
     let mut alternate_quote_count = 0;
 
-    let mut chars = raw.chars().peekable();
-    while let Some(character) = chars.next() {
-        if character == preferred_quote_char {
+    let mut i = 0;
+    while i < raw.len() {
+        let byte = raw[i];
+        if byte == preferred_quote_char {
             preferred_quote_count += 1;
-        } else if character == alternate_quote_char {
+        } else if byte == alternate_quote_char {
             alternate_quote_count += 1;
-        } else if character == '\\'
-            && let Some(&next_char) = chars.peek()
+        } else if byte == b'\\'
+            && let Some(&next_byte) = raw.get(i + 1)
         {
-            if next_char != enclosing_quote {
+            if next_byte != enclosing_quote {
                 return enclosing_quote;
             }
-            chars.next();
+            i += 1;
         }
+        i += 1;
     }
 
     if preferred_quote_count > alternate_quote_count { alternate_quote_char } else { preferred_quote_char }
 }
 
-/// Escapes a raw string and encloses it in quotes, allocating the result in an arena.
+/// Escapes a raw byte slice and encloses it in quotes, allocating the result in an arena.
 ///
 /// # Arguments
 ///
-/// * `arena`: The `Bump` arena to allocate the new string in.
-/// * `raw_text`: The raw string content to process.
-/// * `enclosing_quote`: The quote character (' or ") to use for the output.
-pub fn make_string_in<'arena>(arena: &'arena Bump, raw_text: &'arena str, enclosing_quote: char) -> &'arena str {
-    // Pre-allocate with a reasonable guess to avoid reallocations within the arena.
+/// * `arena`: The `Bump` arena to allocate the new bytes in.
+/// * `raw_text`: The raw byte content to process.
+/// * `enclosing_quote`: The quote byte (`b'\''` or `b'"'`) to use for the output.
+pub fn make_string_in<'arena>(arena: &'arena Bump, raw_text: &'arena [u8], enclosing_quote: u8) -> &'arena [u8] {
     let mut result = Vec::with_capacity_in(raw_text.len() + 2, arena);
-    result.push(enclosing_quote as u8);
+    result.push(enclosing_quote);
 
-    let other_quote = if enclosing_quote == '"' { '\'' } else { '"' };
-    let mut chars = raw_text.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        let mut buf = [0; 4];
-        match c {
-            '\\' => {
-                if let Some(&next_char) = chars.peek() {
-                    if next_char != other_quote {
+    let other_quote = if enclosing_quote == b'"' { b'\'' } else { b'"' };
+    let mut i = 0;
+    while i < raw_text.len() {
+        let byte = raw_text[i];
+        match byte {
+            b'\\' => {
+                if let Some(&next_byte) = raw_text.get(i + 1) {
+                    if next_byte != other_quote {
                         result.push(b'\\');
                     }
-
-                    chars.next();
-                    result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
+                    result.push(next_byte);
+                    i += 1;
                 } else {
                     result.push(b'\\');
                 }
             }
-            _ if c == enclosing_quote => {
+            _ if byte == enclosing_quote => {
                 result.push(b'\\');
-                result.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+                result.push(byte);
             }
             _ => {
-                result.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+                result.push(byte);
             }
         }
+        i += 1;
     }
 
-    result.push(enclosing_quote as u8);
+    result.push(enclosing_quote);
 
-    // Convert the byte vec into a slice and then to a string slice.
-    // SAFETY: The logic ensures only valid UTF-8 characters are pushed.
-    unsafe { std::str::from_utf8_unchecked(result.into_bump_slice()) }
+    result.into_bump_slice()
 }

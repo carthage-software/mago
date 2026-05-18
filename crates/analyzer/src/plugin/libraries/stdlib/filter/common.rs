@@ -41,7 +41,7 @@ pub fn resolve_filter_return_type(
     filter_index: usize,
     options_index: usize,
 ) -> Option<TUnion> {
-    let filter_arg = invocation.get_argument(filter_index, &["filter"])?;
+    let filter_arg = invocation.get_argument(filter_index, &[b"filter"])?;
     let filter_type = context.get_expression_type(filter_arg)?;
     let filter_value = filter_type.get_single_literal_int_value()?;
 
@@ -59,7 +59,7 @@ fn has_null_on_failure_flag(
     invocation: &InvocationInfo<'_, '_, '_>,
     options_index: usize,
 ) -> bool {
-    let Some(options_arg) = invocation.get_argument(options_index, &["options"]) else {
+    let Some(options_arg) = invocation.get_argument(options_index, &[b"options"]) else {
         return false;
     };
 

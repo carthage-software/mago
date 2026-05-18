@@ -241,7 +241,7 @@ impl<'arena> Format<'arena> for Statement<'arena> {
                 Statement::Static(s) => s.format(f),
                 Statement::HaltCompiler(h) => h.format(f),
                 Statement::Unset(u) => u.format(f),
-                Statement::Noop(_) => Document::String(";"),
+                Statement::Noop(_) => Document::String(b";"),
                 #[allow(clippy::unreachable)]
                 _ => unreachable!("A statement variant was not handled in formatter: {self:?}"),
             }
@@ -268,13 +268,13 @@ impl<'arena> Format<'arena> for OpeningTag<'arena> {
 
 impl<'arena> Format<'arena> for FullOpeningTag<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, FullOpeningTag, { Document::String("<?php") })
+        wrap!(f, self, FullOpeningTag, { Document::String(b"<?php") })
     }
 }
 
 impl<'arena> Format<'arena> for ShortOpeningTag {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, ShortOpeningTag, { Document::String("<?") })
+        wrap!(f, self, ShortOpeningTag, { Document::String(b"<?") })
     }
 }
 
@@ -295,7 +295,7 @@ impl<'arena> Format<'arena> for ClosingTag {
                     in f.arena;
                     Document::LineSuffixBoundary,
                     if f.is_at_start_of_line(self.span) { Document::empty() } else { Document::soft_space() },
-                    Document::String("?>"),
+                    Document::String(b"?>"),
                 ])
             }
         })
@@ -317,17 +317,17 @@ impl<'arena> Format<'arena> for Declare<'arena> {
         wrap!(f, self, Declare, {
             let mut contents = vec![in f.arena; self.declare.format(f)];
 
-            contents.push(Document::String("("));
+            contents.push(Document::String(b"("));
 
             let len = self.items.len();
             for (i, item) in self.items.iter().enumerate() {
                 contents.push(item.format(f));
                 if i != len - 1 {
-                    contents.push(Document::String(", "));
+                    contents.push(Document::String(b", "));
                 }
             }
 
-            contents.push(Document::String(")"));
+            contents.push(Document::String(b")"));
             contents.push(self.body.format(f));
 
             Document::Group(Group::new(contents).with_break_mode(BreakMode::Force))
@@ -342,7 +342,7 @@ impl<'arena> Format<'arena> for DeclareItem<'arena> {
                 in f.arena;
                 self.name.format(f),
                 if f.settings.space_around_assignment_in_declare { Document::space() } else { Document::empty() },
-                Document::String("="),
+                Document::String(b"="),
                 if f.settings.space_around_assignment_in_declare { Document::space() } else { Document::empty() },
                 self.value.format(f),
             ])
@@ -502,8 +502,8 @@ impl<'arena> Format<'arena> for TypedUseItemList<'arena> {
                 self.r#type.format(f),
                 Document::space(),
                 self.namespace.format(f),
-                Document::String("\\"),
-                Document::String("{"),
+                Document::String(b"\\"),
+                Document::String(b"{"),
             ];
 
             if !self.items.is_empty() {
@@ -528,7 +528,7 @@ impl<'arena> Format<'arena> for TypedUseItemList<'arena> {
                 contents.push(Document::Line(Line::soft()));
             }
 
-            contents.push(Document::String("}"));
+            contents.push(Document::String(b"}"));
 
             Document::Group(Group::new(contents))
         })
@@ -539,7 +539,7 @@ impl<'arena> Format<'arena> for MixedUseItemList<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, MixedUseItemList, {
             let mut contents =
-                vec![in f.arena; self.namespace.format(f), Document::String("\\"), Document::String("{")];
+                vec![in f.arena; self.namespace.format(f), Document::String(b"\\"), Document::String(b"{")];
 
             if !self.items.is_empty() {
                 let mut items = if f.settings.sort_uses {
@@ -563,7 +563,7 @@ impl<'arena> Format<'arena> for MixedUseItemList<'arena> {
                 contents.push(Document::Line(Line::soft()));
             }
 
-            contents.push(Document::String("}"));
+            contents.push(Document::String(b"}"));
 
             Document::Group(Group::new(contents))
         })
@@ -641,7 +641,7 @@ impl<'arena> Format<'arena> for TraitUse<'arena> {
                     parts.push(self.r#use.format(f));
                     parts.push(Document::space());
                     parts.push(trait_name.format(f));
-                    parts.push(Document::String(";"));
+                    parts.push(Document::String(b";"));
                 }
 
                 return Document::Array(parts);
@@ -650,7 +650,7 @@ impl<'arena> Format<'arena> for TraitUse<'arena> {
             let mut contents = vec![in f.arena; self.r#use.format(f), Document::space()];
             for (i, trait_name) in self.trait_names.iter().enumerate() {
                 if i != 0 {
-                    contents.push(Document::String(", "));
+                    contents.push(Document::String(b", "));
                 }
 
                 contents.push(trait_name.format(f));
@@ -716,7 +716,7 @@ impl<'arena> Format<'arena> for TraitUseAbsoluteMethodReference<'arena> {
             Document::Group(Group::new(vec![
                 in f.arena;
                 self.trait_name.format(f),
-                Document::String("::"),
+                Document::String(b"::"),
                 self.method_name.format(f),
             ]))
         })
@@ -730,7 +730,7 @@ impl<'arena> Format<'arena> for TraitUsePrecedenceAdaptation<'arena> {
 
             for (i, trait_name) in self.trait_names.iter().enumerate() {
                 if i != 0 {
-                    contents.push(Document::String(", "));
+                    contents.push(Document::String(b", "));
                 }
 
                 contents.push(trait_name.format(f));
@@ -815,7 +815,7 @@ impl<'arena> Format<'arena> for ClassLikeConstantItem<'arena> {
                 f,
                 AssignmentLikeNode::ClassLikeConstantItem(self),
                 lhs,
-                Document::String("="),
+                Document::String(b"="),
                 self.value,
                 f.alignment_context(),
             )
@@ -863,7 +863,7 @@ impl<'arena> Format<'arena> for EnumCaseBackedItem<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, EnumCaseBackedItem, {
             let lhs = self.name.format(f);
-            let operator = Document::String("=");
+            let operator = Document::String(b"=");
 
             print_assignment_with_alignment(
                 f,
@@ -1014,7 +1014,7 @@ impl<'arena> Format<'arena> for PropertyConcreteItem<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, PropertyConcreteItem, {
             let lhs = self.variable.format(f);
-            let operator = Document::String("=");
+            let operator = Document::String(b"=");
 
             print_assignment_with_alignment(
                 f,
@@ -1038,7 +1038,7 @@ impl<'arena> Format<'arena> for Terminator<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Terminator, {
             match self {
-                Terminator::Semicolon(_) | Terminator::TagPair(_, _) => Document::String(";"),
+                Terminator::Semicolon(_) | Terminator::TagPair(_, _) => Document::String(b";"),
                 Terminator::ClosingTag(t) => {
                     Document::Array(vec![in f.arena; Document::Space(Space::soft()), t.format(f)])
                 }
@@ -1066,7 +1066,7 @@ impl<'arena> Format<'arena> for ExpressionStatement<'arena> {
                     Document::IfBreak(
                         IfBreak::new(
                             f.arena,
-                            Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::String(";")]),
+                            Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::String(b";")]),
                             terminator,
                         )
                         .with_id(chain_group_id),
@@ -1163,7 +1163,7 @@ impl<'arena> Format<'arena> for EnumBackingTypeHint<'arena> {
         wrap!(f, self, EnumBackingTypeHint, {
             Document::Group(Group::new(vec![
                 in f.arena;
-                format_token(f, self.colon, ":"),
+                format_token(f, self.colon, b":"),
                 Document::space(),
                 self.hint.format(f),
             ]))
@@ -1282,7 +1282,7 @@ impl<'arena> Format<'arena> for Return<'arena> {
                 contents.push(Document::IfBreak(
                     IfBreak::new(
                         f.arena,
-                        Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::String(";")]),
+                        Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::String(b";")]),
                         terminator,
                     )
                     .with_id(chain_group_id),
@@ -1339,7 +1339,7 @@ impl<'arena> Format<'arena> for EchoTag<'arena> {
                 // Single expression: inline as `<?= expr ?>`
                 Document::Group(Group::new(vec![
                     in f.arena;
-                    Document::String("<?="),
+                    Document::String(b"<?="),
                     Document::space(),
                     expression.format(f),
                     self.terminator.format(f),
@@ -1353,7 +1353,7 @@ impl<'arena> Format<'arena> for EchoTag<'arena> {
 
                 Document::Group(Group::new(vec![
                     in f.arena;
-                    Document::String("<?="),
+                    Document::String(b"<?="),
                     Document::IndentIfBreak(IndentIfBreak::new(values_group_id, vec![
                         in f.arena;
                         Document::Line(Line::default()),
@@ -1376,7 +1376,7 @@ impl<'arena> Format<'arena> for ConstantItem<'arena> {
                 f,
                 AssignmentLikeNode::ConstantItem(self),
                 lhs,
-                Document::String("="),
+                Document::String(b"="),
                 self.value,
                 f.alignment_context(),
             )
@@ -1429,9 +1429,9 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                 Hint::Identifier(identifier) => identifier.format(f),
                 Hint::Parenthesized(parenthesized_hint) => Document::Array(vec![
                     in f.arena;
-                    format_token(f, parenthesized_hint.left_parenthesis, "("),
+                    format_token(f, parenthesized_hint.left_parenthesis, b"("),
                     parenthesized_hint.hint.format(f),
-                    format_token(f, parenthesized_hint.right_parenthesis, ")"),
+                    format_token(f, parenthesized_hint.right_parenthesis, b")"),
                 ]),
                 Hint::Nullable(nullable_hint) => {
                     // If the nullable type is nested inside another type hint,
@@ -1443,19 +1443,19 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                         ));
 
                     if !force_long_syntax && f.settings.null_type_hint.is_question() {
-                        Document::Array(vec![in f.arena; Document::String("?"), nullable_hint.hint.format(f)])
+                        Document::Array(vec![in f.arena; Document::String(b"?"), nullable_hint.hint.format(f)])
                     } else if f.settings.null_type_hint.is_null_pipe_last() {
                         Document::Array(vec![
                             in f.arena;
                             nullable_hint.hint.format(f),
-                            Document::String("|"),
-                            Document::String("null"),
+                            Document::String(b"|"),
+                            Document::String(b"null"),
                         ])
                     } else {
                         Document::Array(vec![
                             in f.arena;
-                            Document::String("null"),
-                            Document::String("|"),
+                            Document::String(b"null"),
+                            Document::String(b"|"),
                             nullable_hint.hint.format(f),
                         ])
                     }
@@ -1483,7 +1483,7 @@ impl<'arena> Format<'arena> for Hint<'arena> {
 
                         Document::Array(vec![
                             in f.arena;
-                            Document::String("?"),
+                            Document::String(b"?"),
                             non_null_hint.format(f),
                         ])
                     } else if f.settings.null_type_hint.is_null_pipe_last()
@@ -1493,14 +1493,14 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                     {
                         let mut docs = Vec::new_in(f.arena);
                         format_union_non_null_leaves(f, self, &mut docs);
-                        docs.push(Document::String("|"));
-                        docs.push(Document::String("null"));
+                        docs.push(Document::String(b"|"));
+                        docs.push(Document::String(b"null"));
                         Document::Array(docs)
                     } else {
                         Document::Array(vec![
                             in f.arena;
                             union_hint.left.format(f),
-                            format_token(f, union_hint.pipe, "|"),
+                            format_token(f, union_hint.pipe, b"|"),
                             union_hint.right.format(f),
                         ])
                     }
@@ -1508,26 +1508,26 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                 Hint::Intersection(intersection_hint) => Document::Array(vec![
                     in f.arena;
                     intersection_hint.left.format(f),
-                    format_token(f, intersection_hint.ampersand, "&"),
+                    format_token(f, intersection_hint.ampersand, b"&"),
                     intersection_hint.right.format(f),
                 ]),
-                Hint::Null(_) => Document::String("null"),
-                Hint::True(_) => Document::String("true"),
-                Hint::False(_) => Document::String("false"),
-                Hint::Array(_) => Document::String("array"),
-                Hint::Callable(_) => Document::String("callable"),
-                Hint::Static(_) => Document::String("static"),
-                Hint::Self_(_) => Document::String("self"),
-                Hint::Parent(_) => Document::String("parent"),
-                Hint::Void(_) => Document::String("void"),
-                Hint::Never(_) => Document::String("never"),
-                Hint::Float(_) => Document::String("float"),
-                Hint::Bool(_) => Document::String("bool"),
-                Hint::Integer(_) => Document::String("int"),
-                Hint::String(_) => Document::String("string"),
-                Hint::Object(_) => Document::String("object"),
-                Hint::Mixed(_) => Document::String("mixed"),
-                Hint::Iterable(_) => Document::String("iterable"),
+                Hint::Null(_) => Document::String(b"null"),
+                Hint::True(_) => Document::String(b"true"),
+                Hint::False(_) => Document::String(b"false"),
+                Hint::Array(_) => Document::String(b"array"),
+                Hint::Callable(_) => Document::String(b"callable"),
+                Hint::Static(_) => Document::String(b"static"),
+                Hint::Self_(_) => Document::String(b"self"),
+                Hint::Parent(_) => Document::String(b"parent"),
+                Hint::Void(_) => Document::String(b"void"),
+                Hint::Never(_) => Document::String(b"never"),
+                Hint::Float(_) => Document::String(b"float"),
+                Hint::Bool(_) => Document::String(b"bool"),
+                Hint::Integer(_) => Document::String(b"int"),
+                Hint::String(_) => Document::String(b"string"),
+                Hint::Object(_) => Document::String(b"object"),
+                Hint::Mixed(_) => Document::String(b"mixed"),
+                Hint::Iterable(_) => Document::String(b"iterable"),
             }
         })
     }
@@ -1575,7 +1575,7 @@ impl<'arena> Format<'arena> for AttributeList<'arena> {
                 );
             let should_inline = !preserve_break && attributes_count == 1;
 
-            let mut contents = vec![in f.arena; Document::String("#[")];
+            let mut contents = vec![in f.arena; Document::String(b"#[")];
             if let Some(trailing_comments) = f.print_trailing_comments(self.hash_left_bracket) {
                 contents.push(trailing_comments);
             }
@@ -1605,7 +1605,7 @@ impl<'arena> Format<'arena> for AttributeList<'arena> {
 
             if !should_inline {
                 if f.settings.trailing_comma {
-                    contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
+                    contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
                 }
 
                 contents.push(Document::Line(Line::soft()));
@@ -1615,7 +1615,7 @@ impl<'arena> Format<'arena> for AttributeList<'arena> {
                 contents.push(leading_comments);
             }
 
-            contents.push(Document::String("]"));
+            contents.push(Document::String(b"]"));
 
             Document::Group(Group::new(contents).with_break_mode(if preserve_break {
                 BreakMode::Preserve
@@ -1628,7 +1628,7 @@ impl<'arena> Format<'arena> for AttributeList<'arena> {
 
 impl<'arena> Format<'arena> for PropertyHookAbstractBody {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        wrap!(f, self, PropertyHookAbstractBody, { Document::String(";") })
+        wrap!(f, self, PropertyHookAbstractBody, { Document::String(b";") })
     }
 }
 
@@ -1652,10 +1652,10 @@ impl<'arena> Format<'arena> for PropertyHookConcreteExpressionBody<'arena> {
         wrap!(f, self, PropertyHookConcreteExpressionBody, {
             Document::Group(Group::new(vec![
                 in f.arena;
-                Document::String("=>"),
+                Document::String(b"=>"),
                 Document::space(),
                 self.expression.format(f),
-                Document::String(";"),
+                Document::String(b";"),
             ]))
         })
     }
@@ -1687,7 +1687,7 @@ impl<'arena> Format<'arena> for PropertyHook<'arena> {
             }
 
             if self.ampersand.is_some() {
-                contents.push(Document::String("&"));
+                contents.push(Document::String(b"&"));
             }
 
             contents.push(self.name.format(f));
@@ -1720,23 +1720,23 @@ impl<'arena> Format<'arena> for PropertyHookList<'arena> {
             if can_inline {
                 Document::Group(Group::new(vec![
                     in f.arena;
-                    Document::String("{"),
+                    Document::String(b"{"),
                     f.print_trailing_comments(self.left_brace).unwrap_or_else(Document::empty),
-                    Document::String(" "),
+                    Document::String(b" "),
                     Document::Array(Document::join(
                         f.arena,
                         self.hooks.iter().map(|hook| hook.format(f)),
                         Separator::Space,
                     )),
                     f.print_dangling_comments(self.span(), true).unwrap_or_else(Document::empty),
-                    Document::String(" "),
-                    Document::String("}"),
+                    Document::String(b" "),
+                    Document::String(b"}"),
                     f.print_trailing_comments(self.right_brace).unwrap_or_else(Document::empty),
                 ]))
             } else {
                 Document::Group(Group::new(vec![
                     in f.arena;
-                    Document::String("{"),
+                    Document::String(b"{"),
                     f.print_trailing_comments(self.left_brace).unwrap_or_else(Document::empty),
                     if self.hooks.is_empty() {
                         Document::empty()
@@ -1754,7 +1754,7 @@ impl<'arena> Format<'arena> for PropertyHookList<'arena> {
                     f.print_dangling_comments(self.span(), true).unwrap_or_else(|| {
                         if self.hooks.is_empty() { Document::empty() } else { Document::Line(Line::hard()) }
                     }),
-                    Document::String("}"),
+                    Document::String(b"}"),
                     f.print_trailing_comments(self.right_brace).unwrap_or_else(Document::empty),
                 ]))
             }
@@ -1765,7 +1765,7 @@ impl<'arena> Format<'arena> for PropertyHookList<'arena> {
 impl<'arena> Format<'arena> for FunctionLikeParameterDefaultValue<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, FunctionLikeParameterDefaultValue, {
-            Document::Group(Group::new(vec![in f.arena; Document::String("= "), self.value.format(f)]))
+            Document::Group(Group::new(vec![in f.arena; Document::String(b"= "), self.value.format(f)]))
         })
     }
 }
@@ -1801,11 +1801,11 @@ impl<'arena> Format<'arena> for FunctionLikeParameter<'arena> {
             }
 
             if self.ampersand.is_some() {
-                contents.push(Document::String("&"));
+                contents.push(Document::String(b"&"));
             }
 
             if self.ellipsis.is_some() {
-                contents.push(Document::String("..."));
+                contents.push(Document::String(b"..."));
             }
 
             if let (Some(padding), Some(list_id)) =
@@ -1814,8 +1814,7 @@ impl<'arena> Format<'arena> for FunctionLikeParameter<'arena> {
             {
                 let mut spaces = Vec::with_capacity_in(padding, f.arena);
                 spaces.resize(padding, b' ');
-                // SAFETY: the buffer holds only ASCII space bytes, which is valid UTF-8.
-                let spaces = Document::String(unsafe { std::str::from_utf8_unchecked(spaces.into_bump_slice()) });
+                let spaces = Document::String(spaces.into_bump_slice());
                 contents.push(Document::IfBreak(IfBreak::new(f.arena, spaces, Document::empty()).with_id(list_id)));
             }
 
@@ -1846,7 +1845,7 @@ impl<'arena> Format<'arena> for FunctionLikeReturnTypeHint<'arena> {
         wrap!(f, self, FunctionLikeReturnTypeHint, {
             Document::Group(Group::new(vec![
                 in f.arena;
-                format_token(f, self.colon, ":"),
+                format_token(f, self.colon, b":"),
                 Document::space(),
                 self.hint.format(f),
             ]))
@@ -1899,7 +1898,7 @@ impl<'arena> Format<'arena> for TryCatchClause<'arena> {
                 in f.arena;
                 self.catch.format(f),
                 Document::space(),
-                format_token(f, self.left_parenthesis, "("),
+                format_token(f, self.left_parenthesis, b"("),
                 Document::Group(Group::new(vec![
                     in f.arena;
                     Document::IndentIfBreak(IndentIfBreak::new(hint_group_id, {
@@ -1915,7 +1914,7 @@ impl<'arena> Format<'arena> for TryCatchClause<'arena> {
                     })),
                     Document::Line(Line::soft()),
                 ]).with_id(hint_group_id)),
-                format_token(f, self.right_parenthesis, ")"),
+                format_token(f, self.right_parenthesis, b")"),
                 Document::space(),
                 self.block.format(f),
             ]))
@@ -1972,7 +1971,7 @@ impl<'arena> Format<'arena> for StaticConcreteItem<'arena> {
                 in f.arena;
                 self.variable.format(f),
                 Document::space(),
-                Document::String("="),
+                Document::String(b"="),
                 Document::space(),
                 self.value.format(f),
             ]))
@@ -2020,13 +2019,13 @@ impl<'arena> Format<'arena> for Static<'arena> {
 impl<'arena> Format<'arena> for Unset<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Unset, {
-            let mut contents = vec![in f.arena; self.unset.format(f), Document::String("(")];
+            let mut contents = vec![in f.arena; self.unset.format(f), Document::String(b"(")];
 
             if !self.values.is_empty() {
                 let mut values = Document::join(f.arena, self.values.iter().map(|v| v.format(f)), Separator::CommaLine);
 
                 if f.settings.trailing_comma {
-                    values.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(","))));
+                    values.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
                 }
 
                 values.insert(0, Document::Line(Line::soft()));
@@ -2035,7 +2034,7 @@ impl<'arena> Format<'arena> for Unset<'arena> {
                 contents.push(Document::Line(Line::soft()));
             }
 
-            contents.push(Document::String(")"));
+            contents.push(Document::String(b")"));
             contents.push(self.terminator.format(f));
 
             Document::Group(Group::new(contents))
@@ -2060,7 +2059,7 @@ impl<'arena> Format<'arena> for Goto<'arena> {
 impl<'arena> Format<'arena> for Label<'arena> {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
         wrap!(f, self, Label, {
-            Document::Group(Group::new(vec![in f.arena; self.name.format(f), Document::String(":")]))
+            Document::Group(Group::new(vec![in f.arena; self.name.format(f), Document::String(b":")]))
         })
     }
 }
@@ -2074,8 +2073,8 @@ impl<'arena> Format<'arena> for HaltCompiler<'arena> {
             Document::Group(Group::new(vec![
                 in f.arena;
                 self.halt_compiler.format(f),
-                Document::String("("),
-                Document::String(")"),
+                Document::String(b"("),
+                Document::String(b")"),
                 self.terminator.format(f),
             ]))
         })
@@ -2112,14 +2111,14 @@ fn format_union_non_null_leaves<'arena>(
         Hint::Null(_) => {}
         leaf => {
             if !docs.is_empty() {
-                docs.push(Document::String("|"));
+                docs.push(Document::String(b"|"));
             }
             docs.push(leaf.format(f));
         }
     }
 }
 
-fn format_token<'arena>(f: &mut FormatterState<'_, 'arena>, span: Span, token_value: &'arena str) -> Document<'arena> {
+fn format_token<'arena>(f: &mut FormatterState<'_, 'arena>, span: Span, token_value: &'arena [u8]) -> Document<'arena> {
     let leading = f.print_leading_comments(span);
     let trailing = f.print_trailing_comments(span);
 
@@ -2129,7 +2128,7 @@ fn format_token<'arena>(f: &mut FormatterState<'_, 'arena>, span: Span, token_va
 fn format_token_with_only_leading_comments<'arena>(
     f: &mut FormatterState<'_, 'arena>,
     span: Span,
-    token_value: &'arena str,
+    token_value: &'arena [u8],
 ) -> Document<'arena> {
     let leading = f.print_leading_comments(span);
 

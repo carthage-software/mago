@@ -9,7 +9,7 @@ impl<'arena> Parser<'_, 'arena> {
         let token = self.expect_one_of_keyword(T![InlineText, InlineShebang])?;
 
         Ok(Inline {
-            kind: if token.span.start.offset == 0 && token.value.starts_with("#!") && token.value.contains('\n') {
+            kind: if token.span.start.offset == 0 && token.value.starts_with(b"#!") && token.value.contains(&b'\n') {
                 InlineKind::Shebang
             } else {
                 InlineKind::Text

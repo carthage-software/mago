@@ -155,7 +155,8 @@ impl<'arena> Parser<'_, 'arena> {
         match token.kind {
             TwigTokenKind::Number => {
                 self.stream.consume()?;
-                let is_float = token.value.contains('.') || token.value.contains('e') || token.value.contains('E');
+                let is_float =
+                    token.value.contains(&b'.') || token.value.contains(&b'e') || token.value.contains(&b'E');
                 Ok(Expression::Number(Number { raw: token.value, is_float, span: self.stream.span_of(&token) }))
             }
             TwigTokenKind::StringSingleQuoted | TwigTokenKind::StringDoubleQuoted => {
@@ -171,9 +172,9 @@ impl<'arena> Parser<'_, 'arena> {
                 self.stream.consume()?;
                 let span = self.stream.span_of(&token);
                 Ok(match token.value {
-                    "true" | "TRUE" => Expression::Bool(Bool { value: true, span }),
-                    "false" | "FALSE" => Expression::Bool(Bool { value: false, span }),
-                    "null" | "NULL" | "none" | "NONE" => Expression::Null(Null { span }),
+                    b"true" | b"TRUE" => Expression::Bool(Bool { value: true, span }),
+                    b"false" | b"FALSE" => Expression::Bool(Bool { value: false, span }),
+                    b"null" | b"NULL" | b"none" | b"NONE" => Expression::Null(Null { span }),
                     other => Expression::Name(Name { name: other, span }),
                 })
             }
@@ -185,7 +186,8 @@ impl<'arena> Parser<'_, 'arena> {
                 Ok(Expression::Name(Name { name: token.value, span: self.stream.span_of(&token) }))
             }
             _ => Err(ParseError::UnexpectedToken(
-                format!("unexpected token {:?} of value {:?}", token.kind, token.value),
+                format!("unexpected token {:?} of value {:?}", token.kind, String::from_utf8_lossy(token.value))
+                    .into_bytes(),
                 self.stream.span_of(&token),
             )),
         }

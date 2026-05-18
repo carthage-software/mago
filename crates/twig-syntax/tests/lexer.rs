@@ -20,7 +20,7 @@ fn plain_text_is_raw_text() {
     let toks = lex("hello world");
     assert_eq!(toks.len(), 1);
     assert_eq!(toks[0].kind, TwigTokenKind::RawText);
-    assert_eq!(toks[0].value, "hello world");
+    assert_eq!(toks[0].value, b"hello world".as_slice());
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn raw_text_preserves_newlines_verbatim() {
     roundtrip(src);
     let toks = lex(src);
     assert_eq!(toks[0].kind, TwigTokenKind::RawText);
-    assert_eq!(toks[0].value, src);
+    assert_eq!(toks[0].value, src.as_bytes());
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn nested_interpolation_with_concat() {
 fn single_quoted_string_is_atomic() {
     let toks = lex(r#"{{ 'foo' }}"#);
     let s = toks.iter().find(|t| t.kind == TwigTokenKind::StringSingleQuoted).unwrap();
-    assert_eq!(s.value, "'foo'");
+    assert_eq!(s.value, b"'foo'".as_slice());
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn single_quoted_string_with_escape() {
     roundtrip(src);
     let toks = lex(src);
     let s = toks.iter().find(|t| t.kind == TwigTokenKind::StringSingleQuoted).unwrap();
-    assert_eq!(s.value, r#"'it\'s'"#);
+    assert_eq!(s.value, br#"'it\'s'"#.as_slice());
 }
 
 #[test]
@@ -154,13 +154,13 @@ fn double_quoted_string_with_escape() {
     roundtrip(src);
     let toks = lex(src);
     let s = toks.iter().find(|t| t.kind == TwigTokenKind::StringDoubleQuoted).unwrap();
-    assert_eq!(s.value, r#""a\"b""#);
+    assert_eq!(s.value, br#""a\"b""#.as_slice());
 }
 
 #[test]
 fn double_quoted_without_interpolation_is_atomic() {
     let toks = lex(r#"{{ "plain" }}"#);
-    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::StringDoubleQuoted && t.value == r#""plain""#));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::StringDoubleQuoted && t.value == br#""plain""#));
     assert!(!toks.iter().any(|t| t.kind == TwigTokenKind::StringPart));
     assert!(!toks.iter().any(|t| t.kind == TwigTokenKind::DoubleQuoteStart));
 }
@@ -178,64 +178,64 @@ fn double_quoted_with_interpolation_is_structured() {
 #[test]
 fn whitespace_control_block_open() {
     let t = find_first_token("{%- if a %}b{% endif %}", |t| t.kind == TwigTokenKind::OpenBlockDash).unwrap();
-    assert_eq!(t.value, "{%-");
+    assert_eq!(t.value, b"{%-".as_slice());
 }
 
 #[test]
 fn whitespace_control_block_close() {
     let toks = lex("{% if a -%}b{% endif %}");
     let ends: Vec<_> = toks.iter().filter(|t| t.kind == TwigTokenKind::CloseBlockDash).collect();
-    assert!(ends.iter().any(|t| t.value == "-%}"), "expected `-%}}` marker to be emitted, got {ends:?}");
+    assert!(ends.iter().any(|t| t.value == b"-%}".as_slice()), "expected `-%}}` marker to be emitted, got {ends:?}");
 }
 
 #[test]
 fn whitespace_control_variable_open() {
     let t = find_first_token("{{- x }}", |t| t.kind == TwigTokenKind::OpenVariableDash).unwrap();
-    assert_eq!(t.value, "{{-");
+    assert_eq!(t.value, b"{{-".as_slice());
 }
 
 #[test]
 fn whitespace_control_variable_close() {
     let t = find_first_token("{{ x -}}", |t| t.kind == TwigTokenKind::CloseVariableDash).unwrap();
-    assert_eq!(t.value, "-}}");
+    assert_eq!(t.value, b"-}}".as_slice());
 }
 
 #[test]
 fn whitespace_control_comment_open() {
     let t = find_first_token("{#- c #}", |t| t.kind == TwigTokenKind::Comment).unwrap();
-    assert!(t.value.starts_with("{#-"));
+    assert!(t.value.starts_with(b"{#-"));
 }
 
 #[test]
 fn whitespace_control_comment_close() {
     let t = find_first_token("{# c -#}", |t| t.kind == TwigTokenKind::Comment).unwrap();
-    assert!(t.value.ends_with("-#}"));
+    assert!(t.value.ends_with(b"-#}"));
 }
 
 #[test]
 fn line_trim_tilde_block_open() {
     let t = find_first_token("{%~ if a %}b{% endif %}", |t| t.kind == TwigTokenKind::OpenBlockTilde).unwrap();
-    assert_eq!(t.value, "{%~");
+    assert_eq!(t.value, b"{%~".as_slice());
 }
 
 #[test]
 fn line_trim_tilde_variable_close() {
     let t = find_first_token("{{ x ~}}", |t| t.kind == TwigTokenKind::CloseVariableTilde).unwrap();
-    assert_eq!(t.value, "~}}");
+    assert_eq!(t.value, b"~}}".as_slice());
 }
 
 #[test]
 fn verbatim_body_is_preserved_as_verbatim_text() {
     let toks = lex("{% verbatim %}{{ foo }}{% endverbatim %}");
     let body = toks.iter().find(|t| t.kind == TwigTokenKind::VerbatimText).unwrap();
-    assert_eq!(body.value, "{{ foo }}");
+    assert_eq!(body.value, b"{{ foo }}".as_slice());
 }
 
 #[test]
 fn raw_alias_preserved_as_verbatim_text() {
     let toks = lex("{% raw %}{{ foo }}{% endraw %}");
     let body = toks.iter().find(|t| t.kind == TwigTokenKind::VerbatimText).unwrap();
-    assert_eq!(body.value, "{{ foo }}");
+    assert_eq!(body.value, b"{{ foo }}".as_slice());
 }
 
 #[test]
@@ -255,7 +255,7 @@ fn comment_body_may_contain_close_looking_bytes() {
     roundtrip(src);
     let toks = lex(src);
     let c = toks.iter().find(|t| t.kind == TwigTokenKind::Comment).unwrap();
-    assert_eq!(c.value, src);
+    assert_eq!(c.value, src.as_bytes());
 }
 
 #[test]
@@ -264,7 +264,7 @@ fn comment_body_may_span_multiple_lines() {
     roundtrip(src);
     let toks = lex(src);
     let c = toks.iter().find(|t| t.kind == TwigTokenKind::Comment).unwrap();
-    assert!(c.value.contains('\n'));
+    assert!(c.value.contains(&b'\n'));
 }
 
 #[test]
@@ -272,116 +272,116 @@ fn empty_comment_body_is_ok() {
     roundtrip("{##}");
     let toks = lex("{##}");
     let c = toks.iter().find(|t| t.kind == TwigTokenKind::Comment).unwrap();
-    assert_eq!(c.value, "{##}");
+    assert_eq!(c.value, b"{##}".as_slice());
 }
 
 #[test]
 fn inline_comment_inside_expression() {
     let toks = lex("{{ a # trailing\n + b }}");
     let c = toks.iter().find(|t| t.kind == TwigTokenKind::InlineComment).unwrap();
-    assert_eq!(c.value, "# trailing");
+    assert_eq!(c.value, b"# trailing".as_slice());
 }
 
 #[test]
 fn inline_comment_with_trailing_newline_terminates_at_newline() {
     let toks = lex("{{ a # to-eol\n }}").into_iter().collect::<Vec<_>>();
     let c = toks.iter().find(|t| t.kind == TwigTokenKind::InlineComment).unwrap();
-    assert_eq!(c.value, "# to-eol");
+    assert_eq!(c.value, b"# to-eol".as_slice());
 }
 
-fn first_kind_of(src: &str, kind: TwigTokenKind) -> String {
-    lex(src).into_iter().find(|t| t.kind == kind).map(|t| t.value.to_string()).unwrap_or_default()
+fn first_kind_of(src: &str, kind: TwigTokenKind) -> Vec<u8> {
+    lex(src).into_iter().find(|t| t.kind == kind).map(|t| t.value.to_vec()).unwrap_or_default()
 }
 
 #[test]
 fn operator_equal_equal() {
-    assert_eq!(first_kind_of("{{ a == b }}", TwigTokenKind::EqualEqual), "==");
+    assert_eq!(first_kind_of("{{ a == b }}", TwigTokenKind::EqualEqual), b"==".as_slice());
 }
 
 #[test]
 fn operator_bang_equal() {
-    assert_eq!(first_kind_of("{{ a != b }}", TwigTokenKind::BangEqual), "!=");
+    assert_eq!(first_kind_of("{{ a != b }}", TwigTokenKind::BangEqual), b"!=".as_slice());
 }
 
 #[test]
 fn operator_less_equal() {
-    assert_eq!(first_kind_of("{{ a <= b }}", TwigTokenKind::LessThanEqual), "<=");
+    assert_eq!(first_kind_of("{{ a <= b }}", TwigTokenKind::LessThanEqual), b"<=".as_slice());
 }
 
 #[test]
 fn operator_greater_equal() {
-    assert_eq!(first_kind_of("{{ a >= b }}", TwigTokenKind::GreaterThanEqual), ">=");
+    assert_eq!(first_kind_of("{{ a >= b }}", TwigTokenKind::GreaterThanEqual), b">=".as_slice());
 }
 
 #[test]
 fn operator_spaceship() {
-    assert_eq!(first_kind_of("{{ a <=> b }}", TwigTokenKind::Spaceship), "<=>");
+    assert_eq!(first_kind_of("{{ a <=> b }}", TwigTokenKind::Spaceship), b"<=>".as_slice());
 }
 
 #[test]
 fn operator_identity_triple_equal() {
-    assert_eq!(first_kind_of("{{ a === b }}", TwigTokenKind::EqualEqualEqual), "===");
+    assert_eq!(first_kind_of("{{ a === b }}", TwigTokenKind::EqualEqualEqual), b"===".as_slice());
 }
 
 #[test]
 fn operator_non_identity_bang_double_equal() {
-    assert_eq!(first_kind_of("{{ a !== b }}", TwigTokenKind::BangEqualEqual), "!==");
+    assert_eq!(first_kind_of("{{ a !== b }}", TwigTokenKind::BangEqualEqual), b"!==".as_slice());
 }
 
 #[test]
 fn operator_floor_div() {
-    assert_eq!(first_kind_of("{{ a // b }}", TwigTokenKind::SlashSlash), "//");
+    assert_eq!(first_kind_of("{{ a // b }}", TwigTokenKind::SlashSlash), b"//".as_slice());
 }
 
 #[test]
 fn operator_pow() {
-    assert_eq!(first_kind_of("{{ a ** b }}", TwigTokenKind::AsteriskAsterisk), "**");
+    assert_eq!(first_kind_of("{{ a ** b }}", TwigTokenKind::AsteriskAsterisk), b"**".as_slice());
 }
 
 #[test]
 fn operator_range() {
-    assert_eq!(first_kind_of("{{ 1..10 }}", TwigTokenKind::DotDot), "..");
+    assert_eq!(first_kind_of("{{ 1..10 }}", TwigTokenKind::DotDot), b"..".as_slice());
 }
 
 #[test]
 fn operator_null_coalesce() {
-    assert_eq!(first_kind_of("{{ a ?? b }}", TwigTokenKind::QuestionQuestion), "??");
+    assert_eq!(first_kind_of("{{ a ?? b }}", TwigTokenKind::QuestionQuestion), b"??".as_slice());
 }
 
 #[test]
 fn operator_elvis() {
-    assert_eq!(first_kind_of("{{ a ?: b }}", TwigTokenKind::QuestionColon), "?:");
+    assert_eq!(first_kind_of("{{ a ?: b }}", TwigTokenKind::QuestionColon), b"?:".as_slice());
 }
 
 #[test]
 fn operator_null_safe() {
-    assert_eq!(first_kind_of("{{ a?.b }}", TwigTokenKind::QuestionDot), "?.");
+    assert_eq!(first_kind_of("{{ a?.b }}", TwigTokenKind::QuestionDot), b"?.".as_slice());
 }
 
 #[test]
 fn operator_spread() {
     let toks = lex("{{ f(...xs) }}");
-    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::DotDotDot && t.value == "..."));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::DotDotDot && t.value == b"...".as_slice()));
 }
 
 #[test]
 fn operator_arrow() {
-    assert_eq!(first_kind_of("{{ v => v + 1 }}", TwigTokenKind::FatArrow), "=>");
+    assert_eq!(first_kind_of("{{ v => v + 1 }}", TwigTokenKind::FatArrow), b"=>".as_slice());
 }
 
 #[test]
 fn operator_b_and() {
-    assert_eq!(first_kind_of("{{ a b-and b }}", TwigTokenKind::BAnd), "b-and");
+    assert_eq!(first_kind_of("{{ a b-and b }}", TwigTokenKind::BAnd), b"b-and".as_slice());
 }
 
 #[test]
 fn operator_b_or() {
-    assert_eq!(first_kind_of("{{ a b-or b }}", TwigTokenKind::BOr), "b-or");
+    assert_eq!(first_kind_of("{{ a b-or b }}", TwigTokenKind::BOr), b"b-or".as_slice());
 }
 
 #[test]
 fn operator_b_xor() {
-    assert_eq!(first_kind_of("{{ a b-xor b }}", TwigTokenKind::BXor), "b-xor");
+    assert_eq!(first_kind_of("{{ a b-xor b }}", TwigTokenKind::BXor), b"b-xor".as_slice());
 }
 
 #[test]
@@ -428,56 +428,56 @@ fn operator_divisible_by() {
 
 #[test]
 fn word_operator_and() {
-    assert_eq!(first_kind_of("{{ a and b }}", TwigTokenKind::And), "and");
+    assert_eq!(first_kind_of("{{ a and b }}", TwigTokenKind::And), b"and".as_slice());
 }
 
 #[test]
 fn word_operator_or() {
-    assert_eq!(first_kind_of("{{ a or b }}", TwigTokenKind::Or), "or");
+    assert_eq!(first_kind_of("{{ a or b }}", TwigTokenKind::Or), b"or".as_slice());
 }
 
 #[test]
 fn word_operator_xor() {
-    assert_eq!(first_kind_of("{{ a xor b }}", TwigTokenKind::Xor), "xor");
+    assert_eq!(first_kind_of("{{ a xor b }}", TwigTokenKind::Xor), b"xor".as_slice());
 }
 
 #[test]
 fn word_operator_matches() {
-    assert_eq!(first_kind_of("{{ a matches '/x/' }}", TwigTokenKind::Matches), "matches");
+    assert_eq!(first_kind_of("{{ a matches '/x/' }}", TwigTokenKind::Matches), b"matches".as_slice());
 }
 
 #[test]
 fn number_integer() {
     let toks = lex("{{ 123 }}");
     let n = toks.iter().find(|t| t.kind == TwigTokenKind::Number).unwrap();
-    assert_eq!(n.value, "123");
+    assert_eq!(n.value, b"123".as_slice());
 }
 
 #[test]
 fn number_float() {
     let toks = lex("{{ 3.14 }}");
     let n = toks.iter().find(|t| t.kind == TwigTokenKind::Number).unwrap();
-    assert_eq!(n.value, "3.14");
+    assert_eq!(n.value, b"3.14".as_slice());
 }
 
 #[test]
 fn number_with_underscore_separators() {
     let toks = lex("{{ 1_000_000 }}");
     let n = toks.iter().find(|t| t.kind == TwigTokenKind::Number).unwrap();
-    assert_eq!(n.value, "1_000_000");
+    assert_eq!(n.value, b"1_000_000".as_slice());
 }
 
 #[test]
 fn number_with_exponent() {
     let toks = lex("{{ 1.5e10 }}");
     let n = toks.iter().find(|t| t.kind == TwigTokenKind::Number).unwrap();
-    assert!(n.value.starts_with("1.5e"), "got {:?}", n.value);
+    assert!(n.value.starts_with(b"1.5e"), "got {:?}", n.value);
 }
 
 #[test]
 fn names_may_contain_underscores_and_digits() {
     let toks = lex("{{ _foo_bar1 }}");
-    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Name && t.value == "_foo_bar1"));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Name && t.value == b"_foo_bar1".as_slice()));
 }
 
 #[test]
@@ -486,7 +486,7 @@ fn name_after_dot_is_not_a_word_operator() {
     let idx = toks.iter().position(|t| t.kind == TwigTokenKind::Dot).unwrap();
     let after_dot = &toks[idx + 1..].iter().find(|t| t.kind != TwigTokenKind::Whitespace).unwrap();
     assert_eq!(after_dot.kind, TwigTokenKind::Name);
-    assert_eq!(after_dot.value, "not");
+    assert_eq!(after_dot.value, b"not".as_slice());
 }
 
 #[test]
@@ -495,24 +495,24 @@ fn name_after_pipe_is_not_a_word_operator() {
     let idx = toks.iter().position(|t| t.kind == TwigTokenKind::Pipe).unwrap();
     let after_pipe = &toks[idx + 1..].iter().find(|t| t.kind != TwigTokenKind::Whitespace).unwrap();
     assert_eq!(after_pipe.kind, TwigTokenKind::Name);
-    assert_eq!(after_pipe.value, "in");
+    assert_eq!(after_pipe.value, b"in".as_slice());
 }
 
 #[test]
 fn punctuation_pipe_dot_colon_comma_question() {
     let src = "{{ a|b.c, d ? e : f }}";
     let toks = lex(src);
-    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Pipe && t.value == "|"));
-    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Dot && t.value == "."));
-    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Colon && t.value == ":"));
-    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Comma && t.value == ","));
-    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Question && t.value == "?"));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Pipe && t.value == b"|".as_slice()));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Dot && t.value == b".".as_slice()));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Colon && t.value == b":".as_slice()));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Comma && t.value == b",".as_slice()));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Question && t.value == b"?".as_slice()));
 }
 
 #[test]
 fn brace_emits_left_brace_for_hash_literal_open() {
     let toks = lex("{{ {} }}");
-    let opener = toks.iter().find(|t| t.value == "{" && t.kind == TwigTokenKind::LeftBrace).unwrap();
+    let opener = toks.iter().find(|t| t.value == b"{".as_slice() && t.kind == TwigTokenKind::LeftBrace).unwrap();
     assert_eq!(opener.kind, TwigTokenKind::LeftBrace);
 }
 
@@ -521,7 +521,7 @@ fn span_of_mid_template_name_matches_offsets() {
     let src = "Hello, {{ name }}!";
     let toks = lex(src);
     let name = toks.iter().find(|t| t.kind == TwigTokenKind::Name).unwrap();
-    assert_eq!(name.value, "name");
+    assert_eq!(name.value, b"name".as_slice());
     assert_eq!(name.start.offset as usize, src.find("name").unwrap());
     assert_eq!(name.end().offset as usize, src.find("name").unwrap() + "name".len());
 }
@@ -627,9 +627,9 @@ fn token_values_for_simple_print() {
     assert_eq!(
         names,
         vec![
-            (TwigTokenKind::OpenVariable, "{{".to_string()),
-            (TwigTokenKind::Name, "x".to_string()),
-            (TwigTokenKind::CloseVariable, "}}".to_string()),
+            (TwigTokenKind::OpenVariable, b"{{".to_vec()),
+            (TwigTokenKind::Name, b"x".to_vec()),
+            (TwigTokenKind::CloseVariable, b"}}".to_vec()),
         ]
     );
 }

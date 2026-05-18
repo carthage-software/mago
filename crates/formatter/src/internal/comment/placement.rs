@@ -16,8 +16,8 @@ pub enum CommentLinePosition {
 }
 
 impl CommentLinePosition {
-    pub fn at_offset(source_text: &str, offset: u32) -> Self {
-        for &byte in source_text.as_bytes()[..offset as usize].iter().rev() {
+    pub fn at_offset(source_text: &[u8], offset: u32) -> Self {
+        for &byte in source_text[..offset as usize].iter().rev() {
             match byte {
                 b'\n' | b'\r' => return Self::OwnLine,
                 b' ' | b'\t' => {}
@@ -114,7 +114,7 @@ impl Comments {
 }
 
 pub fn place_comments<'arena>(
-    source_text: &str,
+    source_text: &[u8],
     root: Node<'_, 'arena>,
     all_comments: &'arena [Trivia<'arena>],
 ) -> Comments {
@@ -138,7 +138,7 @@ pub fn place_comments<'arena>(
 }
 
 fn collect_node_comments<'ast, 'arena>(
-    source_text: &str,
+    source_text: &[u8],
     node: Node<'ast, 'arena>,
     all_comments: &'arena [Trivia<'arena>],
     comments: &mut Comments,
@@ -236,7 +236,7 @@ fn is_binary_like(node: Node<'_, '_>) -> bool {
 }
 
 fn make_decorated<'ast, 'arena>(
-    source_text: &str,
+    source_text: &[u8],
     all_comments: &'arena [Trivia<'arena>],
     cursor: usize,
     enclosing: Node<'ast, 'arena>,

@@ -26,7 +26,7 @@ fn byte_before(file: &MagoFile, offset: u32) -> Option<u8> {
         return None;
     }
 
-    file.contents.as_bytes().get((offset - 1) as usize).copied()
+    file.contents.get((offset - 1) as usize).copied()
 }
 
 mod items;
@@ -35,11 +35,11 @@ const MAX_RESULTS: usize = 50;
 
 #[derive(Debug)]
 pub(super) enum Context<'a> {
-    Variable { prefix: &'a str, scope_start: u32 },
-    InstanceMember { receiver_span: (u32, u32), prefix: &'a str },
-    StaticMember { class: &'a str, prefix: &'a str },
-    Qualified { qualifier: &'a str, prefix: &'a str },
-    Bare { prefix: &'a str },
+    Variable { prefix: &'a [u8], scope_start: u32 },
+    InstanceMember { receiver_span: (u32, u32), prefix: &'a [u8] },
+    StaticMember { class: &'a [u8], prefix: &'a [u8] },
+    Qualified { qualifier: &'a [u8], prefix: &'a [u8] },
+    Bare { prefix: &'a [u8] },
 }
 
 pub fn compute(
@@ -90,27 +90,27 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
     if matches!(cur.kind, TokenKind::Variable) {
         let raw = cur.value;
         let consumed = (offset - cur.start.offset) as usize;
-        let prefix = if consumed >= 1 && consumed <= raw.len() { &raw[1..consumed] } else { "" };
+        let prefix: &[u8] = if consumed >= 1 && consumed <= raw.len() { &raw[1..consumed] } else { b"" };
         return Context::Variable { prefix, scope_start };
     }
 
     let cursor_at_end_of_cur = offset == cur.start.offset + cur.value.len() as u32;
     if cursor_at_end_of_cur {
         match cur.kind {
-            TokenKind::Dollar => return Context::Variable { prefix: "", scope_start },
+            TokenKind::Dollar => return Context::Variable { prefix: b"", scope_start },
             TokenKind::MinusGreaterThan | TokenKind::QuestionMinusGreaterThan => {
                 if let Some(receiver_span) = receiver_before(tokens, current_idx) {
-                    return Context::InstanceMember { receiver_span, prefix: "" };
+                    return Context::InstanceMember { receiver_span, prefix: b"" };
                 }
 
-                return Context::Bare { prefix: "" };
+                return Context::Bare { prefix: b"" };
             }
             TokenKind::ColonColon => {
                 if let Some(class) = static_receiver_before(tokens, current_idx) {
-                    return Context::StaticMember { class, prefix: "" };
+                    return Context::StaticMember { class, prefix: b"" };
                 }
 
-                return Context::Bare { prefix: "" };
+                return Context::Bare { prefix: b"" };
             }
             _ => {}
         }
@@ -120,7 +120,7 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
     let prev = prev_idx.map(|j| tokens[j].kind);
 
     if matches!(prev, Some(TokenKind::MinusGreaterThan) | Some(TokenKind::QuestionMinusGreaterThan)) {
-        let prefix = if matches!(cur.kind, TokenKind::Identifier) { cur.value } else { "" };
+        let prefix: &[u8] = if matches!(cur.kind, TokenKind::Identifier) { cur.value } else { b"" };
         if let Some(receiver_span) = receiver_before(tokens, prev_idx.unwrap()) {
             return Context::InstanceMember { receiver_span, prefix };
         }
@@ -130,25 +130,29 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
     if matches!(prev, Some(TokenKind::ColonColon))
         && let Some(class) = static_receiver_before(tokens, prev_idx.unwrap())
     {
-        let prefix = if matches!(cur.kind, TokenKind::Identifier) { cur.value } else { "" };
+        let prefix: &[u8] = if matches!(cur.kind, TokenKind::Identifier) { cur.value } else { b"" };
         return Context::StaticMember { class, prefix };
     }
 
     match cur.kind {
         TokenKind::Identifier => Context::Bare { prefix: cur.value },
-        TokenKind::QualifiedIdentifier => match cur.value.rsplit_once('\\') {
+        TokenKind::QualifiedIdentifier => match rsplit_once_byte(cur.value, b'\\') {
             Some((qual, last)) => Context::Qualified { qualifier: qual, prefix: last },
             None => Context::Bare { prefix: cur.value },
         },
         TokenKind::FullyQualifiedIdentifier => {
-            let stripped = cur.value.trim_start_matches('\\');
-            match stripped.rsplit_once('\\') {
+            let stripped = mago_bytes::trim_start_byte(cur.value, b'\\');
+            match rsplit_once_byte(stripped, b'\\') {
                 Some((qual, last)) => Context::Qualified { qualifier: qual, prefix: last },
-                None => Context::Qualified { qualifier: "", prefix: stripped },
+                None => Context::Qualified { qualifier: b"", prefix: stripped },
             }
         }
-        _ => Context::Bare { prefix: "" },
+        _ => Context::Bare { prefix: b"" },
     }
+}
+
+fn rsplit_once_byte(s: &[u8], byte: u8) -> Option<(&[u8], &[u8])> {
+    memchr::memrchr(byte, s).map(|i| (&s[..i], &s[i + 1..]))
 }
 
 fn classify_after_punctuation<'a>(
@@ -158,7 +162,7 @@ fn classify_after_punctuation<'a>(
     scope_start: u32,
 ) -> Context<'a> {
     if byte_before(file, offset) == Some(b'$') {
-        return Context::Variable { prefix: "", scope_start };
+        return Context::Variable { prefix: b"", scope_start };
     }
 
     let prev_idx = (0..tokens.len()).rev().find(|i| {
@@ -168,25 +172,25 @@ fn classify_after_punctuation<'a>(
     });
 
     let Some(prev_idx) = prev_idx else {
-        return Context::Bare { prefix: "" };
+        return Context::Bare { prefix: b"" };
     };
 
     let prev_kind = tokens[prev_idx].kind;
 
     if matches!(prev_kind, TokenKind::MinusGreaterThan | TokenKind::QuestionMinusGreaterThan) {
         if let Some(receiver_span) = receiver_before(tokens, prev_idx) {
-            return Context::InstanceMember { receiver_span, prefix: "" };
+            return Context::InstanceMember { receiver_span, prefix: b"" };
         }
-        return Context::Bare { prefix: "" };
+        return Context::Bare { prefix: b"" };
     }
 
     if matches!(prev_kind, TokenKind::ColonColon)
         && let Some(class) = static_receiver_before(tokens, prev_idx)
     {
-        return Context::StaticMember { class, prefix: "" };
+        return Context::StaticMember { class, prefix: b"" };
     }
 
-    Context::Bare { prefix: "" }
+    Context::Bare { prefix: b"" }
 }
 
 fn receiver_before(tokens: &[Token<'_>], arrow_idx: usize) -> Option<(u32, u32)> {
@@ -234,7 +238,7 @@ fn walk_chain_start(tokens: &[Token<'_>], end_idx: usize) -> u32 {
     }
 }
 
-fn static_receiver_before<'a>(tokens: &'a [Token<'a>], colon_idx: usize) -> Option<&'a str> {
+fn static_receiver_before<'a>(tokens: &'a [Token<'a>], colon_idx: usize) -> Option<&'a [u8]> {
     let mut k = colon_idx;
     while k > 0 {
         k -= 1;
@@ -244,7 +248,7 @@ fn static_receiver_before<'a>(tokens: &'a [Token<'a>], colon_idx: usize) -> Opti
         return match tokens[k].kind {
             TokenKind::Self_ | TokenKind::Static | TokenKind::Parent => Some(tokens[k].value),
             TokenKind::Identifier | TokenKind::QualifiedIdentifier | TokenKind::FullyQualifiedIdentifier => {
-                Some(tokens[k].value.trim_start_matches('\\'))
+                Some(mago_bytes::trim_start_byte(tokens[k].value, b'\\'))
             }
             _ => None,
         };

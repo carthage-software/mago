@@ -8,7 +8,7 @@ use crate::internal::utils::string_width;
 pub enum Indentation<'arena> {
     Root,
     Indent,
-    Alignment(&'arena str),
+    Alignment(&'arena [u8]),
     Combined(Vec<'arena, Indentation<'arena>>),
 }
 
@@ -50,7 +50,7 @@ impl<'arena> Indentation<'arena> {
                     spaces.into_bump_slice()
                 }
             }
-            Indentation::Alignment(value) => value.as_bytes(),
+            Indentation::Alignment(value) => value,
             Indentation::Combined(nested) => {
                 let mut combined = Vec::new_in(arena);
                 for i in nested {

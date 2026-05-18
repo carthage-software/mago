@@ -1,5 +1,6 @@
 use std::fmt;
 
+use mago_bytes::BytesDisplay;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
@@ -11,9 +12,9 @@ use crate::settings::PermittedDependencyKind;
 #[derive(Debug)]
 pub struct BoundaryBreach {
     /// The namespace where the breach was detected.
-    pub source_namespace: String,
+    pub source_namespace: Vec<u8>,
     /// The fully qualified name of the symbol that was illegally used.
-    pub dependency_fqn: String,
+    pub dependency_fqn: Vec<u8>,
     /// The kind of the dependency being used (e.g., class-like, function).
     pub dependency_kind: PermittedDependencyKind,
     /// The specific code context where the breach occurred (e.g., an `extends` clause).
@@ -56,12 +57,12 @@ pub enum BreachReason {
 
 impl From<BoundaryBreach> for Issue {
     fn from(breach: BoundaryBreach) -> Self {
-        let mut issue = Issue::error(format!("Illegal dependency on `{}`", breach.dependency_fqn))
+        let mut issue = Issue::error(format!("Illegal dependency on `{}`", BytesDisplay(&breach.dependency_fqn)))
             .with_annotation(
                 Annotation::primary(breach.span)
                     .with_message(format!("This {} is not allowed by the architectural rules", breach.vector)),
             )
-            .with_note(format!("Breach occurred in namespace `{}`.", breach.source_namespace));
+            .with_note(format!("Breach occurred in namespace `{}`.", BytesDisplay(&breach.source_namespace)));
 
         match breach.reason {
             BreachReason::Layering { source_layer, target_layer } => {

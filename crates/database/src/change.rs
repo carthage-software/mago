@@ -14,7 +14,7 @@ pub enum Change {
     /// An instruction to add a new file.
     Add(File),
     /// An instruction to update an existing file, identified by its `FileId`.
-    Update(FileId, Cow<'static, str>),
+    Update(FileId, Cow<'static, [u8]>),
     /// An instruction to delete an existing file, identified by its `FileId`.
     Delete(FileId),
 }
@@ -65,7 +65,7 @@ impl ChangeLog {
     /// Returns a `DatabaseError::PoisonedLogMutex` if another thread panicked
     /// while holding the lock, leaving the change log in an unusable state.
     #[inline]
-    pub fn update(&self, id: FileId, new_contents: Cow<'static, str>) -> Result<(), DatabaseError> {
+    pub fn update(&self, id: FileId, new_contents: Cow<'static, [u8]>) -> Result<(), DatabaseError> {
         self.changes.lock().map_err(|_| DatabaseError::PoisonedLogMutex)?.push(Change::Update(id, new_contents));
         Ok(())
     }

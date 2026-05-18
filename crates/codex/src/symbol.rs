@@ -1,19 +1,19 @@
-use mago_atom::AtomSet;
-use mago_atom::atom;
+use mago_word::WordSet;
+use mago_word::word;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
+use mago_word::Word;
+use mago_word::WordMap;
 
-/// A pair of `Atom`s representing a symbol and its member.
+/// A pair of `Word`s representing a symbol and its member.
 ///
 /// This is used to uniquely identify a symbol and its member within the codebase,
-/// where the first `Atom` is the symbol's fully qualified class name (FQCN)
-/// and the second `Atom` is the member's name (e.g., method, property, constant),
+/// where the first `Word` is the symbol's fully qualified class name (FQCN)
+/// and the second `Word` is the member's name (e.g., method, property, constant),
 /// or an empty string if the symbol itself is being referenced (e.g., a class or function
 /// without a specific member).
-pub type SymbolIdentifier = (Atom, Atom);
+pub type SymbolIdentifier = (Word, Word);
 
 /// Represents the different kinds of top-level class-like structures in PHP.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -70,8 +70,8 @@ impl SymbolKind {
 /// Provides basic methods for adding symbols and querying.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Symbols {
-    all: AtomMap<SymbolKind>,
-    namespaces: AtomSet,
+    all: WordMap<SymbolKind>,
+    namespaces: WordSet,
 }
 
 impl Symbols {
@@ -79,33 +79,33 @@ impl Symbols {
     #[inline]
     #[must_use]
     pub fn new() -> Symbols {
-        Symbols { all: AtomMap::default(), namespaces: AtomSet::default() }
+        Symbols { all: WordMap::default(), namespaces: WordSet::default() }
     }
 
     /// Adds or updates a symbol name identified as a `Class`.
     #[inline]
-    pub fn add_class_name(&mut self, name: Atom) {
+    pub fn add_class_name(&mut self, name: Word) {
         self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Class);
     }
 
     /// Adds or updates a symbol name identified as an `Interface`.
     #[inline]
-    pub fn add_interface_name(&mut self, name: Atom) {
+    pub fn add_interface_name(&mut self, name: Word) {
         self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Interface);
     }
 
     /// Adds or updates a symbol name identified as a `Trait`.
     #[inline]
-    pub fn add_trait_name(&mut self, name: Atom) {
+    pub fn add_trait_name(&mut self, name: Word) {
         self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Trait);
     }
 
     /// Adds or updates a symbol name identified as an `Enum`.
     #[inline]
-    pub fn add_enum_name(&mut self, name: Atom) {
+    pub fn add_enum_name(&mut self, name: Word) {
         self.namespaces.extend(get_symbol_namespaces(name));
         self.all.insert(name, SymbolKind::Enum);
     }
@@ -114,14 +114,14 @@ impl Symbols {
     ///
     /// # Arguments
     ///
-    /// * `name`: The `Atom` (likely FQCN) of the symbol to look up.
+    /// * `name`: The `Word` (likely FQCN) of the symbol to look up.
     ///
     /// # Returns
     ///
     /// `Some(SymbolKind)` if the symbol exists in the map, `None` otherwise.
     #[inline]
     #[must_use]
-    pub fn get_kind(&self, name: Atom) -> Option<SymbolKind> {
+    pub fn get_kind(&self, name: Word) -> Option<SymbolKind> {
         self.all.get(&name).copied() // Use copied() since SymbolKind is Copy
     }
 
@@ -129,14 +129,14 @@ impl Symbols {
     ///
     /// # Arguments
     ///
-    /// * `name`: The `Atom` (likely FQCN) of the symbol to check.
+    /// * `name`: The `Word` (likely FQCN) of the symbol to check.
     ///
     /// # Returns
     ///
     /// `true` if the symbol exists in the map, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains(&self, name: Atom) -> bool {
+    pub fn contains(&self, name: Word) -> bool {
         self.all.contains_key(&name)
     }
 
@@ -144,13 +144,13 @@ impl Symbols {
     ///
     /// # Arguments
     ///
-    /// * `namespace`: The `Atom` of the namespace to check for.
+    /// * `namespace`: The `Word` of the namespace to check for.
     ///
     /// # Returns
     ///
     /// `true` if the namespace is present, `false` otherwise.
     #[must_use]
-    pub fn contains_namespace(&self, namespace: Atom) -> bool {
+    pub fn contains_namespace(&self, namespace: Word) -> bool {
         self.namespaces.contains(&namespace)
     }
 
@@ -158,14 +158,14 @@ impl Symbols {
     ///
     /// # Arguments
     ///
-    /// * `name`: The `Atom` (likely FQCN) of the symbol to check.
+    /// * `name`: The `Word` (likely FQCN) of the symbol to check.
     ///
     /// # Returns
     ///
     /// `true` if the symbol is a `Class`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_class(&self, name: Atom) -> bool {
+    pub fn contains_class(&self, name: Word) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Class))
     }
 
@@ -173,14 +173,14 @@ impl Symbols {
     ///
     /// # Arguments
     ///
-    /// * `name`: The `Atom` (likely FQCN) of the symbol to check.
+    /// * `name`: The `Word` (likely FQCN) of the symbol to check.
     ///
     /// # Returns
     ///
     /// `true` if the symbol is an `Interface`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_interface(&self, name: Atom) -> bool {
+    pub fn contains_interface(&self, name: Word) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Interface))
     }
 
@@ -188,14 +188,14 @@ impl Symbols {
     ///
     /// # Arguments
     ///
-    /// * `name`: The `Atom` (likely FQCN) of the symbol to check.
+    /// * `name`: The `Word` (likely FQCN) of the symbol to check.
     ///
     /// # Returns
     ///
     /// `true` if the symbol is a `Trait`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_trait(&self, name: Atom) -> bool {
+    pub fn contains_trait(&self, name: Word) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Trait))
     }
 
@@ -203,21 +203,21 @@ impl Symbols {
     ///
     /// # Arguments
     ///
-    /// * `name`: The `Atom` (likely FQCN) of the symbol to check.
+    /// * `name`: The `Word` (likely FQCN) of the symbol to check.
     ///
     /// # Returns
     ///
     /// `true` if the symbol is an `Enum`, `false` otherwise.
     #[inline]
     #[must_use]
-    pub fn contains_enum(&self, name: Atom) -> bool {
+    pub fn contains_enum(&self, name: Word) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Enum))
     }
 
     /// Returns a reference to the underlying map of all symbols.
     #[inline]
     #[must_use]
-    pub fn get_all(&self) -> &AtomMap<SymbolKind> {
+    pub fn get_all(&self) -> &WordMap<SymbolKind> {
         &self.all
     }
 
@@ -244,7 +244,7 @@ impl Symbols {
     ///
     /// Note: does not remove namespaces (they may be shared by other symbols).
     #[inline]
-    pub fn remove(&mut self, name: Atom) {
+    pub fn remove(&mut self, name: Word) {
         self.all.remove(&name);
     }
 }
@@ -262,8 +262,8 @@ impl Default for Symbols {
 /// 1. `Foo`
 /// 2. `Foo\Bar`
 /// 3. `Foo\Bar\Baz`
-pub(super) fn get_symbol_namespaces(symbol_name: Atom) -> impl Iterator<Item = Atom> {
-    let s = symbol_name.as_str();
+pub(super) fn get_symbol_namespaces(symbol_name: Word) -> impl Iterator<Item = Word> {
+    let bytes: Vec<u8> = symbol_name.as_bytes().to_vec();
 
-    s.as_bytes().iter().enumerate().filter_map(move |(i, &byte)| if byte == b'\\' { Some(atom(&s[..i])) } else { None })
+    (0..bytes.len()).filter_map(move |i| if bytes[i] == b'\\' { Some(word(&bytes[..i])) } else { None })
 }

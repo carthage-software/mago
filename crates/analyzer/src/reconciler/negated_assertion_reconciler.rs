@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::AtomSet;
 use mago_codex::assertion::Assertion;
 use mago_codex::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
+use mago_word::Word;
+use mago_word::WordSet;
 
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -36,8 +36,8 @@ pub(crate) fn reconcile(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
-    old_var_type_atom: Atom,
+    key: Option<&[u8]>,
+    old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {
@@ -180,7 +180,7 @@ fn subtract_complex_type(
                 let existing_classlike_name = existing_named_object.get_name();
                 let assertion_classlike_name = assertion_named_object.get_name();
 
-                if let Some(class_like_metadata) = context.codebase.get_class_like(&existing_classlike_name) {
+                if let Some(class_like_metadata) = context.codebase.get_class_like(existing_classlike_name.as_bytes()) {
                     // handle __Sealed classes, negating where possible
                     if let Some(child_classlikes) = class_like_metadata.child_class_likes.as_ref()
                         && child_classlikes.contains(&assertion_classlike_name)
@@ -199,8 +199,8 @@ fn subtract_complex_type(
                     }
                 }
 
-                if (context.codebase.interface_exists(&assertion_classlike_name)
-                    || context.codebase.interface_exists(&existing_classlike_name))
+                if (context.codebase.interface_exists(assertion_classlike_name.as_bytes())
+                    || context.codebase.interface_exists(existing_classlike_name.as_bytes()))
                     && assertion_classlike_name != existing_classlike_name
                 {
                     *can_be_disjunct = true;
@@ -216,10 +216,10 @@ fn subtract_complex_type(
             (
                 TAtomic::Object(TObject::Enum(TEnum { name: existing_enum_name, case: None })),
                 TAtomic::Object(TObject::Enum(TEnum { name: assertion_enum_name, case: Some(assertion_case) })),
-            ) if context.codebase.is_instance_of(assertion_enum_name, existing_enum_name) => {
+            ) if context.codebase.is_instance_of(assertion_enum_name.as_bytes(), existing_enum_name.as_bytes()) => {
                 *can_be_disjunct = true;
 
-                let Some(enum_metadata) = context.codebase.get_enum(existing_enum_name) else {
+                let Some(enum_metadata) = context.codebase.get_enum(existing_enum_name.as_bytes()) else {
                     acceptable_types.push(existing_atomic);
                     continue;
                 };
@@ -246,7 +246,7 @@ fn subtract_complex_type(
                 acceptable_types.push(existing_atomic);
             }
             (TAtomic::Iterable(iterable), TAtomic::Object(TObject::Named(assertion_named)))
-                if assertion_named.name.eq_ignore_ascii_case("Traversable") =>
+                if assertion_named.name.as_bytes().eq_ignore_ascii_case(b"Traversable") =>
             {
                 *can_be_disjunct = true;
 
@@ -280,16 +280,16 @@ fn subtract_complex_type(
 
 fn handle_negated_class(
     context: &mut Context<'_, '_>,
-    child_classlikes: &AtomSet,
+    child_classlikes: &WordSet,
     existing_atomic: &TAtomic,
-    assertion_classlike_name: Atom,
+    assertion_classlike_name: Word,
     acceptable_types: &mut Vec<TAtomic>,
 ) {
     for child_classlike in child_classlikes {
         if *child_classlike != assertion_classlike_name {
             let alternate_class =
                 TAtomic::Object(TObject::Named(TNamedObject::new(*child_classlike).with_type_parameters(
-                    if let Some(child_metadata) = context.codebase.get_class_like(child_classlike) {
+                    if let Some(child_metadata) = context.codebase.get_class_like(child_classlike.as_bytes()) {
                         let placeholder_params =
                             child_metadata.template_types.iter().map(|_| get_placeholder()).collect::<Vec<_>>();
 
@@ -312,8 +312,8 @@ fn handle_literal_negated_equality(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
-    key: Option<&str>,
-    old_var_type_atom: Atom,
+    key: Option<&[u8]>,
+    old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
 ) -> TUnion {

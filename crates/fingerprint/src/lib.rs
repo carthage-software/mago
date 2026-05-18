@@ -54,7 +54,24 @@ pub mod r#use;
 pub mod variable;
 pub mod r#yield;
 
-const DEFAULT_IMPORTANT_COMMENT_PATTERNS: &[&str] = &["@mago-", "@"];
+const DEFAULT_IMPORTANT_COMMENT_PATTERNS: &[&[u8]] = &[b"@mago-", b"@"];
+
+/// Hashes a byte slice into `hasher` after ASCII case-folding.
+///
+/// Used everywhere a PHP identifier is fingerprinted: PHP's case-insensitivity is ASCII-only,
+/// so two identifiers that differ only in ASCII case must produce identical fingerprints.
+/// Prefixed with the length to prevent `"ab"||"c"` colliding with `"a"||"bc"` when sibling
+/// fields are absorbed back-to-back into the same hasher.
+#[inline]
+pub fn hash_ascii_lowercase<H>(bytes: &[u8], hasher: &mut H)
+where
+    H: std::hash::Hasher,
+{
+    hasher.write_usize(bytes.len());
+    for &b in bytes {
+        hasher.write_u8(b.to_ascii_lowercase());
+    }
+}
 
 pub trait Fingerprintable {
     #[inline]
@@ -109,7 +126,7 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FingerprintOptions<'opts> {
     pub include_use_statements: bool,
-    pub important_comment_patterns: &'opts [&'opts str],
+    pub important_comment_patterns: &'opts [&'opts [u8]],
     pub signature_only: bool,
     pub trivia_context: Option<&'opts [Trivia<'opts>]>,
 }
@@ -160,16 +177,16 @@ impl<'opts> FingerprintOptions<'opts> {
 
     #[inline]
     #[must_use]
-    pub fn with_comment_patterns(mut self, patterns: &'opts [&'opts str]) -> Self {
+    pub fn with_comment_patterns(mut self, patterns: &'opts [&'opts [u8]]) -> Self {
         self.important_comment_patterns = patterns;
         self
     }
 
     #[inline]
     #[must_use]
-    pub fn is_important_comment(&self, comment: &str) -> bool {
+    pub fn is_important_comment(&self, comment: &[u8]) -> bool {
         for pattern in self.important_comment_patterns {
-            if comment.contains(pattern) {
+            if memchr::memmem::find(comment, pattern).is_some() {
                 return true;
             }
         }
@@ -185,13 +202,14 @@ mod tests {
     use mago_database::file::File;
     use mago_names::resolver::NameResolver;
     use mago_syntax::parser::parse_file;
+    use std::borrow::Cow;
     use std::hash::Hasher;
 
     use super::*;
 
     pub(crate) fn fingerprint_code(code: &'static str) -> u64 {
         let arena = Bump::new();
-        let file = File::ephemeral("code.php".into(), code.into());
+        let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Borrowed(code.as_bytes()));
         let program = parse_file(&arena, &file);
         assert!(!program.has_errors(), "Failed to parse code, errors: {:?}", program.errors);
         let resolved_names = NameResolver::new(&arena).resolve(program);
@@ -206,10 +224,10 @@ mod tests {
     fn test_important_comment_detection() {
         let opts = FingerprintOptions::default();
 
-        assert!(opts.is_important_comment("// @mago-ignore"));
-        assert!(opts.is_important_comment("/** @return string */"));
-        assert!(!opts.is_important_comment("// Regular comment"));
-        assert!(!opts.is_important_comment("/* Block comment */"));
+        assert!(opts.is_important_comment(b"// @mago-ignore"));
+        assert!(opts.is_important_comment(b"/** @return string */"));
+        assert!(!opts.is_important_comment(b"// Regular comment"));
+        assert!(!opts.is_important_comment(b"/* Block comment */"));
     }
 
     #[test]

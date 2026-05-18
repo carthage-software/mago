@@ -145,14 +145,18 @@ impl Backend {
         };
         self.apply_change_atomic(move |workspace| {
             let logical = logical_name_for(&workspace.root, &path);
-            let virtual_file = workspace.database.get_id(&logical).is_none();
+            let virtual_file = workspace.database.get_id(logical.as_bytes()).is_none();
             let file_id = if virtual_file {
-                let file =
-                    MagoFile::new(Cow::Owned(logical.clone()), FileType::Host, Some(path.clone()), Cow::Owned(text));
+                let file = MagoFile::new(
+                    Cow::Owned(logical.into_bytes()),
+                    FileType::Host,
+                    Some(path.clone()),
+                    Cow::Owned(text.into_bytes()),
+                );
                 workspace.database.add(file)
             } else {
-                let id = FileId::new(&logical);
-                workspace.database.update(id, Cow::Owned(text));
+                let id = FileId::new(logical.as_bytes());
+                workspace.database.update(id, Cow::Owned(text.into_bytes()));
                 id
             };
             workspace.open_documents.insert(uri, OpenDocument { file_id, virtual_file, version });
@@ -167,7 +171,7 @@ impl Backend {
                 return Vec::new();
             };
             open.version = version;
-            workspace.database.update(open.file_id, Cow::Owned(text));
+            workspace.database.update(open.file_id, Cow::Owned(text.into_bytes()));
             vec![open.file_id]
         })
         .await;

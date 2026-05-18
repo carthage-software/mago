@@ -1,13 +1,5 @@
 use bumpalo::Bump;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
-use mago_atom::empty_atom;
-use mago_atom::u32_atom;
-use mago_atom::u64_atom;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
@@ -41,6 +33,14 @@ use mago_syntax::walker::walk_class_mut;
 use mago_syntax::walker::walk_enum_mut;
 use mago_syntax::walker::walk_interface_mut;
 use mago_syntax::walker::walk_trait_mut;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
+use mago_word::ascii_lowercase_word;
+use mago_word::empty_word;
+use mago_word::u32_word;
+use mago_word::u64_word;
+use mago_word::word;
 
 use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
@@ -128,18 +128,18 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
     }
 }
 
-type TemplateConstraint = (Atom, GenericTemplate);
+type TemplateConstraint = (Word, GenericTemplate);
 type TemplateConstraintList = Vec<TemplateConstraint>;
 
 #[derive(Debug, Default)]
 struct Scanner {
     codebase: CodebaseMetadata,
-    stack: Vec<Atom>,
+    stack: Vec<Word>,
     template_constraints: Vec<TemplateConstraintList>,
     scope: NamespaceScope,
     has_constructor: bool,
-    file_type_aliases: AtomSet,
-    file_imported_aliases: AtomMap<(Atom, Atom)>,
+    file_type_aliases: WordSet,
+    file_imported_aliases: WordMap<(Word, Word)>,
     polyfill_depth: u32,
 }
 
@@ -150,8 +150,8 @@ enum PolyfillGuardBranch {
     None,
 }
 
-const POLYFILL_GUARD_FUNCTIONS: &[&str] =
-    &["class_exists", "interface_exists", "trait_exists", "enum_exists", "function_exists", "defined"];
+const POLYFILL_GUARD_FUNCTIONS: &[&[u8]] =
+    &[b"class_exists", b"interface_exists", b"trait_exists", b"enum_exists", b"function_exists", b"defined"];
 
 fn classify_polyfill_guard(cond: &Expression<'_>) -> PolyfillGuardBranch {
     let cond = cond.unparenthesized();
@@ -207,7 +207,7 @@ impl Scanner {
         context
     }
 
-    fn apply_polyfill_flag_to_class_like(&mut self, id: Atom) {
+    fn apply_polyfill_flag_to_class_like(&mut self, id: Word) {
         if self.polyfill_depth == 0 {
             return;
         }
@@ -307,8 +307,8 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
     fn walk_in_function(&mut self, function: &'arena Function<'arena>, context: &mut Context<'ctx, 'arena>) {
         let type_context = self.get_current_type_resolution_context();
 
-        let name = ascii_lowercase_atom(context.resolved_names.get(&function.name));
-        let identifier = (empty_atom(), name);
+        let name = ascii_lowercase_word(context.resolved_names.get(&function.name));
+        let identifier = (empty_word(), name);
         let Some(mut metadata) = scan_function(
             identifier,
             function,
@@ -348,8 +348,8 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
     fn walk_in_closure(&mut self, closure: &'arena Closure<'arena>, context: &mut Context<'ctx, 'arena>) {
         let span = closure.span();
 
-        let file_ref = u64_atom(span.file_id.as_u64());
-        let closure_ref = u32_atom(span.start.offset);
+        let file_ref = u64_word(span.file_id.as_u64());
+        let closure_ref = u32_word(span.start.offset);
         let identifier = (file_ref, closure_ref);
 
         let type_resolution_context = self.get_current_type_resolution_context();
@@ -387,8 +387,8 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
     ) {
         let span = arrow_function.span();
 
-        let file_ref = u64_atom(span.file_id.as_u64());
-        let closure_ref = u32_atom(span.start.offset);
+        let file_ref = u64_word(span.file_id.as_u64());
+        let closure_ref = u32_word(span.start.offset);
         let identifier = (file_ref, closure_ref);
 
         let type_resolution_context = self.get_current_type_resolution_context();
@@ -539,7 +539,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
         let mut class_like_metadata =
             self.codebase.class_likes.remove(&current_class).expect("Expected class-like metadata to be present");
 
-        let name = ascii_lowercase_atom(method.name.value);
+        let name = ascii_lowercase_word(method.name.value);
 
         if class_like_metadata.methods.contains(&name) {
             if class_like_metadata.pseudo_methods.contains(&name)
@@ -620,7 +620,7 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
                 class_like_metadata.add_property_metadata(property_metadata);
             }
         } else {
-            is_clone = name == atom("__clone");
+            is_clone = name == word("__clone");
         }
 
         class_like_metadata.methods.insert(name);
@@ -701,7 +701,7 @@ fn finalize_class_like(scanner: &mut Scanner, context: &Context<'_, '_>) {
     };
 
     if class_like_metadata.flags.has_consistent_constructor() {
-        let constructor_name = atom("__construct");
+        let constructor_name = word("__construct");
 
         class_like_metadata.methods.insert(constructor_name);
         let constructor_method_id = MethodIdentifier::new(class_like_metadata.name, constructor_name);
@@ -727,9 +727,6 @@ mod polyfill_tests {
 
     use bumpalo::Bump;
 
-    use mago_atom::ascii_lowercase_atom;
-    use mago_atom::atom;
-    use mago_atom::empty_atom;
     use mago_database::Database;
     use mago_database::DatabaseConfiguration;
     use mago_database::DatabaseReader;
@@ -737,13 +734,16 @@ mod polyfill_tests {
     use mago_names::resolver::NameResolver;
     use mago_php_version::PHPVersion;
     use mago_syntax::parser::parse_file;
+    use mago_word::ascii_lowercase_word;
+    use mago_word::empty_word;
+    use mago_word::word;
 
     use crate::metadata::CodebaseMetadata;
     use crate::metadata::flags::MetadataFlags;
     use crate::scanner::scan_program;
 
     fn scan(code: &'static str) -> CodebaseMetadata {
-        let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Borrowed(code));
+        let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Borrowed(code.as_bytes()));
         let config =
             DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![]).into_static();
         let database = Database::single(file, config);
@@ -762,7 +762,7 @@ mod polyfill_tests {
     fn class_flags(codebase: &CodebaseMetadata, name: &str) -> MetadataFlags {
         codebase
             .class_likes
-            .get(&ascii_lowercase_atom(name))
+            .get(&ascii_lowercase_word(name.as_bytes()))
             .unwrap_or_else(|| panic!("class-like `{name}` not found; have {:?}", codebase.class_likes.keys()))
             .flags
     }
@@ -770,13 +770,13 @@ mod polyfill_tests {
     fn function_flags(codebase: &CodebaseMetadata, name: &str) -> MetadataFlags {
         codebase
             .function_likes
-            .get(&(empty_atom(), ascii_lowercase_atom(name)))
+            .get(&(empty_word(), ascii_lowercase_word(name.as_bytes())))
             .unwrap_or_else(|| panic!("function `{name}` not found"))
             .flags
     }
 
     fn constant_flags(codebase: &CodebaseMetadata, name: &str) -> MetadataFlags {
-        codebase.constants.get(&atom(name)).unwrap_or_else(|| panic!("constant `{name}` not found")).flags
+        codebase.constants.get(&word(name)).unwrap_or_else(|| panic!("constant `{name}` not found")).flags
     }
 
     #[test]
@@ -1130,7 +1130,7 @@ mod polyfill_tests {
 
         let tc = codebase
             .class_likes
-            .get(&ascii_lowercase_atom("PHPUnit\\Framework\\TestCase"))
+            .get(&ascii_lowercase_word(b"PHPUnit\\Framework\\TestCase"))
             .expect("TestCase should be present in merged codebase");
 
         assert!(!tc.flags.is_polyfill(), "merged TestCase should be the real definition");

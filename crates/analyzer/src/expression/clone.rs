@@ -46,8 +46,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
                         invalid_clone_atomics.push(atomic_type);
                     }
                     TObject::Named(named_object) => {
-                        if !context.codebase.trait_exists(&named_object.name)
-                            && !context.codebase.class_or_interface_exists(&named_object.name)
+                        if !context.codebase.trait_exists(named_object.name.as_bytes())
+                            && !context.codebase.class_or_interface_exists(named_object.name.as_bytes())
                         {
                             invalid_clone_atomics.push(atomic_type);
                         } else {
@@ -91,7 +91,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Clone<'arena> {
 
         if !invalid_clone_atomics.is_empty() {
             let invalid_types_str =
-                invalid_clone_atomics.iter().map(|t| t.get_id().as_str()).collect::<Vec<_>>().join("|");
+                invalid_clone_atomics.iter().map(|t| t.get_id().to_string()).collect::<Vec<_>>().join("|");
 
             if has_cloneable_object || has_mixed_type {
                 context.collector.report_with_code(

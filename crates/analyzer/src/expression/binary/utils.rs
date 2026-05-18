@@ -215,14 +215,14 @@ pub fn are_definitely_not_identical(
         if let Some(r) = rhs.get_single_literal_string_value() {
             l != r
         } else if let Some(r) = rhs.get_single_class_string_value() {
-            !l.eq_ignore_ascii_case(&r)
+            !l.eq_ignore_ascii_case(r.as_bytes())
         } else {
             false
         }
     } else if let Some(r) = rhs.get_single_literal_string_value()
         && let Some(l) = lhs.get_single_class_string_value()
     {
-        !r.eq_ignore_ascii_case(&l)
+        !r.eq_ignore_ascii_case(l.as_bytes())
     } else {
         false
     }

@@ -34,7 +34,7 @@ impl Formatter for CheckstyleFormatter {
                     let line = file.line_number(annotation.span.start.offset) + 1;
                     let column = file.column_number(annotation.span.start.offset) + 1;
 
-                    (file.name.to_string(), line, column)
+                    (String::from_utf8_lossy(&file.name).into_owned(), line, column)
                 }
                 None => ("<unknown>".to_string(), 0, 0),
             };

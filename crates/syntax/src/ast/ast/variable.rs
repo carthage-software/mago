@@ -35,7 +35,7 @@ pub enum Variable<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct DirectVariable<'arena> {
     pub span: Span,
-    pub name: &'arena str,
+    pub name: &'arena [u8],
 }
 
 /// Represents an indirect variable.

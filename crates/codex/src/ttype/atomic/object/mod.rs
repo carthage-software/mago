@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -53,52 +53,52 @@ impl TObject {
     ///
     /// The `sealed` flag indicates whether the object is sealed (no additional properties will exist beyond those known).
     ///
-    /// The `known_properties` map defines specific types for certain keys (`Atom`), where the `bool` indicates if the property is optional.
+    /// The `known_properties` map defines specific types for certain keys (`Word`), where the `bool` indicates if the property is optional.
     #[inline]
     #[must_use]
-    pub const fn new_with_properties(sealed: bool, known_properties: BTreeMap<Atom, (bool, TUnion)>) -> Self {
+    pub const fn new_with_properties(sealed: bool, known_properties: BTreeMap<Word, (bool, TUnion)>) -> Self {
         TObject::WithProperties(TObjectWithProperties { known_properties, sealed })
     }
 
     /// Creates a new `Object` representing a specific named object type (default flags).
     #[inline]
     #[must_use]
-    pub fn new_named(name: Atom) -> Self {
+    pub fn new_named(name: Word) -> Self {
         TObject::Named(TNamedObject::new(name))
     }
 
     /// Creates a new `Object` representing `$this` for a given class name.
     #[inline]
     #[must_use]
-    pub fn new_named_this(name: Atom) -> Self {
+    pub fn new_named_this(name: Word) -> Self {
         TObject::Named(TNamedObject::new_this(name))
     }
 
     /// Creates a new `TObject` representing an enum.
     #[inline]
     #[must_use]
-    pub fn new_enum(name: Atom) -> Self {
+    pub fn new_enum(name: Word) -> Self {
         TObject::Enum(TEnum::new(name))
     }
 
     /// Creates a new `TObject` representing an enum case.
     #[inline]
     #[must_use]
-    pub fn new_enum_case(name: Atom, case: Atom) -> Self {
+    pub fn new_enum_case(name: Word, case: Word) -> Self {
         TObject::Enum(TEnum::new_case(name, case))
     }
 
     /// Creates a new `TObject` representing an object with a known method.
     #[inline]
     #[must_use]
-    pub const fn new_has_method(method: Atom) -> Self {
+    pub const fn new_has_method(method: Word) -> Self {
         TObject::HasMethod(TObjectHasMethod::new(method))
     }
 
     /// Creates a new `TObject` representing an object with a known property.
     #[inline]
     #[must_use]
-    pub const fn new_has_property(property: Atom) -> Self {
+    pub const fn new_has_property(property: Word) -> Self {
         TObject::HasProperty(TObjectHasProperty::new(property))
     }
 
@@ -199,7 +199,7 @@ impl TObject {
     /// Returns the primary name identifier if this is a `Named` or `Enum` variant.
     #[inline]
     #[must_use]
-    pub const fn get_name(&self) -> Option<Atom> {
+    pub const fn get_name(&self) -> Option<Word> {
         match self {
             TObject::Any | TObject::WithProperties(_) | TObject::HasMethod(_) | TObject::HasProperty(_) => None,
             TObject::Enum(enum_object) => Some(enum_object.name),
@@ -320,9 +320,9 @@ impl TType for TObject {
         }
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
-            TObject::Any => atom("object"),
+            TObject::Any => word("object"),
             TObject::HasMethod(has_method) => has_method.get_id(),
             TObject::HasProperty(has_property) => has_property.get_id(),
             TObject::Enum(enum_object) => enum_object.get_id(),
@@ -331,9 +331,9 @@ impl TType for TObject {
         }
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         match self {
-            TObject::Any => atom("object"),
+            TObject::Any => word("object"),
             TObject::HasMethod(has_method) => has_method.get_pretty_id_with_indent(indent),
             TObject::HasProperty(has_property) => has_property.get_pretty_id_with_indent(indent),
             TObject::Enum(enum_object) => enum_object.get_pretty_id_with_indent(indent),

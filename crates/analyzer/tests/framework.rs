@@ -12,7 +12,6 @@ use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
-use mago_atom::AtomSet;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
 use mago_codex::scanner::scan_program;
@@ -21,6 +20,7 @@ use mago_database::file::File;
 use mago_names::resolver::NameResolver;
 use mago_prelude::Prelude;
 use mago_syntax::parser::parse_file;
+use mago_word::WordSet;
 
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
@@ -28,13 +28,13 @@ static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry:
 #[derive(Debug, Clone)]
 pub struct TestCase<'src> {
     name: &'src str,
-    content: &'src str,
+    content: &'src [u8],
     settings: Option<Settings>,
 }
 
 impl<'src> TestCase<'src> {
     #[must_use]
-    pub fn new(name: &'src str, content: &'src str) -> Self {
+    pub fn new(name: &'src str, content: &'src [u8]) -> Self {
         Self { name, content, settings: None }
     }
 
@@ -94,7 +94,7 @@ pub fn check_name_casing_settings() -> Settings {
 fn run_test_case_inner(config: TestCase) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 
-    let file = File::ephemeral(Cow::Owned(config.name.to_string()), Cow::Owned(config.content.to_string()));
+    let file = File::ephemeral(Cow::Owned(config.name.as_bytes().to_vec()), Cow::Owned(config.content.to_vec()));
     let file_id = database.add(file);
     let source_file = database.get_ref(&file_id).expect("File just added should exist");
 
@@ -109,7 +109,7 @@ fn run_test_case_inner(config: TestCase) {
 
     metadata.extend(scan_program(&arena, source_file, program, &resolved_names, settings.version));
 
-    populate_codebase(&mut metadata, &mut symbol_references, AtomSet::default(), HashSet::default());
+    populate_codebase(&mut metadata, &mut symbol_references, WordSet::default(), HashSet::default());
 
     let mut analysis_result = AnalysisResult::new(symbol_references);
     let analyzer = Analyzer::new(&arena, source_file, &resolved_names, &metadata, &PLUGIN_REGISTRY, settings);

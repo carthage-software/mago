@@ -24,7 +24,7 @@ use crate::context::Context;
 pub fn check_class_like_availability(
     context: &mut Context<'_, '_>,
     metadata: &ClassLikeMetadata,
-    display_name: &str,
+    display_name: &dyn std::fmt::Display,
     span: Span,
 ) {
     let version = context.settings.version;
@@ -53,7 +53,7 @@ pub fn check_class_like_availability(
 pub fn check_function_availability(
     context: &mut Context<'_, '_>,
     metadata: &FunctionLikeMetadata,
-    display_name: &str,
+    display_name: &dyn std::fmt::Display,
     span: Span,
 ) {
     let version = context.settings.version;
@@ -75,7 +75,7 @@ pub fn check_function_availability(
 pub fn check_method_availability(
     context: &mut Context<'_, '_>,
     metadata: &FunctionLikeMetadata,
-    display_name: &str,
+    display_name: &dyn std::fmt::Display,
     span: Span,
 ) {
     let version = context.settings.version;
@@ -97,7 +97,7 @@ pub fn check_method_availability(
 pub fn check_property_availability(
     context: &mut Context<'_, '_>,
     metadata: &PropertyMetadata,
-    display_name: &str,
+    display_name: &dyn std::fmt::Display,
     span: Span,
 ) {
     let version = context.settings.version;
@@ -119,7 +119,7 @@ pub fn check_property_availability(
 pub fn check_constant_availability(
     context: &mut Context<'_, '_>,
     metadata: &ConstantMetadata,
-    display_name: &str,
+    display_name: &dyn std::fmt::Display,
     span: Span,
 ) {
     let version = context.settings.version;
@@ -141,7 +141,7 @@ pub fn check_constant_availability(
 pub fn check_class_constant_availability(
     context: &mut Context<'_, '_>,
     metadata: &ClassLikeConstantMetadata,
-    display_name: &str,
+    display_name: &dyn std::fmt::Display,
     span: Span,
 ) {
     let version = context.settings.version;
@@ -163,7 +163,7 @@ pub fn check_class_constant_availability(
 pub fn check_enum_case_availability(
     context: &mut Context<'_, '_>,
     metadata: &EnumCaseMetadata,
-    display_name: &str,
+    display_name: &dyn std::fmt::Display,
     span: Span,
 ) {
     let version = context.settings.version;
@@ -187,7 +187,7 @@ fn report_unavailable(
     context: &mut Context<'_, '_>,
     code: IssueCode,
     kind: &str,
-    display_name: &str,
+    display_name: &dyn std::fmt::Display,
     constraint: &VersionConstraint,
     configured: PHPVersion,
     span: Span,

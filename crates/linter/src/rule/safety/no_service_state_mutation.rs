@@ -100,7 +100,7 @@ fn is_property_mutation(expr: &Expression<'_>) -> Option<Span> {
 
 /// Returns `true` if the expression is `$this`.
 fn is_this(expr: &Expression<'_>) -> bool {
-    matches!(expr, Expression::Variable(Variable::Direct(var)) if var.name == "$this")
+    matches!(expr, Expression::Variable(Variable::Direct(var)) if var.name == b"$this")
 }
 
 impl LintRule for NoServiceStateMutationRule {
@@ -178,7 +178,7 @@ impl LintRule for NoServiceStateMutationRule {
                 let is_reset_class = class.implements.as_ref().is_some_and(|implements| {
                     implements.types.iter().any(|iface| {
                         let name = ctx.lookup_name(iface);
-                        self.cfg.reset_interfaces.iter().any(|ri| name.eq_ignore_ascii_case(ri.as_str()))
+                        self.cfg.reset_interfaces.iter().any(|ri| name.eq_ignore_ascii_case(ri.as_bytes()))
                     })
                 });
 
@@ -197,17 +197,17 @@ impl LintRule for NoServiceStateMutationRule {
             return;
         }
 
-        let matches_pattern = |ns: &str, pattern: &str| {
+        let matches_pattern = |ns: &[u8], pattern: &[u8]| {
             ns.starts_with(pattern)
-                || (ns.len() + 1 >= pattern.len() && pattern.ends_with('\\') && pattern[..pattern.len() - 1] == *ns)
+                || (ns.len() + 1 >= pattern.len() && pattern.ends_with(b"\\") && &pattern[..pattern.len() - 1] == ns)
         };
 
-        let in_include = self.cfg.include_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
+        let in_include = self.cfg.include_namespaces.iter().any(|p| matches_pattern(namespace, p.as_bytes()));
         if !in_include {
             return;
         }
 
-        let in_exclude = self.cfg.exclude_namespaces.iter().any(|p| matches_pattern(namespace, p.as_str()));
+        let in_exclude = self.cfg.exclude_namespaces.iter().any(|p| matches_pattern(namespace, p.as_bytes()));
         if in_exclude {
             return;
         }
@@ -217,7 +217,7 @@ impl LintRule for NoServiceStateMutationRule {
                 continue;
             };
 
-            if self.cfg.allowed_methods.iter().any(|m| m == method.name.value) {
+            if self.cfg.allowed_methods.iter().any(|m| m.as_bytes() == method.name.value) {
                 continue;
             }
 

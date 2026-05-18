@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
-use mago_atom::Atom;
+use mago_word::Word;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
@@ -72,7 +72,8 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
             return;
         };
 
-        let Some(declaring_class_metadata) = context.codebase.get_class_like(&identifier.get_class_name()) else {
+        let Some(declaring_class_metadata) = context.codebase.get_class_like(identifier.get_class_name().as_bytes())
+        else {
             return;
         };
 
@@ -103,8 +104,8 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
         }
 
         if let StaticClassType::Object(TObject::Named(instance_type)) = &method_context.class_type
-            && !instance_type.name.eq_ignore_ascii_case(&declaring_class_metadata.original_name)
-            && let Some(calling_class_metadata) = context.codebase.get_class_like(&instance_type.name)
+            && !instance_type.name.as_bytes().eq_ignore_ascii_case(declaring_class_metadata.original_name.as_bytes())
+            && let Some(calling_class_metadata) = context.codebase.get_class_like(instance_type.name.as_bytes())
         {
             for (template_name, _) in &declaring_class_metadata.template_types {
                 if template_result.lower_bounds.get(template_name).is_some_and(|m| !m.is_empty()) {
@@ -162,8 +163,8 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
         }
     }
 
-    if !instance_type.name.eq_ignore_ascii_case(&method_context.class_like_metadata.original_name)
-        && let Some(calling_class_metadata) = context.codebase.get_class_like(&instance_type.name)
+    if !instance_type.name.as_bytes().eq_ignore_ascii_case(method_context.class_like_metadata.original_name.as_bytes())
+        && let Some(calling_class_metadata) = context.codebase.get_class_like(instance_type.name.as_bytes())
     {
         for (template_name, _) in &method_context.class_like_metadata.template_types {
             if template_result.lower_bounds.get(template_name).is_some_and(|m| !m.is_empty()) {
@@ -192,7 +193,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
         return;
     };
 
-    let Some(metadata) = context.codebase.get_class_like(&identifier.get_class_name()) else {
+    let Some(metadata) = context.codebase.get_class_like(identifier.get_class_name().as_bytes()) else {
         return;
     };
 
@@ -206,7 +207,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
 /// it calculates the most specific type derived from its lower bounds using
 /// `get_most_specific_type_from_bounds`.
 ///
-/// The result is a map where keys are template parameter names (`Atom`) and
+/// The result is a map where keys are template parameter names (`Word`) and
 /// values are vectors containing pairs of the defining class (`GenericParent`) and the
 /// resolved concrete type (`TUnion`) for that template in the context of that class.
 ///
@@ -224,8 +225,8 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
 pub(super) fn get_class_template_parameters_from_result(
     template_result: &TemplateResult,
     context: &Context<'_, '_>,
-) -> IndexMap<Atom, Vec<GenericTemplate>, RandomState> {
-    let mut class_generic_parameters: IndexMap<Atom, Vec<GenericTemplate>, RandomState> =
+) -> IndexMap<Word, Vec<GenericTemplate>, RandomState> {
+    let mut class_generic_parameters: IndexMap<Word, Vec<GenericTemplate>, RandomState> =
         IndexMap::with_hasher(RandomState::default());
 
     for (template_name, type_map) in &template_result.lower_bounds {
@@ -263,7 +264,7 @@ pub(super) fn refine_template_result_for_function_like<'ctx>(
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     function_like_metadata: &'ctx FunctionLikeMetadata,
-    class_template_parameters: &IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
+    class_template_parameters: &IndexMap<Word, Vec<GenericTemplate>, RandomState>,
 ) {
     if !template_result.template_types.is_empty() {
         return;
@@ -386,8 +387,8 @@ pub(super) fn check_template_result(context: &mut Context<'_, '_>, template_resu
                 lower_bounds.iter().filter(|bound| bound.equality_bound_classlike.is_some()).collect();
 
             if !bounds_with_equality.is_empty() {
-                let equality_types: Vec<_> =
-                    unique_vec(bounds_with_equality.iter().map(|bound| bound.bound_type.get_id().as_str()));
+                let equality_types: Vec<String> =
+                    unique_vec(bounds_with_equality.iter().map(|bound| bound.bound_type.get_id().to_string()));
 
                 if equality_types.len() > 1 {
                     context.collector.report_with_code(

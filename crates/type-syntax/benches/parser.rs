@@ -18,7 +18,7 @@ const LARGE_TYPES: &str = include_str!("fixtures/large.txt");
 
 fn benchmark_type_lexer(c: &mut Criterion) {
     let mut group = c.benchmark_group("type-lexer");
-    let file_id = FileId::new("bench.php");
+    let file_id = FileId::new(b"bench.php");
 
     group.throughput(Throughput::Bytes(LARGE_TYPES.len() as u64));
     group.bench_function("large", |b| {
@@ -40,7 +40,7 @@ fn benchmark_type_lexer(c: &mut Criterion) {
 
 fn benchmark_type_parser(c: &mut Criterion) {
     let mut group = c.benchmark_group("type-parser");
-    let file_id = FileId::new("bench.php");
+    let file_id = FileId::new(b"bench.php");
 
     for (name, content) in [("small", SMALL_TYPES), ("medium", MEDIUM_TYPES), ("large", LARGE_TYPES)] {
         group.throughput(Throughput::Bytes(content.len() as u64));
@@ -54,7 +54,7 @@ fn benchmark_type_parser(c: &mut Criterion) {
                         continue;
                     }
                     let span = Span::new(file_id, Position::new(0), Position::new(line.len() as u32));
-                    if parse_str(&arena, span, black_box(line)).is_ok() {
+                    if parse_str(&arena, span, black_box(line.as_bytes())).is_ok() {
                         success_count += 1;
                     }
                 }
@@ -68,7 +68,7 @@ fn benchmark_type_parser(c: &mut Criterion) {
 
 fn benchmark_single_complex_type(c: &mut Criterion) {
     let mut group = c.benchmark_group("type-complex");
-    let file_id = FileId::new("bench.php");
+    let file_id = FileId::new(b"bench.php");
 
     let complex_type = "array{users: list<object{id: positive-int, name: non-empty-string, email?: string, roles: list<string>}>, pagination: object{page: int, per_page: int, total: int}, filters?: array<string, mixed>}";
 
@@ -77,7 +77,7 @@ fn benchmark_single_complex_type(c: &mut Criterion) {
         b.iter(|| {
             let arena = Bump::new();
             let span = Span::new(file_id, Position::new(0), Position::new(complex_type.len() as u32));
-            let ok = parse_str(&arena, span, black_box(complex_type)).is_ok();
+            let ok = parse_str(&arena, span, black_box(complex_type.as_bytes())).is_ok();
             black_box(ok)
         })
     });
@@ -89,7 +89,7 @@ fn benchmark_single_complex_type(c: &mut Criterion) {
         b.iter(|| {
             let arena = Bump::new();
             let span = Span::new(file_id, Position::new(0), Position::new(closure_type.len() as u32));
-            let ok = parse_str(&arena, span, black_box(closure_type)).is_ok();
+            let ok = parse_str(&arena, span, black_box(closure_type.as_bytes())).is_ok();
             black_box(ok)
         })
     });

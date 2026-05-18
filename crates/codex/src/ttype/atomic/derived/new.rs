@@ -3,9 +3,9 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
@@ -19,7 +19,7 @@ use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::union::TUnion;
 
-fn class_name_of_constraint(constraint: &TAtomic) -> Option<Atom> {
+fn class_name_of_constraint(constraint: &TAtomic) -> Option<Word> {
     match constraint {
         TAtomic::Object(TObject::Named(named)) => Some(named.name),
         _ => None,
@@ -108,11 +108,11 @@ impl TType for TNew {
         false
     }
 
-    fn get_id(&self) -> Atom {
-        concat_atom!("new<", self.0.get_id().as_str(), ">")
+    fn get_id(&self) -> Word {
+        concat_word!(b"new<", self.0.get_id(), b">")
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
-        atom(self.get_id().as_str())
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
+        word(self.get_id())
     }
 }

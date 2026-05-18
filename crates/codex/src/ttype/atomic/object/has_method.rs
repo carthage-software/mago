@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -15,7 +15,7 @@ use crate::ttype::atomic::TAtomic;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TObjectHasMethod {
     /// The name of the method that is known to exist.
-    pub method: Atom,
+    pub method: Word,
     /// Additional intersection types (e.g., other `HasMethod` or `HasProperty` assertions).
     pub intersection_types: Option<Vec<TAtomic>>,
 }
@@ -24,22 +24,22 @@ impl TObjectHasMethod {
     /// Creates a new `TObjectHasMethod` with the given method name.
     #[inline]
     #[must_use]
-    pub const fn new(method: Atom) -> Self {
+    pub const fn new(method: Word) -> Self {
         Self { method, intersection_types: None }
     }
 
     /// Returns the method name.
     #[inline]
     #[must_use]
-    pub const fn get_method(&self) -> Atom {
+    pub const fn get_method(&self) -> Word {
         self.method
     }
 
     /// Checks if this method name matches the given name (case-insensitive).
     #[inline]
     #[must_use]
-    pub fn has_method(&self, method_name: &str) -> bool {
-        self.method.eq_ignore_ascii_case(method_name)
+    pub fn has_method(&self, method_name: &[u8]) -> bool {
+        self.method.as_bytes().eq_ignore_ascii_case(method_name)
     }
 }
 
@@ -86,17 +86,17 @@ impl TType for TObjectHasMethod {
         false
     }
 
-    fn get_id(&self) -> Atom {
-        let mut result = concat_atom!("has-method<'", self.method, "'>");
+    fn get_id(&self) -> Word {
+        let mut result = concat_word!(b"has-method<'", self.method, b"'>");
 
         if let Some(intersection_types) = self.get_intersection_types() {
             for atomic in intersection_types {
                 let atomic_id = atomic.get_id();
 
                 result = if atomic.has_intersection_types() {
-                    concat_atom!(result, "&(", atomic_id, ")")
+                    concat_word!(result, b"&(", atomic_id, b")")
                 } else {
-                    concat_atom!(result, "&", atomic_id)
+                    concat_word!(result, b"&", atomic_id)
                 };
             }
         }
@@ -104,17 +104,17 @@ impl TType for TObjectHasMethod {
         result
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
-        let mut result = concat_atom!("has-method<'", self.method, "'>");
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
+        let mut result = concat_word!(b"has-method<'", self.method, b"'>");
 
         if let Some(intersection_types) = self.get_intersection_types() {
             for atomic in intersection_types {
                 let atomic_id = atomic.get_pretty_id_with_indent(indent);
 
                 result = if atomic.has_intersection_types() {
-                    concat_atom!(result, "&(", atomic_id, ")")
+                    concat_word!(result, b"&(", atomic_id, b")")
                 } else {
-                    concat_atom!(result, "&", atomic_id)
+                    concat_word!(result, b"&", atomic_id)
                 };
             }
         }

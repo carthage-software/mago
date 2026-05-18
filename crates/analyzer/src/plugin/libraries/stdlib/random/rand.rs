@@ -13,7 +13,7 @@ use crate::plugin::provider::function::FunctionTarget;
 static META: ProviderMeta =
     ProviderMeta::new("php::random::rand", "rand/mt_rand", "Returns int range based on min/max arguments");
 
-static TARGETS: [&str; 2] = ["rand", "mt_rand"];
+static TARGETS: [&[u8]; 2] = [b"rand", b"mt_rand"];
 
 /// Provider for the `rand()` and `mt_rand()` functions.
 ///
@@ -41,11 +41,11 @@ impl FunctionReturnTypeProvider for RandProvider {
             return Some(get_int_range(Some(0), None));
         }
 
-        let min_argument = invocation.get_argument(0, &["min"])?;
+        let min_argument = invocation.get_argument(0, &[b"min"])?;
         let min_argument_type = context.get_expression_type(min_argument)?;
         let min_argument_integer = min_argument_type.get_single_int()?;
 
-        let max_argument = invocation.get_argument(1, &["max"])?;
+        let max_argument = invocation.get_argument(1, &[b"max"])?;
         let max_argument_type = context.get_expression_type(max_argument)?;
         let max_argument_integer = max_argument_type.get_single_int()?;
 

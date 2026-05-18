@@ -46,7 +46,7 @@ fn test_all_rule_examples() {
 fn test_code_snippet(rule_code: &str, code: &str, should_have_issues: bool) -> Result<(), String> {
     let arena = Bump::new();
 
-    let file = File::ephemeral(Cow::Owned("test.php".to_string()), Cow::Owned(code.to_string()));
+    let file = File::ephemeral(Cow::Owned(b"test.php".to_vec()), Cow::Owned(code.as_bytes().to_vec()));
 
     let program = parse_file(&arena, &file);
     if program.has_errors() {

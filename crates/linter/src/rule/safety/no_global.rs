@@ -18,7 +18,7 @@ use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
-const GLOBALS_VARIABLE: &str = "$GLOBALS";
+const GLOBALS_VARIABLE: &[u8] = b"$GLOBALS";
 
 #[derive(Debug, Clone)]
 pub struct NoGlobalRule {

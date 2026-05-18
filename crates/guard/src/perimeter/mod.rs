@@ -1,6 +1,5 @@
 mod checker;
 
-use mago_atom::concat_atom;
 use mago_span::HasSpan;
 use mago_syntax::ast::Attribute;
 use mago_syntax::ast::ClassConstantAccess;
@@ -109,10 +108,14 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 };
 
                 typed_use_item_list.items.iter().for_each(|typed_use_item| {
-                    let fqn =
-                        concat_atom!(typed_use_item_list.namespace.value(), "\\", typed_use_item.name.value()).as_str();
+                    let mut fqn = Vec::with_capacity(
+                        typed_use_item_list.namespace.value().len() + 1 + typed_use_item.name.value().len(),
+                    );
+                    fqn.extend_from_slice(typed_use_item_list.namespace.value());
+                    fqn.push(b'\\');
+                    fqn.extend_from_slice(typed_use_item.name.value());
 
-                    check_usage(context, fqn, symbol_kind, BreachVector::Use, typed_use_item.name.span());
+                    check_usage(context, &fqn, symbol_kind, BreachVector::Use, typed_use_item.name.span());
                 });
             }
             UseItems::MixedList(mixed_use_item_list) => {
@@ -123,11 +126,14 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                         None => PermittedDependencyKind::ClassLike,
                     };
 
-                    let fqn =
-                        concat_atom!(mixed_use_item_list.namespace.value(), "\\", mixed_use_item.item.name.value())
-                            .as_str();
+                    let mut fqn = Vec::with_capacity(
+                        mixed_use_item_list.namespace.value().len() + 1 + mixed_use_item.item.name.value().len(),
+                    );
+                    fqn.extend_from_slice(mixed_use_item_list.namespace.value());
+                    fqn.push(b'\\');
+                    fqn.extend_from_slice(mixed_use_item.item.name.value());
 
-                    check_usage(context, fqn, symbol_kind, BreachVector::Use, mixed_use_item.item.name.span());
+                    check_usage(context, &fqn, symbol_kind, BreachVector::Use, mixed_use_item.item.name.span());
                 });
             }
         }

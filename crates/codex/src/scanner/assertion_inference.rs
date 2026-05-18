@@ -1,8 +1,5 @@
 use std::collections::BTreeMap;
 
-use mago_atom::Atom;
-use mago_atom::AtomSet;
-use mago_atom::atom;
 use mago_names::ResolvedNames;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Block;
@@ -13,6 +10,9 @@ use mago_syntax::ast::Literal;
 use mago_syntax::ast::Statement;
 use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::Variable;
+use mago_word::Word;
+use mago_word::WordSet;
+use mago_word::word;
 
 use crate::assertion::Assertion;
 use crate::metadata::function_like::FunctionLikeMetadata;
@@ -21,7 +21,7 @@ use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::scalar::TScalar;
 
-type AssertionMap = BTreeMap<Atom, Vec<Assertion>>;
+type AssertionMap = BTreeMap<Word, Vec<Assertion>>;
 
 /// Infers assertions for a function-like whose body is a single expression
 /// (arrow function).
@@ -76,7 +76,7 @@ fn has_explicit_assertions(metadata: &FunctionLikeMetadata) -> bool {
         || !metadata.if_false_assertions.is_empty()
 }
 
-fn collect_parameter_names(metadata: &FunctionLikeMetadata) -> AtomSet {
+fn collect_parameter_names(metadata: &FunctionLikeMetadata) -> WordSet {
     metadata.parameters.iter().map(|p| p.get_name().0).collect()
 }
 
@@ -109,7 +109,7 @@ fn apply_assertions(metadata: &mut FunctionLikeMetadata, if_true: AssertionMap, 
 
 fn infer_from_expression<'arena>(
     expression: &'arena Expression<'arena>,
-    parameter_names: &AtomSet,
+    parameter_names: &WordSet,
     resolved_names: &ResolvedNames<'arena>,
     negated: bool,
 ) -> (AssertionMap, AssertionMap) {
@@ -142,7 +142,7 @@ fn infer_from_expression<'arena>(
     }
 }
 
-fn build_assertions(var: Atom, atomic: TAtomic, negated: bool) -> (AssertionMap, AssertionMap) {
+fn build_assertions(var: Word, atomic: TAtomic, negated: bool) -> (AssertionMap, AssertionMap) {
     let mut if_true = AssertionMap::new();
     let mut if_false = AssertionMap::new();
 
@@ -164,28 +164,28 @@ fn unwrap_parens<'expr, 'arena>(mut expression: &'expr Expression<'arena>) -> &'
     expression
 }
 
-fn parameter_var(expression: &Expression<'_>, parameter_names: &AtomSet) -> Option<Atom> {
+fn parameter_var(expression: &Expression<'_>, parameter_names: &WordSet) -> Option<Word> {
     let Expression::Variable(Variable::Direct(direct)) = unwrap_parens(expression) else {
         return None;
     };
 
-    let candidate = atom(direct.name);
+    let candidate = word(direct.name);
     if parameter_names.contains(&candidate) { Some(candidate) } else { None }
 }
 
 fn parse_instanceof<'arena>(
     lhs: &Expression<'arena>,
     rhs: &Expression<'arena>,
-    parameter_names: &AtomSet,
+    parameter_names: &WordSet,
     resolved_names: &ResolvedNames<'arena>,
-) -> Option<(Atom, TAtomic)> {
+) -> Option<(Word, TAtomic)> {
     let var = parameter_var(lhs, parameter_names)?;
 
     let Expression::Identifier(identifier) = unwrap_parens(rhs) else {
         return None;
     };
 
-    let class_name = atom(resolved_names.get(identifier));
+    let class_name = word(resolved_names.get(identifier));
 
     Some((var, TAtomic::Object(TObject::Named(TNamedObject::new(class_name)))))
 }
@@ -193,8 +193,8 @@ fn parse_instanceof<'arena>(
 fn parse_null_compare<'arena>(
     lhs: &Expression<'arena>,
     rhs: &Expression<'arena>,
-    parameter_names: &AtomSet,
-) -> Option<Atom> {
+    parameter_names: &WordSet,
+) -> Option<Word> {
     if let Some(var) = parameter_var(lhs, parameter_names)
         && is_null_literal(rhs)
     {
@@ -216,9 +216,9 @@ fn is_null_literal(expression: &Expression<'_>) -> bool {
 
 fn parse_type_check_function<'arena>(
     call: &FunctionCall<'arena>,
-    parameter_names: &AtomSet,
+    parameter_names: &WordSet,
     resolved_names: &ResolvedNames<'arena>,
-) -> Option<(Atom, TAtomic)> {
+) -> Option<(Word, TAtomic)> {
     let Expression::Identifier(function_id) = call.function else {
         return None;
     };
@@ -235,15 +235,15 @@ fn parse_type_check_function<'arena>(
     parameter_var(arg.value(), parameter_names).map(|var| (var, atomic))
 }
 
-fn type_for_check_function(name: &str) -> Option<TAtomic> {
-    match name.to_ascii_lowercase().as_str() {
-        "is_int" | "is_integer" | "is_long" => Some(TAtomic::Scalar(TScalar::int())),
-        "is_string" => Some(TAtomic::Scalar(TScalar::string())),
-        "is_float" | "is_double" | "is_real" => Some(TAtomic::Scalar(TScalar::float())),
-        "is_bool" => Some(TAtomic::Scalar(TScalar::bool())),
-        "is_null" => Some(TAtomic::Null),
-        "is_object" => Some(TAtomic::Object(TObject::Any)),
-        "is_numeric" => Some(TAtomic::Scalar(TScalar::numeric())),
+fn type_for_check_function(name: &[u8]) -> Option<TAtomic> {
+    match name.to_ascii_lowercase().as_slice() {
+        b"is_int" | b"is_integer" | b"is_long" => Some(TAtomic::Scalar(TScalar::int())),
+        b"is_string" => Some(TAtomic::Scalar(TScalar::string())),
+        b"is_float" | b"is_double" | b"is_real" => Some(TAtomic::Scalar(TScalar::float())),
+        b"is_bool" => Some(TAtomic::Scalar(TScalar::bool())),
+        b"is_null" => Some(TAtomic::Null),
+        b"is_object" => Some(TAtomic::Object(TObject::Any)),
+        b"is_numeric" => Some(TAtomic::Scalar(TScalar::numeric())),
         _ => None,
     }
 }

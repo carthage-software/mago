@@ -122,8 +122,8 @@ impl LintRule for AssertionStyleRule {
             return;
         };
 
-        if !method.name.value.starts_with("test")
-            || method.name.value.chars().nth(4).is_none_or(|c| c != '_' && !c.is_uppercase())
+        if !method.name.value.starts_with(b"test")
+            || method.name.value.get(4).is_none_or(|&c| c != b'_' && !c.is_ascii_uppercase())
         {
             return;
         }

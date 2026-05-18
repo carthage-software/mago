@@ -110,21 +110,24 @@ impl LintRule for NoFullyQualifiedGlobalConstantRule {
             return;
         }
 
-        let constant_name = identifier.value().trim_start_matches('\\');
+        let constant_name_bytes = mago_bytes::trim_start_byte(identifier.value(), b'\\');
 
         // Skip true, false, null — these are language keywords.
-        let name_lower = constant_name.to_ascii_lowercase();
-        if matches!(name_lower.as_str(), "true" | "false" | "null") {
+        let name_lower = constant_name_bytes.to_ascii_lowercase();
+        if matches!(name_lower.as_slice(), b"true" | b"false" | b"null") {
             return;
         }
 
-        let short_name = constant_name.rsplit('\\').next().unwrap_or(constant_name);
+        let short_name_bytes = constant_name_bytes.rsplit(|&b| b == b'\\').next().unwrap_or(constant_name_bytes);
         let fqn_span = identifier.span();
 
-        let resolution = ctx.import_constant(constant_name);
+        let resolution = ctx.import_constant(constant_name_bytes);
+
+        let constant_name = mago_bytes::BytesDisplay(constant_name_bytes);
+        let short_name = mago_bytes::BytesDisplay(short_name_bytes);
 
         let (title, help) = match &resolution {
-            Some(res) if res.is_already_available() && res.local_name.as_str() != short_name => (
+            Some(res) if res.is_already_available() && res.local_name.as_bytes() != short_name_bytes => (
                 "Fully-qualified constant access can be replaced with an existing alias.",
                 format!(
                     "`{constant_name}` is already imported as `{}`; replace the reference with it.",
@@ -153,7 +156,7 @@ impl LintRule for NoFullyQualifiedGlobalConstantRule {
         match resolution {
             Some(resolution) => {
                 ctx.collector.propose(issue, |edits| {
-                    edits.push(TextEdit::replace(fqn_span, resolution.local_name.as_str()));
+                    edits.push(TextEdit::replace(fqn_span, resolution.local_name.as_bytes()));
                     if let Some(use_edit) = resolution.use_statement_edit {
                         edits.push(use_edit.with_safety(Safety::Safe));
                     }

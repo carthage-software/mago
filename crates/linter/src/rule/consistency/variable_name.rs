@@ -148,7 +148,9 @@ impl VariableNameRule {
         self.check_variable_name(ctx, name, parameter.variable.span());
     }
 
-    fn check_variable_name(&self, ctx: &mut LintContext<'_, '_>, name: &str, span: Span) {
+    fn check_variable_name(&self, ctx: &mut LintContext<'_, '_>, name: &[u8], span: Span) {
+        let Some(name_str) = std::str::from_utf8(name).ok() else { return };
+        let name = name_str;
         let clean_name = name.trim_start_matches(|c: char| c == '$' || c == '_' || c.is_ascii_digit());
 
         if self.cfg.either {
@@ -206,22 +208,22 @@ impl VariableNameRule {
     }
 }
 
-fn is_special_variable(name: &str) -> bool {
+fn is_special_variable(name: &[u8]) -> bool {
     matches!(
         name,
-        "$this"
-            | "$_"
-            | "$_GET"
-            | "$_POST"
-            | "$_SERVER"
-            | "$_REQUEST"
-            | "$_SESSION"
-            | "$_COOKIE"
-            | "$_FILES"
-            | "$_ENV"
-            | "$GLOBALS"
-            | "$argc"
-            | "$argv"
+        b"$this"
+            | b"$_"
+            | b"$_GET"
+            | b"$_POST"
+            | b"$_SERVER"
+            | b"$_REQUEST"
+            | b"$_SESSION"
+            | b"$_COOKIE"
+            | b"$_FILES"
+            | b"$_ENV"
+            | b"$GLOBALS"
+            | b"$argc"
+            | b"$argv"
     )
 }
 

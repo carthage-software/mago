@@ -103,7 +103,7 @@ impl LintRule for NoHashEmojiRule {
                 continue;
             };
 
-            if !comment.starts_with("#️⃣") {
+            if !comment.starts_with("#\u{fe0f}\u{20e3}".as_bytes()) {
                 continue;
             }
 
@@ -115,7 +115,7 @@ impl LintRule for NoHashEmojiRule {
                 )
                 .with_help("Replace `#️⃣` with `#`.");
 
-            if comment.starts_with("#️⃣[") {
+            if comment.starts_with("#\u{fe0f}\u{20e3}[".as_bytes()) {
                 issue = issue.with_note("`#️⃣[` does not parse as an attribute in PHP; use `#[` instead.");
             }
 

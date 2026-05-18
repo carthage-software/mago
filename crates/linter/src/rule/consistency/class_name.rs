@@ -93,7 +93,8 @@ impl LintRule for ClassNameRule {
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         let Node::Class(class) = node else { return };
         let mut issues = vec![];
-        let name = class.name.value;
+        let name_bytes = class.name.value;
+        let Some(name) = std::str::from_utf8(name_bytes).ok() else { return };
 
         if !is_class_case(name) {
             let issue = Issue::new(self.cfg.level(), format!("Class name `{name}` should be in class case."))
@@ -110,7 +111,7 @@ impl LintRule for ClassNameRule {
             issues.push(issue);
         }
 
-        if class.modifiers.contains_abstract() && self.cfg.psr && !name.starts_with("Abstract") {
+        if class.modifiers.contains_abstract() && self.cfg.psr && !name_bytes.starts_with(b"Abstract") {
             let suggested_name = format!("Abstract{}", to_class_case(name));
 
             issues.push(

@@ -1,7 +1,5 @@
 use std::rc::Rc;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
@@ -24,6 +22,8 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Return;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -133,7 +133,7 @@ pub fn handle_return_value<'ctx>(
     if block_context.flags.collect_initializations()
         && let Some(FunctionLikeIdentifier::Method(class_name, method_name)) =
             block_context.scope.get_function_like_identifier()
-        && method_name.eq_ignore_ascii_case("__construct")
+        && method_name.as_bytes().eq_ignore_ascii_case(b"__construct")
     {
         check_constructor_early_return(context, block_context, return_span, class_name);
     }
@@ -506,7 +506,7 @@ pub fn handle_return_value<'ctx>(
         && !matches!(
             block_context.scope.get_function_like_identifier(),
             Some(FunctionLikeIdentifier::Method(_, name))
-            if name.eq_ignore_ascii_case("__construct")
+            if name.as_bytes().eq_ignore_ascii_case(b"__construct")
         )
     {
         let expected_return_type_str = expected_return_type.get_id();
@@ -540,7 +540,7 @@ fn handle_property_hook_return<'ctx>(
     block_context: &BlockContext<'ctx>,
     return_value: Option<&Expression>,
     mut inferred_return_type: Rc<TUnion>,
-    property_name: Atom,
+    property_name: Word,
     hook_metadata: &PropertyHookMetadata,
     expansion_options: &TypeExpansionOptions,
 ) {
@@ -573,7 +573,7 @@ fn handle_property_hook_return<'ctx>(
         return;
     }
 
-    let hook_name = concat_atom!(class_like.original_name, "::", property_name, "::get");
+    let hook_name = concat_word!(class_like.original_name, "::", property_name, "::get");
 
     if inferred_return_type.is_mixed() {
         context.collector.report_with_code(
@@ -659,9 +659,9 @@ fn check_constructor_early_return<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
     return_span: Span,
-    class_name: Atom,
+    class_name: Word,
 ) {
-    let Some(class_like_metadata) = context.codebase.get_class_like(&class_name) else {
+    let Some(class_like_metadata) = context.codebase.get_class_like(class_name.as_bytes()) else {
         return;
     };
 
@@ -677,7 +677,7 @@ fn check_constructor_early_return<'ctx>(
     // Check each property that needs initialization
     for (prop_name, declaring_class) in &class_like_metadata.declaring_property_ids {
         // Get the property metadata from the declaring class
-        let Some(declaring_meta) = context.codebase.get_class_like(declaring_class) else {
+        let Some(declaring_meta) = context.codebase.get_class_like(declaring_class.as_bytes()) else {
             continue;
         };
         let Some(prop) = declaring_meta.properties.get(prop_name) else {

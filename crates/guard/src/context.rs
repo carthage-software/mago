@@ -15,7 +15,7 @@ pub struct GuardContext<'ctx, 'arena> {
     pub codebase: &'ctx CodebaseMetadata,
     pub boundary_breaches: Vec<BoundaryBreach>,
     pub structural_flaws: Vec<StructuralFlaw>,
-    pub current_namespace: Option<&'arena str>,
+    pub current_namespace: Option<&'arena [u8]>,
 }
 
 impl<'ctx, 'arena> GuardContext<'ctx, 'arena> {
@@ -36,13 +36,13 @@ impl<'ctx, 'arena> GuardContext<'ctx, 'arena> {
     }
 
     /// Sets the current namespace in the context.
-    pub fn set_current_namespace(&mut self, namespace: Option<&'arena str>) {
+    pub fn set_current_namespace(&mut self, namespace: Option<&'arena [u8]>) {
         self.current_namespace = namespace;
     }
 
     /// Gets the current namespace from the context, or an empty string if none is set.
-    pub fn get_current_namespace(&self) -> &'arena str {
-        self.current_namespace.unwrap_or("")
+    pub fn get_current_namespace(&self) -> &'arena [u8] {
+        self.current_namespace.unwrap_or(b"")
     }
 
     /// Retrieves the fully qualified name associated with a given position in the code.
@@ -50,14 +50,14 @@ impl<'ctx, 'arena> GuardContext<'ctx, 'arena> {
     /// # Panics
     ///
     /// Panics if no name is found at the specified position.
-    pub fn lookup_name(&self, position: &impl HasPosition) -> &'arena str {
+    pub fn lookup_name(&self, position: &impl HasPosition) -> &'arena [u8] {
         self.resolved_names.get(&position.position())
     }
 
     /// Attempts to retrieve the fully qualified name associated with a given position.
     ///
     /// Returns `None` if no name is found at the specified position.
-    pub fn try_lookup_name(&self, position: &impl HasPosition) -> Option<&'arena str> {
+    pub fn try_lookup_name(&self, position: &impl HasPosition) -> Option<&'arena [u8]> {
         let pos = position.position();
         if self.resolved_names.contains(&pos) { Some(self.resolved_names.get(&pos)) } else { None }
     }

@@ -208,8 +208,9 @@ impl AstCommand {
             println!("  {: <25} {: <50} {}", "Kind".bold(), "Value".bold(), "Span".bold());
             println!("  {0:─<25} {0:─<50} {0:─<20}", "");
             for token in tokens {
-                let end_byte_index = token.value.char_indices().nth(48).map_or(token.value.len(), |(i, _)| i);
-                let value_for_display = format!("{:?}", &token.value[..end_byte_index]);
+                let display_str = String::from_utf8_lossy(token.value);
+                let end_byte_index = display_str.char_indices().nth(48).map_or(display_str.len(), |(i, _)| i);
+                let value_for_display = format!("{:?}", &display_str[..end_byte_index]);
                 let visual_width = UnicodeWidthStr::width(value_for_display.as_str());
                 let padding_needed = VALUE_COLUMN_WIDTH.saturating_sub(visual_width);
 
@@ -262,7 +263,8 @@ fn print_names<'arena>(arena: &'arena Bump, program: &Program<'arena>) -> Result
 
     for (start, end, name, is_imported) in names.iter() {
         let imported_str = if is_imported { "✅".green() } else { "❌".red() };
-        println!("  {: <10} {: <50} {}", format!("@{start}..{end}").dimmed(), name.cyan(), imported_str);
+        let name_str = String::from_utf8_lossy(name);
+        println!("  {: <10} {: <50} {}", format!("@{start}..{end}").dimmed(), name_str.cyan(), imported_str);
     }
     println!();
     Ok(())
@@ -287,23 +289,34 @@ fn node_to_tree(node: Node) -> Tree<String> {
         Node::Expression(_) => "Expression".bold().underline().to_string(),
         // Literals
         Node::LiteralString(s) => {
-            format!("{} {}", "LiteralString".green(), format!("{:?}", s.value.unwrap_or("")).yellow())
+            let value = s.value.map(|v| String::from_utf8_lossy(v).into_owned()).unwrap_or_default();
+            format!("{} {}", "LiteralString".green(), format!("{:?}", value).yellow())
         }
         Node::LiteralInteger(i) => {
             format!("{} {}", "LiteralInteger".green(), i.value.map_or("?".to_string(), |v| v.to_string()).yellow())
         }
         Node::LiteralFloat(f) => format!("{} {}", "LiteralFloat".green(), f.value.to_string().yellow()),
         // Identifiers
-        Node::LocalIdentifier(id) => format!("{} {}", "LocalIdentifier".cyan(), id.value.bright_black()),
-        Node::QualifiedIdentifier(id) => format!("{} {}", "QualifiedIdentifier".cyan(), id.value.bright_black()),
+        Node::LocalIdentifier(id) => {
+            format!("{} {}", "LocalIdentifier".cyan(), String::from_utf8_lossy(id.value).bright_black())
+        }
+        Node::QualifiedIdentifier(id) => {
+            format!("{} {}", "QualifiedIdentifier".cyan(), String::from_utf8_lossy(id.value).bright_black())
+        }
         Node::FullyQualifiedIdentifier(id) => {
-            format!("{} {}", "FullyQualifiedIdentifier".cyan(), id.value.bright_black())
+            format!("{} {}", "FullyQualifiedIdentifier".cyan(), String::from_utf8_lossy(id.value).bright_black())
         }
         // Variables
-        Node::DirectVariable(var) => format!("{} {}", "DirectVariable".cyan(), var.name.yellow()),
+        Node::DirectVariable(var) => {
+            format!("{} {}", "DirectVariable".cyan(), String::from_utf8_lossy(var.name).yellow())
+        }
         // Operators
-        Node::BinaryOperator(op) => format!("{} {}", "BinaryOperator".magenta(), op.as_str().bold()),
-        Node::UnaryPrefixOperator(op) => format!("{} {}", "UnaryPrefixOperator".magenta(), op.as_str().bold()),
+        Node::BinaryOperator(op) => {
+            format!("{} {}", "BinaryOperator".magenta(), String::from_utf8_lossy(op.as_bytes()).bold())
+        }
+        Node::UnaryPrefixOperator(op) => {
+            format!("{} {}", "UnaryPrefixOperator".magenta(), String::from_utf8_lossy(op.as_bytes()).bold())
+        }
         Node::UnaryPostfixOperator(op) => format!("{} {}", "UnaryPostfixOperator".magenta(), op.as_str().bold()),
         Node::AssignmentOperator(op) => format!("{} {}", "AssignmentOperator".magenta(), op.as_str().bold()),
         Node::ClassLikeMemberMissingSelector(_) | Node::ClassLikeConstantMissingSelector(_) => {

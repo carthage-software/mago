@@ -38,7 +38,7 @@ impl Fingerprintable for LocalIdentifier<'_> {
         H: std::hash::Hasher,
     {
         if let Some(name) = resolved_names.resolve(self) {
-            mago_atom::ascii_lowercase_atom(name).hash(hasher);
+            crate::hash_ascii_lowercase(name, hasher);
         } else {
             self.value.hash(hasher);
         }
@@ -56,7 +56,7 @@ impl Fingerprintable for QualifiedIdentifier<'_> {
         H: std::hash::Hasher,
     {
         if let Some(name) = resolved_names.resolve(self) {
-            mago_atom::ascii_lowercase_atom(name).hash(hasher);
+            crate::hash_ascii_lowercase(name, hasher);
         } else {
             self.value.hash(hasher);
         }
@@ -74,7 +74,7 @@ impl Fingerprintable for FullyQualifiedIdentifier<'_> {
         H: std::hash::Hasher,
     {
         if let Some(name) = resolved_names.resolve(self) {
-            mago_atom::ascii_lowercase_atom(name).hash(hasher);
+            crate::hash_ascii_lowercase(name, hasher);
         } else {
             self.value.hash(hasher);
         }

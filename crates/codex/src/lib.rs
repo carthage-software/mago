@@ -5,9 +5,9 @@
 #![allow(clippy::else_if_without_else)]
 #![allow(clippy::match_wildcard_for_single_variants)]
 
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::word;
 
 pub mod assertion;
 pub mod consts;
@@ -31,29 +31,18 @@ pub mod visibility;
 mod utils;
 
 #[must_use]
-pub fn get_anonymous_class_name(span: Span) -> Atom {
+pub fn get_anonymous_class_name(span: Span) -> Word {
     use std::io::Write;
 
-    // A 64-byte buffer on the stack. This is ample space for the prefix,
-    // u64 file id, and 2 u32 integers, preventing any chance of a heap allocation.
     let mut buffer = [0u8; 64];
-
-    // Use a block to limit the scope of the mutable writer
-    // `writer` is a mutable slice that implements `std::io::Write`.
     let mut writer = &mut buffer[..];
 
-    // SAFETY: We use `unwrap_unchecked` here because we are writing to a fixed-size buffer
+    // SAFETY: 64 bytes is ample for the prefix plus three integers; the write cannot exceed it.
     unsafe {
         write!(writer, "class@anonymous:{}-{}:{}", span.file_id, span.start.offset, span.end.offset).unwrap_unchecked();
     };
 
-    // Determine how many bytes were written by checking the length of the original buffer
-    // against what the `writer` had left. This is a common pattern for `io::Write` on slices.
     let written_len = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
 
-    atom(
-        // SAFETY: We use `unwrap_unchecked` here because we are certain the bytes
-        // up to `written_len` are valid UTF-8.
-        unsafe { std::str::from_utf8(&buffer[..written_len]).unwrap_unchecked() },
-    )
+    word(&buffer[..written_len])
 }

@@ -1,12 +1,12 @@
 //! `Psl\Type\int_range()` return type provider.
 
-use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::union::TUnion;
+use mago_word::word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -36,7 +36,7 @@ impl Provider for IntRangeProvider {
 
 impl FunctionReturnTypeProvider for IntRangeProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("psl\\type\\int_range")
+        FunctionTarget::Exact(b"psl\\type\\int_range")
     }
 
     fn get_return_type(
@@ -44,8 +44,8 @@ impl FunctionReturnTypeProvider for IntRangeProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let min_arg = invocation.get_argument(0, &["min"])?;
-        let max_arg = invocation.get_argument(1, &["max"])?;
+        let min_arg = invocation.get_argument(0, &[b"min"])?;
+        let max_arg = invocation.get_argument(1, &[b"max"])?;
 
         let min_type = context.get_expression_type(min_arg)?;
         let max_type = context.get_expression_type(max_arg)?;
@@ -62,7 +62,7 @@ impl FunctionReturnTypeProvider for IntRangeProvider {
         let inner_type = TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(inner)));
 
         Some(TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
-            atom("Psl\\Type\\TypeInterface"),
+            word("Psl\\Type\\TypeInterface"),
             Some(vec![inner_type]),
         )))))
     }

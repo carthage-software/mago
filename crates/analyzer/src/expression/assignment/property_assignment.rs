@@ -210,10 +210,10 @@ pub fn analyze<'ctx, 'arena>(
 
     if block_context.flags.collect_initializations()
         && let Expression::Variable(Variable::Direct(var)) = property_access.object
-        && var.name == "$this"
+        && var.name == b"$this"
         && let ClassLikeMemberSelector::Identifier(ident) = &property_access.property
     {
-        let property_name = mago_atom::Atom::from(format!("${}", ident.value).as_str());
+        let property_name = mago_word::concat_word!(b"$", ident.value);
         block_context.definitely_initialized_properties.insert(property_name);
         block_context.possibly_initialized_properties.insert(property_name);
     }

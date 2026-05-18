@@ -6,10 +6,10 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
-use mago_atom::empty_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::empty_word;
+use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::reference::ReferenceSource;
@@ -779,7 +779,7 @@ impl TUnion {
     }
 
     #[must_use]
-    pub fn extends_or_implements(&self, codebase: &CodebaseMetadata, interface: &str) -> bool {
+    pub fn extends_or_implements(&self, codebase: &CodebaseMetadata, interface: &[u8]) -> bool {
         for atomic in self.types.as_ref() {
             if !atomic.extends_or_implements(codebase, interface) {
                 return false;
@@ -1152,7 +1152,7 @@ impl TUnion {
     /// Return a vector of pairs containing the enum name, and their case name
     /// if specified.
     #[must_use]
-    pub fn get_enum_cases(&self) -> Vec<(Atom, Option<Atom>)> {
+    pub fn get_enum_cases(&self) -> Vec<(Word, Option<Word>)> {
         self.types
             .iter()
             .filter_map(|t| match t {
@@ -1188,12 +1188,12 @@ impl TUnion {
     }
 
     #[must_use]
-    pub fn get_single_literal_string_value(&self) -> Option<&str> {
+    pub fn get_single_literal_string_value(&self) -> Option<&[u8]> {
         if self.is_single() { self.get_single().get_literal_string_value() } else { None }
     }
 
     #[must_use]
-    pub fn get_single_class_string_value(&self) -> Option<Atom> {
+    pub fn get_single_class_string_value(&self) -> Option<Word> {
         if self.is_single() { self.get_single().get_class_string_value() } else { None }
     }
 
@@ -1249,7 +1249,7 @@ impl TUnion {
     }
 
     #[must_use]
-    pub fn get_literal_string_values(&self) -> Vec<Option<Atom>> {
+    pub fn get_literal_string_values(&self) -> Vec<Option<Word>> {
         self.get_literal_strings()
             .into_iter()
             .map(|atom| match atom {
@@ -1323,6 +1323,7 @@ impl TType for TUnion {
         !self.flags.contains(UnionFlags::POPULATED) && self.types.iter().any(super::TType::needs_population)
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         if self.types.is_empty() {
             return true;
@@ -1335,17 +1336,17 @@ impl TType for TUnion {
         self.types.len() > 3 || self.types.iter().any(super::TType::is_complex)
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         let len = self.types.len();
 
-        let mut atomic_ids: Vec<Atom> = self
+        let mut atomic_ids: Vec<Word> = self
             .types
             .as_ref()
             .iter()
             .map(|atomic| {
                 let id = atomic.get_id();
                 if atomic.is_generic_parameter() || atomic.has_intersection_types() && len > 1 {
-                    concat_atom!("(", id.as_str(), ")")
+                    concat_word!(b"(", id.as_bytes(), b")")
                 } else {
                     id
                 }
@@ -1353,65 +1354,69 @@ impl TType for TUnion {
             .collect();
 
         if len <= 1 {
-            return atomic_ids.pop().unwrap_or_else(empty_atom);
+            return atomic_ids.pop().unwrap_or_else(empty_word);
         }
 
         atomic_ids.sort_unstable();
         let mut result = atomic_ids[0];
         for id in &atomic_ids[1..] {
-            result = concat_atom!(result.as_str(), "|", id.as_str());
+            result = concat_word!(result.as_bytes(), b"|", id.as_bytes());
         }
 
         result
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         let len = self.types.len();
 
         if len <= 1 {
-            return self.types.first().map_or_else(empty_atom, |atomic| atomic.get_pretty_id_with_indent(indent));
+            return self.types.first().map_or_else(empty_word, |atomic| atomic.get_pretty_id_with_indent(indent));
         }
 
         // Use multiline format for unions with more than 3 types
         if len > 3 {
-            let mut atomic_ids: Vec<Atom> = self
+            let mut atomic_ids: Vec<Word> = self
                 .types
                 .as_ref()
                 .iter()
                 .map(|atomic| {
                     let id = atomic.get_pretty_id_with_indent(indent + 2);
-                    if atomic.has_intersection_types() { concat_atom!("(", id.as_str(), ")") } else { id }
+                    if atomic.has_intersection_types() { concat_word!(b"(", id.as_bytes(), b")") } else { id }
                 })
                 .collect();
 
             atomic_ids.sort_unstable();
 
-            let mut result = String::new();
-            result += &atomic_ids[0];
+            let mut result: Vec<u8> = Vec::new();
+            result.extend_from_slice(atomic_ids[0].as_bytes());
             for id in &atomic_ids[1..] {
-                result += "\n";
-                result += &" ".repeat(indent);
-                result += "| ";
-                result += id.as_str();
+                result.extend_from_slice(b"\n");
+                result.resize(result.len() + indent, b' ');
+                result.extend_from_slice(b"| ");
+                result.extend_from_slice(id.as_bytes());
             }
 
-            atom(&result)
+            word(&result)
         } else {
             // Use inline format for smaller unions
-            let mut atomic_ids: Vec<Atom> = self
+            let mut atomic_ids: Vec<Word> = self
                 .types
                 .as_ref()
                 .iter()
                 .map(|atomic| {
                     let id = atomic.get_pretty_id_with_indent(indent);
-                    if atomic.has_intersection_types() && len > 1 { concat_atom!("(", id.as_str(), ")") } else { id }
+                    if atomic.has_intersection_types() && len > 1 {
+                        concat_word!(b"(", id.as_bytes(), b")")
+                    } else {
+                        id
+                    }
                 })
                 .collect();
 
             atomic_ids.sort_unstable();
             let mut result = atomic_ids[0];
             for id in &atomic_ids[1..] {
-                result = concat_atom!(result.as_str(), " | ", id.as_str());
+                result = concat_word!(result.as_bytes(), b" | ", id.as_bytes());
             }
 
             result

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -98,21 +98,21 @@ impl TType for TConditional {
         false
     }
 
-    fn get_id(&self) -> Atom {
-        concat_atom!(
+    fn get_id(&self) -> Word {
+        concat_word!(
             "(",
-            self.subject.get_id().as_str(),
+            self.subject.get_id(),
             if self.negated { " is not " } else { " is " },
-            self.target.get_id().as_str(),
+            self.target.get_id(),
             " ? ",
-            self.then.get_id().as_str(),
+            self.then.get_id(),
             " : ",
-            self.otherwise.get_id().as_str(),
+            self.otherwise.get_id(),
             ")"
         )
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

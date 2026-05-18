@@ -1,6 +1,3 @@
-use mago_atom::Atom;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::ascii_lowercase_constant_name_atom;
 use mago_syntax::ast::ArgumentList;
 use mago_syntax::ast::Binary;
 use mago_syntax::ast::BinaryOperator;
@@ -10,6 +7,9 @@ use mago_syntax::ast::FunctionCall;
 use mago_syntax::ast::Parenthesized;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::UnaryPrefixOperator;
+use mago_word::Word;
+use mago_word::ascii_lowercase_constant_name_word;
+use mago_word::ascii_lowercase_word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
@@ -41,13 +41,13 @@ pub fn extract_function_constant_existence(
             if !negated =>
         {
             let func_name = ident.value().to_ascii_lowercase();
-            match func_name.as_str() {
-                "function_exists" => {
+            match func_name.as_slice() {
+                b"function_exists" => {
                     if let Some(name) = get_first_literal_string_arg(argument_list, artifacts, false) {
                         block_context.known_functions.insert(name);
                     }
                 }
-                "defined" => {
+                b"defined" => {
                     if let Some(name) = get_first_literal_string_arg(argument_list, artifacts, true) {
                         block_context.known_constants.insert(name);
                     }
@@ -66,12 +66,12 @@ fn get_first_literal_string_arg(
     argument_list: &ArgumentList,
     artifacts: &AnalysisArtifacts,
     constant: bool,
-) -> Option<Atom> {
+) -> Option<Word> {
     argument_list
         .arguments
         .first()
         .map(mago_syntax::ast::Argument::value)
         .and_then(|expr| artifacts.get_expression_type(expr))
         .and_then(|ty| ty.get_single_literal_string_value())
-        .map(|s| if constant { ascii_lowercase_constant_name_atom(s) } else { ascii_lowercase_atom(s) })
+        .map(|s| if constant { ascii_lowercase_constant_name_word(s) } else { ascii_lowercase_word(s) })
 }

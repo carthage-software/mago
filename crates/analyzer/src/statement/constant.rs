@@ -29,9 +29,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Constant<'arena> {
         );
 
         for item in &self.items {
-            let name = context.resolved_names.get(&item.name);
+            let name_bytes = context.resolved_names.get(&item.name);
+            let name = mago_bytes::BytesDisplay(name_bytes);
 
-            let Some(constant_metadata) = context.codebase.get_constant(name) else {
+            let Some(constant_metadata) = context.codebase.get_constant(name_bytes) else {
                 return Err(AnalysisError::InternalError(
                     format!("Constant metadata for `{name}` not found during analysis."),
                     item.name.span(),

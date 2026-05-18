@@ -1,5 +1,6 @@
 use std::fmt;
 
+use mago_bytes::BytesDisplay;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
@@ -11,7 +12,7 @@ use crate::settings::StructuralSymbolKind;
 #[derive(Debug)]
 pub struct StructuralFlaw {
     /// The fully qualified name of the symbol that has a flaw.
-    pub symbol_fqn: String,
+    pub symbol_fqn: Vec<u8>,
     /// The kind of the flawed symbol (e.g., class-like, function).
     pub symbol_kind: StructuralSymbolKind,
     /// The source code location of the flawed symbol's definition.
@@ -42,7 +43,7 @@ pub enum FlawKind {
 impl From<StructuralFlaw> for Issue {
     /// Converts a `StructuralFlaw` into a rich, user-friendly `Issue`.
     fn from(flaw: StructuralFlaw) -> Self {
-        let mut issue = Issue::error(format!("Structural flaw in `{}`", flaw.symbol_fqn))
+        let mut issue = Issue::error(format!("Structural flaw in `{}`", BytesDisplay(&flaw.symbol_fqn)))
             .with_annotation(Annotation::primary(flaw.span).with_message(flaw.kind.to_string()));
 
         if let Some(reason) = flaw.reason {

@@ -3,9 +3,9 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -132,50 +132,49 @@ impl TType for TIterable {
         self.key_type.is_complex() || self.value_type.is_complex()
     }
 
-    fn get_id(&self) -> Atom {
-        let base_id = concat_atom!("iterable<", self.key_type.get_id(), ", ", self.value_type.get_id(), ">");
+    fn get_id(&self) -> Word {
+        let base_id = concat_word!(b"iterable<", self.key_type.get_id(), b", ", self.value_type.get_id(), b">");
 
         let Some(intersection_types) = self.intersection_types.as_deref() else {
             return base_id;
         };
 
-        let mut result = concat_atom!("(", base_id, ")");
+        let mut result = concat_word!(b"(", base_id, b")");
         for atomic in intersection_types {
-            result = concat_atom!(result, "&", atomic.get_id());
+            result = concat_word!(result, b"&", atomic.get_id());
         }
 
         result
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         if self.is_complex() {
             let param_indent = indent + 2;
-            let param_spaces = " ".repeat(param_indent);
-            let mut result = String::new();
-            result += "iterable<\n";
-            result += &param_spaces;
-            result += &self.key_type.get_pretty_id_with_indent(param_indent);
-            result += ",\n";
-            result += &param_spaces;
-            result += &self.value_type.get_pretty_id_with_indent(param_indent);
-            result += ",\n";
-            result += &" ".repeat(indent);
-            result += ">";
+            let mut buf: Vec<u8> = Vec::new();
+            buf.extend_from_slice(b"iterable<\n");
+            buf.resize(buf.len() + param_indent, b' ');
+            buf.extend_from_slice(self.key_type.get_pretty_id_with_indent(param_indent).as_bytes());
+            buf.extend_from_slice(b",\n");
+            buf.resize(buf.len() + param_indent, b' ');
+            buf.extend_from_slice(self.value_type.get_pretty_id_with_indent(param_indent).as_bytes());
+            buf.extend_from_slice(b",\n");
+            buf.resize(buf.len() + indent, b' ');
+            buf.extend_from_slice(b">");
 
-            let base_id = atom(&result);
+            let base_id = word(&buf);
 
             let Some(intersection_types) = self.intersection_types.as_deref() else {
                 return base_id;
             };
 
-            let mut result = concat_atom!("(", base_id.as_str(), ")");
+            let mut result = concat_word!(b"(", base_id.as_bytes(), b")");
 
             for atomic in intersection_types {
                 let atomic_id = atomic.get_pretty_id_with_indent(indent);
                 if atomic.has_intersection_types() {
-                    result = concat_atom!(result.as_str(), "&(", atomic_id.as_str(), ")");
+                    result = concat_word!(result.as_bytes(), b"&(", atomic_id.as_bytes(), b")");
                 } else {
-                    result = concat_atom!(result.as_str(), "&", atomic_id.as_str());
+                    result = concat_word!(result.as_bytes(), b"&", atomic_id.as_bytes());
                 }
             }
 

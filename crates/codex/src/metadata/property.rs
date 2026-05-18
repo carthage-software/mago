@@ -3,8 +3,8 @@ use mago_php_version::PHPVersionRange;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::AtomMap;
 use mago_span::Span;
+use mago_word::WordMap;
 
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::property_hook::PropertyHookMetadata;
@@ -73,7 +73,7 @@ pub struct PropertyMetadata {
     ///
     /// Key is the hook name atom ("get" or "set").
     /// Only present for PHP 8.4+ hooked properties.
-    pub hooks: AtomMap<PropertyHookMetadata>,
+    pub hooks: WordMap<PropertyHookMetadata>,
 
     /// PHP version range in which this property is available, derived from
     /// `Mago\AvailableSince` / `Mago\AvailableUntil` attributes during
@@ -97,7 +97,7 @@ impl PropertyMetadata {
             type_metadata: None,
             default_type_metadata: None,
             flags,
-            hooks: AtomMap::default(),
+            hooks: WordMap::default(),
             version_constraint: VersionConstraint::unconstrained(),
         }
     }

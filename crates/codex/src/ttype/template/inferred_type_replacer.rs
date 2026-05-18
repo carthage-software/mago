@@ -3,7 +3,7 @@ use std::sync::Arc;
 use foldhash::HashMap;
 use foldhash::HashSet;
 
-use mago_atom::Atom;
+use mago_word::Word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
@@ -127,14 +127,14 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
 
 #[allow(clippy::too_many_arguments)]
 fn replace_template_parameter(
-    inferred_lower_bounds: &HashMap<Atom, HashMap<GenericParent, Vec<TemplateBound>>>,
-    parameter_name: Atom,
+    inferred_lower_bounds: &HashMap<Word, HashMap<GenericParent, Vec<TemplateBound>>>,
+    parameter_name: Word,
     defining_entity: &GenericParent,
     codebase: &CodebaseMetadata,
     constraint: &TUnion,
     intersection_types: Option<&Vec<TAtomic>>,
     template_result: &TemplateResult,
-    key: Atom,
+    key: Word,
 ) -> Option<TUnion> {
     let mut template_type = None;
     let traversed_type =
@@ -193,7 +193,7 @@ fn replace_template_parameter(
         for lower_bounds_by_source in inferred_lower_bounds.values() {
             for defining_entity in lower_bounds_by_source.keys() {
                 if let GenericParent::ClassLike(classlike_name) = defining_entity
-                    && let Some(metadata) = codebase.get_class_like(classlike_name)
+                    && let Some(metadata) = codebase.get_class_like(classlike_name.as_bytes())
                     && let Some(extended_parameter_map) = metadata.template_extended_parameters.get(&metadata.name)
                     && let Some(param) = extended_parameter_map.get(&key)
                     && let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) = param.get_single()

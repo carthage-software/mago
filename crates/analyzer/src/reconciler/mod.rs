@@ -9,11 +9,6 @@ use indexmap::IndexMap;
 use regex::Regex;
 
 use mago_algebra::assertion_set::AssertionSet;
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
-use mago_atom::atom;
-use mago_atom::concat_atom;
 use mago_codex::assertion::Assertion;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::add_optional_union_type;
@@ -43,11 +38,17 @@ use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::var_has_root;
+use mago_bytes::BytesDisplay;
 
 pub mod assertion_reconciler;
 pub mod negated_assertion_reconciler;
@@ -59,11 +60,11 @@ mod macros;
 #[allow(clippy::similar_names)]
 pub fn reconcile_keyed_types<'ctx>(
     context: &mut Context<'ctx, '_>,
-    new_types: &IndexMap<Atom, AssertionSet>,
-    mut active_new_types: IndexMap<Atom, HashSet<usize>>,
+    new_types: &IndexMap<Word, AssertionSet>,
+    mut active_new_types: IndexMap<Word, HashSet<usize>>,
     block_context: &mut BlockContext<'ctx>,
-    changed_var_ids: &mut AtomSet,
-    referenced_var_ids: &AtomSet,
+    changed_var_ids: &mut WordSet,
+    referenced_var_ids: &WordSet,
     span: &Span,
     can_report_issues: bool,
     negated: bool,
@@ -72,7 +73,7 @@ pub fn reconcile_keyed_types<'ctx>(
         return;
     }
 
-    let mut reference_graph: AtomMap<AtomSet> = AtomMap::default();
+    let mut reference_graph: WordMap<WordSet> = WordMap::default();
     if !block_context.references_in_scope.is_empty() {
         // PHP behaves oddly when passing an array containing references: https://bugs.php.net/bug.php?id=20993
         // To work around the issue, if there are any references, we have to recreate the array and fix the
@@ -80,7 +81,7 @@ pub fn reconcile_keyed_types<'ctx>(
         // required for some unclear reason, just cloning elements of the existing array doesn't work properly.
         let old_locals = std::mem::take(&mut block_context.locals);
 
-        let mut cloned_references: AtomSet = AtomSet::default();
+        let mut cloned_references: WordSet = WordSet::default();
         for (reference, referenced) in &block_context.references_in_scope {
             if cloned_references.contains(referenced) {
                 block_context.locals.insert(*referenced, Rc::clone(&old_locals[referenced]));
@@ -109,8 +110,8 @@ pub fn reconcile_keyed_types<'ctx>(
     add_nested_assertions(&mut new_types, &mut active_new_types, block_context);
 
     for (key, new_type_parts) in &new_types {
-        let key_str = key.as_str();
-        if key_str.contains("::") && !key_str.contains('$') && !key_str.contains('[') {
+        let key_str = key.as_bytes();
+        if memchr::memmem::find(key_str, b"::").is_some() && !key_str.contains(&b'$') && !key_str.contains(&b'[') {
             continue;
         }
 
@@ -219,7 +220,7 @@ pub fn reconcile_keyed_types<'ctx>(
         if !did_type_exist && result_type.is_never() {
             // Even when the type doesn't exist and result is never, we still need to
             // update parent array types for negated isset/key_exists to remove the key
-            if key_str.ends_with(']') && (has_inverted_isset || has_inverted_key_exists) {
+            if key_str.ends_with(b"]") && (has_inverted_isset || has_inverted_key_exists) {
                 adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
             }
 
@@ -231,18 +232,19 @@ pub fn reconcile_keyed_types<'ctx>(
 
         if type_changed {
             changed_var_ids.insert(*key);
-            if key_str.ends_with(']') && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality {
+            if key_str.ends_with(b"]") && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality
+            {
                 adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context.codebase);
-            } else if key_str.ends_with(']') && (has_inverted_isset || has_inverted_key_exists) {
+            } else if key_str.ends_with(b"]") && (has_inverted_isset || has_inverted_key_exists) {
                 adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
-            } else if key_str.contains("->") && !is_equality {
+            } else if memchr::memmem::find(key_str, b"->").is_some() && !is_equality {
                 adjust_object_property_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context);
             } else {
                 // plain variable assertion; no parent array or object property to propagate into
             }
 
-            if key_str != "$this" {
-                let mut removable_keys: Vec<Atom> = Vec::new();
+            if key_str != b"$this" {
+                let mut removable_keys: Vec<Word> = Vec::new();
                 let local_keys = block_context.locals.keys().copied().collect::<Vec<_>>();
                 for new_key in local_keys {
                     if new_key == *key {
@@ -259,7 +261,7 @@ pub fn reconcile_keyed_types<'ctx>(
                                     let reference_to_fix = references_to_fix[0];
                                     reference_graph.remove(&reference_to_fix);
                                     if block_context.references_in_scope.contains_key(&reference_to_fix) {
-                                        block_context.decrement_reference_count(reference_to_fix.as_str());
+                                        block_context.decrement_reference_count(reference_to_fix.as_bytes());
                                         block_context.references_in_scope.remove(&reference_to_fix);
                                     }
                                 }
@@ -275,7 +277,7 @@ pub fn reconcile_keyed_types<'ctx>(
                                         .and_then(|inner_set| inner_set.iter().next().copied())
                                     {
                                         if block_context.references_in_scope.contains_key(&new_primary_reference) {
-                                            block_context.decrement_reference_count(new_primary_reference.as_str());
+                                            block_context.decrement_reference_count(new_primary_reference.as_bytes());
                                             block_context.references_in_scope.remove(&new_primary_reference);
                                         }
 
@@ -292,7 +294,7 @@ pub fn reconcile_keyed_types<'ctx>(
                         reference_graph.remove(&new_key);
                         removable_keys.push(new_key);
                         if block_context.references_in_scope.contains_key(&new_key) {
-                            block_context.decrement_reference_count(new_key.as_str());
+                            block_context.decrement_reference_count(new_key.as_bytes());
                             block_context.references_in_scope.remove(&new_key);
                         }
                     }
@@ -312,7 +314,7 @@ pub fn reconcile_keyed_types<'ctx>(
             block_context.locals.insert(*key, Rc::new(result_type));
         }
 
-        let key_parts_0_atom = atom(&key_parts[0]);
+        let key_parts_0_atom = word(&key_parts[0]);
         if let Some(existing_type) = block_context.locals.get(key).cloned()
             && !did_type_exist
             && reference_graph.contains_key(&key_parts_0_atom)
@@ -320,8 +322,9 @@ pub fn reconcile_keyed_types<'ctx>(
             // If key is new, create references for other variables that reference the root variable.
             let mut reference_key_parts = key_parts.clone();
             for reference in &reference_graph[&key_parts_0_atom] {
-                reference.as_str().clone_into(&mut reference_key_parts[0]);
-                let reference_key = atom(&reference_key_parts.join(""));
+                reference_key_parts[0] = reference.as_bytes().to_vec();
+                let joined: Vec<u8> = reference_key_parts.iter().flatten().copied().collect();
+                let reference_key = word(&joined);
                 block_context.locals.insert(reference_key, Rc::clone(&existing_type));
             }
         }
@@ -329,9 +332,9 @@ pub fn reconcile_keyed_types<'ctx>(
 }
 
 fn adjust_array_type(
-    mut key_parts: Vec<String>,
+    mut key_parts: Vec<Vec<u8>>,
     context: &mut BlockContext<'_>,
-    changed_var_ids: &mut AtomSet,
+    changed_var_ids: &mut WordSet,
     result_type: &TUnion,
     codebase: &CodebaseMetadata,
 ) {
@@ -341,10 +344,10 @@ fn adjust_array_type(
     };
     key_parts.pop();
 
-    let base_key = key_parts.join("");
-    let base_key_atom = atom(&base_key);
+    let base_key: Vec<u8> = key_parts.iter().flatten().copied().collect();
+    let base_key_atom = word(&base_key);
 
-    if array_key.starts_with('$') {
+    if array_key.starts_with(b"$") {
         // When the key is a variable, we can't narrow to a specific key,
         // but we CAN remove empty array variants since isset proves the array is non-empty.
         if let Some(existing_type) = context.locals.get(&base_key_atom).cloned()
@@ -354,7 +357,7 @@ fn adjust_array_type(
             narrowed.types.to_mut().retain(|t| !matches!(t, TAtomic::Array(a) if a.is_empty()));
             if !narrowed.types.is_empty() {
                 context.locals.insert(base_key_atom, Rc::new(narrowed));
-                changed_var_ids.insert(atom(&format!("{}[{}]", base_key, array_key)));
+                changed_var_ids.insert(concat_word!(base_key.as_slice(), b"[", array_key.as_slice(), b"]"));
             }
         }
         return;
@@ -362,9 +365,9 @@ fn adjust_array_type(
 
     let mut has_string_offset = false;
 
-    let arraykey_offset = if array_key.starts_with('\'') || array_key.starts_with('\"') {
+    let arraykey_offset: Vec<u8> = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
         has_string_offset = true;
-        array_key[1..(array_key.len() - 1)].to_string()
+        array_key[1..(array_key.len() - 1)].to_vec()
     } else {
         array_key.clone()
     };
@@ -382,8 +385,10 @@ fn adjust_array_type(
         match &mut base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 let dictkey = if has_string_offset {
-                    ArrayKey::String(atom(&arraykey_offset))
-                } else if let Ok(arraykey_value) = arraykey_offset.parse::<i64>() {
+                    ArrayKey::String(word(&arraykey_offset))
+                } else if let Some(arraykey_value) =
+                    std::str::from_utf8(&arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
+                {
                     ArrayKey::Integer(arraykey_value)
                 } else {
                     compatible_types.push(base_atomic_type);
@@ -408,7 +413,9 @@ fn adjust_array_type(
                 }
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
-                if let Ok(arraykey_offset) = arraykey_offset.parse::<usize>() {
+                if let Some(arraykey_offset) =
+                    std::str::from_utf8(&arraykey_offset).ok().and_then(|s| s.parse::<usize>().ok())
+                {
                     if let Some(known_elements) = known_elements {
                         if let Some((_, existing_item_type)) = known_elements.get(&arraykey_offset) {
                             match intersect_union_types(result_type, existing_item_type, codebase) {
@@ -429,8 +436,10 @@ fn adjust_array_type(
             }
             TAtomic::Mixed(_) => {
                 let key = if has_string_offset {
-                    ArrayKey::String(atom(&arraykey_offset))
-                } else if let Ok(arraykey_value) = arraykey_offset.parse::<i64>() {
+                    ArrayKey::String(word(&arraykey_offset))
+                } else if let Some(arraykey_value) =
+                    std::str::from_utf8(&arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
+                {
                     ArrayKey::Integer(arraykey_value)
                 } else {
                     compatible_types.push(base_atomic_type);
@@ -456,10 +465,10 @@ fn adjust_array_type(
             }
         }
 
-        changed_var_ids.insert(concat_atom!(&base_key, "[", &array_key, "]"));
+        changed_var_ids.insert(concat_word!(base_key.as_slice(), b"[", array_key.as_slice(), b"]"));
 
         if let Some(last_part) = key_parts.last()
-            && last_part == "]"
+            && last_part == b"]"
         {
             adjust_array_type(
                 key_parts.clone(),
@@ -482,9 +491,9 @@ fn adjust_array_type(
 }
 
 fn adjust_array_type_remove_key(
-    mut key_parts: Vec<String>,
+    mut key_parts: Vec<Vec<u8>>,
     context: &mut BlockContext<'_>,
-    changed_var_ids: &mut AtomSet,
+    changed_var_ids: &mut WordSet,
     codebase: &CodebaseMetadata,
 ) {
     key_parts.pop();
@@ -494,21 +503,21 @@ fn adjust_array_type_remove_key(
 
     key_parts.pop();
 
-    if array_key.starts_with('$') {
+    if array_key.starts_with(b"$") {
         return;
     }
 
     let mut has_string_offset = false;
 
-    let arraykey_offset = if array_key.starts_with('\'') || array_key.starts_with('\"') {
+    let arraykey_offset: Vec<u8> = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
         has_string_offset = true;
-        array_key[1..(array_key.len() - 1)].to_string()
+        array_key[1..(array_key.len() - 1)].to_vec()
     } else {
         array_key.clone()
     };
 
-    let base_key = key_parts.join("");
-    let base_key_atom = atom(&base_key);
+    let base_key: Vec<u8> = key_parts.iter().flatten().copied().collect();
+    let base_key_atom = word(&base_key);
 
     let mut existing_type = if let Some(existing_type) = context.locals.get(&base_key_atom) {
         (**existing_type).clone()
@@ -520,8 +529,10 @@ fn adjust_array_type_remove_key(
         match base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 let dictkey = if has_string_offset {
-                    ArrayKey::String(atom(&arraykey_offset))
-                } else if let Ok(arraykey_value) = arraykey_offset.parse::<i64>() {
+                    ArrayKey::String(word(&arraykey_offset))
+                } else if let Some(arraykey_value) =
+                    std::str::from_utf8(&arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
+                {
                     ArrayKey::Integer(arraykey_value)
                 } else {
                     continue;
@@ -532,7 +543,8 @@ fn adjust_array_type_remove_key(
                 }
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
-                if let Ok(arraykey_offset) = arraykey_offset.parse::<usize>()
+                if let Some(arraykey_offset) =
+                    std::str::from_utf8(&arraykey_offset).ok().and_then(|s| s.parse::<usize>().ok())
                     && let Some(known_elements) = known_elements
                 {
                     known_elements.remove(&arraykey_offset);
@@ -543,10 +555,10 @@ fn adjust_array_type_remove_key(
             }
         }
 
-        changed_var_ids.insert(concat_atom!(&base_key, "[", &array_key, "]"));
+        changed_var_ids.insert(concat_word!(base_key.as_slice(), b"[", array_key.as_slice(), b"]"));
 
         if let Some(last_part) = key_parts.last()
-            && last_part == "]"
+            && last_part == b"]"
         {
             adjust_array_type(
                 key_parts.clone(),
@@ -567,9 +579,9 @@ fn adjust_array_type_remove_key(
 /// checks each object variant to see if its declared property type is compatible
 /// with the narrowed type, and removes incompatible variants.
 fn adjust_object_property_type(
-    mut key_parts: Vec<String>,
+    mut key_parts: Vec<Vec<u8>>,
     block_context: &mut BlockContext<'_>,
-    changed_var_ids: &mut AtomSet,
+    changed_var_ids: &mut WordSet,
     result_type: &TUnion,
     context: &Context<'_, '_>,
 ) {
@@ -581,12 +593,12 @@ fn adjust_object_property_type(
         return;
     };
 
-    if divider != "->" {
+    if divider != b"->" {
         return;
     }
 
-    let base_key = key_parts.join("");
-    let base_key_atom = atom(&base_key);
+    let base_key: Vec<u8> = key_parts.iter().flatten().copied().collect();
+    let base_key_atom = word(&base_key);
 
     let mut existing_type = if let Some(existing_type) = block_context.locals.get(&base_key_atom) {
         (**existing_type).clone()
@@ -602,8 +614,8 @@ fn adjust_object_property_type(
         let should_check = match &base_atomic_type {
             TAtomic::Object(TObject::Named(named)) => {
                 let fq_class_name = named.get_name();
-                if fq_class_name.eq_ignore_ascii_case("stdClass")
-                    || !context.codebase.class_or_interface_exists(&fq_class_name)
+                if fq_class_name.as_bytes().eq_ignore_ascii_case(b"stdClass")
+                    || !context.codebase.class_or_interface_exists(fq_class_name.as_bytes())
                 {
                     None
                 } else {
@@ -671,34 +683,34 @@ static INTEGER_REGEX: LazyLock<Regex> = LazyLock::new(|| unsafe {
 #[allow(clippy::multiple_unsafe_ops_per_block)]
 #[allow(clippy::semicolon_inside_block)]
 fn add_nested_assertions(
-    new_types: &mut IndexMap<Atom, AssertionSet>,
-    active_new_types: &mut IndexMap<Atom, HashSet<usize>>,
+    new_types: &mut IndexMap<Word, AssertionSet>,
+    active_new_types: &mut IndexMap<Word, HashSet<usize>>,
     context: &BlockContext<'_>,
 ) {
     let mut keys_to_remove = vec![];
 
     'outer: for (nk, new_type) in new_types.clone() {
-        let nk_str = nk.as_str();
-        if (nk_str.contains('[') || nk_str.contains("->"))
+        let nk_str = nk.as_bytes();
+        if (nk_str.contains(&b'[') || memchr::memmem::find(nk_str, b"->").is_some())
             && (new_type[0][0] == Assertion::IsEqualIsset || new_type[0][0] == Assertion::IsIsset)
         {
             let mut key_parts = break_up_path_into_parts(nk_str);
             key_parts.reverse();
 
             let mut nesting = 0;
-            let mut base_key;
+            let mut base_key: Vec<u8>;
 
             unsafe {
                 // SAFETY: `pop` will always return a value because we checked that the key contains either `[` or `->`.
                 base_key = key_parts.pop().unwrap_unchecked();
 
-                if !&base_key.starts_with('$') && key_parts.len() > 2 && key_parts.last().unwrap_unchecked() == "::$" {
-                    base_key += key_parts.pop().unwrap_unchecked().as_str();
-                    base_key += key_parts.pop().unwrap_unchecked().as_str();
+                if !base_key.starts_with(b"$") && key_parts.len() > 2 && key_parts.last().unwrap_unchecked() == b"::$" {
+                    base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
+                    base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
                 }
             }
 
-            let base_key_atom = atom(&base_key);
+            let base_key_atom = word(&base_key);
             let base_key_set = if let Some(base_key_type) = context.locals.get(&base_key_atom) {
                 !base_key_type.is_nullable()
             } else {
@@ -718,7 +730,7 @@ fn add_nested_assertions(
             }
 
             while let Some(divider) = key_parts.pop() {
-                if divider == "[" {
+                if divider == b"[" {
                     let array_key = unsafe {
                         // SAFETY: we know that after `[` there is always an array key, so `pop` will not panic.
                         key_parts.pop().unwrap_unchecked()
@@ -726,16 +738,21 @@ fn add_nested_assertions(
 
                     key_parts.pop();
 
-                    let new_base_key = format!("{base_key}[{array_key}]");
-                    let base_key_atom = atom(&base_key);
+                    let mut new_base_key = base_key.clone();
+                    new_base_key.push(b'[');
+                    new_base_key.extend_from_slice(&array_key);
+                    new_base_key.push(b']');
+                    let base_key_atom = word(&base_key);
 
                     let entry = new_types.entry(base_key_atom).or_default();
 
-                    let new_key = if array_key.starts_with('\'') {
-                        Some(ArrayKey::String(atom(&array_key[1..(array_key.len() - 1)])))
-                    } else if array_key.starts_with('$') {
+                    let new_key = if array_key.starts_with(b"'") {
+                        Some(ArrayKey::String(word(&array_key[1..(array_key.len() - 1)])))
+                    } else if array_key.starts_with(b"$") {
                         None
-                    } else if let Ok(arraykey_value) = array_key.parse::<i64>() {
+                    } else if let Some(arraykey_value) =
+                        std::str::from_utf8(&array_key).ok().and_then(|s| s.parse::<i64>().ok())
+                    {
                         Some(ArrayKey::Integer(arraykey_value))
                     } else {
                         continue 'outer;
@@ -772,14 +789,16 @@ fn add_nested_assertions(
                     continue;
                 }
 
-                if divider == "->" {
+                if divider == b"->" {
                     let property_name = unsafe {
                         // SAFETY: we know that after `->` there is always a property name, so `pop` will not panic.
                         key_parts.pop().unwrap_unchecked()
                     };
 
-                    let new_base_key = format!("{base_key}->{property_name}");
-                    let base_key_atom = atom(&base_key);
+                    let mut new_base_key = base_key.clone();
+                    new_base_key.extend_from_slice(b"->");
+                    new_base_key.extend_from_slice(&property_name);
+                    let base_key_atom = word(&base_key);
 
                     if !new_types.contains_key(&base_key_atom) {
                         new_types.insert(base_key_atom, vec![vec![Assertion::IsIsset]]);
@@ -800,23 +819,25 @@ fn add_nested_assertions(
     new_types.retain(|k, _| !keys_to_remove.contains(k));
 }
 
-pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
+pub fn break_up_path_into_parts(path: &[u8]) -> Vec<Vec<u8>> {
     if path.is_empty() {
-        return vec![String::new()];
+        return vec![Vec::new()];
     }
 
-    let mut parts: Vec<String> = Vec::with_capacity(path.len() / 4 + 1);
-    parts.push(String::with_capacity(16));
+    let mut parts: Vec<Vec<u8>> = Vec::with_capacity(path.len() / 4 + 1);
+    parts.push(Vec::with_capacity(16));
 
-    let mut chars = path.chars().peekable();
-
-    let mut string_char: Option<char> = None;
+    let mut string_char: Option<u8> = None;
     let mut escape_char = false;
     let mut brackets: i32 = 0;
 
-    while let Some(c) = chars.next() {
+    let mut i = 0;
+    while i < path.len() {
+        let c = path[i];
+        i += 1;
         if let Some(quote) = string_char {
-            // SAFETY: the `parts` vector will always contain at least 1 string.
+            // SAFETY: `parts` is initialised with one element on line 830 and only grown,
+            // never drained, so `last_mut` is always `Some`.
             unsafe {
                 parts.last_mut().unwrap_unchecked().push(c);
             }
@@ -825,62 +846,62 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
                 string_char = None;
             }
 
-            escape_char = c == '\\' && !escape_char;
+            escape_char = c == b'\\' && !escape_char;
         } else {
-            let mut token_found: Option<&'static str> = None;
+            let mut token_found: Option<&'static [u8]> = None;
             match c {
-                '[' => {
+                b'[' => {
                     if brackets == 0 {
-                        token_found = Some("[");
+                        token_found = Some(b"[");
                     } else {
-                        // SAFETY: `parts` is non-empty here because we always push an initial entry before
-                        // entering this loop, so `last_mut()` is guaranteed to return `Some`.
+                        // SAFETY: `parts` is initialised with one element on line 830 and only grown,
+                        // never drained, so `last_mut` is always `Some`.
                         unsafe {
                             parts.last_mut().unwrap_unchecked().push(c);
                         }
                     }
                     brackets += 1;
                 }
-                ']' => {
+                b']' => {
                     brackets -= 1;
                     if brackets == 0 {
-                        token_found = Some("]");
+                        token_found = Some(b"]");
                     } else {
-                        // SAFETY: `parts` is non-empty here because we always push an initial entry before
-                        // entering this loop, so `last_mut()` is guaranteed to return `Some`.
+                        // SAFETY: `parts` is initialised with one element on line 830 and only grown,
+                        // never drained, so `last_mut` is always `Some`.
                         unsafe {
                             parts.last_mut().unwrap_unchecked().push(c);
                         }
                     }
                 }
-                '\'' | '"' => {
+                b'\'' | b'"' => {
                     string_char = Some(c);
+                    // SAFETY: `parts` is initialised with one element on line 830 and only
+                    // grown, never drained, so `last_mut` is always `Some`.
                     unsafe {
-                        // SAFETY: the `parts` vector will always contain at least 1 string.
                         parts.last_mut().unwrap_unchecked().push(c);
                     }
                 }
-                ':' if brackets == 0 && chars.peek() == Some(&':') => {
-                    let mut lookahead = chars.clone();
-                    lookahead.next();
-                    if lookahead.peek() == Some(&'$') {
-                        chars.next();
-                        chars.next();
-                        token_found = Some("::$");
+                b':' if brackets == 0 && path.get(i) == Some(&b':') => {
+                    if path.get(i + 1) == Some(&b'$') {
+                        i += 2;
+                        token_found = Some(b"::$");
                     } else {
+                        // SAFETY: `parts` is initialised with one element on line 830 and only grown,
+                        // never drained, so `last_mut` is always `Some`.
                         unsafe {
-                            // SAFETY: the `parts` vector will always contain at least 1 string.
                             parts.last_mut().unwrap_unchecked().push(c);
                         }
                     }
                 }
-                '-' if brackets == 0 && chars.peek() == Some(&'>') => {
-                    chars.next();
-                    token_found = Some("->");
+                b'-' if brackets == 0 && path.get(i) == Some(&b'>') => {
+                    i += 1;
+                    token_found = Some(b"->");
                 }
                 _ => {
+                    // SAFETY: `parts` is initialised with one element on line 830 and only
+                    // grown, never drained, so `last_mut` is always `Some`.
                     unsafe {
-                        // SAFETY: the `parts` vector will always contain at least 1 string.
                         parts.last_mut().unwrap_unchecked().push(c);
                     }
                 }
@@ -890,18 +911,16 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
                 if let Some(last_part) = parts.last_mut()
                     && last_part.is_empty()
                 {
-                    *last_part = token.to_string();
+                    *last_part = token.to_vec();
                 } else {
-                    parts.push(token.to_string());
+                    parts.push(token.to_vec());
                 }
 
-                parts.push(String::new());
+                parts.push(Vec::new());
             }
         }
     }
 
-    // If the path does not end with a token, the last added empty string will be unused.
-    // We remove it before returning.
     if let Some(last_part) = parts.last()
         && last_part.is_empty()
     {
@@ -915,9 +934,9 @@ pub fn break_up_path_into_parts(path: &str) -> Vec<String> {
 #[allow(clippy::semicolon_inside_block)]
 fn get_value_for_key(
     context: &Context<'_, '_>,
-    key: Atom,
+    key: Word,
     block_context: &mut BlockContext<'_>,
-    new_assertions: &IndexMap<Atom, AssertionSet>,
+    new_assertions: &IndexMap<Word, AssertionSet>,
     has_isset: bool,
     has_inverted_isset: bool,
     has_inverted_key_exists: bool,
@@ -925,7 +944,7 @@ fn get_value_for_key(
     inside_loop: bool,
     has_object_array_access: &mut bool,
 ) -> Option<TUnion> {
-    let key_str = key.as_str();
+    let key_str = key.as_bytes();
     let mut key_parts = break_up_path_into_parts(key_str);
     if key_parts.is_empty() {
         return None;
@@ -941,74 +960,68 @@ fn get_value_for_key(
 
     key_parts.reverse();
 
-    let mut base_key;
+    let mut base_key: Vec<u8>;
 
     unsafe {
         // SAFETY: `pop` will always return a value because we checked that the key has more than one part.
         base_key = key_parts.pop().unwrap_unchecked();
 
-        if !base_key.starts_with('$')
+        if !base_key.starts_with(b"$")
             && key_parts.len() > 2
-            && key_parts.last().is_some_and(|part| part.starts_with("::$"))
+            && key_parts.last().is_some_and(|part| part.starts_with(b"::$"))
         {
             // SAFETY: `pop` will always return a value because we checked that the key has more than two parts.
-            base_key += key_parts.pop().unwrap_unchecked().as_str();
-            base_key += key_parts.pop().unwrap_unchecked().as_str();
+            base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
+            base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
         }
     }
 
-    let base_key_atom = atom(&base_key);
+    let base_key_atom = word(&base_key);
     if let std::collections::hash_map::Entry::Vacant(e) = block_context.locals.entry(base_key_atom) {
-        if base_key.contains("::") {
-            let base_key_parts = &base_key.split("::").collect::<Vec<&str>>();
-            let fq_class_name = &base_key_parts[0];
-            let const_name = &base_key_parts[1];
+        let sep = memchr::memmem::find(&base_key, b"::")?;
+        let fq_class_name = &base_key[..sep];
+        let const_name = &base_key[sep + 2..];
 
-            if !context.codebase.class_like_exists(fq_class_name) {
-                return None;
-            }
-
-            let class_constant = context.codebase.get_class_constant_type(fq_class_name, const_name);
-
-            {
-                let class_constant = class_constant?;
-                let class_constant = Rc::new(match class_constant {
-                    Cow::Borrowed(t) => t.clone(),
-                    Cow::Owned(t) => t,
-                });
-
-                e.insert(class_constant);
-            }
-        } else {
+        if !context.codebase.class_like_exists(fq_class_name) {
             return None;
         }
+
+        let class_constant = context.codebase.get_class_constant_type(fq_class_name, const_name);
+
+        let class_constant = class_constant?;
+        let class_constant = Rc::new(match class_constant {
+            Cow::Borrowed(t) => t.clone(),
+            Cow::Owned(t) => t,
+        });
+
+        e.insert(class_constant);
     }
 
-    let mut base_key_atom = atom(&base_key);
+    let mut base_key_atom = word(&base_key);
     while let Some(divider) = key_parts.pop() {
         let base_key_type = block_context.locals.get(&base_key_atom)?;
 
-        if divider == "[" {
+        if divider == b"[" {
             let array_key = key_parts.pop()?;
 
             key_parts.pop();
 
-            let array_key_offset = if INTEGER_REGEX.is_match(&array_key)
-                && let Ok(integer) = array_key.parse::<usize>()
-            {
-                Some(integer)
-            } else {
-                None
-            };
+            let array_key_offset = std::str::from_utf8(&array_key)
+                .ok()
+                .and_then(|s| if INTEGER_REGEX.is_match(s) { s.parse::<usize>().ok() } else { None });
 
             let array_key_type = if let Some(array_key_offset) = array_key_offset {
                 ArrayKey::Integer(array_key_offset as i64)
             } else {
-                ArrayKey::String(atom(&array_key.replace('\'', "")))
+                let unquoted: Vec<u8> = array_key.iter().copied().filter(|&b| b != b'\'').collect();
+                ArrayKey::String(word(&unquoted))
             };
 
-            let new_base_key = format!("{base_key}[{array_key}]");
-            let new_base_key_atom = atom(&new_base_key);
+            let mut new_base_key = base_key.clone();
+            new_base_key.push(b'[');
+            new_base_key.extend_from_slice(&array_key);
+            new_base_key.push(b']');
+            let new_base_key_atom = word(&new_base_key);
 
             if !block_context.locals.contains_key(&new_base_key_atom) {
                 let mut new_base_type: Option<Rc<TUnion>> = None;
@@ -1028,7 +1041,7 @@ fn get_value_for_key(
                             return None;
                         }
 
-                        let known_item = if !array_key.starts_with('$')
+                        let known_item = if !array_key.starts_with(b"$")
                             && let Some(known_items) = known_items
                         {
                             known_items.get(&array_key_type)
@@ -1148,10 +1161,12 @@ fn get_value_for_key(
 
             base_key = new_base_key;
             base_key_atom = new_base_key_atom;
-        } else if divider == "->" || divider == "::$" {
+        } else if divider == b"->" || divider == b"::$" {
             let property_name = key_parts.pop()?;
-            let new_base_key = format!("{base_key}->{property_name}");
-            let new_base_key_atom = atom(&new_base_key);
+            let mut new_base_key = base_key.clone();
+            new_base_key.extend_from_slice(b"->");
+            new_base_key.extend_from_slice(&property_name);
+            let new_base_key_atom = word(&new_base_key);
 
             if !block_context.locals.contains_key(&new_base_key_atom) {
                 let mut new_base_type: Option<Rc<TUnion>> = None;
@@ -1175,8 +1190,8 @@ fn get_value_for_key(
                     } else if let TAtomic::Object(TObject::Named(named_object)) = existing_key_type_part {
                         let fq_class_name = named_object.get_name();
 
-                        if fq_class_name.eq_ignore_ascii_case("stdClass")
-                            || !context.codebase.class_or_interface_exists(&fq_class_name)
+                        if fq_class_name.as_bytes().eq_ignore_ascii_case(b"stdClass")
+                            || !context.codebase.class_or_interface_exists(fq_class_name.as_bytes())
                         {
                             class_property_type = get_mixed();
                         } else {
@@ -1207,12 +1222,13 @@ fn get_value_for_key(
     block_context.locals.get(&base_key_atom).map(|t| (**t).clone())
 }
 
-fn get_property_type(context: &Context<'_, '_>, classlike_name: Atom, property_name_str: &str) -> Option<TUnion> {
+fn get_property_type(context: &Context<'_, '_>, classlike_name: Word, property_name_str: &[u8]) -> Option<TUnion> {
     // Add `$` prefix
-    let property_name = concat_atom!("$", property_name_str);
+    let property_name = concat_word!(b"$", property_name_str);
 
-    let declaring_property_class = context.codebase.get_declaring_property_class(&classlike_name, &property_name)?;
-    let property_metadata = context.codebase.get_property(&classlike_name, &property_name)?;
+    let declaring_property_class =
+        context.codebase.get_declaring_property_class(classlike_name.as_bytes(), property_name.as_bytes())?;
+    let property_metadata = context.codebase.get_property(classlike_name.as_bytes(), property_name.as_bytes())?;
     let property_type = property_metadata.type_metadata.as_ref().map(|metadata| metadata.type_union.clone());
 
     let property_type = if let Some(mut property_type) = property_type {
@@ -1236,18 +1252,18 @@ fn get_property_type(context: &Context<'_, '_>, classlike_name: Atom, property_n
 
 pub(crate) fn trigger_issue_for_impossible(
     context: &mut Context<'_, '_>,
-    old_var_type_string: Atom,
-    key: &str,
+    old_var_type_string: Word,
+    key: &[u8],
     assertion: &Assertion,
     redundant: bool,
     negated: bool,
     span: &Span,
 ) {
     let mut assertion_atom = assertion.to_atom();
-    let mut not_operator = assertion_atom.starts_with('!');
+    let mut not_operator = assertion_atom.as_bytes().starts_with(b"!");
 
     if not_operator {
-        assertion_atom = atom(&assertion_atom[1..]);
+        assertion_atom = word(&assertion_atom.as_bytes()[1..]);
     }
 
     let mut redundant = redundant;
@@ -1258,12 +1274,12 @@ pub(crate) fn trigger_issue_for_impossible(
 
     if redundant {
         if not_operator {
-            if assertion_atom == "falsy" {
+            if assertion_atom.as_bytes() == b"falsy" {
                 not_operator = false;
-                assertion_atom = atom("truthy");
-            } else if assertion_atom == "truthy" {
+                assertion_atom = word(b"truthy");
+            } else if assertion_atom.as_bytes() == b"truthy" {
                 not_operator = false;
-                assertion_atom = atom("falsy");
+                assertion_atom = word(b"falsy");
             } else {
                 // other assertion atoms don't have a complementary truthy/falsy form to swap into
             }
@@ -1284,11 +1300,12 @@ pub(crate) fn trigger_issue_for_impossible(
 fn report_impossible_issue(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
-    assertion_atom: Atom,
-    key: &str,
+    assertion_atom: Word,
+    key: &[u8],
     span: &Span,
-    old_var_type_string: Atom,
+    old_var_type_string: Word,
 ) {
+    let key = BytesDisplay(key);
     let subject_desc = if old_var_type_string.is_empty() || old_var_type_string.len() > 50 {
         format!("`{key}`")
     } else {
@@ -1362,11 +1379,12 @@ fn report_impossible_issue(
 fn report_redundant_issue(
     context: &mut Context<'_, '_>,
     assertion: &Assertion,
-    assertion_atom: Atom,
-    key: &str,
+    assertion_atom: Word,
+    key: &[u8],
     span: &Span,
-    old_var_type_string: Atom,
+    old_var_type_string: Word,
 ) {
+    let key = BytesDisplay(key);
     let subject_desc = if old_var_type_string.is_empty() || old_var_type_string.len() > 50 {
         format!("`{key}`")
     } else {
@@ -1483,8 +1501,9 @@ mod tests {
 
     #[test]
     fn test_consecutive_tokens() {
-        let path = "$service_name->prop[0]->foo::$prop";
-        let expected: Vec<&str> = vec!["$service_name", "->", "prop", "[", "0", "]", "->", "foo", "::$", "prop"];
+        let path = b"$service_name->prop[0]->foo::$prop";
+        let expected: Vec<&[u8]> =
+            vec![b"$service_name", b"->", b"prop", b"[", b"0", b"]", b"->", b"foo", b"::$", b"prop"];
         let result = break_up_path_into_parts(path);
         assert_eq!(result, expected);
     }

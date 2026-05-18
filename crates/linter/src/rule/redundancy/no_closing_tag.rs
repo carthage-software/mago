@@ -117,7 +117,7 @@ impl NoClosingTagRule {
                 return;
             }
 
-            if inline.value.bytes().all(|b| b.is_ascii_whitespace()) {
+            if inline.value.iter().all(|b| b.is_ascii_whitespace()) {
                 let Some(Statement::ClosingTag(tag)) = sequence.get(stmts_len - 2) else {
                     return;
                 };

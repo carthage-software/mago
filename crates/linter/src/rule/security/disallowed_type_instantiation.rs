@@ -154,7 +154,7 @@ impl LintRule for DisallowedTypeInstantiationRule {
 
         for entry in &self.cfg.types {
             let disallowed_type = entry.name();
-            if !class_name.eq_ignore_ascii_case(disallowed_type) {
+            if !class_name.eq_ignore_ascii_case(disallowed_type.as_bytes()) {
                 continue;
             }
 

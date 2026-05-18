@@ -40,7 +40,7 @@ impl Provider for JsonEncodeProvider {
 
 impl FunctionReturnTypeProvider for JsonEncodeProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("json_encode")
+        FunctionTarget::Exact(b"json_encode")
     }
 
     fn get_return_type(
@@ -48,7 +48,7 @@ impl FunctionReturnTypeProvider for JsonEncodeProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let flags_argument = invocation.get_argument(1, &["flags"])?;
+        let flags_argument = invocation.get_argument(1, &[b"flags"])?;
         let flags_type = context.get_expression_type(flags_argument)?;
 
         let throws = match flags_type.get_single_literal_int_value() {

@@ -2,9 +2,6 @@ use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::ascii_lowercase_atom;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::class_like::TemplateTypes;
@@ -17,18 +14,21 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::ascii_lowercase_word;
 
 pub(crate) fn collect(
     codebase: &CodebaseMetadata,
     class_metadata: &ClassLikeMetadata,
     static_class_metadata: &ClassLikeMetadata,
     object_type: Option<&TObject>,
-) -> Option<HashMap<Atom, HashMap<GenericParent, TUnion>>> {
+) -> Option<HashMap<Word, HashMap<GenericParent, TUnion>>> {
     if class_metadata.template_types.is_empty() {
         return None;
     }
 
-    let mut class_template_parameters: HashMap<Atom, HashMap<GenericParent, TUnion>> = HashMap::default();
+    let mut class_template_parameters: HashMap<Word, HashMap<GenericParent, TUnion>> = HashMap::default();
 
     if let Some(TObject::Named(TNamedObject { type_parameters: Some(parameters), .. })) = &object_type {
         if class_metadata.name == static_class_metadata.name && !static_class_metadata.template_types.is_empty() {
@@ -93,7 +93,7 @@ pub(crate) fn collect(
 
         let self_call =
             if let Some(TObject::Named(TNamedObject { name: self_class_name, is_static: true, .. })) = object_type {
-                template_classname == &GenericParent::ClassLike(ascii_lowercase_atom(self_class_name))
+                template_classname == &GenericParent::ClassLike(ascii_lowercase_word(self_class_name.as_bytes()))
             } else {
                 false
             };
@@ -164,8 +164,8 @@ pub(crate) fn resolve_template_parameter(
 
 fn expand_type(
     input_type_extends: &TUnion,
-    template_extended_parameters: &AtomMap<IndexMap<Atom, TUnion, RandomState>>,
-    static_class_name: Atom,
+    template_extended_parameters: &WordMap<IndexMap<Word, TUnion, RandomState>>,
+    static_class_name: Word,
     static_class_template_types: &TemplateTypes,
 ) -> Vec<TAtomic> {
     let mut output_type_extends = Vec::new();

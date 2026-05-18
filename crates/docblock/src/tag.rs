@@ -6,9 +6,9 @@ use std::fmt;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct Variable {
-    pub name: String,          // normalized: includes `$`, excludes `...` and `&`
-    pub is_variadic: bool,     // true if `...` was present
-    pub is_by_reference: bool, // true if `&` was present
+    pub name: Vec<u8>,
+    pub is_variadic: bool,
+    pub is_by_reference: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -22,7 +22,8 @@ pub enum Visibility {
 pub struct Method {
     pub visibility: Visibility,
     pub is_static: bool,
-    pub name: String,
+
+    pub name: Vec<u8>,
     pub argument_list: Vec<Argument>,
 }
 
@@ -52,19 +53,19 @@ impl fmt::Display for Variable {
         if self.is_variadic {
             f.write_str("...")?;
         }
-        f.write_str(&self.name)
+        f.write_str(&String::from_utf8_lossy(&self.name))
     }
 }
 
 impl fmt::Display for Method {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.name)
+        f.write_str(&String::from_utf8_lossy(&self.name))
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct TypeString {
-    pub value: String,
+    pub value: Vec<u8>,
     pub span: Span,
 }
 
@@ -72,30 +73,39 @@ pub struct TypeString {
 pub struct ReturnTypeTag {
     pub span: Span,
     pub type_string: TypeString,
-    pub description: String,
+
+    pub description: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct TypeTag {
     pub span: Span,
-    pub name: String,
+
+    pub name: Vec<u8>,
     pub type_string: TypeString,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ImportTypeTag {
     pub span: Span,
-    pub name: String,
-    pub from: String,
-    pub alias: Option<String>,
+
+    pub name: Vec<u8>,
+
+    pub from: Vec<u8>,
+    pub alias: Option<ByteAlias>,
 }
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[serde(transparent)]
+pub struct ByteAlias(pub Vec<u8>);
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct ParameterTag {
     pub span: Span,
     pub variable: Variable,
     pub type_string: Option<TypeString>,
-    pub description: String,
+
+    pub description: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -109,7 +119,8 @@ pub struct ParameterOutTag {
 pub struct ThrowsTag {
     pub span: Span,
     pub type_string: TypeString,
-    pub description: String,
+
+    pub description: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
@@ -122,19 +133,13 @@ pub enum TemplateModifier {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct TemplateTag {
-    /// The full span of the original content parsed (e.g., "T as Foo").
     pub span: Span,
-    /// The name of the template parameter (e.g., "T").
-    pub name: String,
-    /// The optional modifier (`as`, `of`, `super`).
+
+    pub name: Vec<u8>,
     pub modifier: Option<TemplateModifier>,
-    /// The optional constraint type string following the modifier, with its span.
     pub type_string: Option<TypeString>,
-    /// The optional default type string after `=` (e.g., `T of int|string = string`).
     pub default: Option<TypeString>,
-    /// Whether the template was declared as covariant (`@template-covariant`).
     pub covariant: bool,
-    /// Whether the template was declared as contravariant (`@template-contravariant`).
     pub contravariant: bool,
 }
 
@@ -147,13 +152,10 @@ pub enum WhereModifier {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub struct WhereTag {
-    /// The full span of the original content parsed (e.g., "T is Foo").
     pub span: Span,
-    /// The name of the template parameter (e.g., "T").
-    pub name: String,
-    /// The modifier (`is`, `:`).
+
+    pub name: Vec<u8>,
     pub modifier: WhereModifier,
-    /// The constraint type string following the modifier, with its span.
     pub type_string: TypeString,
 }
 
@@ -176,199 +178,164 @@ pub struct MethodTag {
     pub span: Span,
     pub method: Method,
     pub type_string: TypeString,
-    pub description: String,
+
+    pub description: Vec<u8>,
 }
-/// Parses a `PHPDoc` variable token and returns a structured `Variable`.
-///
-/// If `allow_property_access` is false:
-/// - Supports `$name`, `...$name`, and `&$name`.
-///
-/// If `allow_property_access` is true:
-/// - Supports `$name` with optional property/array access like `$foo->bar` or `$foo['key']`
-/// - Can be recursive: `$foo->bar->baz['key']->qux`
-/// - Does NOT support `...` (variadic) or `&` (reference) prefixes
-///
-/// The returned `Variable` stores a normalized `name` (with `$`, without leading `...` or `&`),
-/// and sets flags `is_variadic` and `is_by_reference` that can be used for display/rendering.
-///
-/// Examples (`allow_property_access` = false):
-/// - "$foo"       → Some(Variable { name: "$foo", `is_variadic`: false, `is_by_reference`: false })
-/// - "&$foo"      → Some(Variable { name: "$foo", `is_variadic`: false, `is_by_reference`: true })
-/// - "...$ids"    → Some(Variable { name: "$ids", `is_variadic`: true, `is_by_reference`: false })
-/// - "$"          → None
-/// - "...$"       → None
-/// - "$1x"        → None
-///
-/// Examples (`allow_property_access` = true):
-/// - "$foo->bar"     → Some(Variable { name: "$foo->bar", `is_variadic`: false, `is_by_reference`: false })
-/// - "$foo['key']"   → Some(Variable { name: "$foo['key']", `is_variadic`: false, `is_by_reference`: false })
-/// - "$foo->bar->baz['key']" → Some(Variable { name: "$foo->bar->baz['key']", `is_variadic`: false, `is_by_reference`: false })
-/// - "&$foo->bar"    → None (reference not allowed with property access)
-/// - "...$foo->bar"  → None (variadic not allowed with property access)
+
 #[inline]
-fn parse_var_ident(raw: &str, allow_property_access: bool) -> Option<Variable> {
+fn position_of(haystack: &[u8], needle: u8) -> Option<usize> {
+    memchr::memchr(needle, haystack)
+}
+
+#[inline]
+fn split_once_byte(haystack: &[u8], needle: u8) -> Option<(&[u8], &[u8])> {
+    memchr::memchr(needle, haystack).map(|i| (&haystack[..i], &haystack[i + 1..]))
+}
+
+#[inline]
+fn rsplit_once_byte(haystack: &[u8], needle: u8) -> Option<(&[u8], &[u8])> {
+    memchr::memrchr(needle, haystack).map(|i| (&haystack[..i], &haystack[i + 1..]))
+}
+
+#[inline]
+fn find_ascii_whitespace(haystack: &[u8]) -> Option<usize> {
+    haystack.iter().position(|b| b.is_ascii_whitespace())
+}
+
+#[inline]
+fn split_once_ascii_whitespace(haystack: &[u8]) -> Option<(&[u8], &[u8])> {
+    find_ascii_whitespace(haystack).map(|i| (&haystack[..i], &haystack[i + 1..]))
+}
+
+/// Parses a `PHPDoc` variable token and returns a structured `Variable`.
+#[inline]
+fn parse_var_ident(raw: &[u8], allow_property_access: bool) -> Option<Variable> {
     if allow_property_access {
-        // When property access is allowed, we don't support & or ...
-        if raw.starts_with('&') || raw.starts_with("...") {
+        if raw.starts_with(b"&") || raw.starts_with(b"...") {
             return None;
         }
 
-        // Must start with $
-        if !raw.starts_with('$') {
+        if !raw.starts_with(b"$") {
             return None;
         }
 
-        let rest = &raw[1..]; // Skip the $
-        let bytes = rest.as_bytes();
+        let rest = &raw[1..];
 
-        if bytes.is_empty() {
+        if rest.is_empty() {
             return None;
         }
 
-        // Parse the initial identifier
         let is_start = |b: u8| b == b'_' || b.is_ascii_alphabetic();
         let is_cont = |b: u8| is_start(b) || b.is_ascii_digit();
 
-        if !is_start(bytes[0]) {
+        if !is_start(rest[0]) {
             return None;
         }
 
         let mut pos = 1;
-        while pos < bytes.len() && is_cont(bytes[pos]) {
+        while pos < rest.len() && is_cont(rest[pos]) {
             pos += 1;
         }
 
-        // Now parse any property/call/array access chains
-        while pos < bytes.len() {
-            if pos + 1 < bytes.len() && &bytes[pos..pos + 2] == b"->" {
-                // Object property access: ->identifier
-                pos += 2; // Skip ->
+        while pos < rest.len() {
+            if pos + 1 < rest.len() && &rest[pos..pos + 2] == b"->" {
+                pos += 2;
 
-                if pos >= bytes.len() || !is_start(bytes[pos]) {
-                    return None; // Invalid: -> must be followed by valid identifier
+                if pos >= rest.len() || !is_start(rest[pos]) {
+                    return None;
                 }
 
                 pos += 1;
-                while pos < bytes.len() && is_cont(bytes[pos]) {
+                while pos < rest.len() && is_cont(rest[pos]) {
                     pos += 1;
                 }
-            } else if bytes[pos] == b'[' {
-                // Array access: [...]
-                pos += 1; // Skip [
+            } else if rest[pos] == b'[' {
+                pos += 1;
                 let mut bracket_depth = 1;
 
-                while pos < bytes.len() && bracket_depth > 0 {
-                    if bytes[pos] == b'[' {
+                while pos < rest.len() && bracket_depth > 0 {
+                    if rest[pos] == b'[' {
                         bracket_depth += 1;
-                    } else if bytes[pos] == b']' {
+                    } else if rest[pos] == b']' {
                         bracket_depth -= 1;
                     }
                     pos += 1;
                 }
 
                 if bracket_depth != 0 {
-                    return None; // Unmatched brackets
+                    return None;
                 }
-            } else if bytes[pos] == b'(' && bytes.get(pos + 1).is_some_and(|b| *b == b')') {
-                pos += 2; // Skip ()
-                // Method calls terminate the property access chain
+            } else if rest[pos] == b'(' && rest.get(pos + 1).is_some_and(|b| *b == b')') {
+                pos += 2;
                 break;
             } else {
-                // End of valid property access chain
                 break;
             }
         }
 
-        // The full token should be consumed for a valid property access chain
-        let token = &raw[..=pos]; // Include the initial $
+        let token = &raw[..=pos];
 
-        Some(Variable { name: token.to_owned(), is_variadic: false, is_by_reference: false })
+        Some(Variable { name: token.to_vec(), is_variadic: false, is_by_reference: false })
     } else {
-        // Original logic for when property access is not allowed
-        let is_by_reference = raw.starts_with('&');
-        // tolerate "&$x" in docblocks
-        let raw = raw.strip_prefix('&').unwrap_or(raw);
-        // accept "$name" or "...$name"
-        let (prefix_len, rest, is_variadic) = if let Some(r) = raw.strip_prefix("...$") {
+        let is_by_reference = raw.starts_with(b"&");
+        let raw = raw.strip_prefix(b"&").unwrap_or(raw);
+        let (prefix_len, rest, is_variadic) = if let Some(r) = raw.strip_prefix(b"...$") {
             (4usize, r, true)
         } else {
-            let r = raw.strip_prefix('$')?;
+            let r = raw.strip_prefix(b"$")?;
             (1usize, r, false)
         };
-        // PHP identifier rules (ASCII + underscore): [_A-Za-z][_A-Za-z0-9]*
-        let bytes = rest.as_bytes();
-        if bytes.is_empty() {
+        if rest.is_empty() {
             return None;
         }
         let is_start = |b: u8| b == b'_' || b.is_ascii_alphabetic();
         let is_cont = |b: u8| is_start(b) || b.is_ascii_digit();
-        if !is_start(bytes[0]) {
+        if !is_start(rest[0]) {
             return None;
         }
         let mut len = 1usize;
-        while len < bytes.len() && is_cont(bytes[len]) {
+        while len < rest.len() && is_cont(rest[len]) {
             len += 1;
         }
         let token = &raw[..prefix_len + len];
-        // normalized: remove variadic prefix if present, keep `$`
         let normalized = if is_variadic { &token[3..] } else { token };
-        Some(Variable { name: normalized.to_owned(), is_variadic, is_by_reference })
+        Some(Variable { name: normalized.to_vec(), is_variadic, is_by_reference })
     }
 }
 
-/// Parses the content string of a `@template` or `@template-covariant` tag.
-///
-/// Extracts the template name, an optional modifier (`as`, `of`, `super`),
-/// and an optional constraint type following the modifier.
-///
-/// Examples:
-///
-/// - "T" -> name="T", modifier=None, type=None
-/// - "T of U" -> name="T", modifier=Of, type="U"
-/// - "T as string" -> name="T", modifier=As, type="string"
-/// - "T super \\My\\Class" -> name="T", modifier=Super, type="\\My\\Class"
-/// - "T string" -> name="T", modifier=None, type=None (ignores "string")
-/// - "T of" -> name="T", modifier=Of, type=None
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following `@template` or `@template-covariant`.
-/// * `span` - The original `Span` of the `content` slice within its source file.
-/// * `covariant` - `true` if the tag was `@template-covariant`.
-/// * `contravariant` - `true` if the tag was `@template-contravariant`.
+/// Parses the content of a `@template` (and variant) tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the template tag syntax is invalid.
+/// Returns a [`ParseError`] when the tag content is malformed.
 #[inline]
 pub fn parse_template_tag(
-    content: &str,
+    content: &[u8],
     span: Span,
     mut covariant: bool,
     mut contravariant: bool,
 ) -> Result<TemplateTag, ParseError> {
-    // Find start offset of trimmed content relative to original `content`
-    let trim_start_offset_rel = content.find(|c: char| !c.is_whitespace()).unwrap_or(0);
-    let trimmed_content = content.trim();
+    let trim_start_offset_rel = content.iter().position(|b| !b.is_ascii_whitespace()).unwrap_or(0);
+    let trimmed_content = content.trim_ascii();
 
     if trimmed_content.is_empty() {
         return Err(ParseError::InvalidTemplateTag(span, "Expected template parameter name".to_string()));
     }
 
-    let mut parts = trimmed_content.split_whitespace();
+    let mut parts = trimmed_content.split(|b: &u8| b.is_ascii_whitespace()).filter(|s| !s.is_empty());
 
     let mut name_part = parts
         .next()
         .ok_or_else(|| ParseError::InvalidTemplateTag(span, "Expected template parameter name".to_string()))?;
-    if name_part.starts_with('+') && !contravariant && !covariant {
+    if name_part.starts_with(b"+") && !contravariant && !covariant {
         covariant = true;
         name_part = &name_part[1..];
-    } else if name_part.starts_with('-') && !contravariant && !covariant {
+    } else if name_part.starts_with(b"-") && !contravariant && !covariant {
         contravariant = true;
         name_part = &name_part[1..];
     }
 
-    let name = name_part.to_string();
+    let name = name_part.to_vec();
 
     let mut modifier: Option<TemplateModifier> = None;
     let mut type_string_opt: Option<TypeString> = None;
@@ -376,24 +343,25 @@ pub fn parse_template_tag(
 
     let mut current_offset_rel = trim_start_offset_rel + name_part.len();
 
-    let remaining_after_name = content.get(current_offset_rel..).unwrap_or("");
-    let whitespace_len1 = remaining_after_name.find(|c: char| !c.is_whitespace()).unwrap_or(0);
+    let remaining_after_name = content.get(current_offset_rel..).unwrap_or(b"");
+    let whitespace_len1 = remaining_after_name.iter().position(|b| !b.is_ascii_whitespace()).unwrap_or(0);
     let after_whitespace1_offset_rel = current_offset_rel + whitespace_len1;
-    let potential_modifier_slice = remaining_after_name.trim_start();
+    let potential_modifier_slice = remaining_after_name.trim_ascii_start();
 
-    if let Some(rest) = potential_modifier_slice.strip_prefix('=') {
-        // `@template T = DEFAULT` (no constraint).
+    if let Some(rest) = potential_modifier_slice.strip_prefix(b"=") {
         let after_eq_offset_rel = after_whitespace1_offset_rel + 1;
         if let Some((default_type, _)) = split_tag_content(rest, span.subspan(after_eq_offset_rel as u32, 0)) {
             default_opt = Some(default_type);
         }
     } else if !potential_modifier_slice.is_empty() {
-        let mut modifier_parts = potential_modifier_slice.split_whitespace().peekable();
+        let mut modifier_parts =
+            potential_modifier_slice.split(|b: &u8| b.is_ascii_whitespace()).filter(|s| !s.is_empty()).peekable();
         if let Some(potential_modifier_str) = modifier_parts.peek().copied() {
-            let modifier_val = match potential_modifier_str.to_ascii_lowercase().as_str() {
-                "as" => Some(TemplateModifier::As),
-                "of" => Some(TemplateModifier::Of),
-                "super" => Some(TemplateModifier::Super),
+            let lowered = potential_modifier_str.to_ascii_lowercase();
+            let modifier_val = match lowered.as_slice() {
+                b"as" => Some(TemplateModifier::As),
+                b"of" => Some(TemplateModifier::Of),
+                b"super" => Some(TemplateModifier::Super),
                 _ => None,
             };
 
@@ -402,16 +370,16 @@ pub fn parse_template_tag(
                 modifier_parts.next();
                 current_offset_rel = after_whitespace1_offset_rel + potential_modifier_str.len();
 
-                let remaining_after_modifier = content.get(current_offset_rel..).unwrap_or("");
+                let remaining_after_modifier = content.get(current_offset_rel..).unwrap_or(b"");
                 if let Some((type_string, _)) =
                     split_tag_content(remaining_after_modifier, span.subspan(current_offset_rel as u32, 0))
                 {
                     let type_end_rel = (type_string.span.end.offset - span.start.offset) as usize;
                     type_string_opt = Some(type_string);
 
-                    let after_constraint = content.get(type_end_rel..).unwrap_or("");
-                    let trimmed = after_constraint.trim_start();
-                    if let Some(rest) = trimmed.strip_prefix('=') {
+                    let after_constraint = content.get(type_end_rel..).unwrap_or(b"");
+                    let trimmed = after_constraint.trim_ascii_start();
+                    if let Some(rest) = trimmed.strip_prefix(b"=") {
                         let leading_ws = after_constraint.len() - trimmed.len();
                         let after_eq_offset_rel = type_end_rel + leading_ws + 1;
                         if let Some((default_type, _)) =
@@ -436,31 +404,30 @@ pub fn parse_template_tag(
     })
 }
 
-/// Parses the content string of a `@where` tag.
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following `@where`.
-/// * `span` - The original `Span` of the `content` slice.
+/// Parses the content of a `@where` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the where tag syntax is invalid.
-pub fn parse_where_tag(content: &str, span: Span) -> Result<WhereTag, ParseError> {
-    let name_end_pos = content.find(char::is_whitespace).ok_or_else(|| {
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_where_tag(content: &[u8], span: Span) -> Result<WhereTag, ParseError> {
+    let name_end_pos = find_ascii_whitespace(content).ok_or_else(|| {
         ParseError::InvalidWhereTag(span, "Expected template parameter name and constraint".to_string())
     })?;
-    let (name_part, mut rest) = content.split_at(name_end_pos);
+    let (name_part, rest_raw) = content.split_at(name_end_pos);
+    let mut rest = rest_raw;
 
     if !is_valid_identifier_start(name_part, false) {
-        return Err(ParseError::InvalidWhereTag(span, format!("Invalid template parameter name: '{name_part}'")));
+        return Err(ParseError::InvalidWhereTag(
+            span,
+            format!("Invalid template parameter name: '{}'", String::from_utf8_lossy(name_part)),
+        ));
     }
 
-    rest = rest.trim_start();
-    let modifier = if rest.starts_with("is") && rest.chars().nth(2).is_some_and(char::is_whitespace) {
+    rest = rest.trim_ascii_start();
+    let modifier = if rest.starts_with(b"is") && rest.get(2).is_some_and(|b| b.is_ascii_whitespace()) {
         rest = &rest[2..];
         WhereModifier::Is
-    } else if rest.starts_with(':') {
+    } else if rest.starts_with(b":") {
         rest = &rest[1..];
         WhereModifier::Colon
     } else {
@@ -477,90 +444,91 @@ pub fn parse_where_tag(content: &str, span: Span) -> Result<WhereTag, ParseError
     let (type_string, _rest) = split_tag_content(rest, type_part_span)
         .ok_or_else(|| ParseError::InvalidWhereTag(span, "Failed to parse type constraint".to_string()))?;
 
-    Ok(WhereTag { span, name: name_part.to_owned(), modifier, type_string })
+    Ok(WhereTag { span, name: name_part.to_vec(), modifier, type_string })
 }
 
-/// Parses the content string of a `@param` tag.
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following `@param`.
-/// * `span` - The original `Span` of the `content` slice.
+/// Parses the content of a `@param` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the param tag syntax is invalid.
-pub fn parse_param_tag(content: &str, span: Span) -> Result<ParameterTag, ParseError> {
-    let trimmed = content.trim_start();
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_param_tag(content: &[u8], span: Span) -> Result<ParameterTag, ParseError> {
+    let trimmed = content.trim_ascii_start();
 
-    // Check if content starts with a variable (no type specified)
-    if trimmed.starts_with('$') {
-        // No type specified, just parse variable and description
-        let mut parts = trimmed.split_whitespace();
-        let raw_name =
-            parts.next().ok_or_else(|| ParseError::InvalidParameterTag(span, "Expected parameter name".to_string()))?;
+    if trimmed.starts_with(b"$") {
+        let raw_name = trimmed
+            .split(|b: &u8| b.is_ascii_whitespace())
+            .find(|s| !s.is_empty())
+            .ok_or_else(|| ParseError::InvalidParameterTag(span, "Expected parameter name".to_string()))?;
 
-        let variable = parse_var_ident(raw_name, false)
-            .ok_or_else(|| ParseError::InvalidParameterTag(span, format!("Invalid parameter name: '{raw_name}'")))?;
+        let variable = parse_var_ident(raw_name, false).ok_or_else(|| {
+            ParseError::InvalidParameterTag(
+                span,
+                format!("Invalid parameter name: '{}'", String::from_utf8_lossy(raw_name)),
+            )
+        })?;
 
-        let desc_start = trimmed.find(&variable.name).map_or(0, |i| i + variable.name.len());
-        let description = trimmed[desc_start..].trim().to_owned();
+        let desc_start = find_subslice(trimmed, &variable.name).map_or(0, |i| i + variable.name.len());
+        let description = trimmed[desc_start..].trim_ascii().to_vec();
 
         return Ok(ParameterTag { span, variable, type_string: None, description });
     }
 
-    // Type is specified, parse it
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidParameterTag(span, "Failed to parse parameter type".to_string()))?;
 
-    // Type must be valid (not empty, not starting with { or $)
     if type_string.value.is_empty()
-        || type_string.value.starts_with('{')
-        || (type_string.value.starts_with('$') && type_string.value != "$this")
+        || type_string.value.starts_with(b"{")
+        || (type_string.value.starts_with(b"$") && type_string.value != b"$this")
     {
-        return Err(ParseError::InvalidParameterTag(span, format!("Invalid parameter type: '{}'", type_string.value)));
+        return Err(ParseError::InvalidParameterTag(
+            span,
+            format!("Invalid parameter type: '{}'", String::from_utf8_lossy(&type_string.value)),
+        ));
     }
 
     if rest_slice.is_empty() {
-        // Variable name is mandatory
         return Err(ParseError::InvalidParameterTag(span, "Missing parameter name".to_string()));
     }
 
-    let mut rest_parts = rest_slice.split_whitespace();
-    let raw_name = rest_parts
-        .next()
+    let raw_name = rest_slice
+        .split(|b: &u8| b.is_ascii_whitespace())
+        .find(|s| !s.is_empty())
         .ok_or_else(|| ParseError::InvalidParameterTag(span, "Expected parameter name".to_string()))?;
-    let variable = parse_var_ident(raw_name, false)
-        .ok_or_else(|| ParseError::InvalidParameterTag(span, format!("Invalid parameter name: '{raw_name}'")))?;
+    let variable = parse_var_ident(raw_name, false).ok_or_else(|| {
+        ParseError::InvalidParameterTag(
+            span,
+            format!("Invalid parameter name: '{}'", String::from_utf8_lossy(raw_name)),
+        )
+    })?;
 
-    let desc_start = rest_slice.find(&variable.name).map_or(0, |i| i + variable.name.len());
-    let description = rest_slice[desc_start..].trim_start().to_owned();
+    let desc_start = find_subslice(rest_slice, &variable.name).map_or(0, |i| i + variable.name.len());
+    let description = rest_slice[desc_start..].trim_ascii_start().to_vec();
 
     Ok(ParameterTag { span, variable, type_string: Some(type_string), description })
 }
 
-/// Parses the content string of a `@param-out` tag.
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following `@param-out`.
-/// * `span` - The original `Span` of the `content` slice.
+#[inline]
+fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    memchr::memmem::find(haystack, needle)
+}
+
+/// Parses the content of a `@param-out` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the param-out tag syntax is invalid.
-pub fn parse_param_out_tag(content: &str, span: Span) -> Result<ParameterOutTag, ParseError> {
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_param_out_tag(content: &[u8], span: Span) -> Result<ParameterOutTag, ParseError> {
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidParameterOutTag(span, "Failed to parse parameter type".to_string()))?;
 
-    // Type must exist and be valid
     if type_string.value.is_empty()
-        || type_string.value.starts_with('{')
-        || (type_string.value.starts_with('$') && type_string.value != "$this")
+        || type_string.value.starts_with(b"{")
+        || (type_string.value.starts_with(b"$") && type_string.value != b"$this")
     {
         return Err(ParseError::InvalidParameterOutTag(
             span,
-            format!("Invalid parameter type: '{}'", type_string.value),
+            format!("Invalid parameter type: '{}'", String::from_utf8_lossy(&type_string.value)),
         ));
     }
 
@@ -569,133 +537,127 @@ pub fn parse_param_out_tag(content: &str, span: Span) -> Result<ParameterOutTag,
     }
 
     let raw_name = rest_slice
-        .split_whitespace()
-        .next()
+        .split(|b: &u8| b.is_ascii_whitespace())
+        .find(|s| !s.is_empty())
         .ok_or_else(|| ParseError::InvalidParameterOutTag(span, "Expected parameter name".to_string()))?;
-    let variable = parse_var_ident(raw_name, false)
-        .ok_or_else(|| ParseError::InvalidParameterOutTag(span, format!("Invalid parameter name: '{raw_name}'")))?;
+    let variable = parse_var_ident(raw_name, false).ok_or_else(|| {
+        ParseError::InvalidParameterOutTag(
+            span,
+            format!("Invalid parameter name: '{}'", String::from_utf8_lossy(raw_name)),
+        )
+    })?;
 
     Ok(ParameterOutTag { span, variable, type_string })
 }
 
-/// Parses the content string of a `@return` tag.
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following `@return`.
-/// * `span` - The original `Span` of the `content` slice.
+/// Parses the content of a `@return` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the return tag syntax is invalid.
-pub fn parse_return_tag(content: &str, span: Span) -> Result<ReturnTypeTag, ParseError> {
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_return_tag(content: &[u8], span: Span) -> Result<ReturnTypeTag, ParseError> {
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidReturnTag(span, "Failed to parse return type".to_string()))?;
 
-    // Type cannot start with '{'
-    if type_string.value.starts_with('{') {
-        return Err(ParseError::InvalidReturnTag(span, format!("Invalid return type: '{}'", type_string.value)));
+    if type_string.value.starts_with(b"{") {
+        return Err(ParseError::InvalidReturnTag(
+            span,
+            format!("Invalid return type: '{}'", String::from_utf8_lossy(&type_string.value)),
+        ));
     }
 
-    let description = rest_slice.to_owned();
+    let description = rest_slice.to_vec();
 
     Ok(ReturnTypeTag { span, type_string, description })
 }
 
-/// Parses the content string of a `@throws` tag.
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following `@throws`.
-/// * `span` - The original `Span` of the `content` slice.
+/// Parses the content of a `@throws` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the throws tag syntax is invalid.
-pub fn parse_throws_tag(content: &str, span: Span) -> Result<ThrowsTag, ParseError> {
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_throws_tag(content: &[u8], span: Span) -> Result<ThrowsTag, ParseError> {
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidThrowsTag(span, "Failed to parse exception type".to_string()))?;
 
-    // Type cannot start with '{'
-    if type_string.value.starts_with('{') {
-        return Err(ParseError::InvalidThrowsTag(span, format!("Invalid exception type: '{}'", type_string.value)));
+    if type_string.value.starts_with(b"{") {
+        return Err(ParseError::InvalidThrowsTag(
+            span,
+            format!("Invalid exception type: '{}'", String::from_utf8_lossy(&type_string.value)),
+        ));
     }
 
-    // Type cannot start with '$' unless it is "$this"
-    if type_string.value.starts_with('$') && type_string.value != "$this" {
-        return Err(ParseError::InvalidThrowsTag(span, format!("Invalid exception type: '{}'", type_string.value)));
+    if type_string.value.starts_with(b"$") && type_string.value != b"$this" {
+        return Err(ParseError::InvalidThrowsTag(
+            span,
+            format!("Invalid exception type: '{}'", String::from_utf8_lossy(&type_string.value)),
+        ));
     }
 
-    let description = rest_slice.to_owned();
+    let description = rest_slice.to_vec();
 
     Ok(ThrowsTag { span, type_string, description })
 }
 
-/// Parses the content string of an `@assert`, `@assert-if-true`, or `@assert-if-false` tag.
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following the tag.
-/// * `span` - The original `Span` of the `content` slice.
+/// Parses the content of an `@assert`/`@assert-if-true`/`@assert-if-false` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the assertion tag syntax is invalid.
-pub fn parse_assertion_tag(content: &str, span: Span) -> Result<AssertionTag, ParseError> {
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_assertion_tag(content: &[u8], span: Span) -> Result<AssertionTag, ParseError> {
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidAssertionTag(span, "Failed to parse assertion type".to_string()))?;
 
-    // Type must exist and be valid
     if type_string.value.is_empty()
-        || type_string.value.starts_with('{')
-        || (type_string.value.starts_with('$') && type_string.value != "$this")
+        || type_string.value.starts_with(b"{")
+        || (type_string.value.starts_with(b"$") && type_string.value != b"$this")
     {
-        return Err(ParseError::InvalidAssertionTag(span, format!("Invalid assertion type: '{}'", type_string.value)));
+        return Err(ParseError::InvalidAssertionTag(
+            span,
+            format!("Invalid assertion type: '{}'", String::from_utf8_lossy(&type_string.value)),
+        ));
     }
 
     if rest_slice.is_empty() {
-        // Variable name is mandatory
         return Err(ParseError::InvalidAssertionTag(span, "Missing variable name".to_string()));
     }
 
-    let mut rest_parts = rest_slice.split_whitespace();
-
-    let raw_name =
-        rest_parts.next().ok_or_else(|| ParseError::InvalidAssertionTag(span, "Expected variable name".to_string()))?;
-    let variable = parse_var_ident(raw_name, true)
-        .ok_or_else(|| ParseError::InvalidAssertionTag(span, format!("Invalid variable name: '{raw_name}'")))?;
+    let raw_name = rest_slice
+        .split(|b: &u8| b.is_ascii_whitespace())
+        .find(|s| !s.is_empty())
+        .ok_or_else(|| ParseError::InvalidAssertionTag(span, "Expected variable name".to_string()))?;
+    let variable = parse_var_ident(raw_name, true).ok_or_else(|| {
+        ParseError::InvalidAssertionTag(span, format!("Invalid variable name: '{}'", String::from_utf8_lossy(raw_name)))
+    })?;
 
     Ok(AssertionTag { span, type_string, variable })
 }
 
-/// Parses the content string of a `@var` tag.
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following the tag.
-/// * `span` - The original `Span` of the `content` slice.
+/// Parses the content of a `@var` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the var tag syntax is invalid.
-pub fn parse_var_tag(content: &str, span: Span) -> Result<VarTag, ParseError> {
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_var_tag(content: &[u8], span: Span) -> Result<VarTag, ParseError> {
     let (type_string, rest_slice) = split_tag_content(content, span)
         .ok_or_else(|| ParseError::InvalidVarTag(span, "Failed to parse variable type".to_string()))?;
 
-    // Type must exist and be valid
     if type_string.value.is_empty()
-        || type_string.value.starts_with('{')
-        || (type_string.value.starts_with('$') && type_string.value != "$this")
+        || type_string.value.starts_with(b"{")
+        || (type_string.value.starts_with(b"$") && type_string.value != b"$this")
     {
-        return Err(ParseError::InvalidVarTag(span, format!("Invalid variable type: '{}'", type_string.value)));
+        return Err(ParseError::InvalidVarTag(
+            span,
+            format!("Invalid variable type: '{}'", String::from_utf8_lossy(&type_string.value)),
+        ));
     }
 
     let variable = if rest_slice.is_empty() {
         None
     } else {
         let var_part = rest_slice
-            .split_whitespace()
-            .next()
+            .split(|b: &u8| b.is_ascii_whitespace())
+            .find(|s| !s.is_empty())
             .ok_or_else(|| ParseError::InvalidVarTag(span, "Expected variable name".to_string()))?;
         parse_var_ident(var_part, true)
     };
@@ -703,52 +665,55 @@ pub fn parse_var_tag(content: &str, span: Span) -> Result<VarTag, ParseError> {
     Ok(VarTag { span, type_string, variable })
 }
 
-/// Parses the content string of a `@type` tag.
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following the tag.
-/// * `span` - The original `Span` of the `content` slice.
+/// Parses the content of a `@type` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the type tag syntax is invalid.
-pub fn parse_type_tag(content: &str, span: Span) -> Result<TypeTag, ParseError> {
-    let leading_ws = (content.len() - content.trim_start().len()) as u32;
-    let content = content.trim_start();
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_type_tag(content: &[u8], span: Span) -> Result<TypeTag, ParseError> {
+    let leading_ws = (content.len() - content.trim_ascii_start().len()) as u32;
+    let content = content.trim_ascii_start();
 
     if content.is_empty() {
         return Err(ParseError::InvalidTypeTag(span, "Type alias declaration is empty".to_string()));
     }
 
-    let (potential_name, _) = content.split_once(char::is_whitespace).ok_or_else(|| {
-        let trimmed = content.trim();
-        ParseError::InvalidTypeTag(span, format!("Type alias name '{trimmed}' must be followed by a type definition"))
+    let (potential_name, _) = split_once_ascii_whitespace(content).ok_or_else(|| {
+        let trimmed = content.trim_ascii();
+        ParseError::InvalidTypeTag(
+            span,
+            format!("Type alias name '{}' must be followed by a type definition", String::from_utf8_lossy(trimmed)),
+        )
     })?;
 
     let name_len = potential_name.len();
     let after_name = &content[name_len..];
-    let trimmed_after_name = after_name.trim_start();
+    let trimmed_after_name = after_name.trim_ascii_start();
 
-    let (name, type_part, type_offset) = if let Some(after_equals) = trimmed_after_name.strip_prefix('=') {
-        // Format: @type Name = Type
-        let name = potential_name.trim();
+    let (name, type_part, type_offset) = if let Some(after_equals) = trimmed_after_name.strip_prefix(b"=") {
+        let name = potential_name.trim_ascii();
 
         if !is_valid_identifier_start(name, false) {
-            return Err(ParseError::InvalidTypeTag(span, format!("Invalid type alias name: '{name}'")));
+            return Err(ParseError::InvalidTypeTag(
+                span,
+                format!("Invalid type alias name: '{}'", String::from_utf8_lossy(name)),
+            ));
         }
 
         let type_start_offset = name_len + (after_name.len() - trimmed_after_name.len()) + 1;
 
         (name, after_equals, leading_ws + type_start_offset as u32)
     } else {
-        let name = potential_name.trim();
+        let name = potential_name.trim_ascii();
 
         if !is_valid_identifier_start(name, false) {
-            return Err(ParseError::InvalidTypeTag(span, format!("Invalid type alias name: '{name}'")));
+            return Err(ParseError::InvalidTypeTag(
+                span,
+                format!("Invalid type alias name: '{}'", String::from_utf8_lossy(name)),
+            ));
         }
 
-        let rest = after_name.trim_start();
+        let rest = after_name.trim_ascii_start();
         let type_start_offset = name_len + (after_name.len() - rest.len());
 
         (name, rest, leading_ws + type_start_offset as u32)
@@ -758,109 +723,124 @@ pub fn parse_type_tag(content: &str, span: Span) -> Result<TypeTag, ParseError> 
         .ok_or_else(|| ParseError::InvalidTypeTag(span, "Failed to parse type definition".to_string()))?;
 
     if type_string.value.is_empty()
-        || type_string.value.starts_with('{')
-        || (type_string.value.starts_with('$') && type_string.value != "$this")
+        || type_string.value.starts_with(b"{")
+        || (type_string.value.starts_with(b"$") && type_string.value != b"$this")
     {
-        return Err(ParseError::InvalidTypeTag(span, format!("Invalid type definition: '{}'", type_string.value)));
+        return Err(ParseError::InvalidTypeTag(
+            span,
+            format!("Invalid type definition: '{}'", String::from_utf8_lossy(&type_string.value)),
+        ));
     }
 
-    Ok(TypeTag { span, name: name.to_owned(), type_string })
+    Ok(TypeTag { span, name: name.to_vec(), type_string })
 }
 
-/// Parses the content string of an `@import-type` tag.
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following the tag.
-/// * `span` - The original `Span` of the `content` slice.
+/// Parses the content of an `@import-type` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the import-type tag syntax is invalid.
-pub fn parse_import_type_tag(content: &str, span: Span) -> Result<ImportTypeTag, ParseError> {
-    let (name, rest) = content.trim_start().split_once(' ').ok_or_else(|| {
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_import_type_tag(content: &[u8], span: Span) -> Result<ImportTypeTag, ParseError> {
+    let trimmed = content.trim_ascii_start();
+    let (name, rest) = split_once_byte(trimmed, b' ').ok_or_else(|| {
         ParseError::InvalidImportTypeTag(span, "Expected type alias name and 'from' clause".to_string())
     })?;
-    let name = name.trim();
-    let rest = rest.trim();
+    let name = name.trim_ascii();
+    let rest = rest.trim_ascii();
 
     if !is_valid_identifier_start(name, false) {
-        return Err(ParseError::InvalidImportTypeTag(span, format!("Invalid type alias name: '{name}'")));
+        return Err(ParseError::InvalidImportTypeTag(
+            span,
+            format!("Invalid type alias name: '{}'", String::from_utf8_lossy(name)),
+        ));
     }
 
     if rest.is_empty() {
         return Err(ParseError::InvalidImportTypeTag(span, "Missing 'from' clause".to_string()));
     }
 
-    let (from, rest) = rest.split_once(' ').ok_or_else(|| {
+    let (from, rest) = split_once_byte(rest, b' ').ok_or_else(|| {
         ParseError::InvalidImportTypeTag(span, "Expected 'from' keyword followed by class name".to_string())
     })?;
 
-    if !from.eq_ignore_ascii_case("from") {
-        return Err(ParseError::InvalidImportTypeTag(span, format!("Expected 'from' keyword, found '{from}'")));
+    if !from.eq_ignore_ascii_case(b"from") {
+        return Err(ParseError::InvalidImportTypeTag(
+            span,
+            format!("Expected 'from' keyword, found '{}'", String::from_utf8_lossy(from)),
+        ));
     }
 
     if rest.is_empty() {
         return Err(ParseError::InvalidImportTypeTag(span, "Missing class name after 'from'".to_string()));
     }
 
-    let (imported_from, rest) = if let Some((imp_from, rest)) = rest.split_once(' ') {
-        (imp_from.trim(), rest.trim())
+    let (imported_from, rest) = if let Some((imp_from, rest)) = split_once_byte(rest, b' ') {
+        (imp_from.trim_ascii(), rest.trim_ascii())
     } else {
-        (rest.trim(), "")
+        (rest.trim_ascii(), b"" as &[u8])
     };
 
     if !is_valid_identifier_start(imported_from, true) {
-        return Err(ParseError::InvalidImportTypeTag(span, format!("Invalid class name: '{imported_from}'")));
+        return Err(ParseError::InvalidImportTypeTag(
+            span,
+            format!("Invalid class name: '{}'", String::from_utf8_lossy(imported_from)),
+        ));
     }
 
     let mut alias = None;
 
-    if let Some((r#as, rest)) = rest.split_once(' ')
-        && r#as.trim().eq_ignore_ascii_case("as")
+    if let Some((r#as, rest)) = split_once_byte(rest, b' ')
+        && r#as.trim_ascii().eq_ignore_ascii_case(b"as")
         && !rest.is_empty()
     {
         let alias_name = rest
-            .split_whitespace()
-            .next()
+            .split(|b: &u8| b.is_ascii_whitespace())
+            .find(|s| !s.is_empty())
             .ok_or_else(|| ParseError::InvalidImportTypeTag(span, "Expected alias name after 'as'".to_string()))?
-            .trim()
-            .to_owned();
-        alias = Some(alias_name);
+            .trim_ascii()
+            .to_vec();
+        alias = Some(ByteAlias(alias_name));
     }
 
-    Ok(ImportTypeTag { span, name: name.to_owned(), from: imported_from.to_owned(), alias })
+    Ok(ImportTypeTag { span, name: name.to_vec(), from: imported_from.to_vec(), alias })
 }
 
-/// Parses the content string of a `@property` tag.
+/// Parses the content of a `@property` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the property tag syntax is invalid.
-pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bool) -> Result<PropertyTag, ParseError> {
-    // If we are at `$` and not `$this`, then no type is present:
-    let (type_string, variable) = if content.trim_start().starts_with('$') && !content.trim_start().starts_with("$this")
-    {
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_property_tag(
+    content: &[u8],
+    span: Span,
+    is_read: bool,
+    is_write: bool,
+) -> Result<PropertyTag, ParseError> {
+    let trimmed_start = content.trim_ascii_start();
+    let (type_string, variable) = if trimmed_start.starts_with(b"$") && !trimmed_start.starts_with(b"$this") {
         let var_part = content
-            .split_whitespace()
-            .next()
+            .split(|b: &u8| b.is_ascii_whitespace())
+            .find(|s| !s.is_empty())
             .ok_or_else(|| ParseError::InvalidPropertyTag(span, "Expected variable name".to_string()))?;
-        let variable = parse_var_ident(var_part, false)
-            .ok_or_else(|| ParseError::InvalidPropertyTag(span, format!("Invalid variable name: '{var_part}'")))?;
+        let variable = parse_var_ident(var_part, false).ok_or_else(|| {
+            ParseError::InvalidPropertyTag(
+                span,
+                format!("Invalid variable name: '{}'", String::from_utf8_lossy(var_part)),
+            )
+        })?;
 
         (None, variable)
     } else {
         let (type_string, rest_slice) = split_tag_content(content, span)
             .ok_or_else(|| ParseError::InvalidPropertyTag(span, "Failed to parse type definition".to_string()))?;
 
-        // Type must exist and be valid
         if type_string.value.is_empty()
-            || type_string.value.starts_with('{')
-            || (type_string.value.starts_with('$') && type_string.value != "$this")
+            || type_string.value.starts_with(b"{")
+            || (type_string.value.starts_with(b"$") && type_string.value != b"$this")
         {
             return Err(ParseError::InvalidPropertyTag(
                 span,
-                format!("Invalid type definition: '{}'", type_string.value),
+                format!("Invalid type definition: '{}'", String::from_utf8_lossy(&type_string.value)),
             ));
         }
 
@@ -869,11 +849,15 @@ pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bo
         }
 
         let var_part = rest_slice
-            .split_whitespace()
-            .next()
+            .split(|b: &u8| b.is_ascii_whitespace())
+            .find(|s| !s.is_empty())
             .ok_or_else(|| ParseError::InvalidPropertyTag(span, "Expected variable name".to_string()))?;
-        let variable = parse_var_ident(var_part, false)
-            .ok_or_else(|| ParseError::InvalidPropertyTag(span, format!("Invalid variable name: '{var_part}'")))?;
+        let variable = parse_var_ident(var_part, false).ok_or_else(|| {
+            ParseError::InvalidPropertyTag(
+                span,
+                format!("Invalid variable name: '{}'", String::from_utf8_lossy(var_part)),
+            )
+        })?;
 
         (Some(type_string), variable)
     };
@@ -881,149 +865,122 @@ pub fn parse_property_tag(content: &str, span: Span, is_read: bool, is_write: bo
     Ok(PropertyTag { span, type_string, variable, is_read, is_write })
 }
 
-/// Splits tag content into the type string part and the rest, respecting brackets/quotes.
-/// Calculates the absolute span of the identified type string.
-///
-/// Returns None if parsing fails or input is empty.
-///
-/// Output: `Some((TypeString, rest_slice))` or `None`
+/// Splits tag content into the type-string part and the rest, respecting brackets/quotes.
 #[inline]
 #[must_use]
-pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString, &str)> {
-    // Find start byte offset of trimmed content relative to original `content` slice
-    let trim_start_offset = content.find(|c: char| !c.is_whitespace()).unwrap_or(0);
-    // Calculate the absolute start position of the trimmed content
+pub fn split_tag_content(content: &[u8], input_span: Span) -> Option<(TypeString, &[u8])> {
+    let trim_start_offset = content.iter().position(|b| !b.is_ascii_whitespace()).unwrap_or(0);
     let trimmed_start_pos = input_span.start.forward(trim_start_offset as u32);
 
-    // Get the trimmed slice reference to iterate over
-    let trimmed_content = content.trim();
+    let trimmed_content = content.trim_ascii();
     if trimmed_content.is_empty() {
         return None;
     }
 
-    let mut bracket_stack: Vec<char> = Vec::with_capacity(8);
-    let mut quote_char: Option<char> = None;
+    let mut bracket_stack: Vec<u8> = Vec::with_capacity(8);
+    let mut quote_char: Option<u8> = None;
     let mut escaped = false;
     let mut last_char_was_significant = false;
-    // Potential split point *relative to trimmed_content*
     let mut split_point_rel: Option<usize> = None;
 
-    let mut iter = trimmed_content.char_indices().peekable();
+    let bytes = trimmed_content;
+    let len = bytes.len();
+    let mut i = 0usize;
 
-    while let Some((i, char)) = iter.next() {
+    while i < len {
+        let ch = bytes[i];
+
         if let Some(q) = quote_char {
-            if char == q && !escaped {
+            if ch == q && !escaped {
                 quote_char = None;
             } else {
-                escaped = char == '\\' && !escaped;
+                escaped = ch == b'\\' && !escaped;
             }
             last_char_was_significant = true;
+            i += 1;
             continue;
         }
-        if char == '\'' || char == '"' {
-            quote_char = Some(char);
+        if ch == b'\'' || ch == b'"' {
+            quote_char = Some(ch);
             last_char_was_significant = true;
+            i += 1;
             continue;
         }
-        match char {
-            '<' | '(' | '[' | '{' => bracket_stack.push(char),
-            '>' | ')' | ']' | '}' => {
-                match bracket_stack.pop() {
-                    Some(opening) if brackets_match(opening, char) => {}
-                    _ => return None, // Mismatch or unbalanced
-                }
-            }
+        match ch {
+            b'<' | b'(' | b'[' | b'{' => bracket_stack.push(ch),
+            b'>' | b')' | b']' | b'}' => match bracket_stack.pop() {
+                Some(opening) if brackets_match(opening, ch) => {}
+                _ => return None,
+            },
             _ => {}
         }
 
-        // if we are at `:`, `|`, or `&` then consider it significant and consume following
-        // whitespaces, and continue processing
-        // This allows union/intersection types like `int | string` or `Foo & Bar`
-        // as well as callable return types like `callable(): int`
-        //
-        // Exception: when the operator is followed (optionally via whitespace) by `$` or
-        // EOF it is a trailing/dangling operator. In that case we split right
-        // after the operator so the type slice keeps the `|` and the variable/description
-        // lands in `rest_slice`.
-        if char == ':' || char == '|' || char == '&' {
+        if ch == b':' || ch == b'|' || ch == b'&' {
             last_char_was_significant = true;
 
-            let mut peek_iter = iter.clone();
+            let mut peek_i = i + 1;
             let mut has_whitespace_after = false;
-            while let Some(&(_, next_char)) = peek_iter.peek() {
-                if next_char.is_whitespace() {
-                    peek_iter.next();
-                    has_whitespace_after = true;
-                } else {
-                    break;
-                }
+            while peek_i < len && bytes[peek_i].is_ascii_whitespace() {
+                peek_i += 1;
+                has_whitespace_after = true;
             }
 
-            let next_non_ws = peek_iter.peek().map(|&(_, c)| c);
-            if bracket_stack.is_empty() && matches!(next_non_ws, None | Some('$')) {
-                split_point_rel = Some(i + char.len_utf8());
+            let next_non_ws = bytes.get(peek_i).copied();
+            if bracket_stack.is_empty() && matches!(next_non_ws, None | Some(b'$')) {
+                split_point_rel = Some(i + 1);
                 break;
             }
 
             if has_whitespace_after {
-                while let Some(&(_, next_char)) = iter.peek() {
-                    if next_char.is_whitespace() {
-                        iter.next();
-                    } else {
-                        break;
-                    }
+                while i + 1 < len && bytes[i + 1].is_ascii_whitespace() {
+                    i += 1;
                 }
             }
 
+            i += 1;
             continue;
         }
 
-        if char == '/' && iter.peek().is_some_and(|&(_, c)| c == '/') {
+        if ch == b'/' && bytes.get(i + 1).is_some_and(|&b| b == b'/') {
             if !bracket_stack.is_empty() {
-                while let Some(&(_, next_char)) = iter.peek() {
-                    if next_char == '\n' {
+                while i + 1 < len {
+                    if bytes[i + 1] == b'\n' {
                         break;
                     }
-
-                    iter.next();
+                    i += 1;
                 }
                 last_char_was_significant = true;
+                i += 1;
                 continue;
             }
 
-            // Split point is BEFORE the comment start
             split_point_rel = Some(i);
 
-            // Stop processing line here, rest will be handled outside loop
             break;
         }
 
-        if char.is_whitespace() {
+        if ch.is_ascii_whitespace() {
             if bracket_stack.is_empty() && last_char_was_significant {
-                let mut temp_iter = iter.clone();
+                let mut peek_i = i + 1;
                 let mut found_continuation = false;
 
-                while let Some(&(_, next_char)) = temp_iter.peek() {
-                    if next_char.is_whitespace() {
-                        temp_iter.next();
-                    } else {
-                        found_continuation = next_char == ':'
-                            || next_char == '|'
-                            || (next_char == '&' && {
-                                temp_iter.next(); // consume '&'
-                                !temp_iter.peek().is_some_and(|&(_, c)| c == '$' || c == '.')
-                            });
-                        break;
-                    }
+                while peek_i < len && bytes[peek_i].is_ascii_whitespace() {
+                    peek_i += 1;
+                }
+
+                if peek_i < len {
+                    let next_char = bytes[peek_i];
+                    found_continuation = next_char == b':'
+                        || next_char == b'|'
+                        || (next_char == b'&' && {
+                            let after = bytes.get(peek_i + 1).copied();
+                            !matches!(after, Some(b'$') | Some(b'.'))
+                        });
                 }
 
                 if found_continuation {
-                    while let Some(&(_, next_char)) = iter.peek() {
-                        if next_char.is_whitespace() {
-                            iter.next();
-                        } else {
-                            break;
-                        }
+                    while i + 1 < len && bytes[i + 1].is_ascii_whitespace() {
+                        i += 1;
                     }
 
                     last_char_was_significant = true;
@@ -1034,64 +991,52 @@ pub fn split_tag_content(content: &str, input_span: Span) -> Option<(TypeString,
             } else {
                 last_char_was_significant = false;
             }
-        } else if char == '.' {
-            // Only treat '.' as a split point if it's NOT part of a numeric literal
-            // Check if this is a numeric literal by looking at surrounding chars
-            let prev_is_digit = i > 0 && trimmed_content.as_bytes()[i - 1].is_ascii_digit();
-            let next_is_digit = iter.peek().is_some_and(|&(_, c)| c.is_ascii_digit());
+        } else if ch == b'.' {
+            let prev_is_digit = i > 0 && bytes[i - 1].is_ascii_digit();
+            let next_is_digit = bytes.get(i + 1).is_some_and(|b| b.is_ascii_digit());
 
             if prev_is_digit && next_is_digit {
-                // This is part of a numeric literal like "24.0"
                 last_char_was_significant = true;
+            } else if bracket_stack.is_empty() && last_char_was_significant {
+                split_point_rel = Some(i);
+                break;
             } else {
-                // This is a description separator like "string[]. something"
-                if bracket_stack.is_empty() && last_char_was_significant {
-                    split_point_rel = Some(i);
-                    break;
-                }
                 last_char_was_significant = false;
             }
         } else {
             last_char_was_significant = true;
         }
+
+        i += 1;
     }
 
-    // After loop checks
     if !bracket_stack.is_empty() || quote_char.is_some() {
         return None;
     }
 
     if let Some(split_idx_rel) = split_point_rel {
-        // Split occurred
-        let type_part_slice = trimmed_content[..split_idx_rel].trim_end();
-        let rest_part_slice = trimmed_content[split_idx_rel..].trim_start();
+        let type_part_slice = trimmed_content[..split_idx_rel].trim_ascii_end();
+        let rest_part_slice = trimmed_content[split_idx_rel..].trim_ascii_start();
 
-        // Calculate span relative to the *start* of the trimmed content
         let type_span =
             Span::new(input_span.file_id, trimmed_start_pos, trimmed_start_pos.forward(type_part_slice.len() as u32));
 
-        Some((TypeString { value: type_part_slice.to_owned(), span: type_span }, rest_part_slice))
+        Some((TypeString { value: type_part_slice.to_vec(), span: type_span }, rest_part_slice))
     } else {
-        // No split, entire trimmed content is the type
         let type_part_slice = trimmed_content;
         let type_span =
             Span::new(input_span.file_id, trimmed_start_pos, trimmed_start_pos.forward(type_part_slice.len() as u32));
 
-        Some((TypeString { value: type_part_slice.to_owned(), span: type_span }, ""))
+        Some((TypeString { value: type_part_slice.to_vec(), span: type_span }, b"" as &[u8]))
     }
 }
 
-/// Parses the content string of a `@method` tag.
-///
-/// # Arguments
-///
-/// * `content` - The string slice content following `@method`.
-/// * `span` - The original `Span` of the `content` slice.
+/// Parses the content of a `@method` tag.
 ///
 /// # Errors
 ///
-/// Returns a [`ParseError`] if the method tag syntax is invalid.
-pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, ParseError> {
+/// Returns a [`ParseError`] when the tag content is malformed.
+pub fn parse_method_tag(mut content: &[u8], mut span: Span) -> Result<MethodTag, ParseError> {
     let (trimmed_content, leading_ws) = consume_whitespace(content);
     content = trimmed_content;
     span = span.subspan(leading_ws as u32, span.length());
@@ -1101,22 +1046,21 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
 
     let mut acc_len = 0;
 
-    // Track the position and length of the static modifier, in case we need to treat it as return type
     let mut static_modifier_start = 0u32;
     let mut static_modifier_len = 0u32;
 
     loop {
-        if let Some((new_content, char_count)) = try_consume(content, "static ") {
+        if let Some((new_content, char_count)) = try_consume(content, b"static ") {
             if is_static {
                 return Err(ParseError::InvalidMethodTag(span, "Duplicate 'static' modifier".to_string()));
             }
 
             is_static = true;
             static_modifier_start = acc_len as u32;
-            static_modifier_len = 6; // "static" without the space
+            static_modifier_len = 6;
             acc_len += char_count;
             content = new_content;
-        } else if let Some((new_content, char_count)) = try_consume(content, "public ") {
+        } else if let Some((new_content, char_count)) = try_consume(content, b"public ") {
             if visibility.is_some() {
                 return Err(ParseError::InvalidMethodTag(span, "Duplicate visibility modifier".to_string()));
             }
@@ -1124,7 +1068,7 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
             visibility = Some(Visibility::Public);
             acc_len += char_count;
             content = new_content;
-        } else if let Some((new_content, char_count)) = try_consume(content, "protected ") {
+        } else if let Some((new_content, char_count)) = try_consume(content, b"protected ") {
             if visibility.is_some() {
                 return Err(ParseError::InvalidMethodTag(span, "Duplicate visibility modifier".to_string()));
             }
@@ -1132,7 +1076,7 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
             visibility = Some(Visibility::Protected);
             acc_len += char_count;
             content = new_content;
-        } else if let Some((new_content, char_count)) = try_consume(content, "private ") {
+        } else if let Some((new_content, char_count)) = try_consume(content, b"private ") {
             if visibility.is_some() {
                 return Err(ParseError::InvalidMethodTag(span, "Duplicate visibility modifier".to_string()));
             }
@@ -1150,7 +1094,7 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
     let (type_string, rest_slice, rest_slice_span) = if is_static && looks_like_method_signature_only(content) {
         is_static = false;
         let static_span = span.subspan(static_modifier_start, static_modifier_start + static_modifier_len);
-        let type_string = TypeString { value: "static".into(), span: static_span };
+        let type_string = TypeString { value: b"static".to_vec(), span: static_span };
         let (rest_slice, whitespace_count) = consume_whitespace(content);
         let rest_slice_span = rest_span.subspan(whitespace_count as u32, rest_span.length());
         (type_string, rest_slice, rest_slice_span)
@@ -1164,35 +1108,25 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
         (type_string, rest_slice, rest_slice_span)
     };
 
-    // Type must exist and be valid
     if type_string.value.is_empty()
-        || type_string.value.starts_with('{')
-        || (type_string.value.starts_with('$') && type_string.value != "$this")
+        || type_string.value.starts_with(b"{")
+        || (type_string.value.starts_with(b"$") && type_string.value != b"$this")
     {
-        return Err(ParseError::InvalidMethodTag(span, format!("Invalid return type: '{}'", type_string.value)));
+        return Err(ParseError::InvalidMethodTag(
+            span,
+            format!("Invalid return type: '{}'", String::from_utf8_lossy(&type_string.value)),
+        ));
     }
 
     if rest_slice.is_empty() {
-        // Method definition is mandatory
         return Err(ParseError::InvalidMethodTag(span, "Missing method signature".to_string()));
     }
 
-    let mut chars = rest_slice.char_indices();
-
-    let mut name_end = None;
-
-    for (i, ch) in &mut chars {
-        if ch == '(' {
-            name_end = Some(i);
-            break;
-        }
-    }
-
-    let name_end = name_end.ok_or_else(|| {
+    let name_end = position_of(rest_slice, b'(').ok_or_else(|| {
         ParseError::InvalidMethodTag(span, "Missing opening parenthesis '(' for method arguments".to_string())
     })?;
 
-    let name = rest_slice[..name_end].trim();
+    let name = rest_slice[..name_end].trim_ascii();
 
     if name.is_empty() {
         return Err(ParseError::InvalidMethodTag(span, "Missing method name".to_string()));
@@ -1201,18 +1135,20 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
     let mut depth = 1;
     let mut args_end = None;
 
-    for (i, ch) in &mut chars {
-        match ch {
-            '(' => depth += 1,
-            ')' => {
+    let mut idx = name_end + 1;
+    while idx < rest_slice.len() {
+        match rest_slice[idx] {
+            b'(' => depth += 1,
+            b')' => {
                 depth -= 1;
                 if depth == 0 {
-                    args_end = Some(i);
+                    args_end = Some(idx);
                     break;
                 }
             }
             _ => {}
         }
+        idx += 1;
     }
 
     let args_end = args_end.ok_or_else(|| {
@@ -1221,33 +1157,29 @@ pub fn parse_method_tag(mut content: &str, mut span: Span) -> Result<MethodTag, 
     let (args_str, whitespace_count) = consume_whitespace(&rest_slice[name_end + 1..args_end]);
     let args_span = rest_slice_span.subspan((whitespace_count + name_end) as u32 + 1, args_end as u32);
 
-    let description = rest_slice[args_end..].trim();
+    let description = rest_slice[args_end..].trim_ascii();
     let arguments_split = split_args(args_str, args_span);
     let arguments = arguments_split.iter().filter_map(|(arg, span)| parse_argument(arg, span)).collect::<Vec<_>>();
 
     let method = Method {
-        name: name.into(),
+        name: name.to_vec(),
         argument_list: arguments,
         visibility: visibility.unwrap_or(Visibility::Public),
         is_static,
     };
 
-    Ok(MethodTag { span, type_string, method, description: description.into() })
+    Ok(MethodTag { span, type_string, method, description: description.to_vec() })
 }
 
-fn consume_whitespace(input: &str) -> (&str, usize) {
+fn consume_whitespace(input: &[u8]) -> (&[u8], usize) {
     let mut byte_count = 0;
-    for ch in input.chars() {
-        if ch.is_whitespace() {
-            byte_count += ch.len_utf8();
-        } else {
-            break;
-        }
+    while byte_count < input.len() && input[byte_count].is_ascii_whitespace() {
+        byte_count += 1;
     }
     (&input[byte_count..], byte_count)
 }
 
-fn try_consume<'input>(input: &'input str, token: &str) -> Option<(&'input str, usize)> {
+fn try_consume<'input>(input: &'input [u8], token: &[u8]) -> Option<(&'input [u8], usize)> {
     let (input, whitespace_count) = consume_whitespace(input);
 
     if !input.starts_with(token) {
@@ -1255,36 +1187,33 @@ fn try_consume<'input>(input: &'input str, token: &str) -> Option<(&'input str, 
     }
 
     let len = token.len() + whitespace_count;
-    let input = &input[len..];
+    let input = &input[token.len()..];
 
-    let (input, whitespace_count) = consume_whitespace(input);
+    let (input, trailing_whitespace) = consume_whitespace(input);
 
-    Some((input, len + whitespace_count))
+    Some((input, len + trailing_whitespace))
 }
 
-/// Checks if the given content looks like only a method signature (no return type).
-/// e.g., "`foo()`" or "foo($arg)" returns true
-/// e.g., "Money `foo()`" or "int bar($x)" returns false
-fn looks_like_method_signature_only(content: &str) -> bool {
-    let trimmed = content.trim();
-    if let Some(paren_pos) = trimmed.find('(') {
-        let before_paren = trimmed[..paren_pos].trim();
-        !before_paren.is_empty() && !before_paren.contains(' ')
+fn looks_like_method_signature_only(content: &[u8]) -> bool {
+    let trimmed = content.trim_ascii();
+    if let Some(paren_pos) = position_of(trimmed, b'(') {
+        let before_paren = trimmed[..paren_pos].trim_ascii();
+        !before_paren.is_empty() && !before_paren.contains(&b' ')
     } else {
         false
     }
 }
 
-fn split_args(args_str: &str, span: Span) -> Vec<(&str, Span)> {
+fn split_args(args_str: &[u8], span: Span) -> Vec<(&[u8], Span)> {
     let mut args = Vec::new();
 
     let mut start = 0;
     let mut depth = 0;
-    for (i, ch) in args_str.char_indices() {
+    for (i, &ch) in args_str.iter().enumerate() {
         match ch {
-            '(' | '[' => depth += 1,
-            ')' | ']' => depth -= 1,
-            ',' if depth == 0 => {
+            b'(' | b'[' => depth += 1,
+            b')' | b']' => depth -= 1,
+            b',' if depth == 0 => {
                 let (arg, whitespace_count) = consume_whitespace(&args_str[start..i]);
                 if !arg.is_empty() {
                     args.push((arg, span.subspan((whitespace_count + start) as u32, i as u32)));
@@ -1297,7 +1226,7 @@ fn split_args(args_str: &str, span: Span) -> Vec<(&str, Span)> {
 
     if start < args_str.len() {
         let (arg, whitespace_count) = consume_whitespace(&args_str[start..]);
-        let arg_trimmed = arg.trim_end();
+        let arg_trimmed = arg.trim_ascii_end();
         if !arg.is_empty() {
             args.push((
                 arg_trimmed,
@@ -1312,20 +1241,20 @@ fn split_args(args_str: &str, span: Span) -> Vec<(&str, Span)> {
     args
 }
 
-fn parse_argument(arg_str: &str, span: &Span) -> Option<Argument> {
-    let default_value_split = arg_str.rsplit_once('=');
+fn parse_argument(arg_str: &[u8], span: &Span) -> Option<Argument> {
+    let default_value_split = rsplit_once_byte(arg_str, b'=');
 
-    let ((arg_type, raw_name), default_value): ((_, _), Option<&str>) =
+    let ((arg_type, raw_name), default_value): ((_, _), Option<&[u8]>) =
         if let Some((variable_definition, default_value)) = default_value_split {
-            let arg = variable_definition.trim();
-            if let Some((arg_type, raw_name)) = arg.rsplit_once(' ') {
-                ((Some(arg_type), raw_name), Some(default_value.trim()))
+            let arg = variable_definition.trim_ascii();
+            if let Some((arg_type, raw_name)) = rsplit_once_byte(arg, b' ') {
+                ((Some(arg_type), raw_name), Some(default_value.trim_ascii()))
             } else {
                 ((None, arg), Some(default_value))
             }
         } else {
-            let arg = arg_str.trim();
-            if let Some((arg_type, raw_name)) = arg.rsplit_once(' ') {
+            let arg = arg_str.trim_ascii();
+            if let Some((arg_type, raw_name)) = rsplit_once_byte(arg, b' ') {
                 ((Some(arg_type), raw_name), None)
             } else {
                 ((None, arg), None)
@@ -1333,7 +1262,7 @@ fn parse_argument(arg_str: &str, span: &Span) -> Option<Argument> {
         };
 
     let type_string =
-        arg_type.map(|arg_type| TypeString { value: arg_type.into(), span: span.subspan(0, arg_type.len() as u32) });
+        arg_type.map(|arg_type| TypeString { value: arg_type.to_vec(), span: span.subspan(0, arg_type.len() as u32) });
 
     let variable_span = span.subspan(arg_type.map_or(0, |t| 1 + t.len() as u32), span.length());
 
@@ -1348,22 +1277,27 @@ fn parse_argument(arg_str: &str, span: &Span) -> Option<Argument> {
     })
 }
 
-/// Checks if an opening bracket matches a closing one.
 #[inline]
-const fn brackets_match(open: char, close: char) -> bool {
-    matches!((open, close), ('<', '>') | ('(', ')') | ('[', ']') | ('{', '}'))
+const fn brackets_match(open: u8, close: u8) -> bool {
+    matches!((open, close), (b'<', b'>') | (b'(', b')') | (b'[', b']') | (b'{', b'}'))
 }
 
-/// Checks if the identifier is valid
 #[inline]
-fn is_valid_identifier_start(mut identifier: &str, allow_qualified: bool) -> bool {
-    if allow_qualified && identifier.starts_with('\\') {
+fn is_valid_identifier_start(mut identifier: &[u8], allow_qualified: bool) -> bool {
+    if allow_qualified && identifier.starts_with(b"\\") {
         identifier = &identifier[1..];
     }
 
-    !identifier.is_empty()
-        && identifier.chars().all(|c| c.is_alphanumeric() || c == '_' || (allow_qualified && c == '\\'))
-        && identifier.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_')
+    if identifier.is_empty() {
+        return false;
+    }
+
+    let first = identifier[0];
+    if !(first.is_ascii_alphabetic() || first == b'_') {
+        return false;
+    }
+
+    identifier.iter().all(|&b| b.is_ascii_alphanumeric() || b == b'_' || (allow_qualified && b == b'\\'))
 }
 
 #[cfg(test)]
@@ -1375,12 +1309,12 @@ mod tests {
 
     use super::*;
 
-    fn test_span(input: &str, start_offset: u32) -> Span {
+    fn test_span(input: &[u8], start_offset: u32) -> Span {
         let base_start = Position::new(start_offset);
         Span::new(FileId::zero(), base_start, base_start.forward(input.len() as u32))
     }
 
-    fn test_span_for(s: &str) -> Span {
+    fn test_span_for(s: &[u8]) -> Span {
         test_span(s, 0)
     }
 
@@ -1391,20 +1325,20 @@ mod tests {
     #[test]
     fn test_parse_var_ident() {
         struct Expect<'a> {
-            s: &'a str,
+            s: &'a [u8],
             variadic: bool,
             by_ref: bool,
         }
-        let cases: &[(&str, Option<Expect>)] = &[
-            ("$x", Some(Expect { s: "$x", variadic: false, by_ref: false })),
-            ("&$refVar", Some(Expect { s: "$refVar", variadic: false, by_ref: true })),
-            ("$foo,", Some(Expect { s: "$foo", variadic: false, by_ref: false })),
-            ("...$ids)", Some(Expect { s: "$ids", variadic: true, by_ref: false })),
-            ("...$items,", Some(Expect { s: "$items", variadic: true, by_ref: false })),
-            ("$", None),
-            ("...$", None),
-            ("$1x", None),
-            ("foo", None),
+        let cases: &[(&[u8], Option<Expect>)] = &[
+            (b"$x", Some(Expect { s: b"$x", variadic: false, by_ref: false })),
+            (b"&$refVar", Some(Expect { s: b"$refVar", variadic: false, by_ref: true })),
+            (b"$foo,", Some(Expect { s: b"$foo", variadic: false, by_ref: false })),
+            (b"...$ids)", Some(Expect { s: b"$ids", variadic: true, by_ref: false })),
+            (b"...$items,", Some(Expect { s: b"$items", variadic: true, by_ref: false })),
+            (b"$", None),
+            (b"...$", None),
+            (b"$1x", None),
+            (b"foo", None),
         ];
 
         for (input, expected) in cases {
@@ -1412,225 +1346,226 @@ mod tests {
             match (got, expected) {
                 (None, None) => {}
                 (Some(v), Some(e)) => {
-                    assert_eq!(v.name, e.s, "input={input}");
-                    assert_eq!(v.is_variadic, e.variadic, "input={input}");
-                    assert_eq!(v.is_by_reference, e.by_ref, "input={input}");
+                    assert_eq!(v.name, e.s, "input={input:?}");
+                    assert_eq!(v.is_variadic, e.variadic, "input={input:?}");
+                    assert_eq!(v.is_by_reference, e.by_ref, "input={input:?}");
                 }
-                _ => panic!("mismatch for input={input}"),
+                _ => panic!("mismatch for input={input:?}"),
             }
         }
     }
 
     #[test]
     fn test_variable_display_and_raw() {
-        let cases = vec![("$x", "$x"), ("&$x", "&$x"), ("...$x", "...$x"), ("...$x)", "...$x"), ("...$x,", "...$x")];
+        let cases: &[(&[u8], &str)] =
+            &[(b"$x", "$x"), (b"&$x", "&$x"), (b"...$x", "...$x"), (b"...$x)", "...$x"), (b"...$x,", "...$x")];
 
         for (input, expected_raw) in cases {
             let v = parse_var_ident(input, false).expect("should parse variable");
-            assert_eq!(v.to_string(), expected_raw);
+            assert_eq!(v.to_string(), *expected_raw);
         }
     }
 
     #[test]
     fn test_splitter_brackets() {
-        let input = "array<int, (string|bool)> desc";
+        let input = b"array<int, (string|bool)> desc";
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, "array<int, (string|bool)>");
-        assert_eq!(ts.span, make_span(0, "array<int, (string|bool)>".len() as u32));
-        assert_eq!(rest, "desc");
+        assert_eq!(ts.value, b"array<int, (string|bool)>");
+        assert_eq!(ts.span, make_span(0, b"array<int, (string|bool)>".len() as u32));
+        assert_eq!(rest, b"desc");
 
-        let input = "array<int, string> desc";
+        let input = b"array<int, string> desc";
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, "array<int, string>");
-        assert_eq!(ts.span, make_span(0, "array<int, string>".len() as u32));
-        assert_eq!(rest, "desc");
+        assert_eq!(ts.value, b"array<int, string>");
+        assert_eq!(ts.span, make_span(0, b"array<int, string>".len() as u32));
+        assert_eq!(rest, b"desc");
 
-        assert!(split_tag_content("array<int", test_span_for("array<int")).is_none()); // Unclosed
-        assert!(split_tag_content("array<int)", test_span_for("array<int)")).is_none()); // Mismatched
-        assert!(split_tag_content("array(int>", test_span_for("array(int>")).is_none()); // Mismatched
-        assert!(split_tag_content("string>", test_span_for("string>")).is_none()); // Closing without opening
+        assert!(split_tag_content(b"array<int", test_span_for(b"array<int")).is_none());
+        assert!(split_tag_content(b"array<int)", test_span_for(b"array<int)")).is_none());
+        assert!(split_tag_content(b"array(int>", test_span_for(b"array(int>")).is_none());
+        assert!(split_tag_content(b"string>", test_span_for(b"string>")).is_none());
     }
 
     #[test]
     fn test_splitter_quotes() {
-        let input = " 'inside quote' outside ";
+        let input = b" 'inside quote' outside ";
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, "'inside quote'");
+        assert_eq!(ts.value, b"'inside quote'");
         assert_eq!(ts.span, make_span(1, "'inside quote'".len() as u32 + 1));
-        assert_eq!(rest, "outside");
+        assert_eq!(rest, b"outside");
 
-        let input = r#""string \" with escape" $var"#;
+        let input = br#""string \" with escape" $var"#;
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, r#""string \" with escape""#);
+        assert_eq!(ts.value, br#""string \" with escape""#);
         assert_eq!(ts.span, make_span(0, r#""string \" with escape""#.len() as u32));
-        assert_eq!(rest, "$var");
+        assert_eq!(rest, b"$var");
 
-        assert!(split_tag_content("\"unterminated", test_span_for("\"unterminated")).is_none());
+        assert!(split_tag_content(b"\"unterminated", test_span_for(b"\"unterminated")).is_none());
     }
 
     #[test]
     fn test_splitter_comments() {
-        let input = "(string // comment \n | int) $var";
+        let input = b"(string // comment \n | int) $var";
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, "(string // comment \n | int)");
+        assert_eq!(ts.value, b"(string // comment \n | int)");
         assert_eq!(ts.span, make_span(0, "(string // comment \n | int)".len() as u32));
-        assert_eq!(rest, "$var");
+        assert_eq!(rest, b"$var");
 
-        let input = "string // comment goes to end";
+        let input = b"string // comment goes to end";
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, "string");
+        assert_eq!(ts.value, b"string");
         assert_eq!(ts.span, make_span(0, "string".len() as u32));
-        assert_eq!(rest, "// comment goes to end");
+        assert_eq!(rest, b"// comment goes to end");
 
-        let input = "array<string // comment\n> $var";
+        let input = b"array<string // comment\n> $var";
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, "array<string // comment\n>");
+        assert_eq!(ts.value, b"array<string // comment\n>");
         assert_eq!(ts.span, make_span(0, "array<string // comment\n>".len() as u32));
-        assert_eq!(rest, "$var");
+        assert_eq!(rest, b"$var");
     }
 
     #[test]
     fn test_splitter_whole_string_is_type() {
-        let input = " array<int, string> ";
+        let input = b" array<int, string> ";
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, "array<int, string>");
+        assert_eq!(ts.value, b"array<int, string>");
         assert_eq!(ts.span, make_span(1, "array<int, string>".len() as u32 + 1));
-        assert_eq!(rest, ""); // No rest part
+        assert_eq!(rest, b"");
     }
 
     #[test]
     fn test_splitter_with_dot() {
-        let input = "string[]. something";
+        let input = b"string[]. something";
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, "string[]");
+        assert_eq!(ts.value, b"string[]");
         assert_eq!(ts.span, make_span(0, "string[]".len() as u32));
-        assert_eq!(rest, ". something");
+        assert_eq!(rest, b". something");
     }
 
     #[test]
     fn test_param_basic() {
         let offset = 10;
-        let content = " string|int $myVar Description here ";
+        let content = b" string|int $myVar Description here ";
         let span = test_span(content, offset);
         let result = parse_param_tag(content, span).unwrap();
 
-        assert_eq!(result.type_string.as_ref().unwrap().value, "string|int"); // Check owned string value
-        assert_eq!(result.type_string.as_ref().unwrap().span.start.offset, offset + 1); // Span of type part
+        assert_eq!(result.type_string.as_ref().unwrap().value, b"string|int");
+        assert_eq!(result.type_string.as_ref().unwrap().span.start.offset, offset + 1);
         assert_eq!(result.type_string.as_ref().unwrap().span.end.offset, offset + 1 + "string|int".len() as u32);
-        assert_eq!(result.variable.name, "$myVar");
-        assert_eq!(result.description, "Description here");
-        assert_eq!(result.span, span); // Check overall span
+        assert_eq!(result.variable.name, b"$myVar");
+        assert_eq!(result.description, b"Description here");
+        assert_eq!(result.span, span);
     }
 
     #[test]
     fn test_param_complex_type_no_desc() {
         let offset = 5;
-        let content = " array<int, string> $param ";
+        let content = b" array<int, string> $param ";
         let span = test_span(content, offset);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.type_string.as_ref().unwrap().value, "array<int, string>"); // Check owned string
+        assert_eq!(result.type_string.as_ref().unwrap().value, b"array<int, string>");
         assert_eq!(result.type_string.as_ref().unwrap().span.start.offset, offset + 1);
         assert_eq!(
             result.type_string.as_ref().unwrap().span.end.offset,
             offset + 1 + "array<int, string>".len() as u32
         );
-        assert_eq!(result.variable.name, "$param");
-        assert_eq!(result.description, "");
+        assert_eq!(result.variable.name, b"$param");
+        assert_eq!(result.description, b"");
     }
 
     #[test]
     fn test_param_type_with_comment() {
         let offset = 20;
-        let content = " (string // comment \n | int) $var desc";
+        let content = b" (string // comment \n | int) $var desc";
         let span = test_span(content, offset);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.type_string.as_ref().unwrap().value, "(string // comment \n | int)");
+        assert_eq!(result.type_string.as_ref().unwrap().value, b"(string // comment \n | int)");
         assert_eq!(result.type_string.as_ref().unwrap().span.start.offset, offset + 1);
         assert_eq!(
             result.type_string.as_ref().unwrap().span.end.offset,
             offset + 1 + "(string // comment \n | int)".len() as u32
         );
-        assert_eq!(result.variable.name, "$var");
-        assert_eq!(result.description, "desc");
+        assert_eq!(result.variable.name, b"$var");
+        assert_eq!(result.description, b"desc");
     }
 
     #[test]
     fn test_param_no_type() {
-        let content = " $param Description here ";
+        let content = b" $param Description here ";
         let span = test_span(content, 0);
         let result = parse_param_tag(content, span).unwrap();
-        assert!(result.type_string.is_none()); // No type specified
-        assert_eq!(result.variable.name, "$param");
-        assert_eq!(result.description, "Description here");
+        assert!(result.type_string.is_none());
+        assert_eq!(result.variable.name, b"$param");
+        assert_eq!(result.description, b"Description here");
     }
 
     #[test]
     fn test_return_basic() {
         let offset = 10u32;
-        let content = " string Description here ";
+        let content = b" string Description here ";
         let span = test_span(content, offset);
         let result = parse_return_tag(content, span).unwrap();
-        assert_eq!(result.type_string.value, "string");
+        assert_eq!(result.type_string.value, b"string");
         assert_eq!(result.type_string.span.start.offset, offset + 1);
         assert_eq!(result.type_string.span.end.offset, offset + 1 + "string".len() as u32);
-        assert_eq!(result.description, "Description here");
+        assert_eq!(result.description, b"Description here");
         assert_eq!(result.span, span);
     }
 
     #[test]
     fn test_return_complex_type_with_desc() {
         let offset = 0;
-        let content = " array<int, (string|null)> Description ";
+        let content = b" array<int, (string|null)> Description ";
         let span = test_span(content, offset);
         let result = parse_return_tag(content, span).unwrap();
-        assert_eq!(result.type_string.value, "array<int, (string|null)>");
+        assert_eq!(result.type_string.value, b"array<int, (string|null)>");
         assert_eq!(result.type_string.span.start.offset, offset + 1);
         assert_eq!(result.type_string.span.end.offset, offset + 1 + "array<int, (string|null)>".len() as u32);
-        assert_eq!(result.description, "Description");
+        assert_eq!(result.description, b"Description");
     }
 
     #[test]
     fn test_return_complex_type_no_desc() {
         let offset = 0;
-        let content = " array<int, (string|null)> ";
+        let content = b" array<int, (string|null)> ";
         let span = test_span(content, offset);
         let result = parse_return_tag(content, span).unwrap();
-        assert_eq!(result.type_string.value, "array<int, (string|null)>");
+        assert_eq!(result.type_string.value, b"array<int, (string|null)>");
         assert_eq!(result.type_string.span.start.offset, offset + 1);
         assert_eq!(result.type_string.span.end.offset, offset + 1 + "array<int, (string|null)>".len() as u32);
-        assert_eq!(result.description, "");
+        assert_eq!(result.description, b"");
     }
 
     #[test]
     fn test_param_out_no_type() {
-        let content = " $myVar ";
+        let content = b" $myVar ";
         let span = test_span(content, 0);
         parse_param_out_tag(content, span).unwrap_err();
     }
 
     #[test]
     fn test_param_out_no_var() {
-        let content = " string ";
+        let content = b" string ";
         let span = test_span(content, 0);
         parse_param_out_tag(content, span).unwrap_err();
     }
 
     #[test]
     fn test_type() {
-        let content = "MyType = string";
+        let content = b"MyType = string";
         let span = test_span_for(content);
         let result = parse_type_tag(content, span).unwrap();
-        assert_eq!(result.name, "MyType");
-        assert_eq!(result.type_string.value, "string");
+        assert_eq!(result.name, b"MyType");
+        assert_eq!(result.type_string.value, b"string");
         assert_eq!(result.type_string.span.start.offset, 9);
         assert_eq!(result.type_string.span.end.offset, 9 + "string".len() as u32);
         assert_eq!(result.span, span);
@@ -1638,158 +1573,145 @@ mod tests {
 
     #[test]
     fn test_import_type() {
-        let content = "MyType from \\My\\Namespace\\Class as Alias";
+        let content = b"MyType from \\My\\Namespace\\Class as Alias";
         let span = test_span_for(content);
         let result = parse_import_type_tag(content, span).unwrap();
-        assert_eq!(result.name, "MyType");
-        assert_eq!(result.from, "\\My\\Namespace\\Class");
-        assert_eq!(result.alias, Some("Alias".to_owned()));
+        assert_eq!(result.name, b"MyType");
+        assert_eq!(result.from, b"\\My\\Namespace\\Class");
+        assert_eq!(result.alias.as_ref().map(|a| a.0.as_slice()), Some(b"Alias" as &[u8]));
         assert_eq!(result.span, span);
     }
 
     #[test]
     fn test_param_trailing_comma_is_ignored_in_name() {
-        let content = " string $foo, desc";
+        let content = b" string $foo, desc";
         let span = test_span_for(content);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.variable.name, "$foo");
-        assert_eq!(result.description, ", desc");
+        assert_eq!(result.variable.name, b"$foo");
+        assert_eq!(result.description, b", desc");
     }
 
     #[test]
     fn test_param_variadic_trailing_paren_is_ignored_in_name() {
-        let content = " list<int> ...$items) rest";
+        let content = b" list<int> ...$items) rest";
         let span = test_span_for(content);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.variable.name, "$items");
-        assert_eq!(result.description, ") rest");
+        assert_eq!(result.variable.name, b"$items");
+        assert_eq!(result.description, b") rest");
     }
 
     #[test]
     fn test_param_out_trailing_comma() {
-        let content = " int $out,";
+        let content = b" int $out,";
         let span = test_span_for(content);
         let result = parse_param_out_tag(content, span).unwrap();
-        assert_eq!(result.variable.name, "$out");
+        assert_eq!(result.variable.name, b"$out");
     }
 
     #[test]
     fn test_assertion_trailing_comma() {
-        let content = " int $x,";
+        let content = b" int $x,";
         let span = test_span_for(content);
         let result = parse_assertion_tag(content, span).unwrap();
-        assert_eq!(result.type_string.value, "int");
-        assert_eq!(result.variable.name, "$x");
+        assert_eq!(result.type_string.value, b"int");
+        assert_eq!(result.variable.name, b"$x");
     }
 
     #[test]
     fn test_assertion_method_call() {
-        let content = " Statement $this->first()";
+        let content = b" Statement $this->first()";
         let span = test_span_for(content);
         let result = parse_assertion_tag(content, span).unwrap();
-        assert_eq!(result.type_string.value, "Statement");
-        assert_eq!(result.variable.name, "$this->first()");
+        assert_eq!(result.type_string.value, b"Statement");
+        assert_eq!(result.variable.name, b"$this->first()");
     }
 
     #[test]
     fn test_assertion_property_access() {
-        let content = " Statement $this->property";
+        let content = b" Statement $this->property";
         let span = test_span_for(content);
         let result = parse_assertion_tag(content, span).unwrap();
-        assert_eq!(result.type_string.value, "Statement");
-        assert_eq!(result.variable.name, "$this->property");
+        assert_eq!(result.type_string.value, b"Statement");
+        assert_eq!(result.variable.name, b"$this->property");
     }
 
     #[test]
     fn test_param_trailing_without_space() {
-        let content = " string $foo,desc";
+        let content = b" string $foo,desc";
         let span = test_span_for(content);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.variable.name, "$foo");
-        assert_eq!(result.description, ",desc");
+        assert_eq!(result.variable.name, b"$foo");
+        assert_eq!(result.description, b",desc");
     }
 
     #[test]
     fn test_param_variadic_trailing_paren_without_space() {
-        let content = " list<int> ...$items)more";
+        let content = b" list<int> ...$items)more";
         let span = test_span_for(content);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.variable.name, "$items");
-        assert_eq!(result.description, ")more");
+        assert_eq!(result.variable.name, b"$items");
+        assert_eq!(result.description, b")more");
     }
 
     #[test]
     fn test_param_with_numeric_literals_in_union() {
-        let content = "-1|-24.0|string $a";
+        let content = b"-1|-24.0|string $a";
         let span = test_span_for(content);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.type_string.as_ref().unwrap().value, "-1|-24.0|string");
-        assert_eq!(result.variable.name, "$a");
-        assert_eq!(result.description, "");
+        assert_eq!(result.type_string.as_ref().unwrap().value, b"-1|-24.0|string");
+        assert_eq!(result.variable.name, b"$a");
+        assert_eq!(result.description, b"");
     }
 
     #[test]
     fn test_param_with_float_literals() {
-        let content = "1.5|2.0|3.14 $value";
+        let content = b"1.5|2.0|3.14 $value";
         let span = test_span_for(content);
         let result = parse_param_tag(content, span).unwrap();
-        assert_eq!(result.type_string.as_ref().unwrap().value, "1.5|2.0|3.14");
-        assert_eq!(result.variable.name, "$value");
+        assert_eq!(result.type_string.as_ref().unwrap().value, b"1.5|2.0|3.14");
+        assert_eq!(result.variable.name, b"$value");
     }
 
     #[test]
     fn test_splitter_with_dot_still_works_as_separator() {
-        // Ensure we didn't break the original use case where . separates description
-        let input = "string[]. something else";
+        let input = b"string[]. something else";
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, "string[]");
-        assert_eq!(rest, ". something else");
+        assert_eq!(ts.value, b"string[]");
+        assert_eq!(rest, b". something else");
     }
 
     #[test]
     fn test_splitter_with_colon_after_whitespace() {
-        let input = "callable(string)    :         string     $callback";
+        let input = b"callable(string)    :         string     $callback";
         let span = test_span_for(input);
         let (ts, rest) = split_tag_content(input, span).unwrap();
-        assert_eq!(ts.value, "callable(string)    :         string");
-        assert_eq!(rest, "$callback");
+        assert_eq!(ts.value, b"callable(string)    :         string");
+        assert_eq!(rest, b"$callback");
 
-        let input2 = "callable(string) : string $callback";
+        let input2 = b"callable(string) : string $callback";
         let span2 = test_span_for(input2);
         let (ts2, rest2) = split_tag_content(input2, span2).unwrap();
-        assert_eq!(ts2.value, "callable(string) : string");
-        assert_eq!(rest2, "$callback");
+        assert_eq!(ts2.value, b"callable(string) : string");
+        assert_eq!(rest2, b"$callback");
 
-        let input3 = "callable(string): string $callback";
+        let input3 = b"callable(string): string $callback";
         let span3 = test_span_for(input3);
         let (ts3, rest3) = split_tag_content(input3, span3).unwrap();
-        assert_eq!(ts3.value, "callable(string): string");
-        assert_eq!(rest3, "$callback");
+        assert_eq!(ts3.value, b"callable(string): string");
+        assert_eq!(rest3, b"$callback");
     }
 
     #[test]
-    fn test_consume_whitespace_with_fullwidth_space() {
-        // Test case for multi-byte whitespace (Issue #967)
-        // Full-width space U+3000 is 3 bytes, but chars().count() returns 1
-        // The function should return byte count, not character count
-
-        // Single full-width space (3 bytes)
-        let input = "\u{3000}rest";
+    fn test_consume_whitespace_ascii_only() {
+        let input = b"   rest";
         let (rest, count) = consume_whitespace(input);
-        assert_eq!(rest, "rest", "Should skip the full-width space");
-        assert_eq!(count, 3, "Should return byte count (3), not char count (1)");
+        assert_eq!(rest, b"rest");
+        assert_eq!(count, 3);
 
-        // Multiple full-width spaces (6 bytes)
-        let input2 = "\u{3000}\u{3000}rest";
+        let input2 = b"\t \trest";
         let (rest2, count2) = consume_whitespace(input2);
-        assert_eq!(rest2, "rest", "Should skip both full-width spaces");
-        assert_eq!(count2, 6, "Should return byte count (6), not char count (2)");
-
-        // Mixed ASCII and full-width spaces
-        let input3 = " \u{3000} rest";
-        let (rest3, count3) = consume_whitespace(input3);
-        assert_eq!(rest3, "rest", "Should skip all whitespace");
-        assert_eq!(count3, 5, "Should return byte count: 1 (space) + 3 (U+3000) + 1 (space) = 5");
+        assert_eq!(rest2, b"rest");
+        assert_eq!(count2, 3);
     }
 }

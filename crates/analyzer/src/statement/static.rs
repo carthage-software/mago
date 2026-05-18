@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
-use mago_atom::Atom;
 use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::Static;
+use mago_word::Word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -67,7 +67,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Static<'arena> {
                 self.items.len() == 1,
             );
 
-            let variable_name_atom = Atom::from(variable.name);
+            let variable_name_atom = Word::from(variable.name);
             let variable_type = match (inferred_type, docblock_type) {
                 (Some(inferred_type), Some((docblock_type, docblock_type_span))) => {
                     let docblock_type = Rc::new(docblock_type);

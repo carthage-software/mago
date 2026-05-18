@@ -16,10 +16,10 @@ use std::ops::Sub;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
-use mago_atom::i64_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::i64_word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -982,6 +982,7 @@ impl TType for TInteger {
         false
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         false
     }
@@ -990,36 +991,36 @@ impl TType for TInteger {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
             TInteger::Literal(value) => {
-                concat_atom!("int(", i64_atom(*value), ")")
+                concat_word!(b"int(", i64_word(*value), b")")
             }
             TInteger::From(value) => {
                 if *value == 1 {
-                    atom("positive-int")
+                    word("positive-int")
                 } else if *value == 0 {
-                    atom("non-negative-int")
+                    word("non-negative-int")
                 } else {
-                    concat_atom!("int<", i64_atom(*value), ", max>")
+                    concat_word!(b"int<", i64_word(*value), b", max>")
                 }
             }
             TInteger::To(value) => {
                 if *value == -1 {
-                    atom("negative-int")
+                    word("negative-int")
                 } else if *value == 0 {
-                    atom("non-positive-int")
+                    word("non-positive-int")
                 } else {
-                    concat_atom!("int<min, ", i64_atom(*value), ">")
+                    concat_word!(b"int<min, ", i64_word(*value), b">")
                 }
             }
-            TInteger::Range(from, to) => concat_atom!("int<", i64_atom(*from), ", ", i64_atom(*to), ">"),
-            TInteger::Unspecified => atom("int"),
-            TInteger::UnspecifiedLiteral => atom("literal-int"),
+            TInteger::Range(from, to) => concat_word!(b"int<", i64_word(*from), b", ", i64_word(*to), b">"),
+            TInteger::Unspecified => word("int"),
+            TInteger::UnspecifiedLiteral => word("literal-int"),
         }
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

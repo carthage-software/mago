@@ -18,10 +18,10 @@ impl<'arena> Parser<'_, 'arena> {
         vec![in self.arena; value]
     }
 
-    /// Allocates a string in the parser's arena.
+    /// Allocates a byte slice in the parser's arena.
     #[inline]
     #[must_use]
-    pub fn str(&self, string: &str) -> &'arena str {
-        self.arena.alloc_str(string)
+    pub fn bytes(&self, bytes: &[u8]) -> &'arena [u8] {
+        self.arena.alloc_slice_copy(bytes)
     }
 }

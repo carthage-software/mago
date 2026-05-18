@@ -1,8 +1,5 @@
 use std::borrow::Cow;
 
-use mago_atom::AtomMap;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -17,6 +14,9 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::FunctionPartialApplication;
+use mago_word::WordMap;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -112,7 +112,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
                 );
 
                 let mut template_result = TemplateResult::default();
-                let mut parameter_types = AtomMap::default();
+                let mut parameter_types = WordMap::default();
 
                 analyze_invocation(
                     context,
@@ -149,14 +149,14 @@ fn resolve_function_callable_types<'ctx, 'arena, 'artifacts>(
     expression: &Expression<'arena>,
 ) -> Result<Vec<Cow<'artifacts, TCallable>>, AnalysisError> {
     if let Expression::Identifier(function_name) = expression {
-        let name = atom(context.resolved_names.get(function_name));
-        let unqualified_name = atom(function_name.value());
+        let name = word(context.resolved_names.get(function_name));
+        let unqualified_name = word(function_name.value());
 
-        let identifier = if context.codebase.function_exists(&name) {
+        let identifier = if context.codebase.function_exists(name.as_bytes()) {
             FunctionLikeIdentifier::Function(name)
         } else if !function_name.is_fully_qualified()
             && unqualified_name != name
-            && context.codebase.function_exists(&unqualified_name)
+            && context.codebase.function_exists(unqualified_name.as_bytes())
         {
             FunctionLikeIdentifier::Function(unqualified_name)
         } else {
@@ -187,7 +187,7 @@ fn resolve_function_callable_types<'ctx, 'arena, 'artifacts>(
         if let FunctionLikeIdentifier::Function(function_name) = identifier {
             artifacts.symbol_references.add_reference_to_symbol(
                 &block_context.scope,
-                ascii_lowercase_atom(function_name.as_ref()),
+                ascii_lowercase_word(function_name.as_ref()),
                 false,
             );
         }

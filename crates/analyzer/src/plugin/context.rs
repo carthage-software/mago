@@ -3,8 +3,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use mago_atom::Atom;
-use mago_atom::atom;
 use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -22,6 +20,8 @@ use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::PartialApplication;
 use mago_syntax::ast::PartialArgument;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -82,8 +82,8 @@ impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'bloc
     }
 
     #[inline]
-    pub fn get_variable_type(&self, name: &str) -> Option<&Rc<TUnion>> {
-        self.block_context.locals.get(&atom(name))
+    pub fn get_variable_type(&self, name: &[u8]) -> Option<&Rc<TUnion>> {
+        self.block_context.locals.get(&word(name))
     }
 
     #[inline]
@@ -92,7 +92,7 @@ impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'bloc
     }
 
     #[inline]
-    pub fn is_instance_of(&self, class: &str, parent: &str) -> bool {
+    pub fn is_instance_of(&self, class: &[u8], parent: &[u8]) -> bool {
         self.codebase.is_instance_of(class, parent)
     }
 
@@ -168,7 +168,7 @@ impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'bloc
                     let single_object = object_type.get_single_named_object()?;
                     let class_name = single_object.get_name();
 
-                    self.codebase.get_method(&class_name, method_id.value)
+                    self.codebase.get_method(class_name.as_bytes(), method_id.value)
                 }
             },
             _ => {
@@ -189,10 +189,11 @@ impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'bloc
                         literal: Some(TStringLiteral::Value(literal_string)),
                         ..
                     })) => {
-                        if let Some((class_like, method_name)) = literal_string.split_once("::") {
-                            self.codebase.get_method(class_like, method_name)
+                        let bytes = literal_string.as_bytes();
+                        if let Some(pos) = memchr::memmem::find(bytes, b"::") {
+                            self.codebase.get_method(&bytes[..pos], &bytes[pos + 2..])
                         } else {
-                            self.codebase.get_function(literal_string)
+                            self.codebase.get_function(bytes)
                         }
                     }
                     _ => None,
@@ -202,12 +203,12 @@ impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'bloc
     }
 
     #[inline]
-    pub fn get_class_like(&self, name: Atom) -> Option<&ClassLikeMetadata> {
-        self.codebase.get_class_like(&name)
+    pub fn get_class_like(&self, name: Word) -> Option<&ClassLikeMetadata> {
+        self.codebase.get_class_like(name.as_bytes())
     }
 
     #[inline]
-    pub fn current_class_name(&self) -> Option<Atom> {
+    pub fn current_class_name(&self) -> Option<Word> {
         self.block_context.scope.get_class_like_name()
     }
 }
@@ -268,8 +269,8 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
 
     /// Get the type of a variable.
     #[inline]
-    pub fn get_variable_type(&self, name: &str) -> Option<&Rc<TUnion>> {
-        self.block_context.locals.get(&atom(name))
+    pub fn get_variable_type(&self, name: &[u8]) -> Option<&Rc<TUnion>> {
+        self.block_context.locals.get(&word(name))
     }
 
     /// Get the current scope context.
@@ -280,7 +281,7 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
 
     /// Check if a class is an instance of another class.
     #[inline]
-    pub fn is_instance_of(&self, class: &str, parent: &str) -> bool {
+    pub fn is_instance_of(&self, class: &[u8], parent: &[u8]) -> bool {
         self.codebase.is_instance_of(class, parent)
     }
 
@@ -302,13 +303,13 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
 
     /// Get metadata for a class-like by name.
     #[inline]
-    pub fn get_class_like(&self, name: Atom) -> Option<&ClassLikeMetadata> {
-        self.codebase.get_class_like(&name)
+    pub fn get_class_like(&self, name: Word) -> Option<&ClassLikeMetadata> {
+        self.codebase.get_class_like(name.as_bytes())
     }
 
     /// Get the current class name if inside a class.
     #[inline]
-    pub fn current_class_name(&self) -> Option<Atom> {
+    pub fn current_class_name(&self) -> Option<Word> {
         self.block_context.scope.get_class_like_name()
     }
 
@@ -323,8 +324,8 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
 
     /// Set the type of a variable.
     #[inline]
-    pub fn set_variable_type(&mut self, name: &str, ty: TUnion) {
-        self.block_context.locals.insert(atom(name), Rc::new(ty));
+    pub fn set_variable_type(&mut self, name: &[u8], ty: TUnion) {
+        self.block_context.locals.insert(word(name), Rc::new(ty));
     }
 
     /// Get mutable access to the analysis artifacts.
@@ -364,7 +365,7 @@ impl<'ctx, 'ast, 'arena> InvocationInfo<'ctx, 'ast, 'arena> {
 
     #[inline]
     #[must_use]
-    pub fn get_argument(&self, index: usize, names: &[&str]) -> Option<&'ast Expression<'arena>> {
+    pub fn get_argument(&self, index: usize, names: &[&[u8]]) -> Option<&'ast Expression<'arena>> {
         get_argument(self.invocation.arguments_source, index, names)
     }
 
@@ -422,7 +423,7 @@ impl HasSpan for InvocationInfo<'_, '_, '_> {
 fn get_argument<'ast, 'arena>(
     call_arguments: InvocationArgumentsSource<'ast, 'arena>,
     index: usize,
-    names: &[&str],
+    names: &[&[u8]],
 ) -> Option<&'ast Expression<'arena>> {
     match call_arguments {
         InvocationArgumentsSource::ArgumentList(argument_list) => {

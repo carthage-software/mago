@@ -90,22 +90,33 @@ impl LintRule for OptionalParamOrderRule {
             if parameter.default_value.is_some() || parameter.ellipsis.is_some() {
                 optional_parameters.push((parameter.variable.name, parameter.variable.span()));
             } else if !optional_parameters.is_empty() {
+                let opt_names_joined: Vec<u8> = {
+                    let mut out: Vec<u8> = Vec::new();
+                    for (i, (opt_name, _)) in optional_parameters.iter().enumerate() {
+                        if i > 0 {
+                            out.extend_from_slice(b"`, `");
+                        }
+                        out.extend_from_slice(opt_name);
+                    }
+                    out
+                };
+                let opt_names_display = mago_bytes::BytesDisplay(&opt_names_joined);
+                let req_name_display = mago_bytes::BytesDisplay(parameter.variable.name);
                 let issue = Issue::new(
                     self.cfg.level(),
                     format!(
-                        "Optional parameter(s) `{}` defined before required parameter `{}`.",
-                        optional_parameters.iter().map(|(opt_name, _)| *opt_name).collect::<Vec<_>>().join("`, `"),
-                        parameter.variable.name
+                        "Optional parameter(s) `{opt_names_display}` defined before required parameter `{req_name_display}`.",
                     ),
                 )
                 .with_code(self.meta.code)
                 .with_annotation(
                     Annotation::primary(parameter.variable.span())
-                        .with_message(format!("Required parameter `{}` defined here", parameter.variable.name)),
+                        .with_message(format!("Required parameter `{req_name_display}` defined here")),
                 )
                 .with_annotations(optional_parameters.iter().map(|(opt_name, opt_span)| {
+                    let opt_display = mago_bytes::BytesDisplay(opt_name);
                     Annotation::secondary(*opt_span)
-                        .with_message(format!("Optional parameter `{opt_name}` defined here"))
+                        .with_message(format!("Optional parameter `{opt_display}` defined here"))
                 }))
                 .with_note("Parameters after an optional one are implicitly required.")
                 .with_note("Defining optional parameters before required ones has been deprecated since PHP 8.0.")

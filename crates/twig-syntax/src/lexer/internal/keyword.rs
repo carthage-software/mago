@@ -1,19 +1,25 @@
 use crate::token::TwigTokenKind;
 
+/// Continuation suffix + the resolved token kind it produces.
+type MultiWordContinuation = (&'static [u8], TwigTokenKind);
+
+/// An opener word + its set of valid continuations.
+type MultiWordOpener = (&'static [u8], &'static [MultiWordContinuation]);
+
 /// A first word that may open a multi-word operator, paired with its valid
 /// continuations and the resolved token kind for each.
-pub const MULTI_WORD_OPENERS: &[(&str, &[(&str, TwigTokenKind)])] = &[
-    ("not", &[("in", TwigTokenKind::NotIn)]),
-    ("starts", &[("with", TwigTokenKind::StartsWith)]),
-    ("ends", &[("with", TwigTokenKind::EndsWith)]),
-    ("has", &[("some", TwigTokenKind::HasSome), ("every", TwigTokenKind::HasEvery)]),
-    ("same", &[("as", TwigTokenKind::SameAs)]),
-    ("divisible", &[("by", TwigTokenKind::DivisibleBy)]),
+pub const MULTI_WORD_OPENERS: &[MultiWordOpener] = &[
+    (b"not", &[(b"in", TwigTokenKind::NotIn)]),
+    (b"starts", &[(b"with", TwigTokenKind::StartsWith)]),
+    (b"ends", &[(b"with", TwigTokenKind::EndsWith)]),
+    (b"has", &[(b"some", TwigTokenKind::HasSome), (b"every", TwigTokenKind::HasEvery)]),
+    (b"same", &[(b"as", TwigTokenKind::SameAs)]),
+    (b"divisible", &[(b"by", TwigTokenKind::DivisibleBy)]),
 ];
 
 #[inline]
 #[must_use]
-pub fn continuation_words_for(first: &str) -> Option<&'static [(&'static str, TwigTokenKind)]> {
+pub fn continuation_words_for(first: &[u8]) -> Option<&'static [(&'static [u8], TwigTokenKind)]> {
     for (opener, cont) in MULTI_WORD_OPENERS {
         if *opener == first {
             return Some(cont);
@@ -24,15 +30,15 @@ pub fn continuation_words_for(first: &str) -> Option<&'static [(&'static str, Tw
 
 #[inline]
 #[must_use]
-pub fn single_word_operator_kind(name: &str) -> Option<TwigTokenKind> {
+pub fn single_word_operator_kind(name: &[u8]) -> Option<TwigTokenKind> {
     match name {
-        "and" => Some(TwigTokenKind::And),
-        "or" => Some(TwigTokenKind::Or),
-        "xor" => Some(TwigTokenKind::Xor),
-        "not" => Some(TwigTokenKind::Not),
-        "in" => Some(TwigTokenKind::In),
-        "is" => Some(TwigTokenKind::Is),
-        "matches" => Some(TwigTokenKind::Matches),
+        b"and" => Some(TwigTokenKind::And),
+        b"or" => Some(TwigTokenKind::Or),
+        b"xor" => Some(TwigTokenKind::Xor),
+        b"not" => Some(TwigTokenKind::Not),
+        b"in" => Some(TwigTokenKind::In),
+        b"is" => Some(TwigTokenKind::Is),
+        b"matches" => Some(TwigTokenKind::Matches),
         _ => None,
     }
 }

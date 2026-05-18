@@ -6,6 +6,7 @@
 //! token-level rewind: walk backwards from the cursor counting parens
 //! until we land on the function-name token preceding the open paren.
 
+use mago_bytes::BytesDisplay;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::ttype::TType;
@@ -36,9 +37,9 @@ pub fn compute(
         return None;
     }
 
-    let fqcn: &str = match resolved.resolve(&call_name_token.start) {
+    let fqcn: &[u8] = match resolved.resolve(&call_name_token.start) {
         Some(name) => name,
-        None => call_name_token.value.trim_start_matches('\\'),
+        None => mago_bytes::trim_start_byte(call_name_token.value, b'\\'),
     };
     let function = codebase.get_function(fqcn)?;
 
@@ -50,7 +51,8 @@ pub fn compute(
 }
 
 fn signature_information(meta: &FunctionLikeMetadata) -> SignatureInformation {
-    let name = meta.original_name.map(|n| n.as_str().to_string()).unwrap_or_default();
+    use std::fmt::Write;
+    let name = meta.original_name.map(|n| String::from_utf8_lossy(n.as_bytes()).into_owned()).unwrap_or_default();
     let mut label = format!("function {name}(");
     let mut params: Vec<ParameterInformation> = Vec::with_capacity(meta.parameters.len());
 
@@ -60,10 +62,10 @@ fn signature_information(meta: &FunctionLikeMetadata) -> SignatureInformation {
         }
         let param_start = label.len() as u32;
         if let Some(ty) = &param.type_metadata {
-            label.push_str(ty.type_union.get_id().as_str());
+            let _ = write!(label, "{}", BytesDisplay(ty.type_union.get_id().as_bytes()));
             label.push(' ');
         }
-        label.push_str(param.name.0.as_str());
+        let _ = write!(label, "{}", BytesDisplay(param.name.0.as_bytes()));
         if param.flags.has_default() {
             label.push_str(" = ?");
         }
@@ -77,7 +79,7 @@ fn signature_information(meta: &FunctionLikeMetadata) -> SignatureInformation {
     label.push(')');
     if let Some(rt) = &meta.return_type_metadata {
         label.push_str(": ");
-        label.push_str(rt.type_union.get_id().as_str());
+        let _ = write!(label, "{}", BytesDisplay(rt.type_union.get_id().as_bytes()));
     }
 
     SignatureInformation { label, documentation: None, parameters: Some(params), active_parameter: None }

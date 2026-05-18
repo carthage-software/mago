@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
-use mago_atom::atom;
-use mago_atom::concat_atom;
-use mago_atom::f64_atom;
-use mago_atom::i64_atom;
+use mago_word::concat_word;
+use mago_word::f64_word;
+use mago_word::i64_word;
+use mago_word::word;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -263,7 +263,7 @@ fn analyze_string_concat_operand<'arena>(
                     continue;
                 };
 
-                if context.codebase.method_exists(&class_like_name, "__toString") {
+                if context.codebase.method_exists(class_like_name.as_bytes(), b"__toString") {
                     current_atomic_is_valid = true;
 
                     context.collector.report_with_code(
@@ -511,7 +511,7 @@ fn concat_string_lists(left_strings: Vec<TString>, right_strings: &[TString], th
             };
             resulting_string.literal = match (&left_string.literal, &right_string.literal) {
                 (Some(TStringLiteral::Value(left_literal)), Some(TStringLiteral::Value(right_literal))) => {
-                    result_strings.push(TString::known_literal(concat_atom!(left_literal, right_literal)));
+                    result_strings.push(TString::known_literal(concat_word!(left_literal, right_literal)));
 
                     continue;
                 }
@@ -533,12 +533,12 @@ fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
     for operand_atomic_type in operand_type.types.as_ref() {
         match operand_atomic_type {
             TAtomic::Array(_) => {
-                operand_strings.push(TString::known_literal(atom("Array")));
+                operand_strings.push(TString::known_literal(word("Array")));
 
                 continue;
             }
             TAtomic::Never | TAtomic::Null | TAtomic::Void => {
-                operand_strings.push(TString::known_literal(atom("")));
+                operand_strings.push(TString::known_literal(word("")));
 
                 continue;
             }
@@ -559,17 +559,17 @@ fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
         match operand_scalar {
             TScalar::Bool(boolean) => {
                 if boolean.is_true() {
-                    operand_strings.push(TString::known_literal(atom("1")));
+                    operand_strings.push(TString::known_literal(word("1")));
                 } else if boolean.is_false() {
-                    operand_strings.push(TString::known_literal(atom("")));
+                    operand_strings.push(TString::known_literal(word("")));
                 } else {
-                    operand_strings.push(TString::known_literal(atom("1")));
-                    operand_strings.push(TString::known_literal(atom("")));
+                    operand_strings.push(TString::known_literal(word("1")));
+                    operand_strings.push(TString::known_literal(word("")));
                 }
             }
             TScalar::Integer(tint) => {
                 if let Some(v) = tint.get_literal_value() {
-                    operand_strings.push(TString::known_literal(i64_atom(v)));
+                    operand_strings.push(TString::known_literal(i64_word(v)));
                 } else {
                     operand_strings.push(TString::general_with_props(
                         true,
@@ -582,7 +582,7 @@ fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
             }
             TScalar::Float(tfloat) => {
                 if let Some(v) = tfloat.get_literal_value() {
-                    operand_strings.push(TString::known_literal(f64_atom(v)));
+                    operand_strings.push(TString::known_literal(f64_word(v)));
                 } else {
                     operand_strings.push(TString::general_with_props(
                         true,

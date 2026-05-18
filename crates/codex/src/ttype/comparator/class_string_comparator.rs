@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 
-use mago_atom::atom;
-
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
@@ -29,18 +27,18 @@ pub fn is_contained_by(
         TClassLikeString::Literal { value } => {
             if let Some(str_value) = input_scalar.get_known_literal_string_value()
                 && is_valid_class_string(str_value)
-                && str_value.eq_ignore_ascii_case(value)
+                && str_value.eq_ignore_ascii_case(value.as_bytes())
             {
                 return true;
             }
 
             if let Some(literal_class_string) = input_scalar.get_literal_class_string_value()
-                && literal_class_string.eq_ignore_ascii_case(value)
+                && literal_class_string.as_bytes().eq_ignore_ascii_case(value.as_bytes())
             {
                 return true;
             }
 
-            if codebase.enum_exists(value) {
+            if codebase.enum_exists(value.as_bytes()) {
                 Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(*value))))
             } else {
                 Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(*value))))
@@ -52,14 +50,14 @@ pub fn is_contained_by(
 
     let fake_input_type = match input_scalar {
         TScalar::String(TString { literal: Some(TStringLiteral::Value(string_value)), .. }) => {
-            if !is_valid_class_string(string_value) {
+            if !is_valid_class_string(string_value.as_bytes()) {
                 return false;
             }
 
-            if codebase.enum_exists(string_value) {
-                Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(atom(string_value)))))
+            if codebase.enum_exists(string_value.as_bytes()) {
+                Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(*string_value))))
             } else {
-                Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(atom(string_value)))))
+                Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(*string_value))))
             }
         }
         TScalar::ClassLikeString(input_class_string) => match input_class_string {
@@ -67,7 +65,7 @@ pub fn is_contained_by(
                 return matches!(fake_container_type.as_ref(), TAtomic::Object(TObject::Any));
             }
             TClassLikeString::Literal { value } => {
-                if codebase.enum_exists(value) {
+                if codebase.enum_exists(value.as_bytes()) {
                     Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(*value))))
                 } else {
                     Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(*value))))
@@ -90,8 +88,7 @@ pub fn is_contained_by(
     )
 }
 
-fn is_valid_class_string(str: &str) -> bool {
-    let bytes = str.as_bytes();
+fn is_valid_class_string(bytes: &[u8]) -> bool {
     let len = bytes.len();
 
     if len == 0 || bytes[len - 1] == b'\\' {
@@ -136,22 +133,22 @@ mod tests {
 
     #[test]
     fn test_valid_class_string() {
-        assert!(is_valid_class_string("A"));
-        assert!(is_valid_class_string("_A"));
-        assert!(is_valid_class_string("A1"));
-        assert!(is_valid_class_string("A\\B"));
-        assert!(is_valid_class_string("\\A\\B"));
-        assert!(is_valid_class_string("café"));
+        assert!(is_valid_class_string(b"A"));
+        assert!(is_valid_class_string(b"_A"));
+        assert!(is_valid_class_string(b"A1"));
+        assert!(is_valid_class_string(b"A\\B"));
+        assert!(is_valid_class_string(b"\\A\\B"));
+        assert!(is_valid_class_string("café".as_bytes()));
     }
 
     #[test]
     fn test_invalid_class_string() {
-        assert!(!is_valid_class_string(""));
-        assert!(!is_valid_class_string("1A"));
-        assert!(!is_valid_class_string("A-B"));
-        assert!(!is_valid_class_string("A\\"));
-        assert!(!is_valid_class_string("\\"));
-        assert!(!is_valid_class_string("A\\\\B"));
-        assert!(!is_valid_class_string("A B"));
+        assert!(!is_valid_class_string(b""));
+        assert!(!is_valid_class_string(b"1A"));
+        assert!(!is_valid_class_string(b"A-B"));
+        assert!(!is_valid_class_string(b"A\\"));
+        assert!(!is_valid_class_string(b"\\"));
+        assert!(!is_valid_class_string(b"A\\\\B"));
+        assert!(!is_valid_class_string(b"A B"));
     }
 }

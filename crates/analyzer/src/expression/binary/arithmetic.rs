@@ -670,8 +670,8 @@ fn string_bitwise_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomi
         return TAtomic::Scalar(TScalar::string());
     };
 
-    let left_bytes = left_str.as_bytes();
-    let right_bytes = right_str.as_bytes();
+    let left_bytes = left_str;
+    let right_bytes = right_str;
 
     let result_bytes: Vec<u8> = match op {
         BinaryOperator::BitwiseAnd(_) => {
@@ -701,7 +701,7 @@ fn string_bitwise_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomi
     };
 
     match std::str::from_utf8(&result_bytes) {
-        Ok(text) => TAtomic::Scalar(TScalar::literal_string(mago_atom::atom(text))),
+        Ok(text) => TAtomic::Scalar(TScalar::literal_string(mago_word::word(text))),
         Err(_) => TAtomic::Scalar(TScalar::string()),
     }
 }

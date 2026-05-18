@@ -4,10 +4,12 @@ use std::ops::Sub;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use mago_atom::atom;
-use mago_atom::empty_atom;
-use mago_atom::f64_atom;
-use mago_atom::i64_atom;
+use mago_word::empty_word;
+use mago_word::f64_word;
+use mago_word::i64_word;
+use mago_word::word;
+
+use mago_bytes::BytesDisplay;
 
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
@@ -59,8 +61,8 @@ use crate::error::AnalysisError;
 use crate::expression::assignment::assign_to_expression;
 use crate::expression::call::method_call::analyze_implicit_method_call;
 use crate::utils::expression::get_expression_id;
-use crate::utils::php_emulation::str_increment;
-use crate::utils::php_emulation::str_is_numeric;
+use crate::utils::php_emulation::str_increment_bytes;
+use crate::utils::php_emulation::str_is_numeric_bytes;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
     fn analyze<'ctx>(
@@ -160,7 +162,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                                     resulting_types.push(TAtomic::Scalar(TScalar::float()));
                                 } else if let Some(TStringLiteral::Value(value)) = &string.literal {
                                     // literal string with known value → check if numeric
-                                    if str_is_numeric(value.as_str()) {
+                                    if str_is_numeric_bytes(value.as_bytes()) {
                                         resulting_types.push(TAtomic::Scalar(TScalar::int()));
                                         resulting_types.push(TAtomic::Scalar(TScalar::float()));
                                     } else {
@@ -400,7 +402,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
 
                         cast_type_to_string(
                             &t,
-                            operand_expression_id.as_deref(),
+                            operand_expression_id.as_ref().map(|w| w.as_bytes()),
                             context,
                             block_context,
                             artifacts,
@@ -515,34 +517,39 @@ fn increment_operand<'ctx, 'arena>(
                     if block_context.flags.inside_loop() {
                         possibilities.push(TAtomic::Scalar(TScalar::String(string_scalar.without_literal())));
                     } else if let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal {
-                        if string_val.is_empty() {
-                            possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("1"))));
-                        } else if str_is_numeric(string_val) {
+                        let string_bytes = string_val.as_bytes();
+                        if string_bytes.is_empty() {
+                            possibilities.push(TAtomic::Scalar(TScalar::literal_string(word(b"1"))));
+                        } else if str_is_numeric_bytes(string_bytes) {
                             let mut negative = false;
-                            let value = if let Some(value) = string_val.strip_prefix("+") {
+                            let value: &[u8] = if let Some(value) = string_bytes.strip_prefix(b"+") {
                                 value
-                            } else if let Some(value) = string_val.strip_prefix("-") {
+                            } else if let Some(value) = string_bytes.strip_prefix(b"-") {
                                 negative = true;
                                 value
                             } else {
-                                string_val
+                                string_bytes
                             };
 
-                            let value = value.trim_start_matches('0');
+                            let value = mago_bytes::trim_start_byte(value, b'0');
                             if value.is_empty() {
                                 possibilities.push(TAtomic::Scalar(TScalar::literal_int(1)));
-                            } else if let Ok(value) = value.parse::<i64>() {
+                            } else if let Some(value) =
+                                std::str::from_utf8(value).ok().and_then(|s| s.parse::<i64>().ok())
+                            {
                                 let signed_value = if negative { -value } else { value };
                                 possibilities.push(TAtomic::Scalar(TScalar::literal_int(signed_value.wrapping_add(1))));
-                            } else if let Ok(value) = value.parse::<f64>() {
+                            } else if let Some(value) =
+                                std::str::from_utf8(value).ok().and_then(|s| s.parse::<f64>().ok())
+                            {
                                 let signed_value = if negative { -value } else { value };
                                 possibilities.push(TAtomic::Scalar(TScalar::literal_float(signed_value + 1.0)));
                             } else {
                                 possibilities.push(TAtomic::Scalar(TScalar::int()));
                                 possibilities.push(TAtomic::Scalar(TScalar::float()));
                             }
-                        } else if let Some(incremented) = str_increment(string_val) {
-                            possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom(&incremented))));
+                        } else if let Some(incremented) = str_increment_bytes(string_bytes) {
+                            possibilities.push(TAtomic::Scalar(TScalar::literal_string(word(incremented.as_bytes()))));
                         } else {
                             possibilities
                                 .push(TAtomic::Scalar(TScalar::String(string_scalar.with_unspecified_literal())));
@@ -773,27 +780,32 @@ fn decrement_operand<'ctx, 'arena>(
 
                             possibilities.push(TAtomic::Scalar(TScalar::String(*string_scalar)));
                         } else if let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal {
-                            if string_val.is_empty() {
+                            let string_bytes = string_val.as_bytes();
+                            if string_bytes.is_empty() {
                                 possibilities.push(TAtomic::Scalar(TScalar::literal_int(-1)));
                             } else {
                                 let mut negative = false;
-                                let value = if let Some(value) = string_val.strip_prefix("+") {
+                                let value: &[u8] = if let Some(value) = string_bytes.strip_prefix(b"+") {
                                     value
-                                } else if let Some(value) = string_val.strip_prefix("-") {
+                                } else if let Some(value) = string_bytes.strip_prefix(b"-") {
                                     negative = true;
                                     value
                                 } else {
-                                    string_val
+                                    string_bytes
                                 };
 
-                                let value = value.trim_start_matches('0');
+                                let value = mago_bytes::trim_start_byte(value, b'0');
                                 if value.is_empty() {
                                     possibilities.push(TAtomic::Scalar(TScalar::literal_int(-1)));
-                                } else if let Ok(value) = value.parse::<i64>() {
+                                } else if let Some(value) =
+                                    std::str::from_utf8(value).ok().and_then(|s| s.parse::<i64>().ok())
+                                {
                                     let signed_value = if negative { -value } else { value };
                                     possibilities
                                         .push(TAtomic::Scalar(TScalar::literal_int(signed_value.wrapping_sub(1))));
-                                } else if let Ok(value) = value.parse::<f64>() {
+                                } else if let Some(value) =
+                                    std::str::from_utf8(value).ok().and_then(|s| s.parse::<f64>().ok())
+                                {
                                     let signed_value = if negative { -value } else { value };
                                     possibilities.push(TAtomic::Scalar(TScalar::literal_float(signed_value - 1.0)));
                                 } else {
@@ -957,13 +969,16 @@ fn report_redundant_type_cast<'ast, 'arena>(
 ) {
     context.collector.propose_with_code(
         IssueCode::RedundantCast,
-        Issue::help(format!("Redundant cast to `{}`: the expression already has this type.", cast_operator.as_str()))
-            .with_annotation(
-                Annotation::primary(expression.operand.span())
-                    .with_message(format!("This expression already has type `{}`.", known_type.get_id())),
-            )
-            .with_note("Casting a value to a type it already possesses has no effect.")
-            .with_help(format!("Remove the redundant `{}` cast.", cast_operator.as_str())),
+        Issue::help(format!(
+            "Redundant cast to `{}`: the expression already has this type.",
+            BytesDisplay(cast_operator.as_bytes())
+        ))
+        .with_annotation(
+            Annotation::primary(expression.operand.span())
+                .with_message(format!("This expression already has type `{}`.", known_type.get_id())),
+        )
+        .with_note("Casting a value to a type it already possesses has no effect.")
+        .with_help(format!("Remove the redundant `{}` cast.", BytesDisplay(cast_operator.as_bytes()))),
         |edits| {
             // Delete the cast operator, keep only the operand
             // For `(string)$var`, delete `(string)` and keep `$var`
@@ -1031,7 +1046,7 @@ fn cast_type_to_array<'arena>(
             TAtomic::Object(casted_object) => {
                 let is_stdclass = casted_object.get_name().is_some_and(|name| {
                     // Check if the object is stdClass
-                    name.eq_ignore_ascii_case("stdClass")
+                    name.as_bytes().eq_ignore_ascii_case(b"stdClass")
                 });
 
                 // Object to array: properties become key-value pairs.
@@ -1196,8 +1211,10 @@ fn cast_type_to_float<'arena>(
                     TScalar::Float(f) => resulting_float_atomics.push(TAtomic::Scalar(TScalar::Float(*f))),
                     TScalar::String(s) => {
                         if let Some(TStringLiteral::Value(val)) = &s.literal {
+                            let val_bytes = val.as_bytes();
                             let mut num_str = String::new();
-                            for ch in val.chars() {
+                            for &b in val_bytes {
+                                let ch = b as char;
                                 if ch.is_ascii_digit() || ch == '.' || (num_str.is_empty() && (ch == '+' || ch == '-'))
                                 {
                                     num_str.push(ch);
@@ -1212,7 +1229,7 @@ fn cast_type_to_float<'arena>(
                                 resulting_float_atomics.push(TAtomic::Scalar(TScalar::literal_float(0.0)));
                             }
 
-                            if !val.is_empty() && num_str.is_empty() && val != "0" {
+                            if !val.is_empty() && num_str.is_empty() && val_bytes != b"0" {
                                 context.collector.report_with_code(
                                     IssueCode::InvalidTypeCast,
                                     Issue::warning(format!("String `{val}` implicitly cast to float `0.0`."))
@@ -1366,7 +1383,9 @@ fn cast_type_to_int(operand_type: &TUnion, context: &Context<'_, '_>) -> TUnion 
                 },
                 TScalar::String(string_scalar) => match &string_scalar.literal {
                     Some(TStringLiteral::Value(string_literal)) => {
-                        if let Ok(value) = string_literal.parse::<i64>() {
+                        if let Some(value) =
+                            std::str::from_utf8(string_literal.as_bytes()).ok().and_then(|s| s.parse::<i64>().ok())
+                        {
                             TAtomic::Scalar(TScalar::literal_int(value))
                         } else {
                             return get_int();
@@ -1437,7 +1456,7 @@ fn cast_type_to_object<'arena>(
                     // Casting an array to an object produces a `stdClass` instance in PHP,
                     // so intersect the shape with `stdClass` to preserve both the shape
                     // information and the nominal `stdClass` type.
-                    let mut named = TNamedObject::new(atom("stdClass"));
+                    let mut named = TNamedObject::new(word("stdClass"));
                     named.intersection_types = Some(vec![TAtomic::Object(TObject::new_with_properties(
                         keyed_array.parameters.is_none(),
                         known_properties,
@@ -1451,7 +1470,7 @@ fn cast_type_to_object<'arena>(
     }
 
     if possibilities.is_empty() {
-        return get_named_object(atom("stdClass"), None);
+        return get_named_object(word("stdClass"), None);
     }
 
     TUnion::from_vec(combine(possibilities, context.codebase, context.settings.combiner_options()))
@@ -1459,7 +1478,7 @@ fn cast_type_to_object<'arena>(
 
 pub fn cast_type_to_string<'ctx>(
     operand_type: &TUnion,
-    operand_expression_id: Option<&str>,
+    operand_expression_id: Option<&[u8]>,
     context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
@@ -1478,24 +1497,24 @@ pub fn cast_type_to_string<'ctx>(
             TAtomic::Scalar(scalar) => match scalar {
                 TScalar::Bool(boolean) => {
                     if boolean.is_true() {
-                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("1"))));
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(word("1"))));
                     } else if boolean.is_false() {
-                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(empty_atom())));
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(empty_word())));
                     } else {
-                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(empty_atom())));
-                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("1"))));
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(empty_word())));
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(word("1"))));
                     }
                 }
                 TScalar::Integer(integer) => {
                     if let Some(value) = integer.get_literal_value() {
-                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(i64_atom(value))));
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(i64_word(value))));
                     } else {
                         possibilities.push(TAtomic::Scalar(TScalar::numeric_string()));
                     }
                 }
                 TScalar::Float(float) => {
                     if let Some(value) = float.get_literal_value() {
-                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(f64_atom(value))));
+                        possibilities.push(TAtomic::Scalar(TScalar::literal_string(f64_word(value))));
                     } else {
                         possibilities.push(TAtomic::Scalar(TScalar::numeric_string()));
                     }
@@ -1547,7 +1566,7 @@ pub fn cast_type_to_string<'ctx>(
 
             TAtomic::Object(object) => {
                 if let TObject::HasMethod(has_method) = object
-                    && has_method.has_method("__toString")
+                    && has_method.has_method(b"__toString")
                 {
                     possibilities.push(TAtomic::Scalar(TScalar::string()));
                     continue;
@@ -1591,7 +1610,7 @@ pub fn cast_type_to_string<'ctx>(
                     }
                 };
 
-                let Some(class_metadata) = context.codebase.get_class_like(&class_like_name) else {
+                let Some(class_metadata) = context.codebase.get_class_like(class_like_name.as_bytes()) else {
                     context.collector.report_with_code(
                         IssueCode::InvalidTypeCast,
                         Issue::error(format!(
@@ -1628,16 +1647,16 @@ pub fn cast_type_to_string<'ctx>(
                     continue;
                 }
 
-                let to_string_method_id = atom("__toString");
+                let to_string_method_id = word(b"__toString");
                 let declaring_method_id = context.codebase.get_declaring_method_identifier(&MethodIdentifier::new(
                     class_metadata.original_name,
                     to_string_method_id,
                 ));
 
-                if let Some(to_string_metadata) = context
-                    .codebase
-                    .get_method(&declaring_method_id.get_class_name(), &declaring_method_id.get_method_name())
-                {
+                if let Some(to_string_metadata) = context.codebase.get_method(
+                    declaring_method_id.get_class_name().as_bytes(),
+                    declaring_method_id.get_method_name().as_bytes(),
+                ) {
                     let result = analyze_implicit_method_call(
                         context,
                         block_context,
@@ -1715,10 +1734,10 @@ pub fn cast_type_to_string<'ctx>(
                         ),
                     );
                 }
-                possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("Array"))));
+                possibilities.push(TAtomic::Scalar(TScalar::literal_string(word("Array"))));
             }
 
-            TAtomic::Null | TAtomic::Void => possibilities.push(TAtomic::Scalar(TScalar::literal_string(atom("")))),
+            TAtomic::Null | TAtomic::Void => possibilities.push(TAtomic::Scalar(TScalar::literal_string(word("")))),
             TAtomic::Resource(_) => possibilities.push(TAtomic::Scalar(TScalar::non_empty_string())),
             TAtomic::Never => {}
             _ => {
@@ -1749,24 +1768,24 @@ pub fn cast_type_to_string<'ctx>(
 
 fn find_to_string_in_intersections<'ctx>(
     atomic: &TAtomic,
-    operand_expression_id: Option<&str>,
+    operand_expression_id: Option<&[u8]>,
     context: &mut Context<'ctx, '_>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     expression_span: Span,
 ) -> Option<Result<TUnion, AnalysisError>> {
     let intersection_types = atomic.get_intersection_types()?;
-    let to_string_id = atom("__toString");
+    let to_string_id = word(b"__toString");
 
     for intersection in intersection_types {
         match intersection {
-            TAtomic::Object(TObject::HasMethod(has_method)) if has_method.has_method(&to_string_id) => {
+            TAtomic::Object(TObject::HasMethod(has_method)) if has_method.has_method(to_string_id.as_bytes()) => {
                 return Some(Ok(get_string()));
             }
 
             TAtomic::Object(TObject::Named(named)) => {
                 let intersection_name = named.get_name();
-                let Some(intersection_class) = context.codebase.get_class_like(&intersection_name) else {
+                let Some(intersection_class) = context.codebase.get_class_like(intersection_name.as_bytes()) else {
                     continue;
                 };
 
@@ -1775,10 +1794,10 @@ fn find_to_string_in_intersections<'ctx>(
                     to_string_id,
                 ));
 
-                let Some(method) = context
-                    .codebase
-                    .get_method(&intersection_method_id.get_class_name(), &intersection_method_id.get_method_name())
-                else {
+                let Some(method) = context.codebase.get_method(
+                    intersection_method_id.get_class_name().as_bytes(),
+                    intersection_method_id.get_method_name().as_bytes(),
+                ) else {
                     continue;
                 };
 

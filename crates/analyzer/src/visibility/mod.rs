@@ -1,5 +1,5 @@
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 
@@ -12,6 +12,7 @@ use mago_span::Span;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use mago_bytes::BytesDisplay;
 
 /// Checks if a method is visible from the current scope and reports a detailed
 /// error if it is not.
@@ -32,12 +33,12 @@ use crate::context::block::BlockContext;
 pub fn check_method_visibility<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
-    fqcn: &str,
-    method_name: &str,
+    fqcn: &[u8],
+    method_name: &[u8],
     access_span: Span,
     member_span: Option<Span>,
 ) -> bool {
-    let declaring_class = context.codebase.get_declaring_method_class(fqcn, method_name).unwrap_or_else(|| atom(fqcn));
+    let declaring_class = context.codebase.get_declaring_method_class(fqcn, method_name).unwrap_or_else(|| word(fqcn));
 
     let Some(method_metadata) = context.codebase.get_declaring_method(fqcn, method_name) else {
         return true;
@@ -52,19 +53,25 @@ pub fn check_method_visibility<'ctx>(
         return true;
     }
 
-    let is_visible =
-        is_visible_from_scope(context, visibility, &declaring_class, block_context.scope.get_class_like_name());
+    let is_visible = is_visible_from_scope(
+        context,
+        visibility,
+        declaring_class.as_bytes(),
+        block_context.scope.get_class_like_name(),
+    );
 
     if !is_visible {
         let declaring_class_name = context
             .codebase
-            .get_class_like(&declaring_class)
+            .get_class_like(declaring_class.as_bytes())
             .map_or_else(|| declaring_class, |metadata| metadata.original_name);
 
         let issue_title =
-            format!("Cannot access {} method `{}::{}`.", visibility.as_str(), declaring_class_name, method_name);
-        let help_text =
-            format!("Change the visibility of method `{method_name}` to `public`, or call it from an allowed scope.");
+            format!("Cannot access {} method `{}::{}`.", visibility, declaring_class_name, BytesDisplay(method_name));
+        let help_text = format!(
+            "Change the visibility of method `{}` to `public`, or call it from an allowed scope.",
+            BytesDisplay(method_name)
+        );
 
         report_visibility_issue(
             context,
@@ -87,12 +94,12 @@ pub fn check_method_visibility<'ctx>(
 pub fn check_property_read_visibility<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
-    fqcn: &str,
-    property_name: &str,
+    fqcn: &[u8],
+    property_name: &[u8],
     access_span: Span,
     member_span: Option<Span>,
 ) -> bool {
-    let property_name = atom(property_name);
+    let property_name = word(property_name);
 
     let Some(class_metadata) = context.codebase.get_class_like(fqcn) else {
         return true;
@@ -102,7 +109,7 @@ pub fn check_property_read_visibility<'ctx>(
         return true;
     };
 
-    let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_id) else {
+    let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_id.as_bytes()) else {
         return true;
     };
 
@@ -134,8 +141,8 @@ pub fn check_property_read_visibility<'ctx>(
     }
 
     if !property_metadata.hooks.is_empty()
-        && property_metadata.hooks.contains_key(&atom("set"))
-        && !property_metadata.hooks.contains_key(&atom("get"))
+        && property_metadata.hooks.contains_key(&word(b"set"))
+        && !property_metadata.hooks.contains_key(&word(b"get"))
         && property_metadata.flags.is_virtual_property()
     {
         let class_name = &declaring_class_metadata.original_name;
@@ -157,15 +164,17 @@ pub fn check_property_read_visibility<'ctx>(
     }
 
     let visibility = property_metadata.read_visibility;
-    let is_visible =
-        is_visible_from_scope(context, visibility, declaring_class_id, block_context.scope.get_class_like_name());
+    let is_visible = is_visible_from_scope(
+        context,
+        visibility,
+        declaring_class_id.as_bytes(),
+        block_context.scope.get_class_like_name(),
+    );
 
     if !is_visible {
         let issue_title = format!(
             "Cannot read {} property `{}` from class `{}`.",
-            visibility.as_str(),
-            property_name,
-            declaring_class_metadata.original_name
+            visibility, property_name, declaring_class_metadata.original_name
         );
 
         let help_text =
@@ -190,12 +199,12 @@ pub fn check_property_read_visibility<'ctx>(
 pub fn check_property_write_visibility<'ctx>(
     context: &mut Context<'ctx, '_>,
     block_context: &BlockContext<'ctx>,
-    fqcn: &str,
-    property_name: &str,
+    fqcn: &[u8],
+    property_name: &[u8],
     access_span: Span,
     member_span: Option<Span>,
 ) -> bool {
-    let property_name = atom(property_name);
+    let property_name = word(property_name);
 
     let Some(class_metadata) = context.codebase.get_class_like(fqcn) else {
         return true;
@@ -205,7 +214,7 @@ pub fn check_property_write_visibility<'ctx>(
         return true;
     };
 
-    let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_name) else {
+    let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_name.as_bytes()) else {
         return true;
     };
 
@@ -214,8 +223,8 @@ pub fn check_property_write_visibility<'ctx>(
     };
 
     if !property_metadata.hooks.is_empty()
-        && property_metadata.hooks.contains_key(&atom("get"))
-        && !property_metadata.hooks.contains_key(&atom("set"))
+        && property_metadata.hooks.contains_key(&word(b"get"))
+        && !property_metadata.hooks.contains_key(&word(b"set"))
         && property_metadata.flags.is_virtual_property()
     {
         let class_name = &declaring_class_metadata.original_name;
@@ -237,15 +246,17 @@ pub fn check_property_write_visibility<'ctx>(
     }
 
     let visibility = property_metadata.write_visibility;
-    let is_visible =
-        is_visible_from_scope(context, visibility, declaring_class_name, block_context.scope.get_class_like_name());
+    let is_visible = is_visible_from_scope(
+        context,
+        visibility,
+        declaring_class_name.as_bytes(),
+        block_context.scope.get_class_like_name(),
+    );
 
     if !is_visible {
         let issue_title = format!(
             "Cannot write to {} property `{}` on class `{}`.",
-            visibility.as_str(),
-            property_name,
-            declaring_class_metadata.original_name
+            visibility, property_name, declaring_class_metadata.original_name
         );
 
         let help_text = format!(
@@ -266,7 +277,7 @@ pub fn check_property_write_visibility<'ctx>(
     } else if property_metadata.flags.is_readonly()
         && !can_initialize_readonly_property(
             context,
-            declaring_class_name,
+            declaring_class_name.as_bytes(),
             block_context.scope.get_class_like_name(),
             block_context.scope.get_function_like(),
         )
@@ -289,26 +300,26 @@ pub fn check_property_write_visibility<'ctx>(
 fn is_visible_from_scope(
     context: &Context<'_, '_>,
     visibility: Visibility,
-    declaring_class_id: &str,
-    current_class_opt: Option<Atom>,
+    declaring_class_id: &[u8],
+    current_class_opt: Option<Word>,
 ) -> bool {
     match visibility {
         Visibility::Public => true,
         Visibility::Protected => {
             if let Some(current_class_id) = current_class_opt {
-                current_class_id.eq_ignore_ascii_case(declaring_class_id)
-                    || context.codebase.is_instance_of(&current_class_id, declaring_class_id)
-                    || context.codebase.is_instance_of(declaring_class_id, &current_class_id)
-                    || is_visible_via_required_extends(context, &current_class_id, declaring_class_id)
+                current_class_id.as_bytes().eq_ignore_ascii_case(declaring_class_id)
+                    || context.codebase.is_instance_of(current_class_id.as_bytes(), declaring_class_id)
+                    || context.codebase.is_instance_of(declaring_class_id, current_class_id.as_bytes())
+                    || is_visible_via_required_extends(context, current_class_id.as_bytes(), declaring_class_id)
             } else {
                 false
             }
         }
         Visibility::Private => {
             if let Some(current_class_id) = current_class_opt {
-                current_class_id.eq_ignore_ascii_case(declaring_class_id)
-                    || context.codebase.class_uses_trait(&current_class_id, declaring_class_id)
-                    || context.codebase.class_uses_trait(declaring_class_id, &current_class_id)
+                current_class_id.as_bytes().eq_ignore_ascii_case(declaring_class_id)
+                    || context.codebase.class_uses_trait(current_class_id.as_bytes(), declaring_class_id)
+                    || context.codebase.class_uses_trait(declaring_class_id, current_class_id.as_bytes())
             } else {
                 false
             }
@@ -321,12 +332,12 @@ fn is_visible_from_scope(
 /// `@require-extends BaseClass` and `BaseClass` uses another trait that declares the method.
 fn is_visible_via_required_extends(
     context: &Context<'_, '_>,
-    current_class_id: &str,
-    declaring_class_id: &str,
+    current_class_id: &[u8],
+    declaring_class_id: &[u8],
 ) -> bool {
-    let current_class_id_lc = mago_atom::ascii_lowercase_atom(current_class_id);
+    let current_class_id_lc = mago_word::ascii_lowercase_word(current_class_id);
 
-    let Some(current_metadata) = context.codebase.get_class_like(&current_class_id_lc) else {
+    let Some(current_metadata) = context.codebase.get_class_like(current_class_id_lc.as_bytes()) else {
         return false;
     };
 
@@ -335,8 +346,8 @@ fn is_visible_via_required_extends(
     }
 
     for required_class in current_metadata.require_extends.iter() {
-        if context.codebase.is_instance_of(required_class, declaring_class_id)
-            || context.codebase.class_uses_trait(required_class, declaring_class_id)
+        if context.codebase.is_instance_of(required_class.as_bytes(), declaring_class_id)
+            || context.codebase.class_uses_trait(required_class.as_bytes(), declaring_class_id)
         {
             return true;
         }
@@ -347,8 +358,8 @@ fn is_visible_via_required_extends(
 
 fn can_initialize_readonly_property(
     context: &Context<'_, '_>,
-    declaring_class_id: &str,
-    current_class_opt: Option<Atom>,
+    declaring_class_id: &[u8],
+    current_class_opt: Option<Word>,
     current_function_opt: Option<&FunctionLikeMetadata>,
 ) -> bool {
     let is_allowed_method = current_function_opt.is_some_and(|func| {
@@ -359,7 +370,7 @@ fn can_initialize_readonly_property(
 
         // __clone is allowed in PHP 8.3+
         if context.settings.version.is_supported(Feature::ReadonlyPropertyReinitializationInClone)
-            && func.name.is_some_and(|name| name.eq_ignore_ascii_case("__clone"))
+            && func.name.is_some_and(|name| name.as_bytes().eq_ignore_ascii_case(b"__clone"))
         {
             return true;
         }
@@ -369,9 +380,9 @@ fn can_initialize_readonly_property(
 
     is_allowed_method
         && current_class_opt.is_some_and(|current_class_id| {
-            current_class_id.eq_ignore_ascii_case(declaring_class_id)
-                || context.codebase.is_instance_of(&current_class_id, declaring_class_id)
-                || context.codebase.is_instance_of(declaring_class_id, &current_class_id)
+            current_class_id.as_bytes().eq_ignore_ascii_case(declaring_class_id)
+                || context.codebase.is_instance_of(current_class_id.as_bytes(), declaring_class_id)
+                || context.codebase.is_instance_of(declaring_class_id, current_class_id.as_bytes())
         })
 }
 
@@ -397,7 +408,7 @@ fn report_visibility_issue<'ctx>(
     let mut issue = Issue::error(title)
         .with_annotation(
             Annotation::primary(primary_annotation_span)
-                .with_message(format!("This member is {} and cannot be accessed here", visibility.as_str())),
+                .with_message(format!("This member is {} and cannot be accessed here", visibility)),
         )
         .with_annotation(
             Annotation::secondary(access_span).with_message(format!("Invalid access occurs here, {current_scope_str}")),
@@ -407,8 +418,7 @@ fn report_visibility_issue<'ctx>(
         && definition_span != primary_annotation_span
     {
         issue = issue.with_annotation(
-            Annotation::secondary(definition_span)
-                .with_message(format!("Member is defined as `{}` here", visibility.as_str())),
+            Annotation::secondary(definition_span).with_message(format!("Member is defined as `{}` here", visibility)),
         );
     }
 

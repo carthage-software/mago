@@ -25,8 +25,8 @@ use crate::rule::utils::phpunit::find_all_assertion_references_in_method;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
-const NON_STRICT_ASSERTIONS: [&str; 4] =
-    ["assertAttributeEquals", "assertAttributeNotEquals", "assertEquals", "assertNotEquals"];
+const NON_STRICT_ASSERTIONS: [&[u8]; 4] =
+    [b"assertAttributeEquals", b"assertAttributeNotEquals", b"assertEquals", b"assertNotEquals"];
 
 #[derive(Debug, Clone)]
 pub struct StrictAssertionsRule {
@@ -116,8 +116,8 @@ impl LintRule for StrictAssertionsRule {
             return;
         };
 
-        if !method.name.value.starts_with("test")
-            || method.name.value.chars().nth(4).is_none_or(|c| c != '_' && !c.is_uppercase())
+        if !method.name.value.starts_with(b"test")
+            || method.name.value.get(4).is_none_or(|&c| c != b'_' && !c.is_ascii_uppercase())
         {
             return;
         }
@@ -136,7 +136,7 @@ impl LintRule for StrictAssertionsRule {
             };
 
             let is_attribute_assertion =
-                identifier.value == "assertAttributeEquals" || identifier.value == "assertAttributeNotEquals";
+                identifier.value == b"assertAttributeEquals" || identifier.value == b"assertAttributeNotEquals";
 
             let should_flag = if is_attribute_assertion {
                 argument_list.arguments.get(1).is_some_and(|arg| is_non_bool_or_null_scalar(arg.value()))
@@ -149,17 +149,18 @@ impl LintRule for StrictAssertionsRule {
                 continue;
             }
 
-            let strict_name = identifier.value.replacen("Equals", "Same", 1);
+            let Some(name_str) = std::str::from_utf8(identifier.value).ok() else { continue };
+            let strict_name = name_str.replacen("Equals", "Same", 1);
+            let name_display = mago_bytes::BytesDisplay(identifier.value);
 
             let issue = Issue::new(self.cfg.level(), "Use strict assertions in PHPUnit tests.")
                 .with_code(self.meta.code)
                 .with_annotation(
                     Annotation::primary(reference.span())
-                        .with_message(format!("Non-strict assertion `{}` is used here.", identifier.value)),
+                        .with_message(format!("Non-strict assertion `{name_display}` is used here.")),
                 )
                 .with_help(format!(
-                    "Replace `{}` with `{}` to enforce strict comparisons in your tests.",
-                    identifier.value, strict_name
+                    "Replace `{name_display}` with `{strict_name}` to enforce strict comparisons in your tests.",
                 ));
 
             ctx.collector.propose(issue, |edits| {

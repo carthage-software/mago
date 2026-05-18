@@ -65,9 +65,9 @@ impl<'arena> FormatterState<'_, 'arena> {
 
         let remaining_content = &self.source_text[next_content_offset as usize..];
 
-        remaining_content.starts_with("//")
-            || remaining_content.starts_with("/*")
-            || (remaining_content.starts_with('#') && !remaining_content.starts_with("#["))
+        remaining_content.starts_with(b"//")
+            || remaining_content.starts_with(b"/*")
+            || (remaining_content.starts_with(b"#") && !remaining_content.starts_with(b"#["))
     }
 
     /// Checks if a node has a trailing line comment on the same line.
@@ -94,7 +94,7 @@ impl<'arena> FormatterState<'_, 'arena> {
         }
 
         let remaining = &self.source_text[first_char_offset as usize..];
-        remaining.starts_with("//") || (remaining.starts_with('#') && !remaining.starts_with("#["))
+        remaining.starts_with(b"//") || (remaining.starts_with(b"#") && !remaining.starts_with(b"#["))
     }
 
     pub(crate) fn has_leading_own_line_comment(&self, range: Span) -> bool {
@@ -249,7 +249,7 @@ impl<'arena> FormatterState<'_, 'arena> {
 
             if range.end_offset() < comment.start && self.is_insignificant(range.end_offset(), comment.start) {
                 let gap = &self.source_text[(range.end_offset() as usize)..(comment.start as usize)];
-                if comment.is_block && gap.contains(',') {
+                if comment.is_block && gap.contains(&b',') {
                     break;
                 }
 
@@ -367,11 +367,11 @@ impl<'arena> FormatterState<'_, 'arena> {
 
         let followed_by_semicolon = self
             .skip_spaces(Some(comment.end), false)
-            .map(|idx| self.source_text.as_bytes().get(idx as usize))
+            .map(|idx| self.source_text.get(idx as usize))
             .is_some_and(|c| c == Some(&b';'));
 
         let has_semicolon_in_gap =
-            self.source_text[(token_end_offset as usize)..(comment.start as usize)].bytes().any(|c| c == b';');
+            self.source_text[(token_end_offset as usize)..(comment.start as usize)].contains(&b';');
 
         if followed_by_semicolon || has_semicolon_in_gap {
             parts.push(Document::LineSuffix(vec![in self.arena; Document::Space(Space::soft()), printed]));
@@ -681,7 +681,7 @@ impl<'arena> FormatterState<'_, 'arena> {
             }
 
             let pre_gap = &self.source_text[gap_end..(comment.start as usize)];
-            if !pre_gap.bytes().all(is_ws) {
+            if !pre_gap.iter().copied().all(is_ws) {
                 return None;
             }
 
@@ -699,7 +699,7 @@ impl<'arena> FormatterState<'_, 'arena> {
         }
 
         let tail = &self.source_text[gap_end..(before.start_offset() as usize)];
-        if !tail.bytes().all(is_ws) {
+        if !tail.iter().copied().all(is_ws) {
             return None;
         }
 
@@ -734,22 +734,20 @@ impl<'arena> FormatterState<'_, 'arena> {
                 return Document::String(content);
             }
 
-            let new_content = if comment.is_shell_comment {
+            let new_content: &'arena [u8] = if comment.is_shell_comment {
                 let mut buf = Vec::with_capacity_in(content.len() + 2, self.arena);
                 buf.extend_from_slice(b"// ");
-                buf.extend_from_slice(content[1..].trim().as_bytes());
+                buf.extend_from_slice(content[1..].trim_ascii());
 
-                // SAFETY: We are constructing the string from valid UTF-8 parts.
-                unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
-            } else if content.starts_with("/**") && !content.starts_with("/** ") && content.len() > 5 {
+                buf.into_bump_slice()
+            } else if content.starts_with(b"/**") && !content.starts_with(b"/** ") && content.len() > 5 {
                 let inner = &content[3..content.len() - 2];
                 let mut buf = Vec::with_capacity_in(content.len() + 1, self.arena);
                 buf.extend_from_slice(b"/** ");
-                buf.extend_from_slice(inner.trim().as_bytes());
+                buf.extend_from_slice(inner.trim_ascii());
                 buf.extend_from_slice(b" */");
 
-                // SAFETY: We are constructing the string from valid UTF-8 parts.
-                unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
+                buf.into_bump_slice()
             } else {
                 content
             };
@@ -757,27 +755,28 @@ impl<'arena> FormatterState<'_, 'arena> {
             return Document::String(new_content);
         }
 
-        if !content.contains('\n') && !content.contains('\r') {
+        if !content.contains(&b'\n') && !content.contains(&b'\r') {
             return Document::String(content);
         }
 
         let lines = self.split_lines(content);
         let mut contents = Vec::with_capacity_in(lines.len() * 2, self.arena);
 
-        let should_add_asterisks = if content.starts_with("/**") {
+        let should_add_asterisks = if content.starts_with(b"/**") {
             true
         } else {
             let content_lines = &lines[1..lines.len() - 1];
 
             let potential_prefix = content_lines
                 .iter()
-                .map(|line| line.trim_start())
+                .map(|line| line.trim_ascii_start())
                 .find(|trimmed| !trimmed.is_empty())
-                .and_then(|first_line| first_line.chars().next());
+                .and_then(|first_line| first_line.first().copied());
 
-            if let Some(prefix_char) = potential_prefix {
-                if !prefix_char.is_alphanumeric() && prefix_char != '*' {
-                    let all_lines_match = content_lines.iter().all(|line| line.trim_start().starts_with(prefix_char));
+            if let Some(prefix_byte) = potential_prefix {
+                if !prefix_byte.is_ascii_alphanumeric() && prefix_byte != b'*' {
+                    let all_lines_match =
+                        content_lines.iter().all(|line| line.trim_ascii_start().first() == Some(&prefix_byte));
 
                     !all_lines_match
                 } else {
@@ -789,30 +788,27 @@ impl<'arena> FormatterState<'_, 'arena> {
         };
 
         for (i, line) in lines.iter().enumerate() {
-            let trimmed_line = line.trim_start();
+            let trimmed_line = line.trim_ascii_start();
 
-            let processed_line = if i == 0 {
-                *line
+            let processed_line: &'arena [u8] = if i == 0 {
+                line
             } else if !should_add_asterisks {
                 let mut buf = Vec::with_capacity_in(trimmed_line.len() + 1, self.arena);
                 buf.push(b' ');
-                buf.extend_from_slice(trimmed_line.trim_end().as_bytes());
-                // SAFETY: ASCII byte plus bytes from a valid UTF-8 `&str` is valid UTF-8.
-                unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
+                buf.extend_from_slice(trimmed_line.trim_ascii_end());
+                buf.into_bump_slice()
             } else if trimmed_line.is_empty() {
-                " *"
-            } else if trimmed_line.starts_with('*') {
+                b" *"
+            } else if trimmed_line.starts_with(b"*") {
                 let mut buf = Vec::with_capacity_in(trimmed_line.len() + 1, self.arena);
                 buf.push(b' ');
-                buf.extend_from_slice(trimmed_line.trim_end().as_bytes());
-                // SAFETY: ASCII byte plus bytes from a valid UTF-8 `&str` is valid UTF-8.
-                unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
+                buf.extend_from_slice(trimmed_line.trim_ascii_end());
+                buf.into_bump_slice()
             } else {
                 let mut buf = Vec::with_capacity_in(trimmed_line.len() + 3, self.arena);
                 buf.extend_from_slice(b" * ");
-                buf.extend_from_slice(trimmed_line.trim_end().as_bytes());
-                // SAFETY: ASCII bytes plus bytes from a valid UTF-8 `&str` is valid UTF-8.
-                unsafe { std::str::from_utf8_unchecked(buf.into_bump_slice()) }
+                buf.extend_from_slice(trimmed_line.trim_ascii_end());
+                buf.into_bump_slice()
             };
 
             contents.push(Document::String(processed_line));
@@ -826,7 +822,7 @@ impl<'arena> FormatterState<'_, 'arena> {
 
     pub(crate) fn has_placed_leading_own_line_comment(&self, span: Span) -> bool {
         self.has_placed_comment_where(span, Placement::Leading, |_, t| {
-            !t.kind.is_block_comment() || t.value.contains('\n')
+            !t.kind.is_block_comment() || t.value.contains(&b'\n')
         })
     }
 

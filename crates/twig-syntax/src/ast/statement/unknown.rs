@@ -9,7 +9,7 @@ use crate::ast::Identifier;
 pub struct Unknown<'arena> {
     pub open_tag: Span,
     pub name: Identifier<'arena>,
-    pub raw: &'arena str,
+    pub raw: &'arena [u8],
     pub close_tag: Span,
 }
 

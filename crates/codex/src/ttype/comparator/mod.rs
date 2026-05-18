@@ -1,4 +1,4 @@
-use mago_atom::Atom;
+use mago_word::Word;
 
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::template::TemplateBound;
@@ -26,8 +26,8 @@ pub struct ComparisonResult {
     pub type_coerced_from_as_mixed: Option<bool>,
     pub replacement_union_type: Option<TUnion>,
     pub replacement_atomic_type: Option<TAtomic>,
-    pub type_variable_lower_bounds: Vec<(Atom, TemplateBound)>,
-    pub type_variable_upper_bounds: Vec<(Atom, TemplateBound)>,
+    pub type_variable_lower_bounds: Vec<(Word, TemplateBound)>,
+    pub type_variable_upper_bounds: Vec<(Word, TemplateBound)>,
 }
 
 impl Default for ComparisonResult {
@@ -57,13 +57,13 @@ mod tests {
     use std::collections::HashSet;
 
     use bumpalo::Bump;
-    use mago_atom::AtomSet;
-    use mago_atom::atom;
     use mago_database::Database;
     use mago_database::DatabaseReader;
     use mago_database::file::File;
     use mago_names::resolver::NameResolver;
     use mago_syntax::parser::parse_file;
+    use mago_word::WordSet;
+    use mago_word::word;
 
     use crate::metadata::CodebaseMetadata;
     use crate::populator::populate_codebase;
@@ -76,7 +76,7 @@ mod tests {
     use crate::ttype::union::TUnion;
 
     pub(crate) fn create_test_codebase(code: &'static str) -> CodebaseMetadata {
-        let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Borrowed(code));
+        let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Borrowed(code.as_bytes()));
         let config =
             mago_database::DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![])
                 .into_static();
@@ -94,7 +94,7 @@ mod tests {
             codebase.extend(program_codebase);
         }
 
-        populate_codebase(&mut codebase, &mut SymbolReferences::new(), AtomSet::default(), HashSet::default());
+        populate_codebase(&mut codebase, &mut SymbolReferences::new(), WordSet::default(), HashSet::default());
 
         codebase
     }
@@ -123,11 +123,11 @@ mod tests {
 
         let codebase = create_test_codebase(code);
 
-        let datetime_interface_type = TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(atom("DateTime")))]);
+        let datetime_interface_type = TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(word("DateTime")))]);
         let datetime_interface_null_type =
-            TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(atom("DateTimeInterface"))), TAtomic::Null]);
+            TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(word("DateTimeInterface"))), TAtomic::Null]);
         let null_datetime_interface_type =
-            TUnion::from_vec(vec![TAtomic::Null, TAtomic::Object(TObject::new_named(atom("DateTimeInterface")))]);
+            TUnion::from_vec(vec![TAtomic::Null, TAtomic::Object(TObject::new_named(word("DateTimeInterface")))]);
 
         let mut first_comparison_result = ComparisonResult::new();
         let mut second_comparison_result = ComparisonResult::new();
@@ -174,14 +174,14 @@ mod tests {
 
         let codebase = create_test_codebase(code);
 
-        let c_type = TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(atom("C")))]);
+        let c_type = TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(word("C")))]);
         let a_b_type = TUnion::from_vec(vec![
-            TAtomic::Object(TObject::new_named(atom("A"))),
-            TAtomic::Object(TObject::new_named(atom("B"))),
+            TAtomic::Object(TObject::new_named(word("A"))),
+            TAtomic::Object(TObject::new_named(word("B"))),
         ]);
         let b_a_type = TUnion::from_vec(vec![
-            TAtomic::Object(TObject::new_named(atom("B"))),
-            TAtomic::Object(TObject::new_named(atom("A"))),
+            TAtomic::Object(TObject::new_named(word("B"))),
+            TAtomic::Object(TObject::new_named(word("A"))),
         ]);
 
         let mut first_comparison_result = ComparisonResult::new();
@@ -210,9 +210,9 @@ mod tests {
 
         let codebase = create_test_codebase(code);
 
-        let foo_type = TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(atom("Foo")))]);
-        let bar_null_type = TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(atom("Bar"))), TAtomic::Null]);
-        let null_bar_type = TUnion::from_vec(vec![TAtomic::Null, TAtomic::Object(TObject::new_named(atom("Bar")))]);
+        let foo_type = TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(word("Foo")))]);
+        let bar_null_type = TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(word("Bar"))), TAtomic::Null]);
+        let null_bar_type = TUnion::from_vec(vec![TAtomic::Null, TAtomic::Object(TObject::new_named(word("Bar")))]);
 
         let mut first_comparison_result = ComparisonResult::new();
         let mut second_comparison_result = ComparisonResult::new();
@@ -241,14 +241,14 @@ mod tests {
 
         let codebase = create_test_codebase(code);
 
-        let child_type = TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(atom("Child")))]);
+        let child_type = TUnion::from_vec(vec![TAtomic::Object(TObject::new_named(word("Child")))]);
         let parent_unrelated_type = TUnion::from_vec(vec![
-            TAtomic::Object(TObject::new_named(atom("ParentInterface"))),
-            TAtomic::Object(TObject::new_named(atom("Unrelated"))),
+            TAtomic::Object(TObject::new_named(word("ParentInterface"))),
+            TAtomic::Object(TObject::new_named(word("Unrelated"))),
         ]);
         let unrelated_parent_type = TUnion::from_vec(vec![
-            TAtomic::Object(TObject::new_named(atom("Unrelated"))),
-            TAtomic::Object(TObject::new_named(atom("ParentInterface"))),
+            TAtomic::Object(TObject::new_named(word("Unrelated"))),
+            TAtomic::Object(TObject::new_named(word("ParentInterface"))),
         ]);
 
         let mut first_comparison_result = ComparisonResult::new();

@@ -281,7 +281,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::sync::Arc;
 
-    use mago_atom::atom;
+    use mago_word::word;
 
     use crate::ttype::atomic::TAtomic;
     use crate::ttype::atomic::array::TArray;
@@ -307,14 +307,14 @@ mod tests {
 
         // array{'foo': 'bar'}
         let input = t_keyed(TKeyedArray::new().with_known_items(BTreeMap::from([(
-            ArrayKey::String(atom("foo")),
-            (false, get_literal_string(atom("bar"))),
+            ArrayKey::String(word("foo")),
+            (false, get_literal_string(word("bar"))),
         )])));
 
         // array{'required_field': string, ...<array-key, mixed>}
         let container = t_keyed(
             TKeyedArray::new()
-                .with_known_items(BTreeMap::from([(ArrayKey::String(atom("required_field")), (false, get_string()))]))
+                .with_known_items(BTreeMap::from([(ArrayKey::String(word("required_field")), (false, get_string()))]))
                 .with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())),
         );
 
@@ -326,12 +326,12 @@ mod tests {
         let codebase = create_test_codebase("<?php");
         // array{'a': string}
         let input = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))])),
         );
         // array{'a': string, 'b'?: int}
         let container = t_keyed(TKeyedArray::new().with_known_items(BTreeMap::from([
-            (ArrayKey::String(atom("a")), (false, get_string())),
-            (ArrayKey::String(atom("b")), (true, get_int())),
+            (ArrayKey::String(word("a")), (false, get_string())),
+            (ArrayKey::String(word("b")), (true, get_int())),
         ])));
         assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
     }
@@ -341,12 +341,12 @@ mod tests {
         let codebase = create_test_codebase("<?php");
         // array{'a': string, 'b'?: int}
         let input = t_keyed(TKeyedArray::new().with_known_items(BTreeMap::from([
-            (ArrayKey::String(atom("a")), (false, get_string())),
-            (ArrayKey::String(atom("b")), (true, get_int())),
+            (ArrayKey::String(word("a")), (false, get_string())),
+            (ArrayKey::String(word("b")), (true, get_int())),
         ])));
         // array{'a': string}
         let container = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))])),
         );
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
@@ -358,7 +358,7 @@ mod tests {
         let input = t_keyed(TKeyedArray::new());
         // array{'a'?: string}
         let container = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (true, get_string()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (true, get_string()))])),
         );
         assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
     }
@@ -370,7 +370,7 @@ mod tests {
         let input = t_keyed(TKeyedArray::new());
         // array{'a': string}
         let container = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))])),
         );
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
@@ -380,11 +380,11 @@ mod tests {
         let codebase = create_test_codebase("<?php");
         // array{'a'?: string}
         let input = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (true, get_string()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (true, get_string()))])),
         );
         // array{'a': string}
         let container = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))])),
         );
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
@@ -424,7 +424,7 @@ mod tests {
         let codebase = create_test_codebase("<?php");
         // array{'a': string}
         let input = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))])),
         );
         // array<array-key, mixed>
         let container = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())));
@@ -436,7 +436,7 @@ mod tests {
         let codebase = create_test_codebase("<?php");
         // array{'a': string}
         let input = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))])),
         );
         // array<array-key, int>
         let container = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_int())));
@@ -448,13 +448,13 @@ mod tests {
         let codebase = create_test_codebase("<?php");
         // array{'a': string, 'b': int}
         let input = t_keyed(TKeyedArray::new().with_known_items(BTreeMap::from([
-            (ArrayKey::String(atom("a")), (false, get_string())),
-            (ArrayKey::String(atom("b")), (false, get_int())),
+            (ArrayKey::String(word("a")), (false, get_string())),
+            (ArrayKey::String(word("b")), (false, get_int())),
         ])));
         // array{'a': string, ...<array-key, int>}
         let container = t_keyed(
             TKeyedArray::new()
-                .with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))]))
+                .with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))]))
                 .with_parameters(Arc::new(get_arraykey()), Arc::new(get_int())),
         );
         assert_is_contained_by(&codebase, &input, &container, true, &mut ComparisonResult::default());
@@ -465,13 +465,13 @@ mod tests {
         let codebase = create_test_codebase("<?php");
         // array{'a': string, 'b': string}
         let input = t_keyed(TKeyedArray::new().with_known_items(BTreeMap::from([
-            (ArrayKey::String(atom("a")), (false, get_string())),
-            (ArrayKey::String(atom("b")), (false, get_string())),
+            (ArrayKey::String(word("a")), (false, get_string())),
+            (ArrayKey::String(word("b")), (false, get_string())),
         ])));
         // array{'a': string, ...<array-key, int>}
         let container = t_keyed(
             TKeyedArray::new()
-                .with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))]))
+                .with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))]))
                 .with_parameters(Arc::new(get_arraykey()), Arc::new(get_int())),
         );
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
@@ -484,7 +484,7 @@ mod tests {
         let input = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_string())));
         // array{'a': string}
         let container = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))])),
         );
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
@@ -496,7 +496,7 @@ mod tests {
         let input = t_keyed(TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_string())));
         // array{'a': int}
         let container = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_int()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_int()))])),
         );
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
     }
@@ -538,7 +538,7 @@ mod tests {
         );
         // array{'a': string}
         let container = t_keyed(
-            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))])),
+            TKeyedArray::new().with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))])),
         );
 
         assert_is_contained_by(&codebase, &input, &container, false, &mut ComparisonResult::default());
@@ -551,7 +551,7 @@ mod tests {
         // input: array{'a': string, ...<array-key, string>}
         let input = t_keyed(
             TKeyedArray::new()
-                .with_known_items(BTreeMap::from([(ArrayKey::String(atom("a")), (false, get_string()))]))
+                .with_known_items(BTreeMap::from([(ArrayKey::String(word("a")), (false, get_string()))]))
                 .with_parameters(Arc::new(get_arraykey()), Arc::new(get_string())),
         );
 
@@ -559,8 +559,8 @@ mod tests {
         let container = t_keyed(
             TKeyedArray::new()
                 .with_known_items(BTreeMap::from([
-                    (ArrayKey::String(atom("a")), (false, get_string())),
-                    (ArrayKey::String(atom("b")), (true, get_int())),
+                    (ArrayKey::String(word("a")), (false, get_string())),
+                    (ArrayKey::String(word("b")), (true, get_int())),
                 ]))
                 .with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed())),
         );

@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
@@ -69,7 +69,7 @@ impl TTemplateType {
     /// Extracts a class name from a `TUnion` used as the `ClassName`
     /// parameter of `template-type<>`.
     #[must_use]
-    pub fn extract_class_name(class_name_type: &TUnion) -> Option<Atom> {
+    pub fn extract_class_name(class_name_type: &TUnion) -> Option<Word> {
         for atomic in class_name_type.types.as_ref() {
             match atomic {
                 TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Literal { value })) => return Some(*value),
@@ -87,7 +87,7 @@ impl TTemplateType {
     /// Extracts the template parameter name from a `TUnion` expected to
     /// hold a single literal string atomic.
     #[must_use]
-    pub fn extract_template_name(template_name_type: &TUnion) -> Option<Atom> {
+    pub fn extract_template_name(template_name_type: &TUnion) -> Option<Word> {
         for atomic in template_name_type.types.as_ref() {
             if let TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(name)), .. })) = atomic
             {
@@ -119,18 +119,18 @@ impl TTemplateType {
 
 fn resolve_template_from_atomic(
     atomic: &TAtomic,
-    class_name: Atom,
-    template_name: Atom,
+    class_name: Word,
+    template_name: Word,
     codebase: &CodebaseMetadata,
 ) -> Option<TUnion> {
     match atomic {
         TAtomic::Object(TObject::Enum(named)) => {
-            let instantiated_class_metadata = codebase.get_class_like(&named.name)?;
+            let instantiated_class_metadata = codebase.get_class_like(named.name.as_bytes())?;
 
             get_specialized_template_type(codebase, template_name, class_name, instantiated_class_metadata, None)
         }
         TAtomic::Object(TObject::Named(named)) => {
-            let instantiated_class_metadata = codebase.get_class_like(&named.name)?;
+            let instantiated_class_metadata = codebase.get_class_like(named.name.as_bytes())?;
 
             let mut merged: Option<TUnion> = get_specialized_template_type(
                 codebase,
@@ -186,19 +186,19 @@ impl TType for TTemplateType {
         false
     }
 
-    fn get_id(&self) -> Atom {
-        concat_atom!(
+    fn get_id(&self) -> Word {
+        concat_word!(
             "template-type<",
-            self.object.get_id().as_str(),
+            self.object.get_id(),
             ", ",
-            self.class_name.get_id().as_str(),
+            self.class_name.get_id(),
             ", ",
-            self.template_name.get_id().as_str(),
+            self.template_name.get_id(),
             ">"
         )
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

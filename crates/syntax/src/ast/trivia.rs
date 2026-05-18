@@ -25,7 +25,7 @@ pub enum TriviaKind {
 pub struct Trivia<'arena> {
     pub kind: TriviaKind,
     pub span: Span,
-    pub value: &'arena str,
+    pub value: &'arena [u8],
 }
 
 impl TriviaKind {

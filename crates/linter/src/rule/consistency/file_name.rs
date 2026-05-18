@@ -25,6 +25,7 @@ use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
+use mago_bytes::BytesDisplay;
 
 #[derive(Debug, Clone)]
 pub struct FileNameRule {
@@ -110,15 +111,26 @@ impl LintRule for FileNameRule {
         let mut collector = DefinitionCollector { class_likes: Vec::new(), functions: Vec::new() };
         walk_program_mut(&mut collector, program, &mut ());
 
-        let file_name = ctx.source_file.name.as_ref();
-        let file_stem = file_name.rsplit('/').next().unwrap_or(file_name);
-        let file_stem =
-            file_stem.strip_suffix(".php").or_else(|| file_stem.rsplit_once('.').map(|(s, _)| s)).unwrap_or(file_stem);
+        let file_name_bytes: &[u8] = ctx.source_file.name.as_ref();
+        let file_stem_bytes = match memchr::memrchr(b'/', file_name_bytes) {
+            Some(pos) => &file_name_bytes[pos + 1..],
+            None => file_name_bytes,
+        };
+        let file_stem_bytes = if let Some(stripped) = file_stem_bytes.strip_suffix(b".php") {
+            stripped
+        } else {
+            match memchr::memrchr(b'.', file_stem_bytes) {
+                Some(pos) => &file_stem_bytes[..pos],
+                None => file_stem_bytes,
+            }
+        };
+        let file_stem = BytesDisplay(file_stem_bytes);
 
         if collector.class_likes.len() == 1 {
-            let (kind, name, span) = collector.class_likes[0];
+            let (kind, name_bytes, span) = collector.class_likes[0];
+            let name = BytesDisplay(name_bytes);
 
-            if name != file_stem {
+            if name_bytes != file_stem_bytes {
                 let issue = Issue::new(
                     self.cfg.level(),
                     format!("{kind} `{name}` should be in a file named `{name}.php`, found `{file_stem}.php`."),
@@ -137,9 +149,10 @@ impl LintRule for FileNameRule {
         }
 
         if self.cfg.check_functions && collector.class_likes.is_empty() && collector.functions.len() == 1 {
-            let (name, span) = collector.functions[0];
+            let (name_bytes, span) = collector.functions[0];
+            let name = BytesDisplay(name_bytes);
 
-            if name != file_stem {
+            if name_bytes != file_stem_bytes {
                 let issue = Issue::new(
                     self.cfg.level(),
                     format!("Function `{name}` should be in a file named `{name}.php`, found `{file_stem}.php`."),
@@ -155,8 +168,8 @@ impl LintRule for FileNameRule {
 }
 
 struct DefinitionCollector<'ast> {
-    class_likes: Vec<(&'static str, &'ast str, Span)>,
-    functions: Vec<(&'ast str, Span)>,
+    class_likes: Vec<(&'static str, &'ast [u8], Span)>,
+    functions: Vec<(&'ast [u8], Span)>,
 }
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for DefinitionCollector<'ast> {

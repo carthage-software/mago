@@ -10,7 +10,7 @@ pub mod group;
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Document<'arena> {
-    String(&'arena str),
+    String(&'arena [u8]),
     Array(Vec<'arena, Document<'arena>>),
     /// Increase the level of indentation.
     Indent(Vec<'arena, Document<'arena>>),
@@ -48,7 +48,7 @@ pub enum Document<'arena> {
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Align<'arena> {
-    pub alignment: &'arena str,
+    pub alignment: &'arena [u8],
     pub contents: Vec<'arena, Document<'arena>>,
 }
 
@@ -240,7 +240,7 @@ impl<'arena> Document<'arena> {
     #[inline]
     #[must_use]
     pub fn empty() -> Document<'arena> {
-        Document::String("")
+        Document::String(b"")
     }
 
     #[inline]
@@ -289,18 +289,18 @@ impl<'arena> Document<'arena> {
         for (i, document) in documents.into_iter().enumerate() {
             if i != 0 {
                 parts.push(match separator {
-                    Separator::Space => Document::String(" "),
+                    Separator::Space => Document::String(b" "),
                     Separator::SoftLine => Document::Line(Line::soft()),
                     Separator::HardLine => Document::Line(Line::hard()),
-                    Separator::CommaSpace => Document::String(", "),
+                    Separator::CommaSpace => Document::String(b", "),
                     Separator::LiteralLine => {
                         Document::Array(vec![in arena; Document::Line(Line::literal()), Document::BreakParent])
                     }
                     Separator::CommaHardLine => {
-                        Document::Array(vec![in arena; Document::String(","), Document::Line(Line::hard())])
+                        Document::Array(vec![in arena; Document::String(b","), Document::Line(Line::hard())])
                     }
                     Separator::CommaLine => {
-                        Document::Array(vec![in arena; Document::String(","), Document::Line(Line::default())])
+                        Document::Array(vec![in arena; Document::String(b","), Document::Line(Line::default())])
                     }
                 });
             }

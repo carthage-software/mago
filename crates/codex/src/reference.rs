@@ -1,12 +1,12 @@
 use foldhash::HashMap;
 use foldhash::HashSet;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::empty_atom;
+use mago_word::ascii_lowercase_word;
+use mago_word::empty_word;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::AtomSet;
+use mago_word::Word;
+use mago_word::WordSet;
 
 use crate::context::ScopeContext;
 use crate::diff::CodebaseDiff;
@@ -20,13 +20,13 @@ use crate::symbol::SymbolIdentifier;
 pub enum ReferenceSource {
     /// A reference from a top-level symbol (function, class, enum, trait, interface, constant).
     /// The bool indicates if the reference occurs within a signature context (true) or body (false).
-    /// The Atom is the name (FQCN or FQN) of the referencing symbol.
-    Symbol(bool, Atom),
+    /// The Word is the name (FQCN or FQN) of the referencing symbol.
+    Symbol(bool, Word),
     /// A reference from a member within a class-like structure (method, property, class constant, enum case).
     /// The bool indicates if the reference occurs within a signature context (true) or body (false).
-    /// The first Atom is the FQCN of the class-like structure.
-    /// The second Atom is the name of the member.
-    ClassLikeMember(bool, Atom, Atom),
+    /// The first Word is the FQCN of the class-like structure.
+    /// The second Word is the name of the member.
+    ClassLikeMember(bool, Word, Word),
 }
 
 /// Holds sets of symbols and members identified as invalid during analysis,
@@ -42,7 +42,7 @@ pub struct InvalidSymbols {
     invalid_symbol_and_member_bodies: HashSet<SymbolIdentifier>,
     /// Set of top-level symbols (class FQCN, function FQN) that are partially invalid,
     /// meaning at least one member's signature or body is invalid, but not necessarily the whole symbol.
-    partially_invalid_symbols: AtomSet,
+    partially_invalid_symbols: WordSet,
 }
 
 /// Stores various maps tracking references between symbols (classes, functions, etc.)
@@ -70,14 +70,14 @@ pub struct SymbolReferences {
     /// whose return values it references/uses. Used for dead code analysis on return values.
     functionlike_references_to_functionlike_returns: HashMap<FunctionLikeIdentifier, HashSet<FunctionLikeIdentifier>>,
 
-    /// Maps a file (represented by its hash as an Atom) to a set of referenced symbols/members `(Symbol, Member)`
+    /// Maps a file (represented by its hash as an Word) to a set of referenced symbols/members `(Symbol, Member)`
     /// found within the file's global scope (outside any symbol). This tracks references from top-level code.
     /// Used for incremental analysis to determine which files need re-analysis when a symbol changes.
-    file_references_to_symbols: HashMap<Atom, HashSet<SymbolIdentifier>>,
+    file_references_to_symbols: HashMap<Word, HashSet<SymbolIdentifier>>,
 
-    /// Maps a file (represented by its hash as an Atom) to a set of referenced symbols/members `(Symbol, Member)`
+    /// Maps a file (represented by its hash as an Word) to a set of referenced symbols/members `(Symbol, Member)`
     /// found within the file's global scope signatures (e.g., top-level type declarations).
-    file_references_to_symbols_in_signature: HashMap<Atom, HashSet<SymbolIdentifier>>,
+    file_references_to_symbols_in_signature: HashMap<Word, HashSet<SymbolIdentifier>>,
 
     /// Maps a referencing symbol/member to a set of properties that are *written* (assigned to).
     /// This is separate from read references to enable detection of write-only properties.
@@ -197,7 +197,7 @@ impl SymbolReferences {
     #[inline]
     pub fn add_symbol_reference_to_class_member(
         &mut self,
-        referencing_symbol: Atom,
+        referencing_symbol: Word,
         class_member: SymbolIdentifier,
         in_signature: bool,
     ) {
@@ -205,7 +205,7 @@ impl SymbolReferences {
         self.add_symbol_reference_to_symbol(referencing_symbol, class_member.0, false);
 
         // Use empty member for the referencing symbol key
-        let key = (referencing_symbol, empty_atom());
+        let key = (referencing_symbol, empty_word());
         if in_signature {
             self.symbol_references_to_symbols_in_signature.entry(key).or_default().insert(class_member);
         } else {
@@ -222,14 +222,14 @@ impl SymbolReferences {
     /// * `symbol`: The FQN of the symbol being referenced.
     /// * `in_signature`: `true` if the reference occurs in a signature context, `false` if in the body.
     #[inline]
-    pub fn add_symbol_reference_to_symbol(&mut self, referencing_symbol: Atom, symbol: Atom, in_signature: bool) {
+    pub fn add_symbol_reference_to_symbol(&mut self, referencing_symbol: Word, symbol: Word, in_signature: bool) {
         if referencing_symbol == symbol {
             return;
         }
 
         // Represent top-level symbols with an empty member identifier
-        let referencing_key = (referencing_symbol, empty_atom());
-        let referenced_key = (symbol, empty_atom());
+        let referencing_key = (referencing_symbol, empty_word());
+        let referenced_key = (symbol, empty_word());
 
         if in_signature {
             self.symbol_references_to_symbols_in_signature.entry(referencing_key).or_default().insert(referenced_key);
@@ -294,7 +294,7 @@ impl SymbolReferences {
     pub fn add_class_member_reference_to_symbol(
         &mut self,
         referencing_class_member: SymbolIdentifier,
-        symbol: Atom,
+        symbol: Word,
         in_signature: bool,
     ) {
         if referencing_class_member.0 == symbol {
@@ -305,7 +305,7 @@ impl SymbolReferences {
         self.add_symbol_reference_to_symbol(referencing_class_member.0, symbol, false);
 
         // Represent the referenced symbol with an empty member identifier
-        let referenced_key = (symbol, empty_atom());
+        let referenced_key = (symbol, empty_word());
 
         if in_signature {
             self.symbol_references_to_symbols_in_signature
@@ -328,7 +328,7 @@ impl SymbolReferences {
     #[inline]
     pub fn add_file_reference_to_class_member(
         &mut self,
-        file_hash: Atom,
+        file_hash: Word,
         class_member: SymbolIdentifier,
         in_signature: bool,
     ) {
@@ -372,7 +372,7 @@ impl SymbolReferences {
         scope: &ScopeContext<'_>,
         class_member: SymbolIdentifier,
         in_signature: bool,
-        file_hash: Option<Atom>,
+        file_hash: Option<Word>,
     ) {
         if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
             match referencing_functionlike {
@@ -387,11 +387,11 @@ impl SymbolReferences {
                     ),
                 _ => {
                     // A reference from a closure or arrow function
-                    // If we have a file hash, track it at file level; otherwise use empty_atom()
+                    // If we have a file hash, track it at file level; otherwise use empty_word()
                     if let Some(hash) = file_hash {
                         self.add_file_reference_to_class_member(hash, class_member, in_signature);
                     } else {
-                        self.add_symbol_reference_to_class_member(empty_atom(), class_member, in_signature);
+                        self.add_symbol_reference_to_class_member(empty_word(), class_member, in_signature);
                     }
                 }
             }
@@ -404,7 +404,7 @@ impl SymbolReferences {
             if let Some(hash) = file_hash {
                 self.add_file_reference_to_class_member(hash, class_member, in_signature);
             } else {
-                self.add_symbol_reference_to_class_member(empty_atom(), class_member, in_signature);
+                self.add_symbol_reference_to_class_member(empty_word(), class_member, in_signature);
             }
         }
     }
@@ -413,15 +413,15 @@ impl SymbolReferences {
     pub fn add_reference_for_method_call(&mut self, scope: &ScopeContext<'_>, method: &MethodIdentifier) {
         self.add_reference_to_class_member(
             scope,
-            (ascii_lowercase_atom(&method.get_class_name()), method.get_method_name()),
+            (ascii_lowercase_word(method.get_class_name().as_bytes()), method.get_method_name()),
             false,
         );
     }
 
     /// Records a read reference to a property (e.g., `$this->prop` used as a value).
     #[inline]
-    pub fn add_reference_for_property_read(&mut self, scope: &ScopeContext<'_>, class_name: Atom, property_name: Atom) {
-        let normalized_class_name = ascii_lowercase_atom(&class_name);
+    pub fn add_reference_for_property_read(&mut self, scope: &ScopeContext<'_>, class_name: Word, property_name: Word) {
+        let normalized_class_name = ascii_lowercase_word(class_name.as_bytes());
         let class_member = (normalized_class_name, property_name);
 
         self.add_reference_to_class_member(scope, class_member, false);
@@ -436,10 +436,10 @@ impl SymbolReferences {
     pub fn add_reference_for_property_write(
         &mut self,
         scope: &ScopeContext<'_>,
-        class_name: Atom,
-        property_name: Atom,
+        class_name: Word,
+        property_name: Word,
     ) {
-        let normalized_class_name = ascii_lowercase_atom(&class_name);
+        let normalized_class_name = ascii_lowercase_word(class_name.as_bytes());
         let class_member = (normalized_class_name, property_name);
 
         self.add_reference_to_class_member(scope, class_member, false);
@@ -453,14 +453,14 @@ impl SymbolReferences {
     fn get_referencing_key_from_scope(&self, scope: &ScopeContext<'_>) -> SymbolIdentifier {
         if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
             match referencing_functionlike {
-                FunctionLikeIdentifier::Function(function_name) => (function_name, empty_atom()),
+                FunctionLikeIdentifier::Function(function_name) => (function_name, empty_word()),
                 FunctionLikeIdentifier::Method(class_name, function_name) => (class_name, function_name),
-                _ => (empty_atom(), empty_atom()),
+                _ => (empty_word(), empty_word()),
             }
         } else if let Some(calling_class) = scope.get_class_like_name() {
-            (ascii_lowercase_atom(&calling_class), empty_atom())
+            (ascii_lowercase_word(calling_class.as_bytes()), empty_word())
         } else {
-            (empty_atom(), empty_atom())
+            (empty_word(), empty_word())
         }
     }
 
@@ -470,7 +470,7 @@ impl SymbolReferences {
     pub fn add_reference_to_overridden_class_member(&mut self, scope: &ScopeContext, class_member: SymbolIdentifier) {
         let referencing_key = if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
             match referencing_functionlike {
-                FunctionLikeIdentifier::Function(function_name) => (empty_atom(), function_name),
+                FunctionLikeIdentifier::Function(function_name) => (empty_word(), function_name),
                 FunctionLikeIdentifier::Method(class_name, function_name) => (class_name, function_name),
                 _ => {
                     // A reference from a closure can be ignored for now.
@@ -478,7 +478,7 @@ impl SymbolReferences {
                 }
             }
         } else if let Some(calling_class) = scope.get_class_like_name() {
-            (ascii_lowercase_atom(&calling_class), empty_atom())
+            (ascii_lowercase_word(calling_class.as_bytes()), empty_word())
         } else {
             return; // Cannot record reference without a source context
         };
@@ -489,7 +489,7 @@ impl SymbolReferences {
     /// Convenience method to add a reference *from* the current function context *to* a top-level symbol.
     /// Delegates to appropriate `add_*` methods based on the function context.
     #[inline]
-    pub fn add_reference_to_symbol(&mut self, scope: &ScopeContext, symbol: Atom, in_signature: bool) {
+    pub fn add_reference_to_symbol(&mut self, scope: &ScopeContext, symbol: Word, in_signature: bool) {
         if let Some(referencing_functionlike) = scope.get_function_like_identifier() {
             match referencing_functionlike {
                 FunctionLikeIdentifier::Function(function_name) => {
@@ -503,7 +503,7 @@ impl SymbolReferences {
                 }
             }
         } else if let Some(calling_class) = scope.get_class_like_name() {
-            self.add_symbol_reference_to_symbol(ascii_lowercase_atom(&calling_class), symbol, in_signature);
+            self.add_symbol_reference_to_symbol(ascii_lowercase_word(calling_class.as_bytes()), symbol, in_signature);
         }
     }
 
@@ -687,13 +687,13 @@ impl SymbolReferences {
     /// Returns `None` if the propagation exceeds an expense limit (currently 5000 steps).
     #[inline]
     #[must_use]
-    pub fn get_invalid_symbols(&self, codebase_diff: &CodebaseDiff) -> Option<(HashSet<SymbolIdentifier>, AtomSet)> {
+    pub fn get_invalid_symbols(&self, codebase_diff: &CodebaseDiff) -> Option<(HashSet<SymbolIdentifier>, WordSet)> {
         let mut invalid_signatures = HashSet::default();
-        let mut partially_invalid_symbols = AtomSet::default();
+        let mut partially_invalid_symbols = WordSet::default();
 
         let mut sig_reverse_index: HashMap<SymbolIdentifier, Vec<SymbolIdentifier>> = HashMap::default();
         for (referencing_item, referenced_items) in &self.symbol_references_to_symbols_in_signature {
-            let containing_symbol = (referencing_item.0, empty_atom());
+            let containing_symbol = (referencing_item.0, empty_word());
             if codebase_diff.contains_changed_entry(&containing_symbol) {
                 invalid_signatures.insert(*referencing_item);
                 partially_invalid_symbols.insert(referencing_item.0);
@@ -726,7 +726,7 @@ impl SymbolReferences {
             if !invalidated_item.1.is_empty() {
                 // If it's a member, also mark its containing symbol for processing.
                 partially_invalid_symbols.insert(invalidated_item.0);
-                let containing_symbol = (invalidated_item.0, empty_atom());
+                let containing_symbol = (invalidated_item.0, empty_word());
                 if !processed_symbols.contains(&containing_symbol) {
                     symbols_to_process.push(containing_symbol);
                 }
@@ -792,7 +792,7 @@ impl SymbolReferences {
     pub fn restore_references_for_safe_symbols(
         &mut self,
         previous: &SymbolReferences,
-        safe_symbols: &AtomSet,
+        safe_symbols: &WordSet,
         safe_symbol_members: &HashSet<SymbolIdentifier>,
     ) {
         let is_safe = |key: &SymbolIdentifier| -> bool {
@@ -816,7 +816,7 @@ impl SymbolReferences {
         // Restore function-like return references for safe symbols
         for (key, refs) in &previous.functionlike_references_to_functionlike_returns {
             let sym_key = match key {
-                FunctionLikeIdentifier::Function(name) => (*name, mago_atom::empty_atom()),
+                FunctionLikeIdentifier::Function(name) => (*name, mago_word::empty_word()),
                 FunctionLikeIdentifier::Method(class, method) => (*class, *method),
                 _ => continue,
             };
@@ -855,7 +855,7 @@ impl SymbolReferences {
     pub fn remove_body_references_for_symbols(
         &mut self,
         symbols_and_members: &HashSet<SymbolIdentifier>,
-        file_names: &[Atom],
+        file_names: &[Word],
     ) {
         // Remove body (not signature) references
         for key in symbols_and_members {
@@ -868,7 +868,7 @@ impl SymbolReferences {
         // Remove function-like return references for matching keys
         self.functionlike_references_to_functionlike_returns.retain(|key, _| {
             let sym_key = match key {
-                FunctionLikeIdentifier::Function(name) => (*name, mago_atom::empty_atom()),
+                FunctionLikeIdentifier::Function(name) => (*name, mago_word::empty_word()),
                 FunctionLikeIdentifier::Method(class, method) => (*class, *method),
                 _ => return true,
             };
@@ -913,7 +913,7 @@ impl SymbolReferences {
     #[inline]
     pub fn retain_safe_symbol_references(
         &mut self,
-        safe_symbols: &AtomSet,
+        safe_symbols: &WordSet,
         safe_symbol_members: &HashSet<SymbolIdentifier>,
     ) {
         let is_safe = |key: &SymbolIdentifier| -> bool {
@@ -928,7 +928,7 @@ impl SymbolReferences {
 
         self.functionlike_references_to_functionlike_returns.retain(|key, _| {
             let sym_key = match key {
-                FunctionLikeIdentifier::Function(name) => (*name, mago_atom::empty_atom()),
+                FunctionLikeIdentifier::Function(name) => (*name, mago_word::empty_word()),
                 FunctionLikeIdentifier::Method(class, method) => (*class, *method),
                 _ => return true, // Keep closures and other non-symbol function-likes
             };
@@ -995,14 +995,14 @@ impl SymbolReferences {
     /// Returns a reference to the map tracking file-level references to symbols (body).
     #[inline]
     #[must_use]
-    pub fn get_file_references_to_symbols(&self) -> &HashMap<Atom, HashSet<SymbolIdentifier>> {
+    pub fn get_file_references_to_symbols(&self) -> &HashMap<Word, HashSet<SymbolIdentifier>> {
         &self.file_references_to_symbols
     }
 
     /// Returns a reference to the map tracking file-level references to symbols (signature).
     #[inline]
     #[must_use]
-    pub fn get_file_references_to_symbols_in_signature(&self) -> &HashMap<Atom, HashSet<SymbolIdentifier>> {
+    pub fn get_file_references_to_symbols_in_signature(&self) -> &HashMap<Word, HashSet<SymbolIdentifier>> {
         &self.file_references_to_symbols_in_signature
     }
 }
@@ -1011,8 +1011,8 @@ impl SymbolReferences {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use mago_atom::atom;
-    use mago_atom::empty_atom;
+    use mago_word::empty_word;
+    use mago_word::word;
 
     fn make_refs_with_body(entries: Vec<(SymbolIdentifier, Vec<SymbolIdentifier>)>) -> SymbolReferences {
         let mut refs = SymbolReferences::new();
@@ -1025,19 +1025,19 @@ mod tests {
 
     #[test]
     fn test_restore_references_for_safe_symbols_restores_missing_body_refs() {
-        let class_a = atom("class_a");
-        let class_b = atom("class_b");
-        let method_foo = atom("foo");
-        let method_bar = atom("bar");
+        let class_a = word("class_a");
+        let class_b = word("class_b");
+        let method_foo = word("foo");
+        let method_bar = word("bar");
 
         let previous = make_refs_with_body(vec![
-            ((class_a, method_foo), vec![(class_b, empty_atom())]),
-            ((class_b, method_bar), vec![(class_a, empty_atom())]),
+            ((class_a, method_foo), vec![(class_b, empty_word())]),
+            ((class_b, method_bar), vec![(class_a, empty_word())]),
         ]);
 
-        let mut current = make_refs_with_body(vec![((class_b, method_bar), vec![(class_a, empty_atom())])]);
+        let mut current = make_refs_with_body(vec![((class_b, method_bar), vec![(class_a, empty_word())])]);
 
-        let safe_symbols = AtomSet::default();
+        let safe_symbols = WordSet::default();
         let mut safe_members = HashSet::default();
         safe_members.insert((class_a, method_foo));
 
@@ -1045,92 +1045,92 @@ mod tests {
 
         assert!(current.symbol_references_to_symbols.contains_key(&(class_a, method_foo)));
         let restored = &current.symbol_references_to_symbols[&(class_a, method_foo)];
-        assert!(restored.contains(&(class_b, empty_atom())));
+        assert!(restored.contains(&(class_b, empty_word())));
 
         assert!(current.symbol_references_to_symbols.contains_key(&(class_b, method_bar)));
     }
 
     #[test]
     fn test_restore_references_does_not_overwrite_existing() {
-        let class_a = atom("class_a");
-        let class_b = atom("class_b");
-        let class_c = atom("class_c");
-        let method_foo = atom("foo");
+        let class_a = word("class_a");
+        let class_b = word("class_b");
+        let class_c = word("class_c");
+        let method_foo = word("foo");
 
-        let previous = make_refs_with_body(vec![((class_a, method_foo), vec![(class_b, empty_atom())])]);
+        let previous = make_refs_with_body(vec![((class_a, method_foo), vec![(class_b, empty_word())])]);
 
-        let mut current = make_refs_with_body(vec![((class_a, method_foo), vec![(class_c, empty_atom())])]);
+        let mut current = make_refs_with_body(vec![((class_a, method_foo), vec![(class_c, empty_word())])]);
 
-        let safe_symbols = AtomSet::default();
+        let safe_symbols = WordSet::default();
         let mut safe_members = HashSet::default();
         safe_members.insert((class_a, method_foo));
 
         current.restore_references_for_safe_symbols(&previous, &safe_symbols, &safe_members);
 
         let refs = &current.symbol_references_to_symbols[&(class_a, method_foo)];
-        assert!(refs.contains(&(class_c, empty_atom())));
-        assert!(!refs.contains(&(class_b, empty_atom())));
+        assert!(refs.contains(&(class_c, empty_word())));
+        assert!(!refs.contains(&(class_b, empty_word())));
     }
 
     #[test]
     fn test_restore_references_for_safe_top_level_symbols() {
-        let func_a = atom("func_a");
-        let class_b = atom("class_b");
+        let func_a = word("func_a");
+        let class_b = word("class_b");
 
-        let previous = make_refs_with_body(vec![((func_a, empty_atom()), vec![(class_b, empty_atom())])]);
+        let previous = make_refs_with_body(vec![((func_a, empty_word()), vec![(class_b, empty_word())])]);
 
         let mut current = SymbolReferences::new();
 
-        let mut safe_symbols = AtomSet::default();
+        let mut safe_symbols = WordSet::default();
         safe_symbols.insert(func_a);
         let safe_members = HashSet::default();
 
         current.restore_references_for_safe_symbols(&previous, &safe_symbols, &safe_members);
 
-        assert!(current.symbol_references_to_symbols.contains_key(&(func_a, empty_atom())));
-        let restored = &current.symbol_references_to_symbols[&(func_a, empty_atom())];
-        assert!(restored.contains(&(class_b, empty_atom())));
+        assert!(current.symbol_references_to_symbols.contains_key(&(func_a, empty_word())));
+        let restored = &current.symbol_references_to_symbols[&(func_a, empty_word())];
+        assert!(restored.contains(&(class_b, empty_word())));
     }
 
     #[test]
     fn test_restore_skips_non_safe_symbols() {
-        let func_a = atom("func_a");
-        let class_b = atom("class_b");
-        let previous = make_refs_with_body(vec![((func_a, empty_atom()), vec![(class_b, empty_atom())])]);
+        let func_a = word("func_a");
+        let class_b = word("class_b");
+        let previous = make_refs_with_body(vec![((func_a, empty_word()), vec![(class_b, empty_word())])]);
 
         let mut current = SymbolReferences::new();
 
-        let safe_symbols = AtomSet::default();
+        let safe_symbols = WordSet::default();
         let safe_members = HashSet::default();
 
         current.restore_references_for_safe_symbols(&previous, &safe_symbols, &safe_members);
 
-        assert!(!current.symbol_references_to_symbols.contains_key(&(func_a, empty_atom())));
+        assert!(!current.symbol_references_to_symbols.contains_key(&(func_a, empty_word())));
     }
 
     #[test]
     fn test_get_invalid_symbols_basic_cascade() {
-        let class_a = atom("class_a");
-        let class_b = atom("class_b");
-        let method_foo = atom("foo");
+        let class_a = word("class_a");
+        let class_b = word("class_b");
+        let method_foo = word("foo");
 
         let mut refs = SymbolReferences::new();
         refs.symbol_references_to_symbols_in_signature.insert((class_b, method_foo), {
             let mut set = HashSet::default();
-            set.insert((class_a, empty_atom()));
+            set.insert((class_a, empty_word()));
             set
         });
 
         let mut diff = crate::diff::CodebaseDiff::new();
         let mut changed = HashSet::default();
-        changed.insert((class_a, empty_atom()));
+        changed.insert((class_a, empty_word()));
         diff = diff.with_changed(changed);
 
         let result = refs.get_invalid_symbols(&diff);
         assert!(result.is_some());
         let (invalid, partially_invalid) = result.unwrap();
 
-        assert!(invalid.contains(&(class_a, empty_atom())));
+        assert!(invalid.contains(&(class_a, empty_word())));
         assert!(invalid.contains(&(class_b, method_foo)));
         assert!(partially_invalid.contains(&class_b));
     }

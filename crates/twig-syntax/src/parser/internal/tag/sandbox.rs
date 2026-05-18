@@ -14,14 +14,14 @@ impl<'arena> Parser<'_, 'arena> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let keyword = self.keyword_from(&keyword_tok);
         let close_tag = self.stream.expect_block_end()?;
-        let body = self.parse_statements(&BlockTerminator { names: &["endsandbox"] })?;
+        let body = self.parse_statements(&BlockTerminator { names: &[b"endsandbox"] })?;
         let end_open_tok = self.stream.expect_block_start()?;
         let end_open_tag = self.stream.span_of(&end_open_tok);
-        let end_kw_tok = self.stream.expect_name("expected `endsandbox`")?;
-        if end_kw_tok.value != "endsandbox" {
+        let end_kw_tok = self.stream.expect_name(b"expected `endsandbox`")?;
+        if end_kw_tok.value != b"endsandbox" {
             return Err(ParseError::MismatchedEndTag {
-                expected: "endsandbox".to_string(),
-                got: end_kw_tok.value.to_string(),
+                expected: b"endsandbox".to_vec(),
+                got: end_kw_tok.value.to_vec(),
                 span: self.stream.span_of(&end_kw_tok),
             });
         }

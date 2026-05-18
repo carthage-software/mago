@@ -46,9 +46,8 @@ impl<'arena> TypeLexer<'arena> {
 
     #[inline]
     #[must_use]
-    pub fn slice_in_range(&self, from: u32, to: u32) -> &'arena str {
-        let bytes_slice = self.input.slice_in_range(from, to);
-        bytes_slice.utf8_chunks().next().map_or("", |chunk| chunk.valid())
+    pub fn slice_in_range(&self, from: u32, to: u32) -> &'arena [u8] {
+        self.input.slice_in_range(from, to)
     }
 
     #[inline]
@@ -407,11 +406,7 @@ impl<'arena> TypeLexer<'arena> {
 
     #[inline]
     fn token(&self, kind: TypeTokenKind, value: &'arena [u8], start: Position, _end: Position) -> TypeToken<'arena> {
-        // SAFETY: `Input` is constructed from a `&str` so the underlying bytes
-        // are valid UTF-8. Token boundaries are either ASCII stop bytes or end
-        // of input, which land on UTF-8 char boundaries.
-        let value_str = unsafe { std::str::from_utf8_unchecked(value) };
-        TypeToken { kind, start, value: value_str }
+        TypeToken { kind, start, value }
     }
 }
 

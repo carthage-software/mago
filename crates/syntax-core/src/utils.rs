@@ -16,15 +16,16 @@ use crate::number_separator;
 /// after validation). This should not occur with valid PHP strings.
 pub fn parse_literal_string_in<'arena>(
     arena: &'arena Bump,
-    s: &'arena str,
-    quote_char: Option<char>,
+    s: &'arena [u8],
+    quote_char: Option<u8>,
     has_quote: bool,
-) -> Option<&'arena str> {
+) -> Option<&'arena [u8]> {
     if s.is_empty() {
-        return Some("");
+        return Some(b"");
     }
 
-    let s = if has_quote && (s.starts_with("b\"") || s.starts_with("b'") || s.starts_with("B\"") || s.starts_with("B'"))
+    let s = if has_quote
+        && (s.starts_with(b"b\"") || s.starts_with(b"b'") || s.starts_with(b"B\"") || s.starts_with(b"B'"))
     {
         &s[1..]
     } else {
@@ -35,87 +36,90 @@ pub fn parse_literal_string_in<'arena>(
         (Some(quote_char), s)
     } else if !has_quote {
         (None, s)
-    } else if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
-        (Some('"'), &s[1..s.len() - 1])
-    } else if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
-        (Some('\''), &s[1..s.len() - 1])
+    } else if s.starts_with(b"\"") && s.ends_with(b"\"") && s.len() >= 2 {
+        (Some(b'"'), &s[1..s.len() - 1])
+    } else if s.starts_with(b"'") && s.ends_with(b"'") && s.len() >= 2 {
+        (Some(b'\''), &s[1..s.len() - 1])
     } else {
         return None;
     };
 
-    let needs_processing = content.contains('\\') || quote_char.is_some_and(|q| content.contains(q));
+    let needs_processing = content.contains(&b'\\') || quote_char.is_some_and(|q| content.contains(&q));
     if !needs_processing {
         return Some(content);
     }
 
     let mut result = Vec::with_capacity_in(content.len(), arena);
-    let mut chars = content.chars().peekable();
-    let mut buf = [0; 4];
+    let mut i = 0;
 
-    while let Some(c) = chars.next() {
-        if c != '\\' {
-            result.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+    while i < content.len() {
+        let b = content[i];
+        if b != b'\\' {
+            result.push(b);
+            i += 1;
             continue;
         }
 
-        let Some(&next_char) = chars.peek() else {
+        let next_index = i + 1;
+        let Some(&next) = content.get(next_index) else {
             result.push(b'\\');
+            i += 1;
             continue;
         };
 
-        let mut consumed = true;
+        // Most escapes consume two bytes (`\` + the next byte). The hex and octal
+        // forms scan additional digit bytes and update `i` themselves.
+        let mut consumed = 2;
 
-        match next_char {
-            '\\' => result.push(b'\\'),
-            '\'' if quote_char == Some('\'') => result.push(b'\''),
-            '"' if quote_char == Some('"') => result.push(b'"'),
-            '$' if quote_char == Some('"') => result.push(b'$'),
-            'n' if quote_char == Some('"') => result.push(b'\n'),
-            't' if quote_char == Some('"') => result.push(b'\t'),
-            'r' if quote_char == Some('"') => result.push(b'\r'),
-            'v' if quote_char == Some('"') => result.push(0x0B),
-            'e' if quote_char == Some('"') => result.push(0x1B),
-            'f' if quote_char == Some('"') => result.push(0x0C),
-            'x' if quote_char == Some('"') => {
-                chars.next(); // Consume 'x'
+        match next {
+            b'\\' => result.push(b'\\'),
+            b'\'' if quote_char == Some(b'\'') => result.push(b'\''),
+            b'"' if quote_char == Some(b'"') => result.push(b'"'),
+            b'$' if quote_char == Some(b'"') => result.push(b'$'),
+            b'n' if quote_char == Some(b'"') => result.push(b'\n'),
+            b't' if quote_char == Some(b'"') => result.push(b'\t'),
+            b'r' if quote_char == Some(b'"') => result.push(b'\r'),
+            b'v' if quote_char == Some(b'"') => result.push(0x0B),
+            b'e' if quote_char == Some(b'"') => result.push(0x1B),
+            b'f' if quote_char == Some(b'"') => result.push(0x0C),
+            b'x' if quote_char == Some(b'"') => {
                 let mut hex_val = 0u8;
                 let mut hex_len = 0;
-                // Peek up to 2 hex digits
-                while let Some(peeked) = chars.peek() {
-                    if hex_len < 2
-                        && peeked.is_ascii_hexdigit()
-                        && let Some(digit) = peeked.to_digit(16)
-                    {
-                        hex_val = hex_val * 16 + digit as u8;
-                        hex_len += 1;
-                        chars.next(); // Consume the digit
+                let mut j = i + 2;
+                while hex_len < 2 && j < content.len() {
+                    let c = content[j];
+                    let digit = if c.is_ascii_digit() {
+                        c - b'0'
+                    } else if (b'a'..=b'f').contains(&c) {
+                        c - b'a' + 10
+                    } else if (b'A'..=b'F').contains(&c) {
+                        c - b'A' + 10
                     } else {
                         break;
-                    }
+                    };
+                    hex_val = hex_val * 16 + digit;
+                    hex_len += 1;
+                    j += 1;
                 }
                 if hex_len > 0 {
                     result.push(hex_val);
+                    consumed = 2 + hex_len;
                 } else {
                     // Invalid `\x` sequence, treat as literal `\x`
                     result.push(b'\\');
                     result.push(b'x');
                 }
-
-                consumed = false;
             }
-            c if quote_char == Some('"') && c.is_ascii_digit() => {
+            c if quote_char == Some(b'"') && c.is_ascii_digit() => {
                 let mut octal_val = 0u16;
                 let mut octal_len = 0;
-
-                while let Some(peeked) = chars.peek() {
-                    if octal_len < 3
-                        && peeked.is_ascii_digit()
-                        && *peeked <= '7'
-                        && let Some(digit) = peeked.to_digit(8)
-                    {
-                        octal_val = octal_val * 8 + digit as u16;
+                let mut j = i + 1;
+                while octal_len < 3 && j < content.len() {
+                    let d = content[j];
+                    if d.is_ascii_digit() && d <= b'7' {
+                        octal_val = octal_val * 8 + u16::from(d - b'0');
                         octal_len += 1;
-                        chars.next(); // Consume the digit
+                        j += 1;
                     } else {
                         break;
                     }
@@ -123,209 +127,49 @@ pub fn parse_literal_string_in<'arena>(
                 if octal_len > 0 {
                     // Truncate to u8 (matches PHP behavior for octal sequences > 255)
                     result.push(octal_val as u8);
+                    consumed = 1 + octal_len;
                 } else {
                     result.push(b'\\');
-                    result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
-                    chars.next();
+                    result.push(next);
                 }
-
-                consumed = false;
             }
             _ => {
                 // Unrecognized escape sequence
                 result.push(b'\\');
-                result.extend_from_slice(next_char.encode_utf8(&mut buf).as_bytes());
+                result.push(next);
             }
         }
 
-        if consumed {
-            chars.next(); // Consume the character after the backslash
-        }
+        i += consumed;
     }
 
-    std::str::from_utf8(result.into_bump_slice()).ok()
-}
-
-/// Parses a PHP literal string, handling all escape sequences, and returns the result as a `String`.
-///
-/// # Returns
-///
-/// An `Option<String>` containing the parsed string or `None` if the input is invalid.
-///
-/// # Notes
-///
-/// This function is similar to `parse_literal_string_in`, but it allocates the result on the heap instead of in an arena.
-/// It is recommended to use `parse_literal_string_in` when possible for better performance in contexts where an arena is available.
-///
-/// # Panics
-///
-/// Panics if internal assumptions about character parsing are violated (e.g., invalid hex or octal digits
-/// after validation). This should not occur with valid PHP strings.
-#[inline]
-#[must_use]
-pub fn parse_literal_string(s: &str, quote_char: Option<char>, has_quote: bool) -> Option<String> {
-    if s.is_empty() {
-        return Some(String::new());
-    }
-
-    let (quote_char, content) = if let Some(quote_char) = quote_char {
-        (Some(quote_char), s)
-    } else if !has_quote {
-        (None, s)
-    } else if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
-        (Some('"'), &s[1..s.len() - 1])
-    } else if s.starts_with('\'') && s.ends_with('\'') && s.len() >= 2 {
-        (Some('\''), &s[1..s.len() - 1])
-    } else {
-        return None;
-    };
-
-    let mut result = String::new();
-    let mut chars = content.chars().peekable();
-
-    while let Some(c) = chars.next() {
-        if c != '\\' {
-            result.push(c);
-
-            continue;
-        }
-
-        let Some(&next_char) = chars.peek() else {
-            result.push(c);
-
-            continue;
-        };
-
-        match next_char {
-            '\\' => {
-                result.push('\\');
-                chars.next();
-            }
-            '\'' if quote_char == Some('\'') => {
-                result.push('\'');
-                chars.next();
-            }
-            '"' if quote_char == Some('"') => {
-                result.push('"');
-                chars.next();
-            }
-            'n' if quote_char == Some('"') => {
-                result.push('\n');
-                chars.next();
-            }
-            't' if quote_char == Some('"') => {
-                result.push('\t');
-                chars.next();
-            }
-            'r' if quote_char == Some('"') => {
-                result.push('\r');
-                chars.next();
-            }
-            'v' if quote_char == Some('"') => {
-                result.push('\x0B');
-                chars.next();
-            }
-            'e' if quote_char == Some('"') => {
-                result.push('\x1B');
-                chars.next();
-            }
-            'f' if quote_char == Some('"') => {
-                result.push('\x0C');
-                chars.next();
-            }
-            'x' if quote_char == Some('"') => {
-                chars.next();
-
-                let mut hex_chars = String::new();
-                for _ in 0..2 {
-                    if let Some(&next) = chars.peek() {
-                        if next.is_ascii_hexdigit() {
-                            if let Some(c) = chars.next() {
-                                hex_chars.push(c);
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                }
-
-                if hex_chars.is_empty() {
-                    return None;
-                }
-                match u8::from_str_radix(&hex_chars, 16) {
-                    Ok(byte_val) => result.push(byte_val as char),
-                    Err(_) => {
-                        return None;
-                    }
-                }
-            }
-            c if quote_char == Some('"') && c.is_ascii_digit() => {
-                let mut octal = String::new();
-                if let Some(first) = chars.next() {
-                    octal.push(first);
-                }
-
-                for _ in 0..2 {
-                    if let Some(&next) = chars.peek() {
-                        if next.is_ascii_digit() && next <= '7' {
-                            if let Some(c) = chars.next() {
-                                octal.push(c);
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-                }
-
-                match u8::from_str_radix(&octal, 8) {
-                    Ok(val) => result.push(val as char),
-                    Err(_) => {
-                        result.push('\\');
-                        result.push_str(&octal);
-                    }
-                }
-            }
-            '$' if quote_char == Some('"') => {
-                result.push('$');
-                chars.next();
-            }
-            _ => {
-                result.push(c);
-                result.push(next_char);
-                chars.next();
-            }
-        }
-    }
-
-    Some(result)
+    Some(result.into_bump_slice())
 }
 
 /// Parses a PHP literal float, handling underscore separators.
 #[inline]
 #[must_use]
-pub fn parse_literal_float(value: &str) -> Option<f64> {
-    if memchr::memchr(b'_', value.as_bytes()).is_none() {
-        return value.parse::<f64>().ok();
+pub fn parse_literal_float(value: &[u8]) -> Option<f64> {
+    if memchr::memchr(b'_', value).is_none() {
+        return std::str::from_utf8(value).ok()?.parse::<f64>().ok();
     }
 
     let mut buf = [0u8; 64];
     let mut len = 0;
 
-    for &b in value.as_bytes() {
+    for &b in value {
         if b != b'_' {
             if len < 64 {
                 buf[len] = b;
                 len += 1;
             } else {
-                let source = value.replace('_', "");
-                return source.parse::<f64>().ok();
+                let source: std::vec::Vec<u8> = value.iter().copied().filter(|&b| b != b'_').collect();
+                return std::str::from_utf8(&source).ok()?.parse::<f64>().ok();
             }
         }
     }
 
-    // SAFETY: We only copied ASCII bytes from a valid UTF-8 string
-    let s = unsafe { std::str::from_utf8_unchecked(&buf[..len]) };
-    s.parse::<f64>().ok()
+    std::str::from_utf8(&buf[..len]).ok()?.parse::<f64>().ok()
 }
 
 /// Parses a PHP literal integer with support for binary, octal, decimal, and hex.
@@ -333,8 +177,7 @@ pub fn parse_literal_float(value: &str) -> Option<f64> {
 /// Optimized to use byte-level iteration instead of Unicode chars.
 #[inline]
 #[must_use]
-pub fn parse_literal_integer(value: &str) -> Option<u64> {
-    let bytes = value.as_bytes();
+pub fn parse_literal_integer(bytes: &[u8]) -> Option<u64> {
     if bytes.is_empty() {
         return None;
     }
@@ -529,19 +372,19 @@ mod tests {
 
     #[test]
     fn test_parse_literal_integer() {
-        parse_int!("123", Some(123));
-        parse_int!("0", Some(0));
-        parse_int!("0b1010", Some(10));
-        parse_int!("0o17", Some(15));
-        parse_int!("0x1A3F", Some(6719));
-        parse_int!("0XFF", Some(255));
-        parse_int!("0_1_2_3", Some(83));
-        parse_int!("0b1_0_1_0", Some(10));
-        parse_int!("0o1_7", Some(15));
-        parse_int!("0x1_A_3_F", Some(6719));
-        parse_int!("", None);
-        parse_int!("0xGHI", None);
-        parse_int!("0b102", None);
-        parse_int!("0o89", None);
+        parse_int!(b"123", Some(123));
+        parse_int!(b"0", Some(0));
+        parse_int!(b"0b1010", Some(10));
+        parse_int!(b"0o17", Some(15));
+        parse_int!(b"0x1A3F", Some(6719));
+        parse_int!(b"0XFF", Some(255));
+        parse_int!(b"0_1_2_3", Some(83));
+        parse_int!(b"0b1_0_1_0", Some(10));
+        parse_int!(b"0o1_7", Some(15));
+        parse_int!(b"0x1_A_3_F", Some(6719));
+        parse_int!(b"", None);
+        parse_int!(b"0xGHI", None);
+        parse_int!(b"0b102", None);
+        parse_int!(b"0o89", None);
     }
 }

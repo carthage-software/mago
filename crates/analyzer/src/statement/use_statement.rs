@@ -1,4 +1,3 @@
-use mago_atom::concat_atom;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -7,6 +6,7 @@ use mago_syntax::ast::Identifier;
 use mago_syntax::ast::Use;
 use mago_syntax::ast::UseItems;
 use mago_syntax::ast::UseType;
+use mago_word::concat_word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -14,6 +14,8 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use mago_bytes::BytesDisplay;
+use mago_bytes::trim_start_byte;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Use<'arena> {
     fn analyze<'ctx>(
@@ -25,31 +27,31 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Use<'arena> {
         match &self.items {
             UseItems::Sequence(sequence) => {
                 for item in sequence.items.iter() {
-                    let fqn = item.name.value().trim_start_matches('\\');
+                    let fqn = trim_start_byte(item.name.value(), b'\\');
                     check_class_like_import(context, &item.name, fqn);
                 }
             }
             UseItems::TypedSequence(typed_sequence) => {
                 for item in typed_sequence.items.iter() {
-                    let fqn = item.name.value().trim_start_matches('\\');
+                    let fqn = trim_start_byte(item.name.value(), b'\\');
                     check_typed_import(context, &item.name, fqn, &typed_sequence.r#type);
                 }
             }
             UseItems::TypedList(typed_list) => {
-                let prefix = typed_list.namespace.value().trim_start_matches('\\');
+                let prefix = trim_start_byte(typed_list.namespace.value(), b'\\');
                 for item in typed_list.items.iter() {
-                    let fqn = concat_atom!(prefix, "\\", item.name.value());
-                    check_typed_import(context, &item.name, &fqn, &typed_list.r#type);
+                    let fqn = concat_word!(prefix, b"\\", item.name.value());
+                    check_typed_import(context, &item.name, fqn.as_bytes(), &typed_list.r#type);
                 }
             }
             UseItems::MixedList(mixed_list) => {
-                let prefix = mixed_list.namespace.value().trim_start_matches('\\');
+                let prefix = trim_start_byte(mixed_list.namespace.value(), b'\\');
                 for maybe_typed_item in mixed_list.items.iter() {
-                    let fqn = concat_atom!(prefix, "\\", maybe_typed_item.item.name.value());
+                    let fqn = concat_word!(prefix, b"\\", maybe_typed_item.item.name.value());
                     check_maybe_typed_import(
                         context,
                         &maybe_typed_item.item.name,
-                        &fqn,
+                        fqn.as_bytes(),
                         maybe_typed_item.r#type.as_ref(),
                     );
                 }
@@ -60,13 +62,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Use<'arena> {
     }
 }
 
-fn check_class_like_import(context: &mut Context<'_, '_>, name: &Identifier<'_>, fqn: &str) {
+fn check_class_like_import(context: &mut Context<'_, '_>, name: &Identifier<'_>, fqn: &[u8]) {
     if !context.codebase.class_like_exists(fqn) && !context.codebase.namespace_exists(fqn) {
         report_non_existent_import(context, name.span(), fqn, "class, interface, trait, or enum");
     }
 }
 
-fn check_typed_import(context: &mut Context<'_, '_>, name: &Identifier<'_>, fqn: &str, use_type: &UseType<'_>) {
+fn check_typed_import(context: &mut Context<'_, '_>, name: &Identifier<'_>, fqn: &[u8], use_type: &UseType<'_>) {
     match use_type {
         UseType::Function(_) => {
             if !context.codebase.function_exists(fqn) {
@@ -84,7 +86,7 @@ fn check_typed_import(context: &mut Context<'_, '_>, name: &Identifier<'_>, fqn:
 fn check_maybe_typed_import(
     context: &mut Context<'_, '_>,
     name: &Identifier<'_>,
-    fqn: &str,
+    fqn: &[u8],
     use_type: Option<&UseType<'_>>,
 ) {
     match use_type {
@@ -106,7 +108,8 @@ fn check_maybe_typed_import(
     }
 }
 
-fn report_non_existent_import(context: &mut Context<'_, '_>, span: Span, fqn: &str, symbol_type: &str) {
+fn report_non_existent_import(context: &mut Context<'_, '_>, span: Span, fqn: &[u8], symbol_type: &str) {
+    let fqn = BytesDisplay(fqn);
     context.collector.report_with_code(
         IssueCode::NonExistentUseImport,
         Issue::error(format!("Imported {symbol_type} `{fqn}` does not exist."))

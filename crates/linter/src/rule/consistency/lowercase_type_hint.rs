@@ -106,19 +106,22 @@ impl LintRule for LowercaseTypeHintRule {
             return;
         };
 
-        if identifier.value.chars().all(|c| !c.is_ascii_alphabetic() || c.is_ascii_lowercase()) {
+        if identifier.value.iter().all(|&b| !b.is_ascii_alphabetic() || b.is_ascii_lowercase()) {
             return; // Already in lowercase, no issue to report
         }
 
         let lowercase = identifier.value.to_ascii_lowercase();
+        let Some(lowercase_str) = std::str::from_utf8(&lowercase).ok() else { return };
+        let identifier_display = mago_bytes::BytesDisplay(identifier.value);
 
-        let issue = Issue::new(self.cfg.level(), format!("Type hint `{}` should be in lowercase.", identifier.value))
+        let issue = Issue::new(self.cfg.level(), format!("Type hint `{identifier_display}` should be in lowercase."))
             .with_code(self.meta.code)
             .with_annotation(Annotation::primary(identifier.span()))
-            .with_help(format!("Consider using `{}` instead of `{}`.", lowercase, identifier.value));
+            .with_help(format!("Consider using `{lowercase_str}` instead of `{identifier_display}`."));
 
+        let lowercase_owned = lowercase_str.to_owned();
         ctx.collector.propose(issue, |edits| {
-            edits.push(TextEdit::replace(identifier.span, lowercase));
+            edits.push(TextEdit::replace(identifier.span, lowercase_owned));
         });
     }
 }

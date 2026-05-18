@@ -86,7 +86,7 @@ impl LintRule for NoUnderscoreClassRule {
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
         match node {
             Node::Class(class) => {
-                if class.name.value != "_" {
+                if class.name.value != b"_" {
                     return;
                 }
 
@@ -103,7 +103,7 @@ impl LintRule for NoUnderscoreClassRule {
                 );
             }
             Node::Interface(interface) => {
-                if interface.name.value != "_" {
+                if interface.name.value != b"_" {
                     return;
                 }
 
@@ -120,7 +120,7 @@ impl LintRule for NoUnderscoreClassRule {
                 );
             }
             Node::Trait(r#trait) => {
-                if r#trait.name.value != "_" {
+                if r#trait.name.value != b"_" {
                     return;
                 }
 
@@ -137,7 +137,7 @@ impl LintRule for NoUnderscoreClassRule {
                 );
             }
             Node::Enum(r#enum) => {
-                if r#enum.name.value != "_" {
+                if r#enum.name.value != b"_" {
                     return;
                 }
 

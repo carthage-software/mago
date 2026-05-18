@@ -40,14 +40,14 @@ impl Visibility {
         matches!(self, Visibility::Private)
     }
 
-    /// Returns the visibility level as a static string.
+    /// Returns the visibility level as static bytes.
     #[inline]
     #[must_use]
-    pub const fn as_str(&self) -> &'static str {
+    pub const fn as_bytes(&self) -> &'static [u8] {
         match self {
-            Visibility::Public => "public",
-            Visibility::Protected => "protected",
-            Visibility::Private => "private",
+            Visibility::Public => b"public",
+            Visibility::Protected => b"protected",
+            Visibility::Private => b"private",
         }
     }
 }
@@ -55,7 +55,7 @@ impl Visibility {
 /// Formats the visibility level as the corresponding lowercase PHP keyword.
 impl std::fmt::Display for Visibility {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
+        write!(f, "{}", mago_bytes::BytesDisplay(self.as_bytes()))
     }
 }
 

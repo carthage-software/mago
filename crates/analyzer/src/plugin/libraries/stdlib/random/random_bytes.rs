@@ -28,7 +28,7 @@ impl Provider for RandomBytesProvider {
 
 impl FunctionReturnTypeProvider for RandomBytesProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("random_bytes")
+        FunctionTarget::Exact(b"random_bytes")
     }
 
     fn get_return_type(
@@ -36,7 +36,7 @@ impl FunctionReturnTypeProvider for RandomBytesProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let length_argument = invocation.get_argument(0, &["length"])?;
+        let length_argument = invocation.get_argument(0, &[b"length"])?;
         let length_argument_type = context.get_expression_type(length_argument)?;
         let length_argument_integer = length_argument_type.get_single_int()?;
         let minimum_value = length_argument_integer.get_minimum_value()?;

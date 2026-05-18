@@ -32,8 +32,8 @@ fn benchmark_mago_parser(c: &mut Criterion) {
     group.bench_function("small", |b| {
         b.iter(|| {
             let arena = Bump::new();
-            let file_id = FileId::new("bench.php");
-            let result = parse_file_content(&arena, file_id, black_box(SMALL_PHP));
+            let file_id = FileId::new(b"bench.php");
+            let result = parse_file_content(&arena, file_id, black_box(SMALL_PHP.as_bytes()));
             let _ = black_box(result.errors.len());
         })
     });
@@ -42,8 +42,8 @@ fn benchmark_mago_parser(c: &mut Criterion) {
     group.bench_function("medium", |b| {
         b.iter(|| {
             let arena = Bump::new();
-            let file_id = FileId::new("bench.php");
-            let result = parse_file_content(&arena, file_id, black_box(MEDIUM_PHP));
+            let file_id = FileId::new(b"bench.php");
+            let result = parse_file_content(&arena, file_id, black_box(MEDIUM_PHP.as_bytes()));
             let _ = black_box(result.errors.len());
         })
     });
@@ -52,8 +52,8 @@ fn benchmark_mago_parser(c: &mut Criterion) {
     group.bench_function("large", |b| {
         b.iter(|| {
             let arena = Bump::new();
-            let file_id = FileId::new("bench.php");
-            let result = parse_file_content(&arena, file_id, black_box(LARGE_PHP));
+            let file_id = FileId::new(b"bench.php");
+            let result = parse_file_content(&arena, file_id, black_box(LARGE_PHP.as_bytes()));
             let _ = black_box(result.errors.len());
         })
     });
@@ -100,7 +100,7 @@ fn benchmark_mago_lexer(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(LARGE_PHP.len() as u64));
     group.bench_function("large", |b| {
         b.iter(|| {
-            let file_id = FileId::new("bench.php");
+            let file_id = FileId::new(b"bench.php");
             let input = Input::new(file_id, black_box(LARGE_PHP.as_bytes()));
             let mut lexer = Lexer::new(input, LexerSettings::default());
             let mut count = 0usize;

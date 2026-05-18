@@ -39,8 +39,8 @@ pub fn get_type_diff(context: &Context<'_, '_>, container: &TUnion, input: &TUni
         formatter = formatter.with_color();
     }
 
-    let container_id = container.get_pretty_id();
-    let input_id = input.get_pretty_id();
+    let container_id = container.get_pretty_id().to_string();
+    let input_id = input.get_pretty_id().to_string();
     let patch = diffy::create_patch(&container_id, &input_id);
     let diff = formatter.fmt_patch(&patch);
 

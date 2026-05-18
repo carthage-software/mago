@@ -1,4 +1,4 @@
-use mago_atom::Atom;
+use mago_word::Word;
 
 pub mod case_scope;
 pub mod conditional_scope;
@@ -8,28 +8,33 @@ pub mod if_scope;
 pub mod loop_scope;
 
 #[inline]
-pub fn var_has_root(var_id: Atom, root_var_id: Atom) -> bool {
+pub fn var_has_root(var_id: Word, root_var_id: Word) -> bool {
     if var_id == root_var_id {
         return true;
     }
 
-    if !var_id.starts_with(root_var_id.as_str()) {
+    let var_bytes = var_id.as_bytes();
+    let root_bytes = root_var_id.as_bytes();
+    if !var_bytes.starts_with(root_bytes) {
         return false;
     }
 
-    let after_root = &var_id[root_var_id.len()..];
-    after_root.starts_with("->") || after_root.starts_with("::") || after_root.starts_with('[')
+    let after_root = &var_bytes[root_bytes.len()..];
+    after_root.starts_with(b"->") || after_root.starts_with(b"::") || after_root.starts_with(b"[")
 }
 
 #[inline]
-pub fn var_references_dynamic(var_id: Atom, referenced_var_id: Atom) -> bool {
-    let var_str = var_id.as_str();
-    let ref_str = referenced_var_id.as_str();
+pub fn var_references_dynamic(var_id: Word, referenced_var_id: Word) -> bool {
+    let var_bytes = var_id.as_bytes();
+    let ref_bytes = referenced_var_id.as_bytes();
 
     let mut start = 1;
-    while let Some(pos) = var_str.get(start..).and_then(|s| s.find(ref_str)) {
-        let end = start + pos + ref_str.len();
-        if end == var_str.len() || !var_str.as_bytes()[end].is_ascii_alphanumeric() && var_str.as_bytes()[end] != b'_' {
+    while start <= var_bytes.len() {
+        let Some(pos) = memchr::memmem::find(&var_bytes[start..], ref_bytes) else {
+            return false;
+        };
+        let end = start + pos + ref_bytes.len();
+        if end == var_bytes.len() || (!var_bytes[end].is_ascii_alphanumeric() && var_bytes[end] != b'_') {
             return true;
         }
 
@@ -42,32 +47,32 @@ pub fn var_references_dynamic(var_id: Atom, referenced_var_id: Atom) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mago_atom::atom;
+    use mago_word::word;
 
     #[test]
     fn test_var_has_root() {
-        assert!(var_has_root(atom("$foo"), atom("$foo")));
-        assert!(var_has_root(atom("$foo[bar]"), atom("$foo")));
-        assert!(var_has_root(atom("$foo->bar"), atom("$foo")));
-        assert!(var_has_root(atom("$foo::bar"), atom("$foo")));
-        assert!(var_has_root(atom("$foo->bar[0]"), atom("$foo")));
-        assert!(var_has_root(atom("$foo->bar[0]->baz"), atom("$foo")));
-        assert!(!var_has_root(atom("$foo[bar]"), atom("$bar")));
-        assert!(var_has_root(atom("$foo[bar]"), atom("$foo[bar]")));
-        assert!(!var_has_root(atom("$foo[bar]"), atom("$foo[bar][baz]")));
-        assert!(!var_has_root(atom("$foo[bar]"), atom("$foo[bar][baz]")));
+        assert!(var_has_root(word(b"$foo"), word(b"$foo")));
+        assert!(var_has_root(word(b"$foo[bar]"), word(b"$foo")));
+        assert!(var_has_root(word(b"$foo->bar"), word(b"$foo")));
+        assert!(var_has_root(word(b"$foo::bar"), word(b"$foo")));
+        assert!(var_has_root(word(b"$foo->bar[0]"), word(b"$foo")));
+        assert!(var_has_root(word(b"$foo->bar[0]->baz"), word(b"$foo")));
+        assert!(!var_has_root(word(b"$foo[bar]"), word(b"$bar")));
+        assert!(var_has_root(word(b"$foo[bar]"), word(b"$foo[bar]")));
+        assert!(!var_has_root(word(b"$foo[bar]"), word(b"$foo[bar][baz]")));
+        assert!(!var_has_root(word(b"$foo[bar]"), word(b"$foo[bar][baz]")));
     }
 
     #[test]
     fn test_var_references_dynamic() {
-        assert!(var_references_dynamic(atom("$this->{$name}"), atom("$name")));
-        assert!(var_references_dynamic(atom("$this->$name"), atom("$name")));
-        assert!(var_references_dynamic(atom("$arr[$name]"), atom("$name")));
-        assert!(var_references_dynamic(atom("$this->{$name}->foo"), atom("$name")));
-        assert!(!var_references_dynamic(atom("$this->name"), atom("$name")));
-        assert!(!var_references_dynamic(atom("$this->$names"), atom("$name")));
-        assert!(!var_references_dynamic(atom("$name"), atom("$name")));
-        assert!(!var_references_dynamic(atom("$name->foo"), atom("$name")));
-        assert!(!var_references_dynamic(atom("$name[0]"), atom("$name")));
+        assert!(var_references_dynamic(word(b"$this->{$name}"), word(b"$name")));
+        assert!(var_references_dynamic(word(b"$this->$name"), word(b"$name")));
+        assert!(var_references_dynamic(word(b"$arr[$name]"), word(b"$name")));
+        assert!(var_references_dynamic(word(b"$this->{$name}->foo"), word(b"$name")));
+        assert!(!var_references_dynamic(word(b"$this->name"), word(b"$name")));
+        assert!(!var_references_dynamic(word(b"$this->$names"), word(b"$name")));
+        assert!(!var_references_dynamic(word(b"$name"), word(b"$name")));
+        assert!(!var_references_dynamic(word(b"$name->foo"), word(b"$name")));
+        assert!(!var_references_dynamic(word(b"$name[0]"), word(b"$name")));
     }
 }

@@ -120,13 +120,15 @@ impl LintRule for AmbiguousConstantAccessRule {
             return;
         }
 
-        let constant_name = identifier.value();
+        let constant_name_bytes = identifier.value();
 
         // Skip compile-time constants that PHP resolves without ambiguity.
-        let name_lower = constant_name.to_ascii_lowercase();
-        if matches!(name_lower.as_str(), "true" | "false" | "null" | "stdin" | "stdout" | "stderr") {
+        let name_lower = constant_name_bytes.to_ascii_lowercase();
+        if matches!(name_lower.as_slice(), b"true" | b"false" | b"null" | b"stdin" | b"stdout" | b"stderr") {
             return;
         }
+
+        let constant_name = mago_bytes::BytesDisplay(constant_name_bytes);
 
         ctx.collector.report(
             Issue::new(self.cfg.level, "Ambiguous constant access detected.")

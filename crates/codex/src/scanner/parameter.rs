@@ -1,9 +1,9 @@
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::atom;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::FunctionLikeParameter;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::word;
 
 use crate::metadata::constant::ConstantMetadata;
 use crate::metadata::flags::MetadataFlags;
@@ -20,7 +20,7 @@ use crate::scanner::version_claim::evaluate_version_attributes;
 #[inline]
 pub fn scan_function_like_parameter<'arena>(
     parameter: &'arena FunctionLikeParameter<'arena>,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
 ) -> Option<FunctionLikeParameterMetadata> {
@@ -30,10 +30,10 @@ pub fn scan_function_like_parameter<'arena>(
 #[inline]
 pub fn scan_function_like_parameter_with_constants<'arena>(
     parameter: &'arena FunctionLikeParameter<'arena>,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     context: &mut Context<'_, 'arena>,
     scope: &NamespaceScope,
-    constants: Option<&AtomMap<ConstantMetadata>>,
+    constants: Option<&WordMap<ConstantMetadata>>,
 ) -> Option<FunctionLikeParameterMetadata> {
     let verdict = evaluate_version_attributes(&parameter.attribute_lists, context, context.php_version);
     if !verdict.is_available(context.php_version) {
@@ -55,7 +55,7 @@ pub fn scan_function_like_parameter_with_constants<'arena>(
     }
 
     let mut metadata = FunctionLikeParameterMetadata::new(
-        VariableIdentifier(atom(parameter.variable.name)),
+        VariableIdentifier(word(parameter.variable.name)),
         parameter.span(),
         parameter.variable.span,
         flags,

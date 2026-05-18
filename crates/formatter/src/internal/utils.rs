@@ -157,22 +157,21 @@ pub fn will_break<'arena>(document: &'arena Document<'arena>) -> bool {
     }
 }
 
-/// Split a string on any line terminator: `\r\n`, `\n`, or bare `\r`.
+/// Split a byte slice on any line terminator: `\r\n`, `\n`, or bare `\r`.
 ///
 /// behaves like `str::split('\n')` — a trailing line terminator produces a
-/// trailing empty string.
-fn split_any_newline(text: &str) -> impl Iterator<Item = &str> {
-    let mut remaining: Option<&str> = Some(text);
+/// trailing empty slice.
+fn split_any_newline(text: &[u8]) -> impl Iterator<Item = &[u8]> {
+    let mut remaining: Option<&[u8]> = Some(text);
     std::iter::from_fn(move || {
         let text = remaining?;
 
-        let bytes = text.as_bytes();
-        for i in 0..bytes.len() {
-            if bytes[i] == b'\r' {
+        for i in 0..text.len() {
+            if text[i] == b'\r' {
                 let line = &text[..i];
-                remaining = Some(if bytes.get(i + 1) == Some(&b'\n') { &text[i + 2..] } else { &text[i + 1..] });
+                remaining = Some(if text.get(i + 1) == Some(&b'\n') { &text[i + 2..] } else { &text[i + 1..] });
                 return Some(line);
-            } else if bytes[i] == b'\n' {
+            } else if text[i] == b'\n' {
                 let line = &text[..i];
                 remaining = Some(&text[i + 1..]);
                 return Some(line);
@@ -273,11 +272,11 @@ pub fn could_expand_value<'arena>(
                 || should_expand_last_arg(f, arguments, true)
         }
         Expression::Literal(Literal::String(literal_string)) => {
-            literal_string.raw.contains('\n') || literal_string.raw.contains('\r')
+            literal_string.raw.contains(&b'\n') || literal_string.raw.contains(&b'\r')
         }
         Expression::CompositeString(composite_string) => composite_string.parts().iter().any(|part| match part {
             StringPart::Literal(literal_string) => {
-                literal_string.value.contains('\n') || literal_string.value.contains('\r')
+                literal_string.value.contains(&b'\n') || literal_string.value.contains(&b'\r')
             }
             _ => false,
         }),
@@ -322,7 +321,7 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
             },
             Argument::Named(arg) => get_expression_width(arg.value).map(|mut width| {
                 width += 2;
-                width += arg.name.value.width();
+                width += bytes_width(arg.name.value);
                 width
             }),
         }
@@ -343,18 +342,18 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
 
     Some(match element {
         Expression::Literal(literal) => match literal {
-            Literal::String(literal_string) => string_width(literal_string.raw),
-            Literal::Integer(literal_integer) => literal_integer.raw.width(),
-            Literal::Float(literal_float) => literal_float.raw.width(),
+            Literal::String(literal_string) => bytes_width(literal_string.raw),
+            Literal::Integer(literal_integer) => bytes_width(literal_integer.raw),
+            Literal::Float(literal_float) => bytes_width(literal_float.raw),
             Literal::True(_) => 4,
             Literal::False(_) => 5,
             Literal::Null(_) => 4,
         },
         Expression::CompositeString(composite_string) => get_composite_string_width(composite_string)?,
-        Expression::MagicConstant(magic_constant) => string_width(magic_constant.value().value),
+        Expression::MagicConstant(magic_constant) => bytes_width(magic_constant.value().value),
         Expression::ConstantAccess(ConstantAccess { name: Identifier::Local(local) })
-        | Expression::Identifier(Identifier::Local(local)) => string_width(local.value),
-        Expression::Variable(Variable::Direct(variable)) => string_width(variable.name),
+        | Expression::Identifier(Identifier::Local(local)) => bytes_width(local.value),
+        Expression::Variable(Variable::Direct(variable)) => bytes_width(variable.name),
         Expression::Call(Call::Function(FunctionCall { function, argument_list })) => {
             let function_width = get_expression_width(function)?;
             let args_width = get_argument_list_width(argument_list)?;
@@ -368,7 +367,7 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
             ..
         })) => {
             let class_width = get_expression_width(class)?;
-            let method_width = string_width(method.value);
+            let method_width = bytes_width(method.value);
             let args_width = get_argument_list_width(argument_list)?;
 
             class_width + 2 + method_width + args_width
@@ -378,7 +377,7 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
             constant: ClassLikeConstantSelector::Identifier(constant),
             ..
         })) => {
-            return get_expression_width(class).map(|class| class + 2 + string_width(constant.value));
+            return get_expression_width(class).map(|class| class + 2 + bytes_width(constant.value));
         }
         _ => {
             return None;
@@ -389,7 +388,7 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
 fn get_composite_string_width(composite_string: &CompositeString<'_>) -> Option<usize> {
     let mut width = match composite_string {
         CompositeString::Interpolated(interpolated) => {
-            interpolated.prefix.map_or(0, |prefix| string_width(prefix.value)) + 2
+            interpolated.prefix.map_or(0, |prefix| bytes_width(prefix.value)) + 2
         }
         CompositeString::ShellExecute(_) => 2,
         CompositeString::Document(_) => return None,
@@ -398,11 +397,11 @@ fn get_composite_string_width(composite_string: &CompositeString<'_>) -> Option<
     for part in composite_string.parts() {
         width += match part {
             StringPart::Literal(literal) => {
-                if literal.value.contains(['\n', '\r']) {
+                if literal.value.contains(&b'\n') || literal.value.contains(&b'\r') {
                     return None;
                 }
 
-                string_width(literal.value)
+                bytes_width(literal.value)
             }
             StringPart::Expression(expression) => get_expression_width(expression)?,
             StringPart::BracedExpression(braced) => get_expression_width(braced.expression)? + 2,
@@ -413,14 +412,20 @@ fn get_composite_string_width(composite_string: &CompositeString<'_>) -> Option<
 }
 
 #[inline]
-pub fn string_width(s: &str) -> usize {
-    let line = s.lines().last().unwrap_or("");
+pub fn string_width(s: &[u8]) -> usize {
+    bytes_width(s)
+}
 
-    if line.contains("الله") {
+#[inline]
+pub fn bytes_width(s: &[u8]) -> usize {
+    let line = split_any_newline(s).last().unwrap_or(b"");
+    let line_str = String::from_utf8_lossy(line);
+
+    if line_str.contains("الله") {
         // The word "الله" is a special case, as it is usually rendered as a single glyph
         // while being 4 characters wide. This is a hack to handle this case.
-        line.replace("الله", "_").width()
+        line_str.replace("الله", "_").width()
     } else {
-        line.width()
+        line_str.width()
     }
 }

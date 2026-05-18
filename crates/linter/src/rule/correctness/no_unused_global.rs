@@ -110,7 +110,7 @@ impl LintRule for NoUnusedGlobalRule {
             return;
         }
 
-        let interest: HashSet<&'arena str> = decls.items.iter().map(|(name, _)| *name).collect();
+        let interest: HashSet<&'arena [u8]> = decls.items.iter().map(|(name, _)| *name).collect();
         let usage = variable_usage::collect_used_names(body, interest);
         if usage.bailed {
             return;
@@ -125,13 +125,13 @@ impl LintRule for NoUnusedGlobalRule {
                 continue;
             }
 
+            let name_display = mago_bytes::BytesDisplay(name);
             ctx.collector.report(
-                Issue::new(self.cfg.level(), format!("Global variable `{name}` is imported but never used."))
+                Issue::new(self.cfg.level(), format!("Global variable `{name_display}` is imported but never used."))
                     .with_code(self.meta.code)
-                    .with_annotation(
-                        Annotation::primary(*span)
-                            .with_message(format!("`{name}` is imported via `global` here but never read or written")),
-                    )
+                    .with_annotation(Annotation::primary(*span).with_message(format!(
+                        "`{name_display}` is imported via `global` here but never read or written"
+                    )))
                     .with_help("Remove this `global` declaration, or reference the variable below."),
             );
         }
@@ -139,7 +139,7 @@ impl LintRule for NoUnusedGlobalRule {
 }
 
 struct GlobalDeclCollector<'arena> {
-    items: Vec<(&'arena str, mago_span::Span)>,
+    items: Vec<(&'arena [u8], mago_span::Span)>,
 }
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for GlobalDeclCollector<'arena> {

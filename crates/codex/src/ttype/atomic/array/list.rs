@@ -4,9 +4,9 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -209,11 +209,11 @@ impl TType for TList {
         self.element_type.is_complex()
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         if let Some(elements) = &self.known_elements {
             // Format as list{...} shape
-            let mut string = String::new();
-            string += "list{";
+            let mut buf: Vec<u8> = Vec::new();
+            buf.extend_from_slice(b"list{");
             let has_optional = self.has_known_optional_elements();
             let mut first = true;
             let mut include_index = false;
@@ -222,54 +222,53 @@ impl TType for TList {
                     first = false;
                     include_index = *i != 0;
                 } else {
-                    string += ", ";
+                    buf.extend_from_slice(b", ");
                 }
 
                 if has_optional || include_index {
-                    string += &i.to_string();
+                    buf.extend_from_slice(i.to_string().as_bytes());
                     if *optional {
-                        string += "?";
+                        buf.extend_from_slice(b"?");
                     }
 
-                    string += ": ";
+                    buf.extend_from_slice(b": ");
                 }
 
-                string += &element_type.get_id();
+                buf.extend_from_slice(element_type.get_id().as_bytes());
             }
 
             if !self.element_type.is_never() {
                 if !first {
-                    string += ", ";
+                    buf.extend_from_slice(b", ");
                 }
 
-                string += "...<";
-                string += &self.element_type.get_id();
-                string += ">";
+                buf.extend_from_slice(b"...<");
+                buf.extend_from_slice(self.element_type.get_id().as_bytes());
+                buf.extend_from_slice(b">");
             }
 
-            string += "}";
+            buf.extend_from_slice(b"}");
 
-            atom(&string)
+            word(&buf)
         } else {
-            concat_atom!(
-                if self.is_non_empty() { "non-empty-list" } else { "list" },
-                "<",
-                self.element_type.get_id().as_str(),
-                ">"
+            concat_word!(
+                if self.is_non_empty() { b"non-empty-list".as_slice() } else { b"list".as_slice() },
+                b"<",
+                self.element_type.get_id(),
+                b">"
             )
         }
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
         if let Some(elements) = &self.known_elements {
             if elements.is_empty() && self.element_type.is_never() {
-                return atom("list{}");
+                return word(b"list{}");
             }
 
-            let mut string = String::new();
-            string += "list{\n";
+            let mut buf: Vec<u8> = Vec::new();
+            buf.extend_from_slice(b"list{\n");
             let element_indent = indent + 2;
-            let element_spaces = " ".repeat(element_indent);
             let has_optional = self.has_known_optional_elements();
             let mut include_index = false;
 
@@ -278,56 +277,56 @@ impl TType for TList {
                     include_index = elements.len() > 1 || has_optional;
                 }
 
-                string += &element_spaces;
+                buf.resize(buf.len() + element_indent, b' ');
                 if has_optional || include_index {
-                    string += &i.to_string();
+                    buf.extend_from_slice(i.to_string().as_bytes());
                     if *optional {
-                        string += "?";
+                        buf.extend_from_slice(b"?");
                     }
-                    string += ": ";
+                    buf.extend_from_slice(b": ");
                 }
-                string += &element_type.get_pretty_id_with_indent(element_indent);
-                string += ",\n";
+                buf.extend_from_slice(element_type.get_pretty_id_with_indent(element_indent).as_bytes());
+                buf.extend_from_slice(b",\n");
             }
 
             if !self.element_type.is_never() {
-                string += &element_spaces;
-                string += "...";
+                buf.resize(buf.len() + element_indent, b' ');
+                buf.extend_from_slice(b"...");
                 if self.element_type.is_complex() {
-                    string += "<\n";
-                    string += &" ".repeat(element_indent + 2);
-                    string += &self.element_type.get_pretty_id_with_indent(element_indent + 2);
-                    string += ",\n";
-                    string += &element_spaces;
-                    string += ">";
+                    buf.extend_from_slice(b"<\n");
+                    buf.resize(buf.len() + element_indent + 2, b' ');
+                    buf.extend_from_slice(self.element_type.get_pretty_id_with_indent(element_indent + 2).as_bytes());
+                    buf.extend_from_slice(b",\n");
+                    buf.resize(buf.len() + element_indent, b' ');
+                    buf.extend_from_slice(b">");
                 } else {
-                    string += "<";
-                    string += &self.element_type.get_pretty_id_with_indent(element_indent);
-                    string += ">";
+                    buf.extend_from_slice(b"<");
+                    buf.extend_from_slice(self.element_type.get_pretty_id_with_indent(element_indent).as_bytes());
+                    buf.extend_from_slice(b">");
                 }
-                string += ",\n";
+                buf.extend_from_slice(b",\n");
             }
 
-            string += &" ".repeat(indent);
-            string += "}";
+            buf.resize(buf.len() + indent, b' ');
+            buf.extend_from_slice(b"}");
 
-            atom(&string)
+            word(&buf)
         } else if self.element_type.is_complex() {
-            let mut string = String::new();
-            string += if self.is_non_empty() { "non-empty-list" } else { "list" };
-            string += "<\n";
-            string += &" ".repeat(indent + 2);
-            string += &self.element_type.get_pretty_id_with_indent(indent + 2);
-            string += ",\n";
-            string += &" ".repeat(indent);
-            string += ">";
-            atom(&string)
+            let mut buf: Vec<u8> = Vec::new();
+            buf.extend_from_slice(if self.is_non_empty() { b"non-empty-list" } else { b"list" });
+            buf.extend_from_slice(b"<\n");
+            buf.resize(buf.len() + indent + 2, b' ');
+            buf.extend_from_slice(self.element_type.get_pretty_id_with_indent(indent + 2).as_bytes());
+            buf.extend_from_slice(b",\n");
+            buf.resize(buf.len() + indent, b' ');
+            buf.extend_from_slice(b">");
+            word(&buf)
         } else {
-            concat_atom!(
-                if self.is_non_empty() { "non-empty-list" } else { "list" },
-                "<",
-                self.element_type.get_pretty_id_with_indent(indent).as_str(),
-                ">"
+            concat_word!(
+                if self.is_non_empty() { b"non-empty-list".as_slice() } else { b"list".as_slice() },
+                b"<",
+                self.element_type.get_pretty_id_with_indent(indent),
+                b">"
             )
         }
     }

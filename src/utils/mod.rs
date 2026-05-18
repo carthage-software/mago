@@ -131,26 +131,28 @@ pub(crate) fn create_orchestrator<'a>(
 pub fn apply_update(
     change_log: &ChangeLog,
     file: &File,
-    modified_contents: &str,
+    modified_contents: &[u8],
     dry_run: bool,
     color_choice: ColorChoice,
 ) -> Result<bool, Error> {
-    if file.contents == modified_contents {
+    if *file.contents == *modified_contents {
         return Ok(false);
     }
 
     if dry_run {
-        let patch = diffy::create_patch(&file.contents, modified_contents);
+        let original = String::from_utf8_lossy(&file.contents);
+        let modified = String::from_utf8_lossy(modified_contents);
+        let patch = diffy::create_patch(&original, &modified);
         let mut formatter = PatchFormatter::new();
 
         if should_use_colors(color_choice) {
             formatter = formatter.with_color();
         };
 
-        println!("diff of '{}':", file.name);
+        println!("diff of '{}':", mago_bytes::BytesDisplay(&file.name));
         println!("{}", formatter.fmt_patch(&patch));
     } else {
-        change_log.update(file.id, Cow::Owned(modified_contents.to_owned()))?;
+        change_log.update(file.id, Cow::Owned(modified_contents.to_vec()))?;
     }
 
     Ok(true)

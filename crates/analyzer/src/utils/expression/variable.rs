@@ -24,7 +24,7 @@ use mago_syntax::walker::walk_trait_mut;
 pub fn get_variables_referenced_in_expression<'arena>(
     expression: &Expression<'arena>,
     ignore_symbols: bool,
-) -> HashSet<(&'arena str, Span)> {
+) -> HashSet<(&'arena [u8], Span)> {
     let mut scanner = VariableScanner { ignore_symbols, ..Default::default() };
 
     scanner.walk_expression(expression, &mut ());
@@ -34,7 +34,7 @@ pub fn get_variables_referenced_in_expression<'arena>(
 #[derive(Debug, Default)]
 struct VariableScanner<'arena> {
     ignore_symbols: bool,
-    variables: HashSet<(&'arena str, Span)>,
+    variables: HashSet<(&'arena [u8], Span)>,
 }
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for VariableScanner<'arena> {

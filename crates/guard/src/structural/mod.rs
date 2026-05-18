@@ -23,25 +23,25 @@ pub struct StructuralGuardWalker;
 impl StructuralGuardWalker {
     fn get_structural_rules<'ctx, 'arena>(
         context: &'ctx GuardContext<'ctx, 'arena>,
-        fqn: &'arena str,
+        fqn: &'arena [u8],
         kind: StructuralSymbolKind,
     ) -> Vec<&'ctx StructuralRule> {
         context.settings.structural.rules.iter().filter(|rule| Self::applies_to(rule, fqn, kind)).collect()
     }
 
-    fn applies_to(rule: &StructuralRule, fqn: &str, kind: StructuralSymbolKind) -> bool {
+    fn applies_to(rule: &StructuralRule, fqn: &[u8], kind: StructuralSymbolKind) -> bool {
         if let Some(rule_kind) = rule.target
             && rule_kind != kind
         {
             return false;
         }
 
-        if !matcher::matches(fqn, &rule.on, kind.is_constant(), true) {
+        if !matcher::matches(fqn, rule.on.as_bytes(), kind.is_constant(), true) {
             return false;
         }
 
         if let Some(not_on) = &rule.not_on
-            && matcher::matches(fqn, not_on, kind.is_constant(), true)
+            && matcher::matches(fqn, not_on.as_bytes(), kind.is_constant(), true)
         {
             return false;
         }
@@ -50,13 +50,16 @@ impl StructuralGuardWalker {
     }
 
     fn satisfies_inheritance_constraint(
-        implemented_fqns: &[&str],
+        implemented_fqns: &[&[u8]],
         constraint: &StructuralInheritanceConstraint,
     ) -> bool {
         match constraint {
             StructuralInheritanceConstraint::AnyOfAllOf(groups) => {
                 for items in groups {
-                    if items.iter().all(|item| implemented_fqns.iter().any(|imp| imp.eq_ignore_ascii_case(item))) {
+                    if items
+                        .iter()
+                        .all(|item| implemented_fqns.iter().any(|imp| imp.eq_ignore_ascii_case(item.as_bytes())))
+                    {
                         return true;
                     }
                 }
@@ -65,7 +68,7 @@ impl StructuralGuardWalker {
             }
             StructuralInheritanceConstraint::AllOf(items) => {
                 for item in items {
-                    if !implemented_fqns.iter().any(|imp| imp.eq_ignore_ascii_case(item)) {
+                    if !implemented_fqns.iter().any(|imp| imp.eq_ignore_ascii_case(item.as_bytes())) {
                         return false;
                     }
                 }
@@ -73,11 +76,15 @@ impl StructuralGuardWalker {
                 true
             }
             StructuralInheritanceConstraint::Single(item) => {
-                implemented_fqns.iter().any(|imp| imp.eq_ignore_ascii_case(item))
+                implemented_fqns.iter().any(|imp| imp.eq_ignore_ascii_case(item.as_bytes()))
             }
             StructuralInheritanceConstraint::Nothing => implemented_fqns.is_empty(),
         }
     }
+}
+
+fn fqn_to_owned(fqn: &[u8]) -> Vec<u8> {
+    fqn.to_vec()
 }
 
 impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for StructuralGuardWalker {
@@ -97,10 +104,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
 
         for structural_rule in structural_rules {
             if let Some(must_be_named) = &structural_rule.must_be_named
-                && !matcher::matches(class.name.value, must_be_named, false, false)
+                && !matcher::matches(class.name.value, must_be_named.as_bytes(), false, false)
             {
                 structural_flaws.push(StructuralFlaw {
-                    symbol_fqn: fqn.to_string(),
+                    symbol_fqn: fqn_to_owned(fqn),
                     symbol_kind: StructuralSymbolKind::Class,
                     span: class.name.span,
                     kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
@@ -112,7 +119,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 && !allowed_kinds.contains(&StructuralSymbolKind::Class)
             {
                 structural_flaws.push(StructuralFlaw {
-                    symbol_fqn: fqn.to_string(),
+                    symbol_fqn: fqn_to_owned(fqn),
                     symbol_kind: StructuralSymbolKind::Class,
                     span: class.name.span,
                     kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
@@ -126,7 +133,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 match (must_be_final, is_final) {
                     (true, false) => {
                         structural_flaws.push(StructuralFlaw {
-                            symbol_fqn: fqn.to_string(),
+                            symbol_fqn: fqn_to_owned(fqn),
                             symbol_kind: StructuralSymbolKind::Class,
                             span: class.name.span,
                             kind: FlawKind::MustBeFinal,
@@ -135,7 +142,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     }
                     (false, true) => {
                         structural_flaws.push(StructuralFlaw {
-                            symbol_fqn: fqn.to_string(),
+                            symbol_fqn: fqn_to_owned(fqn),
                             symbol_kind: StructuralSymbolKind::Class,
                             span: class.name.span,
                             kind: FlawKind::MustNotBeFinal,
@@ -152,7 +159,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 match (must_be_abstract, is_abstract) {
                     (true, false) => {
                         structural_flaws.push(StructuralFlaw {
-                            symbol_fqn: fqn.to_string(),
+                            symbol_fqn: fqn_to_owned(fqn),
                             symbol_kind: StructuralSymbolKind::Class,
                             span: class.name.span,
                             kind: FlawKind::MustBeAbstract,
@@ -161,7 +168,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     }
                     (false, true) => {
                         structural_flaws.push(StructuralFlaw {
-                            symbol_fqn: fqn.to_string(),
+                            symbol_fqn: fqn_to_owned(fqn),
                             symbol_kind: StructuralSymbolKind::Class,
                             span: class.name.span,
                             kind: FlawKind::MustNotBeAbstract,
@@ -178,7 +185,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 match (must_be_readonly, is_readonly) {
                     (true, false) => {
                         structural_flaws.push(StructuralFlaw {
-                            symbol_fqn: fqn.to_string(),
+                            symbol_fqn: fqn_to_owned(fqn),
                             symbol_kind: StructuralSymbolKind::Class,
                             span: class.name.span,
                             kind: FlawKind::MustBeReadonly,
@@ -187,7 +194,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     }
                     (false, true) => {
                         structural_flaws.push(StructuralFlaw {
-                            symbol_fqn: fqn.to_string(),
+                            symbol_fqn: fqn_to_owned(fqn),
                             symbol_kind: StructuralSymbolKind::Class,
                             span: class.name.span,
                             kind: FlawKind::MustNotBeReadonly,
@@ -199,7 +206,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_extends) = &structural_rule.must_extend {
-                let extended_fqns: Vec<_> = class
+                let extended_fqns: Vec<&[u8]> = class
                     .extends
                     .as_ref()
                     .iter()
@@ -207,12 +214,9 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .map(|ident| context.lookup_name(ident))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &extended_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_extends,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&extended_fqns, must_extends) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Class,
                         span: class.name.span,
                         kind: FlawKind::MustExtend { expected: must_extends.clone() },
@@ -222,7 +226,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_implement) = &structural_rule.must_implement {
-                let implemented_fqns: Vec<_> = class
+                let implemented_fqns: Vec<&[u8]> = class
                     .implements
                     .as_ref()
                     .iter()
@@ -230,12 +234,9 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .map(|ident| context.lookup_name(ident))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &implemented_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_implement,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&implemented_fqns, must_implement) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Class,
                         span: class.name.span,
                         kind: FlawKind::MustImplement { expected: must_implement.clone() },
@@ -245,7 +246,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_use_traits) = &structural_rule.must_use_trait {
-                let used_fqns: Vec<_> = class
+                let used_fqns: Vec<&[u8]> = class
                     .members
                     .iter()
                     .filter_map(|member| match member {
@@ -256,12 +257,9 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .map(|ident| context.lookup_name(ident))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &used_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_use_traits,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&used_fqns, must_use_traits) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Class,
                         span: class.name.span,
                         kind: FlawKind::MustUseTrait { expected: must_use_traits.clone() },
@@ -271,19 +269,16 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_use_attributes) = &structural_rule.must_use_attribute {
-                let used_attributes: Vec<_> = class
+                let used_attributes: Vec<&[u8]> = class
                     .attribute_lists
                     .iter()
                     .flat_map(|attribute_list| attribute_list.attributes.iter())
                     .map(|attr| context.lookup_name(&attr.name))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_use_attributes,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&used_attributes, must_use_attributes) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Class,
                         span: class.name.span,
                         kind: FlawKind::MustUseAttribute { expected: must_use_attributes.clone() },
@@ -303,10 +298,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
         let mut structural_flaws = vec![];
         for structural_rule in structural_rules {
             if let Some(must_be_named) = &structural_rule.must_be_named
-                && !matcher::matches(interface.name.value, must_be_named, false, false)
+                && !matcher::matches(interface.name.value, must_be_named.as_bytes(), false, false)
             {
                 structural_flaws.push(StructuralFlaw {
-                    symbol_fqn: fqn.to_string(),
+                    symbol_fqn: fqn_to_owned(fqn),
                     symbol_kind: StructuralSymbolKind::Interface,
                     span: interface.name.span,
                     kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
@@ -318,7 +313,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 && !allowed_kinds.contains(&StructuralSymbolKind::Interface)
             {
                 structural_flaws.push(StructuralFlaw {
-                    symbol_fqn: fqn.to_string(),
+                    symbol_fqn: fqn_to_owned(fqn),
                     symbol_kind: StructuralSymbolKind::Interface,
                     span: interface.name.span,
                     kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
@@ -327,7 +322,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_extends) = &structural_rule.must_extend {
-                let extended_fqns: Vec<_> = interface
+                let extended_fqns: Vec<&[u8]> = interface
                     .extends
                     .as_ref()
                     .iter()
@@ -335,12 +330,9 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .map(|ident| context.lookup_name(ident))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &extended_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_extends,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&extended_fqns, must_extends) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Interface,
                         span: interface.name.span,
                         kind: FlawKind::MustExtend { expected: must_extends.clone() },
@@ -350,19 +342,16 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_use_attributes) = &structural_rule.must_use_attribute {
-                let used_attributes: Vec<_> = interface
+                let used_attributes: Vec<&[u8]> = interface
                     .attribute_lists
                     .iter()
                     .flat_map(|attribute_list| attribute_list.attributes.iter())
                     .map(|attr| context.lookup_name(&attr.name))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_use_attributes,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&used_attributes, must_use_attributes) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Interface,
                         span: interface.name.span,
                         kind: FlawKind::MustUseAttribute { expected: must_use_attributes.clone() },
@@ -382,10 +371,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
         let mut structural_flaws = vec![];
         for structural_rule in structural_rules {
             if let Some(must_be_named) = &structural_rule.must_be_named
-                && !matcher::matches(r#enum.name.value, must_be_named, false, false)
+                && !matcher::matches(r#enum.name.value, must_be_named.as_bytes(), false, false)
             {
                 structural_flaws.push(StructuralFlaw {
-                    symbol_fqn: fqn.to_string(),
+                    symbol_fqn: fqn_to_owned(fqn),
                     symbol_kind: StructuralSymbolKind::Enum,
                     span: r#enum.name.span,
                     kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
@@ -397,7 +386,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 && !allowed_kinds.contains(&StructuralSymbolKind::Enum)
             {
                 structural_flaws.push(StructuralFlaw {
-                    symbol_fqn: fqn.to_string(),
+                    symbol_fqn: fqn_to_owned(fqn),
                     symbol_kind: StructuralSymbolKind::Enum,
                     span: r#enum.name.span,
                     kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
@@ -406,7 +395,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_implement) = &structural_rule.must_implement {
-                let implemented_fqns: Vec<_> = r#enum
+                let implemented_fqns: Vec<&[u8]> = r#enum
                     .implements
                     .as_ref()
                     .iter()
@@ -414,12 +403,9 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .map(|ident| context.lookup_name(ident))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &implemented_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_implement,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&implemented_fqns, must_implement) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Enum,
                         span: r#enum.name.span,
                         kind: FlawKind::MustImplement { expected: must_implement.clone() },
@@ -429,19 +415,16 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_use_attributes) = &structural_rule.must_use_attribute {
-                let used_attributes: Vec<_> = r#enum
+                let used_attributes: Vec<&[u8]> = r#enum
                     .attribute_lists
                     .iter()
                     .flat_map(|attribute_list| attribute_list.attributes.iter())
                     .map(|attr| context.lookup_name(&attr.name))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_use_attributes,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&used_attributes, must_use_attributes) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Enum,
                         span: r#enum.name.span,
                         kind: FlawKind::MustUseAttribute { expected: must_use_attributes.clone() },
@@ -461,10 +444,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
         let mut structural_flaws = vec![];
         for structural_rule in structural_rules {
             if let Some(must_be_named) = &structural_rule.must_be_named
-                && !matcher::matches(r#trait.name.value, must_be_named, false, false)
+                && !matcher::matches(r#trait.name.value, must_be_named.as_bytes(), false, false)
             {
                 structural_flaws.push(StructuralFlaw {
-                    symbol_fqn: fqn.to_string(),
+                    symbol_fqn: fqn_to_owned(fqn),
                     symbol_kind: StructuralSymbolKind::Trait,
                     span: r#trait.name.span,
                     kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
@@ -476,7 +459,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 && !allowed_kinds.contains(&StructuralSymbolKind::Trait)
             {
                 structural_flaws.push(StructuralFlaw {
-                    symbol_fqn: fqn.to_string(),
+                    symbol_fqn: fqn_to_owned(fqn),
                     symbol_kind: StructuralSymbolKind::Trait,
                     span: r#trait.name.span,
                     kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
@@ -485,7 +468,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_use_traits) = &structural_rule.must_use_trait {
-                let used_fqns: Vec<_> = r#trait
+                let used_fqns: Vec<&[u8]> = r#trait
                     .members
                     .iter()
                     .filter_map(|member| match member {
@@ -496,12 +479,9 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .map(|ident| context.lookup_name(ident))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &used_fqns.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_use_traits,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&used_fqns, must_use_traits) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Trait,
                         span: r#trait.name.span,
                         kind: FlawKind::MustUseTrait { expected: must_use_traits.clone() },
@@ -511,19 +491,16 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_use_attributes) = &structural_rule.must_use_attribute {
-                let used_attributes: Vec<_> = r#trait
+                let used_attributes: Vec<&[u8]> = r#trait
                     .attribute_lists
                     .iter()
                     .flat_map(|attribute_list| attribute_list.attributes.iter())
                     .map(|attr| context.lookup_name(&attr.name))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_use_attributes,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&used_attributes, must_use_attributes) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Trait,
                         span: r#trait.name.span,
                         kind: FlawKind::MustUseAttribute { expected: must_use_attributes.clone() },
@@ -543,10 +520,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
         let mut structural_flaws = vec![];
         for structural_rule in structural_rules {
             if let Some(must_be_named) = &structural_rule.must_be_named
-                && !matcher::matches(function.name.value, must_be_named, false, false)
+                && !matcher::matches(function.name.value, must_be_named.as_bytes(), false, false)
             {
                 structural_flaws.push(StructuralFlaw {
-                    symbol_fqn: fqn.to_string(),
+                    symbol_fqn: fqn_to_owned(fqn),
                     symbol_kind: StructuralSymbolKind::Function,
                     span: function.name.span,
                     kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
@@ -558,7 +535,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 && !allowed_kinds.contains(&StructuralSymbolKind::Function)
             {
                 structural_flaws.push(StructuralFlaw {
-                    symbol_fqn: fqn.to_string(),
+                    symbol_fqn: fqn_to_owned(fqn),
                     symbol_kind: StructuralSymbolKind::Function,
                     span: function.name.span,
                     kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
@@ -567,19 +544,16 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_use_attribute) = &structural_rule.must_use_attribute {
-                let used_attributes: Vec<_> = function
+                let used_attributes: Vec<&[u8]> = function
                     .attribute_lists
                     .iter()
                     .flat_map(|attribute_list| attribute_list.attributes.iter())
                     .map(|attr| context.lookup_name(&attr.name))
                     .collect();
 
-                if !Self::satisfies_inheritance_constraint(
-                    &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                    must_use_attribute,
-                ) {
+                if !Self::satisfies_inheritance_constraint(&used_attributes, must_use_attribute) {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Function,
                         span: function.name.span,
                         kind: FlawKind::MustUseAttribute { expected: must_use_attribute.clone() },
@@ -600,10 +574,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
 
             for structural_rule in structural_rules {
                 if let Some(must_be_named) = &structural_rule.must_be_named
-                    && !matcher::matches(constant_item.name.value, must_be_named, true, false)
+                    && !matcher::matches(constant_item.name.value, must_be_named.as_bytes(), true, false)
                 {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Constant,
                         span: constant_item.name.span,
                         kind: FlawKind::MustBeNamed { pattern: must_be_named.clone() },
@@ -615,7 +589,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     && !allowed_kinds.contains(&StructuralSymbolKind::Constant)
                 {
                     structural_flaws.push(StructuralFlaw {
-                        symbol_fqn: fqn.to_string(),
+                        symbol_fqn: fqn_to_owned(fqn),
                         symbol_kind: StructuralSymbolKind::Constant,
                         span: constant_item.name.span,
                         kind: FlawKind::MustBe { allowed: allowed_kinds.clone() },
@@ -624,19 +598,16 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                 }
 
                 if let Some(must_use_attributes) = &structural_rule.must_use_attribute {
-                    let used_attributes: Vec<_> = constant
+                    let used_attributes: Vec<&[u8]> = constant
                         .attribute_lists
                         .iter()
                         .flat_map(|attribute_list| attribute_list.attributes.iter())
                         .map(|attr| context.lookup_name(&attr.name))
                         .collect();
 
-                    if !Self::satisfies_inheritance_constraint(
-                        &used_attributes.iter().map(std::convert::AsRef::as_ref).collect::<Vec<_>>(),
-                        must_use_attributes,
-                    ) {
+                    if !Self::satisfies_inheritance_constraint(&used_attributes, must_use_attributes) {
                         structural_flaws.push(StructuralFlaw {
-                            symbol_fqn: fqn.to_string(),
+                            symbol_fqn: fqn_to_owned(fqn),
                             symbol_kind: StructuralSymbolKind::Constant,
                             span: constant_item.name.span,
                             kind: FlawKind::MustUseAttribute { expected: must_use_attributes.clone() },

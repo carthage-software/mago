@@ -9,10 +9,6 @@ use mago_syntax_core::input::Input;
 use mago_type_syntax::lexer::TypeLexer;
 
 fuzz_target!(|data: &[u8]| {
-    if std::str::from_utf8(data).is_err() {
-        return;
-    }
-
     let input = Input::new(FileId::zero(), data);
     let mut lexer = TypeLexer::new(input);
 
@@ -21,7 +17,7 @@ fuzz_target!(|data: &[u8]| {
 
     while let Some(result) = lexer.advance() {
         match result {
-            Ok(token) => reconstructed.extend_from_slice(token.value.as_bytes()),
+            Ok(token) => reconstructed.extend_from_slice(token.value),
             Err(_) => {
                 hit_error = true;
                 break;

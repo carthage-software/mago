@@ -107,7 +107,7 @@ impl LintRule for NoRedundantReadonlyRule {
             }
 
             if let ClassLikeMember::Method(method) = member
-                && method.name.value.eq_ignore_ascii_case("__construct")
+                && method.name.value.eq_ignore_ascii_case(b"__construct")
             {
                 for param in method.parameter_list.parameters.iter() {
                     if param.is_promoted_property()

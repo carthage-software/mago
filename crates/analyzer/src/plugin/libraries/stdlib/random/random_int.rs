@@ -27,7 +27,7 @@ impl Provider for RandomIntProvider {
 
 impl FunctionReturnTypeProvider for RandomIntProvider {
     fn targets() -> FunctionTarget {
-        FunctionTarget::Exact("random_int")
+        FunctionTarget::Exact(b"random_int")
     }
 
     fn get_return_type(
@@ -35,11 +35,11 @@ impl FunctionReturnTypeProvider for RandomIntProvider {
         context: &ProviderContext<'_, '_, '_>,
         invocation: &InvocationInfo<'_, '_, '_>,
     ) -> Option<TUnion> {
-        let min_argument = invocation.get_argument(0, &["min"])?;
+        let min_argument = invocation.get_argument(0, &[b"min"])?;
         let min_argument_type = context.get_expression_type(min_argument)?;
         let min_argument_integer = min_argument_type.get_single_int()?;
 
-        let max_argument = invocation.get_argument(1, &["max"])?;
+        let max_argument = invocation.get_argument(1, &[b"max"])?;
         let max_argument_type = context.get_expression_type(max_argument)?;
         let max_argument_integer = max_argument_type.get_single_int()?;
 

@@ -17,13 +17,13 @@ impl<'arena> Parser<'_, 'arena> {
         let keyword = self.keyword_from(&keyword_tok);
         let template = self.parse_expression()?;
 
-        let (with_keyword, aliases) = if let Some(with_keyword) = self.try_consume_name_keyword("with")? {
+        let (with_keyword, aliases) = if let Some(with_keyword) = self.try_consume_name_keyword(b"with")? {
             let mut alias_nodes = self.new_vec();
             let mut alias_commas = self.new_vec();
             loop {
-                let from = self.expect_flexible_identifier("expected block name to import")?;
-                let (as_keyword, to) = if let Some(as_keyword) = self.try_consume_name_keyword("as")? {
-                    let alias = self.expect_flexible_identifier("expected alias name")?;
+                let from = self.expect_flexible_identifier(b"expected block name to import")?;
+                let (as_keyword, to) = if let Some(as_keyword) = self.try_consume_name_keyword(b"as")? {
+                    let alias = self.expect_flexible_identifier(b"expected alias name")?;
                     (Some(as_keyword), Some(alias))
                 } else {
                     (None, None)

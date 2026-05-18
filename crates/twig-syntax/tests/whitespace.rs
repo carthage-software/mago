@@ -12,43 +12,43 @@ use crate::common::lex;
 use crate::common::parse_and_roundtrip;
 use crate::common::roundtrip;
 
-fn first_value_for(src: &str, kind: TwigTokenKind) -> String {
-    lex(src).into_iter().find(|t| t.kind == kind).map(|t| t.value.to_string()).expect("kind not found")
+fn first_value_for(src: &str, kind: TwigTokenKind) -> Vec<u8> {
+    lex(src).into_iter().find(|t| t.kind == kind).map(|t| t.value.to_vec()).expect("kind not found")
 }
 
-fn first_comment(src: &str) -> String {
+fn first_comment(src: &str) -> Vec<u8> {
     lex(src)
         .into_iter()
         .find(|t| t.kind == TwigTokenKind::Comment)
-        .map(|t| t.value.to_string())
+        .map(|t| t.value.to_vec())
         .expect("comment not found")
 }
 
 #[test]
 fn block_open_trim() {
-    assert_eq!(first_value_for("{%- do 1 %}", TwigTokenKind::OpenBlockDash), "{%-");
+    assert_eq!(first_value_for("{%- do 1 %}", TwigTokenKind::OpenBlockDash), b"{%-");
 }
 
 #[test]
 fn block_close_trim() {
-    assert_eq!(first_value_for("{% do 1 -%}", TwigTokenKind::CloseBlockDash), "-%}");
+    assert_eq!(first_value_for("{% do 1 -%}", TwigTokenKind::CloseBlockDash), b"-%}");
 }
 
 #[test]
 fn block_both_sides_trim() {
     parse_and_roundtrip("{%- if a -%}b{%- endif -%}");
-    assert_eq!(first_value_for("{%- if a -%}b{% endif %}", TwigTokenKind::OpenBlockDash), "{%-");
-    assert_eq!(first_value_for("{%- if a -%}b{% endif %}", TwigTokenKind::CloseBlockDash), "-%}");
+    assert_eq!(first_value_for("{%- if a -%}b{% endif %}", TwigTokenKind::OpenBlockDash), b"{%-");
+    assert_eq!(first_value_for("{%- if a -%}b{% endif %}", TwigTokenKind::CloseBlockDash), b"-%}");
 }
 
 #[test]
 fn variable_open_trim() {
-    assert_eq!(first_value_for("{{- x }}", TwigTokenKind::OpenVariableDash), "{{-");
+    assert_eq!(first_value_for("{{- x }}", TwigTokenKind::OpenVariableDash), b"{{-");
 }
 
 #[test]
 fn variable_close_trim() {
-    assert_eq!(first_value_for("{{ x -}}", TwigTokenKind::CloseVariableDash), "-}}");
+    assert_eq!(first_value_for("{{ x -}}", TwigTokenKind::CloseVariableDash), b"-}}");
 }
 
 #[test]
@@ -58,12 +58,12 @@ fn variable_both_sides_trim() {
 
 #[test]
 fn comment_open_trim() {
-    assert!(first_comment("{#- c #}").starts_with("{#-"));
+    assert!(first_comment("{#- c #}").starts_with(b"{#-"));
 }
 
 #[test]
 fn comment_close_trim() {
-    assert!(first_comment("{# c -#}").ends_with("-#}"));
+    assert!(first_comment("{# c -#}").ends_with(b"-#}"));
 }
 
 #[test]
@@ -73,32 +73,32 @@ fn comment_both_sides_trim() {
 
 #[test]
 fn block_open_line_trim() {
-    assert_eq!(first_value_for("{%~ do 1 %}", TwigTokenKind::OpenBlockTilde), "{%~");
+    assert_eq!(first_value_for("{%~ do 1 %}", TwigTokenKind::OpenBlockTilde), b"{%~");
 }
 
 #[test]
 fn block_close_line_trim() {
-    assert_eq!(first_value_for("{% do 1 ~%}", TwigTokenKind::CloseBlockTilde), "~%}");
+    assert_eq!(first_value_for("{% do 1 ~%}", TwigTokenKind::CloseBlockTilde), b"~%}");
 }
 
 #[test]
 fn variable_open_line_trim() {
-    assert_eq!(first_value_for("{{~ x }}", TwigTokenKind::OpenVariableTilde), "{{~");
+    assert_eq!(first_value_for("{{~ x }}", TwigTokenKind::OpenVariableTilde), b"{{~");
 }
 
 #[test]
 fn variable_close_line_trim() {
-    assert_eq!(first_value_for("{{ x ~}}", TwigTokenKind::CloseVariableTilde), "~}}");
+    assert_eq!(first_value_for("{{ x ~}}", TwigTokenKind::CloseVariableTilde), b"~}}");
 }
 
 #[test]
 fn comment_open_line_trim() {
-    assert!(first_comment("{#~ c #}").starts_with("{#~"));
+    assert!(first_comment("{#~ c #}").starts_with(b"{#~"));
 }
 
 #[test]
 fn comment_close_line_trim() {
-    assert!(first_comment("{# c ~#}").ends_with("~#}"));
+    assert!(first_comment("{# c ~#}").ends_with(b"~#}"));
 }
 
 #[test]

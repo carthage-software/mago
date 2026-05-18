@@ -18,7 +18,6 @@ use std::borrow::Cow;
 use std::path::Path;
 
 use mago_analyzer::analysis_result::AnalysisResult;
-use mago_atom::Atom;
 use mago_database::Database;
 use mago_database::DatabaseConfiguration;
 use mago_database::DatabaseReader;
@@ -29,6 +28,7 @@ use mago_linter::integration::IntegrationSet;
 use mago_linter::settings::Settings as LinterSettings;
 use mago_orchestrator::service::incremental_analysis::IncrementalAnalysisService;
 use mago_prelude::Prelude;
+use mago_word::Word;
 
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
@@ -69,7 +69,7 @@ pub struct WorkspaceState {
 
 #[derive(Debug, Default, Clone)]
 pub struct ExpressionTypeIndex {
-    pub by_span: HashMap<(u32, u32), Vec<Atom>>,
+    pub by_span: HashMap<(u32, u32), Vec<Word>>,
 }
 
 impl WorkspaceState {
@@ -79,7 +79,7 @@ impl WorkspaceState {
         }
 
         let file = self.database.get(&file_id).ok()?;
-        let hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_bytes());
+        let hash = xxhash_rust::xxh3::xxh3_64(&file.contents);
 
         if let Some((cached_hash, _)) = self.artifact_cache.get(&file_id)
             && *cached_hash == hash
@@ -106,7 +106,7 @@ impl WorkspaceState {
     /// spans all share this.
     pub fn file_analysis_for(&mut self, file_id: FileId) -> Option<Arc<FileAnalysis>> {
         let file = self.database.get(&file_id).ok()?;
-        let hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_bytes());
+        let hash = xxhash_rust::xxh3::xxh3_64(&file.contents);
 
         if let Some((cached_hash, analysis)) = self.file_analyses.get(&file_id)
             && *cached_hash == hash
@@ -130,7 +130,7 @@ impl WorkspaceState {
                 self.file_analyses.remove(&file_id);
                 continue;
             };
-            let hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_bytes());
+            let hash = xxhash_rust::xxh3::xxh3_64(&file.contents);
             let analysis = Arc::new(file_analysis::build(&file, &self.linter, with_semantics));
             self.file_analyses.insert(file_id, (hash, analysis));
         }
@@ -141,9 +141,9 @@ fn build_index(artifacts: &mago_analyzer::artifacts::AnalysisArtifacts) -> Expre
     use mago_codex::ttype::atomic::TAtomic;
     use mago_codex::ttype::atomic::object::TObject;
 
-    let mut by_span: HashMap<(u32, u32), Vec<Atom>> = HashMap::default();
+    let mut by_span: HashMap<(u32, u32), Vec<Word>> = HashMap::default();
     for (span, ty) in artifacts.expression_types.iter() {
-        let mut classes: Vec<Atom> = Vec::new();
+        let mut classes: Vec<Word> = Vec::new();
         for atomic in ty.types.iter() {
             match atomic {
                 TAtomic::Object(TObject::Named(n)) => classes.push(n.name),
@@ -224,17 +224,18 @@ fn load_workspace_database(
 
     // No `[source].paths`: fall back to scanning the workspace root, the
     // same default behaviour `mago lint` / `mago analyze` rely on.
-    let paths: Vec<Cow<'static, str>> = if source.paths.is_empty() {
-        vec![Cow::Owned(root.to_string_lossy().into_owned())]
+    let paths: Vec<Cow<'static, [u8]>> = if source.paths.is_empty() {
+        vec![Cow::Owned(root.to_string_lossy().into_owned().into_bytes())]
     } else {
-        source.paths.iter().cloned().map(Cow::<'static, str>::Owned).collect()
+        source.paths.iter().cloned().map(|s| Cow::<'static, [u8]>::Owned(s.into_bytes())).collect()
     };
 
-    let includes: Vec<Cow<'static, str>> = source.includes.iter().cloned().map(Cow::<'static, str>::Owned).collect();
-    let extensions: Vec<Cow<'static, str>> = if source.extensions.is_empty() {
-        vec![Cow::Borrowed("php")]
+    let includes: Vec<Cow<'static, [u8]>> =
+        source.includes.iter().cloned().map(|s| Cow::<'static, [u8]>::Owned(s.into_bytes())).collect();
+    let extensions: Vec<Cow<'static, [u8]>> = if source.extensions.is_empty() {
+        vec![Cow::Borrowed(b"php")]
     } else {
-        source.extensions.iter().cloned().map(Cow::<'static, str>::Owned).collect()
+        source.extensions.iter().cloned().map(|s| Cow::<'static, [u8]>::Owned(s.into_bytes())).collect()
     };
 
     let excludes: Vec<Exclusion<'static>> = source

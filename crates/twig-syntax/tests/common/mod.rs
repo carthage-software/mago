@@ -31,7 +31,7 @@ use mago_twig_syntax::token::TwigTokenKind;
 
 /// Parse `source` under [`FileId::zero`] with default settings.
 pub fn parse<'arena>(arena: &'arena Bump, source: &'arena str) -> &'arena Template<'arena> {
-    parse_file_content(arena, FileId::zero(), source)
+    parse_file_content(arena, FileId::zero(), source.as_bytes())
 }
 
 /// Tokenise the source and collect every token (including trivia).
@@ -51,12 +51,12 @@ pub fn tokenize(source: &str) -> Result<Vec<TwigToken<'_>>, SyntaxError> {
 /// non-lossless lexer.
 pub fn roundtrip_tokens(source: &str) -> Result<String, SyntaxError> {
     let tokens = tokenize(source)?;
-    let mut out = String::with_capacity(source.len());
+    let mut out: Vec<u8> = Vec::with_capacity(source.len());
     for tok in &tokens {
-        out.push_str(tok.value);
+        out.extend_from_slice(tok.value);
     }
 
-    Ok(out)
+    Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
 pub fn parse_ok<'a>(arena: &'a Bump, src: &'a str) -> &'a Template<'a> {
@@ -119,8 +119,8 @@ pub fn kinds(src: &str) -> Vec<TwigTokenKind> {
 }
 
 /// `(kind, value)` pairs for all tokens produced by lexing `src`.
-pub fn kinds_and_values(src: &str) -> Vec<(TwigTokenKind, String)> {
-    lex(src).into_iter().map(|t| (t.kind, t.value.to_string())).collect()
+pub fn kinds_and_values(src: &str) -> Vec<(TwigTokenKind, Vec<u8>)> {
+    lex(src).into_iter().map(|t| (t.kind, t.value.to_vec())).collect()
 }
 
 /// Return the first token matching `pred` (non-trivia by default if caller

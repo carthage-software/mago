@@ -1,9 +1,9 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
 use mago_reporting::Issue;
 use mago_span::Span;
+use mago_word::Word;
 
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
@@ -18,7 +18,7 @@ use crate::metadata::ttype::TypeMetadata;
 #[non_exhaustive]
 pub struct PropertyHookMetadata {
     /// The hook name ("get" or "set").
-    pub name: Atom,
+    pub name: Word,
 
     /// Span of the hook declaration.
     pub span: Span,
@@ -53,7 +53,7 @@ impl PropertyHookMetadata {
     /// Creates a new `PropertyHookMetadata` with the given name and span.
     #[inline]
     #[must_use]
-    pub fn new(name: Atom, span: Span) -> Self {
+    pub fn new(name: Word, span: Span) -> Self {
         Self {
             name,
             span,
@@ -72,14 +72,14 @@ impl PropertyHookMetadata {
     #[inline]
     #[must_use]
     pub fn is_get(&self) -> bool {
-        self.name.as_str() == "get"
+        self.name.as_bytes() == b"get"
     }
 
     /// Returns whether this is a set hook.
     #[inline]
     #[must_use]
     pub fn is_set(&self) -> bool {
-        self.name.as_str() == "set"
+        self.name.as_bytes() == b"set"
     }
 
     /// Sets the flags for this hook.

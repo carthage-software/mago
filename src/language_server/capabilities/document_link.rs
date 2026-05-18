@@ -74,7 +74,7 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, file: &Mago
                 t.kind,
                 TokenKind::Identifier | TokenKind::QualifiedIdentifier | TokenKind::FullyQualifiedIdentifier
             ) {
-                let name = t.value.trim_start_matches('\\');
+                let name = mago_bytes::trim_start_byte(t.value, b'\\');
                 if let Some(span) = resolve(codebase, kind, name)
                     && let Some(uri) = file_url(database, span)
                 {
@@ -83,7 +83,7 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, file: &Mago
                     out.push(DocumentLink {
                         range: range_at_offsets(file, start, end),
                         target: Some(uri),
-                        tooltip: Some(name.to_string()),
+                        tooltip: Some(String::from_utf8_lossy(name).into_owned()),
                         data: None,
                     });
                 }
@@ -98,7 +98,7 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, file: &Mago
     out
 }
 
-fn resolve(codebase: &CodebaseMetadata, kind: UseKind, name: &str) -> Option<Span> {
+fn resolve(codebase: &CodebaseMetadata, kind: UseKind, name: &[u8]) -> Option<Span> {
     match kind {
         UseKind::Class => codebase.get_class_like(name).map(|m| m.name_span.unwrap_or(m.span)),
         UseKind::Function => codebase.get_function(name).map(|m| m.name_span.unwrap_or(m.span)),

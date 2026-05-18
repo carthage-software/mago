@@ -47,7 +47,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
             );
 
             if let Some(value_id) = &value_id {
-                block_context.remove_variable(value_id, true, context);
+                block_context.remove_variable(value_id.as_bytes(), true, context);
                 block_context.references_possibly_from_confusing_scope.remove(value_id);
             }
 

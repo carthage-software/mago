@@ -175,7 +175,7 @@ fn requires_this_binding(root: Node<'_, '_>) -> bool {
 
     while let Some(node) = stack.pop() {
         if let Node::Expression(Expression::Variable(Variable::Direct(var))) = node
-            && var.name == "$this"
+            && var.name == b"$this"
         {
             return true;
         }

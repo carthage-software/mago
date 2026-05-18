@@ -8,11 +8,11 @@ use mago_syntax::ast::Variable;
 /// or one level of array/property access.
 #[derive(Debug, PartialEq, Eq)]
 pub enum AccessStep<'ast> {
-    DirectVariable(&'ast str),
-    ArrayStringIndex(&'ast str),
+    DirectVariable(&'ast [u8]),
+    ArrayStringIndex(&'ast [u8]),
     ArrayIntegerIndex(u64),
-    Property(&'ast str),
-    NullSafeProperty(&'ast str),
+    Property(&'ast [u8]),
+    NullSafeProperty(&'ast [u8]),
 }
 
 /// The full access path of an expression, from root to leaf.

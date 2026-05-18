@@ -49,15 +49,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             && let Expression::Parent(_) = self.class
             && let ClassLikeMemberSelector::Identifier(method_ident) = &self.method
         {
-            if method_ident.value.eq_ignore_ascii_case("__construct") {
+            if method_ident.value.eq_ignore_ascii_case(b"__construct") {
                 block_context.flags.set_calls_parent_constructor(true);
             } else {
-                let method_name = mago_atom::ascii_lowercase_atom(method_ident.value);
+                let method_name = mago_word::ascii_lowercase_word(method_ident.value);
                 let parent_meta = block_context
                     .scope
                     .get_class_like()
                     .and_then(|m| m.direct_parent_class)
-                    .and_then(|p| context.codebase.get_class_like(&p));
+                    .and_then(|p| context.codebase.get_class_like(p.as_bytes()));
                 if let Some(parent_meta) = parent_meta
                     && context.settings.is_class_initializer_for(parent_meta, method_name)
                 {
@@ -73,7 +73,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
         for resolved_method in method_resolution.resolved_methods {
             let metadata = context
                 .codebase
-                .get_class_like(&resolved_method.classname)
+                .get_class_like(resolved_method.classname.as_bytes())
                 .expect("class-like metadata should exist for resolved method");
 
             let method_metadata = context

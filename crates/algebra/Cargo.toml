@@ -15,7 +15,7 @@ workspace = true
 [dependencies]
 mago-codex = { workspace = true }
 mago-span = { workspace = true }
-mago-atom = { workspace = true }
+mago-word = { workspace = true }
 foldhash = { workspace = true }
 indexmap = { workspace = true }
 

@@ -11,7 +11,6 @@ use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::artifacts::AnalysisArtifacts;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
-use mago_atom::AtomSet;
 use mago_codex::diff::CodebaseDiff;
 use mago_codex::metadata::CodebaseEntryKeys;
 use mago_codex::metadata::CodebaseMetadata;
@@ -30,6 +29,7 @@ use mago_reporting::IssueCollection;
 use mago_semantics::SemanticsChecker;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::settings::ParserSettings;
+use mago_word::WordSet;
 use rayon::prelude::*;
 
 use crate::error::OrchestratorError;
@@ -260,14 +260,14 @@ impl IncrementalAnalysisService {
         let per_file_results: Vec<(FileId, u64, CodebaseMetadata)> = source_files
             .into_par_iter()
             .map_init(Bump::new, |arena, file| {
-                let content_hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_bytes());
+                let content_hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_ref());
 
                 let program = parse_file_with_settings(arena, &file, parser_settings);
                 if program.has_errors() {
                     tracing::warn!(
                         "Encountered {} parsing error(s) in '{}'. Codebase analysis may be incomplete.",
                         program.errors.len(),
-                        file.name,
+                        mago_bytes::BytesDisplay(&file.name),
                     );
                 }
 
@@ -296,7 +296,7 @@ impl IncrementalAnalysisService {
             .collect();
 
         let mut symbol_references = (*self.base_symbol_references).clone();
-        populate_codebase(&mut merged_codebase, &mut symbol_references, AtomSet::default(), HashSet::default());
+        populate_codebase(&mut merged_codebase, &mut symbol_references, WordSet::default(), HashSet::default());
 
         let mut file_states: HashMap<FileId, FileState> = HashMap::default();
         for (file_id, content_hash, metadata) in staged {
@@ -389,20 +389,23 @@ impl IncrementalAnalysisService {
 
             for file in &source_files {
                 if hint_set.contains(&file.id) || !self.file_states.contains_key(&file.id) {
-                    let hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_bytes());
+                    let hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_ref());
                     file_hashes.insert(file.id, hash);
 
                     if let Some(prev_state) = self.file_states.get(&file.id) {
                         if prev_state.content_hash == hash {
                             unchanged_file_ids.push(file.id);
-                            tracing::trace!("File unchanged (hash match despite watcher hint): {}", file.name);
+                            tracing::trace!(
+                                "File unchanged (hash match despite watcher hint): {}",
+                                mago_bytes::BytesDisplay(&file.name)
+                            );
                         } else {
                             changed_files.push(file);
-                            tracing::debug!("File changed: {}", file.name);
+                            tracing::debug!("File changed: {}", mago_bytes::BytesDisplay(&file.name));
                         }
                     } else {
                         changed_files.push(file);
-                        tracing::debug!("New file: {}", file.name);
+                        tracing::debug!("New file: {}", mago_bytes::BytesDisplay(&file.name));
                     }
                 } else {
                     if let Some(prev_state) = self.file_states.get(&file.id) {
@@ -416,7 +419,7 @@ impl IncrementalAnalysisService {
             let all_hashes: HashMap<FileId, u64> = source_files
                 .par_iter()
                 .map(|file| {
-                    let hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_bytes());
+                    let hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_ref());
                     (file.id, hash)
                 })
                 .collect();
@@ -428,14 +431,14 @@ impl IncrementalAnalysisService {
                 if let Some(prev_state) = self.file_states.get(&file.id) {
                     if prev_state.content_hash == current_hash {
                         unchanged_file_ids.push(file.id);
-                        tracing::trace!("File unchanged (cached): {}", file.name);
+                        tracing::trace!("File unchanged (cached): {}", mago_bytes::BytesDisplay(&file.name));
                     } else {
                         changed_files.push(file);
-                        tracing::debug!("File changed (hash mismatch): {}", file.name);
+                        tracing::debug!("File changed (hash mismatch): {}", mago_bytes::BytesDisplay(&file.name));
                     }
                 } else {
                     changed_files.push(file);
-                    tracing::debug!("New file (not in cache): {}", file.name);
+                    tracing::debug!("New file (not in cache): {}", mago_bytes::BytesDisplay(&file.name));
                 }
             }
         }
@@ -457,7 +460,7 @@ impl IncrementalAnalysisService {
                     tracing::warn!(
                         "Encountered {} parsing error(s) in '{}'. Codebase analysis may be incomplete.",
                         program.errors.len(),
-                        file.name,
+                        mago_bytes::BytesDisplay(&file.name),
                     );
                 }
 
@@ -511,7 +514,7 @@ impl IncrementalAnalysisService {
                 };
 
                 for node in &sig.ast_nodes {
-                    diff.add_keep_entry((node.name, mago_atom::empty_atom()));
+                    diff.add_keep_entry((node.name, mago_word::empty_word()));
 
                     for child in &node.children {
                         diff.add_keep_entry((node.name, child.name));
@@ -535,8 +538,8 @@ impl IncrementalAnalysisService {
             let files_to_skip: HashSet<FileId> = unchanged_file_ids.iter().copied().collect();
             let mut symbol_references = std::mem::take(&mut self.symbol_references);
 
-            let mut changed_symbols: HashSet<(mago_atom::Atom, mago_atom::Atom)> = HashSet::default();
-            let mut changed_file_names: Vec<mago_atom::Atom> = Vec::new();
+            let mut changed_symbols: HashSet<(mago_word::Word, mago_word::Word)> = HashSet::default();
+            let mut changed_file_names: Vec<mago_word::Word> = Vec::new();
 
             for (file_id, metadata) in &new_file_scans {
                 for &key in metadata.function_likes.keys() {
@@ -544,11 +547,11 @@ impl IncrementalAnalysisService {
                 }
 
                 for &name in metadata.class_likes.keys() {
-                    changed_symbols.insert((name, mago_atom::empty_atom()));
+                    changed_symbols.insert((name, mago_word::empty_word()));
                 }
 
                 for &name in metadata.constants.keys() {
-                    changed_symbols.insert((name, mago_atom::empty_atom()));
+                    changed_symbols.insert((name, mago_word::empty_word()));
                 }
 
                 if let Some(sig) = metadata.file_signatures.values().next() {
@@ -561,7 +564,7 @@ impl IncrementalAnalysisService {
 
                 // Collect file names for file-level reference cleanup
                 if let Ok(file) = self.database.get(file_id) {
-                    changed_file_names.push(mago_atom::atom(&file.name));
+                    changed_file_names.push(mago_word::word(&file.name));
                 }
             }
 
@@ -570,9 +573,9 @@ impl IncrementalAnalysisService {
             // Collect class_like names from changed files so we exclude them from safe_symbols.
             // Changed classes had their old metadata removed and fresh (unpopulated) metadata added,
             // so the populator must repopulate them to rebuild parent resolution, overridden_method_ids, etc.
-            let changed_class_like_names: AtomSet =
+            let changed_class_like_names: WordSet =
                 new_file_scans.iter().flat_map(|(_, metadata)| metadata.class_likes.keys().copied()).collect();
-            let safe_symbols: AtomSet = merged_codebase
+            let safe_symbols: WordSet = merged_codebase
                 .class_likes
                 .keys()
                 .copied()
@@ -659,7 +662,7 @@ impl IncrementalAnalysisService {
         // class was deleted and later re-added — the child→parent reference edge
         // was removed when the parent was deleted, so the cascade can't reach the child).
         {
-            let changed_class_like_names: AtomSet = diff
+            let changed_class_like_names: WordSet = diff
                 .get_changed()
                 .iter()
                 .filter(|key| key.1.is_empty() && merged_codebase.class_likes.contains_key(&key.0))
@@ -667,7 +670,7 @@ impl IncrementalAnalysisService {
                 .collect();
 
             if !changed_class_like_names.is_empty() {
-                let to_unsafify: Vec<mago_atom::Atom> = merged_codebase
+                let to_unsafify: Vec<mago_word::Word> = merged_codebase
                     .class_likes
                     .iter()
                     .filter(|(name, _)| merged_codebase.safe_symbols.contains(name))
@@ -688,18 +691,18 @@ impl IncrementalAnalysisService {
         let safe_symbols = std::mem::take(&mut merged_codebase.safe_symbols);
         let safe_symbol_members = std::mem::take(&mut merged_codebase.safe_symbol_members);
 
-        let mut dirty_symbols: HashSet<(mago_atom::Atom, mago_atom::Atom)> = diff.get_changed().clone();
+        let mut dirty_symbols: HashSet<(mago_word::Word, mago_word::Word)> = diff.get_changed().clone();
         for (_file_id, metadata) in &new_file_scans {
             for &key in metadata.function_likes.keys() {
                 dirty_symbols.insert(key);
             }
 
             for &name in metadata.class_likes.keys() {
-                dirty_symbols.insert((name, mago_atom::empty_atom()));
+                dirty_symbols.insert((name, mago_word::empty_word()));
             }
 
             for &name in metadata.constants.keys() {
-                dirty_symbols.insert((name, mago_atom::empty_atom()));
+                dirty_symbols.insert((name, mago_word::empty_word()));
             }
         }
 
@@ -973,7 +976,7 @@ impl IncrementalAnalysisService {
                 if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
                     tracing::warn!(
                         "Analysis of source file '{}' took longer than {}s: {}s",
-                        source_file.name,
+                        mago_bytes::BytesDisplay(&source_file.name),
                         ANALYSIS_DURATION_THRESHOLD.as_secs_f32(),
                         analysis_result.time_in_analysis.as_secs_f32()
                     );
@@ -1017,16 +1020,21 @@ mod tests {
     fn make_database(files: Vec<(&str, &str)>) -> Database<'static> {
         let config = DatabaseConfiguration {
             workspace: Cow::Owned(Path::new("/test").to_path_buf()),
-            paths: vec![Cow::Borrowed("src")],
+            paths: vec![Cow::Borrowed(b"src")],
             includes: vec![],
             excludes: vec![],
-            extensions: vec![Cow::Borrowed("php")],
+            extensions: vec![Cow::Borrowed(b"php")],
             glob: mago_database::GlobSettings::default(),
         };
 
         let mut db = Database::new(config);
         for (name, contents) in files {
-            db.add(File::new(Cow::Owned(name.to_string()), FileType::Host, None, Cow::Owned(contents.to_string())));
+            db.add(File::new(
+                Cow::Owned(name.as_bytes().to_vec()),
+                FileType::Host,
+                None,
+                Cow::Owned(contents.as_bytes().to_vec()),
+            ));
         }
 
         db
@@ -1102,10 +1110,7 @@ mod tests {
         let mut service = make_service(&db);
         service.analyze().expect("Initial analysis failed.");
 
-        db.update(
-            FileId::new("src/a.php"),
-            Cow::Owned("<?php\nfunction get_value(): int { return 99; }\n".to_string()),
-        );
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(b"<?php\nfunction get_value(): int { return 99; }\n".to_vec()));
 
         service.update_database(db.read_only());
         let incremental = service.analyze_incremental(None).expect("Incremental analysis failed.");
@@ -1131,8 +1136,8 @@ mod tests {
         service.analyze().expect("Initial analysis failed.");
 
         db.update(
-            FileId::new("src/a.php"),
-            Cow::Owned("<?php\nfunction compute(): string { return 'hello'; }\n".to_string()),
+            FileId::new(b"src/a.php"),
+            Cow::Owned(b"<?php\nfunction compute(): string { return 'hello'; }\n".to_vec()),
         );
 
         service.update_database(db.read_only());
@@ -1158,7 +1163,7 @@ mod tests {
         let mut service = make_service(&db);
         service.analyze().expect("Initial analysis failed.");
 
-        db.delete(FileId::new("src/a.php"));
+        db.delete(FileId::new(b"src/a.php"));
 
         service.update_database(db.read_only());
         let incremental = service.analyze_incremental(None).expect("Incremental analysis failed.");
@@ -1181,10 +1186,10 @@ mod tests {
         service.analyze().expect("Initial analysis failed.");
 
         db.add(File::new(
-            Cow::Owned("src/b.php".to_string()),
+            Cow::Owned(b"src/b.php".to_vec()),
             FileType::Host,
             None,
-            Cow::Owned("<?php\nfunction new_func(): int { return existing(); }\n".to_string()),
+            Cow::Owned(b"<?php\nfunction new_func(): int { return existing(); }\n".to_vec()),
         ));
 
         service.update_database(db.read_only());
@@ -1213,11 +1218,11 @@ mod tests {
         let mut service = make_service(&db);
         service.analyze().expect("Initial analysis failed.");
 
-        db.update(FileId::new("src/a.php"), Cow::Owned(modified_content.to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(modified_content.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("incremental analysis after modification failed");
 
-        db.update(FileId::new("src/a.php"), Cow::Owned(original_content.to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(original_content.as_bytes().to_vec()));
         service.update_database(db.read_only());
         let reverted = service.analyze_incremental(None).expect("incremental analysis after revert failed");
 
@@ -1242,16 +1247,16 @@ mod tests {
         service.analyze().expect("Initial analysis failed.");
 
         db.update(
-            FileId::new("src/a.php"),
-            Cow::Owned("<?php\nfunction compute(int $x): int { return $x * 3; }\n".to_string()),
+            FileId::new(b"src/a.php"),
+            Cow::Owned(b"<?php\nfunction compute(int $x): int { return $x * 3; }\n".to_vec()),
         );
         service.update_database(db.read_only());
         let cycle1 = service.analyze_incremental(None).expect("First incremental analysis failed");
         let cycle2 = service.analyze_incremental(None).expect("Second incremental analysis failed");
 
         db.update(
-            FileId::new("src/a.php"),
-            Cow::Owned("<?php\nfunction compute(int $x): string { return (string)($x * 3); }\n".to_string()),
+            FileId::new(b"src/a.php"),
+            Cow::Owned(b"<?php\nfunction compute(int $x): string { return (string)($x * 3); }\n".to_vec()),
         );
         service.update_database(db.read_only());
         let cycle3 = service.analyze_incremental(None).expect("Third incremental analysis failed");
@@ -1290,7 +1295,7 @@ mod tests {
 
         let parent_v2 =
             concat!("<?php\n", "class Animal {\n", "    public function speak(): int { return 42; }\n", "}\n",);
-        db.update(FileId::new("src/Animal.php"), Cow::Owned(parent_v2.to_string()));
+        db.update(FileId::new(b"src/Animal.php"), Cow::Owned(parent_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         let incremental = service.analyze_incremental(None).expect("Incremental analysis after class change failed");
 
@@ -1316,7 +1321,7 @@ mod tests {
         let initial_count = initial.issues.len();
 
         let a_broken = "<?php\nfunction get_count(): string { return 'not a number'; }\n";
-        db.update(FileId::new("src/a.php"), Cow::Owned(a_broken.to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(a_broken.as_bytes().to_vec()));
         service.update_database(db.read_only());
         let broken = service.analyze_incremental(None).expect("Incremental analysis after breaking change failed");
 
@@ -1328,7 +1333,7 @@ mod tests {
             "Broken state: incremental != full.\n  Only in incremental: {only_incr:?}\n  Only in full: {only_full:?}"
         );
 
-        db.update(FileId::new("src/a.php"), Cow::Owned(a_valid.to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(a_valid.as_bytes().to_vec()));
         service.update_database(db.read_only());
         let fixed = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -1355,11 +1360,8 @@ mod tests {
         service.analyze().expect("Initial analysis failed.");
 
         // Change both a.php and b.php at the same time
-        db.update(
-            FileId::new("src/a.php"),
-            Cow::Owned("<?php\nfunction alpha(): string { return 'a'; }\n".to_string()),
-        );
-        db.update(FileId::new("src/b.php"), Cow::Owned("<?php\nfunction beta(): string { return 'b'; }\n".to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(b"<?php\nfunction alpha(): string { return 'a'; }\n".to_vec()));
+        db.update(FileId::new(b"src/b.php"), Cow::Owned(b"<?php\nfunction beta(): string { return 'b'; }\n".to_vec()));
 
         service.update_database(db.read_only());
         let incremental =
@@ -1382,14 +1384,14 @@ mod tests {
         let mut service = make_service(&db);
         service.analyze().expect("Initial analysis failed.");
 
-        db.update(FileId::new("src/a.php"), Cow::Owned("<?php\nfunction broken( { return 1; }\n".to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(b"<?php\nfunction broken( { return 1; }\n".to_vec()));
         service.update_database(db.read_only());
         let with_error = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
         // Should have at least one parse error
         assert!(!with_error.issues.is_empty(), "Parse error should produce at least one issue");
 
-        db.update(FileId::new("src/a.php"), Cow::Owned("<?php\nfunction valid(): int { return 1; }\n".to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(b"<?php\nfunction valid(): int { return 1; }\n".to_vec()));
         service.update_database(db.read_only());
         let fixed = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -1414,9 +1416,9 @@ mod tests {
         service.analyze().expect("Initial analysis failed.");
 
         db.update(
-            FileId::new("src/a.php"),
+            FileId::new(b"src/a.php"),
             Cow::Owned(
-                "<?php\nfunction first(): int { return 1; }\nfunction second(): string { return 'two'; }\n".to_string(),
+                b"<?php\nfunction first(): int { return 1; }\nfunction second(): string { return 'two'; }\n".to_vec(),
             ),
         );
         service.update_database(db.read_only());
@@ -1442,7 +1444,7 @@ mod tests {
         let mut service = make_service(&db);
         service.analyze().expect("Initial analysis failed.");
 
-        db.update(FileId::new("src/a.php"), Cow::Owned("<?php\nfunction first(): int { return 1; }\n".to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(b"<?php\nfunction first(): int { return 1; }\n".to_vec()));
         service.update_database(db.read_only());
         let incremental = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -1483,7 +1485,7 @@ mod tests {
         ];
 
         for (i, edit) in edits.iter().enumerate() {
-            db.update(FileId::new("src/a.php"), Cow::Owned(edit.to_string()));
+            db.update(FileId::new(b"src/a.php"), Cow::Owned(edit.as_bytes().to_vec()));
             service.update_database(db.read_only());
             let incremental = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -1510,11 +1512,11 @@ mod tests {
         let mut service = make_service(&db);
         service.analyze().expect("Initial analysis failed.");
 
-        db.update(FileId::new("src/a.php"), Cow::Owned("<?php\nfunction a(): string { return 'a'; }\n".to_string()));
-        db.update(FileId::new("src/b.php"), Cow::Owned("<?php\nfunction b(): string { return 'b'; }\n".to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(b"<?php\nfunction a(): string { return 'a'; }\n".to_vec()));
+        db.update(FileId::new(b"src/b.php"), Cow::Owned(b"<?php\nfunction b(): string { return 'b'; }\n".to_vec()));
         db.update(
-            FileId::new("src/c.php"),
-            Cow::Owned("<?php\nfunction c(): string { return a() . b(); }\n".to_string()),
+            FileId::new(b"src/c.php"),
+            Cow::Owned(b"<?php\nfunction c(): string { return a() . b(); }\n".to_vec()),
         );
 
         service.update_database(db.read_only());
@@ -1541,9 +1543,9 @@ mod tests {
         service.analyze().expect("Initial analysis failed.");
 
         db.update(
-            FileId::new("src/a.php"),
+            FileId::new(b"src/a.php"),
             Cow::Owned(
-                "<?php\nclass NewClass {\n    public function method(): string { return 'hello'; }\n}\n".to_string(),
+                b"<?php\nclass NewClass {\n    public function method(): string { return 'hello'; }\n}\n".to_vec(),
             ),
         );
 
@@ -1567,10 +1569,7 @@ mod tests {
         let mut service = make_service(&db);
         let initial = service.analyze().expect("Full analysis failed.");
 
-        db.update(
-            FileId::new("src/a.php"),
-            Cow::Owned("<?php\nfunction new_thing(): int { return 42; }\n".to_string()),
-        );
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(b"<?php\nfunction new_thing(): int { return 42; }\n".to_vec()));
         service.update_database(db.read_only());
         let with_content = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -1582,7 +1581,7 @@ mod tests {
             "Empty to nonempty: incremental != full.\n  Only in incremental: {only_incr:?}\n  Only in full: {only_full:?}"
         );
 
-        db.update(FileId::new("src/a.php"), Cow::Owned("<?php\n".to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(b"<?php\n".to_vec()));
         service.update_database(db.read_only());
         let back_to_empty = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -1622,11 +1621,11 @@ mod tests {
                 "<?php\nclass Greeter {{\n    public function greet(string $name): string {{ return 'Hi #{} ' . $name; }}\n}}\n",
                 i
             );
-            db.update(FileId::new("src/greeter.php"), Cow::Owned(edited));
+            db.update(FileId::new(b"src/greeter.php"), Cow::Owned(edited.into_bytes()));
             service.update_database(db.read_only());
             service.analyze_incremental(None).expect("Incremental analysis failed.");
 
-            db.update(FileId::new("src/greeter.php"), Cow::Owned(original.to_string()));
+            db.update(FileId::new(b"src/greeter.php"), Cow::Owned(original.as_bytes().to_vec()));
             service.update_database(db.read_only());
             service.analyze_incremental(None).expect("Incremental analysis failed.");
         }
@@ -1666,11 +1665,11 @@ mod tests {
 
         for i in 0..30 {
             let edited = format!("<?php\nfunction compute(): string {{ return 'value_{}'; }}\n", i);
-            db.update(FileId::new("src/compute.php"), Cow::Owned(edited));
+            db.update(FileId::new(b"src/compute.php"), Cow::Owned(edited.into_bytes()));
             service.update_database(db.read_only());
             service.analyze_incremental(None).expect("Incremental analysis failed.");
 
-            db.update(FileId::new("src/compute.php"), Cow::Owned(original.to_string()));
+            db.update(FileId::new(b"src/compute.php"), Cow::Owned(original.as_bytes().to_vec()));
             service.update_database(db.read_only());
             service.analyze_incremental(None).expect("Incremental analysis failed.");
         }
@@ -1704,25 +1703,25 @@ mod tests {
 
         for i in 0..20 {
             let body_edit = format!("<?php\nfunction alpha(): int {{ return {}; }}\n", i);
-            db.update(FileId::new("src/a.php"), Cow::Owned(body_edit));
+            db.update(FileId::new(b"src/a.php"), Cow::Owned(body_edit.into_bytes()));
             service.update_database(db.read_only());
             service.analyze_incremental(None).expect("Incremental analysis failed.");
 
             db.update(
-                FileId::new("src/a.php"),
-                Cow::Owned("<?php\nfunction alpha(): string { return 'x'; }\n".to_string()),
+                FileId::new(b"src/a.php"),
+                Cow::Owned(b"<?php\nfunction alpha(): string { return 'x'; }\n".to_vec()),
             );
             service.update_database(db.read_only());
             service.analyze_incremental(None).expect("Incremental analysis failed.");
 
             db.update(
-                FileId::new("src/a.php"),
-                Cow::Owned("<?php\nfunction alpha(): string { return 'x'; }\nfunction extra(): void {}\n".to_string()),
+                FileId::new(b"src/a.php"),
+                Cow::Owned(b"<?php\nfunction alpha(): string { return 'x'; }\nfunction extra(): void {}\n".to_vec()),
             );
             service.update_database(db.read_only());
             service.analyze_incremental(None).expect("Incremental analysis failed.");
 
-            db.update(FileId::new("src/a.php"), Cow::Owned(base.to_string()));
+            db.update(FileId::new(b"src/a.php"), Cow::Owned(base.as_bytes().to_vec()));
             service.update_database(db.read_only());
             service.analyze_incremental(None).expect("Incremental analysis failed.");
         }
@@ -1776,7 +1775,7 @@ mod tests {
         // Body-only change to an unrelated file.
         let unrelated_v2 =
             concat!("<?php\n", "class Unrelated {\n", "    public function greet(): string { return 'hi'; }\n", "}\n",);
-        db.update(FileId::new("src/Unrelated.php"), Cow::Owned(unrelated_v2.to_string()));
+        db.update(FileId::new(b"src/Unrelated.php"), Cow::Owned(unrelated_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         let incremental = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -1823,7 +1822,7 @@ mod tests {
             "    private function unused(): void {}\n",
             "}\n",
         );
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         let incremental = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -1877,7 +1876,7 @@ mod tests {
             "    public function compute(): string { return 'hello'; }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Other.php"), Cow::Owned(other_v2.to_string()));
+        db.update(FileId::new(b"src/Other.php"), Cow::Owned(other_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         let incremental = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -1915,7 +1914,7 @@ mod tests {
             "    public function process(): float { echo 'hi'; return 1.0; }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         let incremental = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -1964,7 +1963,7 @@ mod tests {
             "    private function unused(): void {}\n",
             "}\n",
         );
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         let incremental = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -2023,7 +2022,7 @@ mod tests {
             "    private function unused(): void {}\n",
             "}\n",
         );
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         let cycle1 = service.analyze_incremental(None).expect("Incremental analysis failed.");
 
@@ -2043,9 +2042,9 @@ mod tests {
             "    private function unused(): void {}\n",
             "}\n",
         );
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v3.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v3.as_bytes().to_vec()));
         service.update_database(db.read_only());
-        let child_id = FileId::new("src/Child.php");
+        let child_id = FileId::new(b"src/Child.php");
         let cycle2 = service
             .analyze_incremental(Some(&[child_id]))
             .expect("Incremental analysis failed after signature change following body-only change.");
@@ -2099,13 +2098,13 @@ mod tests {
 
         // Parent changes return type to int — child's override is now incompatible.
         let base_v2 = "<?php\nclass Base {\n    public function run(): int { return 42; }\n}\n";
-        db.update(FileId::new("src/Base.php"), Cow::Owned(base_v2.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(base_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent return type changed");
 
         // Revert parent — child should be compatible again.
-        db.update(FileId::new("src/Base.php"), Cow::Owned(base_v1.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(base_v1.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent reverted");
@@ -2125,7 +2124,7 @@ mod tests {
 
         // Parent changes parameter type to string.
         let base_v2 = "<?php\nclass Base {\n    public function process(string $x): void { echo $x; }\n}\n";
-        db.update(FileId::new("src/Base.php"), Cow::Owned(base_v2.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(base_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent param type changed");
@@ -2144,7 +2143,7 @@ mod tests {
 
         // Parent adds a new method.
         let base_v2 = "<?php\nclass Base {\n    public function run(): string { return 'ok'; }\n    public function extra(): void {}\n}\n";
-        db.update(FileId::new("src/Base.php"), Cow::Owned(base_v2.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(base_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent added method");
@@ -2163,7 +2162,7 @@ mod tests {
 
         // Parent removes the overridden method — child's #[Override] now has no parent method.
         let base_v2 = "<?php\nclass Base {\n    public function other(): void {}\n}\n";
-        db.update(FileId::new("src/Base.php"), Cow::Owned(base_v2.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(base_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent removed overridden method");
@@ -2182,13 +2181,13 @@ mod tests {
 
         // Child changes return type to float — now incompatible.
         let child_v2 = "<?php\nclass Child extends Base {\n    public function run(): float { return 1.0; }\n}\n";
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "child return type incompatible");
 
         // Child fixes return type — compatible again.
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v1.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v1.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "child return type fixed");
@@ -2207,7 +2206,7 @@ mod tests {
 
         // Add #[Override].
         let child_v2 = "<?php\nclass Child extends Base {\n    #[\\Override] public function run(): string { return 'child'; }\n    private function unused(): void {}\n}\n";
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "child added Override");
@@ -2226,7 +2225,7 @@ mod tests {
 
         // Remove #[Override].
         let child_v2 = "<?php\nclass Child extends Base {\n    public function run(): string { return 'child'; }\n}\n";
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "child removed Override");
@@ -2245,7 +2244,7 @@ mod tests {
 
         // Body-only change in child.
         let child_v2 = "<?php\nclass Child extends Base {\n    public function run(): float { echo 'hi'; return 1.0; }\n    private function unused(): void {}\n}\n";
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "body change in child");
@@ -2264,7 +2263,7 @@ mod tests {
 
         // Body-only change in parent.
         let base_v2 = "<?php\nclass Base {\n    public function run(): string { return 'changed'; }\n}\n";
-        db.update(FileId::new("src/Base.php"), Cow::Owned(base_v2.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(base_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "body change in parent");
@@ -2285,7 +2284,7 @@ mod tests {
 
         // Body-only change in unrelated file.
         let unrelated_v2 = "<?php\nclass Unrelated {\n    public function greet(): string { return 'hi'; }\n}\n";
-        db.update(FileId::new("src/Unrelated.php"), Cow::Owned(unrelated_v2.to_string()));
+        db.update(FileId::new(b"src/Unrelated.php"), Cow::Owned(unrelated_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "body change in unrelated file");
@@ -2325,13 +2324,13 @@ mod tests {
             "    public function extra(): void { echo []; }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "added method to Helper");
 
         // Revert — should restore original issues exactly.
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v1.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v1.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "reverted Helper method addition");
@@ -2363,7 +2362,7 @@ mod tests {
             "    private function unused(): void {}\n",
             "}\n",
         );
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "removed method");
@@ -2381,7 +2380,7 @@ mod tests {
 
         // Add an unused private method.
         let code_v2 = "<?php\nclass Foo {\n    public function bar(): void { echo 'bar'; }\n    private function secret(): void {}\n}\n";
-        db.update(FileId::new("src/Foo.php"), Cow::Owned(code_v2.to_string()));
+        db.update(FileId::new(b"src/Foo.php"), Cow::Owned(code_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "added unused private method");
@@ -2411,7 +2410,7 @@ mod tests {
             "    private function helper(): void { echo 'help'; }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Foo.php"), Cow::Owned(code_v2.to_string()));
+        db.update(FileId::new(b"src/Foo.php"), Cow::Owned(code_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "helper became unused");
@@ -2441,7 +2440,7 @@ mod tests {
             "    private function helper(): void { echo 'help'; }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Foo.php"), Cow::Owned(code_v2.to_string()));
+        db.update(FileId::new(b"src/Foo.php"), Cow::Owned(code_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "helper became used");
@@ -2460,7 +2459,7 @@ mod tests {
 
         // Caller stops calling helper.
         let caller_v2 = "<?php\nfunction main_fn(): int { return 99; }\n";
-        db.update(FileId::new("src/caller.php"), Cow::Owned(caller_v2.to_string()));
+        db.update(FileId::new(b"src/caller.php"), Cow::Owned(caller_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "cross-file reference removed");
@@ -2479,7 +2478,7 @@ mod tests {
 
         // Caller adds a call to helper.
         let caller_v2 = "<?php\nfunction main_fn(): int { return helper(); }\n";
-        db.update(FileId::new("src/caller.php"), Cow::Owned(caller_v2.to_string()));
+        db.update(FileId::new(b"src/caller.php"), Cow::Owned(caller_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "cross-file reference added");
@@ -2497,7 +2496,7 @@ mod tests {
         assert_matches_full(&service, &db, "initial");
 
         // Delete parent class file.
-        db.delete(FileId::new("src/Base.php"));
+        db.delete(FileId::new(b"src/Base.php"));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent deleted");
@@ -2515,7 +2514,7 @@ mod tests {
         assert_matches_full(&service, &db, "initial");
 
         // Delete child class file.
-        db.delete(FileId::new("src/Child.php"));
+        db.delete(FileId::new(b"src/Child.php"));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "child deleted");
@@ -2533,13 +2532,18 @@ mod tests {
         assert_matches_full(&service, &db, "initial");
 
         // Delete parent.
-        db.delete(FileId::new("src/Base.php"));
+        db.delete(FileId::new(b"src/Base.php"));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent deleted");
 
         // Re-add parent.
-        db.add(File::new(Cow::Owned("src/Base.php".to_string()), FileType::Host, None, Cow::Owned(base.to_string())));
+        db.add(File::new(
+            Cow::Owned(b"src/Base.php".to_vec()),
+            FileType::Host,
+            None,
+            Cow::Owned(base.as_bytes().to_vec()),
+        ));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent re-added");
@@ -2579,7 +2583,7 @@ mod tests {
             "    public function newMethod(): void { echo []; }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Classes.php"), Cow::Owned(file_v2.to_string()));
+        db.update(FileId::new(b"src/Classes.php"), Cow::Owned(file_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "one class changed in multi-class file");
@@ -2619,13 +2623,13 @@ mod tests {
             "    public function extra(): int { return 1; }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Classes.php"), Cow::Owned(file_v2.to_string()));
+        db.update(FileId::new(b"src/Classes.php"), Cow::Owned(file_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "changed Helper");
 
         // Revert.
-        db.update(FileId::new("src/Classes.php"), Cow::Owned(file_v1.to_string()));
+        db.update(FileId::new(b"src/Classes.php"), Cow::Owned(file_v1.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "reverted multi-class file");
@@ -2662,7 +2666,7 @@ mod tests {
             "    public function help(): void { echo 'changed'; }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Classes.php"), Cow::Owned(file_v2.to_string()));
+        db.update(FileId::new(b"src/Classes.php"), Cow::Owned(file_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "body-only change in multi-class file");
@@ -2680,7 +2684,12 @@ mod tests {
 
         // Add a new child class file with incompatible return type.
         let child = "<?php\nclass Child extends Base {\n    public function run(): float { return 1.0; }\n}\n";
-        db.add(File::new(Cow::Owned("src/Child.php".to_string()), FileType::Host, None, Cow::Owned(child.to_string())));
+        db.add(File::new(
+            Cow::Owned(b"src/Child.php".to_vec()),
+            FileType::Host,
+            None,
+            Cow::Owned(child.as_bytes().to_vec()),
+        ));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "new child class added");
@@ -2700,13 +2709,13 @@ mod tests {
         // Add implements clause.
         let class_v2 =
             "<?php\nclass Printer implements Printable {\n    public function print(): string { return 'hello'; }\n}\n";
-        db.update(FileId::new("src/Printer.php"), Cow::Owned(class_v2.to_string()));
+        db.update(FileId::new(b"src/Printer.php"), Cow::Owned(class_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "added implements");
 
         // Remove implements clause.
-        db.update(FileId::new("src/Printer.php"), Cow::Owned(class_v1.to_string()));
+        db.update(FileId::new(b"src/Printer.php"), Cow::Owned(class_v1.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "removed implements");
@@ -2726,8 +2735,8 @@ mod tests {
 
         // Cycle 1: Change base return type.
         db.update(
-            FileId::new("src/Base.php"),
-            Cow::Owned("<?php\nclass Base {\n    public function run(): int { return 42; }\n}\n".to_string()),
+            FileId::new(b"src/Base.php"),
+            Cow::Owned(b"<?php\nclass Base {\n    public function run(): int { return 42; }\n}\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -2735,8 +2744,8 @@ mod tests {
 
         // Cycle 2: Change child return type to match new base.
         db.update(
-            FileId::new("src/Child.php"),
-            Cow::Owned("<?php\nclass Child extends Base {\n    public function run(): int { return 99; }\n    private function unused(): void {}\n}\n".to_string()),
+            FileId::new(b"src/Child.php"),
+            Cow::Owned(b"<?php\nclass Child extends Base {\n    public function run(): int { return 99; }\n    private function unused(): void {}\n}\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -2744,8 +2753,8 @@ mod tests {
 
         // Cycle 3: Change user code.
         db.update(
-            FileId::new("src/user.php"),
-            Cow::Owned("<?php\nfunction useChild(): int { return (new Child())->run() + 1; }\n".to_string()),
+            FileId::new(b"src/user.php"),
+            Cow::Owned(b"<?php\nfunction useChild(): int { return (new Child())->run() + 1; }\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -2765,27 +2774,27 @@ mod tests {
 
         // Body change.
         let child_body = "<?php\nclass Child extends Base {\n    public function run(): float { echo 'x'; return 1.0; }\n    private function unused(): void {}\n}\n";
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_body.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_body.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "body change");
 
         // Signature change.
         let child_sig = "<?php\nclass Child extends Base {\n    #[\\Override] public function run(): float { echo 'x'; return 1.0; }\n    private function unused(): void {}\n}\n";
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_sig.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_sig.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "signature change");
 
         // Another body change.
         let child_body2 = "<?php\nclass Child extends Base {\n    #[\\Override] public function run(): float { echo 'y'; return 2.0; }\n    private function unused(): void {}\n}\n";
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_body2.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_body2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "another body change");
 
         // Revert to original.
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v1.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v1.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "reverted to original");
@@ -2810,8 +2819,8 @@ mod tests {
 
         // Change grandparent return type — should cascade to parent and child.
         db.update(
-            FileId::new("src/GrandParent.php"),
-            Cow::Owned("<?php\nclass GrandParent_ {\n    public function run(): int { return 42; }\n}\n".to_string()),
+            FileId::new(b"src/GrandParent.php"),
+            Cow::Owned(b"<?php\nclass GrandParent_ {\n    public function run(): int { return 42; }\n}\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -2819,10 +2828,10 @@ mod tests {
 
         // Fix parent to match.
         db.update(
-            FileId::new("src/Parent.php"),
+            FileId::new(b"src/Parent.php"),
             Cow::Owned(
-                "<?php\nclass Parent_ extends GrandParent_ {\n    public function run(): int { return 1; }\n}\n"
-                    .to_string(),
+                b"<?php\nclass Parent_ extends GrandParent_ {\n    public function run(): int { return 1; }\n}\n"
+                    .to_vec(),
             ),
         );
         service.update_database(db.read_only());
@@ -2831,9 +2840,9 @@ mod tests {
 
         // Fix child to match.
         db.update(
-            FileId::new("src/Child.php"),
+            FileId::new(b"src/Child.php"),
             Cow::Owned(
-                "<?php\nclass Child extends Parent_ {\n    public function run(): int { return 2; }\n}\n".to_string(),
+                b"<?php\nclass Child extends Parent_ {\n    public function run(): int { return 2; }\n}\n".to_vec(),
             ),
         );
         service.update_database(db.read_only());
@@ -2853,17 +2862,17 @@ mod tests {
         assert_matches_full(&service, &db, "initial");
 
         // Delete a.php.
-        db.delete(FileId::new("src/a.php"));
+        db.delete(FileId::new(b"src/a.php"));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "a.php deleted");
 
         // Re-add a.php with different content.
         db.add(File::new(
-            Cow::Owned("src/a.php".to_string()),
+            Cow::Owned(b"src/a.php".to_vec()),
             FileType::Host,
             None,
-            Cow::Owned("<?php\nfunction helper(): string { return 'oops'; }\n".to_string()),
+            Cow::Owned(b"<?php\nfunction helper(): string { return 'oops'; }\n".to_vec()),
         ));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -2894,13 +2903,13 @@ mod tests {
             "    private function log(): void { echo 'log'; }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Service.php"), Cow::Owned(code_v2.to_string()));
+        db.update(FileId::new(b"src/Service.php"), Cow::Owned(code_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "body change — log now used");
 
         // Remove the call again — log becomes unused.
-        db.update(FileId::new("src/Service.php"), Cow::Owned(code_v1.to_string()));
+        db.update(FileId::new(b"src/Service.php"), Cow::Owned(code_v1.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "reverted — log unused again");
@@ -2927,8 +2936,8 @@ mod tests {
 
         // Change Animal hierarchy — Vehicle hierarchy must be unaffected.
         db.update(
-            FileId::new("src/Animal.php"),
-            Cow::Owned("<?php\nclass Animal {\n    public function speak(): int { return 42; }\n}\n".to_string()),
+            FileId::new(b"src/Animal.php"),
+            Cow::Owned(b"<?php\nclass Animal {\n    public function speak(): int { return 42; }\n}\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -2936,10 +2945,8 @@ mod tests {
 
         // Change Vehicle hierarchy — Animal hierarchy must be unaffected.
         db.update(
-            FileId::new("src/Vehicle.php"),
-            Cow::Owned(
-                "<?php\nclass Vehicle {\n    public function speed(): string { return 'fast'; }\n}\n".to_string(),
-            ),
+            FileId::new(b"src/Vehicle.php"),
+            Cow::Owned(b"<?php\nclass Vehicle {\n    public function speed(): string { return 'fast'; }\n}\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -3032,14 +3039,14 @@ mod tests {
         ];
 
         for (i, edit) in edits.iter().enumerate() {
-            db.update(FileId::new("src/Classes.php"), Cow::Owned(edit.to_string()));
+            db.update(FileId::new(b"src/Classes.php"), Cow::Owned(edit.as_bytes().to_vec()));
             service.update_database(db.read_only());
             service.analyze_incremental(None).expect("Incremental failed.");
             assert_matches_full(&service, &db, &format!("rapid edit {}", i + 1));
         }
 
         // Revert to original.
-        db.update(FileId::new("src/Classes.php"), Cow::Owned(file_original.to_string()));
+        db.update(FileId::new(b"src/Classes.php"), Cow::Owned(file_original.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "reverted to original");
@@ -3058,7 +3065,7 @@ mod tests {
 
         // Change trait method return type.
         let trait_v2 = "<?php\ntrait Greeter {\n    public function greet(): int { return 42; }\n}\n";
-        db.update(FileId::new("src/Greeter.php"), Cow::Owned(trait_v2.to_string()));
+        db.update(FileId::new(b"src/Greeter.php"), Cow::Owned(trait_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "trait method return type changed");
@@ -3077,13 +3084,13 @@ mod tests {
 
         // Change abstract method return type to int — Circle's implementation is now incompatible.
         let abstract_v2 = "<?php\nabstract class Shape {\n    abstract public function area(): int;\n}\n";
-        db.update(FileId::new("src/Shape.php"), Cow::Owned(abstract_v2.to_string()));
+        db.update(FileId::new(b"src/Shape.php"), Cow::Owned(abstract_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "abstract method return type changed");
 
         // Revert abstract method.
-        db.update(FileId::new("src/Shape.php"), Cow::Owned(abstract_v1.to_string()));
+        db.update(FileId::new(b"src/Shape.php"), Cow::Owned(abstract_v1.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "abstract method reverted");
@@ -3117,7 +3124,7 @@ mod tests {
             "    public function label(): string { return $this->value; }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Color.php"), Cow::Owned(enum_v2.to_string()));
+        db.update(FileId::new(b"src/Color.php"), Cow::Owned(enum_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "enum case added");
@@ -3137,8 +3144,8 @@ mod tests {
         // Both change at the same time.
         let base_v2 = "<?php\nclass Base {\n    public function run(): int { return 42; }\n}\n";
         let child_v2 = "<?php\nclass Child extends Base {\n    public function run(): int { return 99; }\n    private function unused(): void {}\n}\n";
-        db.update(FileId::new("src/Base.php"), Cow::Owned(base_v2.to_string()));
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_v2.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(base_v2.as_bytes().to_vec()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "both parent and child changed");
@@ -3165,8 +3172,13 @@ mod tests {
         // Move Foo to b.php.
         let file_a_v2 = "<?php\nclass Helper {\n    public function help(): void { echo (new Foo())->bar(); }\n}\n";
         let file_b = "<?php\nclass Foo {\n    public function bar(): string { return 'foo'; }\n}\n";
-        db.update(FileId::new("src/a.php"), Cow::Owned(file_a_v2.to_string()));
-        db.add(File::new(Cow::Owned("src/b.php".to_string()), FileType::Host, None, Cow::Owned(file_b.to_string())));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(file_a_v2.as_bytes().to_vec()));
+        db.add(File::new(
+            Cow::Owned(b"src/b.php".to_vec()),
+            FileType::Host,
+            None,
+            Cow::Owned(file_b.as_bytes().to_vec()),
+        ));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "Foo moved to b.php");
@@ -3185,7 +3197,7 @@ mod tests {
 
         // Make it abstract.
         let class_v2 = "<?php\nabstract class Base {\n    abstract public function run(): string;\n}\n";
-        db.update(FileId::new("src/Base.php"), Cow::Owned(class_v2.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(class_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "class became abstract");
@@ -3204,7 +3216,7 @@ mod tests {
 
         // Change property type.
         let base_v2 = "<?php\nclass Base {\n    public int $name = 42;\n    public function getName(): int { return $this->name; }\n}\n";
-        db.update(FileId::new("src/Base.php"), Cow::Owned(base_v2.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(base_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent property type changed");
@@ -3230,10 +3242,10 @@ mod tests {
 
         // Edit only Child1 (body change) — Child2 and Child3 issues must persist.
         db.update(
-            FileId::new("src/Child1.php"),
+            FileId::new(b"src/Child1.php"),
             Cow::Owned(
-                "<?php\nclass Child1 extends Base {\n    public function run(): float { echo 'x'; return 1.0; }\n}\n"
-                    .to_string(),
+                b"<?php\nclass Child1 extends Base {\n    public function run(): float { echo 'x'; return 1.0; }\n}\n"
+                    .to_vec(),
             ),
         );
         service.update_database(db.read_only());
@@ -3242,10 +3254,10 @@ mod tests {
 
         // Edit only Child2 (signature change) — Child1 and Child3 issues must persist.
         db.update(
-            FileId::new("src/Child2.php"),
+            FileId::new(b"src/Child2.php"),
             Cow::Owned(
-                "<?php\nclass Child2 extends Base {\n    #[\\Override] public function run(): int { return 42; }\n}\n"
-                    .to_string(),
+                b"<?php\nclass Child2 extends Base {\n    #[\\Override] public function run(): int { return 42; }\n}\n"
+                    .to_vec(),
             ),
         );
         service.update_database(db.read_only());
@@ -3269,7 +3281,7 @@ mod tests {
 
         // Change trait method return type.
         let trait_v2 = "<?php\ntrait Logger {\n    public function log(): int { return 42; }\n}\n";
-        db.update(FileId::new("src/Logger.php"), Cow::Owned(trait_v2.to_string()));
+        db.update(FileId::new(b"src/Logger.php"), Cow::Owned(trait_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "trait return type changed");
@@ -3289,7 +3301,7 @@ mod tests {
 
         // Add a method to trait.
         let trait_v2 = "<?php\ntrait Greet {\n    public function hello(): string { return 'hi'; }\n    public function goodbye(): int { return 0; }\n}\n";
-        db.update(FileId::new("src/Greet.php"), Cow::Owned(trait_v2.to_string()));
+        db.update(FileId::new(b"src/Greet.php"), Cow::Owned(trait_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "trait added method");
@@ -3308,7 +3320,7 @@ mod tests {
 
         // Remove assist method from trait.
         let trait_v2 = "<?php\ntrait Helper {\n    public function other(): void {}\n}\n";
-        db.update(FileId::new("src/Helper.php"), Cow::Owned(trait_v2.to_string()));
+        db.update(FileId::new(b"src/Helper.php"), Cow::Owned(trait_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "trait method removed");
@@ -3328,13 +3340,13 @@ mod tests {
 
         // Interface changes return type.
         let iface_v2 = "<?php\ninterface Renderable {\n    public function render(): int;\n}\n";
-        db.update(FileId::new("src/Renderable.php"), Cow::Owned(iface_v2.to_string()));
+        db.update(FileId::new(b"src/Renderable.php"), Cow::Owned(iface_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "interface return type changed");
 
         // Revert.
-        db.update(FileId::new("src/Renderable.php"), Cow::Owned(iface_v1.to_string()));
+        db.update(FileId::new(b"src/Renderable.php"), Cow::Owned(iface_v1.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "interface reverted");
@@ -3354,7 +3366,7 @@ mod tests {
 
         // Add required method to interface.
         let iface_v2 = "<?php\ninterface Cacheable {\n    public function getKey(): string;\n    public function getTtl(): int;\n}\n";
-        db.update(FileId::new("src/Cacheable.php"), Cow::Owned(iface_v2.to_string()));
+        db.update(FileId::new(b"src/Cacheable.php"), Cow::Owned(iface_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "interface added method");
@@ -3384,7 +3396,7 @@ mod tests {
 
         // Change Writable interface.
         let iface_b_v2 = "<?php\ninterface Writable {\n    public function write(string $data): int;\n}\n";
-        db.update(FileId::new("src/Writable.php"), Cow::Owned(iface_b_v2.to_string()));
+        db.update(FileId::new(b"src/Writable.php"), Cow::Owned(iface_b_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "one of two interfaces changed");
@@ -3404,7 +3416,7 @@ mod tests {
         // Parent adds required parameter.
         let parent_v2 =
             "<?php\nclass Base {\n    public function __construct(public string $name, public int $age) {}\n}\n";
-        db.update(FileId::new("src/Base.php"), Cow::Owned(parent_v2.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(parent_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent constructor added param");
@@ -3423,7 +3435,7 @@ mod tests {
 
         // Change promoted property type.
         let class_v2 = "<?php\nclass Config {\n    public function __construct(public int $value) {}\n    public function get(): int { return $this->value; }\n}\n";
-        db.update(FileId::new("src/Config.php"), Cow::Owned(class_v2.to_string()));
+        db.update(FileId::new(b"src/Config.php"), Cow::Owned(class_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "promoted property type changed");
@@ -3442,7 +3454,7 @@ mod tests {
 
         // Change constant type.
         let class_v2 = "<?php\nclass Settings {\n    public const int VERSION = 2;\n    public function getVersion(): int { return self::VERSION; }\n}\n";
-        db.update(FileId::new("src/Settings.php"), Cow::Owned(class_v2.to_string()));
+        db.update(FileId::new(b"src/Settings.php"), Cow::Owned(class_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "constant type changed");
@@ -3461,14 +3473,14 @@ mod tests {
 
         // Add a case.
         let enum_v2 = "<?php\nenum Status: string {\n    case Active = 'active';\n    case Inactive = 'inactive';\n    case Pending = 'pending';\n}\n";
-        db.update(FileId::new("src/Status.php"), Cow::Owned(enum_v2.to_string()));
+        db.update(FileId::new(b"src/Status.php"), Cow::Owned(enum_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "enum case added");
 
         // Remove a case.
         let enum_v3 = "<?php\nenum Status: string {\n    case Active = 'active';\n}\n";
-        db.update(FileId::new("src/Status.php"), Cow::Owned(enum_v3.to_string()));
+        db.update(FileId::new(b"src/Status.php"), Cow::Owned(enum_v3.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "enum cases removed");
@@ -3494,7 +3506,7 @@ mod tests {
             "function alpha(): string { return 'now_correct'; }\n",
             "function beta(): string { return 42; }\n",
         );
-        db.update(FileId::new("src/funcs.php"), Cow::Owned(file_v2.to_string()));
+        db.update(FileId::new(b"src/funcs.php"), Cow::Owned(file_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "alpha changed, beta preserved");
@@ -3525,7 +3537,7 @@ mod tests {
             "}\n",
             "function standalone(): string { return 'fixed'; }\n",
         );
-        db.update(FileId::new("src/mixed.php"), Cow::Owned(file_v2.to_string()));
+        db.update(FileId::new(b"src/mixed.php"), Cow::Owned(file_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "function changed, class issues preserved");
@@ -3544,7 +3556,7 @@ mod tests {
 
         // Make method private.
         let class_v2 = "<?php\nclass Service {\n    private function doWork(): void { echo 'work'; }\n}\n";
-        db.update(FileId::new("src/Service.php"), Cow::Owned(class_v2.to_string()));
+        db.update(FileId::new(b"src/Service.php"), Cow::Owned(class_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "method became private");
@@ -3563,7 +3575,7 @@ mod tests {
 
         // Make base final.
         let base_v2 = "<?php\nfinal class Base {\n    public function run(): string { return 'ok'; }\n}\n";
-        db.update(FileId::new("src/Base.php"), Cow::Owned(base_v2.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(base_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "base became final");
@@ -3583,7 +3595,7 @@ mod tests {
         // Make method static.
         let class_v2 =
             "<?php\nclass Math {\n    public static function add(int $a, int $b): int { return $a + $b; }\n}\n";
-        db.update(FileId::new("src/Math.php"), Cow::Owned(class_v2.to_string()));
+        db.update(FileId::new(b"src/Math.php"), Cow::Owned(class_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "method became static");
@@ -3605,8 +3617,8 @@ mod tests {
 
         // Change L1 return type.
         db.update(
-            FileId::new("src/L1.php"),
-            Cow::Owned("<?php\nclass L1 {\n    public function method(): int { return 1; }\n}\n".to_string()),
+            FileId::new(b"src/L1.php"),
+            Cow::Owned(b"<?php\nclass L1 {\n    public function method(): int { return 1; }\n}\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -3628,8 +3640,8 @@ mod tests {
 
         // Change interface A return type — now class is incompatible with A.
         db.update(
-            FileId::new("src/A.php"),
-            Cow::Owned("<?php\ninterface A {\n    public function process(): int;\n}\n".to_string()),
+            FileId::new(b"src/A.php"),
+            Cow::Owned(b"<?php\ninterface A {\n    public function process(): int;\n}\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -3657,12 +3669,12 @@ mod tests {
 
         // Both parent and interface change simultaneously.
         db.update(
-            FileId::new("src/Base.php"),
-            Cow::Owned("<?php\nclass Base {\n    public function run(): int { return 42; }\n}\n".to_string()),
+            FileId::new(b"src/Base.php"),
+            Cow::Owned(b"<?php\nclass Base {\n    public function run(): int { return 42; }\n}\n".to_vec()),
         );
         db.update(
-            FileId::new("src/HasId.php"),
-            Cow::Owned("<?php\ninterface HasId {\n    public function getId(): string;\n}\n".to_string()),
+            FileId::new(b"src/HasId.php"),
+            Cow::Owned(b"<?php\ninterface HasId {\n    public function getId(): string;\n}\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -3685,8 +3697,8 @@ mod tests {
 
         // Parent changes return type — all children become incompatible.
         db.update(
-            FileId::new("src/Base.php"),
-            Cow::Owned("<?php\nclass Base {\n    public function method(): int { return 1; }\n}\n".to_string()),
+            FileId::new(b"src/Base.php"),
+            Cow::Owned(b"<?php\nclass Base {\n    public function method(): int { return 1; }\n}\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -3706,15 +3718,15 @@ mod tests {
 
         // Change helper return type.
         db.update(
-            FileId::new("src/lib.php"),
-            Cow::Owned("<?php\nfunction helper(): string { return 'nope'; }\n".to_string()),
+            FileId::new(b"src/lib.php"),
+            Cow::Owned(b"<?php\nfunction helper(): string { return 'nope'; }\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "function return type changed");
 
         // Revert.
-        db.update(FileId::new("src/lib.php"), Cow::Owned(lib.to_string()));
+        db.update(FileId::new(b"src/lib.php"), Cow::Owned(lib.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "function reverted");
@@ -3732,28 +3744,33 @@ mod tests {
 
         // Add a child.
         let child = "<?php\nclass Child extends Base {\n    public function run(): string { return 'child'; }\n    private function secret(): void {}\n}\n";
-        db.add(File::new(Cow::Owned("src/Child.php".to_string()), FileType::Host, None, Cow::Owned(child.to_string())));
+        db.add(File::new(
+            Cow::Owned(b"src/Child.php".to_vec()),
+            FileType::Host,
+            None,
+            Cow::Owned(child.as_bytes().to_vec()),
+        ));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "child added");
 
         // Modify parent return type.
         db.update(
-            FileId::new("src/Base.php"),
-            Cow::Owned("<?php\nclass Base {\n    public function run(): int { return 42; }\n}\n".to_string()),
+            FileId::new(b"src/Base.php"),
+            Cow::Owned(b"<?php\nclass Base {\n    public function run(): int { return 42; }\n}\n".to_vec()),
         );
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent modified after child added");
 
         // Delete child.
-        db.delete(FileId::new("src/Child.php"));
+        db.delete(FileId::new(b"src/Child.php"));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "child deleted");
 
         // Revert parent.
-        db.update(FileId::new("src/Base.php"), Cow::Owned(base.to_string()));
+        db.update(FileId::new(b"src/Base.php"), Cow::Owned(base.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "parent reverted after child deleted");
@@ -3775,7 +3792,12 @@ mod tests {
                 "<?php\nclass {} extends Base {{\n    public function run(): float {{ return 1.0; }}\n}}\n",
                 &name[4..5]
             );
-            db.add(File::new(Cow::Owned(name.to_string()), FileType::Host, None, Cow::Owned(content)));
+            db.add(File::new(
+                Cow::Owned(name.as_bytes().to_vec()),
+                FileType::Host,
+                None,
+                Cow::Owned(content.into_bytes()),
+            ));
         }
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -3783,7 +3805,7 @@ mod tests {
 
         // Delete all three at once.
         for name in ["src/A.php", "src/B.php", "src/C.php"] {
-            db.delete(FileId::new(name));
+            db.delete(FileId::new(name.as_bytes()));
         }
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
@@ -3805,8 +3827,8 @@ mod tests {
         // Swap: Alpha goes to b.php, Beta goes to a.php.
         let file_a_v2 = "<?php\nclass Beta {\n    public function name(): string { return 'beta'; }\n}\n";
         let file_b_v2 = "<?php\nclass Alpha {\n    public function name(): string { return 'alpha'; }\n}\n";
-        db.update(FileId::new("src/a.php"), Cow::Owned(file_a_v2.to_string()));
-        db.update(FileId::new("src/b.php"), Cow::Owned(file_b_v2.to_string()));
+        db.update(FileId::new(b"src/a.php"), Cow::Owned(file_a_v2.as_bytes().to_vec()));
+        db.update(FileId::new(b"src/b.php"), Cow::Owned(file_b_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "classes swapped between files");
@@ -3825,7 +3847,7 @@ mod tests {
 
         // Rename class.
         let file_v2 = "<?php\nclass NewName {\n    public function run(): string { return 'ok'; }\n}\n";
-        db.update(FileId::new("src/class.php"), Cow::Owned(file_v2.to_string()));
+        db.update(FileId::new(b"src/class.php"), Cow::Owned(file_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "class renamed");
@@ -3843,19 +3865,19 @@ mod tests {
         assert_matches_full(&service, &db, "initial");
 
         // Delete child.
-        db.delete(FileId::new("src/Child.php"));
+        db.delete(FileId::new(b"src/Child.php"));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "child deleted");
 
         // Re-add child with different content.
         db.add(File::new(
-            Cow::Owned("src/Child.php".to_string()),
+            Cow::Owned(b"src/Child.php".to_vec()),
             FileType::Host,
             None,
             Cow::Owned(
-                "<?php\nclass Child extends Base {\n    public function run(): string { return 'compatible'; }\n}\n"
-                    .to_string(),
+                b"<?php\nclass Child extends Base {\n    public function run(): string { return 'compatible'; }\n}\n"
+                    .to_vec(),
             ),
         ));
         service.update_database(db.read_only());
@@ -3863,20 +3885,20 @@ mod tests {
         assert_matches_full(&service, &db, "child re-added compatible");
 
         // Modify child to be incompatible again.
-        db.update(FileId::new("src/Child.php"), Cow::Owned(child_original.to_string()));
+        db.update(FileId::new(b"src/Child.php"), Cow::Owned(child_original.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "child made incompatible again");
 
         // Modify base at the same time as child.
         db.update(
-            FileId::new("src/Base.php"),
-            Cow::Owned("<?php\nclass Base {\n    public function run(): float { return 0.5; }\n}\n".to_string()),
+            FileId::new(b"src/Base.php"),
+            Cow::Owned(b"<?php\nclass Base {\n    public function run(): float { return 0.5; }\n}\n".to_vec()),
         );
         db.update(
-            FileId::new("src/Child.php"),
+            FileId::new(b"src/Child.php"),
             Cow::Owned(
-                "<?php\nclass Child extends Base {\n    public function run(): float { return 1.0; }\n}\n".to_string(),
+                b"<?php\nclass Child extends Base {\n    public function run(): float { return 1.0; }\n}\n".to_vec(),
             ),
         );
         service.update_database(db.read_only());
@@ -3915,7 +3937,7 @@ mod tests {
             "    }\n",
             "}\n",
         );
-        db.update(FileId::new("src/Service.php"), Cow::Owned(service_v2.to_string()));
+        db.update(FileId::new(b"src/Service.php"), Cow::Owned(service_v2.as_bytes().to_vec()));
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "body change in closure with typed param");

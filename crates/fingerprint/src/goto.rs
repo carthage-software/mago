@@ -18,7 +18,7 @@ impl Fingerprintable for Goto<'_> {
         H: std::hash::Hasher,
     {
         "goto".hash(hasher);
-        mago_atom::ascii_lowercase_atom(self.label.value).hash(hasher);
+        crate::hash_ascii_lowercase(self.label.value, hasher);
     }
 }
 
@@ -33,6 +33,6 @@ impl Fingerprintable for Label<'_> {
         H: std::hash::Hasher,
     {
         "label".hash(hasher);
-        mago_atom::ascii_lowercase_atom(self.name.value).hash(hasher);
+        crate::hash_ascii_lowercase(self.name.value, hasher);
     }
 }

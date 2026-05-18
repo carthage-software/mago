@@ -2,10 +2,10 @@ use ordered_float::OrderedFloat;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
-use mago_atom::f64_atom;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::f64_word;
+use mago_word::word;
 
 use crate::ttype::TType;
 
@@ -128,6 +128,7 @@ impl TType for TFloat {
         false
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         false
     }
@@ -136,15 +137,15 @@ impl TType for TFloat {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
-            Self::Float => atom("float"),
-            Self::UnspecifiedLiteral => atom("literal-float"),
-            Self::Literal(value) => concat_atom!("float(", f64_atom(**value), ")"),
+            Self::Float => word("float"),
+            Self::UnspecifiedLiteral => word("literal-float"),
+            Self::Literal(value) => concat_word!(b"float(", f64_word(**value), b")"),
         }
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

@@ -48,13 +48,13 @@ pub struct IgnoreRegion {
 }
 
 /// Markers that indicate the start of an unformatted region.
-const IGNORE_START_MARKERS: [&str; 2] = ["@mago-format-ignore-start", "@mago-formatter-ignore-start"];
+const IGNORE_START_MARKERS: [&[u8]; 2] = [b"@mago-format-ignore-start", b"@mago-formatter-ignore-start"];
 
 /// Markers that indicate the end of an unformatted region.
-const IGNORE_END_MARKERS: [&str; 2] = ["@mago-format-ignore-end", "@mago-formatter-ignore-end"];
+const IGNORE_END_MARKERS: [&[u8]; 2] = [b"@mago-format-ignore-end", b"@mago-formatter-ignore-end"];
 
 /// Markers that indicate the next statement should be ignored.
-const IGNORE_NEXT_MARKERS: [&str; 2] = ["@mago-format-ignore-next", "@mago-formatter-ignore-next"];
+const IGNORE_NEXT_MARKERS: [&[u8]; 2] = [b"@mago-format-ignore-next", b"@mago-formatter-ignore-next"];
 
 /// A marker indicating the next statement should not be formatted.
 #[derive(Debug, Clone, Copy)]
@@ -76,9 +76,9 @@ fn build_ignore_markers<'arena>(
     let mut current_start: Option<u32> = None;
 
     for comment in comments {
-        let has_start = IGNORE_START_MARKERS.iter().any(|m| comment.value.contains(m));
-        let has_end = IGNORE_END_MARKERS.iter().any(|m| comment.value.contains(m));
-        let has_next = IGNORE_NEXT_MARKERS.iter().any(|m| comment.value.contains(m));
+        let has_start = IGNORE_START_MARKERS.iter().any(|m| memchr::memmem::find(comment.value, m).is_some());
+        let has_end = IGNORE_END_MARKERS.iter().any(|m| memchr::memmem::find(comment.value, m).is_some());
+        let has_next = IGNORE_NEXT_MARKERS.iter().any(|m| memchr::memmem::find(comment.value, m).is_some());
 
         if has_start && current_start.is_none() {
             current_start = Some(comment.span.start.offset);
@@ -105,7 +105,7 @@ fn build_ignore_markers<'arena>(
 #[derive(Debug)]
 pub struct FormatterState<'ctx, 'arena> {
     arena: &'arena Bump,
-    source_text: &'arena str,
+    source_text: &'arena [u8],
     file: &'ctx File,
     php_version: PHPVersion,
     settings: FormatSettings,
@@ -226,8 +226,8 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     }
 
     #[inline]
-    fn as_str(&self, string: impl AsRef<str>) -> &'arena str {
-        self.arena.alloc_str(string.as_ref())
+    fn as_str(&self, string: impl AsRef<str>) -> &'arena [u8] {
+        self.arena.alloc_str(string.as_ref()).as_bytes()
     }
 
     #[inline]
@@ -295,7 +295,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         let span_start_offset = span.start.offset as usize;
         let prefix = &self.source_text[line_start_offset..span_start_offset];
 
-        prefix.trim().is_empty()
+        prefix.trim_ascii().is_empty()
     }
 
     #[inline]
@@ -326,21 +326,21 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             return Some(start_index); // Not enough characters to check for comment
         }
 
-        if self.source_text[start_index_usize..].starts_with("//")
-            || (self.source_text[start_index_usize..].starts_with('#')
-                && !self.source_text[start_index_usize + 1..].starts_with('['))
+        if self.source_text[start_index_usize..].starts_with(b"//")
+            || (self.source_text[start_index_usize..].starts_with(b"#")
+                && !self.source_text[start_index_usize + 1..].starts_with(b"["))
         {
             return self.skip_to_line_end_or_closing_tag(Some(start_index));
         }
 
-        if self.source_text[start_index_usize..].starts_with("/*") {
+        if self.source_text[start_index_usize..].starts_with(b"/*") {
             // Find the closing */
-            if let Some(end_pos) = self.source_text[start_index_usize + 2..].find("*/") {
+            if let Some(end_pos) = memchr::memmem::find(&self.source_text[start_index_usize + 2..], b"*/") {
                 let end_index = start_index_usize + 2 + end_pos + 2; // +2 for the "*/" itself
 
                 // Check if there's a newline between /* and */
                 let comment_text = &self.source_text[start_index_usize..end_index];
-                if !comment_text.contains('\n') && !comment_text.contains('\r') {
+                if !comment_text.contains(&b'\n') && !comment_text.contains(&b'\r') {
                     return Some(end_index as u32);
                 }
 
@@ -361,7 +361,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             return false;
         }
 
-        self.source_text[start_index..end_index].bytes().all(is_insignificant)
+        self.source_text[start_index..end_index].iter().copied().all(is_insignificant)
     }
 
     #[inline]
@@ -389,14 +389,14 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         let start_index = start_index? as usize;
         let mut index = start_index;
         if backwards {
-            for c in self.source_text[..=start_index].bytes().rev() {
+            for &c in self.source_text[..=start_index].iter().rev() {
                 if !f(c) {
                     return Some(index as u32);
                 }
                 index -= 1;
             }
         } else {
-            let source_bytes = self.source_text.as_bytes();
+            let source_bytes = self.source_text;
             let text_len = source_bytes.len();
             while index < text_len {
                 if !f(source_bytes[index]) {
@@ -414,7 +414,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     #[inline]
     fn skip_to_line_end_or_closing_tag(&self, start_index: Option<u32>) -> Option<u32> {
         let mut index = start_index? as usize;
-        let source_bytes = self.source_text.as_bytes();
+        let source_bytes = self.source_text;
         let text_len = source_bytes.len();
 
         while index < text_len {
@@ -441,9 +441,9 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         let start_index = start_index?;
         let start_index_usize = start_index as usize;
         let c = if backwards {
-            self.source_text[..=start_index_usize].bytes().next_back()
+            self.source_text[..=start_index_usize].iter().copied().next_back()
         } else {
-            self.source_text[start_index_usize..].bytes().next()
+            self.source_text[start_index_usize..].iter().copied().next()
         }?;
 
         if matches!(c, b'\n') {
@@ -453,9 +453,9 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
         if matches!(c, b'\r') {
             let next_index = if backwards { start_index_usize - 1 } else { start_index_usize + 1 };
             let next_c = if backwards {
-                self.source_text.get(..=next_index).and_then(|s| s.bytes().next_back())
+                self.source_text.get(..=next_index).and_then(|s| s.iter().copied().next_back())
             } else {
-                self.source_text.get(next_index..).and_then(|s| s.bytes().next())
+                self.source_text.get(next_index..).and_then(|s| s.iter().copied().next())
             };
 
             if matches!(next_c, Some(b'\n')) {
@@ -482,16 +482,16 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     }
 
     #[inline]
-    fn split_lines(&self, slice: &'arena str) -> BumpVec<'arena, &'arena str> {
+    fn split_lines(&self, slice: &'arena [u8]) -> BumpVec<'arena, &'arena [u8]> {
         let mut lines = BumpVec::new_in(self.arena);
         let mut remaining = slice;
 
         while !remaining.is_empty() {
             // find the earliest line terminator: \r\n, \n, or bare \r
-            let next_break = remaining.bytes().enumerate().find_map(|(i, b)| {
+            let next_break = remaining.iter().enumerate().find_map(|(i, &b)| {
                 if b == b'\r' {
                     // check for \r\n (CRLF) — consume both bytes
-                    if remaining.as_bytes().get(i + 1) == Some(&b'\n') {
+                    if remaining.get(i + 1) == Some(&b'\n') {
                         Some((i, 2))
                     } else {
                         // bare \r — still a line terminator
@@ -519,9 +519,9 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     }
 
     #[inline]
-    fn skip_leading_whitespace_up_to(s: &'arena str, indent: usize) -> &'arena str {
+    fn skip_leading_whitespace_up_to(s: &'arena [u8], indent: usize) -> &'arena [u8] {
         let mut position = 0;
-        for (count, (i, b)) in s.bytes().enumerate().enumerate() {
+        for (count, (i, &b)) in s.iter().enumerate().enumerate() {
             // Check if the current byte represents whitespace
             if !b.is_ascii_whitespace() || count >= indent {
                 break;
@@ -539,7 +539,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     }
 
     /// Get source text slice for a given range.
-    pub(crate) fn get_source_slice(&self, start: u32, end: u32) -> &'arena str {
+    pub(crate) fn get_source_slice(&self, start: u32, end: u32) -> &'arena [u8] {
         &self.source_text[start as usize..end as usize]
     }
 
@@ -593,8 +593,8 @@ const fn is_insignificant(c: u8) -> bool {
 /// newlines, semicolons, commas, and comments. Returns `false` if there is
 /// any significant code in between, meaning the marker was inside a
 /// sub-expression and should not be consumed by an outer construct.
-fn is_gap_insignificant(source: &str, from: u32, to: u32) -> bool {
-    let bytes = source.as_bytes();
+fn is_gap_insignificant(source: &[u8], from: u32, to: u32) -> bool {
+    let bytes = source;
     let mut i = from as usize;
     let end = to as usize;
     while i < end && i < bytes.len() {

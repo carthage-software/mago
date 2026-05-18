@@ -12,11 +12,7 @@ use mago_database::file::File;
 use mago_twig_syntax::parser::parse_file;
 
 fuzz_target!(|data: &[u8]| {
-    let Ok(src) = std::str::from_utf8(data) else {
-        return;
-    };
-
     let arena = Bump::new();
-    let file = File::ephemeral(Cow::Borrowed("fuzz.twig"), Cow::Borrowed(src));
+    let file = File::ephemeral(Cow::Borrowed(b"fuzz.twig"), Cow::Owned(data.to_vec()));
     let _ = parse_file(&arena, &file);
 });

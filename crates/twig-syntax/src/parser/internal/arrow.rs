@@ -42,7 +42,7 @@ impl<'arena> Parser<'_, 'arena> {
             return self.finish_arrow_parameters(left_parenthesis, inner);
         }
 
-        let rp_tok = self.stream.expect_kind(TwigTokenKind::RightParen, "expected `)`")?;
+        let rp_tok = self.stream.expect_kind(TwigTokenKind::RightParen, b"expected `)`")?;
         let right_parenthesis = self.stream.span_of(&rp_tok);
 
         if let Some(arrow_tok) = self.stream.try_consume(TwigTokenKind::FatArrow)?
@@ -74,7 +74,7 @@ impl<'arena> Parser<'_, 'arena> {
         let mut commas = self.new_vec();
         let Expression::Name(n) = &inner else {
             return Err(ParseError::UnexpectedToken(
-                "arrow function parameters must be simple names".to_string(),
+                b"arrow function parameters must be simple names".to_vec(),
                 inner.span(),
             ));
         };
@@ -85,11 +85,11 @@ impl<'arena> Parser<'_, 'arena> {
             if self.stream.is_at(TwigTokenKind::RightParen)? {
                 break;
             }
-            let name_tok = self.stream.expect_kind(TwigTokenKind::Name, "expected parameter name")?;
+            let name_tok = self.stream.expect_kind(TwigTokenKind::Name, b"expected parameter name")?;
             parameters.push(self.identifier_from(&name_tok));
         }
 
-        let rp_tok = self.stream.expect_kind(TwigTokenKind::RightParen, "expected `)`")?;
+        let rp_tok = self.stream.expect_kind(TwigTokenKind::RightParen, b"expected `)`")?;
         let right_parenthesis = self.stream.span_of(&rp_tok);
 
         let Some(arrow_tok) = self.stream.try_consume(TwigTokenKind::FatArrow)? else {

@@ -84,7 +84,7 @@ impl<'src> Input<'src> {
     /// A new `Input` instance initialized with the file's ID and contents.
     #[must_use]
     pub fn from_file(file: &'src File) -> Self {
-        Self::new(file.id, file.contents.as_bytes())
+        Self::new(file.id, file.contents.as_ref())
     }
 
     /// Creates a new `Input` instance from the contents of a `File`.
@@ -97,7 +97,7 @@ impl<'src> Input<'src> {
     ///
     /// A new `Input` instance initialized with the file's ID and contents.
     pub fn from_file_in(arena: &'src Bump, file: &File) -> Self {
-        Self::new(file.id, arena.alloc_slice_clone(file.contents.as_bytes()))
+        Self::new(file.id, arena.alloc_slice_clone(file.contents.as_ref()))
     }
 
     /// Creates a new `Input` instance representing a byte slice that is

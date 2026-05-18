@@ -4,10 +4,10 @@ use std::sync::Arc;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
-use mago_atom::concat_atom;
+use mago_word::Word;
+use mago_word::ascii_lowercase_word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
@@ -44,12 +44,12 @@ pub enum TClassLikeString {
     },
     Generic {
         kind: TClassLikeStringKind,
-        parameter_name: Atom,
+        parameter_name: Word,
         defining_entity: GenericParent,
         constraint: Arc<TAtomic>,
     },
     Literal {
-        value: Atom,
+        value: Word,
     },
     OfType {
         kind: TClassLikeStringKind,
@@ -59,12 +59,12 @@ pub enum TClassLikeString {
 
 impl TClassLikeStringKind {
     #[must_use]
-    pub fn as_str(&self) -> &'static str {
+    pub fn as_bytes(&self) -> &'static [u8] {
         match self {
-            TClassLikeStringKind::Class => "class-string",
-            TClassLikeStringKind::Interface => "interface-string",
-            TClassLikeStringKind::Enum => "enum-string",
-            TClassLikeStringKind::Trait => "trait-string",
+            TClassLikeStringKind::Class => b"class-string",
+            TClassLikeStringKind::Interface => b"interface-string",
+            TClassLikeStringKind::Enum => b"enum-string",
+            TClassLikeStringKind::Trait => b"trait-string",
         }
     }
 }
@@ -89,7 +89,7 @@ impl TClassLikeString {
     #[must_use]
     pub fn generic(
         kind: TClassLikeStringKind,
-        parameter_name: Atom,
+        parameter_name: Word,
         defining_entity: GenericParent,
         constraint: TAtomic,
     ) -> Self {
@@ -99,7 +99,7 @@ impl TClassLikeString {
     /// Creates a new `class-string` instance with a literal value.
     #[inline]
     #[must_use]
-    pub const fn literal(value: Atom) -> Self {
+    pub const fn literal(value: Word) -> Self {
         Self::Literal { value }
     }
 
@@ -246,7 +246,7 @@ impl TClassLikeString {
     /// Returns the literal string value (class/interface/enum name) if this is a `Literal` variant.
     #[inline]
     #[must_use]
-    pub fn literal_value(&self) -> Option<Atom> {
+    pub fn literal_value(&self) -> Option<Word> {
         match self {
             Self::Literal { value } => Some(*value),
             _ => None,
@@ -267,7 +267,7 @@ impl TClassLikeString {
     /// Returns the generic parameter name if this is a `Generic` variant.
     #[inline]
     #[must_use]
-    pub fn generic_parameter_name(&self) -> Option<Atom> {
+    pub fn generic_parameter_name(&self) -> Option<Word> {
         match self {
             Self::Generic { parameter_name, .. } => Some(*parameter_name),
             _ => None,
@@ -298,7 +298,7 @@ impl TClassLikeString {
                 ))
             }
             TClassLikeString::Literal { value } => {
-                if codebase.symbols.contains_enum(ascii_lowercase_atom(value)) {
+                if codebase.symbols.contains_enum(ascii_lowercase_word(value.as_bytes())) {
                     TAtomic::Object(TObject::Enum(TEnum::new(*value)))
                 } else {
                     TAtomic::Object(TObject::Named(TNamedObject::new(*value)))
@@ -342,37 +342,37 @@ impl TType for TClassLikeString {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         match self {
-            TClassLikeString::Any { kind } => atom(kind.as_str()),
+            TClassLikeString::Any { kind } => word(kind.as_bytes()),
             TClassLikeString::Generic { kind, parameter_name, defining_entity, constraint, .. } => {
-                concat_atom!(
-                    kind.as_str(),
-                    "<'",
-                    parameter_name,
-                    ".",
-                    defining_entity.to_string(),
-                    " extends ",
-                    constraint.get_id(),
-                    ">"
+                concat_word!(
+                    kind.as_bytes(),
+                    b"<'",
+                    parameter_name.as_bytes(),
+                    b".",
+                    defining_entity.id_word().as_bytes(),
+                    b" extends ",
+                    constraint.get_id().as_bytes(),
+                    b">"
                 )
             }
             TClassLikeString::Literal { value } => {
-                concat_atom!("class-string('", value, "')")
+                concat_word!(b"class-string('", value, b"')")
             }
             TClassLikeString::OfType { kind, constraint } => {
-                concat_atom!(kind.as_str(), "<", constraint.get_id(), ">")
+                concat_word!(kind.as_bytes(), b"<", constraint.get_id(), b">")
             }
         }
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }
 
 impl std::fmt::Display for TClassLikeStringKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
+        write!(f, "{}", mago_bytes::BytesDisplay(self.as_bytes()))
     }
 }

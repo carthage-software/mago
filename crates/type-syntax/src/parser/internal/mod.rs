@@ -91,7 +91,7 @@ pub(crate) fn is_at_member_identifier_at(stream: &mut TypeTokenStream<'_>, offse
     match token.kind {
         TypeTokenKind::Identifier => Ok(true),
         TypeTokenKind::New => Ok(stream.lookahead(offset + 1)?.is_none_or(|t| t.kind != TypeTokenKind::LessThan)),
-        kind if kind.is_keyword() && !token.value.as_bytes().contains(&b'-') => Ok(true),
+        kind if kind.is_keyword() && !token.value.contains(&b'-') => Ok(true),
         _ => Ok(false),
     }
 }
@@ -285,7 +285,10 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                         let token = stream.consume()?;
                         #[allow(clippy::unreachable)]
                         let value = parse_literal_integer(token.value).unwrap_or_else(|| {
-                            unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
+                            unreachable!(
+                                "lexer generated invalid integer `{}`; this should never happen.",
+                                String::from_utf8_lossy(token.value)
+                            )
                         });
 
                         IntOrKeyword::Int(LiteralIntType {
@@ -314,7 +317,10 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                         let token = stream.consume()?;
                         #[allow(clippy::unreachable)]
                         let value = parse_literal_integer(token.value).unwrap_or_else(|| {
-                            unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
+                            unreachable!(
+                                "lexer generated invalid integer `{}`; this should never happen.",
+                                String::from_utf8_lossy(token.value)
+                            )
                         });
 
                         IntOrKeyword::Int(LiteralIntType {
@@ -421,7 +427,10 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
             let token = stream.consume()?;
             #[allow(clippy::unreachable)]
             let value = parse_literal_float(token.value).unwrap_or_else(|| {
-                unreachable!("lexer generated invalid float `{}`; this should never happen.", token.value)
+                unreachable!(
+                    "lexer generated invalid float `{}`; this should never happen.",
+                    String::from_utf8_lossy(token.value)
+                )
             });
 
             Type::LiteralFloat(LiteralFloatType {
@@ -434,7 +443,10 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
             let token = stream.consume()?;
             #[allow(clippy::unreachable)]
             let value = parse_literal_integer(token.value).unwrap_or_else(|| {
-                unreachable!("lexer generated invalid integer `{}`; this should never happen.", token.value)
+                unreachable!(
+                    "lexer generated invalid integer `{}`; this should never happen.",
+                    String::from_utf8_lossy(token.value)
+                )
             });
 
             Type::LiteralInt(LiteralIntType { span: token.span_for(stream.file_id()), value, raw: token.value })
@@ -519,13 +531,13 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
                 Type::Reference(ReferenceType { identifier, parameters: parse_generic_parameters_or_none(stream)? })
             }
         }
-        TypeTokenKind::Identifier if next.value == "_" => {
+        TypeTokenKind::Identifier if next.value == b"_" => {
             let token = stream.consume()?;
 
             Type::Wildcard(WildcardType { span: token.span_for(stream.file_id()), kind: WildcardKind::Underscore })
         }
         TypeTokenKind::Identifier => {
-            if next.value.eq_ignore_ascii_case("Closure")
+            if next.value.eq_ignore_ascii_case(b"Closure")
                 && matches!(stream.lookahead(1)?.map(|t| t.kind), Some(TypeTokenKind::LeftParenthesis))
             {
                 Type::Callable(CallableType {
@@ -578,7 +590,7 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
             }
         }
         TypeTokenKind::FullyQualifiedIdentifier => {
-            if next.value.eq_ignore_ascii_case("\\Closure")
+            if next.value.eq_ignore_ascii_case(b"\\Closure")
                 && matches!(stream.lookahead(1)?.map(|t| t.kind), Some(TypeTokenKind::LeftParenthesis))
             {
                 Type::Callable(CallableType {
@@ -650,7 +662,7 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
 
             // Parse the alias name (can be identifier or keyword without `-`)
             let next = stream.peek()?;
-            let alias = if next.kind.is_keyword() && !next.value.contains('-') {
+            let alias = if next.kind.is_keyword() && !next.value.contains(&b'-') {
                 AliasName::Keyword(stream.consume_keyword()?)
             } else if next.kind == TypeTokenKind::Identifier {
                 AliasName::Identifier(Identifier::from_token(stream.consume()?, stream.file_id()))

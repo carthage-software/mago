@@ -16,14 +16,14 @@ impl<'arena> Parser<'_, 'arena> {
         let template = self.parse_expression()?;
         let (ignore_missing, with_clause, only_keyword) = self.parse_include_tail()?;
         let close_tag = self.stream.expect_block_end()?;
-        let body = self.parse_statements(&BlockTerminator { names: &["endembed"] })?;
+        let body = self.parse_statements(&BlockTerminator { names: &[b"endembed"] })?;
         let end_open_tok = self.stream.expect_block_start()?;
         let end_open_tag = self.stream.span_of(&end_open_tok);
-        let end_kw_tok = self.stream.expect_name("expected `endembed`")?;
-        if end_kw_tok.value != "endembed" {
+        let end_kw_tok = self.stream.expect_name(b"expected `endembed`")?;
+        if end_kw_tok.value != b"endembed" {
             return Err(ParseError::MismatchedEndTag {
-                expected: "endembed".to_string(),
-                got: end_kw_tok.value.to_string(),
+                expected: b"endembed".to_vec(),
+                got: end_kw_tok.value.to_vec(),
                 span: self.stream.span_of(&end_kw_tok),
             });
         }

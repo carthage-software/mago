@@ -111,37 +111,45 @@ impl LintRule for NoLiteralNamespaceStringRule {
 ///
 /// Matches patterns like `Vendor\Module` or `Vendor\Module\ClassName` with at least 2 segments,
 /// each starting with an uppercase letter.
-fn looks_like_class_name(value: &str) -> bool {
-    // Normalize double backslashes to single
-    let normalized: String;
-    let s = if value.contains("\\\\") {
-        normalized = value.replace("\\\\", "\\");
+fn looks_like_class_name(value: &[u8]) -> bool {
+    let normalized: Vec<u8>;
+    let s: &[u8] = if memchr::memmem::find(value, b"\\\\").is_some() {
+        normalized = collapse_double_backslash(value);
         &normalized
     } else {
         value
     };
 
-    // Strip optional leading backslash
-    let s = s.strip_prefix('\\').unwrap_or(s);
+    let s = s.strip_prefix(b"\\").unwrap_or(s);
 
-    // Must not end with backslash
-    if s.ends_with('\\') {
+    if s.ends_with(b"\\") {
         return false;
     }
 
-    let segments: Vec<&str> = s.split('\\').collect();
+    let segments: Vec<&[u8]> = s.split(|&b| b == b'\\').collect();
 
-    // Need at least 2 segments (e.g. Vendor\Module)
     if segments.len() < 2 {
         return false;
     }
 
-    // Each segment must start with an uppercase letter and contain only alphanumeric + underscore
     segments.iter().all(|seg| {
-        !seg.is_empty()
-            && seg.starts_with(|c: char| c.is_ascii_uppercase())
-            && seg.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        !seg.is_empty() && seg[0].is_ascii_uppercase() && seg.iter().all(|&b| b.is_ascii_alphanumeric() || b == b'_')
     })
+}
+
+fn collapse_double_backslash(value: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(value.len());
+    let mut i = 0;
+    while i < value.len() {
+        if i + 1 < value.len() && value[i] == b'\\' && value[i + 1] == b'\\' {
+            out.push(b'\\');
+            i += 2;
+        } else {
+            out.push(value[i]);
+            i += 1;
+        }
+    }
+    out
 }
 
 #[cfg(test)]

@@ -41,7 +41,7 @@ impl FunctionCallHook for SessionSetCookieParamsHook {
             return Ok(());
         };
 
-        if !identifier.value().eq_ignore_ascii_case("session_set_cookie_params") {
+        if !identifier.value().eq_ignore_ascii_case(b"session_set_cookie_params") {
             return Ok(());
         }
 

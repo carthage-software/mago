@@ -1,9 +1,4 @@
 use bumpalo::Bump;
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::AtomSet;
-use mago_atom::ascii_lowercase_atom;
-use mago_atom::atom;
 use mago_docblock::tag::TypeString;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
@@ -26,6 +21,11 @@ use mago_syntax::ast::SwitchCase;
 use mago_syntax::ast::Variable;
 use mago_syntax::ast::WhileBody;
 use mago_syntax::utils;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::assertion::Assertion;
 use crate::issue::ScanningIssueKind;
@@ -55,7 +55,7 @@ use crate::visibility::Visibility;
 
 #[inline]
 pub fn scan_method<'arena>(
-    functionlike_id: (Atom, Atom),
+    functionlike_id: (Word, Word),
     method: &'arena Method<'arena>,
     class_like_metadata: &ClassLikeMetadata,
     context: &mut Context<'_, 'arena>,
@@ -76,8 +76,8 @@ pub fn scan_method<'arena>(
     metadata.version_constraint = verdict.constraint;
     metadata.attributes = scan_attribute_lists(&method.attribute_lists, context);
     metadata.type_resolution_context = type_resolution_context.filter(|c| !c.is_empty());
-    metadata.name = Some(ascii_lowercase_atom(method.name.value));
-    metadata.original_name = Some(atom(method.name.value));
+    metadata.name = Some(ascii_lowercase_word(method.name.value));
+    metadata.original_name = Some(word(method.name.value));
 
     metadata.name_span = Some(method.name.span);
     metadata.parameters = method
@@ -101,13 +101,13 @@ pub fn scan_method<'arena>(
         is_final: method.modifiers.contains_final(),
         is_abstract: method.modifiers.contains_abstract(),
         is_static: method.modifiers.contains_static(),
-        is_constructor: method_name_str.eq_ignore_ascii_case("__construct"),
+        is_constructor: method_name_str.eq_ignore_ascii_case(b"__construct"),
         visibility: if let Some(v) = method.modifiers.get_first_visibility() {
             Visibility::try_from(v).unwrap_or(Visibility::Public)
         } else {
             Visibility::Public
         },
-        where_constraints: AtomMap::default(),
+        where_constraints: WordMap::default(),
     };
 
     if let MethodBody::Concrete(block) = &method.body {
@@ -132,13 +132,13 @@ pub fn scan_method<'arena>(
         infer_assertions_from_block_body(block, &mut metadata, context.resolved_names);
     }
 
-    if metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
+    if metadata.attributes.iter().any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"Deprecated")) {
         metadata.flags |= MetadataFlags::DEPRECATED;
     }
 
     // Automatically mark known fiber-suspending methods.
-    if method.name.value.eq_ignore_ascii_case("suspend")
-        && class_like_metadata.name.as_str().eq_ignore_ascii_case("revolt\\eventloop\\suspension")
+    if method.name.value.eq_ignore_ascii_case(b"suspend")
+        && class_like_metadata.name.as_bytes().eq_ignore_ascii_case(b"revolt\\eventloop\\suspension")
     {
         metadata.flags |= MetadataFlags::SUSPENDS_FIBER;
     }
@@ -148,13 +148,13 @@ pub fn scan_method<'arena>(
 
 #[inline]
 pub fn scan_function<'arena>(
-    functionlike_id: (Atom, Atom),
+    functionlike_id: (Word, Word),
     function: &'arena Function<'arena>,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
-    constants: Option<&AtomMap<ConstantMetadata>>,
+    constants: Option<&WordMap<ConstantMetadata>>,
 ) -> Option<FunctionLikeMetadata> {
     let verdict = evaluate_version_attributes(&function.attribute_lists, context, context.php_version);
 
@@ -178,8 +178,8 @@ pub fn scan_function<'arena>(
     metadata.version_constraint = verdict.constraint;
     collect_globals_into(&function.body, &mut metadata.globals_accessed);
 
-    metadata.name = Some(ascii_lowercase_atom(name));
-    metadata.original_name = Some(atom(name));
+    metadata.name = Some(ascii_lowercase_word(name));
+    metadata.original_name = Some(word(name));
     metadata.name_span = Some(function.name.span);
     metadata.parameters = function
         .parameter_list
@@ -204,7 +204,7 @@ pub fn scan_function<'arena>(
 
     infer_assertions_from_block_body(&function.body, &mut metadata, context.resolved_names);
 
-    if metadata.attributes.iter().any(|attr| attr.name.eq_ignore_ascii_case("Deprecated")) {
+    if metadata.attributes.iter().any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"Deprecated")) {
         metadata.flags |= MetadataFlags::DEPRECATED;
     }
 
@@ -213,9 +213,9 @@ pub fn scan_function<'arena>(
 
 #[inline]
 pub fn scan_closure<'arena>(
-    functionlike_id: (Atom, Atom),
+    functionlike_id: (Word, Word),
     closure: &'arena Closure<'arena>,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
@@ -266,9 +266,9 @@ pub fn scan_closure<'arena>(
 
 #[inline]
 pub fn scan_arrow_function<'arena>(
-    functionlike_id: (Atom, Atom),
+    functionlike_id: (Word, Word),
     arrow_function: &'arena ArrowFunction<'arena>,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     context: &mut Context<'_, 'arena>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
@@ -318,9 +318,9 @@ pub fn scan_arrow_function<'arena>(
 
 fn scan_function_like_docblock(
     span: Span,
-    functionlike_id: (Atom, Atom),
+    functionlike_id: (Word, Word),
     metadata: &mut FunctionLikeMetadata,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     context: &Context<'_, '_>,
     scope: &mut NamespaceScope,
 ) {
@@ -399,7 +399,7 @@ fn scan_function_like_docblock(
 
     let mut type_context = metadata.type_resolution_context.clone().unwrap_or_default();
     for template in &docblock.templates {
-        let template_name = atom(&template.name);
+        let template_name = word(&template.name);
         let template_as_type = if let Some(type_string) = &template.type_string {
             match builder::get_type_from_string(
                 context.arena,
@@ -464,7 +464,7 @@ fn scan_function_like_docblock(
     }
 
     for parameter_tag in docblock.parameters {
-        let parameter_name = atom(&parameter_tag.variable.name);
+        let parameter_name = word(&parameter_tag.variable.name);
         let param_type_string = &parameter_tag.type_string;
         let is_variadic = parameter_tag.variable.is_variadic;
 
@@ -545,7 +545,7 @@ fn scan_function_like_docblock(
     }
 
     for param_out in docblock.parameters_out {
-        let param_name = atom(&param_out.variable.name);
+        let param_name = word(&param_out.variable.name);
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(param_name) else {
             metadata.issues.push(
@@ -658,16 +658,19 @@ fn scan_function_like_docblock(
         match get_type_metadata_from_type_string(context.arena, &where_tag.type_string, classname, &type_context, scope)
         {
             Ok(constraint_type) => {
-                let template_name = atom(&where_tag.name);
+                let template_name = word(&where_tag.name);
 
                 method_metadata.where_constraints.insert(template_name, constraint_type);
             }
             Err(typing_error) => metadata.issues.push(
-                Issue::error(format!("Invalid constraint type `{}` in `@where` tag.", where_tag.type_string.value))
-                    .with_code(ScanningIssueKind::InvalidWhereTag)
-                    .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
-                    .with_note(typing_error.note())
-                    .with_help(typing_error.help()),
+                Issue::error(format!(
+                    "Invalid constraint type `{}` in `@where` tag.",
+                    mago_bytes::BytesDisplay(&where_tag.type_string.value)
+                ))
+                .with_code(ScanningIssueKind::InvalidWhereTag)
+                .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
+                .with_note(typing_error.note())
+                .with_help(typing_error.help()),
             ),
         }
     }
@@ -692,7 +695,7 @@ fn scan_function_like_docblock(
     }
 
     for assertion_tag in docblock.assertions {
-        let assertion_param_name = atom(&assertion_tag.variable.name);
+        let assertion_param_name = word(&assertion_tag.variable.name);
 
         let assertions =
             parse_assertion_string(context.arena, assertion_tag.type_string, classname, &type_context, scope, metadata);
@@ -703,7 +706,7 @@ fn scan_function_like_docblock(
     }
 
     for assertion_tag in docblock.if_true_assertions {
-        let assertion_param_name = atom(&assertion_tag.variable.name);
+        let assertion_param_name = word(&assertion_tag.variable.name);
 
         let assertions =
             parse_assertion_string(context.arena, assertion_tag.type_string, classname, &type_context, scope, metadata);
@@ -714,7 +717,7 @@ fn scan_function_like_docblock(
     }
 
     for assertion_tag in docblock.if_false_assertions {
-        let assertion_param_name = atom(&assertion_tag.variable.name);
+        let assertion_param_name = word(&assertion_tag.variable.name);
 
         let assertions =
             parse_assertion_string(context.arena, assertion_tag.type_string, classname, &type_context, scope, metadata);
@@ -742,31 +745,31 @@ fn scan_function_like_docblock(
 fn parse_assertion_string(
     arena: &Bump,
     mut type_string: TypeString,
-    classname: Option<Atom>,
+    classname: Option<Word>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
     function_like_metadata: &mut FunctionLikeMetadata,
 ) -> Vec<Assertion> {
     let mut assertions = Vec::new();
-    if type_string.value.eq_ignore_ascii_case("truthy") || type_string.value.eq_ignore_ascii_case("!falsy") {
+    if type_string.value.eq_ignore_ascii_case(b"truthy") || type_string.value.eq_ignore_ascii_case(b"!falsy") {
         assertions.push(Assertion::Truthy);
 
         return assertions;
     }
 
-    if type_string.value.eq_ignore_ascii_case("falsy") || type_string.value.eq_ignore_ascii_case("!truthy") {
+    if type_string.value.eq_ignore_ascii_case(b"falsy") || type_string.value.eq_ignore_ascii_case(b"!truthy") {
         assertions.push(Assertion::Falsy);
 
         return assertions;
     }
 
-    if type_string.value.eq_ignore_ascii_case("empty") || type_string.value.eq_ignore_ascii_case("!non-empty") {
+    if type_string.value.eq_ignore_ascii_case(b"empty") || type_string.value.eq_ignore_ascii_case(b"!non-empty") {
         assertions.push(Assertion::Empty);
 
         return assertions;
     }
 
-    if type_string.value.eq_ignore_ascii_case("non-empty") || type_string.value.eq_ignore_ascii_case("!empty") {
+    if type_string.value.eq_ignore_ascii_case(b"non-empty") || type_string.value.eq_ignore_ascii_case(b"!empty") {
         assertions.push(Assertion::NonEmpty);
 
         return assertions;
@@ -774,15 +777,15 @@ fn parse_assertion_string(
 
     let mut is_equal = false;
     let mut is_negation = false;
-    if type_string.value.starts_with('!') {
+    if type_string.value.starts_with(b"!") {
         is_negation = true;
-        type_string.value = type_string.value[1..].to_string();
+        type_string.value = type_string.value[1..].to_vec();
         type_string.span = type_string.span.from_start(type_string.span.start + 1);
     }
 
-    if type_string.value.starts_with('=') {
+    if type_string.value.starts_with(b"=") {
         is_equal = true;
-        type_string.value = type_string.value[1..].to_string();
+        type_string.value = type_string.value[1..].to_vec();
         type_string.span = type_string.span.from_start(type_string.span.start + 1);
     }
 
@@ -826,18 +829,18 @@ fn parse_assertion_string(
 /// Collects every variable imported via `global $x;` anywhere in `block`, without
 /// descending into nested function/closure/arrow-function definitions (those are
 /// separate scopes).
-pub fn collect_globals_into(block: &Block, globals: &mut AtomSet) {
+pub fn collect_globals_into(block: &Block, globals: &mut WordSet) {
     for statement in &block.statements {
         collect_globals_from_statement(statement, globals);
     }
 }
 
-fn collect_globals_from_statement(statement: &Statement, globals: &mut AtomSet) {
+fn collect_globals_from_statement(statement: &Statement, globals: &mut WordSet) {
     match statement {
         Statement::Global(global) => {
             for variable in &global.variables {
                 if let Variable::Direct(direct) = variable {
-                    globals.insert(atom(direct.name));
+                    globals.insert(word(direct.name));
                 }
             }
         }

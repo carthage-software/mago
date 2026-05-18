@@ -46,10 +46,10 @@ impl<'arena> BinaryishOperator<'arena> {
         }
     }
 
-    fn as_str(self) -> &'arena str {
+    fn as_bytes(self) -> &'arena [u8] {
         match self {
-            Self::Binary(op) => op.as_str(),
-            Self::Elvis(_) => "?:",
+            Self::Binary(op) => op.as_bytes(),
+            Self::Elvis(_) => b"?:",
         }
     }
 
@@ -153,8 +153,8 @@ pub(super) fn print_binaryish_expression<'arena>(
                 Document::IndentIfBreak(IndentIfBreak::new(group_id, vec![
                     in f.arena;
                     Document::Line(if has_space_around { Line::default() } else { Line::soft() }),
-                    format_token(f, operator.span(), operator.as_str()),
-                    Document::String(if has_space_around { " " } else { "" }),
+                    format_token(f, operator.span(), operator.as_bytes()),
+                    Document::String(if has_space_around { b" " } else { b"" }),
                     right.format(f),
                 ])),
             ])
@@ -414,14 +414,14 @@ fn print_binaryish_expression_parts<'arena>(
                 Line::soft()
             })
         } else {
-            Document::String(if has_space_around { " " } else { "" })
+            Document::String(if has_space_around { b" " } else { b"" })
         },
     );
 
-    right_document.push(format_token(f, operator.span(), operator.as_str()));
+    right_document.push(format_token(f, operator.span(), operator.as_bytes()));
 
     right_document.push(if operator_has_leading_comments || line_before_operator || should_inline_this_level {
-        Document::String(if has_space_around { " " } else { "" })
+        Document::String(if has_space_around { b" " } else { b"" })
     } else {
         Document::Line(if has_space_around { Line::default() } else { Line::soft() })
     });

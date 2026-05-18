@@ -111,7 +111,7 @@ impl LintRule for NoDirectDbQueryRule {
 /// Check if an expression is a reference to the $wpdb variable
 fn is_wpdb_variable(expr: &Expression) -> bool {
     match expr {
-        Expression::Variable(Variable::Direct(var)) => var.name == "$wpdb",
+        Expression::Variable(Variable::Direct(var)) => var.name == b"$wpdb",
         _ => false,
     }
 }

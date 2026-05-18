@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::TType;
@@ -69,7 +69,7 @@ pub fn combine_with_array_threshold(atomics: Vec<TAtomic>, threshold: u16) -> Ve
     combine(atomics, &empty_codebase(), default_opts().with_array_combination_threshold(threshold))
 }
 
-/// Asserts that the combined atomics, compared as a multiset of `Atom` ids,
+/// Asserts that the combined atomics, compared as a multiset of `Word` ids,
 /// equal the multiset of ids of `expected`. Order in the output is implementation-defined.
 pub fn assert_combines_to(input: Vec<TAtomic>, expected: Vec<TAtomic>) {
     let actual = combine_default(input);
@@ -233,7 +233,7 @@ pub fn t_string() -> TAtomic {
 }
 #[must_use]
 pub fn t_lit_string(s: &str) -> TAtomic {
-    TAtomic::Scalar(TScalar::literal_string(atom(s)))
+    TAtomic::Scalar(TScalar::literal_string(word(s)))
 }
 #[must_use]
 pub fn t_non_empty_string() -> TAtomic {
@@ -295,7 +295,7 @@ pub fn t_trait_string() -> TAtomic {
 }
 #[must_use]
 pub fn t_lit_class_string(name: &str) -> TAtomic {
-    TAtomic::Scalar(TScalar::literal_class_string(atom(name)))
+    TAtomic::Scalar(TScalar::literal_class_string(word(name)))
 }
 
 // Resources
@@ -319,19 +319,19 @@ pub fn t_object_any() -> TAtomic {
 }
 #[must_use]
 pub fn t_named(name: &str) -> TAtomic {
-    TAtomic::Object(TObject::new_named(atom(name)))
+    TAtomic::Object(TObject::new_named(word(name)))
 }
 #[must_use]
 pub fn t_generic_named(name: &str, params: Vec<TUnion>) -> TAtomic {
-    TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(atom(name), Some(params))))
+    TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(word(name), Some(params))))
 }
 #[must_use]
 pub fn t_enum(name: &str) -> TAtomic {
-    TAtomic::Object(TObject::new_enum(atom(name)))
+    TAtomic::Object(TObject::new_enum(word(name)))
 }
 #[must_use]
 pub fn t_enum_case(name: &str, case: &str) -> TAtomic {
-    TAtomic::Object(TObject::new_enum_case(atom(name), atom(case)))
+    TAtomic::Object(TObject::new_enum_case(word(name), word(case)))
 }
 
 // Arrays
@@ -384,10 +384,10 @@ pub fn ak_int(n: i64) -> ArrayKey {
 
 #[must_use]
 pub fn ak_str(s: &str) -> ArrayKey {
-    ArrayKey::String(atom(s))
+    ArrayKey::String(word(s))
 }
 
 #[must_use]
-pub fn name_atom(s: &str) -> Atom {
-    atom(s)
+pub fn name_atom(s: &str) -> Word {
+    word(s)
 }

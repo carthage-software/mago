@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_atom::Atom;
-use mago_atom::atom;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::atomic::mixed::truthiness::TMixedTruthiness;
@@ -199,16 +199,16 @@ impl TType for TMixed {
         false
     }
 
-    fn get_id(&self) -> Atom {
+    fn get_id(&self) -> Word {
         if self.is_empty {
-            atom(match self.truthiness {
+            word(match self.truthiness {
                 TMixedTruthiness::Truthy => "empty-truthy-mixed",
                 TMixedTruthiness::Falsy => "empty-falsy-mixed",
                 TMixedTruthiness::Undetermined if self.is_non_null => "empty-nonnull",
                 TMixedTruthiness::Undetermined => "empty-mixed",
             })
         } else {
-            atom(match self.truthiness {
+            word(match self.truthiness {
                 TMixedTruthiness::Truthy => "truthy-mixed",
                 TMixedTruthiness::Falsy => "falsy-mixed",
                 TMixedTruthiness::Undetermined if self.is_non_null => "nonnull",
@@ -217,7 +217,7 @@ impl TType for TMixed {
         }
     }
 
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Atom {
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
         self.get_id()
     }
 }

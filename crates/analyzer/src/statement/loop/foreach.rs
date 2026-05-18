@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use mago_atom::Atom;
 use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -11,6 +10,7 @@ use mago_syntax::ast::ForeachTarget;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::Variable;
+use mago_word::Word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -109,7 +109,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         value_type.set_by_reference(is_by_reference);
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
-            loop_block_context.references_to_external_scope.remove(&Atom::from(direct_variable.name));
+            loop_block_context.references_to_external_scope.remove(&Word::from(direct_variable.name));
         }
 
         let assigned = assign_to_expression(
@@ -139,7 +139,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         }
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
-            loop_block_context.references_to_external_scope.insert(Atom::from(direct_variable.name));
+            loop_block_context.references_to_external_scope.insert(Word::from(direct_variable.name));
         }
 
         let loop_scope = LoopScope::new(self.span(), block_context.locals.clone(), None);

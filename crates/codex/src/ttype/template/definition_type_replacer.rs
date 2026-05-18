@@ -4,10 +4,10 @@ use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
-use mago_atom::Atom;
-use mago_atom::AtomMap;
-use mago_atom::empty_atom;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::empty_word;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::CodebaseMetadata;
@@ -45,7 +45,7 @@ use crate::ttype::wrap_atomic;
 /// resolver can prefer the shallowest contribution).
 #[derive(Copy, Clone, Debug)]
 pub struct DefinitionReplacementOptions<'fn_id> {
-    pub calling_class: Option<Atom>,
+    pub calling_class: Option<Word>,
     pub calling_function: Option<&'fn_id FunctionLikeIdentifier>,
     pub add_lower_bound: bool,
     pub iteration_depth: usize,
@@ -198,11 +198,12 @@ fn replace_atomic(
 
             if let Some(type_parameters) = named_object.get_type_parameters_mut() {
                 for (offset, type_param) in type_parameters.iter_mut().enumerate() {
-                    let is_covariant = if let Some(class_like_metadata) = codebase.get_class_like(&object_name) {
-                        matches!(class_like_metadata.template_variance.get(offset), Some(Variance::Covariant))
-                    } else {
-                        false
-                    };
+                    let is_covariant =
+                        if let Some(class_like_metadata) = codebase.get_class_like(object_name.as_bytes()) {
+                            matches!(class_like_metadata.template_variance.get(offset), Some(Variance::Covariant))
+                        } else {
+                            false
+                        };
 
                     *type_param = self::replace(
                         type_param,
@@ -250,7 +251,7 @@ fn replace_atomic(
 
 fn handle_template_param_substitution(
     atomic_type: &TAtomic,
-    normalized_key: Atom,
+    normalized_key: Word,
     template_type: &TUnion,
     template_result: &mut TemplateResult,
     codebase: &CodebaseMetadata,
@@ -341,7 +342,7 @@ fn handle_template_param_substitution(
                     .is_none_or(|calling_class| replacement_defining_entity != &GenericParent::ClassLike(calling_class))
                 && match options.calling_function {
                     Some(FunctionLikeIdentifier::Function(calling_function)) => {
-                        replacement_defining_entity != &GenericParent::FunctionLike((*calling_function, empty_atom()))
+                        replacement_defining_entity != &GenericParent::FunctionLike((*calling_function, empty_word()))
                     }
                     Some(FunctionLikeIdentifier::Method(_, _)) => true,
                     Some(FunctionLikeIdentifier::Closure(_, _)) => true,
@@ -401,7 +402,7 @@ fn handle_template_param_substitution(
 /// * `argument_span` - Optional span of the argument expression.
 pub fn insert_bound_type(
     template_result: &mut TemplateResult,
-    param_name: Atom,
+    param_name: Word,
     defining_entity: &GenericParent,
     bound_type: TUnion,
     options: DefinitionReplacementOptions,
@@ -492,8 +493,8 @@ fn handle_template_param_class_substitution(
 }
 
 fn template_types_contains<'tt>(
-    template_types: &'tt IndexMap<Atom, Vec<GenericTemplate>, RandomState>,
-    parameter_name: Atom,
+    template_types: &'tt IndexMap<Word, Vec<GenericTemplate>, RandomState>,
+    parameter_name: Word,
     defining_entity: &GenericParent,
 ) -> Option<&'tt TUnion> {
     template_types.get(&parameter_name).and_then(|mapped_classes| {
@@ -508,7 +509,7 @@ fn template_types_contains<'tt>(
 pub fn get_mapped_generic_type_parameters(
     codebase: &CodebaseMetadata,
     input_type_part: &TAtomic,
-    container_name: Atom,
+    container_name: Word,
     container_remapped_parameters: bool,
 ) -> Vec<(Option<usize>, TUnion)> {
     let mut input_type_parameters = match input_type_part {
@@ -531,7 +532,7 @@ pub fn get_mapped_generic_type_parameters(
         }
     };
 
-    let Some(input_class_metadata) = codebase.get_class_like(&input_name) else {
+    let Some(input_class_metadata) = codebase.get_class_like(input_name.as_bytes()) else {
         return vec![];
     };
 
@@ -542,7 +543,7 @@ pub fn get_mapped_generic_type_parameters(
     let input_template_types = &input_class_metadata.template_types;
 
     let mut i = 0;
-    let mut replacement_templates: HashMap<Atom, HashMap<GenericParent, TUnion>> = HashMap::default();
+    let mut replacement_templates: HashMap<Word, HashMap<GenericParent, TUnion>> = HashMap::default();
     if matches!(input_type_part, TAtomic::Object(TObject::Named(o)) if !o.remapped_parameters)
         && !container_remapped_parameters
     {
@@ -637,7 +638,7 @@ pub fn get_mapped_generic_type_parameters(
 #[must_use]
 pub fn get_extended_templated_types<'ty>(
     atomic_type: &'ty TAtomic,
-    extends: &'ty AtomMap<IndexMap<Atom, TUnion, RandomState>>,
+    extends: &'ty WordMap<IndexMap<Word, TUnion, RandomState>>,
 ) -> Vec<&'ty TAtomic> {
     let mut extra_added_types = Vec::new();
 

@@ -1,4 +1,3 @@
-use mago_atom::atom;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
@@ -12,6 +11,7 @@ use mago_span::HasSpan;
 use mago_syntax::ast::Binary;
 use mago_syntax::ast::BinaryOperator;
 use mago_syntax::ast::Expression;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -92,7 +92,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Binary<'arena> {
                 if let Expression::Identifier(identifier) = self.rhs {
                     let class_name = context.resolved_names.get(identifier);
                     if !context.codebase.class_like_exists(class_name) {
-                        report_non_existent_class_like(context, identifier.span(), atom(class_name));
+                        report_non_existent_class_like(context, identifier.span(), word(class_name));
                     }
                 }
 
@@ -119,7 +119,7 @@ fn compute_instanceof_type(
     }
 
     let class_name = match binary.rhs {
-        Expression::Identifier(identifier) => atom(context.resolved_names.get(identifier)),
+        Expression::Identifier(identifier) => word(context.resolved_names.get(identifier)),
         Expression::Self_(_) | Expression::Static(_) => match block_context.scope.get_class_like_name() {
             Some(name) => name,
             None => return get_bool(),

@@ -202,10 +202,10 @@ impl<'arena> Walker<'arena, 'arena, SpanCollectCtx<'_>> for SpanCollector {
 fn push_comment_ranges(file: &MagoFile, out: &mut Vec<FoldingRange>) {
     let text = file.contents.as_ref();
     let mut search_start = 0;
-    while let Some(rel_open) = text[search_start..].find("/*") {
+    while let Some(rel_open) = memchr::memmem::find(&text[search_start..], b"/*") {
         let open = search_start + rel_open;
         let after = open + 2;
-        if let Some(rel_close) = text[after..].find("*/") {
+        if let Some(rel_close) = memchr::memmem::find(&text[after..], b"*/") {
             let close_end = after + rel_close + 2;
             let start_line = file.line_number(open as u32);
             let end_line = file.line_number(close_end as u32);

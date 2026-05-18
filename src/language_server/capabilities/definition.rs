@@ -24,7 +24,7 @@ pub fn compute(
     span_to_location(database, span)
 }
 
-fn resolve_span(codebase: &CodebaseMetadata, fqcn: &str) -> Option<Span> {
+fn resolve_span(codebase: &CodebaseMetadata, fqcn: &[u8]) -> Option<Span> {
     if let Some(meta) = codebase.get_class_like(fqcn) {
         return Some(meta.name_span.unwrap_or(meta.span));
     }

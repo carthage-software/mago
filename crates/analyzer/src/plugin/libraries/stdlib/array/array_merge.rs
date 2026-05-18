@@ -29,7 +29,7 @@ use crate::plugin::provider::function::FunctionTarget;
 static META: ProviderMeta =
     ProviderMeta::new("php::array::array_merge", "array_merge", "Returns merged array with combined types");
 
-static TARGETS: [&str; 2] = ["array_merge", "psl\\dict\\merge"];
+static TARGETS: [&[u8]; 2] = [b"array_merge", b"psl\\dict\\merge"];
 
 /// Provider for the `array_merge()` and `Psl\Dict\merge()` functions.
 ///

@@ -10,7 +10,7 @@ mod runner {
 
     pub fn parse_file_test(name: &'static str, code: &'static str, expected_errors: usize) {
         let arena = Bump::new();
-        let file = File::ephemeral(Cow::Borrowed(name), Cow::Borrowed(code));
+        let file = File::ephemeral(Cow::Borrowed(name.as_bytes()), Cow::Borrowed(code.as_bytes()));
         let program = parse_file(&arena, &file);
         let actual = program.errors.len();
         if actual != expected_errors {

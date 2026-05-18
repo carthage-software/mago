@@ -11,6 +11,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::ArgumentList;
 use mago_syntax::ast::Expression;
+use mago_word::Word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -202,7 +203,7 @@ fn verify_construct_input_type<'arena>(
                 construct_kind,
                 input_expression,
                 argument_offset,
-                &parameter_type_str,
+                parameter_type_str,
                 construct_keyword,
                 is_argument,
             );
@@ -213,8 +214,8 @@ fn verify_construct_input_type<'arena>(
                 construct_kind,
                 input_expression,
                 argument_offset,
-                &input_type_str,
-                &parameter_type_str,
+                input_type_str,
+                parameter_type_str,
                 construct_keyword,
                 is_argument,
             );
@@ -228,7 +229,7 @@ fn verify_construct_input_type<'arena>(
                 construct_kind,
                 input_expression,
                 argument_offset,
-                &parameter_type_str,
+                parameter_type_str,
                 construct_keyword,
                 is_argument,
             );
@@ -239,8 +240,8 @@ fn verify_construct_input_type<'arena>(
                 construct_kind,
                 input_expression,
                 argument_offset,
-                &input_type_str,
-                &parameter_type_str,
+                input_type_str,
+                parameter_type_str,
                 construct_keyword,
                 is_argument,
             );
@@ -266,8 +267,8 @@ fn verify_construct_input_type<'arena>(
             construct_kind,
             input_expression,
             argument_offset,
-            &input_type_str,
-            &parameter_type_str,
+            input_type_str,
+            parameter_type_str,
             construct_keyword,
             is_argument,
         );
@@ -280,8 +281,8 @@ fn verify_construct_input_type<'arena>(
             construct_kind,
             input_expression,
             argument_offset,
-            &input_type_str,
-            &parameter_type_str,
+            input_type_str,
+            parameter_type_str,
             construct_keyword,
             is_argument,
         );
@@ -293,8 +294,8 @@ fn verify_construct_input_type<'arena>(
             construct_kind,
             input_expression,
             argument_offset,
-            &input_type_str,
-            &parameter_type_str,
+            input_type_str,
+            parameter_type_str,
             construct_keyword,
             is_argument,
         );
@@ -361,7 +362,7 @@ fn report_null_input<'arena>(
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
-    param_type: &str,
+    param_type: Word,
     keyword: &Span,
     is_argument: bool,
 ) {
@@ -383,8 +384,8 @@ fn report_possibly_null_input<'arena>(
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
-    in_type: &str,
-    param_type: &str,
+    in_type: Word,
+    param_type: Word,
     keyword: &Span,
     is_argument: bool,
 ) {
@@ -407,7 +408,7 @@ fn report_false_input<'arena>(
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
-    param_type: &str,
+    param_type: Word,
     keyword: &Span,
     is_argument: bool,
 ) {
@@ -430,8 +431,8 @@ fn report_possibly_false_input<'arena>(
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
-    in_type: &str,
-    param_type: &str,
+    in_type: Word,
+    param_type: Word,
     keyword: &Span,
     is_argument: bool,
 ) {
@@ -455,8 +456,8 @@ fn report_mixed_input<'arena>(
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
-    in_type: &str,
-    param_type: &str,
+    in_type: Word,
+    param_type: Word,
     keyword: &Span,
     is_argument: bool,
 ) {
@@ -479,8 +480,8 @@ fn report_less_specific_input<'arena>(
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
-    in_type: &str,
-    param_type: &str,
+    in_type: Word,
+    param_type: Word,
     keyword: &Span,
     is_argument: bool,
 ) {
@@ -510,8 +511,8 @@ fn report_invalid_or_possibly_invalid_input<'arena>(
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
-    in_type_str: &str,
-    param_type_str: &str,
+    in_type_str: Word,
+    param_type_str: Word,
     keyword: &Span,
     is_argument: bool,
 ) {

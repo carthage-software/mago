@@ -1,8 +1,8 @@
 use foldhash::HashMap;
 use foldhash::HashSet;
 
-use mago_atom::empty_atom;
 use mago_database::file::FileId;
+use mago_word::empty_word;
 
 use crate::diff::CodebaseDiff;
 use crate::diff::DeletionRange;
@@ -49,7 +49,7 @@ fn mark_all_as_changed(signature: &FileSignature) -> CodebaseDiff {
 
     for node in &signature.ast_nodes {
         // Add top-level symbol
-        changed.insert((node.name, empty_atom()));
+        changed.insert((node.name, empty_word()));
 
         // Add all children (methods, properties, etc.)
         for child in &node.children {
@@ -104,7 +104,7 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
                 let mut has_child_sig_change = false;
 
                 let Ok((class_trace, class_x, class_y)) = calculate_trace(&a.children, &b.children) else {
-                    changed.insert((a.name, empty_atom()));
+                    changed.insert((a.name, empty_word()));
                     for child in &a.children {
                         changed.insert((a.name, child.name));
                     }
@@ -154,9 +154,9 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
                 }
 
                 if has_child_sig_change || a.signature_hash != b.signature_hash {
-                    changed.insert((a.name, empty_atom()));
+                    changed.insert((a.name, empty_word()));
                 } else {
-                    keep.insert((a.name, empty_atom()));
+                    keep.insert((a.name, empty_word()));
 
                     // Track position changes for issue mapping
                     if b.start_offset != a.start_offset || b.start_line != a.start_line {
@@ -170,7 +170,7 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
                 }
             }
             AstDiffElem::Remove(node) => {
-                changed.insert((node.name, empty_atom()));
+                changed.insert((node.name, empty_word()));
                 deletion_ranges.push((node.start_offset as usize, node.end_offset as usize));
 
                 // Also mark all children as removed
@@ -179,7 +179,7 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
                 }
             }
             AstDiffElem::Add(node) => {
-                changed.insert((node.name, empty_atom()));
+                changed.insert((node.name, empty_word()));
 
                 // Also mark all children as added
                 for child in &node.children {

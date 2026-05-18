@@ -13,7 +13,6 @@ use wasm_bindgen::prelude::*;
 use mago_analyzer::plugin::available_plugins;
 use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_analyzer::settings::Settings as AnalyzerSettings;
-use mago_atom::atom;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::File;
@@ -103,7 +102,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
     let settings: WasmSettings = serde_wasm_bindgen::from_value(settings_js).unwrap_or_default();
 
     let version = parse_php_version(&settings.php_version);
-    let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
+    let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Owned(code.into_bytes()));
     let file_id = file.id;
 
     let disabled_rules: HashSet<String> = settings.linter.disabled_rules.into_iter().collect();
@@ -156,8 +155,12 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         memoize_properties: s.memoize_properties,
         allow_possibly_undefined_array_keys: s.allow_possibly_undefined_array_keys,
         check_throws: s.check_throws,
-        unchecked_exceptions: s.unchecked_exceptions.iter().map(|e| atom(e.as_str())).collect(),
-        unchecked_exception_classes: s.unchecked_exception_classes.iter().map(|e| atom(e.as_str())).collect(),
+        unchecked_exceptions: s.unchecked_exceptions.iter().map(|e| mago_word::word(e.as_bytes())).collect(),
+        unchecked_exception_classes: s
+            .unchecked_exception_classes
+            .iter()
+            .map(|e| mago_word::word(e.as_bytes()))
+            .collect(),
         check_missing_override: s.check_missing_override,
         find_unused_parameters: s.find_unused_parameters,
         strict_list_index_checks: s.strict_list_index_checks,
@@ -239,7 +242,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
 #[wasm_bindgen]
 pub fn lint(code: String, php_version: &str) -> Result<JsValue, JsValue> {
     let version = parse_php_version(php_version);
-    let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
+    let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Owned(code.into_bytes()));
     let settings = LinterSettings { php_version: version, ..Default::default() };
 
     let database = ReadDatabase::empty();
@@ -278,7 +281,7 @@ pub fn lint(code: String, php_version: &str) -> Result<JsValue, JsValue> {
 #[wasm_bindgen]
 pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
     let version = parse_php_version(php_version);
-    let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
+    let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Owned(code.into_bytes()));
     let file_id = file.id;
 
     // Load prelude and use orchestrator's analyze_file
@@ -343,7 +346,7 @@ pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
 #[wasm_bindgen]
 pub fn format(code: String, php_version: &str) -> Result<String, JsValue> {
     let version = parse_php_version(php_version);
-    let file = File::ephemeral(Cow::Borrowed("code.php"), Cow::Owned(code));
+    let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Owned(code.into_bytes()));
 
     let arena = bumpalo::Bump::new();
     let program = parse_file(&arena, &file);
@@ -352,7 +355,7 @@ pub fn format(code: String, php_version: &str) -> Result<String, JsValue> {
     }
 
     let formatter = Formatter::new(&arena, version, FormatSettings::default());
-    Ok(formatter.format(&file, program).to_string())
+    Ok(String::from_utf8_lossy(formatter.format(&file, program)).into_owned())
 }
 
 /// Returns metadata for all available linter rules.
