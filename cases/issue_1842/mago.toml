@@ -1,0 +1,15 @@
+extends = "../defaults.toml"
+
+php-version = "8.4"
+
+[source]
+paths = ["src"]
+includes = []
+
+[analyzer]
+minimum-fail-level = "note"
+
+[linter.rules]
+single-class-per-file = { enabled = false }
+file-name = { enabled = false }
+function-name = { enabled = false }

@@ -861,10 +861,7 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
                             || invocation.target.get_return_type().is_some_and(|t| !t.is_void() && !t.is_never()));
 
                     if all_negated {
-                        if suppress_redundant {
-                            // Side effects or a meaningful return value mean removing the call
-                            // would lose behavior. Skip the redundant warning.
-                        } else {
+                        if !any_possible && !suppress_redundant {
                             context.collector.report_with_code(
                                 IssueCode::RedundantTypeComparison,
                                 Issue::warning(format!(
