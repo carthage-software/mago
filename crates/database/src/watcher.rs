@@ -4,8 +4,6 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::mem::ManuallyDrop;
-#[cfg(not(windows))]
-use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::mpsc;
@@ -263,7 +261,7 @@ impl<'config> DatabaseWatcher<'config> {
         for path in event.paths {
             // Check if file has a valid extension
             if let Some(ext) = path.extension() {
-                if !extensions.contains(ext.as_bytes()) {
+                if !extensions.contains(ext.as_encoded_bytes()) {
                     continue;
                 }
             } else {
@@ -305,12 +303,12 @@ impl<'config> DatabaseWatcher<'config> {
                 .strip_prefix(workspace)
                 .unwrap_or(&path)
                 .as_os_str()
-                .as_bytes()
+                .as_encoded_bytes()
                 .iter()
                 .map(|i| if *i == b'\\' { b'/' } else { *i })
                 .collect::<Vec<_>>();
             #[cfg(not(windows))]
-            let logical_name = path.strip_prefix(workspace).unwrap_or(&path).as_os_str().as_bytes().to_owned();
+            let logical_name = path.strip_prefix(workspace).unwrap_or(&path).as_os_str().as_encoded_bytes().to_owned();
 
             let file_id = FileId::new(&logical_name);
 

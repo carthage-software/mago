@@ -75,12 +75,12 @@ pub(crate) fn read_file(workspace: &Path, path: &Path, file_type: FileType) -> R
         .strip_prefix(workspace)
         .unwrap_or(path)
         .as_os_str()
-        .as_bytes()
+        .as_encoded_bytes()
         .iter()
         .map(|i| if *i == b'\\' { b'/' } else { *i })
         .collect::<Vec<_>>();
     #[cfg(not(windows))]
-    let logical_name = path.strip_prefix(workspace).unwrap_or(path).as_os_str().as_bytes().to_owned();
+    let logical_name = path.strip_prefix(workspace).unwrap_or(path).as_os_str().as_encoded_bytes().to_owned();
 
     Ok(File::new(Cow::Owned(logical_name), file_type, Some(path.to_path_buf()), Cow::Owned(bytes)))
 }
