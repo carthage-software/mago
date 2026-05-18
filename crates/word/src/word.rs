@@ -224,13 +224,23 @@ impl Eq for Word {}
 #[cfg(feature = "sso")]
 impl Hash for Word {
     #[inline]
+    #[allow(clippy::multiple_unsafe_ops_per_block)]
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
     {
-        // SAFETY: `repr.bytes` is the canonical 16-byte representation; hashing it gives a
-        // value-determined hash regardless of which arm of the union is active.
-        unsafe { state.write(&self.repr.bytes) }
+        // The hash must be value-determined *and* stable across processes, so it must never
+        // depend on a pointer. An inline word hashes its 16-byte repr (tag + content); a heap
+        // word hashes the interner entry's precomputed content hash rather than its address.
+        // SAFETY: `inline.tag` aliases the first byte of the repr; when it is `TAG_HEAP`,
+        // `heap.ptr` is the `Entry` address written at construction and live for the process.
+        unsafe {
+            if self.repr.inline.tag == TAG_HEAP {
+                state.write_u64((*(self.repr.heap.ptr as *const Entry)).hash);
+            } else {
+                state.write(&self.repr.bytes);
+            }
+        }
     }
 }
 
@@ -241,7 +251,12 @@ impl Hash for Word {
     where
         H: Hasher,
     {
-        state.write_usize(self.repr.ptr.as_ptr() as usize);
+        // Hash the interner entry's precomputed content hash, never the pointer: the pointer
+        // value varies between processes, which would make any `WordMap`/`WordSet` iteration
+        // order non-deterministic across runs.
+        // SAFETY: `repr.ptr` is the canonical interner pointer written at construction; the
+        // `Entry` it addresses lives for the lifetime of the process.
+        state.write_u64(unsafe { self.repr.ptr.as_ref().hash });
     }
 }
 
