@@ -17,7 +17,7 @@ function use_integer(int $x): void
 }
 
 /**
- * @template-covariant TKey of array-key
+ * @template TKey of array-key
  * @template-covariant TValue
  */
 final class Collection
@@ -93,7 +93,6 @@ $bar = $foo->map(
 )->reindex(
     /**
      * @param 1 $_v
-     * @param 'a'|'b'|'c' $k
      */
     function (int $_v, string $k): string {
         return 'key_' . $k;

@@ -203,11 +203,8 @@ pub fn validate_method_signature_compatibility(
     if let (Some(parent_return), Some(child_return)) =
         (&parent_method.return_type_declaration_metadata, &child_method.return_type_declaration_metadata)
     {
-        let parent_return_type = &parent_return.type_union;
-        let child_return_type = &child_return.type_union;
-
-        let mut expanded_parent_return_type = parent_return_type.clone();
-        let mut expanded_child_return_type = child_return_type.clone();
+        let mut expanded_parent_return_type = parent_return.type_union.clone();
+        let mut expanded_child_return_type = child_return.type_union.clone();
 
         let expansion_options = TypeExpansionOptions {
             self_class: Some(child_class_name),
@@ -240,6 +237,49 @@ pub fn validate_method_signature_compatibility(
                 parent_type: expanded_parent_return_type.get_id(),
             });
             return issues;
+        }
+    }
+
+    if let (Some(parent_return), Some(child_return)) =
+        (&parent_method.return_type_metadata, &child_method.return_type_metadata)
+        && child_return.from_docblock
+    {
+        let mut expanded_parent_return_type = parent_return.type_union.clone();
+        let mut expanded_child_return_type = child_return.type_union.clone();
+
+        let expansion_options = TypeExpansionOptions {
+            self_class: Some(child_class_name),
+            static_class_type: StaticClassType::Name(child_class_name),
+            function_is_final: child_method_meta.is_final,
+            ..Default::default()
+        };
+
+        if expanded_parent_return_type.is_expandable() {
+            expand_union(codebase, &mut expanded_parent_return_type, &expansion_options);
+        }
+        if expanded_child_return_type.is_expandable() {
+            expand_union(codebase, &mut expanded_child_return_type, &expansion_options);
+        }
+
+        if !expanded_parent_return_type.has_template_types() && !expanded_child_return_type.has_template_types() {
+            let mut comparison_result = ComparisonResult::new();
+            let is_compatible = union_comparator::is_contained_by(
+                codebase,
+                &expanded_child_return_type,
+                &expanded_parent_return_type,
+                false,
+                false,
+                false,
+                &mut comparison_result,
+            );
+
+            if !is_compatible {
+                issues.push(SignatureCompatibilityIssue::IncompatibleReturnType {
+                    child_type: expanded_child_return_type.get_id(),
+                    parent_type: expanded_parent_return_type.get_id(),
+                });
+                return issues;
+            }
         }
     }
 

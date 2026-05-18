@@ -59,6 +59,7 @@ pub struct ClassLikeMetadata {
     pub template_variance: Vec<Variance>,
     pub template_extended_offsets: WordMap<Vec<TUnion>>,
     pub template_extended_parameters: WordMap<IndexMap<Word, TUnion, RandomState>>,
+    pub template_extended_parameter_paths: WordMap<Vec<IndexMap<Word, TUnion, RandomState>>>,
     pub template_type_extends_count: WordMap<usize>,
     pub template_type_implements_count: WordMap<usize>,
     pub template_type_uses_count: WordMap<usize>,
@@ -138,6 +139,7 @@ impl ClassLikeMetadata {
             template_variance: Vec::new(),
             template_type_extends_count: WordMap::default(),
             template_extended_parameters: WordMap::default(),
+            template_extended_parameter_paths: WordMap::default(),
             template_extended_offsets: WordMap::default(),
             template_type_implements_count: WordMap::default(),
             template_type_uses_count: WordMap::default(),
@@ -354,6 +356,20 @@ impl ClassLikeMetadata {
         parameter_type: TUnion,
     ) -> Option<TUnion> {
         self.template_extended_parameters.entry(parent_fqcn).or_default().insert(parameter_name, parameter_type)
+    }
+
+    /// Records one complete parameterization of `ancestor` (a single inheritance
+    /// path), de-duplicating against parameterizations already recorded.
+    #[inline]
+    pub fn record_template_extended_path(&mut self, ancestor: Word, parameters: IndexMap<Word, TUnion, RandomState>) {
+        if parameters.is_empty() {
+            return;
+        }
+
+        let paths = self.template_extended_parameter_paths.entry(ancestor).or_default();
+        if !paths.contains(&parameters) {
+            paths.push(parameters);
+        }
     }
 
     /// Adds or updates the declaring method identifier for a method name.

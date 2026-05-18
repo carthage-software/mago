@@ -8,21 +8,25 @@ use mago_codex::context::ScopeContext;
 use mago_word::Word;
 use mago_word::ascii_lowercase_word;
 use mago_word::word;
-
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
+use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
+use mago_codex::ttype::get_never;
+use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::definition_type_replacer;
@@ -45,6 +49,7 @@ use mago_syntax::ast::Interface;
 use mago_syntax::ast::Property;
 use mago_syntax::ast::Trait;
 use mago_syntax::ast::TraitUse;
+use mago_bytes::BytesDisplay;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -58,7 +63,6 @@ use crate::statement::attributes::analyze_attributes;
 use crate::statement::class_like::method_signature::SignatureCompatibilityIssue;
 use crate::statement::function_like::report_undefined_type_references;
 use crate::utils::missing_type_hints;
-use mago_bytes::BytesDisplay;
 
 pub mod constant;
 pub mod enum_case;
@@ -991,6 +995,8 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
 
     check_trait_property_conflicts(context, class_like_metadata, members);
     check_readonly_class_trait_properties(context, class_like_metadata, members);
+    check_template_variance_positions(context, class_like_metadata);
+    check_uninhabitable_diamonds(context, class_like_metadata);
 
     if !class_like_metadata.template_types.is_empty() {
         for (template_name, _) in &class_like_metadata.template_types {
@@ -1295,21 +1301,18 @@ fn check_class_like_extends<'ctx, 'arena>(
                         .with_help(format!("To allow this, add `{using_name}` to the list in the `@inheritors` PHPDoc tag for `{extended_name}`.")),
                 );
             }
-
-            let actual_parameters_count = class_like_metadata
-                .template_type_extends_count
-                .get(&extended_class_metadata.name)
-                .copied()
-                .unwrap_or(0);
-
-            check_template_parameters(
-                context,
-                class_like_metadata,
-                extended_class_metadata,
-                actual_parameters_count,
-                InheritanceKind::Extends(extended_type.span()),
-            );
         }
+
+        let actual_parameters_count =
+            class_like_metadata.template_type_extends_count.get(&extended_class_metadata.name).copied().unwrap_or(0);
+
+        check_template_parameters(
+            context,
+            class_like_metadata,
+            extended_class_metadata,
+            actual_parameters_count,
+            InheritanceKind::Extends(extended_type.span()),
+        );
     }
 }
 
@@ -1882,6 +1885,176 @@ fn should_skip_enum_builtin_interface(class_like_metadata: &ClassLikeMetadata, i
     class_like_metadata.kind.is_enum() && (interface_fqcn == b"backedenum" || interface_fqcn == b"unitenum")
 }
 
+fn check_template_variance_positions<'ctx>(
+    context: &mut Context<'ctx, '_>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+) {
+    use mago_codex::ttype::template::variance::Variance;
+
+    if class_like_metadata.template_variance.is_empty() {
+        return;
+    }
+
+    let mut covariant_templates: Vec<Word> = Vec::new();
+    let mut contravariant_templates: Vec<Word> = Vec::new();
+    for (index, (template_name, _)) in class_like_metadata.template_types.iter().enumerate() {
+        match class_like_metadata.template_variance.get(index) {
+            Some(Variance::Covariant) => covariant_templates.push(*template_name),
+            Some(Variance::Contravariant) => contravariant_templates.push(*template_name),
+            _ => {}
+        }
+    }
+
+    if covariant_templates.is_empty() && contravariant_templates.is_empty() {
+        return;
+    }
+
+    let class_name = class_like_metadata.original_name;
+    let own_entity = GenericParent::ClassLike(class_like_metadata.name);
+
+    for method_name in &class_like_metadata.methods {
+        let Some(method) = context.codebase.get_method(class_like_metadata.name.as_bytes(), method_name.as_bytes())
+        else {
+            continue;
+        };
+
+        if let Some(method_metadata) = &method.method_metadata
+            && (method_metadata.is_constructor || matches!(method_metadata.visibility, Visibility::Private))
+        {
+            continue;
+        }
+
+        for parameter in &method.parameters {
+            let Some(type_metadata) = &parameter.type_metadata else {
+                continue;
+            };
+
+            for atomic in type_metadata.type_union.types.as_ref() {
+                let TAtomic::GenericParameter(generic) = atomic else {
+                    continue;
+                };
+
+                if generic.defining_entity != own_entity || !covariant_templates.contains(&generic.parameter_name) {
+                    continue;
+                }
+
+                let template_name = generic.parameter_name;
+                context.collector.report_with_code(
+                    IssueCode::InvalidTemplateParameter,
+                    Issue::error(format!(
+                        "Covariant template parameter `{template_name}` cannot appear in a parameter position."
+                    ))
+                    .with_annotation(Annotation::primary(parameter.span).with_message(format!(
+                        "`{template_name}` is declared covariant (`@template-covariant`) on `{class_name}`"
+                    )))
+                    .with_note("A method parameter is a contravariant position; a covariant template parameter may only appear in covariant positions, such as a return type.")
+                    .with_help(format!(
+                        "Declare `{template_name}` as invariant (`@template`), or remove it from parameter positions."
+                    )),
+                );
+            }
+        }
+
+        if let Some(return_type) = &method.return_type_metadata {
+            for atomic in return_type.type_union.types.as_ref() {
+                let TAtomic::GenericParameter(generic) = atomic else {
+                    continue;
+                };
+
+                if generic.defining_entity != own_entity || !contravariant_templates.contains(&generic.parameter_name) {
+                    continue;
+                }
+
+                let template_name = generic.parameter_name;
+                context.collector.report_with_code(
+                    IssueCode::InvalidTemplateParameter,
+                    Issue::error(format!(
+                        "Contravariant template parameter `{template_name}` cannot appear in a return position."
+                    ))
+                    .with_annotation(Annotation::primary(return_type.span).with_message(format!(
+                        "`{template_name}` is declared contravariant (`@template-contravariant`) on `{class_name}`"
+                    )))
+                    .with_note("A method return type is a covariant position; a contravariant template parameter may only appear in contravariant positions, such as a method parameter.")
+                    .with_help(format!(
+                        "Declare `{template_name}` as invariant (`@template`), or remove it from return positions."
+                    )),
+                );
+            }
+        }
+    }
+}
+
+/// Rejects an uninhabitable diamond at the declaration site: a class-like
+/// reaching one generic ancestor through two conflicting parameterizations
+/// inherits a method whose return positions merge (by intersection) to an
+/// uninhabited type, so no class could ever implement it. A class that declares
+/// the method itself is left to the per-path override checks.
+fn check_uninhabitable_diamonds<'ctx>(context: &mut Context<'ctx, '_>, class_like_metadata: &'ctx ClassLikeMetadata) {
+    if class_like_metadata.template_extended_parameter_paths.is_empty() {
+        return;
+    }
+
+    let class_name = class_like_metadata.original_name;
+    let class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
+
+    let mut findings: Vec<(Word, Word, usize)> = Vec::new();
+    for (ancestor_name, paths) in &class_like_metadata.template_extended_parameter_paths {
+        if paths.len() < 2 {
+            continue;
+        }
+
+        let Some(ancestor_metadata) = context.codebase.get_class_like(ancestor_name.as_bytes()) else {
+            continue;
+        };
+        let ancestor_display = ancestor_metadata.original_name;
+
+        for method_name in &ancestor_metadata.methods {
+            let method_name = *method_name;
+
+            if let Some(declaring_id) = class_like_metadata.declaring_method_ids.get(&method_name)
+                && declaring_id.get_class_name() == class_like_metadata.name
+            {
+                continue;
+            }
+
+            let Some(method) = context.codebase.get_method(ancestor_name.as_bytes(), method_name.as_bytes()) else {
+                continue;
+            };
+
+            let Some(return_type) = &method.return_type_metadata else {
+                continue;
+            };
+            if return_type.type_union.is_never() {
+                continue;
+            }
+
+            let merged = get_substituted_method(method, class_like_metadata, *ancestor_name, context.codebase);
+            if merged.return_type_metadata.as_ref().is_some_and(|r| r.type_union.is_never()) {
+                findings.push((ancestor_display, method_name, paths.len()));
+            }
+        }
+    }
+
+    for (ancestor_display, method_name, path_count) in findings {
+        context.collector.report_with_code(
+            IssueCode::InvalidTemplateParameter,
+            Issue::error(format!(
+                "Diamond inheritance of `{ancestor_display}::{method_name}()` requires an uninhabited return type."
+            ))
+            .with_annotation(Annotation::primary(class_span).with_message(format!(
+                "`{class_name}` reaches `{ancestor_display}` through {path_count} conflicting parameterizations"
+            )))
+            .with_note("A method return is a covariant position, so a diamond merges it by intersection.")
+            .with_note(format!(
+                "The parameterizations of `{ancestor_display}` give `{method_name}()` disjoint return types whose intersection is uninhabited, so no class could implement `{class_name}`."
+            ))
+            .with_help(
+                "Constrain the template parameter with an object bound, since object intersections stay inhabitable, or remove one of the conflicting parameterizations.",
+            ),
+        );
+    }
+}
+
 fn check_abstract_method_signatures<'ctx>(
     context: &mut Context<'ctx, '_>,
     class_like_metadata: &'ctx ClassLikeMetadata,
@@ -2032,6 +2205,7 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena>(
                         else {
                             continue;
                         };
+
                         let Some(second_method) = context
                             .codebase
                             .get_declaring_method(second_method_id.get_class_name().as_ref(), first_method_str)
@@ -2443,18 +2617,80 @@ fn get_substituted_method(
     parent_class_name: Word,
     codebase: &CodebaseMetadata,
 ) -> FunctionLikeMetadata {
-    let template_mapping =
-        class_like_metadata.template_extended_parameters.get(&parent_class_name).cloned().unwrap_or_default();
+    let parameterizations: Vec<&IndexMap<Word, TUnion, RandomState>> =
+        match class_like_metadata.template_extended_parameter_paths.get(&parent_class_name) {
+            Some(paths) if !paths.is_empty() => paths.iter().collect(),
+            _ => match class_like_metadata.template_extended_parameters.get(&parent_class_name) {
+                Some(mapping) if !mapping.is_empty() => vec![mapping],
+                _ => return method.clone(),
+            },
+        };
 
-    if template_mapping.is_empty() {
-        method.clone()
-    } else {
+    let mut substituted = parameterizations.into_iter().map(|mapping| {
         let mut template_result = TemplateResult::default();
-        for (template_name, concrete_type) in template_mapping {
-            template_result.add_lower_bound(template_name, GenericParent::ClassLike(parent_class_name), concrete_type);
+        for (template_name, concrete_type) in mapping {
+            template_result.add_lower_bound(
+                *template_name,
+                GenericParent::ClassLike(parent_class_name),
+                concrete_type.clone(),
+            );
         }
 
         apply_template_substitution_to_method(method, &template_result, codebase)
+    });
+
+    let Some(mut merged) = substituted.next() else {
+        return method.clone();
+    };
+
+    for other in substituted {
+        merge_method_signature_into(&mut merged, &other, codebase);
+    }
+
+    merged
+}
+
+/// Folds one parameterization of an inherited method into the running merge:
+/// parameter positions widen to the union of all paths, the return position
+/// narrows to the intersection. This synthesises the diamond-merged contract an
+/// implementer must satisfy.
+fn merge_method_signature_into(
+    merged: &mut FunctionLikeMetadata,
+    other: &FunctionLikeMetadata,
+    codebase: &CodebaseMetadata,
+) {
+    for (index, parameter) in merged.parameters.iter_mut().enumerate() {
+        let Some(other_parameter) = other.parameters.get(index) else {
+            continue;
+        };
+
+        join_type_metadata(parameter.type_metadata.as_mut(), other_parameter.type_metadata.as_ref(), codebase);
+        join_type_metadata(
+            parameter.type_declaration_metadata.as_mut(),
+            other_parameter.type_declaration_metadata.as_ref(),
+            codebase,
+        );
+    }
+
+    meet_type_metadata(merged.return_type_metadata.as_mut(), other.return_type_metadata.as_ref(), codebase);
+    meet_type_metadata(
+        merged.return_type_declaration_metadata.as_mut(),
+        other.return_type_declaration_metadata.as_ref(),
+        codebase,
+    );
+}
+
+fn join_type_metadata(target: Option<&mut TypeMetadata>, other: Option<&TypeMetadata>, codebase: &CodebaseMetadata) {
+    if let (Some(target), Some(other)) = (target, other) {
+        target.type_union =
+            combine_union_types(&target.type_union, &other.type_union, codebase, CombinerOptions::default());
+    }
+}
+
+fn meet_type_metadata(target: Option<&mut TypeMetadata>, other: Option<&TypeMetadata>, codebase: &CodebaseMetadata) {
+    if let (Some(target), Some(other)) = (target, other) {
+        target.type_union =
+            intersect_union_types(&target.type_union, &other.type_union, codebase).unwrap_or_else(get_never);
     }
 }
 
@@ -2473,6 +2709,10 @@ fn apply_template_substitution_to_method(
     }
 
     if let Some(return_type) = &mut substituted_method.return_type_declaration_metadata {
+        return_type.type_union = inferred_type_replacer::replace(&return_type.type_union, template_result, codebase);
+    }
+
+    if let Some(return_type) = &mut substituted_method.return_type_metadata {
         return_type.type_union = inferred_type_replacer::replace(&return_type.type_union, template_result, codebase);
     }
 

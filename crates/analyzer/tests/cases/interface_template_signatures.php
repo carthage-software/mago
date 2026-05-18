@@ -6,7 +6,8 @@
  * @template K
  * @template V
  */
-interface Collection {
+interface Collection
+{
     /**
      * @param K $key
      * @return V|null
@@ -17,9 +18,11 @@ interface Collection {
 /**
  * @implements Collection<string, User>
  */
-class UserCollection implements Collection {
+class UserCollection implements Collection
+{
     // OK: Substituted types should match
-    public function get(mixed $key): mixed {
+    public function get(mixed $key): mixed
+    {
         return new User();
     }
 }
@@ -29,7 +32,8 @@ class UserCollection implements Collection {
 /**
  * @template T
  */
-interface Repository {
+interface Repository
+{
     /**
      * @param T $entity
      */
@@ -44,11 +48,13 @@ interface Repository {
 /**
  * @implements Repository<User>
  */
-class UserRepository implements Repository {
+class UserRepository implements Repository
+{
     // Types in signatures must still use mixed
     public function save(mixed $entity): void {}
 
-    public function find(int $id): mixed {
+    public function find(int $id): mixed
+    {
         return null;
     }
 }
@@ -58,7 +64,8 @@ class UserRepository implements Repository {
 /**
  * @template T
  */
-interface Container {
+interface Container
+{
     /**
      * @return T
      */
@@ -67,9 +74,10 @@ interface Container {
 
 /**
  * @template U
- * @implements Container<array<U>>
+ * @extends Container<array<U>>
  */
-interface ListContainer extends Container {
+interface ListContainer extends Container
+{
     /**
      * @return array<U>
      */
@@ -79,8 +87,10 @@ interface ListContainer extends Container {
 /**
  * @implements ListContainer<string>
  */
-class StringList implements ListContainer {
-    public function value(): mixed {
+class StringList implements ListContainer
+{
+    public function value(): mixed
+    {
         return [];
     }
 }
@@ -90,7 +100,8 @@ class StringList implements ListContainer {
 /**
  * @template T of object
  */
-interface EntityManager {
+interface EntityManager
+{
     /**
      * @param T $entity
      */
@@ -106,10 +117,12 @@ interface EntityManager {
 /**
  * @implements EntityManager<User>
  */
-class UserManager implements EntityManager {
+class UserManager implements EntityManager
+{
     public function persist(object $entity): void {}
 
-    public function find(string $class, int $id): ?object {
+    public function find(string $class, int $id): ?object
+    {
         return null;
     }
 }
@@ -121,7 +134,8 @@ class UserManager implements EntityManager {
  * @template TValue
  * @template TReturn
  */
-interface Transformer {
+interface Transformer
+{
     /**
      * @param array<TKey, TValue> $input
      * @return array<TKey, TReturn>
@@ -132,13 +146,16 @@ interface Transformer {
 /**
  * @implements Transformer<int, string, User>
  */
-class StringToUserTransformer implements Transformer {
-    public function transform(array $input): array {
+class StringToUserTransformer implements Transformer
+{
+    public function transform(array $input): array
+    {
         return [];
     }
 }
 
 // Dummy class
-class User {
-    public string $name = "test";
+class User
+{
+    public string $name = 'test';
 }

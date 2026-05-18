@@ -2,13 +2,12 @@
 
 declare(strict_types=1);
 
-interface CountableV extends Countable
-{
-}
+interface CountableV extends Countable {}
 
-interface IteratorV extends Traversable
-{
-}
+/**
+ * @extends Traversable<mixed, mixed>
+ */
+interface IteratorV extends Traversable {}
 
 /**
  * @param Countable&Stringable $x

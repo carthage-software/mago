@@ -365,6 +365,23 @@ pub fn populate_class_like_types(
         }
     }
 
+    for p in metadata
+        .template_extended_parameter_paths
+        .values_mut()
+        .flat_map(|paths| paths.iter_mut())
+        .flat_map(|m| m.values_mut())
+    {
+        if p.needs_population() || force_repopulation {
+            populate_union_type(
+                p,
+                codebase_symbols,
+                Some(&class_like_reference_source),
+                symbol_references,
+                force_repopulation,
+            );
+        }
+    }
+
     for type_alias in metadata.type_aliases.values_mut() {
         populate_union_type(
             &mut type_alias.type_union,

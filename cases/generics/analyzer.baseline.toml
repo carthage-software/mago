@@ -1,0 +1,76 @@
+variant = "strict"
+
+[[entries."src/arity_interface_extends_violation.php".issues]]
+code = "missing-template-parameter"
+start_line = 8
+end_line = 8
+
+[[entries."src/bound_extends_violation.php".issues]]
+code = "invalid-template-parameter"
+start_line = 12
+end_line = 12
+
+[[entries."src/bound_implements_violation.php".issues]]
+code = "docblock-type-mismatch"
+start_line = 15
+end_line = 15
+
+[[entries."src/bound_implements_violation.php".issues]]
+code = "invalid-template-parameter"
+start_line = 13
+end_line = 13
+
+[[entries."src/diamond_contravariant_sink_violation.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 21
+end_line = 21
+
+[[entries."src/diamond_covariant_producer_violation.php".issues]]
+code = "incompatible-return-type"
+start_line = 21
+end_line = 21
+
+[[entries."src/diamond_method_return_violation.php".issues]]
+code = "incompatible-return-type"
+start_line = 22
+end_line = 22
+
+[[entries."src/diamond_param_narrowed_violation.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 22
+end_line = 22
+
+[[entries."src/diamond_return_other_branch_violation.php".issues]]
+code = "incompatible-return-type"
+start_line = 22
+end_line = 22
+
+[[entries."src/diamond_uninhabitable_decl_violation.php".issues]]
+code = "invalid-template-parameter"
+start_line = 14
+end_line = 14
+
+[[entries."src/diamond_uninhabitable_violation.php".issues]]
+code = "incompatible-return-type"
+start_line = 19
+end_line = 19
+
+[[entries."src/lsp_param_narrowed_violation.php".issues]]
+code = "incompatible-parameter-type"
+start_line = 19
+end_line = 19
+
+[[entries."src/lsp_return_widened_violation.php".issues]]
+code = "incompatible-return-type"
+start_line = 18
+end_line = 18
+
+[[entries."src/variance_contravariant_return_violation.php".issues]]
+code = "invalid-template-parameter"
+start_line = 12
+end_line = 12
+
+[[entries."src/variance_covariant_param_violation.php".issues]]
+code = "invalid-template-parameter"
+start_line = 14
+end_line = 14
