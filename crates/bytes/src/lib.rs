@@ -136,6 +136,9 @@ fn simd_skip_leading(s: &[u8], byte: u8) -> usize {
     unsafe {
         let target = _mm_set1_epi8(byte as i8);
         while i + 16 <= s.len() {
+            // `_mm_loadu_si128` is an unaligned load, so the pointer need not satisfy
+            // `__m128i`'s 16-byte alignment requirement.
+            #[allow(clippy::cast_ptr_alignment)]
             let chunk = _mm_loadu_si128(s.as_ptr().add(i).cast::<__m128i>());
             let eq = _mm_cmpeq_epi8(chunk, target);
             let mask = _mm_movemask_epi8(eq) as u32;
@@ -191,6 +194,9 @@ fn simd_skip_trailing(s: &[u8], byte: u8) -> usize {
         let target = _mm_set1_epi8(byte as i8);
         while end >= 16 {
             let start = end - 16;
+            // `_mm_loadu_si128` is an unaligned load, so the pointer need not satisfy
+            // `__m128i`'s 16-byte alignment requirement.
+            #[allow(clippy::cast_ptr_alignment)]
             let chunk = _mm_loadu_si128(s.as_ptr().add(start).cast::<__m128i>());
             let eq = _mm_cmpeq_epi8(chunk, target);
             let mask = _mm_movemask_epi8(eq) as u32;
