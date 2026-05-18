@@ -13,7 +13,7 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = ["sso", "serde"]
+default = ["serde"]
 sso = []
 serde = ["dep:serde"]
 
