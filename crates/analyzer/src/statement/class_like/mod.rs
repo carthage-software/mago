@@ -4,10 +4,8 @@ use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
+use mago_bytes::BytesDisplay;
 use mago_codex::context::ScopeContext;
-use mago_word::Word;
-use mago_word::ascii_lowercase_word;
-use mago_word::word;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
@@ -49,7 +47,9 @@ use mago_syntax::ast::Interface;
 use mago_syntax::ast::Property;
 use mago_syntax::ast::Trait;
 use mago_syntax::ast::TraitUse;
-use mago_bytes::BytesDisplay;
+use mago_word::Word;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

@@ -75,6 +75,7 @@ use crate::rule::NoGlobalConfig;
 use crate::rule::NoGotoConfig;
 use crate::rule::NoHashCommentConfig;
 use crate::rule::NoHashEmojiConfig;
+use crate::rule::NoImplicitModelQueryConfig;
 use crate::rule::NoIniSetConfig;
 use crate::rule::NoInlineConfig;
 use crate::rule::NoInsecureComparisonConfig;
@@ -134,9 +135,13 @@ use crate::rule::NoVoidReferenceReturnConfig;
 use crate::rule::OptionalParamOrderConfig;
 use crate::rule::PreferAnonymousMigrationConfig;
 use crate::rule::PreferArraySpreadConfig;
+use crate::rule::PreferArrayValidationRulesConfig;
 use crate::rule::PreferArrowFunctionConfig;
+use crate::rule::PreferCastsMethodConfig;
+use crate::rule::PreferDedicatedStatusAssertionConfig;
 use crate::rule::PreferEarlyContinueConfig;
 use crate::rule::PreferExplodeOverPregSplitConfig;
+use crate::rule::PreferFakeHelperConfig;
 use crate::rule::PreferFirstClassCallableConfig;
 use crate::rule::PreferInterfaceConfig;
 use crate::rule::PreferPreIncrementConfig;
@@ -248,8 +253,12 @@ pub struct RulesSettings {
     pub deprecated_shell_execute_string: RuleSettings<DeprecatedShellExecuteStringConfig>,
     pub deprecated_switch_semicolon: RuleSettings<DeprecatedSwitchSemicolonConfig>,
     pub prefer_anonymous_migration: RuleSettings<PreferAnonymousMigrationConfig>,
+    pub prefer_array_validation_rules: RuleSettings<PreferArrayValidationRulesConfig>,
+    pub prefer_casts_method: RuleSettings<PreferCastsMethodConfig>,
+    pub prefer_dedicated_status_assertion: RuleSettings<PreferDedicatedStatusAssertionConfig>,
     pub prefer_array_spread: RuleSettings<PreferArraySpreadConfig>,
     pub prefer_explode_over_preg_split: RuleSettings<PreferExplodeOverPregSplitConfig>,
+    pub prefer_fake_helper: RuleSettings<PreferFakeHelperConfig>,
     pub prefer_first_class_callable: RuleSettings<PreferFirstClassCallableConfig>,
     pub no_void_reference_return: RuleSettings<NoVoidReferenceReturnConfig>,
     pub no_underscore_class: RuleSettings<NoUnderscoreClassConfig>,
@@ -382,6 +391,7 @@ pub struct RulesSettings {
     pub no_null_property_init: RuleSettings<NoNullPropertyInitConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,
     pub no_direct_db_query: RuleSettings<NoDirectDbQueryConfig>,
+    pub no_implicit_model_query: RuleSettings<NoImplicitModelQueryConfig>,
     pub no_db_schema_change: RuleSettings<NoDbSchemaChangeConfig>,
     pub no_unescaped_output: RuleSettings<NoUnescapedOutputConfig>,
     pub no_roles_as_capabilities: RuleSettings<NoRolesAsCapabilitiesConfig>,
