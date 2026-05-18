@@ -30,6 +30,7 @@ extend-ignore-re = [
 "encrypter" = "encrypter"
 "consts" = "consts"
 "writeable" = "writeable"
+"caf" = "caf"
 
 [type.rust.extend-identifiers]
 "thr" = "thr"
