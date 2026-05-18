@@ -503,7 +503,8 @@ impl<'ctx> BlockContext<'ctx> {
         {
             // If a referenced variable goes out of scope, we need to update the references.
             // All of the references to this variable are still references to the same value,
-            // so we pick the first one and make the rest of the references point to it.
+            // so we pick one as the new root and point the rest at it. The candidates are
+            // sorted so the choice is deterministic regardless of map iteration order.
             let mut references = vec![];
             for (reference, referenced) in &self.references_in_scope {
                 if *referenced == remove_var_atom {
@@ -511,6 +512,7 @@ impl<'ctx> BlockContext<'ctx> {
                 }
             }
 
+            references.sort_unstable();
             for reference in &references {
                 self.references_in_scope.remove(reference);
             }
