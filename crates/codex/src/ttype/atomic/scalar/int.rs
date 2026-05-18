@@ -982,6 +982,7 @@ impl TType for TInteger {
         false
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         false
     }

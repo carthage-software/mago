@@ -69,6 +69,7 @@ impl TType for TBool {
         false
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         false
     }

@@ -431,6 +431,7 @@ impl TType for TString {
         false
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         false
     }

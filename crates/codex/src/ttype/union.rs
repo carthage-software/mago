@@ -1323,6 +1323,7 @@ impl TType for TUnion {
         !self.flags.contains(UnionFlags::POPULATED) && self.types.iter().any(super::TType::needs_population)
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         if self.types.is_empty() {
             return true;

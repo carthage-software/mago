@@ -1044,6 +1044,7 @@ impl TType for TAtomic {
         }
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         if let Some(intersection) = self.get_intersection_types() {
             for intersection_type in intersection {

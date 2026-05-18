@@ -128,6 +128,7 @@ impl TType for TFloat {
         false
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         false
     }

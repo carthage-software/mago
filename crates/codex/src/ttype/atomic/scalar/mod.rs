@@ -623,6 +623,7 @@ impl TType for TScalar {
         }
     }
 
+    #[inline]
     fn is_expandable(&self) -> bool {
         match self {
             TScalar::Bool(ttype) => ttype.is_expandable(),
