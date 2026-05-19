@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fs::read;
-#[cfg(not(windows))]
+#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
@@ -16,11 +16,11 @@ use crate::file::FileType;
 /// (and other non-Unix platforms), paths are UTF-8 — invalid sequences fall back to
 /// lossy decoding with replacement characters.
 pub(crate) fn bytes_to_os_str(bytes: &[u8]) -> Cow<'_, OsStr> {
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     {
         Cow::Borrowed(OsStr::from_bytes(bytes))
     }
-    #[cfg(windows)]
+    #[cfg(not(unix))]
     {
         match std::str::from_utf8(bytes) {
             Ok(s) => Cow::Borrowed(OsStr::new(s)),
