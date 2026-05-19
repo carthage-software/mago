@@ -102,7 +102,7 @@ MAGO_ALLOW_UNSUPPORTED_PHP_VERSION=true mago lint
 
 ### `MAGO_NO_VERSION_CHECK`
 
-Overrides `no-version-check`. Set to `true` to silence the warning emitted when the installed binary drifts from the version pinned in `mago.toml`. Major-version drift remains fatal regardless of this variable: the whole point of a major pin is to stop runs across incompatible config schemas.
+Overrides `no-version-check`. Set to `true` to bypass the version-drift check entirely, silencing the warning (or skipping the failure) emitted when the installed binary drifts from the version pinned in `mago.toml`. Major-version drift remains fatal regardless of this variable: the whole point of a major pin is to stop runs across incompatible config schemas.
 
 ```sh
 MAGO_NO_VERSION_CHECK=true mago lint

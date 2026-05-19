@@ -288,11 +288,21 @@ fn check_project_version(configuration: &Configuration) -> Result<(), Error> {
             Err(Error::ProjectMajorVersionMismatch(pin.to_string(), VERSION.to_string()))
         }
         VersionCheck::MinorDrift | VersionCheck::PatchDrift => {
-            if !configuration.no_version_check {
-                tracing::warn!("mago.toml is pinned to `{pin}` but the installed mago binary is `{VERSION}`.");
-                tracing::warn!("Run `mago self-update --to-project-version` to sync.");
-                tracing::warn!("Pass `--no-version-check` or set `MAGO_NO_VERSION_CHECK=1` to silence this warning.");
+            if configuration.no_version_check {
+                return Ok(());
             }
+
+            if result.is_fatal(configuration.version_drift_fail_level) {
+                tracing::error!("mago.toml is pinned to `{pin}` but the installed mago binary is `{VERSION}`.");
+                tracing::error!("Run `mago self-update --to-project-version` to sync.");
+                tracing::error!("Pass `--no-version-check` or set `MAGO_NO_VERSION_CHECK=1` to bypass this check.");
+
+                return Err(Error::ProjectVersionMismatch(pin.to_string(), VERSION.to_string()));
+            }
+
+            tracing::warn!("mago.toml is pinned to `{pin}` but the installed mago binary is `{VERSION}`.");
+            tracing::warn!("Run `mago self-update --to-project-version` to sync.");
+            tracing::warn!("Pass `--no-version-check` or set `MAGO_NO_VERSION_CHECK=1` to silence this warning.");
 
             Ok(())
         }

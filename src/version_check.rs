@@ -21,6 +21,10 @@
 //! No `[metadata] version = ...`, no renaming, no upgrading to an object.
 //! Ever.
 
+use schemars::JsonSchema;
+use serde::Deserialize;
+use serde::Serialize;
+
 /// Outcome of comparing a project version pin against the installed binary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VersionCheck {
@@ -32,6 +36,44 @@ pub enum VersionCheck {
     MinorDrift,
     /// The major component differs. Always fatal.
     MajorDrift,
+}
+
+/// The smallest version-pin drift that aborts the run.
+///
+/// Major drift is always fatal regardless of this setting; it only widens the
+/// failure to also cover minor or (with `Patch`) patch drift. Configured via
+/// `version-drift-fail-level` in `mago.toml`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum VersionDriftFailLevel {
+    /// Fail only on a major-version drift. This is the default and matches
+    /// mago's long-standing behavior.
+    #[default]
+    Major,
+    /// Fail on a minor-version drift, as well as on major drift. Patch drift
+    /// still only warns.
+    Minor,
+    /// Fail on any drift, down to the patch version.
+    Patch,
+}
+
+impl VersionCheck {
+    /// Whether this drift outcome should abort the run, given the configured
+    /// failure threshold.
+    ///
+    /// Major drift is always fatal. Minor drift is fatal at the `Minor` or
+    /// `Patch` threshold; patch drift only at `Patch`.
+    #[must_use]
+    pub fn is_fatal(self, fail_level: VersionDriftFailLevel) -> bool {
+        match self {
+            VersionCheck::Match => false,
+            VersionCheck::MajorDrift => true,
+            VersionCheck::MinorDrift => {
+                matches!(fail_level, VersionDriftFailLevel::Minor | VersionDriftFailLevel::Patch)
+            }
+            VersionCheck::PatchDrift => matches!(fail_level, VersionDriftFailLevel::Patch),
+        }
+    }
 }
 
 /// A parsed `version = "..."` pin from `mago.toml`.
@@ -318,5 +360,37 @@ mod tests {
         let pin = VersionPin::parse("1.19").unwrap();
         assert_eq!(pin.check("1.19.0-rc1").unwrap(), VersionCheck::Match);
         assert_eq!(pin.check("1.19.0+build.42").unwrap(), VersionCheck::Match);
+    }
+
+    #[test]
+    fn default_fail_level_is_major() {
+        assert_eq!(VersionDriftFailLevel::default(), VersionDriftFailLevel::Major);
+    }
+
+    #[test]
+    fn match_is_never_fatal() {
+        assert!(!VersionCheck::Match.is_fatal(VersionDriftFailLevel::Major));
+        assert!(!VersionCheck::Match.is_fatal(VersionDriftFailLevel::Patch));
+    }
+
+    #[test]
+    fn major_drift_is_fatal_at_every_level() {
+        assert!(VersionCheck::MajorDrift.is_fatal(VersionDriftFailLevel::Major));
+        assert!(VersionCheck::MajorDrift.is_fatal(VersionDriftFailLevel::Minor));
+        assert!(VersionCheck::MajorDrift.is_fatal(VersionDriftFailLevel::Patch));
+    }
+
+    #[test]
+    fn minor_drift_is_fatal_from_the_minor_level() {
+        assert!(!VersionCheck::MinorDrift.is_fatal(VersionDriftFailLevel::Major));
+        assert!(VersionCheck::MinorDrift.is_fatal(VersionDriftFailLevel::Minor));
+        assert!(VersionCheck::MinorDrift.is_fatal(VersionDriftFailLevel::Patch));
+    }
+
+    #[test]
+    fn patch_drift_is_fatal_only_at_the_patch_level() {
+        assert!(!VersionCheck::PatchDrift.is_fatal(VersionDriftFailLevel::Major));
+        assert!(!VersionCheck::PatchDrift.is_fatal(VersionDriftFailLevel::Minor));
+        assert!(VersionCheck::PatchDrift.is_fatal(VersionDriftFailLevel::Patch));
     }
 }

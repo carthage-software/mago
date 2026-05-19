@@ -264,6 +264,13 @@ pub enum Error {
     /// Fields are: pinned version string, installed version string.
     ProjectMajorVersionMismatch(String, String),
 
+    /// The installed mago binary drifts from the `version` pinned in
+    /// `mago.toml` at or beyond the configured `version-drift-fail-level`,
+    /// escalating a minor or patch drift to a hard failure.
+    ///
+    /// Fields are: pinned version string, installed version string.
+    ProjectVersionMismatch(String, String),
+
     /// The `self-update --to-project-version` flag was used, but the current
     /// `mago.toml` does not set a `version` pin.
     NoPinnedProjectVersion,
@@ -357,6 +364,9 @@ impl std::fmt::Display for Error {
                     f,
                     "mago.toml is pinned to major version `{pinned}`, but the installed mago binary is `{installed}`"
                 )
+            }
+            Self::ProjectVersionMismatch(pinned, installed) => {
+                write!(f, "mago.toml is pinned to `{pinned}`, but the installed mago binary is `{installed}`")
             }
             Self::NoPinnedProjectVersion => {
                 write!(f, "`self-update --to-project-version` requires a `version` pin in mago.toml")

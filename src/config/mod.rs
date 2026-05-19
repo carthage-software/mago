@@ -104,6 +104,7 @@ use crate::config::parser::ParserConfiguration;
 use crate::config::source::SourceConfiguration;
 use crate::consts::*;
 use crate::error::Error;
+use crate::version_check::VersionDriftFailLevel;
 
 pub mod analyzer;
 pub mod formatter;
@@ -240,6 +241,21 @@ pub struct Configuration {
     /// `--no-version-check` CLI flag.
     #[serde(default)]
     pub no_version_check: bool,
+
+    /// The version-pin drift level at which Mago aborts the run.
+    ///
+    /// When `mago.toml` pins a `version` and the installed binary drifts from
+    /// it, this decides whether Mago warns or fails:
+    ///
+    /// - `major` (default): only a major drift fails; minor / patch drift warns.
+    /// - `minor`: a minor or major drift fails; patch drift warns.
+    /// - `patch`: any drift fails.
+    ///
+    /// A major drift is always fatal regardless of this setting.
+    /// `--no-version-check` / `MAGO_NO_VERSION_CHECK` bypasses the check
+    /// entirely, including a failure configured here.
+    #[serde(default)]
+    pub version_drift_fail_level: VersionDriftFailLevel,
 
     /// Source discovery and workspace configuration.
     ///
@@ -582,6 +598,7 @@ impl Configuration {
             php_version: DEFAULT_PHP_VERSION,
             allow_unsupported_php_version: false,
             no_version_check: false,
+            version_drift_fail_level: VersionDriftFailLevel::Major,
             source: SourceConfiguration::from_workspace(workspace),
             linter: LinterConfiguration::default(),
             parser: ParserConfiguration::default(),
@@ -609,6 +626,7 @@ impl Configuration {
             "php-version": self.php_version,
             "allow-unsupported-php-version": self.allow_unsupported_php_version,
             "no-version-check": self.no_version_check,
+            "version-drift-fail-level": self.version_drift_fail_level,
             "source": self.source,
             "linter": self.linter.to_filtered_value(self.php_version),
             "parser": self.parser,
