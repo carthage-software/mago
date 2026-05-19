@@ -608,8 +608,9 @@ mago analyze --retain-code invalid-argument --retain-code type-mismatch
 <p>Flags for managing baseline files. The full guide is on the <a href="../../../../main/en/fundamentals/baseline">baseline page</a>.</p>
 <table><thead><tr><th style="text-align: left">Flag</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>--generate-baseline</code></td><td style="text-align: left">Generate a new baseline file capturing every current issue.</td></tr>
+<tr><td style="text-align: left"><code>--remove-outdated-baseline-entries</code></td><td style="text-align: left">Remove baseline entries that no longer match an issue, without adding new ones.</td></tr>
 <tr><td style="text-align: left"><code>--baseline &lt;PATH&gt;</code></td><td style="text-align: left">Use the baseline at the given path.</td></tr>
-<tr><td style="text-align: left"><code>--backup-baseline</code></td><td style="text-align: left">When regenerating, copy the old baseline to <code>&lt;file&gt;.bkp</code> before overwriting.</td></tr>
+<tr><td style="text-align: left"><code>--backup-baseline</code></td><td style="text-align: left">When regenerating or pruning, copy the old baseline to <code>&lt;file&gt;.bkp</code> before overwriting.</td></tr>
 <tr><td style="text-align: left"><code>--ignore-baseline</code></td><td style="text-align: left">Ignore any configured or specified baseline and report every issue.</td></tr>
 </tbody></table>
 

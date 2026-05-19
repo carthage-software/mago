@@ -635,10 +635,15 @@ mago analyze --ignore-baseline
 </code></pre>
 <p>Utile quand vous voulez voir les problèmes actuellement supprimés par la baseline, par exemple pour en nettoyer une partie.</p>
 <h2 id="keeping-the-baseline-tidy">Garder la baseline propre</h2>
-<p>Quand vous corrigez un problème faisant partie de la baseline, son entrée devient obsolète. Mago détecte cela et signale les entrées obsolètes. Régénérez pour nettoyer :</p>
+<p>Quand vous corrigez un problème faisant partie de la baseline, son entrée devient obsolète. Mago détecte cela et signale les entrées obsolètes.</p>
+<p>Pour ne supprimer que les entrées obsolètes, lancez :</p>
+<pre><code class="language-sh">mago lint --remove-outdated-baseline-entries --baseline lint-baseline.toml
+</code></pre>
+<p>Cela réécrit la baseline en retirant les entrées obsolètes. Contrairement à <code>--generate-baseline</code>, cette commande n'ajoute jamais de nouvelle entrée : les problèmes introduits depuis la création de la baseline restent signalés au lieu d'être supprimés silencieusement. Vous pouvez donc l'utiliser sans risque pendant que vous corrigez les problèmes existants.</p>
+<p>Pour reconstruire entièrement la baseline en capturant chaque problème courant :</p>
 <pre><code class="language-sh">mago lint --generate-baseline --baseline lint-baseline.toml
 </code></pre>
-<p>Passez <code>--backup-baseline</code> pour conserver le fichier précédent sous <code>lint-baseline.toml.bkp</code> avant écrasement.</p>
+<p>Passez <code>--backup-baseline</code> avec l'une ou l'autre commande pour conserver le fichier précédent sous <code>lint-baseline.toml.bkp</code> avant écrasement.</p>
 <h2 id="json-schema">JSON Schema</h2>
 <p>Si vous construisez de l'outillage ou une intégration IDE qui doit analyser ou générer des fichiers de baseline, récupérez le schéma :</p>
 <pre><code class="language-sh">mago config --schema --show baseline

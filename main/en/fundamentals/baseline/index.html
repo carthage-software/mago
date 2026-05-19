@@ -633,10 +633,15 @@ mago analyze --ignore-baseline
 </code></pre>
 <p>Useful when you want to see issues currently suppressed by the baseline, for example to clean some of them up.</p>
 <h2 id="keeping-the-baseline-tidy">Keeping the baseline tidy</h2>
-<p>When you fix an issue that was part of the baseline, its entry becomes dead. Mago detects this and warns about stale entries. Regenerate to clean up:</p>
+<p>When you fix an issue that was part of the baseline, its entry becomes dead. Mago detects this and warns about stale entries.</p>
+<p>To prune just the dead entries, run:</p>
+<pre><code class="language-sh">mago lint --remove-outdated-baseline-entries --baseline lint-baseline.toml
+</code></pre>
+<p>This rewrites the baseline with stale entries removed. Unlike <code>--generate-baseline</code>, it never adds new entries, so issues introduced since the baseline was created stay reportable instead of being silently suppressed. That makes it safe to run while you are working through existing issues.</p>
+<p>To rebuild the baseline from scratch instead, capturing every current issue:</p>
 <pre><code class="language-sh">mago lint --generate-baseline --baseline lint-baseline.toml
 </code></pre>
-<p>Pass <code>--backup-baseline</code> to keep the previous file as <code>lint-baseline.toml.bkp</code> before overwriting.</p>
+<p>Pass <code>--backup-baseline</code> with either command to keep the previous file as <code>lint-baseline.toml.bkp</code> before overwriting.</p>
 <h2 id="json-schema">JSON Schema</h2>
 <p>If you build tooling or IDE integration that needs to parse or generate baseline files, get the schema:</p>
 <pre><code class="language-sh">mago config --schema --show baseline

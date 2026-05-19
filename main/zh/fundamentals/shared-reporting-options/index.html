@@ -637,8 +637,9 @@ mago analyze --retain-code invalid-argument --retain-code type-mismatch
 <p>用于管理 baseline 文件的参数。完整指南在 <a href="../../../../main/zh/fundamentals/baseline">baseline 页面</a>。</p>
 <table><thead><tr><th style="text-align: left">参数</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>--generate-baseline</code></td><td style="text-align: left">生成一份新的 baseline 文件,记录当前所有问题。</td></tr>
+<tr><td style="text-align: left"><code>--remove-outdated-baseline-entries</code></td><td style="text-align: left">移除 baseline 中不再匹配任何问题的条目,且不添加新条目。</td></tr>
 <tr><td style="text-align: left"><code>--baseline &lt;PATH&gt;</code></td><td style="text-align: left">使用给定路径的 baseline。</td></tr>
-<tr><td style="text-align: left"><code>--backup-baseline</code></td><td style="text-align: left">重新生成时,在覆盖前把旧 baseline 复制为 <code>&lt;file&gt;.bkp</code>。</td></tr>
+<tr><td style="text-align: left"><code>--backup-baseline</code></td><td style="text-align: left">重新生成或清理时,在覆盖前把旧 baseline 复制为 <code>&lt;file&gt;.bkp</code>。</td></tr>
 <tr><td style="text-align: left"><code>--ignore-baseline</code></td><td style="text-align: left">忽略任何已配置或指定的 baseline,报告所有问题。</td></tr>
 </tbody></table>
 

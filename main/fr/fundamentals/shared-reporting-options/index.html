@@ -610,8 +610,9 @@ mago analyze --retain-code invalid-argument --retain-code type-mismatch
 <p>Drapeaux pour la gestion des fichiers baseline. Le guide complet se trouve sur la <a href="../../../../main/fr/fundamentals/baseline">page baseline</a>.</p>
 <table><thead><tr><th style="text-align: left">Drapeau</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>--generate-baseline</code></td><td style="text-align: left">Génère un nouveau fichier baseline capturant chaque problème courant.</td></tr>
+<tr><td style="text-align: left"><code>--remove-outdated-baseline-entries</code></td><td style="text-align: left">Supprime les entrées de la baseline qui ne correspondent plus à un problème, sans en ajouter de nouvelles.</td></tr>
 <tr><td style="text-align: left"><code>--baseline &lt;PATH&gt;</code></td><td style="text-align: left">Utilise la baseline au chemin donné.</td></tr>
-<tr><td style="text-align: left"><code>--backup-baseline</code></td><td style="text-align: left">À la régénération, copie l'ancienne baseline dans <code>&lt;file&gt;.bkp</code> avant écrasement.</td></tr>
+<tr><td style="text-align: left"><code>--backup-baseline</code></td><td style="text-align: left">Lors de la régénération ou de l'élagage, copie l'ancienne baseline dans <code>&lt;file&gt;.bkp</code> avant écrasement.</td></tr>
 <tr><td style="text-align: left"><code>--ignore-baseline</code></td><td style="text-align: left">Ignore toute baseline configurée ou spécifiée et signale chaque problème.</td></tr>
 </tbody></table>
 
