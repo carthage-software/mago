@@ -59,6 +59,7 @@ Utility commands:
 | [`mago list-files`](/guide/list-files/) | List the files Mago will process. |
 | [`mago generate-completions`](/guide/generate-completions/) | Print shell completion scripts. |
 | [`mago self-update`](/guide/upgrading/) | Replace the installed binary with a newer release. |
+| `mago version` | Print Mago's version. Same as `--version`. |
 
 ## Exit codes
 

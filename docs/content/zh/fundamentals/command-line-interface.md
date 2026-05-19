@@ -59,6 +59,7 @@ mago lint --colors=never        # 错误, --colors 是全局选项
 | [`mago list-files`](/guide/list-files/) | 列出 Mago 将处理的文件。 |
 | [`mago generate-completions`](/guide/generate-completions/) | 打印 shell 补全脚本。 |
 | [`mago self-update`](/guide/upgrading/) | 用更新的发行版替换已安装的二进制。 |
+| `mago version` | 打印 Mago 的版本,与 `--version` 相同。 |
 
 ## 退出码
 

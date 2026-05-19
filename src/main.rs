@@ -45,6 +45,7 @@ use std::process::ExitCode;
 use std::time::Duration;
 use std::time::Instant;
 
+use clap::CommandFactory;
 use clap::Parser;
 use tracing::Level;
 use tracing::enabled;
@@ -173,6 +174,12 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
     let arguments = CliArguments::parse();
     let clap_duration = clap_start.elapsed();
 
+    if matches!(arguments.command, MagoCommand::Version) {
+        print!("{}", CliArguments::command().render_version());
+
+        return Ok(ExitCode::SUCCESS);
+    }
+
     // Configure global color settings based on the color choice.
     // This must be done before initializing the logger or any other
     // component that uses colors.
@@ -253,6 +260,9 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         MagoCommand::LanguageServer(cmd) => cmd.execute(configuration),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
+        }
+        MagoCommand::Version => {
+            unreachable!("The version command should have been handled before this point.")
         }
     };
 

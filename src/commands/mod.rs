@@ -230,6 +230,15 @@ pub enum MagoCommand {
     #[command(name = "generate-completions")]
     GenerateCompletions(GenerateCompletionsCommand),
 
+    /// Display Mago's version.
+    ///
+    /// Prints the same output as the `--version` flag. Provided as a command so
+    /// it can be used alongside the `help` command.
+    ///
+    /// **Usage**: `mago version`
+    #[command(name = "version")]
+    Version,
+
     /// Start the Mago language server (LSP over stdio).
     #[cfg(feature = "language-server")]
     #[command(name = "language-server")]

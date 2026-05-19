@@ -59,6 +59,7 @@ Commandes utilitaires :
 | [`mago list-files`](/guide/list-files/) | Liste les fichiers que Mago va traiter. |
 | [`mago generate-completions`](/guide/generate-completions/) | Affiche les scripts de complétion shell. |
 | [`mago self-update`](/guide/upgrading/) | Remplace le binaire installé par une release plus récente. |
+| `mago version` | Affiche la version de Mago. Identique à `--version`. |
 
 ## Codes de sortie
 
