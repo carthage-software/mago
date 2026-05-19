@@ -635,7 +635,7 @@
 <pre><code class="language-sh">MAGO_ALLOW_UNSUPPORTED_PHP_VERSION=true mago lint
 </code></pre>
 <h3 id="mago-no-version-check"><code>MAGO_NO_VERSION_CHECK</code></h3>
-<p>覆盖 <code>no-version-check</code>。设为 <code>true</code> 可关闭"已安装二进制偏离 <code>mago.toml</code> 中锁定版本"的警告。无论该变量如何设置,主版本漂移仍然是致命错误:主版本锁定的全部意义在于阻止跨不兼容配置 schema 的运行。</p>
+<p>覆盖 <code>no-version-check</code>。设为 <code>true</code> 可完全跳过版本漂移检查,从而关闭"已安装二进制偏离 <code>mago.toml</code> 中锁定版本"时发出的警告(或跳过相应的失败)。无论该变量如何设置,主版本漂移仍然是致命错误:主版本锁定的全部意义在于阻止跨不兼容配置 schema 的运行。</p>
 <pre><code class="language-sh">MAGO_NO_VERSION_CHECK=true mago lint
 </code></pre>
 

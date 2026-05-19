@@ -47,6 +47,11 @@
       "type": "boolean",
       "default": false
     },
+    "version-drift-fail-level": {
+      "description": "The version-pin drift level at which Mago aborts the run.\n\nWhen `mago.toml` pins a `version` and the installed binary drifts from\nit, this decides whether Mago warns or fails:\n\n- `major` (default): only a major drift fails; minor / patch drift warns.\n- `minor`: a minor or major drift fails; patch drift warns.\n- `patch`: any drift fails.\n\nA major drift is always fatal regardless of this setting.\n`--no-version-check` / `MAGO_NO_VERSION_CHECK` bypasses the check\nentirely, including a failure configured here.",
+      "$ref": "#/$defs/VersionDriftFailLevel",
+      "default": "major"
+    },
     "source": {
       "description": "Source discovery and workspace configuration.\n\nDefines the workspace root, source paths to scan, and exclusion patterns.\nThis configuration determines which PHP files are loaded into the database\nfor analysis, linting, or formatting.",
       "$ref": "#/$defs/SourceConfiguration",
@@ -983,6 +988,26 @@
     "PHPVersion": {
       "description": "Represents a PHP version in `(major, minor, patch)` format,\npacked internally into a single `u32` for easy comparison.\n\n# Examples\n\n```\nuse mago_php_version::PHPVersion;\n\nlet version = PHPVersion::new(8, 4, 0);\nassert_eq!(version.major(), 8);\nassert_eq!(version.minor(), 4);\nassert_eq!(version.patch(), 0);\nassert_eq!(version.to_version_id(), 0x08_04_00);\nassert_eq!(version.to_string(), \"8.4.0\");\n```",
       "type": "string"
+    },
+    "VersionDriftFailLevel": {
+      "description": "The smallest version-pin drift that aborts the run.\n\nMajor drift is always fatal regardless of this setting; it only widens the\nfailure to also cover minor or (with `Patch`) patch drift. Configured via\n`version-drift-fail-level` in `mago.toml`.",
+      "oneOf": [
+        {
+          "description": "Fail only on a major-version drift. This is the default and matches\nmago's long-standing behavior.",
+          "type": "string",
+          "const": "major"
+        },
+        {
+          "description": "Fail on a minor-version drift, as well as on major drift. Patch drift\nstill only warns.",
+          "type": "string",
+          "const": "minor"
+        },
+        {
+          "description": "Fail on any drift, down to the patch version.",
+          "type": "string",
+          "const": "patch"
+        }
+      ]
     },
     "SourceConfiguration": {
       "description": "Configuration options for source discovery.",

@@ -606,7 +606,7 @@
 <pre><code class="language-sh">MAGO_ALLOW_UNSUPPORTED_PHP_VERSION=true mago lint
 </code></pre>
 <h3 id="mago-no-version-check"><code>MAGO_NO_VERSION_CHECK</code></h3>
-<p>Overrides <code>no-version-check</code>. Set to <code>true</code> to silence the warning emitted when the installed binary drifts from the version pinned in <code>mago.toml</code>. Major-version drift remains fatal regardless of this variable: the whole point of a major pin is to stop runs across incompatible config schemas.</p>
+<p>Overrides <code>no-version-check</code>. Set to <code>true</code> to bypass the version-drift check entirely, silencing the warning (or skipping the failure) emitted when the installed binary drifts from the version pinned in <code>mago.toml</code>. Major-version drift remains fatal regardless of this variable: the whole point of a major pin is to stop runs across incompatible config schemas.</p>
 <pre><code class="language-sh">MAGO_NO_VERSION_CHECK=true mago lint
 </code></pre>
 
