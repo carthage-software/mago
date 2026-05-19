@@ -616,8 +616,13 @@ sudo mv "mago-${VERSION}-${TARGET}/mago" /usr/local/bin/
 <pre><code class="language-sh">brew install mago
 mago self-update
 </code></pre>
+<h3 id="winget">WinGet</h3>
+<p>For Windows. The WinGet package can lag behind the GitHub release, so update the installed binary afterwards.</p>
+<pre><code class="language-powershell">winget install CarthageSoftware.Mago
+mago self-update
+</code></pre>
 <h3 id="cargo">Cargo</h3>
-<p>Crates.io publishing can lag a few hours behind a release. Same pattern as Homebrew.</p>
+<p>Crates.io publishing can lag a few hours behind a release. Same pattern as Homebrew, and WinGet.</p>
 <pre><code class="language-sh">cargo install mago
 mago self-update
 </code></pre>
@@ -691,6 +696,10 @@ curl --proto '=https' --tlsv1.2 -sSf \
     
     <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#homebrew">Homebrew</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#winget">WinGet</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">

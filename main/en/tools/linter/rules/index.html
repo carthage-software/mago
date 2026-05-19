@@ -552,8 +552,8 @@
 
   <main id="content" class="doc-content">
     <article class="doc-page">
-      <p>Mago's linter ships 176 rules across 9 categories. Click any rule to expand its description, requirements, default configuration, and examples.</p>
-<div class="rule-index" role="navigation" aria-label="Rule categories"><a class="rule-index__item" href="#clarity"><span class="rule-index__name">Clarity</span><span class="rule-index__count">22 rules</span><span class="rule-index__blurb">Rules that make intent explicit and reduce reader effort. They flag patterns that are technically valid but obscure what the code is doing.</span></a><a class="rule-index__item" href="#bestpractices"><span class="rule-index__name">Best practices</span><span class="rule-index__count">40 rules</span><span class="rule-index__blurb">Idiomatic PHP patterns and widely-accepted conventions. These rules nudge code toward the way modern PHP is written by people who've shipped a lot of it.</span></a><a class="rule-index__item" href="#consistency"><span class="rule-index__name">Consistency</span><span class="rule-index__count">27 rules</span><span class="rule-index__blurb">Stylistic uniformity across a codebase. Pick one way to do a thing, these rules help everyone stick to it.</span></a><a class="rule-index__item" href="#deprecation"><span class="rule-index__name">Deprecation</span><span class="rule-index__count">7 rules</span><span class="rule-index__blurb">PHP features and APIs that have been deprecated upstream and will eventually be removed. Migrate before they break.</span></a><a class="rule-index__item" href="#maintainability"><span class="rule-index__name">Maintainability</span><span class="rule-index__count">11 rules</span><span class="rule-index__blurb">Code that is hard to keep alive over time, too complex, too tangled, too fragile. These rules surface the cost early.</span></a><a class="rule-index__item" href="#redundancy"><span class="rule-index__name">Redundancy</span><span class="rule-index__count">29 rules</span><span class="rule-index__blurb">Dead code, unused values, and constructs that have no observable effect. Trimming them keeps the codebase honest.</span></a><a class="rule-index__item" href="#security"><span class="rule-index__name">Security</span><span class="rule-index__count">12 rules</span><span class="rule-index__blurb">Rules that flag security vulnerabilities, injection vectors, unsafe deserialisation, untrusted input flowing into dangerous sinks.</span></a><a class="rule-index__item" href="#safety"><span class="rule-index__name">Safety</span><span class="rule-index__count">9 rules</span><span class="rule-index__blurb">Patterns that compile but blow up at runtime. These rules catch the foot-guns before users do.</span></a><a class="rule-index__item" href="#correctness"><span class="rule-index__name">Correctness</span><span class="rule-index__count">19 rules</span><span class="rule-index__blurb">Bugs and logic errors. Rules in this category catch code that does something the author probably did not intend.</span></a></div>
+      <p>Mago's linter ships 181 rules across 9 categories. Click any rule to expand its description, requirements, default configuration, and examples.</p>
+<div class="rule-index" role="navigation" aria-label="Rule categories"><a class="rule-index__item" href="#clarity"><span class="rule-index__name">Clarity</span><span class="rule-index__count">22 rules</span><span class="rule-index__blurb">Rules that make intent explicit and reduce reader effort. They flag patterns that are technically valid but obscure what the code is doing.</span></a><a class="rule-index__item" href="#bestpractices"><span class="rule-index__name">Best practices</span><span class="rule-index__count">45 rules</span><span class="rule-index__blurb">Idiomatic PHP patterns and widely-accepted conventions. These rules nudge code toward the way modern PHP is written by people who've shipped a lot of it.</span></a><a class="rule-index__item" href="#consistency"><span class="rule-index__name">Consistency</span><span class="rule-index__count">27 rules</span><span class="rule-index__blurb">Stylistic uniformity across a codebase. Pick one way to do a thing, these rules help everyone stick to it.</span></a><a class="rule-index__item" href="#deprecation"><span class="rule-index__name">Deprecation</span><span class="rule-index__count">7 rules</span><span class="rule-index__blurb">PHP features and APIs that have been deprecated upstream and will eventually be removed. Migrate before they break.</span></a><a class="rule-index__item" href="#maintainability"><span class="rule-index__name">Maintainability</span><span class="rule-index__count">11 rules</span><span class="rule-index__blurb">Code that is hard to keep alive over time, too complex, too tangled, too fragile. These rules surface the cost early.</span></a><a class="rule-index__item" href="#redundancy"><span class="rule-index__name">Redundancy</span><span class="rule-index__count">29 rules</span><span class="rule-index__blurb">Dead code, unused values, and constructs that have no observable effect. Trimming them keeps the codebase honest.</span></a><a class="rule-index__item" href="#security"><span class="rule-index__name">Security</span><span class="rule-index__count">12 rules</span><span class="rule-index__blurb">Rules that flag security vulnerabilities, injection vectors, unsafe deserialisation, untrusted input flowing into dangerous sinks.</span></a><a class="rule-index__item" href="#safety"><span class="rule-index__name">Safety</span><span class="rule-index__count">9 rules</span><span class="rule-index__blurb">Patterns that compile but blow up at runtime. These rules catch the foot-guns before users do.</span></a><a class="rule-index__item" href="#correctness"><span class="rule-index__name">Correctness</span><span class="rule-index__count">19 rules</span><span class="rule-index__blurb">Bugs and logic errors. Rules in this category catch code that does something the author probably did not intend.</span></a></div>
 <h2 id="integration-specific-rules">Integration-specific rules</h2>
 <p>Some rules only fire when Mago detects a particular library or framework. Each rule is linked to its full description in the section above.</p>
 <h3 id="integration-cakephp">CakePHP</h3>
@@ -564,8 +564,13 @@
 <ul>
 <li><a href="#final-controller"><code>final-controller</code></a></li>
 <li><a href="#middleware-in-routes"><code>middleware-in-routes</code></a></li>
+<li><a href="#no-implicit-model-query"><code>no-implicit-model-query</code></a></li>
 <li><a href="#no-request-all"><code>no-request-all</code></a></li>
 <li><a href="#prefer-anonymous-migration"><code>prefer-anonymous-migration</code></a></li>
+<li><a href="#prefer-array-validation-rules"><code>prefer-array-validation-rules</code></a></li>
+<li><a href="#prefer-casts-method"><code>prefer-casts-method</code></a></li>
+<li><a href="#prefer-dedicated-status-assertion"><code>prefer-dedicated-status-assertion</code></a></li>
+<li><a href="#prefer-fake-helper"><code>prefer-fake-helper</code></a></li>
 <li><a href="#prefer-view-array"><code>prefer-view-array</code></a></li>
 </ul>
 <h3 id="integration-phpunit">PHPUnit</h3>
@@ -2547,6 +2552,201 @@ $wp_filesystem-&gt;put_contents( '/path/to/my-file.txt', 'data' );
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>enabled</code></td><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>true</code></td></tr>
 <tr><td style="text-align: left"><code>level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"warning"</code></td></tr>
+</tbody></table>
+</div>
+</details>
+<details class="rule" name="rule" id="no-implicit-model-query">
+<summary><code class="rule__code">no-implicit-model-query</code><a class="rule__anchor" href="#no-implicit-model-query" aria-label="Permalink to no-implicit-model-query">¶</a><span class="rule__level rule__level--note">note</span></summary>
+<div class="rule__body">
+<p>Detects query-builder methods (<code>where</code>, <code>orderBy</code>, <code>with</code>, ...) called statically on an
+Eloquent model. Such calls are forwarded to a new query through <code>__callStatic</code>. Starting
+the chain with an explicit <code>query()</code> makes the query obvious and improves IDE support.</p>
+<blockquote class="rule-requirement">This rule requires the <a href="#integration-laravel"><code>Laravel</code></a> integration to be enabled.</blockquote>
+<hr class="rule__separator">
+<div class="rule-examples">
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">Avoid</div>
+<pre><code class="language-php">&lt;?php
+
+$users = User::where('is_active', true)-&gt;get();
+</code></pre>
+</div>
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">Prefer</div>
+<pre><code class="language-php">&lt;?php
+
+$users = User::query()-&gt;where('is_active', true)-&gt;get();
+</code></pre>
+</div>
+</div>
+<hr class="rule__separator">
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>enabled</code></td><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>true</code></td></tr>
+<tr><td style="text-align: left"><code>level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"note"</code></td></tr>
+</tbody></table>
+</div>
+</details>
+<details class="rule" name="rule" id="prefer-array-validation-rules">
+<summary><code class="rule__code">prefer-array-validation-rules</code><a class="rule__anchor" href="#prefer-array-validation-rules" aria-label="Permalink to prefer-array-validation-rules">¶</a><span class="rule__level rule__level--note">note</span></summary>
+<div class="rule__body">
+<p>Detects <code>|</code>-delimited validation rule strings in a <code>rules()</code> method. Expressing the rules
+as an array keeps a consistent structure and avoids ambiguity when a rule value itself
+contains a <code>|</code>, such as a <code>regex</code> pattern.</p>
+<blockquote class="rule-requirement">This rule requires the <a href="#integration-laravel"><code>Laravel</code></a> integration to be enabled.</blockquote>
+<hr class="rule__separator">
+<div class="rule-examples">
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">Avoid</div>
+<pre><code class="language-php">&lt;?php
+
+class StoreUserRequest
+{
+    public function rules(): array
+    {
+        return [
+            'name' =&gt; 'required|string|max:255',
+        ];
+    }
+}
+</code></pre>
+</div>
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">Prefer</div>
+<pre><code class="language-php">&lt;?php
+
+class StoreUserRequest
+{
+    public function rules(): array
+    {
+        return [
+            'name' =&gt; ['required', 'string', 'max:255'],
+        ];
+    }
+}
+</code></pre>
+</div>
+</div>
+<hr class="rule__separator">
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>enabled</code></td><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>true</code></td></tr>
+<tr><td style="text-align: left"><code>level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"note"</code></td></tr>
+</tbody></table>
+</div>
+</details>
+<details class="rule" name="rule" id="prefer-casts-method">
+<summary><code class="rule__code">prefer-casts-method</code><a class="rule__anchor" href="#prefer-casts-method" aria-label="Permalink to prefer-casts-method">¶</a><span class="rule__level rule__level--note">note</span></summary>
+<div class="rule__body">
+<p>Detects the <code>$casts</code> property on an Eloquent model. Laravel 11 introduced the <code>casts()</code>
+method as the modern way to declare attribute casts, allowing the cast values to be
+expressed with code (such as enum or class references) rather than a static array.</p>
+<blockquote class="rule-requirement">This rule requires the <a href="#integration-laravel"><code>Laravel</code></a> integration to be enabled.</blockquote>
+<hr class="rule__separator">
+<div class="rule-examples">
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">Avoid</div>
+<pre><code class="language-php">&lt;?php
+
+class User
+{
+    protected $casts = [
+        'is_admin' =&gt; 'boolean',
+    ];
+}
+</code></pre>
+</div>
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">Prefer</div>
+<pre><code class="language-php">&lt;?php
+
+class User
+{
+    protected function casts(): array
+    {
+        return [
+            'is_admin' =&gt; 'boolean',
+        ];
+    }
+}
+</code></pre>
+</div>
+</div>
+<hr class="rule__separator">
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>enabled</code></td><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>true</code></td></tr>
+<tr><td style="text-align: left"><code>level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"note"</code></td></tr>
+</tbody></table>
+</div>
+</details>
+<details class="rule" name="rule" id="prefer-dedicated-status-assertion">
+<summary><code class="rule__code">prefer-dedicated-status-assertion</code><a class="rule__anchor" href="#prefer-dedicated-status-assertion" aria-label="Permalink to prefer-dedicated-status-assertion">¶</a><span class="rule__level rule__level--note">note</span></summary>
+<div class="rule__body">
+<p>Detects calls to <code>assertStatus()</code> with a status code that has a dedicated assertion
+method, such as <code>assertOk()</code> for <code>200</code> or <code>assertNotFound()</code> for <code>404</code>. The dedicated
+methods read better and state the expected outcome directly.</p>
+<blockquote class="rule-requirement">This rule requires the <a href="#integration-laravel"><code>Laravel</code></a> integration to be enabled.</blockquote>
+<hr class="rule__separator">
+<div class="rule-examples">
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">Avoid</div>
+<pre><code class="language-php">&lt;?php
+
+$response-&gt;assertStatus(200);
+</code></pre>
+</div>
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">Prefer</div>
+<pre><code class="language-php">&lt;?php
+
+$response-&gt;assertOk();
+</code></pre>
+</div>
+</div>
+<hr class="rule__separator">
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>enabled</code></td><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>true</code></td></tr>
+<tr><td style="text-align: left"><code>level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"note"</code></td></tr>
+</tbody></table>
+</div>
+</details>
+<details class="rule" name="rule" id="prefer-fake-helper">
+<summary><code class="rule__code">prefer-fake-helper</code><a class="rule__anchor" href="#prefer-fake-helper" aria-label="Permalink to prefer-fake-helper">¶</a><span class="rule__level rule__level--note">note</span></summary>
+<div class="rule__body">
+<p>Detects use of the <code>$this-&gt;faker</code> property inside a Laravel model factory. The global
+<code>fake()</code> helper is the modern equivalent and does not depend on the property being set.</p>
+<blockquote class="rule-requirement">This rule requires the <a href="#integration-laravel"><code>Laravel</code></a> integration to be enabled.</blockquote>
+<hr class="rule__separator">
+<div class="rule-examples">
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">Avoid</div>
+<pre><code class="language-php">&lt;?php
+
+class UserFactory
+{
+    public function definition(): array
+    {
+        return ['name' =&gt; $this-&gt;faker-&gt;name()];
+    }
+}
+</code></pre>
+</div>
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">Prefer</div>
+<pre><code class="language-php">&lt;?php
+
+class UserFactory
+{
+    public function definition(): array
+    {
+        return ['name' =&gt; fake()-&gt;name()];
+    }
+}
+</code></pre>
+</div>
+</div>
+<hr class="rule__separator">
+<table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>enabled</code></td><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>true</code></td></tr>
+<tr><td style="text-align: left"><code>level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"note"</code></td></tr>
 </tbody></table>
 </div>
 </details>
