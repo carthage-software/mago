@@ -278,6 +278,14 @@ pub struct BaselineIssueProcessor {
     /// the baseline is out of sync. Requires `baseline_path` to be set.
     pub verify_baseline: bool,
 
+    /// Remove outdated entries from the baseline file without adding new ones.
+    ///
+    /// When `true`, instead of processing issues normally, the baseline file is
+    /// rewritten with stale entries removed. Entries for issues that no longer
+    /// exist are dropped, while issues introduced since the baseline was created
+    /// are left unsuppressed. Requires `baseline_path` to be set.
+    pub remove_outdated_baseline_entries: bool,
+
     /// Fail even when only the baseline is out of sync.
     ///
     /// Normally, if there are no new issues to report, the command succeeds even
@@ -708,6 +716,13 @@ impl BaselineIssueProcessor {
                 return Ok((if success { ExitCode::SUCCESS } else { ExitCode::FAILURE }, Vec::new()));
             }
 
+            if self.remove_outdated_baseline_entries {
+                let read_database = database.read_only();
+                self.remove_outdated_baseline_entries(baseline_path, &read_database, issues)?;
+
+                return Ok((ExitCode::SUCCESS, Vec::new()));
+            }
+
             self.get_baseline(Some(baseline_path))
         } else {
             if !self.validate_baseline_parameters() {
@@ -885,6 +900,51 @@ impl BaselineIssueProcessor {
         }
     }
 
+    /// Removes outdated entries from an existing baseline file.
+    fn remove_outdated_baseline_entries(
+        &self,
+        baseline_path: &Path,
+        read_database: &ReadDatabase,
+        issues: IssueCollection,
+    ) -> Result<(), Error> {
+        if !baseline_path.exists() {
+            tracing::warn!(
+                "Baseline file `{}` does not exist; there are no outdated entries to remove.",
+                baseline_path.display()
+            );
+
+            return Ok(());
+        }
+
+        tracing::info!("Removing outdated entries from baseline file at `{}`...", baseline_path.display());
+
+        let (baseline, needs_warning) = unserialize_baseline(baseline_path)?;
+        if needs_warning {
+            tracing::warn!(
+                "Baseline file does not specify a variant, assuming 'strict'. \
+                 Regenerate the baseline with `--generate-baseline` to update the format."
+            );
+        }
+
+        let (pruned_baseline, removed_count) = baseline.prune_outdated_entries(&issues, read_database);
+
+        if removed_count == 0 {
+            tracing::info!("No outdated entries found; the baseline file is already up to date.");
+
+            return Ok(());
+        }
+
+        baseline::serialize_baseline(baseline_path, &pruned_baseline, self.backup_baseline)?;
+
+        let noun = if removed_count == 1 { "entry" } else { "entries" };
+        tracing::info!(
+            "Removed {removed_count} outdated {noun} from the baseline file at `{}`.",
+            baseline_path.display()
+        );
+
+        Ok(())
+    }
+
     /// Validates that baseline-related flags are consistent with the absence of a baseline path.
     ///
     /// This method checks whether baseline operations were requested (`generate_baseline`,
@@ -912,6 +972,12 @@ impl BaselineIssueProcessor {
         } else if self.verify_baseline {
             tracing::warn!("Cannot verify baseline file because no baseline path was specified.");
             tracing::warn!("Use the `--baseline <PATH>` option to specify the baseline file to verify.");
+            tracing::warn!("Or set a default baseline path in the configuration file.");
+
+            false
+        } else if self.remove_outdated_baseline_entries {
+            tracing::warn!("Cannot remove outdated baseline entries because no baseline path was specified.");
+            tracing::warn!("Use the `--baseline <PATH>` option to specify the baseline file to update.");
             tracing::warn!("Or set a default baseline path in the configuration file.");
 
             false

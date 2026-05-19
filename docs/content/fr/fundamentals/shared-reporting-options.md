@@ -78,6 +78,7 @@ Drapeaux pour la gestion des fichiers baseline. Le guide complet se trouve sur l
 | Drapeau | Description |
 | :--- | :--- |
 | `--generate-baseline` | Génère un nouveau fichier baseline capturant chaque problème courant. |
+| `--remove-outdated-baseline-entries` | Supprime les entrées de la baseline qui ne correspondent plus à un problème, sans en ajouter de nouvelles. |
 | `--baseline <PATH>` | Utilise la baseline au chemin donné. |
-| `--backup-baseline` | À la régénération, copie l'ancienne baseline dans `<file>.bkp` avant écrasement. |
+| `--backup-baseline` | Lors de la régénération ou de l'élagage, copie l'ancienne baseline dans `<file>.bkp` avant écrasement. |
 | `--ignore-baseline` | Ignore toute baseline configurée ou spécifiée et signale chaque problème. |

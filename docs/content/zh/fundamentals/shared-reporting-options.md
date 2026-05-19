@@ -78,6 +78,7 @@ mago analyze --retain-code invalid-argument --retain-code type-mismatch
 | 参数 | 说明 |
 | :--- | :--- |
 | `--generate-baseline` | 生成一份新的 baseline 文件,记录当前所有问题。 |
+| `--remove-outdated-baseline-entries` | 移除 baseline 中不再匹配任何问题的条目,且不添加新条目。 |
 | `--baseline <PATH>` | 使用给定路径的 baseline。 |
-| `--backup-baseline` | 重新生成时,在覆盖前把旧 baseline 复制为 `<file>.bkp`。 |
+| `--backup-baseline` | 重新生成或清理时,在覆盖前把旧 baseline 复制为 `<file>.bkp`。 |
 | `--ignore-baseline` | 忽略任何已配置或指定的 baseline,报告所有问题。 |

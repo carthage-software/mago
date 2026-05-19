@@ -122,13 +122,23 @@ Utile quand vous voulez voir les problèmes actuellement supprimés par la basel
 
 ## Garder la baseline propre
 
-Quand vous corrigez un problème faisant partie de la baseline, son entrée devient obsolète. Mago détecte cela et signale les entrées obsolètes. Régénérez pour nettoyer :
+Quand vous corrigez un problème faisant partie de la baseline, son entrée devient obsolète. Mago détecte cela et signale les entrées obsolètes.
+
+Pour ne supprimer que les entrées obsolètes, lancez :
+
+```sh
+mago lint --remove-outdated-baseline-entries --baseline lint-baseline.toml
+```
+
+Cela réécrit la baseline en retirant les entrées obsolètes. Contrairement à `--generate-baseline`, cette commande n'ajoute jamais de nouvelle entrée : les problèmes introduits depuis la création de la baseline restent signalés au lieu d'être supprimés silencieusement. Vous pouvez donc l'utiliser sans risque pendant que vous corrigez les problèmes existants.
+
+Pour reconstruire entièrement la baseline en capturant chaque problème courant :
 
 ```sh
 mago lint --generate-baseline --baseline lint-baseline.toml
 ```
 
-Passez `--backup-baseline` pour conserver le fichier précédent sous `lint-baseline.toml.bkp` avant écrasement.
+Passez `--backup-baseline` avec l'une ou l'autre commande pour conserver le fichier précédent sous `lint-baseline.toml.bkp` avant écrasement.
 
 ## JSON Schema
 

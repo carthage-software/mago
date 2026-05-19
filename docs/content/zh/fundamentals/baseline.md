@@ -122,13 +122,23 @@ mago analyze --ignore-baseline
 
 ## 保持 baseline 整洁
 
-当你修复了 baseline 中的某个问题后,对应条目就成了死条目。Mago 会检测到并就过期条目发出警告。重新生成以清理:
+当你修复了 baseline 中的某个问题后,对应条目就成了死条目。Mago 会检测到并就过期条目发出警告。
+
+若只想清除这些过期条目,运行:
+
+```sh
+mago lint --remove-outdated-baseline-entries --baseline lint-baseline.toml
+```
+
+该命令会重写 baseline,移除其中的过期条目。与 `--generate-baseline` 不同,它不会添加任何新条目,因此自 baseline 创建以来新引入的问题仍会被报告,而不会被静默抑制。这样在你逐步修复存量问题时,使用它是安全的。
+
+若想从头重建 baseline 并记录当前所有问题:
 
 ```sh
 mago lint --generate-baseline --baseline lint-baseline.toml
 ```
 
-传 `--backup-baseline` 可以在覆盖前把旧文件保留为 `lint-baseline.toml.bkp`。
+对上述任一命令传入 `--backup-baseline`,即可在覆盖前把旧文件保留为 `lint-baseline.toml.bkp`。
 
 ## JSON Schema
 

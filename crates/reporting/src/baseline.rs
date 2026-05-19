@@ -330,6 +330,41 @@ impl StrictBaseline {
             files_with_changes_count: files_with_changes.len(),
         }
     }
+
+    /// Removes baseline entries that no longer correspond to a current issue.
+    ///
+    /// Unlike [`generate_from_issues`](Self::generate_from_issues), this never adds new
+    /// entries. The returned baseline keeps only entries that still match an issue in
+    /// `issues`; the second tuple element is the number of stale entries removed.
+    #[must_use]
+    pub fn prune_outdated_entries(&self, issues: &IssueCollection, read_database: &ReadDatabase) -> (Self, usize) {
+        let current = Self::generate_from_issues(issues, read_database);
+
+        let mut entries: BTreeMap<Cow<'static, str>, StrictBaselineEntry> = BTreeMap::new();
+        let mut removed_count = 0;
+
+        for (file_path, entry) in &self.entries {
+            let current_issues: HashSet<&StrictBaselineIssue> = match current.entries.get(file_path) {
+                Some(current_entry) => current_entry.issues.iter().collect(),
+                None => HashSet::default(),
+            };
+
+            let mut kept = Vec::new();
+            for issue in &entry.issues {
+                if current_issues.contains(issue) {
+                    kept.push(issue.clone());
+                } else {
+                    removed_count += 1;
+                }
+            }
+
+            if !kept.is_empty() {
+                entries.insert(file_path.clone(), StrictBaselineEntry { issues: kept });
+            }
+        }
+
+        (Self { variant: Some(BaselineVariant::Strict), entries }, removed_count)
+    }
 }
 
 impl LooseBaseline {
@@ -474,6 +509,46 @@ impl LooseBaseline {
             files_with_changes_count: files_with_changes.len(),
         }
     }
+
+    /// Removes baseline issues that no longer correspond to a current issue.
+    ///
+    /// Unlike [`generate_from_issues`](Self::generate_from_issues), this never adds new
+    /// issues and never raises a count. For each `(file, code, message)` tuple the count
+    /// is capped at the current number of occurrences; tuples with no current occurrence
+    /// are dropped. The second tuple element is the number of stale occurrences removed.
+    #[must_use]
+    pub fn prune_outdated_entries(&self, issues: &IssueCollection, read_database: &ReadDatabase) -> (Self, usize) {
+        let current = Self::generate_from_issues(issues, read_database);
+        let current_counts: HashMap<(String, String, String), u32> = current
+            .issues
+            .iter()
+            .map(|issue| ((issue.file.clone(), issue.code.clone(), issue.message.clone()), issue.count))
+            .collect();
+
+        let mut kept: Vec<LooseBaselineIssue> = Vec::new();
+        let mut removed_count = 0;
+
+        for issue in &self.issues {
+            let key = (issue.file.clone(), issue.code.clone(), issue.message.clone());
+            let current_count = current_counts.get(&key).copied().unwrap_or(0);
+            let new_count = issue.count.min(current_count);
+
+            removed_count += (issue.count - new_count) as usize;
+
+            if new_count > 0 {
+                kept.push(LooseBaselineIssue {
+                    file: issue.file.clone(),
+                    code: issue.code.clone(),
+                    message: issue.message.clone(),
+                    count: new_count,
+                });
+            }
+        }
+
+        kept.sort();
+
+        (Self { variant: BaselineVariant::Loose, issues: kept }, removed_count)
+    }
 }
 
 impl Baseline {
@@ -514,6 +589,24 @@ impl Baseline {
         match self {
             Baseline::Strict(strict) => strict.compare_with_issues(issues, read_database),
             Baseline::Loose(loose) => loose.compare_with_issues(issues, read_database),
+        }
+    }
+
+    /// Removes baseline entries that no longer correspond to a current issue.
+    ///
+    /// This never adds new entries, so issues introduced since the baseline was created
+    /// remain reportable. The second tuple element is the number of stale entries removed.
+    #[must_use]
+    pub fn prune_outdated_entries(&self, issues: &IssueCollection, read_database: &ReadDatabase) -> (Self, usize) {
+        match self {
+            Baseline::Strict(strict) => {
+                let (pruned, removed) = strict.prune_outdated_entries(issues, read_database);
+                (Baseline::Strict(pruned), removed)
+            }
+            Baseline::Loose(loose) => {
+                let (pruned, removed) = loose.prune_outdated_entries(issues, read_database);
+                (Baseline::Loose(pruned), removed)
+            }
         }
     }
 
@@ -747,5 +840,83 @@ mod tests {
 
         assert!(matches!(baseline, Baseline::Loose(_)));
         assert_eq!(baseline.variant(), BaselineVariant::Loose);
+    }
+
+    #[test]
+    fn test_strict_prune_outdated_entries() {
+        let (db, file_id) = create_test_database();
+        let read_db = db.read_only();
+
+        let mut baseline = StrictBaseline::new();
+        let mut entry = StrictBaselineEntry::default();
+        entry.issues.push(StrictBaselineIssue { code: "E001".to_string(), start_line: 0, end_line: 0 });
+        entry.issues.push(StrictBaselineIssue { code: "E999".to_string(), start_line: 2, end_line: 2 });
+        baseline.entries.insert(Cow::Borrowed("test.php"), entry);
+
+        let mut issues = IssueCollection::new();
+        issues.push(create_test_issue(file_id, "E001", 0, 5));
+        issues.push(create_test_issue(file_id, "E500", 10, 15));
+
+        let (pruned, removed) = baseline.prune_outdated_entries(&issues, &read_db);
+
+        assert_eq!(removed, 1, "the stale `E999` entry should be removed");
+        let Some(kept) = pruned.entries.get("test.php") else {
+            panic!("the file entry should be kept");
+        };
+        assert_eq!(kept.issues.len(), 1, "the new `E500` issue must not be added");
+        assert_eq!(kept.issues.first().map(|issue| issue.code.as_str()), Some("E001"));
+    }
+
+    #[test]
+    fn test_strict_prune_drops_emptied_file_entry() {
+        let (db, _file_id) = create_test_database();
+        let read_db = db.read_only();
+
+        let mut baseline = StrictBaseline::new();
+        let mut entry = StrictBaselineEntry::default();
+        entry.issues.push(StrictBaselineIssue { code: "E999".to_string(), start_line: 2, end_line: 2 });
+        baseline.entries.insert(Cow::Borrowed("test.php"), entry);
+
+        let issues = IssueCollection::new();
+
+        let (pruned, removed) = baseline.prune_outdated_entries(&issues, &read_db);
+
+        assert_eq!(removed, 1);
+        assert!(pruned.entries.is_empty(), "a file with no surviving entries should be dropped");
+    }
+
+    #[test]
+    fn test_loose_prune_outdated_entries() {
+        let (db, file_id) = create_test_database();
+        let read_db = db.read_only();
+
+        let baseline = LooseBaseline {
+            variant: BaselineVariant::Loose,
+            issues: vec![
+                LooseBaselineIssue {
+                    file: "test.php".to_string(),
+                    code: "E001".to_string(),
+                    message: "test error".to_string(),
+                    count: 3,
+                },
+                LooseBaselineIssue {
+                    file: "test.php".to_string(),
+                    code: "E999".to_string(),
+                    message: "test error".to_string(),
+                    count: 1,
+                },
+            ],
+        };
+
+        let mut issues = IssueCollection::new();
+        issues.push(create_test_issue(file_id, "E001", 0, 5));
+        issues.push(create_test_issue(file_id, "E500", 10, 15));
+
+        let (pruned, removed) = baseline.prune_outdated_entries(&issues, &read_db);
+
+        assert_eq!(removed, 3);
+        assert_eq!(pruned.issues.len(), 1, "the new `E500` issue must not be added");
+        assert_eq!(pruned.issues[0].code, "E001");
+        assert_eq!(pruned.issues[0].count, 1, "the count must be capped at the current occurrences");
     }
 }

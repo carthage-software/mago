@@ -78,6 +78,7 @@ Flags for managing baseline files. The full guide is on the [baseline page](/fun
 | Flag | Description |
 | :--- | :--- |
 | `--generate-baseline` | Generate a new baseline file capturing every current issue. |
+| `--remove-outdated-baseline-entries` | Remove baseline entries that no longer match an issue, without adding new ones. |
 | `--baseline <PATH>` | Use the baseline at the given path. |
-| `--backup-baseline` | When regenerating, copy the old baseline to `<file>.bkp` before overwriting. |
+| `--backup-baseline` | When regenerating or pruning, copy the old baseline to `<file>.bkp` before overwriting. |
 | `--ignore-baseline` | Ignore any configured or specified baseline and report every issue. |

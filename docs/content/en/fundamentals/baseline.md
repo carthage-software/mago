@@ -122,13 +122,23 @@ Useful when you want to see issues currently suppressed by the baseline, for exa
 
 ## Keeping the baseline tidy
 
-When you fix an issue that was part of the baseline, its entry becomes dead. Mago detects this and warns about stale entries. Regenerate to clean up:
+When you fix an issue that was part of the baseline, its entry becomes dead. Mago detects this and warns about stale entries.
+
+To prune just the dead entries, run:
+
+```sh
+mago lint --remove-outdated-baseline-entries --baseline lint-baseline.toml
+```
+
+This rewrites the baseline with stale entries removed. Unlike `--generate-baseline`, it never adds new entries, so issues introduced since the baseline was created stay reportable instead of being silently suppressed. That makes it safe to run while you are working through existing issues.
+
+To rebuild the baseline from scratch instead, capturing every current issue:
 
 ```sh
 mago lint --generate-baseline --baseline lint-baseline.toml
 ```
 
-Pass `--backup-baseline` to keep the previous file as `lint-baseline.toml.bkp` before overwriting.
+Pass `--backup-baseline` with either command to keep the previous file as `lint-baseline.toml.bkp` before overwriting.
 
 ## JSON Schema
 

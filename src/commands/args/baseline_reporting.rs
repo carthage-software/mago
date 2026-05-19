@@ -14,6 +14,7 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
 
+use clap::ArgGroup;
 use clap::ColorChoice;
 use clap::Parser;
 use mago_reporting::Level;
@@ -27,6 +28,9 @@ use crate::service::BaselineIssueProcessor;
 /// This struct is designed to be flattened into other clap commands
 /// that require baseline functionality for filtering issues.
 #[derive(Parser, Debug, Clone)]
+#[command(group(
+    ArgGroup::new("baseline_write").args(["generate_baseline", "remove_outdated_baseline_entries"]),
+))]
 pub struct BaselineReportingArgs {
     /// Specify a baseline file to ignore existing issues.
     ///
@@ -47,10 +51,11 @@ pub struct BaselineReportingArgs {
 
     /// Create a backup of the existing baseline file before generating a new one.
     ///
-    /// When generating a new baseline, the old file will be saved with a .bkp extension.
+    /// When generating a new baseline (or removing outdated entries), the old file
+    /// will be saved with a .bkp extension.
     /// This provides a safety net in case you need to revert the baseline.
-    /// Requires --generate-baseline to be enabled.
-    #[arg(long, requires = "generate_baseline")]
+    /// Requires --generate-baseline or --remove-outdated-baseline-entries to be enabled.
+    #[arg(long, requires = "baseline_write")]
     pub backup_baseline: bool,
 
     /// Check if the baseline file is synchronized with current issues.
@@ -60,6 +65,20 @@ pub struct BaselineReportingArgs {
     /// was created. Cannot be used with --generate-baseline.
     #[arg(long, conflicts_with = "generate_baseline")]
     pub verify_baseline: bool,
+
+    /// Remove outdated entries from the baseline file without adding new ones.
+    ///
+    /// Like --generate-baseline, this rewrites the baseline file, but it only removes
+    /// entries that no longer match a current issue. New issues introduced since the
+    /// baseline was created are left unsuppressed, so fixing old issues never silently
+    /// hides new ones. Requires --baseline to specify the file to update.
+    #[arg(
+        long,
+        conflicts_with = "verify_baseline",
+        conflicts_with = "fail_on_out_of_sync_baseline",
+        conflicts_with = "ignore_baseline"
+    )]
+    pub remove_outdated_baseline_entries: bool,
 
     /// Fail the command when baseline is out of sync, even with no new issues.
     ///
@@ -126,6 +145,7 @@ impl BaselineReportingArgs {
             generate_baseline: self.generate_baseline,
             backup_baseline: self.backup_baseline,
             verify_baseline: self.verify_baseline,
+            remove_outdated_baseline_entries: self.remove_outdated_baseline_entries,
             fail_on_out_of_sync_baseline: self.fail_on_out_of_sync_baseline,
             baseline_variant,
             issue_processor: self.reporting.get_processor(color_choice, editor_url, config_minimum_fail_level),
