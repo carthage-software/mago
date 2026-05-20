@@ -42,11 +42,18 @@ impl Backend {
         let outcome = tokio::task::spawn_blocking(move || build_workspace(pending)).await;
 
         match outcome {
-            Ok(Ok((mut workspace, analysis_result))) => {
+            Ok(Ok((mut workspace, mut analysis_result))) => {
                 tracing::info!(
                     elapsed = ?started.elapsed(),
                     issues = analysis_result.issues.len(),
                     "analyzer pass complete",
+                );
+                analysis_result.issues.filter_out_ignored(
+                    &self.config.configuration.analyzer.ignore,
+                    self.config.configuration.source.glob.to_database_settings(),
+                    |file_id| {
+                        workspace.database.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
+                    },
                 );
 
                 if workspace.config.linter {
@@ -86,6 +93,7 @@ impl Backend {
     where
         F: FnOnce(&mut WorkspaceState) -> Vec<FileId> + Send + 'static,
     {
+        let cfg = self.config.clone();
         let started = std::time::Instant::now();
         let state = Arc::clone(&self.state);
         let outcome = tokio::task::spawn_blocking(move || -> Result<_, mago_orchestrator::error::OrchestratorError> {
@@ -100,11 +108,18 @@ impl Backend {
             }
 
             workspace.service.update_database(workspace.database.read_only());
-            let result = if workspace.config.analyzer {
+            let mut result = if workspace.config.analyzer {
                 workspace.service.analyze_incremental(Some(&changed))?
             } else {
                 mago_analyzer::analysis_result::AnalysisResult::new(mago_codex::reference::SymbolReferences::new())
             };
+            result.issues.filter_out_ignored(
+                &cfg.configuration.analyzer.ignore,
+                cfg.configuration.source.glob.to_database_settings(),
+                |file_id| {
+                    workspace.database.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
+                },
+            );
             workspace.invalidate_artifacts(&changed);
             crate::language_server::capabilities::lookup::invalidate(&changed);
 
