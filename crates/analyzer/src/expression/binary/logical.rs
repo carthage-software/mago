@@ -4,6 +4,7 @@ use foldhash::HashSet;
 
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
+use mago_bytes::BytesDisplay;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combine_union_types_rc;
 use mago_codex::ttype::get_bool;
@@ -33,8 +34,8 @@ use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler;
 use crate::utils::conditional;
+use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::symbol_existence::extract_function_constant_existence;
-use mago_bytes::BytesDisplay;
 
 #[inline]
 pub fn analyze_logical_and_operation<'ctx, 'arena>(
@@ -721,6 +722,12 @@ fn report_redundant_logical_operation<'arena>(
     let operator_span = binary.operator.span();
     if operator_span.is_zero() {
         // Do not report issues for synthetic nodes.
+        return;
+    }
+
+    if let Some(remove_right) = side_to_remove
+        && expression_has_observable_side_effect(if remove_right { binary.rhs } else { binary.lhs })
+    {
         return;
     }
 

@@ -22,6 +22,7 @@ use crate::plugin::HookAction;
 use crate::plugin::context::HookContext;
 use crate::utils::docblock::populate_docblock_variables;
 use crate::utils::docblock::populate_docblock_variables_excluding;
+use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_function_like_id_from_call;
 
@@ -314,8 +315,10 @@ fn detect_unused_statement_expressions<'ast, 'arena>(
         }
         Expression::MagicConstant(_) => "Evaluating a magic constant as a statement has no effect.",
         Expression::Binary(binary) => {
-            if binary.operator.is_null_coalesce() && binary.rhs.is_throw() {
-                return; // `?? throw` has side effects
+            if (binary.operator.is_null_coalesce() || binary.operator.is_logical())
+                && expression_has_observable_side_effect(binary.rhs)
+            {
+                return;
             }
 
             "A binary operation used as a statement likely has no effect."

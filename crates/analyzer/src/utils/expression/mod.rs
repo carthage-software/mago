@@ -7,10 +7,6 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::union::TUnion;
-use mago_word::Word;
-use mago_word::concat_word;
-use mago_word::word;
-
 use mago_names::ResolvedNames;
 use mago_span::HasSpan;
 use mago_syntax::ast::Access;
@@ -24,14 +20,49 @@ use mago_syntax::ast::Literal;
 use mago_syntax::ast::MethodCall;
 use mago_syntax::ast::NullSafeMethodCall;
 use mago_syntax::ast::StaticMethodCall;
+use mago_syntax::ast::UnaryPostfixOperator;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::UnaryPrefixOperator;
 use mago_syntax::ast::Variable;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::utils::misc::unwrap_expression;
 
 pub mod array;
 pub mod variable;
+
+/// Checks if an expression has observable side effects.
+///
+/// An expression is considered to have observable side effects if it performs operations that can modify state
+/// or have effects beyond just computing a value.
+pub(crate) const fn expression_has_observable_side_effect(expression: &Expression<'_>) -> bool {
+    match expression {
+        Expression::Parenthesized(p) => expression_has_observable_side_effect(p.expression),
+        Expression::Assignment(_) | Expression::Throw(_) | Expression::Yield(_) | Expression::Clone(_) => true,
+        Expression::UnaryPrefix(u) => {
+            matches!(
+                u.operator,
+                UnaryPrefixOperator::PreIncrement(_)
+                    | UnaryPrefixOperator::PreDecrement(_)
+                    | UnaryPrefixOperator::Reference(_)
+            ) || expression_has_observable_side_effect(u.operand)
+        }
+        Expression::UnaryPostfix(u) => {
+            matches!(u.operator, UnaryPostfixOperator::PostIncrement(_) | UnaryPostfixOperator::PostDecrement(_))
+        }
+        Expression::Binary(b) => {
+            expression_has_observable_side_effect(b.lhs) || expression_has_observable_side_effect(b.rhs)
+        }
+        Expression::Conditional(c) => {
+            matches!(c.then, Some(then_expr) if expression_has_observable_side_effect(then_expr))
+                || expression_has_observable_side_effect(c.r#else)
+                || expression_has_observable_side_effect(c.condition)
+        }
+        _ => false,
+    }
+}
 
 /// Checks if an expression is using nullsafe access anywhere in its chain.
 ///
