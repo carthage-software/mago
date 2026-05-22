@@ -1014,8 +1014,9 @@ fn intersect_string(
                         is_non_empty || existing_string.is_non_empty,
                         is_callable || existing_string.is_callable,
                         match (casing, existing_string.casing) {
-                            (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
-                            (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
+                            (a, b) if a == b => a,
+                            (TStringCasing::Unspecified, b) => b,
+                            (a, TStringCasing::Unspecified) => a,
                             _ => TStringCasing::Unspecified,
                         },
                     )
