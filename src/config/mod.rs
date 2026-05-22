@@ -8,11 +8,12 @@
 //!
 //! - When `--config <path>` is given, that exact file is loaded. Format is detected from the
 //!   extension; unrecognised extensions are an error.
-//! - Otherwise, the loader looks for `mago.{toml,yaml,yml,json}` (then `mago.dist.{...}`) in:
-//!   1. The workspace directory.
-//!   2. `$XDG_CONFIG_HOME`.
-//!   3. `~/.config`.
-//!   4. `~`.
+//! - Otherwise, the loader looks in the workspace directory for
+//!   `mago.{toml,yaml,yml,json}` and then `mago.dist.{toml,yaml,yml,json}`.
+//!   If neither is present, it looks for `mago.{toml,yaml,yml,json}` only in:
+//!   1. `$XDG_CONFIG_HOME`.
+//!   2. `~/.config`.
+//!   3. `~`.
 //!      The first match wins; workspace beats global. If nothing is found, built-in defaults
 //!      are used.
 //! - Within a directory, format precedence is `toml > yaml > yml > json`.
@@ -462,44 +463,39 @@ impl Configuration {
 
     /// Searches for configuration files in a project directory, falling back to global config locations.
     ///
-    /// This function attempts to load at most one configuration file per supported config type.
-    /// It first searches the given `root_dir` (typically the workspace/project directory).
-    /// If any configuration file is found there, those results are returned immediately and no
-    /// fallback locations are checked.
+    /// It first searches the given `root_dir` (typically the workspace/project directory)
+    /// for `mago.*`, then `mago.dist.*`. If any configuration file is found there, it is
+    /// returned immediately and no fallback locations are checked.
     ///
     /// If no config files are found in `root_dir`, the function searches each directory in
-    /// `fallback_roots` in order. The first matching format for each config file name is returned.
+    /// `fallback_roots` in order for `mago.*` only.
     ///
     /// # Arguments
     ///
     /// * `root_dir` - The primary directory to search (project root)
     /// * `fallback_roots` - A list of additional directories to search if `root_dir` contains no matches
-    /// * `file_formats` - Supported configuration formats (`toml`, `yaml`, etc.), each with possible extensions
     ///
     /// # Returns
     ///
-    /// A vector of `(PathBuf, FileFormat)` pairs, where:
+    /// A `(PathBuf, ConfigFormat)` pair, where:
     /// * The path is the resolved config file
     /// * The format indicates which file format identified it
     ///
     /// # Behavior Summary
     ///
-    /// 1. Try to resolve `<root_dir>/<name>.<ext>` for each supported format
+    /// 1. Try to resolve `<root_dir>/mago.<ext>`, then `<root_dir>/mago.dist.<ext>`
     /// 2. Stop and return immediately if any matches are found
-    /// 3. Otherwise, search each directory in `fallback_roots` in order
-    /// 4. The first match (by name and directory order) wins
+    /// 3. Otherwise, search each directory in `fallback_roots` for `mago.<ext>` in order
+    /// 4. The first match wins
     ///
     /// This prevents global configuration files from overriding project-local configuration.
     fn find_config_files(root_dir: &Path, fallback_roots: &[Option<PathBuf>]) -> Option<(PathBuf, ConfigFormat)> {
         let config_files = [CONFIGURATION_FILE_NAME, CONFIGURATION_DIST_FILE_NAME];
 
         for name in config_files.iter() {
-            let mut candidate = root_dir.join(name);
-            // The base path has no extension yet, so the first `set_extension` adds it
-            // rather than replacing — equivalent to `with_added_extension(ext)`.
             for format in ConfigFormat::ALL.iter() {
                 for ext in format.extensions() {
-                    candidate.set_extension(ext);
+                    let candidate = root_dir.join(format!("{name}.{ext}"));
                     if candidate.exists() {
                         return Some((candidate, *format));
                     }
@@ -508,10 +504,9 @@ impl Configuration {
         }
 
         for root in fallback_roots.iter().flatten() {
-            let mut candidate = root.join(CONFIGURATION_FILE_NAME);
             for format in ConfigFormat::ALL.iter() {
                 for ext in format.extensions() {
-                    candidate.set_extension(ext);
+                    let candidate = root.join(format!("{CONFIGURATION_FILE_NAME}.{ext}"));
                     if candidate.exists() {
                         return Some((candidate, *format));
                     }
@@ -767,6 +762,7 @@ mod tests {
     #[test]
     fn test_toml_has_precedence_when_multiple_configs_present() {
         let workspace_path = temp_dir().join("workspace-with-multiple-configs");
+        let _ = std::fs::remove_dir_all(&workspace_path);
         std::fs::create_dir_all(&workspace_path).unwrap();
 
         create_tmp_file("threads = 3", &workspace_path, "toml");
@@ -777,6 +773,61 @@ mod tests {
 
         assert_eq!(config.threads, 3);
         assert_eq!(config.php_version.to_string(), DEFAULT_PHP_VERSION.to_string())
+    }
+
+    #[test]
+    fn test_dist_config_is_loaded_when_primary_config_is_absent() {
+        let workspace_path = temp_dir().join("workspace-with-dist-config");
+        let _ = std::fs::remove_dir_all(&workspace_path);
+        std::fs::create_dir_all(&workspace_path).unwrap();
+
+        create_named_tmp_file("threads = 3", &workspace_path, CONFIGURATION_DIST_FILE_NAME, "toml");
+
+        let config = Configuration::load(Some(workspace_path.clone()), None, None, None, false, false).unwrap();
+
+        assert_eq!(config.threads, 3);
+        assert_eq!(config.config_file, Some(workspace_path.join("mago.dist.toml")));
+    }
+
+    #[test]
+    fn test_primary_config_has_precedence_over_dist_config() {
+        let workspace_path = temp_dir().join("workspace-with-primary-and-dist-config");
+        let _ = std::fs::remove_dir_all(&workspace_path);
+        std::fs::create_dir_all(&workspace_path).unwrap();
+
+        create_tmp_file("threads = 5", &workspace_path, "toml");
+        create_named_tmp_file("threads = 3", &workspace_path, CONFIGURATION_DIST_FILE_NAME, "toml");
+
+        let config = Configuration::load(Some(workspace_path.clone()), None, None, None, false, false).unwrap();
+
+        assert_eq!(config.threads, 5);
+        assert_eq!(config.config_file, Some(workspace_path.join("mago.toml")));
+    }
+
+    #[test]
+    fn test_global_dist_config_is_not_loaded() {
+        let workspace_path = temp_dir().join("workspace-without-config");
+        let xdg_config_home_path = temp_dir().join("xdg-config-home-with-dist-config");
+        let _ = std::fs::remove_dir_all(&workspace_path);
+        let _ = std::fs::remove_dir_all(&xdg_config_home_path);
+        std::fs::create_dir_all(&workspace_path).unwrap();
+        std::fs::create_dir_all(&xdg_config_home_path).unwrap();
+
+        create_named_tmp_file("threads = 3", &xdg_config_home_path, CONFIGURATION_DIST_FILE_NAME, "toml");
+
+        let config = temp_env::with_vars(
+            [
+                ("HOME", None::<PathBuf>),
+                ("XDG_CONFIG_HOME", Some(xdg_config_home_path)),
+                ("MAGO_THREADS", None),
+                ("MAGO_PHP_VERSION", None),
+                ("MAGO_ALLOW_UNSUPPORTED_PHP_VERSION", None),
+            ],
+            || Configuration::load(Some(workspace_path), None, None, None, false, false).unwrap(),
+        );
+
+        assert_eq!(config.config_file, None);
+        assert_eq!(config.threads, *LOGICAL_CPUS);
     }
 
     #[test]
@@ -863,8 +914,12 @@ mod tests {
     }
 
     fn create_tmp_file(config_content: &str, folder: &PathBuf, extension: &str) -> PathBuf {
+        create_named_tmp_file(config_content, folder, CONFIGURATION_FILE_NAME, extension)
+    }
+
+    fn create_named_tmp_file(config_content: &str, folder: &PathBuf, name: &str, extension: &str) -> PathBuf {
         fs::create_dir_all(folder).unwrap();
-        let config_path = folder.join(CONFIGURATION_FILE_NAME).with_extension(extension);
+        let config_path = folder.join(format!("{name}.{extension}"));
         fs::write(&config_path, config_content).unwrap();
         config_path
     }
