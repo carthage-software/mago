@@ -57,11 +57,11 @@ fn invalid_class_reference_break(class: &Expression) -> Option<(Span, &'static s
         | Expression::Variable(_) => None,
         Expression::Access(Access::StaticProperty(_)) => None,
         Expression::Access(Access::ClassConstant(c)) => Some((c.double_colon, "::")),
-        Expression::Access(Access::Property(p)) => is_new_variable_chain(p.object).then(|| (p.arrow, "->")),
+        Expression::Access(Access::Property(p)) => is_new_variable_chain(p.object).then_some((p.arrow, "->")),
         Expression::Access(Access::NullSafeProperty(p)) => {
-            is_new_variable_chain(p.object).then(|| (p.question_mark_arrow, "?->"))
+            is_new_variable_chain(p.object).then_some((p.question_mark_arrow, "?->"))
         }
-        Expression::ArrayAccess(a) => is_new_variable_chain(a.array).then(|| (a.left_bracket, "[")),
+        Expression::ArrayAccess(a) => is_new_variable_chain(a.array).then_some((a.left_bracket, "[")),
         other => Some((other.span(), "this expression")),
     }
 }

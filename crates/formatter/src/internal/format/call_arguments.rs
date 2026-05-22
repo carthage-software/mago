@@ -98,19 +98,19 @@ fn instantiation_needs_inline_new_parens<'arena>(
             continue;
         }
 
-        return match ancestor {
-            Node::Call(Call::Method(_) | Call::NullSafeMethod(_) | Call::StaticMethod(_)) => true,
-            Node::PropertyAccess(_)
-            | Node::NullSafePropertyAccess(_)
-            | Node::StaticPropertyAccess(_)
-            | Node::ClassConstantAccess(_)
-            | Node::MethodPartialApplication(_)
-            | Node::StaticMethodPartialApplication(_)
-            | Node::MethodCall(_)
-            | Node::NullSafeMethodCall(_)
-            | Node::StaticMethodCall(_) => true,
-            _ => false,
-        };
+        return matches!(
+            ancestor,
+            Node::Call(Call::Method(_) | Call::NullSafeMethod(_) | Call::StaticMethod(_))
+                | Node::PropertyAccess(_)
+                | Node::NullSafePropertyAccess(_)
+                | Node::StaticPropertyAccess(_)
+                | Node::ClassConstantAccess(_)
+                | Node::MethodPartialApplication(_)
+                | Node::StaticMethodPartialApplication(_)
+                | Node::MethodCall(_)
+                | Node::NullSafeMethodCall(_)
+                | Node::StaticMethodCall(_)
+        );
     }
 
     false
