@@ -207,6 +207,21 @@ fn split_once_ascii_whitespace(haystack: &[u8]) -> Option<(&[u8], &[u8])> {
     find_ascii_whitespace(haystack).map(|i| (&haystack[..i], &haystack[i + 1..]))
 }
 
+/// First-byte predicate for a PHP variable name, matching PHP's
+/// `[a-zA-Z_\x80-\xff]` rule. The `\x80-\xff` range is how PHP admits
+/// multi-byte UTF-8 codepoints (e.g. `$café`, `$module🤔`).
+#[inline]
+const fn is_var_name_start(byte: u8) -> bool {
+    matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_' | 0x80..=0xFF)
+}
+
+/// Continuation-byte predicate for a PHP variable name, matching PHP's
+/// `[a-zA-Z0-9_\x80-\xff]` rule.
+#[inline]
+const fn is_var_name_part(byte: u8) -> bool {
+    matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | 0x80..=0xFF)
+}
+
 /// Parses a `PHPDoc` variable token and returns a structured `Variable`.
 #[inline]
 fn parse_var_ident(raw: &[u8], allow_property_access: bool) -> Option<Variable> {
@@ -225,15 +240,12 @@ fn parse_var_ident(raw: &[u8], allow_property_access: bool) -> Option<Variable> 
             return None;
         }
 
-        let is_start = |b: u8| b == b'_' || b.is_ascii_alphabetic();
-        let is_cont = |b: u8| is_start(b) || b.is_ascii_digit();
-
-        if !is_start(rest[0]) {
+        if !is_var_name_start(rest[0]) {
             return None;
         }
 
         let mut pos = 1;
-        while pos < rest.len() && is_cont(rest[pos]) {
+        while pos < rest.len() && is_var_name_part(rest[pos]) {
             pos += 1;
         }
 
@@ -241,12 +253,12 @@ fn parse_var_ident(raw: &[u8], allow_property_access: bool) -> Option<Variable> 
             if pos + 1 < rest.len() && &rest[pos..pos + 2] == b"->" {
                 pos += 2;
 
-                if pos >= rest.len() || !is_start(rest[pos]) {
+                if pos >= rest.len() || !is_var_name_start(rest[pos]) {
                     return None;
                 }
 
                 pos += 1;
-                while pos < rest.len() && is_cont(rest[pos]) {
+                while pos < rest.len() && is_var_name_part(rest[pos]) {
                     pos += 1;
                 }
             } else if rest[pos] == b'[' {
@@ -285,18 +297,20 @@ fn parse_var_ident(raw: &[u8], allow_property_access: bool) -> Option<Variable> 
             let r = raw.strip_prefix(b"$")?;
             (1usize, r, false)
         };
+
         if rest.is_empty() {
             return None;
         }
-        let is_start = |b: u8| b == b'_' || b.is_ascii_alphabetic();
-        let is_cont = |b: u8| is_start(b) || b.is_ascii_digit();
-        if !is_start(rest[0]) {
+
+        if !is_var_name_start(rest[0]) {
             return None;
         }
+
         let mut len = 1usize;
-        while len < rest.len() && is_cont(rest[len]) {
+        while len < rest.len() && is_var_name_part(rest[len]) {
             len += 1;
         }
+
         let token = &raw[..prefix_len + len];
         let normalized = if is_variadic { &token[3..] } else { token };
         Some(Variable { name: normalized.to_vec(), is_variadic, is_by_reference })
@@ -1353,6 +1367,26 @@ mod tests {
                 _ => panic!("mismatch for input={input:?}"),
             }
         }
+    }
+
+    #[test]
+    fn test_parse_var_ident_accepts_non_ascii_bytes() {
+        let input = "$module🤔_lorem_ipsum_dolor_sit_amet_consete".as_bytes();
+        let parsed = parse_var_ident(input, false).expect("emoji-containing variable should parse");
+        assert_eq!(parsed.name.as_slice(), input);
+        assert!(!parsed.is_variadic);
+        assert!(!parsed.is_by_reference);
+
+        let parsed = parse_var_ident(input, true).expect("emoji-containing variable should parse (path mode)");
+        assert_eq!(parsed.name.as_slice(), input);
+
+        let input = "$café".as_bytes();
+        let parsed = parse_var_ident(input, false).expect("$café should parse");
+        assert_eq!(parsed.name.as_slice(), input);
+
+        let input = "$module🤔->name".as_bytes();
+        let parsed = parse_var_ident(input, true).expect("property access on emoji name should parse");
+        assert_eq!(parsed.name.as_slice(), input);
     }
 
     #[test]
