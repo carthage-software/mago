@@ -108,11 +108,12 @@ impl LintRule for NoRedundantVariableRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        let Some((parameter_list, body, use_clause)) = variable_usage::function_like_parts(node) else {
+        let Some(parts) = variable_usage::function_like_parts(node) else {
             return;
         };
 
-        let usage: RedundantRecorder<'_> = variable_usage::analyze(parameter_list, body, use_clause);
+        let usage: RedundantRecorder<'_> =
+            variable_usage::analyze(parts.parameter_list, parts.body, parts.use_clause, parts.binds_this);
         if usage.bailed {
             return;
         }
@@ -552,6 +553,39 @@ mod tests {
                 while ($count < 10) {
                     $items[] = $count;
                     $count = count($items);
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = passing_this_as_argument_is_not_flagged,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            use SplObjectStorage;
+
+            final class Foo {
+                public function bar(SplObjectStorage $storage): void {
+                    $storage->attach($this);
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = this_passed_in_non_static_closure,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            class C {
+                public function go(): void {
+                    $fn = function () { return get_class($this); };
+                    $fn();
                 }
             }
         "#}

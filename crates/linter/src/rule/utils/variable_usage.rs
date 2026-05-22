@@ -284,6 +284,7 @@ pub fn analyze<'arena, R>(
     parameter_list: &FunctionLikeParameterList<'arena>,
     body: &Block<'arena>,
     use_clause: Option<&ClosureUseClause<'arena>>,
+    binds_this: bool,
 ) -> R
 where
     R: Recorder<'arena> + Default + Sync + Send,
@@ -294,10 +295,15 @@ where
     for param in parameter_list.parameters.iter() {
         walker.rec.declare_external(param.variable.name);
     }
+
     if let Some(use_clause) = use_clause {
         for cap in use_clause.variables.iter() {
             walker.rec.declare_external(cap.variable.name);
         }
+    }
+
+    if binds_this {
+        walker.rec.declare_external(b"$this");
     }
 
     walker.walk_block(body, &mut ());
@@ -317,16 +323,36 @@ pub fn collect_used_names<'arena>(body: &Block<'arena>, interest: HashSet<&'aren
     walker.rec
 }
 
-pub fn function_like_parts<'ast, 'arena>(
-    node: Node<'ast, 'arena>,
-) -> Option<(&'ast FunctionLikeParameterList<'arena>, &'ast Block<'arena>, Option<&'ast ClosureUseClause<'arena>>)> {
+pub struct FunctionLikeParts<'ast, 'arena> {
+    pub parameter_list: &'ast FunctionLikeParameterList<'arena>,
+    pub body: &'ast Block<'arena>,
+    pub use_clause: Option<&'ast ClosureUseClause<'arena>>,
+    pub binds_this: bool,
+}
+
+pub fn function_like_parts<'ast, 'arena>(node: Node<'ast, 'arena>) -> Option<FunctionLikeParts<'ast, 'arena>> {
     match node {
-        Node::Function(f) => Some((&f.parameter_list, &f.body, None)),
+        Node::Function(f) => Some(FunctionLikeParts {
+            parameter_list: &f.parameter_list,
+            body: &f.body,
+            use_clause: None,
+            binds_this: false,
+        }),
         Node::Method(m) => match &m.body {
-            MethodBody::Concrete(b) => Some((&m.parameter_list, b, None)),
+            MethodBody::Concrete(b) => Some(FunctionLikeParts {
+                parameter_list: &m.parameter_list,
+                body: b,
+                use_clause: None,
+                binds_this: !m.is_static(),
+            }),
             MethodBody::Abstract(_) => None,
         },
-        Node::Closure(c) => Some((&c.parameter_list, &c.body, c.use_clause.as_ref())),
+        Node::Closure(c) => Some(FunctionLikeParts {
+            parameter_list: &c.parameter_list,
+            body: &c.body,
+            use_clause: c.use_clause.as_ref(),
+            binds_this: c.r#static.is_none(),
+        }),
         _ => None,
     }
 }

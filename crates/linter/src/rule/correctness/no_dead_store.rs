@@ -15,6 +15,7 @@ use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule::utils::variable_usage;
+use crate::rule::utils::variable_usage::DeadStoreRecorder;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -104,11 +105,11 @@ impl LintRule for NoDeadStoreRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        let Some((parameter_list, body, use_clause)) = variable_usage::function_like_parts(node) else {
+        let Some(parts) = variable_usage::function_like_parts(node) else {
             return;
         };
 
-        let usage: variable_usage::DeadStoreRecorder<'_> = variable_usage::analyze(parameter_list, body, use_clause);
+        let usage: DeadStoreRecorder<'_> = variable_usage::analyze(parts.parameter_list, parts.body, parts.use_clause, parts.binds_this);
         if usage.bailed {
             return;
         }

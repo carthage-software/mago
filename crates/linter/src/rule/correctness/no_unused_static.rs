@@ -100,18 +100,18 @@ impl LintRule for NoUnusedStaticRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        let Some((_, body, _)) = variable_usage::function_like_parts(node) else {
+        let Some(parts) = variable_usage::function_like_parts(node) else {
             return;
         };
 
         let mut decls = StaticDeclCollector { items: Vec::new() };
-        decls.walk_block(body, &mut ());
+        decls.walk_block(parts.body, &mut ());
         if decls.items.is_empty() {
             return;
         }
 
         let interest: HashSet<&'arena [u8]> = decls.items.iter().map(|(name, _)| *name).collect();
-        let usage = variable_usage::collect_used_names(body, interest);
+        let usage = variable_usage::collect_used_names(parts.body, interest);
         if usage.bailed {
             return;
         }
