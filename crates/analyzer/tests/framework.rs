@@ -91,6 +91,11 @@ pub fn check_name_casing_settings() -> Settings {
     Settings { check_name_casing: true, ..Default::default() }
 }
 
+#[must_use]
+pub fn check_missing_type_hints_settings() -> Settings {
+    Settings { check_missing_type_hints: true, ..Default::default() }
+}
+
 fn run_test_case_inner(config: TestCase) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 

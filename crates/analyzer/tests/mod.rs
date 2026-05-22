@@ -2494,6 +2494,7 @@ test_case!(issue_1830);
 test_case!(issue_1831);
 test_case!(issue_1875, crate::framework::php_90_settings());
 test_case!(issue_1879);
+test_case!(issue_1885, crate::framework::check_missing_type_hints_settings());
 test_case!(issue_1888);
 
 #[test]

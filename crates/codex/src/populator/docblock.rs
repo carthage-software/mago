@@ -553,3 +553,155 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
         }
     }
 }
+
+pub fn inherit_property_docblocks(
+    codebase: &mut CodebaseMetadata,
+    safe_symbols: &WordSet,
+    dirty_classes: Option<&WordSet>,
+) {
+    let mut inheritance_work: Vec<(Word, Word, Word)> = Vec::new();
+
+    if let Some(dirty) = dirty_classes {
+        let mut targets = dirty.clone();
+        for class_name in dirty {
+            if let Some(descendants) = codebase.all_class_like_descendants.get(class_name) {
+                targets.extend(descendants.iter().copied());
+            }
+        }
+
+        for class_name in &targets {
+            if !safe_symbols.is_empty() && safe_symbols.contains(class_name) {
+                continue;
+            }
+
+            if let Some(class_metadata) = codebase.class_likes.get(class_name) {
+                collect_property_inheritance_work(
+                    *class_name,
+                    class_metadata,
+                    &codebase.class_likes,
+                    &mut inheritance_work,
+                );
+            }
+        }
+    } else {
+        for (class_name, class_metadata) in &codebase.class_likes {
+            if !safe_symbols.is_empty() && safe_symbols.contains(class_name) {
+                continue;
+            }
+
+            collect_property_inheritance_work(
+                *class_name,
+                class_metadata,
+                &codebase.class_likes,
+                &mut inheritance_work,
+            );
+        }
+    }
+
+    inheritance_work.sort_by_key(|(class_name, _, _)| {
+        codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
+    });
+
+    apply_property_inheritance_work(codebase, inheritance_work);
+}
+
+fn collect_property_inheritance_work(
+    class_name: Word,
+    class_metadata: &crate::metadata::class_like::ClassLikeMetadata,
+    class_likes: &WordMap<crate::metadata::class_like::ClassLikeMetadata>,
+    inheritance_work: &mut Vec<(Word, Word, Word)>,
+) {
+    for (property_name, parent_ids) in &class_metadata.overridden_property_ids {
+        let mut parent_class = None;
+        let mut current = class_metadata.direct_parent_class;
+        while let Some(name) = current {
+            if parent_ids.contains(&name) {
+                parent_class = Some(name);
+                break;
+            }
+            current = class_likes.get(&name).and_then(|m| m.direct_parent_class);
+        }
+        if parent_class.is_none() {
+            for trait_name in &class_metadata.used_traits {
+                if parent_ids.contains(trait_name) {
+                    parent_class = Some(*trait_name);
+                    break;
+                }
+            }
+        }
+        if parent_class.is_none()
+            && let Some(declaring_class) = parent_ids.iter().next()
+        {
+            parent_class = Some(*declaring_class);
+        }
+
+        if let Some(parent_class) = parent_class {
+            inheritance_work.push((class_name, *property_name, parent_class));
+        }
+    }
+}
+
+fn apply_property_inheritance_work(codebase: &mut CodebaseMetadata, inheritance_work: Vec<(Word, Word, Word)>) {
+    for (class_name, property_name, parent_class) in inheritance_work {
+        let Some(parent_metadata) = codebase.class_likes.get(&parent_class) else { continue };
+        let Some(parent_property) = parent_metadata.properties.get(&property_name) else { continue };
+
+        let parent_type = parent_property.type_metadata.as_ref();
+        let parent_native = parent_property.type_declaration_metadata.as_ref();
+        let Some(parent_docblock) = parent_type.filter(|m| m.from_docblock) else {
+            continue;
+        };
+
+        let Some(child_metadata) = codebase.class_likes.get(&class_name) else { continue };
+        let parent_template_params =
+            child_metadata.template_extended_parameters.get(&parent_class).cloned().unwrap_or_default();
+
+        let template_result = if parent_template_params.is_empty() {
+            None
+        } else {
+            let mut result = TemplateResult::default();
+            for (template_name, concrete_type) in &parent_template_params {
+                result.add_lower_bound(*template_name, GenericParent::ClassLike(parent_class), concrete_type.clone());
+            }
+            Some(result)
+        };
+
+        let mut substituted_type = parent_docblock.type_union.clone();
+        if let Some(template_result) = template_result.as_ref() {
+            substituted_type = inferred_type_replacer::replace(&substituted_type, template_result, codebase);
+        }
+
+        let parent_docblock_span = parent_docblock.span;
+        let parent_native_for_check = parent_native.map(|m| m.type_union.clone());
+        let parent_docblock_for_check = TypeMetadata::from_docblock(substituted_type.clone(), parent_docblock_span);
+
+        let (child_native, child_docblock_owned) = {
+            let Some(child_metadata) = codebase.class_likes.get(&class_name) else { continue };
+            let Some(child_property) = child_metadata.properties.get(&property_name) else { continue };
+
+            (
+                child_property.type_declaration_metadata.as_ref().map(|m| m.type_union.clone()),
+                child_property.type_metadata.clone().filter(|m| m.from_docblock),
+            )
+        };
+
+        if !should_inherit_docblock_type(
+            parent_native_for_check.as_ref(),
+            Some(&parent_docblock_for_check),
+            child_native.as_ref(),
+            child_docblock_owned.as_ref(),
+            true,
+            false,
+            codebase,
+        ) {
+            continue;
+        }
+
+        let Some(child_metadata) = codebase.class_likes.get_mut(&class_name) else { continue };
+        let Some(child_property) = child_metadata.properties.get_mut(&property_name) else { continue };
+
+        let mut inherited = TypeMetadata::from_docblock(substituted_type, parent_docblock_span);
+        inherited.inferred = true;
+        child_property.type_metadata = Some(inherited);
+    }
+}

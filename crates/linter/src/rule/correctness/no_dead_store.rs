@@ -109,7 +109,8 @@ impl LintRule for NoDeadStoreRule {
             return;
         };
 
-        let usage: DeadStoreRecorder<'_> = variable_usage::analyze(parts.parameter_list, parts.body, parts.use_clause, parts.binds_this);
+        let usage: DeadStoreRecorder<'_> =
+            variable_usage::analyze(parts.parameter_list, parts.body, parts.use_clause, parts.binds_this);
         if usage.bailed {
             return;
         }

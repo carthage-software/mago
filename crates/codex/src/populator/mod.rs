@@ -328,6 +328,7 @@ fn populate_codebase_inner(
         let dirty_classes = if dirty_symbols.is_some() { Some(&class_likes_to_repopulate) } else { None };
 
         docblock::inherit_method_docblocks(codebase, &safe_symbols, dirty_classes);
+        docblock::inherit_property_docblocks(codebase, &safe_symbols, dirty_classes);
     }
 
     codebase.safe_symbols = safe_symbols;
