@@ -729,32 +729,54 @@ pub(super) fn print_member_access_chain<'arena>(
     member_access_chain: &MemberAccessChain<'arena>,
     f: &mut FormatterState<'_, 'arena>,
 ) -> Document<'arena> {
-    let base_adds_parens = if let Some(first) = member_access_chain.accesses.first() {
+    enum ChainBaseFrame {
+        None,
+        BaseHandlesParens,
+        ChainHandlesParens,
+    }
+
+    let chain_base_frame = if let Some(first) = member_access_chain.accesses.first() {
         match first {
             MemberAccess::PropertyAccess(pa) => {
                 f.enter_node(Node::PropertyAccess(pa));
-                true
+                ChainBaseFrame::BaseHandlesParens
             }
             MemberAccess::NullSafePropertyAccess(pa) => {
                 f.enter_node(Node::NullSafePropertyAccess(pa));
-                true
+                ChainBaseFrame::BaseHandlesParens
             }
-            _ => false,
+            MemberAccess::MethodCall(mc) => {
+                f.enter_node(Node::MethodCall(mc));
+                ChainBaseFrame::ChainHandlesParens
+            }
+            MemberAccess::NullSafeMethodCall(mc) => {
+                f.enter_node(Node::NullSafeMethodCall(mc));
+                ChainBaseFrame::ChainHandlesParens
+            }
+            MemberAccess::StaticMethodCall(mc) => {
+                f.enter_node(Node::StaticMethodCall(mc));
+                ChainBaseFrame::ChainHandlesParens
+            }
         }
     } else {
-        false
+        ChainBaseFrame::None
     };
 
     let base_document = member_access_chain.base.format(f);
 
-    if base_adds_parens {
+    if !matches!(chain_base_frame, ChainBaseFrame::None) {
         f.leave_node();
     }
 
-    let mut parts = if base_adds_parens || !base_needs_parens(f, member_access_chain.base) {
-        vec![in f.arena; base_document]
-    } else {
+    let chain_owns_parens = match chain_base_frame {
+        ChainBaseFrame::BaseHandlesParens => false,
+        ChainBaseFrame::None | ChainBaseFrame::ChainHandlesParens => base_needs_parens(f, member_access_chain.base),
+    };
+
+    let mut parts = if chain_owns_parens {
         vec![in f.arena; Document::String(b"("), base_document, Document::String(b")")]
+    } else {
+        vec![in f.arena; base_document]
     };
 
     let mut accesses_iter = member_access_chain.accesses.iter().enumerate().peekable();

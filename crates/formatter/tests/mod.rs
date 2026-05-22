@@ -428,6 +428,7 @@ test_case!(issue_1672);
 test_case!(issue_1744);
 test_case!(issue_1806);
 test_case!(issue_1808);
+test_case!(issue_1875);
 test_case!(member_access_chain_keeps_breaks_with_comments);
 test_case!(issue_1562);
 test_case!(bare_cr_line_endings);

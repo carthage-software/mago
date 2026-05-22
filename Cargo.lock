@@ -1912,6 +1912,7 @@ dependencies = [
 name = "mago-semantics"
 version = "1.28.0"
 dependencies = [
+ "bumpalo",
  "mago-bytes",
  "mago-database",
  "mago-names",

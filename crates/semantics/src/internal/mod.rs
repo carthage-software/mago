@@ -17,6 +17,7 @@ use mago_syntax::ast::FunctionLikeParameterList;
 use mago_syntax::ast::FunctionLikeReturnTypeHint;
 use mago_syntax::ast::Goto;
 use mago_syntax::ast::Hint;
+use mago_syntax::ast::Instantiation;
 use mago_syntax::ast::Interface;
 use mago_syntax::ast::List;
 use mago_syntax::ast::Literal;
@@ -52,6 +53,15 @@ impl<'ast, 'arena> Walker<'ast, 'arena, Context<'_, 'ast, 'arena>> for CheckingW
         context.ancestors.push(expression.span());
 
         checker::expression::check_for_clone_with(expression, context);
+    }
+
+    #[inline]
+    fn walk_in_instantiation(
+        &self,
+        instantiation: &'ast Instantiation<'arena>,
+        context: &mut Context<'_, 'ast, 'arena>,
+    ) {
+        checker::expression::check_instantiation_class_reference(instantiation, context);
     }
 
     #[inline]

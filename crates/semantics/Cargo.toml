@@ -20,3 +20,6 @@ mago-php-version = { workspace = true }
 mago-span = { workspace = true }
 mago-names = { workspace = true }
 mago-database = { workspace = true }
+
+[dev-dependencies]
+bumpalo = { workspace = true }

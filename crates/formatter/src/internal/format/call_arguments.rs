@@ -91,22 +91,29 @@ fn instantiation_needs_inline_new_parens<'arena>(
         return false;
     }
 
-    let Some(grandparent) = f.grandparent_node() else {
-        return false;
-    };
-
-    match grandparent {
-        Node::Call(call) => {
-            matches!(call, Call::Method(_) | Call::NullSafeMethod(_) | Call::StaticMethod(_))
+    let mut depth: u32 = 2;
+    while let Some(ancestor) = f.nth_parent_kind(depth) {
+        if let Node::Expression(_) = ancestor {
+            depth += 1;
+            continue;
         }
-        Node::PropertyAccess(_)
-        | Node::NullSafePropertyAccess(_)
-        | Node::StaticPropertyAccess(_)
-        | Node::ClassConstantAccess(_)
-        | Node::MethodPartialApplication(_)
-        | Node::StaticMethodPartialApplication(_) => true,
-        _ => false,
+
+        return match ancestor {
+            Node::Call(Call::Method(_) | Call::NullSafeMethod(_) | Call::StaticMethod(_)) => true,
+            Node::PropertyAccess(_)
+            | Node::NullSafePropertyAccess(_)
+            | Node::StaticPropertyAccess(_)
+            | Node::ClassConstantAccess(_)
+            | Node::MethodPartialApplication(_)
+            | Node::StaticMethodPartialApplication(_)
+            | Node::MethodCall(_)
+            | Node::NullSafeMethodCall(_)
+            | Node::StaticMethodCall(_) => true,
+            _ => false,
+        };
     }
+
+    false
 }
 
 pub(super) fn print_argument_list<'arena>(
