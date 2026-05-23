@@ -74,11 +74,8 @@ const SANITIZATION_FUNCTIONS: &[&str] = &[
     "wp_strip_all_tags",
 ];
 
-const PARTIAL_SANITIZERS: &[(&str, usize, &str)] = &[
-    ("sanitize_meta", 1, "meta_value"),
-    ("sanitize_option", 1, "value"),
-    ("wp_kses", 0, "content"),
-];
+const PARTIAL_SANITIZERS: &[(&str, usize, &str)] =
+    &[("sanitize_meta", 1, "meta_value"), ("sanitize_option", 1, "value"), ("wp_kses", 0, "content")];
 
 const UNSLASHING_SANITIZERS: &[&str] = &[
     "absint",
