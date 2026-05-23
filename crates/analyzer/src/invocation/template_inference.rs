@@ -50,11 +50,18 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::invocation::MethodTargetContext;
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct InferenceOptions {
     pub infer_only_if_new: bool,
     pub argument_offset: Option<usize>,
     pub source_span: Option<Span>,
+    pub is_top_level: bool,
+}
+
+impl Default for InferenceOptions {
+    fn default() -> Self {
+        Self { infer_only_if_new: false, argument_offset: None, source_span: None, is_top_level: true }
+    }
 }
 
 #[derive(Debug)]
@@ -94,6 +101,17 @@ fn infer_templates_from_input_and_container_types(
     options: InferenceOptions,
     violations: &mut Vec<TemplateInferenceViolation>,
 ) {
+    // Capture the top-level flag for this frame's insertion decisions, then
+    // shadow `options` so every recursive call descends as "nested". A
+    // top-level object specialization (e.g. `Column<T>` matched against
+    // `IntColumn extends Column<int>`) pins T at a shallower depth than the
+    // sibling bare-`T` arg's bound, so the structural inference wins. Any
+    // recursion below this frame is by definition no longer the parameter's
+    // top level: `list<NodeInterface<T>>` is top level, the `NodeInterface<T>`
+    // inside it is not.
+    let top_level = options.is_top_level;
+    let options = InferenceOptions { is_top_level: false, ..options };
+
     if input_type.is_mixed() && !container_type.is_generic_parameter() {
         return;
     }
@@ -693,12 +711,13 @@ fn infer_templates_from_input_and_container_types(
                                     });
                                 }
 
+                                let appearance_depth = usize::from(!top_level);
                                 insert_bound_type(
                                     template_result,
                                     generic_parameter.parameter_name,
                                     &generic_parameter.defining_entity,
                                     inferred_bound,
-                                    DefinitionReplacementOptions { appearance_depth: 1, ..Default::default() },
+                                    DefinitionReplacementOptions { appearance_depth, ..Default::default() },
                                     options.argument_offset,
                                     options.source_span,
                                 );
@@ -939,15 +958,12 @@ fn infer_templates_from_input_and_container_types(
             );
         }
 
-        // Bare `T` parameter positions get a deeper appearance depth than
-        // structural inferences (e.g. `Container<T>`) so the structural ones
-        // overshadow them in `get_relevant_bounds`.
         insert_bound_type(
             template_result,
             *template_parameter_name,
             &container_generic.defining_entity,
             residual_input_type.clone(),
-            DefinitionReplacementOptions { appearance_depth: 2, ..Default::default() },
+            DefinitionReplacementOptions { appearance_depth: 1, ..Default::default() },
             options.argument_offset,
             options.source_span,
         );
@@ -1101,6 +1117,7 @@ pub fn infer_parameter_templates_from_argument(
             infer_only_if_new: is_callable_argument,
             argument_offset: Some(argument_offset),
             source_span: Some(argument_span),
+            ..Default::default()
         },
         &mut violations,
     );
@@ -1151,7 +1168,7 @@ pub fn infer_parameter_templates_from_default(
         parameter_type,
         default_type,
         template_result,
-        InferenceOptions { infer_only_if_new: true, argument_offset: None, source_span: None },
+        InferenceOptions { infer_only_if_new: true, ..Default::default() },
         &mut Vec::new(),
     );
 }
