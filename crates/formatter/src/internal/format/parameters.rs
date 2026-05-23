@@ -55,7 +55,8 @@ pub(super) fn print_function_like_parameters<'arena>(
     let left_parenthesis = {
         let mut contents = vec![in f.arena; Document::String(b"(")];
 
-        if parameter_list.parameters.len() == 1
+        if !should_break
+            && parameter_list.parameters.len() == 1
             && let Some(parameter) = parameter_list.parameters.first()
             && let Some(inline_doc) =
                 f.collect_inline_block_comments_between(parameter_list.left_parenthesis, parameter.span())
