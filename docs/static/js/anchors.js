@@ -13,11 +13,13 @@
       event.preventDefault();
       event.stopPropagation();
 
+      if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+
       try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(code.textContent || "");
-        }
-      } catch (_) {}
+        await navigator.clipboard.writeText(code.textContent || "");
+      } catch (_) {
+        return;
+      }
 
       code.classList.add("rule__code--copied");
       const previousTimer = copiedTimers.get(code);
