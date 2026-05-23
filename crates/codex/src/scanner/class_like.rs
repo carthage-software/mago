@@ -112,6 +112,7 @@ pub fn register_anonymous_class<'arena>(
         .map(|(name, definition)| (*name, definition.clone()))
         .collect::<TemplateConstraintList>();
 
+    let name = class_like_metadata.name;
     let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<WordSet>();
     let imported_aliases = class_like_metadata
         .imported_type_aliases

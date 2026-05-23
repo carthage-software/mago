@@ -849,7 +849,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_anonymous_class(&self, file: &File, span: Span) -> Option<&ClassLikeMetadata> {
         let name = Self::get_anonymous_class_name(file, span);
-        if self.class_exists(name.as_bytes()) { self.class_likes.get(&name) } else { None }
+        self.get_class_like(name.as_bytes())
     }
 
     /// Gets the file signature for a given file ID.
