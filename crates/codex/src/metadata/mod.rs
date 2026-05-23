@@ -6,9 +6,9 @@ use foldhash::HashSet;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_reporting::IssueCollection;
-use mago_span::Position;
 use mago_span::Span;
 use mago_word::Word;
 use mago_word::WordMap;
@@ -16,8 +16,6 @@ use mago_word::WordSet;
 use mago_word::ascii_lowercase_constant_name_word;
 use mago_word::ascii_lowercase_word;
 use mago_word::empty_word;
-use mago_word::u32_word;
-use mago_word::u64_word;
 use mago_word::word;
 
 use crate::diff::CodebaseDiff;
@@ -325,14 +323,22 @@ impl CodebaseMetadata {
         self.function_likes.get(&identifier)
     }
 
-    /// Retrieves metadata for a closure based on its file and position.
+    /// Retrieves metadata for a closure or arrow function by its synthetic
+    /// name (e.g. `{closure:src/foo.php:12:5}`).
     #[inline]
     #[must_use]
-    pub fn get_closure(&self, file_id: &FileId, position: &Position) -> Option<&FunctionLikeMetadata> {
-        let file_ref = u64_word(file_id.as_u64());
-        let closure_ref = u32_word(position.offset);
-        let identifier = (file_ref, closure_ref);
-        self.function_likes.get(&identifier)
+    pub fn get_closure(&self, synthetic_name: &Word) -> Option<&FunctionLikeMetadata> {
+        self.function_likes.get(&(empty_word(), *synthetic_name))
+    }
+
+    /// Retrieves metadata for a closure declared at the given file and span.
+    /// Convenience wrapper that rebuilds the synthetic name and delegates to
+    /// [`Self::get_closure`].
+    #[inline]
+    #[must_use]
+    pub fn get_closure_at(&self, file: &File, span: Span) -> Option<&FunctionLikeMetadata> {
+        let name = crate::build_synthetic_name("closure", file, span);
+        self.get_closure(&name)
     }
 
     /// Retrieves method metadata by `MethodIdentifier`.
@@ -370,7 +376,7 @@ impl CodebaseMetadata {
         match identifier {
             FunctionLikeIdentifier::Function(name) => self.get_function(name.as_bytes()),
             FunctionLikeIdentifier::Method(class, method) => self.get_method(class.as_bytes(), method.as_bytes()),
-            FunctionLikeIdentifier::Closure(file_id, position) => self.get_closure(file_id, position),
+            FunctionLikeIdentifier::Closure(name) => self.get_closure(name),
         }
     }
 
@@ -765,9 +771,7 @@ impl CodebaseMetadata {
             return &[];
         };
 
-        let Some(method_name) = function_like.name.as_ref() else {
-            return &[];
-        };
+        let method_name = &function_like.name;
 
         if let Some(overridden_map) = class_like.overridden_method_ids.get(method_name) {
             for (parent_class_name, parent_method_id) in overridden_map {
@@ -833,34 +837,18 @@ impl CodebaseMetadata {
         all_descendants
     }
 
-    /// Generates a unique name for an anonymous class based on its span.
+    /// Generates the synthetic display name for an anonymous class based on
+    /// its declaring file and span. Delegates to [`crate::get_anonymous_class_name`].
     #[must_use]
-    #[allow(clippy::semicolon_outside_block)]
-    pub fn get_anonymous_class_name(span: mago_span::Span) -> Word {
-        use std::io::Write;
-
-        let mut buffer = [0u8; 64];
-        let mut writer = &mut buffer[..];
-
-        // SAFETY: writing into a 64-byte buffer with three small numeric values (FileId
-        // and two u32 offsets formatted as decimal) cannot exceed the buffer; the
-        // `Write` impl for `&mut [u8]` only fails when the slice is full.
-        unsafe {
-            write!(writer, "class@anonymous:{}-{}:{}", span.file_id, span.start.offset, span.end.offset)
-                .unwrap_unchecked();
-        }
-
-        let written_len = buffer.iter().position(|&b| b == 0).unwrap_or(buffer.len());
-
-        // SAFETY: every byte written above was ASCII (digits, '@', ':', '-', alphabet),
-        // so the prefix `&buffer[..written_len]` is valid UTF-8.
-        word(unsafe { std::str::from_utf8(&buffer[..written_len]).unwrap_unchecked() })
+    pub fn get_anonymous_class_name(file: &File, span: Span) -> Word {
+        crate::get_anonymous_class_name(file, span)
     }
 
-    /// Retrieves the metadata for an anonymous class based on its span.
+    /// Retrieves the metadata for an anonymous class based on its declaring
+    /// file and span.
     #[must_use]
-    pub fn get_anonymous_class(&self, span: mago_span::Span) -> Option<&ClassLikeMetadata> {
-        let name = Self::get_anonymous_class_name(span);
+    pub fn get_anonymous_class(&self, file: &File, span: Span) -> Option<&ClassLikeMetadata> {
+        let name = Self::get_anonymous_class_name(file, span);
         if self.class_exists(name.as_bytes()) { self.class_likes.get(&name) } else { None }
     }
 

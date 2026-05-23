@@ -370,7 +370,7 @@ fn can_initialize_readonly_property(
 
         // __clone is allowed in PHP 8.3+
         if context.settings.version.is_supported(Feature::ReadonlyPropertyReinitializationInClone)
-            && func.name.is_some_and(|name| name.as_bytes().eq_ignore_ascii_case(b"__clone"))
+            && func.name.as_bytes().eq_ignore_ascii_case(b"__clone")
         {
             return true;
         }

@@ -50,7 +50,6 @@ pub fn check_experimental_function_with_metadata(
     context: &mut Context<'_, '_>,
     block_context: &BlockContext<'_>,
     metadata: &FunctionLikeMetadata,
-    function_name: Word,
     span: Span,
 ) {
     if !context.settings.check_experimental {
@@ -65,7 +64,7 @@ pub fn check_experimental_function_with_metadata(
         return;
     }
 
-    let display_name = metadata.original_name.unwrap_or(function_name);
+    let display_name = metadata.original_name;
 
     context.collector.report_with_code(
         IssueCode::ExperimentalUsage,

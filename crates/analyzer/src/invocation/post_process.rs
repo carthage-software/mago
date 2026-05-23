@@ -74,38 +74,21 @@ pub fn post_invocation_process<'ctx, 'arena>(
     };
 
     let (callable_kind_str, full_callable_name) = match identifier {
-        FunctionLikeIdentifier::Function(name) => {
-            let display = metadata.original_name.unwrap_or(*name);
-
-            ("function", format!("`{display}`"))
-        }
-        FunctionLikeIdentifier::Method(class_name, method_name) => {
+        FunctionLikeIdentifier::Function(_) => ("function", format!("`{}`", metadata.original_name)),
+        FunctionLikeIdentifier::Method(class_name, _) => {
             let class_display =
                 context.codebase.get_class_like(class_name.as_bytes()).map(|m| m.original_name).unwrap_or(*class_name);
-            let method_display = metadata.original_name.unwrap_or(*method_name);
 
-            ("method", format!("`{class_display}::{method_display}`"))
+            ("method", format!("`{class_display}::{}`", metadata.original_name))
         }
-        FunctionLikeIdentifier::Closure(file_id, position) => (
-            "closure",
-            format!(
-                "defined at `{}:{}:{}`",
-                if *file_id == context.source_file.id {
-                    format!("{}", mago_bytes::BytesDisplay(&context.source_file.name))
-                } else {
-                    format!("<file:{file_id}>")
-                },
-                context.source_file.line_number(position.offset),
-                context.source_file.column_number(position.offset)
-            ),
-        ),
+        FunctionLikeIdentifier::Closure(name) => ("closure", format!("`{name}`")),
     };
 
     if metadata.flags.is_deprecated() {
         let issue_kind = match identifier {
             FunctionLikeIdentifier::Function(_) => IssueCode::DeprecatedFunction,
             FunctionLikeIdentifier::Method(_, _) => IssueCode::DeprecatedMethod,
-            FunctionLikeIdentifier::Closure(_, _) => IssueCode::DeprecatedClosure,
+            FunctionLikeIdentifier::Closure(_) => IssueCode::DeprecatedClosure,
         };
 
         context.collector.report_with_code(
@@ -1207,6 +1190,7 @@ fn collect_plugin_throw_types<'ctx, 'arena>(
     let exceptions = match identifier {
         FunctionLikeIdentifier::Function(name) => context.plugin_registry.get_function_thrown_exceptions(
             context.codebase,
+            context.source_file,
             block_context,
             artifacts,
             name.as_bytes(),
@@ -1215,6 +1199,7 @@ fn collect_plugin_throw_types<'ctx, 'arena>(
         FunctionLikeIdentifier::Method(class_name, method_name) => {
             context.plugin_registry.get_method_thrown_exceptions(
                 context.codebase,
+                context.source_file,
                 block_context,
                 artifacts,
                 class_name.as_bytes(),
@@ -1222,7 +1207,7 @@ fn collect_plugin_throw_types<'ctx, 'arena>(
                 invocation,
             )
         }
-        FunctionLikeIdentifier::Closure(_, _) => return,
+        FunctionLikeIdentifier::Closure(_) => return,
     };
 
     for exception in exceptions {
@@ -1243,6 +1228,7 @@ fn apply_plugin_assertions<'ctx, 'arena>(
 ) {
     let Some(assertions) = context.plugin_registry.get_function_like_assertions(
         context.codebase,
+        context.source_file,
         block_context,
         artifacts,
         identifier,

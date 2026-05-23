@@ -16,18 +16,14 @@ pub(crate) fn display_class_like_name(context: &Context<'_, '_>, name: Word) -> 
 /// user-facing diagnostics. Falls back to the input if metadata is missing.
 #[inline]
 pub(crate) fn display_method_name(context: &Context<'_, '_>, class_name: Word, method_name: Word) -> Word {
-    context
-        .codebase
-        .get_method(class_name.as_bytes(), method_name.as_bytes())
-        .and_then(|m| m.original_name)
-        .unwrap_or(method_name)
+    context.codebase.get_method(class_name.as_bytes(), method_name.as_bytes()).map_or(method_name, |m| m.original_name)
 }
 
 /// Returns the case-preserved name of a global function for user-facing
 /// diagnostics. Falls back to the input if metadata is missing.
 #[inline]
 pub(crate) fn display_function_name(context: &Context<'_, '_>, name: Word) -> Word {
-    context.codebase.get_function(name.as_bytes()).and_then(|m| m.original_name).unwrap_or(name)
+    context.codebase.get_function(name.as_bytes()).map_or(name, |m| m.original_name)
 }
 
 /// Produces a user-facing display string for a `FunctionLikeIdentifier`.
@@ -43,6 +39,6 @@ pub(crate) fn display_function_like_identifier(
             let method_display = display_method_name(context, *class_name, *method_name);
             format!("{class_display}::{method_display}")
         }
-        FunctionLikeIdentifier::Closure(_, _) => identifier.as_string(),
+        FunctionLikeIdentifier::Closure(name) => name.to_string(),
     }
 }

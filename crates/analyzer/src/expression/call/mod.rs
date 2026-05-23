@@ -81,7 +81,7 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
             ..
         } = target
         {
-            metadata.original_name
+            Some(metadata.original_name)
         } else {
             None
         }
@@ -89,9 +89,8 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
 
     let mut resulting_type = None;
     for target in invocation_targets {
-        if let InvocationTarget::FunctionLike { metadata, .. } = &target
-            && let Some(name) = metadata.name
-        {
+        if let InvocationTarget::FunctionLike { metadata, .. } = &target {
+            let name = metadata.name;
             match true {
                 _ if name.as_bytes().eq_ignore_ascii_case(b"mago\\inspect") => {
                     inspect_arguments(context, block_context, artifacts, &target, &invocation_arguments)?;

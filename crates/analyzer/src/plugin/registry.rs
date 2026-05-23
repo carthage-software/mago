@@ -991,17 +991,24 @@ impl PluginRegistry {
     pub fn get_function_like_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_like: &FunctionLikeIdentifier,
         invocation: &Invocation<'ctx, '_, '_>,
     ) -> Option<ProviderResult> {
         match function_like {
-            FunctionLikeIdentifier::Function(name) => {
-                Some(self.get_function_return_type(codebase, block_context, artifacts, name.as_bytes(), invocation))
-            }
+            FunctionLikeIdentifier::Function(name) => Some(self.get_function_return_type(
+                codebase,
+                source_file,
+                block_context,
+                artifacts,
+                name.as_bytes(),
+                invocation,
+            )),
             FunctionLikeIdentifier::Method(class_name, method_name) => Some(self.get_method_return_type(
                 codebase,
+                source_file,
                 block_context,
                 artifacts,
                 class_name.as_bytes(),
@@ -1016,6 +1023,7 @@ impl PluginRegistry {
     pub fn get_function_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_name: &[u8],
@@ -1025,7 +1033,7 @@ impl PluginRegistry {
         let mut all_issues = Vec::new();
 
         for idx in indices {
-            let provider_context = ProviderContext::new(codebase, block_context, artifacts);
+            let provider_context = ProviderContext::new(codebase, source_file, block_context, artifacts);
             let invocation_info = InvocationInfo::new(invocation);
 
             if let Some(ty) = self.function_providers[idx].get_return_type(&provider_context, &invocation_info) {
@@ -1043,6 +1051,7 @@ impl PluginRegistry {
     pub fn get_method_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         class_name: &[u8],
@@ -1053,7 +1062,7 @@ impl PluginRegistry {
         let mut all_issues = Vec::new();
 
         for idx in indices {
-            let provider_context = ProviderContext::new(codebase, block_context, artifacts);
+            let provider_context = ProviderContext::new(codebase, source_file, block_context, artifacts);
             let invocation_info = InvocationInfo::new(invocation);
 
             if let Some(ty) =
@@ -1160,17 +1169,24 @@ impl PluginRegistry {
     pub fn get_function_like_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_like: &FunctionLikeIdentifier,
         invocation: &Invocation<'ctx, '_, '_>,
     ) -> Option<InvocationAssertions> {
         match function_like {
-            FunctionLikeIdentifier::Function(name) => {
-                self.get_function_assertions(codebase, block_context, artifacts, name.as_bytes(), invocation)
-            }
+            FunctionLikeIdentifier::Function(name) => self.get_function_assertions(
+                codebase,
+                source_file,
+                block_context,
+                artifacts,
+                name.as_bytes(),
+                invocation,
+            ),
             FunctionLikeIdentifier::Method(class_name, method_name) => self.get_method_assertions(
                 codebase,
+                source_file,
                 block_context,
                 artifacts,
                 class_name.as_bytes(),
@@ -1186,6 +1202,7 @@ impl PluginRegistry {
     pub fn get_function_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_name: &[u8],
@@ -1198,7 +1215,7 @@ impl PluginRegistry {
         let indices = self.get_function_assertion_provider_indices(function_name);
 
         for idx in indices {
-            let provider_context = ProviderContext::new(codebase, block_context, artifacts);
+            let provider_context = ProviderContext::new(codebase, source_file, block_context, artifacts);
             let invocation_info = InvocationInfo::new(invocation);
 
             if let Some(assertions) =
@@ -1217,6 +1234,7 @@ impl PluginRegistry {
     pub fn get_method_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         class_name: &[u8],
@@ -1230,7 +1248,7 @@ impl PluginRegistry {
         let indices = self.get_method_assertion_provider_indices(class_name, method_name);
 
         for idx in indices {
-            let provider_context = ProviderContext::new(codebase, block_context, artifacts);
+            let provider_context = ProviderContext::new(codebase, source_file, block_context, artifacts);
             let invocation_info = InvocationInfo::new(invocation);
 
             if let Some(assertions) = self.method_assertion_providers[idx].get_assertions(
@@ -1312,6 +1330,7 @@ impl PluginRegistry {
     pub fn get_expression_thrown_exceptions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         expression: &mago_syntax::ast::Expression<'_>,
@@ -1319,7 +1338,7 @@ impl PluginRegistry {
         let mut exceptions = WordSet::default();
 
         for provider in &self.expression_throw_providers {
-            let provider_context = ProviderContext::new(codebase, block_context, artifacts);
+            let provider_context = ProviderContext::new(codebase, source_file, block_context, artifacts);
             exceptions.extend(provider.get_thrown_exceptions(&provider_context, expression));
         }
 
@@ -1331,6 +1350,7 @@ impl PluginRegistry {
     pub fn get_function_thrown_exceptions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         function_name: &[u8],
@@ -1340,7 +1360,7 @@ impl PluginRegistry {
         let indices = self.get_function_throw_provider_indices(function_name);
 
         for idx in indices {
-            let provider_context = ProviderContext::new(codebase, block_context, artifacts);
+            let provider_context = ProviderContext::new(codebase, source_file, block_context, artifacts);
             let invocation_info = InvocationInfo::new(invocation);
             exceptions
                 .extend(self.function_throw_providers[idx].get_thrown_exceptions(&provider_context, &invocation_info));
@@ -1354,6 +1374,7 @@ impl PluginRegistry {
     pub fn get_method_thrown_exceptions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
         class_name: &[u8],
@@ -1364,7 +1385,7 @@ impl PluginRegistry {
         let indices = self.get_method_throw_provider_indices(class_name, method_name);
 
         for idx in indices {
-            let provider_context = ProviderContext::new(codebase, block_context, artifacts);
+            let provider_context = ProviderContext::new(codebase, source_file, block_context, artifacts);
             let invocation_info = InvocationInfo::new(invocation);
             exceptions.extend(self.method_throw_providers[idx].get_thrown_exceptions(
                 &provider_context,

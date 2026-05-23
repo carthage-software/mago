@@ -72,12 +72,13 @@ pub fn scan_method<'arena>(
 
     let verdict = evaluate_version_attributes(&method.attribute_lists, context, context.php_version);
 
-    let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Method, span, flags);
+    let lookup_name = ascii_lowercase_word(method.name.value);
+    let display_name = word(method.name.value);
+
+    let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Method, lookup_name, display_name, span, flags);
     metadata.version_constraint = verdict.constraint;
     metadata.attributes = scan_attribute_lists(&method.attribute_lists, context);
     metadata.type_resolution_context = type_resolution_context.filter(|c| !c.is_empty());
-    metadata.name = Some(ascii_lowercase_word(method.name.value));
-    metadata.original_name = Some(word(method.name.value));
 
     metadata.name_span = Some(method.name.span);
     metadata.parameters = method
@@ -173,13 +174,14 @@ pub fn scan_function<'arena>(
     }
 
     let name = context.resolved_names.get(&function.name);
+    let lookup_name = ascii_lowercase_word(name);
+    let display_name = word(name);
 
-    let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Function, function.span(), flags);
+    let mut metadata =
+        FunctionLikeMetadata::new(FunctionLikeKind::Function, lookup_name, display_name, function.span(), flags);
     metadata.version_constraint = verdict.constraint;
     collect_globals_into(&function.body, &mut metadata.globals_accessed);
 
-    metadata.name = Some(ascii_lowercase_word(name));
-    metadata.original_name = Some(word(name));
     metadata.name_span = Some(function.name.span);
     metadata.parameters = function
         .parameter_list
@@ -236,13 +238,17 @@ pub fn scan_closure<'arena>(
         flags |= MetadataFlags::BY_REFERENCE;
     }
 
-    let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Closure, span, flags).with_parameters(
-        closure
-            .parameter_list
-            .parameters
-            .iter()
-            .filter_map(|p| scan_function_like_parameter(p, classname, context, scope)),
-    );
+    let synthetic_name = functionlike_id.1;
+
+    let mut metadata =
+        FunctionLikeMetadata::new(FunctionLikeKind::Closure, synthetic_name, synthetic_name, span, flags)
+            .with_parameters(
+                closure
+                    .parameter_list
+                    .parameters
+                    .iter()
+                    .filter_map(|p| scan_function_like_parameter(p, classname, context, scope)),
+            );
     collect_globals_into(&closure.body, &mut metadata.globals_accessed);
 
     metadata.attributes = scan_attribute_lists(&closure.attribute_lists, context);
@@ -289,13 +295,17 @@ pub fn scan_arrow_function<'arena>(
         flags |= MetadataFlags::BY_REFERENCE;
     }
 
-    let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::ArrowFunction, span, flags).with_parameters(
-        arrow_function
-            .parameter_list
-            .parameters
-            .iter()
-            .filter_map(|p| scan_function_like_parameter(p, classname, context, scope)),
-    );
+    let synthetic_name = functionlike_id.1;
+
+    let mut metadata =
+        FunctionLikeMetadata::new(FunctionLikeKind::ArrowFunction, synthetic_name, synthetic_name, span, flags)
+            .with_parameters(
+                arrow_function
+                    .parameter_list
+                    .parameters
+                    .iter()
+                    .filter_map(|p| scan_function_like_parameter(p, classname, context, scope)),
+            );
 
     metadata.attributes = scan_attribute_lists(&arrow_function.attribute_lists, context);
     metadata.type_resolution_context =

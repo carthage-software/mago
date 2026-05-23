@@ -345,7 +345,7 @@ fn handle_template_param_substitution(
                         replacement_defining_entity != &GenericParent::FunctionLike((*calling_function, empty_word()))
                     }
                     Some(FunctionLikeIdentifier::Method(_, _)) => true,
-                    Some(FunctionLikeIdentifier::Closure(_, _)) => true,
+                    Some(FunctionLikeIdentifier::Closure(_)) => true,
                     None => true,
                 }
             {

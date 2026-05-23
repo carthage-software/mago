@@ -787,8 +787,8 @@ pub fn get_signature_of_function_like_identifier(
                 &TypeExpansionOptions::default(),
             )
         }
-        FunctionLikeIdentifier::Closure(file_id, position) => {
-            let function_like_metadata = codebase.get_closure(file_id, position)?;
+        FunctionLikeIdentifier::Closure(name) => {
+            let function_like_metadata = codebase.get_closure(name)?;
 
             get_signature_of_function_like_metadata(
                 function_like_identifier,
@@ -861,17 +861,11 @@ pub fn get_signature_of_function_like_metadata(
         None
     };
 
-    let is_closure = matches!(function_like_identifier, FunctionLikeIdentifier::Closure(..));
-    let mut signature = TCallableSignature::new(function_like_metadata.flags.is_pure(), is_closure)
+    let is_closure = matches!(function_like_identifier, FunctionLikeIdentifier::Closure(_));
+    TCallableSignature::new(function_like_metadata.flags.is_pure(), is_closure)
         .with_parameters(parameters)
         .with_return_type(return_type)
-        .with_source(Some(*function_like_identifier));
-
-    if let FunctionLikeIdentifier::Closure(file_id, closure_position) = function_like_identifier {
-        signature = signature.with_closure_location(Some((*file_id, *closure_position)));
-    }
-
-    signature
+        .with_source(Some(*function_like_identifier))
 }
 
 #[cold]
@@ -1056,9 +1050,9 @@ mod tests {
     use mago_database::Database;
     use mago_database::DatabaseReader;
     use mago_database::file::File;
-    use mago_database::file::FileId;
+
     use mago_names::resolver::NameResolver;
-    use mago_span::Position;
+
     use mago_syntax::parser::parse_file;
     use mago_word::WordSet;
     use mago_word::word;
@@ -2495,7 +2489,7 @@ mod tests {
     fn test_get_signature_of_closure() {
         let codebase = CodebaseMetadata::new();
 
-        let id = FunctionLikeIdentifier::Closure(FileId::new(b"test"), Position::new(0));
+        let id = FunctionLikeIdentifier::Closure(word(b"{closure:test.php:1:1}"));
         let sig = get_signature_of_function_like_identifier(&id, &codebase);
 
         assert!(sig.is_none());

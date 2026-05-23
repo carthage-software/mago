@@ -98,9 +98,7 @@ fn render_function_like(meta: &FunctionLikeMetadata, method_of: Option<&[u8]>) -
         let _ = write!(signature, "{}", BytesDisplay(class));
         signature.push_str("::");
     }
-    if let Some(name) = meta.original_name {
-        let _ = write!(signature, "{}", BytesDisplay(name.as_bytes()));
-    }
+    let _ = write!(signature, "{}", BytesDisplay(meta.original_name.as_bytes()));
     signature.push('(');
     let mut first = true;
     for param in &meta.parameters {

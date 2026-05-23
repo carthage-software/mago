@@ -1,12 +1,8 @@
 use std::sync::Arc;
 
-use mago_word::u32_word;
-use mago_word::u64_word;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_database::file::FileId;
-use mago_span::Position;
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
@@ -30,15 +26,11 @@ pub struct TCallableSignature {
     /// `true` if the callable is known to be pure (no side effects), often from `@psalm-pure`.
     pub is_pure: bool,
     /// `true` if this signature specifically represents a closure instance.
-    /// May overlap with `closure_position` being `Some`.
     pub is_closure: bool,
     /// Ordered list of parameters expected by the callable signature.
     pub parameters: Vec<TCallableParameter>,
     /// The return type of the callable, if specified. `None` implies `mixed` or unknown.
     pub return_type: Option<Arc<TUnion>>,
-    /// The source code starting position if this signature originated from a specific closure definition.
-    /// `None` if it represents a general callable type not tied to a specific closure literal.
-    pub closure_location: Option<(FileId, Position)>,
     /// The source of the callable, if it is an alias or reference to another function-like construct.
     pub source: Option<FunctionLikeIdentifier>,
 }
@@ -60,7 +52,7 @@ impl TCallableSignature {
     #[inline]
     #[must_use]
     pub fn new(is_pure: bool, is_closure: bool) -> Self {
-        Self { is_pure, is_closure, parameters: Vec::new(), return_type: None, closure_location: None, source: None }
+        Self { is_pure, is_closure, parameters: Vec::new(), return_type: None, source: None }
     }
 
     #[must_use]
@@ -94,13 +86,6 @@ impl TCallableSignature {
     #[inline]
     pub fn get_return_type_mut(&mut self) -> Option<&mut TUnion> {
         self.return_type.as_mut().map(Arc::make_mut)
-    }
-
-    /// Returns the closure's starting position, if this signature represents a specific closure literal.
-    #[inline]
-    #[must_use]
-    pub fn get_closure_position(&self) -> Option<(FileId, Position)> {
-        self.closure_location
     }
 
     /// Checks if the callable is marked as pure.
@@ -140,7 +125,6 @@ impl TCallableSignature {
             is_closure: true,
             parameters: self.parameters.clone(),
             return_type: self.return_type.clone(),
-            closure_location: self.closure_location,
             source: self.source,
         }
     }
@@ -166,14 +150,6 @@ impl TCallableSignature {
     #[must_use]
     pub fn with_return_type(mut self, return_type: Option<Arc<TUnion>>) -> Self {
         self.return_type = return_type;
-        self
-    }
-
-    /// Returns a new instance with the closure position set.
-    #[inline]
-    #[must_use]
-    pub fn with_closure_location(mut self, closure_position: Option<(FileId, Position)>) -> Self {
-        self.closure_location = closure_position;
         self
     }
 
@@ -329,14 +305,8 @@ impl TType for TCallable {
                 FunctionLikeIdentifier::Method(fqcn, method_name) => {
                     concat_word!(b"Closure<", fqcn.as_bytes(), b"::", method_name.as_bytes(), b">(...)")
                 }
-                FunctionLikeIdentifier::Closure(file_id, position) => {
-                    concat_word!(
-                        "Closure<anonymous@",
-                        u64_word(file_id.as_u64()).as_bytes(),
-                        "::",
-                        u32_word(position.offset).as_bytes(),
-                        ">(...)"
-                    )
+                FunctionLikeIdentifier::Closure(name) => {
+                    concat_word!(b"Closure<", name.as_bytes(), b">(...)")
                 }
             },
         }

@@ -467,13 +467,11 @@ fn is_safe_to_add_parameter_type_hint(
         return true;
     }
 
-    // For methods, check if we have a name
-    let Some(method_name) = function_like_metadata.name else {
-        return true;
-    };
-
     // Check if this method is overriding a parent method
-    if context.codebase.method_is_overriding(class_like_metadata.name.as_bytes(), method_name.as_bytes()) {
+    if context
+        .codebase
+        .method_is_overriding(class_like_metadata.name.as_bytes(), function_like_metadata.name.as_bytes())
+    {
         // If overriding, we need to be conservative and not report
         // because we'd need to check if all parameters in the parent have type hints
         return false;
@@ -496,13 +494,11 @@ fn is_safe_to_add_return_type_hint(
         return true;
     }
 
-    // For methods, check if we have a name
-    let Some(method_name) = function_like_metadata.name else {
-        return true;
-    };
-
     // Check if this method is overriding a parent method
-    if context.codebase.method_is_overriding(class_like_metadata.name.as_bytes(), method_name.as_bytes()) {
+    if context
+        .codebase
+        .method_is_overriding(class_like_metadata.name.as_bytes(), function_like_metadata.name.as_bytes())
+    {
         // If overriding, we need to be conservative and not report
         return false;
     }

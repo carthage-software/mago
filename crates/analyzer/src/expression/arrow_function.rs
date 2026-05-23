@@ -42,7 +42,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
     ) -> Result<(), AnalysisError> {
         let s = self.span();
 
-        let Some(function_metadata) = context.codebase.get_closure(&s.file_id, &s.start) else {
+        let Some(function_metadata) = context.codebase.get_closure_at(context.source_file, s) else {
             return Err(AnalysisError::InternalError(
                 format!(
                     "Metadata for arrow function defined in `{}` at offset {} not found.",
@@ -136,7 +136,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             inferred_parameter_types,
         )?;
 
-        let function_identifier = FunctionLikeIdentifier::Closure(s.file_id, s.start);
+        let function_identifier = FunctionLikeIdentifier::for_closure(context.source_file, s);
 
         let mut signature = get_signature_of_function_like_metadata(
             &function_identifier,

@@ -21,6 +21,7 @@ pub fn fetch_invocation_return_type<'ctx, 'arena>(
     if let Some(identifier) = invocation.target.get_function_like_identifier()
         && let Some(result) = context.plugin_registry.get_function_like_return_type(
             context.codebase,
+            context.source_file,
             block_context,
             artifacts,
             identifier,

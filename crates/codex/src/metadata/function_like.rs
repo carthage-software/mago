@@ -73,13 +73,18 @@ pub struct FunctionLikeMetadata {
     /// For closures/arrow functions, this covers the `function(...) { ... }` or `fn(...) => ...` part.
     pub span: Span,
 
-    /// The name of the function or method, lowercased, if applicable.
-    /// `None` for closures and arrow functions unless assigned to a variable later.
-    /// Example: `processRequest`, `__construct`, `my_global_func`.
-    pub name: Option<Word>,
+    /// The lookup name of the function or method. For named functions and
+    /// methods this is the lowercased identifier (PHP-style case-insensitive
+    /// lookup); for closures and arrow functions it is the synthetic
+    /// `{closure:path:line:col}` word produced by
+    /// [`crate::build_synthetic_name`]. Always set.
+    /// Example: `processrequest`, `__construct`, `my_global_func`,
+    /// `{closure:src/foo.php:12:5}`.
+    pub name: Word,
 
-    /// The original name of the function or method, in its original case.
-    pub original_name: Option<Word>,
+    /// The original-case name. Matches the source identifier for named
+    /// functions/methods, and matches [`Self::name`] verbatim for closures.
+    pub original_name: Word,
 
     /// The specific source code location (span) of the function or method name identifier.
     /// `None` if the function/method has no name (closures/arrow functions).
@@ -194,16 +199,20 @@ impl FunctionLikeKind {
 /// Contains comprehensive metadata for any function-like structure in PHP.
 impl FunctionLikeMetadata {
     /// Creates new `FunctionLikeMetadata` with basic information and default flags.
+    ///
+    /// Pass the lookup `name` (lowercased identifier for named functions/methods,
+    /// synthetic `{closure:...}` word for closures) and `original_name` (source
+    /// casing for named items, identical to `name` for closures).
     #[must_use]
-    pub fn new(kind: FunctionLikeKind, span: Span, flags: MetadataFlags) -> Self {
+    pub fn new(kind: FunctionLikeKind, name: Word, original_name: Word, span: Span, flags: MetadataFlags) -> Self {
         let method_metadata = if kind.is_method() { Some(MethodMetadata::default()) } else { None };
 
         Self {
             kind,
             span,
             flags,
-            name: None,
-            original_name: None,
+            name,
+            original_name,
             name_span: None,
             parameters: vec![],
             return_type_declaration_metadata: None,

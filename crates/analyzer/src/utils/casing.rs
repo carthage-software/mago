@@ -52,9 +52,7 @@ pub fn check_function_casing_with_metadata(
         return;
     }
 
-    let Some(canonical) = metadata.original_name else {
-        return;
-    };
+    let canonical = metadata.original_name;
 
     if canonical == used_name {
         return;

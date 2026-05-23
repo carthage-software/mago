@@ -65,7 +65,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
         artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError> {
         if context.plugin_registry.has_expression_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);
             let expression_hook_result = context.plugin_registry.before_expression(self, &mut hook_context)?;
             for reported in hook_context.take_issues() {
                 context.collector.report_with_code(reported.code, reported.issue);
@@ -117,7 +117,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
                     AttributeTarget::ClassLike,
                 );
 
-                let Some(class_like_metadata) = context.codebase.get_anonymous_class(self.span()) else {
+                let Some(class_like_metadata) = context.codebase.get_anonymous_class(context.source_file, self.span())
+                else {
                     return Ok(());
                 };
 
@@ -236,7 +237,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
         result?;
 
         if context.plugin_registry.has_expression_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, block_context, artifacts);
+            let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);
             context.plugin_registry.after_expression(self, &mut hook_context)?;
             for reported in hook_context.take_issues() {
                 context.collector.report_with_code(reported.code, reported.issue);
@@ -246,6 +247,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
         if context.settings.check_throws && context.plugin_registry.has_expression_throw_providers() {
             let exceptions = context.plugin_registry.get_expression_thrown_exceptions(
                 context.codebase,
+                context.source_file,
                 block_context,
                 artifacts,
                 self,

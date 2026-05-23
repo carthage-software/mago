@@ -232,19 +232,17 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
 
         context.collector.report_with_code(
             IssueCode::MissingReturnStatement,
-            Issue::error(match function_metadata.name {
-                Some(name) => format!("Missing return statement in function '{name}'"),
-                None => "Missing return statement in closure".to_string(),
-            })
-            .with_annotation(
-                Annotation::primary(function_metadata.name_span.unwrap_or(function_metadata.span))
-                    .with_message(format!("This function is declared to return '{expected_return_type_id}'...")),
-            )
-            .with_annotation(
-                Annotation::secondary(body.span()).with_message("...but this path can exit without returning a value."),
-            )
-            .with_note("A function that does not explicitly return a value will implicitly return `null`.")
-            .with_help(help_message),
+            Issue::error(format!("Missing return statement in function `{}`", function_metadata.name))
+                .with_annotation(
+                    Annotation::primary(function_metadata.name_span.unwrap_or(function_metadata.span))
+                        .with_message(format!("This function is declared to return '{expected_return_type_id}'...")),
+                )
+                .with_annotation(
+                    Annotation::secondary(body.span())
+                        .with_message("...but this path can exit without returning a value."),
+                )
+                .with_note("A function that does not explicitly return a value will implicitly return `null`.")
+                .with_help(help_message),
         );
     }
 
@@ -266,14 +264,10 @@ fn add_parameter_types_to_context<'ctx, 'arena>(
     parameter_list: &FunctionLikeParameterList<'arena>,
     mut inferred_parameter_types: Option<HashMap<usize, TUnion>>,
 ) -> Result<(), AnalysisError> {
-    let is_overriding_method = if function_like_metadata.kind.is_method()
-        && let Some(class_name) = block_context.scope.get_class_like_name()
-        && let Some(method_name) = function_like_metadata.name
-    {
-        context.codebase.method_is_overriding(class_name.as_bytes(), method_name.as_bytes())
-    } else {
-        false
-    };
+    let is_overriding_method = function_like_metadata.kind.is_method()
+        && block_context.scope.get_class_like_name().is_some_and(|class_name| {
+            context.codebase.method_is_overriding(class_name.as_bytes(), function_like_metadata.name.as_bytes())
+        });
 
     for (i, parameter_metadata) in function_like_metadata.parameters.iter().enumerate() {
         let parameter_variable_str = parameter_metadata.get_name().0;
@@ -820,14 +814,10 @@ fn check_return_type_width<'ctx>(
         return;
     }
 
-    let is_overriding_method = if function_like_metadata.kind.is_method()
-        && let Some(class_name) = block_context.scope.get_class_like_name()
-        && let Some(method_name) = function_like_metadata.name
-    {
-        context.codebase.method_is_overriding(class_name.as_bytes(), method_name.as_bytes())
-    } else {
-        false
-    };
+    let is_overriding_method = function_like_metadata.kind.is_method()
+        && block_context.scope.get_class_like_name().is_some_and(|class_name| {
+            context.codebase.method_is_overriding(class_name.as_bytes(), function_like_metadata.name.as_bytes())
+        });
 
     if is_overriding_method {
         return;
@@ -901,7 +891,7 @@ fn check_return_type_width<'ctx>(
 
     let declared_str = expanded_declared.get_id();
     let return_span = return_type_metadata.span;
-    let function_label = function_like_metadata.name.unwrap_or_else(|| word("closure"));
+    let function_label = function_like_metadata.name;
 
     let issue = Issue::help(format!(
         "Declared return type `{declared_str}` for `{function_label}` has unused branches: `{unused_list}`."
@@ -938,9 +928,7 @@ fn check_thrown_types<'ctx>(
         return;
     }
 
-    let Some(function_name) = function_like_metadata.original_name.as_ref() else {
-        return;
-    };
+    let function_name = &function_like_metadata.original_name;
 
     let (function_kind, function_name) = if function_like_metadata.kind.is_method() {
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {

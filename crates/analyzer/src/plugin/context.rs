@@ -12,6 +12,7 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::union::TUnion;
+use mago_database::file::File;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -38,6 +39,7 @@ pub struct ReportedIssue {
 #[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct ProviderContext<'codebase, 'artifacts, 'block> {
     pub(crate) codebase: &'codebase CodebaseMetadata,
+    pub(crate) source_file: &'codebase File,
     pub(crate) artifacts: &'artifacts AnalysisArtifacts,
     pub(crate) block_context: &'block BlockContext<'codebase>,
     pub(crate) reported_issues: RefCell<Vec<ReportedIssue>>,
@@ -46,10 +48,11 @@ pub struct ProviderContext<'codebase, 'artifacts, 'block> {
 impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'block> {
     pub(crate) fn new(
         codebase: &'codebase CodebaseMetadata,
+        source_file: &'codebase File,
         block_context: &'block BlockContext<'codebase>,
         artifacts: &'artifacts AnalysisArtifacts,
     ) -> Self {
-        Self { codebase, artifacts, block_context, reported_issues: RefCell::new(Vec::new()) }
+        Self { codebase, source_file, artifacts, block_context, reported_issues: RefCell::new(Vec::new()) }
     }
 
     pub fn report(&self, code: IssueCode, issue: Issue) {
@@ -99,14 +102,8 @@ impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'bloc
     #[inline]
     pub fn get_closure_metadata<'arena>(&self, expr: &Expression<'arena>) -> Option<&'codebase FunctionLikeMetadata> {
         match expr {
-            Expression::ArrowFunction(arrow_fn) => {
-                let span = arrow_fn.span();
-                self.codebase.get_closure(&span.file_id, &span.start)
-            }
-            Expression::Closure(closure) => {
-                let span = closure.span();
-                self.codebase.get_closure(&span.file_id, &span.start)
-            }
+            Expression::ArrowFunction(arrow_fn) => self.codebase.get_closure_at(self.source_file, arrow_fn.span()),
+            Expression::Closure(closure) => self.codebase.get_closure_at(self.source_file, closure.span()),
             _ => None,
         }
     }
@@ -118,16 +115,8 @@ impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'bloc
     #[inline]
     pub fn get_callable_metadata<'arena>(&self, expr: &Expression<'arena>) -> Option<&'codebase FunctionLikeMetadata> {
         match expr {
-            Expression::ArrowFunction(arrow_fn) => {
-                let span = arrow_fn.span();
-
-                self.codebase.get_closure(&span.file_id, &span.start)
-            }
-            Expression::Closure(closure) => {
-                let span = closure.span();
-
-                self.codebase.get_closure(&span.file_id, &span.start)
-            }
+            Expression::ArrowFunction(arrow_fn) => self.codebase.get_closure_at(self.source_file, arrow_fn.span()),
+            Expression::Closure(closure) => self.codebase.get_closure_at(self.source_file, closure.span()),
             Expression::PartialApplication(partial) => match partial {
                 PartialApplication::Function(func_partial) => {
                     if !func_partial.argument_list.is_first_class_callable() {
@@ -220,6 +209,7 @@ impl<'codebase, 'artifacts, 'block> ProviderContext<'codebase, 'artifacts, 'bloc
 #[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct HookContext<'ctx, 'block> {
     pub(crate) codebase: &'ctx CodebaseMetadata,
+    pub(crate) source_file: &'ctx File,
     pub(crate) block_context: &'block mut BlockContext<'ctx>,
     pub(crate) artifacts: &'block mut AnalysisArtifacts,
     pub(crate) reported_issues: RefCell<Vec<ReportedIssue>>,
@@ -228,10 +218,11 @@ pub struct HookContext<'ctx, 'block> {
 impl<'ctx, 'block> HookContext<'ctx, 'block> {
     pub(crate) fn new(
         codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
         block_context: &'block mut BlockContext<'ctx>,
         artifacts: &'block mut AnalysisArtifacts,
     ) -> Self {
-        Self { codebase, artifacts, block_context, reported_issues: RefCell::new(Vec::new()) }
+        Self { codebase, source_file, artifacts, block_context, reported_issues: RefCell::new(Vec::new()) }
     }
 
     /// Report an issue from a hook.
@@ -289,14 +280,8 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
     #[inline]
     pub fn get_closure_metadata<'arena>(&self, expr: &Expression<'arena>) -> Option<&'ctx FunctionLikeMetadata> {
         match expr {
-            Expression::ArrowFunction(arrow_fn) => {
-                let span = arrow_fn.span();
-                self.codebase.get_closure(&span.file_id, &span.start)
-            }
-            Expression::Closure(closure) => {
-                let span = closure.span();
-                self.codebase.get_closure(&span.file_id, &span.start)
-            }
+            Expression::ArrowFunction(arrow_fn) => self.codebase.get_closure_at(self.source_file, arrow_fn.span()),
+            Expression::Closure(closure) => self.codebase.get_closure_at(self.source_file, closure.span()),
             _ => None,
         }
     }

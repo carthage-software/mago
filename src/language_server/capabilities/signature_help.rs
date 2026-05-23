@@ -52,7 +52,7 @@ pub fn compute(
 
 fn signature_information(meta: &FunctionLikeMetadata) -> SignatureInformation {
     use std::fmt::Write;
-    let name = meta.original_name.map(|n| String::from_utf8_lossy(n.as_bytes()).into_owned()).unwrap_or_default();
+    let name = String::from_utf8_lossy(meta.original_name.as_bytes()).into_owned();
     let mut label = format!("function {name}(");
     let mut params: Vec<ParameterInformation> = Vec::with_capacity(meta.parameters.len());
 

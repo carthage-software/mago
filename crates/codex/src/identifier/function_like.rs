@@ -1,8 +1,8 @@
-use mago_database::file::FileId;
+use mago_database::file::File;
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_span::Position;
+use mago_span::Span;
 use mago_word::Word;
 
 use crate::identifier::method::MethodIdentifier;
@@ -10,7 +10,7 @@ use crate::identifier::method::MethodIdentifier;
 /// Identifies a specific function-like construct within the codebase.
 ///
 /// This distinguishes between globally/namespaced defined functions, methods within
-/// class-like structures, and closures identified by their source position.
+/// class-like structures, and closures identified by their synthetic name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
 pub enum FunctionLikeIdentifier {
     /// A globally or namespaced defined function.
@@ -22,12 +22,21 @@ pub enum FunctionLikeIdentifier {
     Method(Word, Word),
     /// A closure (anonymous function `function() {}` or arrow function `fn() => expr`).
     ///
-    /// * `FileId` - The identifier of the file where the closure is defined.
-    /// * `Position` - The starting position of the closure definition.
-    Closure(FileId, Position),
+    /// * `Word` - The synthetic display name produced by
+    ///   [`crate::build_synthetic_name`], for example
+    ///   `{closure:src/foo.php:12:5}`. The same word doubles as the
+    ///   `function_likes` HashMap key and as the user-facing identifier in
+    ///   issue messages, so the name is stable across machines and rebuilds.
+    Closure(Word),
 }
 
 impl FunctionLikeIdentifier {
+    #[inline]
+    #[must_use]
+    pub fn for_closure(file: &File, span: Span) -> Self {
+        Self::Closure(crate::build_synthetic_name("closure", file, span))
+    }
+
     /// Checks if this identifier represents a `Function`.
     #[inline]
     #[must_use]
@@ -46,7 +55,7 @@ impl FunctionLikeIdentifier {
     #[inline]
     #[must_use]
     pub const fn is_closure(&self) -> bool {
-        matches!(self, FunctionLikeIdentifier::Closure(_, _))
+        matches!(self, FunctionLikeIdentifier::Closure(_))
     }
 
     /// If this identifier represents a method, returns it as a `MethodIdentifier`.
@@ -69,7 +78,7 @@ impl FunctionLikeIdentifier {
         match self {
             FunctionLikeIdentifier::Function(_) => "Function",
             FunctionLikeIdentifier::Method(_, _) => "Method",
-            FunctionLikeIdentifier::Closure(_, _) => "Closure",
+            FunctionLikeIdentifier::Closure(_) => "Closure",
         }
     }
 
@@ -80,13 +89,14 @@ impl FunctionLikeIdentifier {
         match self {
             FunctionLikeIdentifier::Function(_) => "function",
             FunctionLikeIdentifier::Method(_, _) => "method",
-            FunctionLikeIdentifier::Closure(_, _) => "closure",
+            FunctionLikeIdentifier::Closure(_) => "closure",
         }
     }
 
     /// Converts the identifier to a human-readable string representation.
     ///
-    /// For closures, this typically includes the filename and starting offset.
+    /// Functions and methods render as `name` and `Class::method`. Closures
+    /// render as their synthetic name verbatim, e.g. `{closure:src/foo.php:12:5}`.
     #[inline]
     #[must_use]
     pub fn as_string(&self) -> String {
@@ -95,9 +105,7 @@ impl FunctionLikeIdentifier {
             FunctionLikeIdentifier::Method(fq_classlike_name, method_name) => {
                 format!("{fq_classlike_name}::{method_name}")
             }
-            FunctionLikeIdentifier::Closure(file_id, position) => {
-                format!("{}:{}", file_id, position.offset)
-            }
+            FunctionLikeIdentifier::Closure(name) => name.to_string(),
         }
     }
 
@@ -105,15 +113,7 @@ impl FunctionLikeIdentifier {
     #[inline]
     #[must_use]
     pub fn to_hash(&self) -> String {
-        match self {
-            FunctionLikeIdentifier::Function(fn_name) => fn_name.to_string(),
-            FunctionLikeIdentifier::Method(fq_classlike_name, method_name) => {
-                format!("{fq_classlike_name}::{method_name}")
-            }
-            FunctionLikeIdentifier::Closure(file_id, position) => {
-                format!("{}::{}", file_id, position.offset)
-            }
-        }
+        self.as_string()
     }
 }
 

@@ -88,7 +88,7 @@ pub fn register_anonymous_class<'arena>(
     scope: &mut NamespaceScope,
 ) -> ClassLikeRegistration {
     let span = class.span();
-    let name = get_anonymous_class_name(span);
+    let name = get_anonymous_class_name(context.file, span);
 
     let class_like_metadata = scan_class_like(
         codebase,
@@ -1036,11 +1036,13 @@ fn scan_class_like<'arena>(
 
             let method_id = (name, method_name);
 
-            let mut function_like_metadata =
-                FunctionLikeMetadata::new(FunctionLikeKind::Method, method_tag.span, MetadataFlags::empty());
-
-            function_like_metadata.name = Some(method_name);
-            function_like_metadata.original_name = Some(word(&method_tag.method.name));
+            let mut function_like_metadata = FunctionLikeMetadata::new(
+                FunctionLikeKind::Method,
+                method_name,
+                word(&method_tag.method.name),
+                method_tag.span,
+                MetadataFlags::empty(),
+            );
 
             let Some(method_metadata) = function_like_metadata.method_metadata.as_mut() else {
                 continue;
@@ -1510,8 +1512,8 @@ fn create_enum_from_method(enum_name: &[u8], enum_method_span: Span, backing_typ
     FunctionLikeMetadata {
         kind: FunctionLikeKind::Method,
         span: enum_method_span,
-        name: Some(word("from")),
-        original_name: Some(word("from")),
+        name: word("from"),
+        original_name: word("from"),
         name_span: Some(enum_method_span),
         parameters: vec![FunctionLikeParameterMetadata {
             attributes: vec![],
@@ -1567,8 +1569,8 @@ fn create_enum_try_from_method(
     FunctionLikeMetadata {
         kind: FunctionLikeKind::Method,
         span: enum_method_span,
-        name: Some(word("tryFrom")),
-        original_name: Some(word("tryFrom")),
+        name: word("tryFrom"),
+        original_name: word("tryFrom"),
         name_span: Some(enum_method_span),
         parameters: vec![FunctionLikeParameterMetadata {
             attributes: vec![],
@@ -1626,8 +1628,8 @@ fn create_enum_cases_method(enum_name: &[u8], enum_method_span: Span, has_cases:
     FunctionLikeMetadata {
         kind: FunctionLikeKind::Method,
         span: enum_method_span,
-        name: Some(word("cases")),
-        original_name: Some(word("cases")),
+        name: word("cases"),
+        original_name: word("cases"),
         name_span: Some(enum_method_span),
         parameters: vec![],
         return_type_declaration_metadata: Some(TypeMetadata::new(

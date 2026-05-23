@@ -12,7 +12,6 @@ use mago_database::file::File as MagoFile;
 use mago_database::file::FileType;
 use mago_span::Span;
 use mago_syntax::token::TokenKind;
-use mago_word::Word;
 use tower_lsp::lsp_types::CompletionItem;
 use tower_lsp::lsp_types::CompletionItemKind;
 use tower_lsp::lsp_types::Documentation;
@@ -133,7 +132,7 @@ pub(super) fn bare_items(
         if !is_user_symbol(database, meta.span) {
             continue;
         }
-        let display: &[u8] = meta.original_name.as_ref().map_or_else(|| name.as_bytes(), Word::as_bytes);
+        let display: &[u8] = meta.original_name.as_bytes();
         let local = local_name(display);
         if !local.to_ascii_lowercase().starts_with(&needle) || !in_scope(name.as_bytes()) {
             continue;
@@ -263,7 +262,7 @@ fn collect_class_members(
         else {
             continue;
         };
-        let display: &[u8] = method.original_name.as_ref().map_or_else(|| name.as_bytes(), Word::as_bytes);
+        let display: &[u8] = method.original_name.as_bytes();
         let display_str = String::from_utf8_lossy(display).into_owned();
         out.push(CompletionItem {
             label: display_str.clone(),

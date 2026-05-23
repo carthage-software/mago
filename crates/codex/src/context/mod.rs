@@ -75,20 +75,22 @@ impl<'ctx> ScopeContext<'ctx> {
     #[must_use]
     pub fn get_function_like_identifier(&self) -> Option<FunctionLikeIdentifier> {
         let function_like = self.function_like?;
+        let function_name = function_like.name;
 
-        let Some(function_name) = function_like.name else {
-            return Some(FunctionLikeIdentifier::Closure(function_like.span.file_id, function_like.span.start));
-        };
+        if function_like.get_kind().is_method() {
+            if let Some(class_like) = self.class_like {
+                return Some(FunctionLikeIdentifier::Method(class_like.name, function_name));
+            }
 
-        Some(if function_like.get_kind().is_method() {
-            let Some(class_like) = self.class_like else {
-                return Some(FunctionLikeIdentifier::Function(function_name));
-            };
+            return Some(FunctionLikeIdentifier::Function(function_name));
+        }
 
-            FunctionLikeIdentifier::Method(class_like.name, function_name)
-        } else {
-            FunctionLikeIdentifier::Function(function_name)
-        })
+        let kind = function_like.get_kind();
+        if kind.is_closure() || kind.is_arrow_function() {
+            return Some(FunctionLikeIdentifier::Closure(function_name));
+        }
+
+        Some(FunctionLikeIdentifier::Function(function_name))
     }
 
     /// Checks if the calling class scope is marked as `final`.

@@ -177,7 +177,7 @@ impl<'ctx> InvocationTarget<'ctx> {
             Some(identifier) => match identifier {
                 FunctionLikeIdentifier::Function(_) => "function",
                 FunctionLikeIdentifier::Method(_, _) => "method",
-                FunctionLikeIdentifier::Closure(_, _) => "closure",
+                FunctionLikeIdentifier::Closure(_) => "closure",
             },
             None => {
                 if self.is_non_closure_callable() {

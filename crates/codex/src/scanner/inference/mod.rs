@@ -569,22 +569,12 @@ pub(super) fn infer_with_constants<'arena>(
 
             Some(TUnion::from_single(Cow::Owned(TAtomic::Array(TArray::Keyed(keyed_array)))))
         }
-        Expression::Closure(closure) => {
-            let span = closure.span();
-
-            Some(wrap_atomic(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Closure(
-                span.file_id,
-                span.start,
-            )))))
-        }
-        Expression::ArrowFunction(arrow_func) => {
-            let span = arrow_func.span();
-
-            Some(wrap_atomic(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Closure(
-                span.file_id,
-                span.start,
-            )))))
-        }
+        Expression::Closure(closure) => Some(wrap_atomic(TAtomic::Callable(TCallable::Alias(
+            FunctionLikeIdentifier::for_closure(context.file, closure.span()),
+        )))),
+        Expression::ArrowFunction(arrow_func) => Some(wrap_atomic(TAtomic::Callable(TCallable::Alias(
+            FunctionLikeIdentifier::for_closure(context.file, arrow_func.span()),
+        )))),
         _ => None,
     }
 }

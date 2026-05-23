@@ -62,10 +62,7 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str
         if let Some(location) = span_to_location(database, meta.span) {
             #[allow(deprecated)]
             out.push(SymbolInformation {
-                name: meta
-                    .original_name
-                    .map(|n| String::from_utf8_lossy(n.as_bytes()).into_owned())
-                    .unwrap_or_else(|| String::from_utf8_lossy(name.as_bytes()).into_owned()),
+                name: String::from_utf8_lossy(meta.original_name.as_bytes()).into_owned(),
                 kind: LspSymbolKind::FUNCTION,
                 tags: None,
                 deprecated: None,

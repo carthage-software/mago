@@ -441,7 +441,7 @@ fn get_current_generator_parameters<'ctx>(
                     Issue::error(format!(
                         "Declared return type `{}` for generator function `{}` is not a valid Generator or iterable type.",
                         iterable_type.get_id(),
-                        function.name.map_or_else(|| "current".to_string(), |id| id.to_string())
+                        function.name
                     ))
                     .with_annotation(
                         Annotation::primary(return_type_metadata.span)

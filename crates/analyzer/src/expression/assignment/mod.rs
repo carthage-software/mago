@@ -115,7 +115,7 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
     if let (Some(source_expression), Some(target_variable_id)) = (source_expression, &target_variable_id)
         && matches!(target_expression, Expression::Variable(_))
         && is_closure_expression(source_expression)
-        && let Some(preliminary_type) = get_closure_expression_type(source_expression)
+        && let Some(preliminary_type) = get_closure_expression_type(context.source_file, source_expression)
     {
         block_context.locals.insert(*target_variable_id, Rc::new(preliminary_type));
     }
@@ -1105,13 +1105,13 @@ fn get_closure_expression_span<'arena>(expression: &'arena Expression<'arena>) -
     if matches!(expression, Expression::Closure(_)) { Some(expression.span()) } else { None }
 }
 
-fn get_closure_expression_type<'arena>(expression: &'arena Expression<'arena>) -> Option<TUnion> {
+fn get_closure_expression_type<'arena>(
+    file: &mago_database::file::File,
+    expression: &'arena Expression<'arena>,
+) -> Option<TUnion> {
     let span = get_closure_expression_span(expression)?;
 
-    Some(TUnion::from_atomic(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Closure(
-        span.file_id,
-        span.start,
-    )))))
+    Some(TUnion::from_atomic(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::for_closure(file, span)))))
 }
 
 #[cfg(test)]

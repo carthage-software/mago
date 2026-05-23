@@ -38,8 +38,6 @@ use mago_word::WordMap;
 use mago_word::WordSet;
 use mago_word::ascii_lowercase_word;
 use mago_word::empty_word;
-use mago_word::u32_word;
-use mago_word::u64_word;
 use mago_word::word;
 
 use crate::identifier::method::MethodIdentifier;
@@ -348,9 +346,8 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
     fn walk_in_closure(&mut self, closure: &'arena Closure<'arena>, context: &mut Context<'ctx, 'arena>) {
         let span = closure.span();
 
-        let file_ref = u64_word(span.file_id.as_u64());
-        let closure_ref = u32_word(span.start.offset);
-        let identifier = (file_ref, closure_ref);
+        let synthetic = crate::build_synthetic_name("closure", context.file, span);
+        let identifier = (empty_word(), synthetic);
 
         let type_resolution_context = self.get_current_type_resolution_context();
         let metadata = scan_closure(
@@ -387,9 +384,8 @@ impl<'ctx, 'arena> MutWalker<'arena, 'arena, Context<'ctx, 'arena>> for Scanner 
     ) {
         let span = arrow_function.span();
 
-        let file_ref = u64_word(span.file_id.as_u64());
-        let closure_ref = u32_word(span.start.offset);
-        let identifier = (file_ref, closure_ref);
+        let synthetic = crate::build_synthetic_name("closure", context.file, span);
+        let identifier = (empty_word(), synthetic);
 
         let type_resolution_context = self.get_current_type_resolution_context();
 
@@ -713,7 +709,13 @@ fn finalize_class_like(scanner: &mut Scanner, context: &Context<'_, '_>) {
 
         scanner.codebase.function_likes.insert(
             (class_like_metadata.name, constructor_name),
-            FunctionLikeMetadata::new(FunctionLikeKind::Method, class_like_metadata.span, flags),
+            FunctionLikeMetadata::new(
+                FunctionLikeKind::Method,
+                constructor_name,
+                constructor_name,
+                class_like_metadata.span,
+                flags,
+            ),
         );
     }
 
