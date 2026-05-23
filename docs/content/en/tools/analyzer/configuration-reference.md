@@ -20,7 +20,7 @@ baseline = "analyzer-baseline.toml"
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `excludes` | `string[]` | `[]` | Paths or glob patterns to exclude from analysis. Additive to `[source].excludes`. |
-| `ignore` | `(string \| object)[]` | `[]` | Issue codes to ignore, optionally scoped to specific paths. See below. |
+| `ignore` | `(string \| object)[]` | `[]` | Issue codes to ignore, optionally scoped to specific paths or filtered by regex against issue text. See below. |
 | `baseline` | `string` | unset | Path to a baseline file. Equivalent to passing `--baseline` on every run. The CLI flag overrides this. |
 | `baseline-variant` | `string` | `"loose"` | Format for newly generated baselines. `"loose"` (count-based) or `"strict"` (exact line matching). See [baseline](/fundamentals/baseline/). |
 | `minimum-fail-level` | `string` | `"error"` | Minimum severity that causes a non-zero exit. One of `"note"`, `"help"`, `"warning"`, `"error"`. Overridden by `--minimum-fail-level`. |
@@ -62,6 +62,23 @@ ignore = [
 ```
 
 Glob matching honours the project-wide settings under `[source.glob]`, so toggles like `literal-separator` and `case-insensitive` apply here as well.
+
+### Pattern-based ignoring
+
+When a code is too broad to silence wholesale but the issues you want gone share a recognisable phrase (a vendor name, an inferred type, a function called out by name), use a `pattern` entry. The pattern is a regex tested against every textual field of the issue, in order: the title, each annotation message, each note, and the help message. The first match suppresses the issue. The most instance-specific text (title and annotations) is searched first; notes and help are searched last because they are typically templated per rule and rarely differ between two issues with the same code.
+
+```toml
+[analyzer]
+ignore = [
+    { pattern = "Symfony", code = "mixed-assignment" },
+    { pattern = "Saw type `mixed`", in = "src/Bridge/" },
+    { pattern = "(?i)deprecated" },
+]
+```
+
+Both `code` and `in` are optional. With only a `pattern`, every reported issue is tested against the regex regardless of code or file. Combining `pattern` with `code` and/or `in` narrows the search before running the regex, which is cheaper and avoids accidental matches in unrelated rules.
+
+The pattern is a [bare Rust regex](https://docs.rs/regex/). Write `(?i)` at the start to match case-insensitively; do not wrap the regex in `/.../` delimiters. An invalid regex is logged and the entry is skipped, so a single bad pattern does not stop the run.
 
 `excludes` and `ignore` are not the same. `excludes` removes files from analysis entirely, so they are not parsed for type information. `ignore` still analyses the file but suppresses the listed codes in the output.
 

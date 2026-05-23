@@ -58,6 +58,7 @@ use mago_database::watcher::DatabaseWatcher;
 use mago_database::watcher::WatchOptions;
 use mago_orchestrator::Orchestrator;
 use mago_prelude::Prelude;
+use mago_reporting::CompiledIgnoreSet;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::commands::args::substitution::SubstitutionArgs;
@@ -302,11 +303,14 @@ impl AnalyzeCommand {
         let report_start = trace_enabled.then(Instant::now);
         let mut issues = analysis_result.issues;
         let read_db = database.read_only();
-        issues.filter_out_ignored(
+        let ignore_set = CompiledIgnoreSet::compile(
             &configuration.analyzer.ignore,
             configuration.source.glob.to_database_settings(),
-            |file_id| read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned()),
         );
+
+        issues.filter_out_ignored(&ignore_set, |file_id| {
+            read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
+        });
 
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
@@ -437,13 +441,17 @@ impl AnalyzeCommand {
             orchestrator.get_incremental_analysis_service(watcher.read_only_database(), metadata, symbol_references);
         let analysis_result = service.analyze()?;
 
-        let mut issues = analysis_result.issues;
-        let read_db = watcher.read_only_database();
-        issues.filter_out_ignored(
+        let ignore_set = CompiledIgnoreSet::compile(
             &configuration.analyzer.ignore,
             configuration.source.glob.to_database_settings(),
-            |file_id| read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned()),
         );
+
+        let mut issues = analysis_result.issues;
+        let read_db = watcher.read_only_database();
+
+        issues.filter_out_ignored(&ignore_set, |file_id| {
+            read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
+        });
 
         let baseline = configuration.analyzer.baseline.as_deref();
         let baseline_variant = configuration.analyzer.baseline_variant;
@@ -481,11 +489,9 @@ impl AnalyzeCommand {
 
             let mut issues = analysis_result.issues;
             let read_db = watcher.read_only_database();
-            issues.filter_out_ignored(
-                &configuration.analyzer.ignore,
-                configuration.source.glob.to_database_settings(),
-                |file_id| read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned()),
-            );
+            issues.filter_out_ignored(&ignore_set, |file_id| {
+                read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
+            });
 
             watcher.with_database_mut(|database| {
                 processor.process_issues(&orchestrator, database, issues).map(|(code, _)| code)

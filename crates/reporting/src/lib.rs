@@ -18,6 +18,7 @@ use std::str::FromStr;
 
 use foldhash::HashMap;
 use foldhash::HashMapExt;
+use regex::Regex;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -30,13 +31,37 @@ use mago_database::matcher::ExclusionMatcher;
 use mago_span::Span;
 use mago_text_edit::TextEdit;
 
+mod formatter;
+mod internal;
+
+pub mod baseline;
+pub mod color;
+pub mod error;
+pub mod output;
+pub mod reporter;
+
+pub use color::ColorChoice;
+pub use formatter::ReportingFormat;
+pub use output::ReportingTarget;
+
 /// Represents an entry in the analyzer's `ignore` configuration.
 ///
-/// Can be either a plain code string (ignored everywhere) or a scoped entry
-/// that only ignores a code in specific paths. Scoped paths accept both
-/// plain directory/file prefixes (e.g. `"tests/"`, `"src/Legacy.php"`) and
-/// glob patterns (e.g. `"src/**/*.php"`); entries
+/// One of three shapes:
+///
+/// * A plain code string ignored everywhere: `"code1"`.
+/// * A code scoped to one or more paths/globs:
+///   `{ code = "code2", in = ["tests/", "src/**/*.php"] }`.
+/// * A regex pattern matched against the issue's textual content
+///   (title, notes, help, and annotation messages), optionally narrowed
+///   by `code` and/or `in`:
+///   `{ pattern = "Symfony", code = "mixed-assignment" }`.
+///
+/// Path entries accept both plain directory/file prefixes (e.g. `"tests/"`,
+/// `"src/Legacy.php"`) and glob patterns (e.g. `"src/**/*.php"`); entries
 /// containing any of `*`, `?`, `[`, `{` are matched with [`ExclusionMatcher`].
+///
+/// The `pattern` field is a [bare Rust regex](https://docs.rs/regex/) — use
+/// `(?i)` for case-insensitive matching. No surrounding delimiters.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum IgnoreEntry {
@@ -48,6 +73,23 @@ pub enum IgnoreEntry {
         code: String,
         #[serde(rename = "in", deserialize_with = "one_or_many")]
         paths: Vec<String>,
+    },
+    /// Ignore by regex against issue text, with optional code and path scoping:
+    /// `{ pattern = "Symfony", code = "mixed-assignment", in = ["src/Bridge/"] }`.
+    Pattern {
+        /// A bare regex tested against the issue's title, annotation messages,
+        /// notes, and help message, in that order. First match short-circuits.
+        /// The most instance-specific text is searched first (title,
+        /// annotations); notes and help are tested last because they are
+        /// typically templated per rule.
+        pattern: String,
+        /// Optional code to narrow the match. When set, only issues with this
+        /// code are tested against the pattern.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        code: Option<String>,
+        /// Optional paths/globs to narrow the match.
+        #[serde(rename = "in", default, skip_serializing_if = "Option::is_none", deserialize_with = "opt_one_or_many")]
+        paths: Option<Vec<String>>,
     },
 }
 
@@ -68,18 +110,30 @@ where
     }
 }
 
-mod formatter;
-mod internal;
+fn opt_one_or_many<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Some(one_or_many(deserializer)?))
+}
 
-pub mod baseline;
-pub mod color;
-pub mod error;
-pub mod output;
-pub mod reporter;
+/// Pre-compiled ignore entries ready for use by [`IssueCollection::filter_out_ignored`].
+///
+/// Build once per analysis (regex compilation and glob building are non-trivial),
+/// then reuse across watch-mode rebuilds and LSP analyses. Entries with invalid
+/// regex or invalid glob patterns are logged and skipped — a bad config line
+/// silently drops that entry rather than crashing the run.
+#[derive(Debug, Default)]
+pub struct CompiledIgnoreSet {
+    entries: Vec<CompiledIgnoreEntry>,
+}
 
-pub use color::ColorChoice;
-pub use formatter::ReportingFormat;
-pub use output::ReportingTarget;
+#[derive(Debug)]
+enum CompiledIgnoreEntry {
+    Code(String),
+    Scoped { code: String, matcher: ExclusionMatcher<String> },
+    Pattern { regex: Regex, code: Option<String>, matcher: Option<ExclusionMatcher<String>> },
+}
 
 /// Represents the kind of annotation associated with an issue.
 #[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize)]
@@ -178,6 +232,68 @@ impl AnnotationKind {
     #[must_use]
     pub const fn is_secondary(&self) -> bool {
         matches!(self, AnnotationKind::Secondary)
+    }
+}
+
+impl CompiledIgnoreSet {
+    /// Compiles the given ignore entries into a reusable matcher set.
+    ///
+    /// Bad regex/glob entries are reported via `tracing::error!` and skipped;
+    /// the returned set still contains the valid entries.
+    #[must_use]
+    pub fn compile(entries: &[IgnoreEntry], glob: GlobSettings) -> Self {
+        let mut compiled = Vec::with_capacity(entries.len());
+        for entry in entries {
+            match entry {
+                IgnoreEntry::Code(code) => compiled.push(CompiledIgnoreEntry::Code(code.clone())),
+                IgnoreEntry::Scoped { code, paths } => match ExclusionMatcher::compile(paths.iter().cloned(), glob) {
+                    Ok(matcher) => compiled.push(CompiledIgnoreEntry::Scoped { code: code.clone(), matcher }),
+                    Err(err) => {
+                        tracing::error!("Failed to compile ignore patterns for `{code}`: {err}. Entry will be skipped.")
+                    }
+                },
+                IgnoreEntry::Pattern { pattern, code, paths } => {
+                    let regex = match Regex::new(pattern) {
+                        Ok(regex) => regex,
+                        Err(err) => {
+                            tracing::error!(
+                                "Failed to compile ignore regex `{pattern}`: {err}. Entry will be skipped."
+                            );
+
+                            continue;
+                        }
+                    };
+
+                    let matcher = match paths {
+                        Some(paths) => match ExclusionMatcher::compile(paths.iter().cloned(), glob) {
+                            Ok(matcher) => Some(matcher),
+                            Err(err) => {
+                                tracing::error!(
+                                    "Failed to compile ignore paths for regex `{pattern}`: {err}. Entry will be skipped."
+                                );
+
+                                continue;
+                            }
+                        },
+                        None => None,
+                    };
+
+                    compiled.push(CompiledIgnoreEntry::Pattern { regex, code: code.clone(), matcher });
+                }
+            }
+        }
+
+        Self { entries: compiled }
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.entries.len()
     }
 }
 
@@ -598,61 +714,71 @@ impl IssueCollection {
         self.issues.iter().map(|issue| issue.level).min()
     }
 
-    pub fn filter_out_ignored<F>(&mut self, ignore: &[IgnoreEntry], glob: GlobSettings, resolve_file_name: F)
+    pub fn filter_out_ignored<F>(&mut self, set: &CompiledIgnoreSet, resolve_file_name: F)
     where
         F: Fn(FileId) -> Option<String>,
     {
-        if ignore.is_empty() {
+        if set.is_empty() {
             return;
         }
 
-        enum CompiledEntry<'entry> {
-            Code(&'entry str),
-            Scoped { code: &'entry str, matcher: ExclusionMatcher<&'entry str> },
-        }
-
-        let compiled: Vec<CompiledEntry<'_>> = ignore
-            .iter()
-            .filter_map(|entry| match entry {
-                IgnoreEntry::Code(code) => Some(CompiledEntry::Code(code.as_str())),
-                IgnoreEntry::Scoped { code, paths } => {
-                    match ExclusionMatcher::compile(paths.iter().map(String::as_str), glob) {
-                        Ok(matcher) => Some(CompiledEntry::Scoped { code: code.as_str(), matcher }),
-                        Err(err) => {
-                            tracing::error!(
-                                "Failed to compile ignore patterns for `{code}`: {err}. Entry will be skipped."
-                            );
-                            None
-                        }
-                    }
-                }
-            })
-            .collect();
-
         self.issues.retain(|issue| {
-            let Some(code) = &issue.code else {
-                return true;
+            let mut cached_path: Option<Option<String>> = None;
+            let mut resolve_path = |issue: &Issue| -> Option<String> {
+                cached_path
+                    .get_or_insert_with(|| issue.primary_span().and_then(|span| resolve_file_name(span.file_id)))
+                    .clone()
             };
 
-            let mut cached_path: Option<Option<String>> = None;
-
-            for entry in &compiled {
+            for entry in &set.entries {
                 match entry {
-                    CompiledEntry::Code(ignored_code) if *ignored_code == code => return false,
-                    CompiledEntry::Scoped { code: ignored_code, matcher } if *ignored_code == code => {
-                        let file_name = cached_path
-                            .get_or_insert_with(|| {
-                                issue.primary_span().and_then(|span| resolve_file_name(span.file_id))
-                            })
-                            .as_deref();
-
-                        if let Some(name) = file_name
-                            && matcher.is_match(name)
+                    CompiledIgnoreEntry::Code(ignored_code) => {
+                        if let Some(code) = &issue.code
+                            && ignored_code == code
                         {
                             return false;
                         }
                     }
-                    _ => {}
+                    CompiledIgnoreEntry::Scoped { code: ignored_code, matcher } => {
+                        let Some(code) = &issue.code else {
+                            continue;
+                        };
+
+                        if ignored_code != code {
+                            continue;
+                        }
+
+                        if let Some(name) = resolve_path(issue)
+                            && matcher.is_match(&name)
+                        {
+                            return false;
+                        }
+                    }
+                    CompiledIgnoreEntry::Pattern { regex, code: ignored_code, matcher } => {
+                        if let Some(ignored_code) = ignored_code {
+                            let Some(code) = &issue.code else {
+                                continue;
+                            };
+
+                            if ignored_code != code {
+                                continue;
+                            }
+                        }
+
+                        if let Some(matcher) = matcher {
+                            let Some(name) = resolve_path(issue) else {
+                                continue;
+                            };
+
+                            if !matcher.is_match(&name) {
+                                continue;
+                            }
+                        }
+
+                        if issue_text_matches(issue, regex) {
+                            return false;
+                        }
+                    }
                 }
             }
 
@@ -728,6 +854,31 @@ impl IssueCollection {
 
         result
     }
+}
+
+/// Returns `true` when any of the issue's textual fields matches the regex.
+///
+/// Tested in order: title, annotation messages, notes, help. The most
+/// instance-specific fields are searched first; notes and help are last
+/// because they are typically templated per rule.
+fn issue_text_matches(issue: &Issue, regex: &Regex) -> bool {
+    if regex.is_match(&issue.message) {
+        return true;
+    }
+
+    if issue
+        .annotations
+        .iter()
+        .any(|annotation| annotation.message.as_ref().is_some_and(|message| regex.is_match(message)))
+    {
+        return true;
+    }
+
+    if issue.notes.iter().any(|note| regex.is_match(note)) {
+        return true;
+    }
+
+    issue.help.as_ref().is_some_and(|help| regex.is_match(help))
 }
 
 impl IntoIterator for IssueCollection {
@@ -949,24 +1100,31 @@ mod tests {
         (IssueCollection::from(issues), mapping)
     }
 
-    #[test]
-    pub fn test_filter_out_ignored_with_plain_prefix() {
-        let (mut collection, mapping) = ignore_fixture();
-        let ignore =
-            vec![IgnoreEntry::Scoped { code: "invalid-global".to_string(), paths: vec!["tests/".to_string()] }];
+    fn resolve<'mapping>(
+        mapping: &'mapping HashMap<FileId, &'static [u8]>,
+    ) -> impl Fn(FileId) -> Option<String> + 'mapping {
+        move |id| mapping.get(&id).map(|s| String::from_utf8_lossy(s).into_owned())
+    }
 
-        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| {
-            mapping.get(&id).map(|s| String::from_utf8_lossy(s).into_owned())
-        });
-
-        let remaining: Vec<String> = collection
+    fn remaining_paths(collection: &IssueCollection, mapping: &HashMap<FileId, &'static [u8]>) -> Vec<String> {
+        collection
             .iter()
             .filter_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
             .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
-            .collect();
+            .collect()
+    }
+
+    #[test]
+    pub fn test_filter_out_ignored_with_plain_prefix() {
+        let (mut collection, mapping) = ignore_fixture();
+        let entries =
+            vec![IgnoreEntry::Scoped { code: "invalid-global".to_string(), paths: vec!["tests/".to_string()] }];
+        let set = CompiledIgnoreSet::compile(&entries, GlobSettings::default());
+
+        collection.filter_out_ignored(&set, resolve(&mapping));
 
         assert_eq!(
-            remaining,
+            remaining_paths(&collection, &mapping),
             vec![
                 "src/App.php".to_string(),
                 "modules/auth/views/login.tpl".to_string(),
@@ -978,54 +1136,169 @@ mod tests {
     #[test]
     pub fn test_filter_out_ignored_with_glob_pattern() {
         let (mut collection, mapping) = ignore_fixture();
-        let ignore = vec![IgnoreEntry::Scoped {
+        let entries = vec![IgnoreEntry::Scoped {
             code: "invalid-global".to_string(),
             paths: vec!["modules/*/*/*.tpl".to_string(), "types/*/*.tpl".to_string()],
         }];
+        let set = CompiledIgnoreSet::compile(&entries, GlobSettings::default());
 
-        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| {
-            mapping.get(&id).map(|s| String::from_utf8_lossy(s).into_owned())
-        });
+        collection.filter_out_ignored(&set, resolve(&mapping));
 
-        let remaining: Vec<String> = collection
-            .iter()
-            .filter_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
-            .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
-            .collect();
-
-        assert_eq!(remaining, vec!["src/App.php".to_string(), "tests/Unit/FooTest.php".to_string(),]);
+        assert_eq!(
+            remaining_paths(&collection, &mapping),
+            vec!["src/App.php".to_string(), "tests/Unit/FooTest.php".to_string()]
+        );
     }
 
     #[test]
     pub fn test_filter_out_ignored_mixes_plain_and_glob() {
         let (mut collection, mapping) = ignore_fixture();
-        let ignore = vec![IgnoreEntry::Scoped {
+        let entries = vec![IgnoreEntry::Scoped {
             code: "invalid-global".to_string(),
             paths: vec!["tests/".to_string(), "modules/*/*/*.tpl".to_string(), "types/*/*.tpl".to_string()],
         }];
+        let set = CompiledIgnoreSet::compile(&entries, GlobSettings::default());
 
-        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| {
-            mapping.get(&id).map(|s| String::from_utf8_lossy(s).into_owned())
-        });
+        collection.filter_out_ignored(&set, resolve(&mapping));
 
-        let remaining: Vec<String> = collection
-            .iter()
-            .filter_map(|issue| issue.primary_span().and_then(|s| mapping.get(&s.file_id)).copied())
-            .map(|bytes| String::from_utf8_lossy(bytes).into_owned())
-            .collect();
-
-        assert_eq!(remaining, vec!["src/App.php".to_string()]);
+        assert_eq!(remaining_paths(&collection, &mapping), vec!["src/App.php".to_string()]);
     }
 
     #[test]
     pub fn test_filter_out_ignored_respects_code_scope() {
         let (mut collection, mapping) = ignore_fixture();
-        let ignore = vec![IgnoreEntry::Scoped { code: "different-code".to_string(), paths: vec!["**/*".to_string()] }];
+        let entries = vec![IgnoreEntry::Scoped { code: "different-code".to_string(), paths: vec!["**/*".to_string()] }];
+        let set = CompiledIgnoreSet::compile(&entries, GlobSettings::default());
 
-        collection.filter_out_ignored(&ignore, GlobSettings::default(), |id| {
-            mapping.get(&id).map(|s| String::from_utf8_lossy(s).into_owned())
-        });
+        collection.filter_out_ignored(&set, resolve(&mapping));
 
         assert_eq!(collection.len(), 4);
+    }
+
+    fn pattern_fixture() -> (IssueCollection, HashMap<FileId, &'static [u8]>) {
+        let paths: [&[u8]; 3] = [b"src/App.php", b"src/Bridge/Symfony.php", b"tests/Unit/FooTest.php"];
+        let mut mapping = HashMap::new();
+        let mut issues: Vec<Issue> = Vec::new();
+
+        let id0 = FileId::new(blake3::hash(paths[0]).as_bytes());
+        mapping.insert(id0, paths[0]);
+        issues.push(
+            Issue::error("Saw type `mixed` in Symfony bridge.")
+                .with_code("mixed-assignment")
+                .with_annotation(Annotation::primary(Span::new(id0, 0u32.into(), 1u32.into()))),
+        );
+
+        let id1 = FileId::new(blake3::hash(paths[1]).as_bytes());
+        mapping.insert(id1, paths[1]);
+        issues.push(
+            Issue::error("Could not infer a precise return type.")
+                .with_code("mixed-assignment")
+                .with_note("Originates from Symfony vendor stubs.")
+                .with_annotation(Annotation::primary(Span::new(id1, 0u32.into(), 1u32.into()))),
+        );
+
+        let id2 = FileId::new(blake3::hash(paths[2]).as_bytes());
+        mapping.insert(id2, paths[2]);
+        issues.push(
+            Issue::error("Unused variable.")
+                .with_code("unused-variable")
+                .with_annotation(Annotation::primary(Span::new(id2, 0u32.into(), 1u32.into()))),
+        );
+
+        (IssueCollection::from(issues), mapping)
+    }
+
+    #[test]
+    pub fn test_pattern_matches_title_and_note() {
+        let (mut collection, mapping) = pattern_fixture();
+        let entries = vec![IgnoreEntry::Pattern {
+            pattern: "Symfony".to_string(),
+            code: Some("mixed-assignment".to_string()),
+            paths: None,
+        }];
+        let set = CompiledIgnoreSet::compile(&entries, GlobSettings::default());
+
+        collection.filter_out_ignored(&set, resolve(&mapping));
+
+        assert_eq!(remaining_paths(&collection, &mapping), vec!["tests/Unit/FooTest.php".to_string()]);
+    }
+
+    #[test]
+    pub fn test_pattern_without_code_matches_across_codes() {
+        let (mut collection, mapping) = pattern_fixture();
+        let entries = vec![IgnoreEntry::Pattern { pattern: "Symfony".to_string(), code: None, paths: None }];
+        let set = CompiledIgnoreSet::compile(&entries, GlobSettings::default());
+
+        collection.filter_out_ignored(&set, resolve(&mapping));
+
+        assert_eq!(remaining_paths(&collection, &mapping), vec!["tests/Unit/FooTest.php".to_string()]);
+    }
+
+    #[test]
+    pub fn test_pattern_with_path_scope() {
+        let (mut collection, mapping) = pattern_fixture();
+        let entries = vec![IgnoreEntry::Pattern {
+            pattern: "Symfony".to_string(),
+            code: None,
+            paths: Some(vec!["src/Bridge/".to_string()]),
+        }];
+        let set = CompiledIgnoreSet::compile(&entries, GlobSettings::default());
+
+        collection.filter_out_ignored(&set, resolve(&mapping));
+
+        assert_eq!(
+            remaining_paths(&collection, &mapping),
+            vec!["src/App.php".to_string(), "tests/Unit/FooTest.php".to_string()]
+        );
+    }
+
+    #[test]
+    pub fn test_pattern_case_insensitive_with_flag() {
+        let (mut collection, mapping) = pattern_fixture();
+        let entries = vec![IgnoreEntry::Pattern { pattern: "(?i)symfony".to_string(), code: None, paths: None }];
+        let set = CompiledIgnoreSet::compile(&entries, GlobSettings::default());
+
+        collection.filter_out_ignored(&set, resolve(&mapping));
+
+        assert_eq!(remaining_paths(&collection, &mapping), vec!["tests/Unit/FooTest.php".to_string()]);
+    }
+
+    #[test]
+    pub fn test_pattern_invalid_regex_is_skipped() {
+        let (mut collection, mapping) = pattern_fixture();
+        let entries = vec![
+            IgnoreEntry::Pattern { pattern: "[unterminated".to_string(), code: None, paths: None },
+            IgnoreEntry::Code("unused-variable".to_string()),
+        ];
+        let set = CompiledIgnoreSet::compile(&entries, GlobSettings::default());
+
+        assert_eq!(set.len(), 1);
+
+        collection.filter_out_ignored(&set, resolve(&mapping));
+
+        assert_eq!(
+            remaining_paths(&collection, &mapping),
+            vec!["src/App.php".to_string(), "src/Bridge/Symfony.php".to_string()]
+        );
+    }
+
+    #[test]
+    pub fn test_pattern_matches_help_message() {
+        let id = FileId::new(blake3::hash(b"src/foo.php").as_bytes());
+        let mut mapping: HashMap<FileId, &'static [u8]> = HashMap::new();
+        mapping.insert(id, &b"src/foo.php"[..]);
+        let mut collection = IssueCollection::from(vec![
+            Issue::error("Title.")
+                .with_code("some-code")
+                .with_help("Consider migrating off legacy Symfony bridge.")
+                .with_annotation(Annotation::primary(Span::new(id, 0u32.into(), 1u32.into()))),
+        ]);
+
+        let entries = vec![IgnoreEntry::Pattern { pattern: "Symfony".to_string(), code: None, paths: None }];
+        let set = CompiledIgnoreSet::compile(&entries, GlobSettings::default());
+
+        collection.filter_out_ignored(&set, resolve(&mapping));
+
+        assert!(collection.is_empty());
     }
 }

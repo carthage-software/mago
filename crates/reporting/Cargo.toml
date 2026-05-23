@@ -27,3 +27,4 @@ ariadne = { workspace = true }
 serde-sarif = { workspace = true }
 schemars = { workspace = true }
 tracing = { workspace = true }
+regex = { workspace = true }

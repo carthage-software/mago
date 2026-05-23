@@ -15,6 +15,7 @@ use mago_database::DatabaseReader;
 use mago_database::file::File as MagoFile;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
+use mago_reporting::CompiledIgnoreSet;
 
 use crate::language_server::diagnostics::build_diagnostics;
 use crate::language_server::document::OpenDocument;
@@ -48,13 +49,13 @@ impl Backend {
                     issues = analysis_result.issues.len(),
                     "analyzer pass complete",
                 );
-                analysis_result.issues.filter_out_ignored(
+                let ignore_set = CompiledIgnoreSet::compile(
                     &self.config.configuration.analyzer.ignore,
                     self.config.configuration.source.glob.to_database_settings(),
-                    |file_id| {
-                        workspace.database.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
-                    },
                 );
+                analysis_result.issues.filter_out_ignored(&ignore_set, |file_id| {
+                    workspace.database.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
+                });
 
                 if workspace.config.linter {
                     let lint_started = std::time::Instant::now();
@@ -113,13 +114,16 @@ impl Backend {
             } else {
                 mago_analyzer::analysis_result::AnalysisResult::new(mago_codex::reference::SymbolReferences::new())
             };
-            result.issues.filter_out_ignored(
+
+            let ignore_set = CompiledIgnoreSet::compile(
                 &cfg.configuration.analyzer.ignore,
                 cfg.configuration.source.glob.to_database_settings(),
-                |file_id| {
-                    workspace.database.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
-                },
             );
+
+            result.issues.filter_out_ignored(&ignore_set, |file_id| {
+                workspace.database.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
+            });
+
             workspace.invalidate_artifacts(&changed);
             crate::language_server::capabilities::lookup::invalidate(&changed);
 

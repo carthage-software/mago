@@ -20,7 +20,7 @@ baseline = "analyzer-baseline.toml"
 | Option | Type | Défaut | Description |
 | :--- | :--- | :--- | :--- |
 | `excludes` | `string[]` | `[]` | Chemins ou motifs glob à exclure de l'analyse. S'ajoute à `[source].excludes`. |
-| `ignore` | `(string \| object)[]` | `[]` | Codes de problèmes à ignorer, optionnellement délimités à des chemins spécifiques. Voir ci-dessous. |
+| `ignore` | `(string \| object)[]` | `[]` | Codes de problèmes à ignorer, optionnellement délimités à des chemins spécifiques ou filtrés par regex sur le texte du problème. Voir ci-dessous. |
 | `baseline` | `string` | non défini | Chemin vers un fichier de baseline. Équivalent à passer `--baseline` à chaque exécution. L'indicateur CLI le remplace. |
 | `baseline-variant` | `string` | `"loose"` | Format pour les baselines nouvellement générées. `"loose"` (basée sur le compte) ou `"strict"` (correspondance exacte de ligne). Voir [baseline](/fundamentals/baseline/). |
 | `minimum-fail-level` | `string` | `"error"` | Sévérité minimale qui provoque un code de sortie non nul. L'un de `"note"`, `"help"`, `"warning"`, `"error"`. Remplacé par `--minimum-fail-level`. |
@@ -62,6 +62,23 @@ ignore = [
 ```
 
 La correspondance glob respecte les paramètres globaux du projet sous `[source.glob]`, donc des bascules comme `literal-separator` et `case-insensitive` s'appliquent ici aussi.
+
+### Ignorer par motif
+
+Quand un code est trop large pour être réduit au silence en bloc mais que les problèmes que vous voulez éliminer partagent une formulation reconnaissable (nom de fournisseur, type inféré, fonction nommée explicitement), utilisez une entrée `pattern`. Le motif est une regex testée contre chaque champ textuel du problème, dans l'ordre : le titre, chaque message d'annotation, chaque note, puis le message d'aide. La première correspondance supprime le problème. Les textes les plus spécifiques à l'instance (titre et annotations) sont cherchés en premier ; notes et aide passent en dernier car elles sont généralement génériques par règle et diffèrent rarement entre deux problèmes partageant le même code.
+
+```toml
+[analyzer]
+ignore = [
+    { pattern = "Symfony", code = "mixed-assignment" },
+    { pattern = "Saw type `mixed`", in = "src/Bridge/" },
+    { pattern = "(?i)deprecated" },
+]
+```
+
+`code` et `in` sont tous deux optionnels. Avec uniquement un `pattern`, chaque problème rapporté est testé contre la regex, indépendamment de son code ou de son fichier. Combiner `pattern` avec `code` et/ou `in` restreint la recherche avant d'exécuter la regex, ce qui est plus rapide et évite les correspondances accidentelles dans des règles sans rapport.
+
+Le motif est une [regex Rust brute](https://docs.rs/regex/). Écrivez `(?i)` au début pour une correspondance insensible à la casse ; n'entourez pas la regex de délimiteurs `/.../`. Une regex invalide est journalisée et l'entrée est ignorée, donc un seul motif erroné n'interrompt pas l'exécution.
 
 `excludes` et `ignore` ne sont pas la même chose. `excludes` retire entièrement les fichiers de l'analyse, ils ne sont donc pas analysés pour les informations de type. `ignore` analyse toujours le fichier mais supprime les codes listés dans la sortie.
 
