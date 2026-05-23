@@ -335,7 +335,7 @@ impl<'config> DatabaseLoader<'config> {
                 let canonical_root = resolved_path.canonicalize().unwrap_or(resolved_path);
                 let has_dir_prunes = !dir_prune_globs.is_empty();
                 let has_path_prunes = !canonical_excludes.is_empty();
-                let walker = WalkDir::new(&canonical_root).into_iter().filter_entry(|entry| {
+                let walker = WalkDir::new(&canonical_root).follow_links(true).into_iter().filter_entry(|entry| {
                     if entry.depth() == 0 || !entry.file_type().is_dir() {
                         return true;
                     }
@@ -361,12 +361,24 @@ impl<'config> DatabaseLoader<'config> {
                     true
                 });
 
-                for entry in walker.filter_map(Result::ok) {
-                    let file_type = entry.file_type();
-                    #[allow(clippy::filetype_is_file)]
-                    let include = file_type.is_file() || file_type.is_symlink();
-                    if include {
-                        paths_to_process.push((entry.into_path(), specificity));
+                for entry in walker {
+                    match entry {
+                        Ok(entry) => {
+                            if !entry.file_type().is_dir() {
+                                paths_to_process.push((entry.into_path(), specificity));
+                            }
+                        }
+                        Err(err) => {
+                            let path = err.path().unwrap_or(canonical_root.as_path()).display();
+                            if let Some(ancestor) = err.loop_ancestor() {
+                                tracing::warn!(
+                                    "Skipping symlink loop at `{path}`: link cycles back to `{}`.",
+                                    ancestor.display(),
+                                );
+                            } else {
+                                tracing::warn!("Failed to walk `{path}`: {err}. Entry will be skipped.");
+                            }
+                        }
                     }
                 }
             }
@@ -761,5 +773,57 @@ mod tests {
 
         let file = db.files().find(|f| name_str(&f.name).contains("buffer.php")).unwrap();
         assert_eq!(file.contents.as_ref(), content.as_slice());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_symlinked_file_under_include_is_loaded() {
+        let temp_dir = TempDir::new().unwrap();
+        let external = TempDir::new().unwrap();
+
+        create_test_file(&external, "Bar.php", "<?php class Bar {}\n");
+        std::fs::create_dir_all(temp_dir.path().join("vendor")).unwrap();
+        std::os::unix::fs::symlink(external.path().join("Bar.php"), temp_dir.path().join("vendor/Bar.php")).unwrap();
+
+        let config = create_test_config(&temp_dir, vec![], vec!["vendor/"]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let bar = db.files().find(|f| name_str(&f.name).contains("Bar.php"));
+        assert!(bar.is_some(), "symlinked Bar.php should be loaded via include = ['vendor/']");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_symlinked_directory_under_include_is_descended() {
+        let temp_dir = TempDir::new().unwrap();
+        let external = TempDir::new().unwrap();
+
+        create_test_file(&external, "src/Foo.php", "<?php class Foo {}\n");
+        create_test_file(&external, "src/Bar.php", "<?php class Bar {}\n");
+
+        std::fs::create_dir_all(temp_dir.path().join("vendor")).unwrap();
+        std::os::unix::fs::symlink(external.path(), temp_dir.path().join("vendor/example-package")).unwrap();
+
+        let config = create_test_config(&temp_dir, vec![], vec!["vendor/"]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        assert!(db.files().any(|f| name_str(&f.name).contains("Foo.php")), "Foo.php inside symlinked dir not found");
+        assert!(db.files().any(|f| name_str(&f.name).contains("Bar.php")), "Bar.php inside symlinked dir not found");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_symlink_cycle_is_warned_and_skipped() {
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "src/Real.php", "<?php class Real {}\n");
+        std::os::unix::fs::symlink(temp_dir.path().join("src"), temp_dir.path().join("src/loop")).unwrap();
+
+        let config = create_test_config(&temp_dir, vec![], vec!["src/"]);
+        let db = DatabaseLoader::new(config).load().expect("symlink cycle should not abort the load");
+
+        assert!(
+            db.files().any(|f| name_str(&f.name).contains("Real.php")),
+            "Real.php still reachable despite the loop"
+        );
     }
 }
