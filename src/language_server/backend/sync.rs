@@ -3,6 +3,7 @@
 //! (`apply_change_atomic`), and shared utilities.
 
 use std::borrow::Cow;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use foldhash::HashMap;
@@ -28,19 +29,12 @@ use crate::language_server::workspace::logical_name_for;
 use super::Backend;
 
 impl Backend {
-    pub(super) async fn bootstrap(&self) {
-        let pending = match std::mem::replace(&mut *self.state.lock().unwrap(), BackendState::Uninitialized) {
-            BackendState::Pending(config) => config,
-            other => {
-                *self.state.lock().unwrap() = other;
-                return;
-            }
-        };
-
+    pub(super) async fn bootstrap(&self, root: PathBuf) {
         let started = std::time::Instant::now();
-        tracing::info!(root = %pending.root.display(), "bootstrap starting");
+        tracing::info!(root = %root.display(), "bootstrap starting");
 
-        let outcome = tokio::task::spawn_blocking(move || build_workspace(pending)).await;
+        let config = Arc::clone(&self.config);
+        let outcome = tokio::task::spawn_blocking(move || build_workspace(root, config)).await;
 
         match outcome {
             Ok(Ok((mut workspace, mut analysis_result))) => {

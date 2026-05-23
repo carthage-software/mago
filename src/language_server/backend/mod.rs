@@ -16,7 +16,6 @@ use crate::language_server::capabilities;
 use crate::language_server::capabilities::server_capabilities;
 use crate::language_server::position::offset_at_position;
 use crate::language_server::state::BackendState;
-use crate::language_server::state::PendingConfig;
 use crate::language_server::workspace::workspace_root;
 
 mod sync;
@@ -45,8 +44,7 @@ impl LanguageServer for Backend {
                 .log_message(MessageType::INFO, format!("mago-server: workspace root = {}", root.display()))
                 .await;
 
-            *self.state.lock().unwrap() =
-                BackendState::Pending(PendingConfig { root, config: Arc::clone(&self.config) });
+            self.bootstrap(root).await;
         } else {
             self.client.log_message(MessageType::WARNING, "mago-server: no workspace root provided").await;
         }
@@ -80,8 +78,6 @@ impl LanguageServer for Backend {
                 client.log_message(MessageType::ERROR, format!("mago-server: register watcher: {err}")).await;
             }
         });
-
-        self.bootstrap().await;
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {

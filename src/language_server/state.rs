@@ -1,8 +1,7 @@
 //! Backend state lifecycle.
 //!
 //! On startup the backend is [`BackendState::Uninitialized`]. The
-//! `initialize` request transitions it to [`BackendState::Pending`]; the
-//! `initialized` notification triggers a one-shot bootstrap that walks
+//! `initialize` request triggers a one-shot bootstrap that walks
 //! the workspace, builds the database, runs an initial full analysis (if
 //! enabled by the [`super::ServerConfig`]), and transitions to
 //! [`BackendState::Ready`].
@@ -41,13 +40,7 @@ use crate::language_server::linter::LinterContext;
 #[allow(clippy::large_enum_variant)]
 pub enum BackendState {
     Uninitialized,
-    Pending(PendingConfig),
     Ready(WorkspaceState),
-}
-
-pub struct PendingConfig {
-    pub root: PathBuf,
-    pub config: Arc<ServerConfig>,
 }
 
 pub struct WorkspaceState {
@@ -158,8 +151,7 @@ fn build_index(artifacts: &mago_analyzer::artifacts::AnalysisArtifacts) -> Expre
     ExpressionTypeIndex { by_span }
 }
 
-pub fn build_workspace(pending: PendingConfig) -> Result<(WorkspaceState, AnalysisResult), String> {
-    let PendingConfig { root, config } = pending;
+pub fn build_workspace(root: PathBuf, config: Arc<ServerConfig>) -> Result<(WorkspaceState, AnalysisResult), String> {
     let root = root.canonicalize().unwrap_or(root);
     let prelude = Prelude::decode(PRELUDE_BYTES).map_err(|e| format!("decode prelude: {e}"))?;
     let Prelude { database: prelude_db, metadata, symbol_references } = prelude;
