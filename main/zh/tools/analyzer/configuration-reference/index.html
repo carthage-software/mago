@@ -623,7 +623,7 @@ ignore = [
 </code></pre>
 <p>glob 匹配会遵循 <code>[source.glob]</code> 下的项目级设置,因此像 <code>literal-separator</code> 和 <code>case-insensitive</code> 这样的开关在这里同样适用。</p>
 <p><code>excludes</code> 与 <code>ignore</code> 含义不同。<code>excludes</code> 把文件完全从分析中移除,因此这些文件不会被解析以提供类型信息。<code>ignore</code> 仍会分析文件,但会在输出中抑制所列代码。</p>
-<h2 id="feature-flags">特性开关</h2>
+<h2 id="pattern-based-ignoring">特性开关</h2>
 <p>这些开关用于切换各项独立的分析。默认值已为日常使用调好;在代码库逐步收紧时再开启它们。</p>
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>find-unused-expressions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">报告其结果被丢弃的表达式,例如 <code>$a + $b;</code>。</td></tr>
@@ -653,7 +653,7 @@ ignore = [
 <tr><td style="text-align: left"><code>check-experimental</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告在非实验性上下文中使用 <code>@experimental</code> 符号的情况。自 1.19.0 起可用。</td></tr>
 <tr><td style="text-align: left"><code>allow-side-effects-in-conditions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">设为 <code>false</code> 时,报告在 <code>if</code>、<code>while</code>、<code>for</code>、三元或 <code>match</code> 条件中调用非纯函数的情况。</td></tr>
 </tbody></table>
-<h2 id="property-initialization">属性初始化</h2>
+<h2 id="feature-flags">属性初始化</h2>
 <p>启用 <code>check-property-initialization</code> 时,分析器会报告两类问题:</p>
 <ul>
 <li><code>missing-constructor</code>,针对带类型属性但没有构造函数的类。</li>
@@ -678,7 +678,7 @@ class-initializers = ["setUp", "initialize", "boot"]
     }
 }
 </code></pre>
-<h2 id="exception-filtering">异常过滤</h2>
+<h2 id="property-initialization">异常过滤</h2>
 <p>启用 <code>check-throws</code> 时,有两个选项可以让你跳过特定异常。</p>
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>unchecked-exceptions</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">要忽略的异常,包括其所有子类(感知继承层级)。</td></tr>
@@ -697,7 +697,7 @@ unchecked-exception-classes = [
 ]
 </code></pre>
 <p>使用 <code>unchecked-exceptions</code> 来一次性屏蔽某一整类异常,例如所有 <code>LogicException</code> 的子类。当你想忽略某一个具体异常但仍跟踪其同级和父类时,使用 <code>unchecked-exception-classes</code>。</p>
-<h2 id="experimental-api-detection">实验性 API 检测</h2>
+<h2 id="exception-filtering">实验性 API 检测</h2>
 <p>设置 <code>check-experimental = true</code> 来标记从非实验性代码中使用 <code>@experimental</code> 符号的情况。用 PHPDoc 标签标注符号:</p>
 <pre><code class="language-php">/** @experimental */
 class UnstableApi {}
@@ -724,13 +724,13 @@ class StableService {
     }
 }
 </code></pre>
-<h2 id="plugins">插件</h2>
+<h2 id="experimental-api-detection">插件</h2>
 <p>插件为各种库和框架提供类型提供器,使函数返回精确类型而非泛化类型。</p>
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>disable-default-plugins</code></td><td style="text-align: left"><code>bool</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">禁用所有默认插件。仅 <code>plugins</code> 中列出的名称会激活。</td></tr>
 <tr><td style="text-align: left"><code>plugins</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">按名称或别名启用的插件。</td></tr>
 </tbody></table>
-<h3 id="available-plugins">可用插件</h3>
+<h3 id="plugins">可用插件</h3>
 <table><thead><tr><th style="text-align: left">插件</th><th style="text-align: left">别名</th><th style="text-align: left">默认</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>stdlib</code></td><td style="text-align: left"><code>standard</code>、<code>std</code>、<code>php-stdlib</code></td><td style="text-align: left">已启用</td><td style="text-align: left">PHP 内置函数:<code>strlen</code>、<code>array_*</code>、<code>json_*</code> 等。</td></tr>
 <tr><td style="text-align: left"><code>psl</code></td><td style="text-align: left"><code>php-standard-library</code>、<code>azjezz-psl</code></td><td style="text-align: left">未启用</td><td style="text-align: left"><a href="https://github.com/php-standard-library/php-standard-library">php-standard-library</a>。</td></tr>
@@ -738,7 +738,7 @@ class StableService {
 <tr><td style="text-align: left"><code>psr-container</code></td><td style="text-align: left"><code>psr-11</code></td><td style="text-align: left">未启用</td><td style="text-align: left"><a href="https://github.com/php-fig/container">psr/container</a>。</td></tr>
 </tbody></table>
 <p>举例来说,<code>stdlib</code> 插件会让分析器知道 <code>strlen($s)</code> 返回 <code>int&lt;0, max&gt;</code>,<code>json_decode($json, true)</code> 返回 <code>array&lt;string, mixed&gt;</code>,而 <code>array_filter($array)</code> 会保留输入形状但可能丢弃元素。</p>
-<h3 id="examples">示例</h3>
+<h3 id="available-plugins">示例</h3>
 <p>使用默认值(仅 <code>stdlib</code>):</p>
 <pre><code class="language-toml">[analyzer]
 </code></pre>
@@ -756,9 +756,9 @@ disable-default-plugins = true
 plugins = ["psl"]
 </code></pre>
 <p>插件别名在所有位置都生效,因此 <code>plugins = ["std"]</code> 与 <code>plugins = ["stdlib"]</code> 等价。</p>
-<h2 id="strict-mode">严格模式</h2>
+<h2 id="examples">严格模式</h2>
 <p>分析器默认运行在适中的严格度。开启更多检查会更严格;对遗留代码可适度放宽。</p>
-<h3 id="maximum-strictness">最高严格度</h3>
+<h3 id="strict-mode">最高严格度</h3>
 <pre><code class="language-toml">[analyzer]
 find-unused-expressions = true
 find-unused-definitions = true
@@ -778,7 +778,7 @@ strict-array-index-existence = true
 no-boolean-literal-comparison = true
 trust-existence-checks = false
 </code></pre>
-<h3 id="lenient-mode">宽松模式</h3>
+<h3 id="maximum-strictness">宽松模式</h3>
 <pre><code class="language-toml">[analyzer]
 check-missing-type-hints = false
 strict-list-index-checks = false
@@ -792,7 +792,7 @@ trust-existence-checks = true
 check-throws = false
 </code></pre>
 <p>把 Mago 引入既有代码库时,先以宽松模式起步,配合 <a href="../../../../../main/zh/fundamentals/baseline">baseline</a>,随着代码改善再逐步收紧。</p>
-<h3 id="notes-on-individual-flags">关于个别开关的说明</h3>
+<h3 id="lenient-mode">关于个别开关的说明</h3>
 <p><code>trust-existence-checks</code> 决定分析器是否基于运行时检查进行类型收窄。开启时(默认),下面的代码没问题:</p>
 <pre><code class="language-php">function process(object $obj): mixed
 {
@@ -808,7 +808,7 @@ check-throws = false
 <p><code>strict-array-index-existence</code> 让类型系统与 PHP 的运行时语义保持一致。在运行时,PHP 会把缺失的读取结果视为 <code>null</code>,并发出 <code>Undefined array key</code> 警告;开启该开关后,分析器会发出 <code>possibly-undefined-int-array-index</code>(或 <code>-string-array-index</code>)并把结果类型扩展为 <code>T|null</code>,这样后续的 <code>=== null</code> 与 <code>??</code> 检查就能按预期工作。它适用于 <code>list&lt;T&gt;</code> 中非零下标的读取、<code>array{...}</code> 形状中的可选条目,以及通过任意键访问 <code>array&lt;K, V&gt;</code> 的情况。该选项默认关闭,因为对于不显式断言键存在便对列表进行解构或下标访问的 PHP 代码来说,把它设为默认值会过于嘈杂。</p>
 <p><code>allow-possibly-undefined-array-keys = false</code> 已弃用。它仅对带有单个字面量键的 <code>array&lt;K, V&gt;</code> 读取发出警告,且不会把类型扩展为 <code>T|null</code>,因此读取后的 <code>=== null</code> 检查会被报告为冗余。请改用 <code>strict-array-index-existence = true</code>,它的覆盖更全面,并将运行时语义体现到类型上。设置 <code>allow-possibly-undefined-array-keys = false</code> 时,CLI 会输出弃用警告。</p>
 <p><code>allow-array-truthy-operand</code> 控制是否接受数组作为 <code>&amp;&amp;</code>、<code>||</code> 与 <code>xor</code> 的操作数。PHP 会将空数组转换为 <code>false</code>,非空数组转换为 <code>true</code>,这与独立的 <code>if ($array)</code> 所使用的真值判定一致。默认情况下,分析器会对逻辑运算符的数组操作数发出 <code>invalid-operand</code>,以提醒这种隐式的 <code>bool</code> 转换;开启该选项会抑制该警告,从而允许依赖此转换风格的代码库保留其写法。独立的 <code>if ($array)</code> 始终不受影响。</p>
-<h2 id="performance-tuning">性能调优</h2>
+<h2 id="notes-on-individual-flags">性能调优</h2>
 <p>分析器使用内部阈值在分析深度与速度之间取得平衡。设置位于 <code>[analyzer.performance]</code> 下。</p>
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>saturation-complexity-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>8192</code></td><td style="text-align: left">CNF 饱和过程中的最大子句数。</td></tr>
@@ -822,9 +822,9 @@ check-throws = false
 <tr><td style="text-align: left"><code>loop-assignment-depth-threshold</code></td><td style="text-align: left"><code>u8</code></td><td style="text-align: left"><code>1</code></td><td style="text-align: left">循环不动点迭代的最大深度。<code>0</code> 表示禁用重新迭代。</td></tr>
 </tbody></table>
 <p><code>string-concat-combination-threshold</code> 仍作为 <code>string-combination-threshold</code> 的别名被接受。</p>
-<h3 id="when-to-adjust">何时调整</h3>
+<h3 id="performance-tuning">何时调整</h3>
 <p>默认值适合大多数项目。若分析感觉太慢,可调低这些阈值,代价是部分推断精度。在条件高度复杂的代码中需要更深入的推断时,可调高这些阈值。</p>
-<h3 id="what-each-threshold-controls">每个阈值控制什么</h3>
+<h3 id="when-to-adjust">每个阈值控制什么</h3>
 <p>分析器会把类型约束转换成合取范式(CNF)的逻辑公式。这些公式会随着复杂条件呈指数级增长,因此使用阈值防止计算失控。</p>
 <ul>
 <li>饱和复杂度限制公式简化过程中处理的子句数。一旦超过,简化会提前停止。</li>
@@ -836,7 +836,7 @@ check-throws = false
 <li>数组合并上限限制在类型合并过程中保持分离的封闭键控数组形状数。当过程式代码在不同分支上为同一变量积累大量略有差异的形状时,合并器会一直保留每一种,直到达到此阈值,然后将它们合并为一个泛化形状。对依赖非常精确的逐键收窄的代码,可调高它。</li>
 <li>循环赋值深度上限限制循环分析器对每个循环主体运行多少次不动点迭代。当存在 <code>N</code> 个跨循环依赖链时,可能需要多达 <code>N</code> 次额外遍历,链末端的类型才能完全稳定;每次遍历都会重新分析整个主体。默认值 <code>1</code> 对几乎所有真实代码都足够。把它调到 <code>2</code> 或 <code>3</code> 适合需要对深度跨循环依赖链做非常精确收窄的代码库。<code>0</code> 表示完全禁用重新迭代,这是最快的设置,但可能让一些自依赖类型比所需更宽。</li>
 </ul>
-<h3 id="examples-2">示例</h3>
+<h3 id="what-each-threshold-controls">示例</h3>
 <p>快速分析,精度较低:</p>
 <pre><code class="language-toml">[analyzer.performance]
 saturation-complexity-threshold = 2048
@@ -862,7 +862,7 @@ array-combination-threshold = 256
 loop-assignment-depth-threshold = 4
 </code></pre>
 <p>在条件逻辑沉重或包含数千次数组操作的代码库上,提高阈值可能会显著拉长分析时间。在部署到 CI 之前先在你的项目上测试。</p>
-<h3 id="diagnosing-slow-runs">诊断慢速运行</h3>
+<h3 id="examples-2">诊断慢速运行</h3>
 <p>如果 Mago 感觉慢,通常预示 Mago 中存在 bug,而不是正常表现。作为参考,在 Apple M1 Pro 上,分析器对 <a href="https://github.com/WordPress/wordpress-develop"><code>WordPress/wordpress-develop</code></a> 全量分析耗时不到两秒,对 <a href="https://github.com/php-standard-library/php-standard-library"><code>php-standard-library/php-standard-library</code></a> 不到 200 毫秒。具体数字会随硬件和项目规模而变,但作为粗略阈值:如果 Mago 分析你的项目超过 30 秒,那就有问题,要么在 Mago 中,要么在它撞上了某种病态输入。</p>
 <p>同样的判断也适用于你在版本之间注意到的回归。如果一次先前很快的分析突然变慢,那值得报告。</p>
 <p>使用 <code>MAGO_LOG=trace</code> 重新运行以获取完整的流水线 trace:</p>
@@ -895,67 +895,67 @@ loop-assignment-depth-threshold = 4
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#feature-flags">特性开关</a>
+      <a class="doc-toc__link" href="#pattern-based-ignoring">特性开关</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#property-initialization">属性初始化</a>
+      <a class="doc-toc__link" href="#feature-flags">属性初始化</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#exception-filtering">异常过滤</a>
+      <a class="doc-toc__link" href="#property-initialization">异常过滤</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#experimental-api-detection">实验性 API 检测</a>
+      <a class="doc-toc__link" href="#exception-filtering">实验性 API 检测</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#plugins">插件</a>
+      <a class="doc-toc__link" href="#experimental-api-detection">插件</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#available-plugins">可用插件</a>
+      <a class="doc-toc__link" href="#plugins">可用插件</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#examples">示例</a>
+      <a class="doc-toc__link" href="#available-plugins">示例</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#strict-mode">严格模式</a>
+      <a class="doc-toc__link" href="#examples">严格模式</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#maximum-strictness">最高严格度</a>
+      <a class="doc-toc__link" href="#strict-mode">最高严格度</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#lenient-mode">宽松模式</a>
+      <a class="doc-toc__link" href="#maximum-strictness">宽松模式</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#notes-on-individual-flags">关于个别开关的说明</a>
+      <a class="doc-toc__link" href="#lenient-mode">关于个别开关的说明</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#performance-tuning">性能调优</a>
+      <a class="doc-toc__link" href="#notes-on-individual-flags">性能调优</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#when-to-adjust">何时调整</a>
+      <a class="doc-toc__link" href="#performance-tuning">何时调整</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#what-each-threshold-controls">每个阈值控制什么</a>
+      <a class="doc-toc__link" href="#when-to-adjust">每个阈值控制什么</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#examples-2">示例</a>
+      <a class="doc-toc__link" href="#what-each-threshold-controls">示例</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#diagnosing-slow-runs">诊断慢速运行</a>
+      <a class="doc-toc__link" href="#examples-2">诊断慢速运行</a>
     </li>
     
   </ol>

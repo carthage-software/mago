@@ -561,7 +561,7 @@ baseline = "analyzer-baseline.toml"
 <h2 id="general-options">General options</h2>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Paths or glob patterns to exclude from analysis. Additive to <code>[source].excludes</code>.</td></tr>
-<tr><td style="text-align: left"><code>ignore</code></td><td style="text-align: left"><code>(string | object)[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Issue codes to ignore, optionally scoped to specific paths. See below.</td></tr>
+<tr><td style="text-align: left"><code>ignore</code></td><td style="text-align: left"><code>(string | object)[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Issue codes to ignore, optionally scoped to specific paths or filtered by regex against issue text. See below.</td></tr>
 <tr><td style="text-align: left"><code>baseline</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">unset</td><td style="text-align: left">Path to a baseline file. Equivalent to passing <code>--baseline</code> on every run. The CLI flag overrides this.</td></tr>
 <tr><td style="text-align: left"><code>baseline-variant</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"loose"</code></td><td style="text-align: left">Format for newly generated baselines. <code>"loose"</code> (count-based) or <code>"strict"</code> (exact line matching). See <a href="../../../../../main/en/fundamentals/baseline">baseline</a>.</td></tr>
 <tr><td style="text-align: left"><code>minimum-fail-level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"error"</code></td><td style="text-align: left">Minimum severity that causes a non-zero exit. One of <code>"note"</code>, <code>"help"</code>, <code>"warning"</code>, <code>"error"</code>. Overridden by <code>--minimum-fail-level</code>.</td></tr>
@@ -593,6 +593,17 @@ ignore = [
 ]
 </code></pre>
 <p>Glob matching honours the project-wide settings under <code>[source.glob]</code>, so toggles like <code>literal-separator</code> and <code>case-insensitive</code> apply here as well.</p>
+<h3 id="pattern-based-ignoring">Pattern-based ignoring</h3>
+<p>When a code is too broad to silence wholesale but the issues you want gone share a recognisable phrase (a vendor name, an inferred type, a function called out by name), use a <code>pattern</code> entry. The pattern is a regex tested against every textual field of the issue, in order: the title, each annotation message, each note, and the help message. The first match suppresses the issue. The most instance-specific text (title and annotations) is searched first; notes and help are searched last because they are typically templated per rule and rarely differ between two issues with the same code.</p>
+<pre><code class="language-toml">[analyzer]
+ignore = [
+    { pattern = "Symfony", code = "mixed-assignment" },
+    { pattern = "Saw type `mixed`", in = "src/Bridge/" },
+    { pattern = "(?i)deprecated" },
+]
+</code></pre>
+<p>Both <code>code</code> and <code>in</code> are optional. With only a <code>pattern</code>, every reported issue is tested against the regex regardless of code or file. Combining <code>pattern</code> with <code>code</code> and/or <code>in</code> narrows the search before running the regex, which is cheaper and avoids accidental matches in unrelated rules.</p>
+<p>The pattern is a <a href="https://docs.rs/regex/">bare Rust regex</a>. Write <code>(?i)</code> at the start to match case-insensitively; do not wrap the regex in <code>/.../</code> delimiters. An invalid regex is logged and the entry is skipped, so a single bad pattern does not stop the run.</p>
 <p><code>excludes</code> and <code>ignore</code> are not the same. <code>excludes</code> removes files from analysis entirely, so they are not parsed for type information. <code>ignore</code> still analyses the file but suppresses the listed codes in the output.</p>
 <h2 id="feature-flags">Feature flags</h2>
 <p>These flags toggle individual analyses. Defaults are tuned for everyday use; flip them on as your codebase tightens up.</p>
@@ -868,6 +879,10 @@ loop-assignment-depth-threshold = 4
     
     <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#path-scoped-ignoring">Path-scoped ignoring</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#pattern-based-ignoring">Pattern-based ignoring</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">

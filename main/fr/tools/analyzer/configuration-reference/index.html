@@ -563,7 +563,7 @@ baseline = "analyzer-baseline.toml"
 <h2 id="general-options">Options générales</h2>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Chemins ou motifs glob à exclure de l'analyse. S'ajoute à <code>[source].excludes</code>.</td></tr>
-<tr><td style="text-align: left"><code>ignore</code></td><td style="text-align: left"><code>(string | object)[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Codes de problèmes à ignorer, optionnellement délimités à des chemins spécifiques. Voir ci-dessous.</td></tr>
+<tr><td style="text-align: left"><code>ignore</code></td><td style="text-align: left"><code>(string | object)[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Codes de problèmes à ignorer, optionnellement délimités à des chemins spécifiques ou filtrés par regex sur le texte du problème. Voir ci-dessous.</td></tr>
 <tr><td style="text-align: left"><code>baseline</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left">non défini</td><td style="text-align: left">Chemin vers un fichier de baseline. Équivalent à passer <code>--baseline</code> à chaque exécution. L'indicateur CLI le remplace.</td></tr>
 <tr><td style="text-align: left"><code>baseline-variant</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"loose"</code></td><td style="text-align: left">Format pour les baselines nouvellement générées. <code>"loose"</code> (basée sur le compte) ou <code>"strict"</code> (correspondance exacte de ligne). Voir <a href="../../../../../main/fr/fundamentals/baseline">baseline</a>.</td></tr>
 <tr><td style="text-align: left"><code>minimum-fail-level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"error"</code></td><td style="text-align: left">Sévérité minimale qui provoque un code de sortie non nul. L'un de <code>"note"</code>, <code>"help"</code>, <code>"warning"</code>, <code>"error"</code>. Remplacé par <code>--minimum-fail-level</code>.</td></tr>
@@ -595,6 +595,17 @@ ignore = [
 ]
 </code></pre>
 <p>La correspondance glob respecte les paramètres globaux du projet sous <code>[source.glob]</code>, donc des bascules comme <code>literal-separator</code> et <code>case-insensitive</code> s'appliquent ici aussi.</p>
+<h3 id="pattern-based-ignoring">Ignorer par motif</h3>
+<p>Quand un code est trop large pour être réduit au silence en bloc mais que les problèmes que vous voulez éliminer partagent une formulation reconnaissable (nom de fournisseur, type inféré, fonction nommée explicitement), utilisez une entrée <code>pattern</code>. Le motif est une regex testée contre chaque champ textuel du problème, dans l'ordre : le titre, chaque message d'annotation, chaque note, puis le message d'aide. La première correspondance supprime le problème. Les textes les plus spécifiques à l'instance (titre et annotations) sont cherchés en premier ; notes et aide passent en dernier car elles sont généralement génériques par règle et diffèrent rarement entre deux problèmes partageant le même code.</p>
+<pre><code class="language-toml">[analyzer]
+ignore = [
+    { pattern = "Symfony", code = "mixed-assignment" },
+    { pattern = "Saw type `mixed`", in = "src/Bridge/" },
+    { pattern = "(?i)deprecated" },
+]
+</code></pre>
+<p><code>code</code> et <code>in</code> sont tous deux optionnels. Avec uniquement un <code>pattern</code>, chaque problème rapporté est testé contre la regex, indépendamment de son code ou de son fichier. Combiner <code>pattern</code> avec <code>code</code> et/ou <code>in</code> restreint la recherche avant d'exécuter la regex, ce qui est plus rapide et évite les correspondances accidentelles dans des règles sans rapport.</p>
+<p>Le motif est une <a href="https://docs.rs/regex/">regex Rust brute</a>. Écrivez <code>(?i)</code> au début pour une correspondance insensible à la casse ; n'entourez pas la regex de délimiteurs <code>/.../</code>. Une regex invalide est journalisée et l'entrée est ignorée, donc un seul motif erroné n'interrompt pas l'exécution.</p>
 <p><code>excludes</code> et <code>ignore</code> ne sont pas la même chose. <code>excludes</code> retire entièrement les fichiers de l'analyse, ils ne sont donc pas analysés pour les informations de type. <code>ignore</code> analyse toujours le fichier mais supprime les codes listés dans la sortie.</p>
 <h2 id="feature-flags">Indicateurs de fonctionnalité</h2>
 <p>Ces indicateurs activent ou désactivent des analyses individuelles. Les valeurs par défaut sont ajustées pour un usage quotidien ; activez-les à mesure que votre base de code se renforce.</p>
@@ -870,6 +881,10 @@ loop-assignment-depth-threshold = 4
     
     <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#path-scoped-ignoring">Ignorer par chemin</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#pattern-based-ignoring">Ignorer par motif</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
