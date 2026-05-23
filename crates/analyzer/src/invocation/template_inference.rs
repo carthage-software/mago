@@ -939,12 +939,15 @@ fn infer_templates_from_input_and_container_types(
             );
         }
 
+        // Bare `T` parameter positions get a deeper appearance depth than
+        // structural inferences (e.g. `Container<T>`) so the structural ones
+        // overshadow them in `get_relevant_bounds`.
         insert_bound_type(
             template_result,
             *template_parameter_name,
             &container_generic.defining_entity,
             residual_input_type.clone(),
-            DefinitionReplacementOptions { appearance_depth: 1, ..Default::default() },
+            DefinitionReplacementOptions { appearance_depth: 2, ..Default::default() },
             options.argument_offset,
             options.source_span,
         );

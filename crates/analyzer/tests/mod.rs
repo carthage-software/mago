@@ -2492,6 +2492,7 @@ test_case!(issue_1811);
 test_case!(issue_1815);
 test_case!(issue_1830);
 test_case!(issue_1831);
+test_case!(issue_1859);
 test_case!(issue_1869);
 test_case!(issue_1875, crate::framework::php_90_settings());
 test_case!(issue_1879);
