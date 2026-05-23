@@ -88,6 +88,15 @@ impl<'ctx, 'arena> LintContext<'ctx, 'arena> {
         self.imports.import(fqn, ImportKind::Constant)
     }
 
+    /// Returns the span of `use function <fqn>;` when `<fqn>` is bound to
+    /// `local` and that `use` statement holds only this one item. Used by
+    /// rules that migrate a `use function` import to a different shape and
+    /// want to remove the now-orphaned line in the same fix pass.
+    #[must_use]
+    pub fn sole_function_import_use_span(&self, local: &[u8]) -> Option<mago_span::Span> {
+        self.imports.sole_function_import_use_span(local)
+    }
+
     /// Checks if we are currently inside a constant expression context.
     ///
     /// Constant expression contexts include attribute arguments, parameter default values,

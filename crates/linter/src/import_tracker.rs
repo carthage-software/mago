@@ -4,6 +4,7 @@ use foldhash::HashMap;
 use foldhash::HashSet;
 
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_word::Word;
 use mago_word::ascii_lowercase_constant_name_word;
 use mago_word::ascii_lowercase_word;
@@ -114,6 +115,7 @@ struct ScopeState {
     local_classes: HashSet<Word>,
     local_functions: HashSet<Word>,
     local_constants: HashSet<Word>,
+    sole_function_import_use_span: HashMap<Word, Span>,
 }
 
 impl ScopeState {
@@ -225,10 +227,11 @@ impl ImportTracker {
     }
 
     fn enter_use(&mut self, r#use: &Use<'_>) {
+        let use_span = r#use.span();
         match &r#use.items {
             UseItems::Sequence(seq) => {
                 for item in seq.items.iter() {
-                    self.register_use_item(item, ImportKind::Name, None);
+                    self.register_use_item(item, ImportKind::Name, None, None);
                 }
             }
             UseItems::TypedSequence(typed) => {
@@ -236,9 +239,10 @@ impl ImportTracker {
                     UseType::Function(_) => ImportKind::Function,
                     UseType::Const(_) => ImportKind::Constant,
                 };
+                let sole_use_span = (typed.items.len() == 1).then_some(use_span);
 
                 for item in typed.items.iter() {
-                    self.register_use_item(item, kind, None);
+                    self.register_use_item(item, kind, None, sole_use_span);
                 }
             }
             UseItems::TypedList(list) => {
@@ -246,10 +250,11 @@ impl ImportTracker {
                     UseType::Function(_) => ImportKind::Function,
                     UseType::Const(_) => ImportKind::Constant,
                 };
+                let sole_use_span = (list.items.len() == 1).then_some(use_span);
 
                 let prefix = trim_start_byte(list.namespace.value(), b'\\');
                 for item in list.items.iter() {
-                    self.register_use_item(item, kind, Some(prefix));
+                    self.register_use_item(item, kind, Some(prefix), sole_use_span);
                 }
             }
             UseItems::MixedList(list) => {
@@ -261,7 +266,7 @@ impl ImportTracker {
                         None => ImportKind::Name,
                     };
 
-                    self.register_use_item(&item.item, kind, Some(prefix));
+                    self.register_use_item(&item.item, kind, Some(prefix), None);
                 }
             }
         }
@@ -269,7 +274,13 @@ impl ImportTracker {
         self.scope.record_anchor_after_use(r#use.end_offset());
     }
 
-    fn register_use_item(&mut self, item: &UseItem<'_>, kind: ImportKind, prefix: Option<&[u8]>) {
+    fn register_use_item(
+        &mut self,
+        item: &UseItem<'_>,
+        kind: ImportKind,
+        prefix: Option<&[u8]>,
+        sole_use_span: Option<Span>,
+    ) {
         let raw = trim_start_byte(item.name.value(), b'\\');
         let fqn = match prefix {
             Some(prefix) => concat_word!(prefix, b"\\", raw),
@@ -296,12 +307,22 @@ impl ImportTracker {
                 let fqn_key = ascii_lowercase_word(fqn.as_bytes());
                 self.scope.function_imports.insert(lookup, fqn);
                 self.scope.function_fqn_to_local.insert(fqn_key, local);
+
+                if let Some(span) = sole_use_span {
+                    self.scope.sole_function_import_use_span.insert(lookup, span);
+                }
             }
             ImportKind::Constant => {
                 self.scope.constant_imports.insert(local, fqn);
                 self.scope.constant_fqn_to_local.insert(ascii_lowercase_constant_name_word(fqn.as_bytes()), local);
             }
         }
+    }
+
+    #[must_use]
+    pub fn sole_function_import_use_span(&self, local: &[u8]) -> Option<Span> {
+        let lookup = ascii_lowercase_word(local);
+        self.scope.sole_function_import_use_span.get(&lookup).copied()
     }
 
     pub fn import(&mut self, fqn: &[u8], kind: ImportKind) -> Option<ImportResolution> {
