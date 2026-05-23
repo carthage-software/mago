@@ -129,15 +129,28 @@ impl LintRule for PreferFakeHelperRule {
             return;
         }
 
+        let inside_interpolation = ctx.is_child_of(NodeKind::CompositeString)
+            || ctx.is_child_of(NodeKind::InterpolatedString)
+            || ctx.is_child_of(NodeKind::ShellExecuteString)
+            || ctx.is_child_of(NodeKind::BracedExpressionStringPart);
+
         let issue = Issue::new(self.cfg.level(), "Use the `fake()` helper instead of the `$this->faker` property.")
             .with_code(self.meta.code)
             .with_annotation(Annotation::primary(access.span()).with_message("This can be written as `fake()`"))
             .with_note("`fake()` is the modern helper for obtaining a Faker generator in a Laravel factory.")
-            .with_help("Replace `$this->faker` with `fake()`.");
+            .with_help(if inside_interpolation {
+                "Break the interpolation apart with concatenation or `sprintf`, then replace `$this->faker` with `fake()`."
+            } else {
+                "Replace `$this->faker` with `fake()`."
+            });
 
-        ctx.collector.propose(issue, |edits| {
-            edits.push(TextEdit::replace(access.span(), "fake()"));
-        });
+        if inside_interpolation {
+            ctx.collector.report(issue);
+        } else {
+            ctx.collector.propose(issue, |edits| {
+                edits.push(TextEdit::replace(access.span(), "fake()"));
+            });
+        }
     }
 }
 
@@ -223,5 +236,37 @@ mod tests {
                 }
             }
         "}
+    }
+
+    test_lint_failure! {
+        name = faker_in_braced_interpolation_is_reported_but_not_fixed,
+        rule = PreferFakeHelperRule,
+        code = indoc! {r#"
+            <?php
+
+            class UserFactory
+            {
+                public function definition(): array
+                {
+                    return ['url' => "https://{$this->faker->domainName}"];
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = faker_in_bare_interpolation_is_reported_but_not_fixed,
+        rule = PreferFakeHelperRule,
+        code = indoc! {r#"
+            <?php
+
+            class UserFactory
+            {
+                public function definition(): array
+                {
+                    return ['url' => "host: $this->faker"];
+                }
+            }
+        "#}
     }
 }
