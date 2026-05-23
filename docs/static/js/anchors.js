@@ -6,6 +6,32 @@
     anchor.addEventListener("click", (event) => event.stopPropagation());
   });
 
+  const copiedTimers = new WeakMap();
+  article.querySelectorAll("summary .rule__code").forEach((code) => {
+    code.title = "Click to copy rule name";
+    code.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(code.textContent || "");
+        }
+      } catch (_) {}
+
+      code.classList.add("rule__code--copied");
+      const previousTimer = copiedTimers.get(code);
+      if (previousTimer) clearTimeout(previousTimer);
+      copiedTimers.set(
+        code,
+        setTimeout(() => {
+          code.classList.remove("rule__code--copied");
+          copiedTimers.delete(code);
+        }, 1200),
+      );
+    });
+  });
+
   const openAncestorDetailsFor = (id) => {
     if (!id) return null;
     const target = document.getElementById(id);

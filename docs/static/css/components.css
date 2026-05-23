@@ -1320,6 +1320,14 @@
     padding: 0;
     word-break: keep-all;
     flex: 0 0 auto;
+    cursor: copy;
+  }
+
+  details.rule .rule__code--copied {
+    background: var(--bg-soft);
+    box-shadow: 0 0 0 2px var(--accent-deep);
+    border-radius: 3px;
+    transition: background var(--t-snap), box-shadow var(--t-snap);
   }
 
   details.rule .rule__anchor {
