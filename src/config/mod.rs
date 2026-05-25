@@ -741,20 +741,24 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_take_defaults() {
-        let workspace_path = temp_dir().join("workspace-0");
-        std::fs::create_dir_all(&workspace_path).unwrap();
-
-        let config = temp_env::with_vars(
+    fn load_config(workspace_path: Option<PathBuf>) -> Configuration {
+        temp_env::with_vars(
             [
                 ("HOME", temp_dir().to_str()),
                 ("MAGO_THREADS", None),
                 ("MAGO_PHP_VERSION", None),
                 ("MAGO_ALLOW_UNSUPPORTED_PHP_VERSION", None),
             ],
-            || Configuration::load(Some(workspace_path), None, None, None, false, false).unwrap(),
-        );
+            || Configuration::load(workspace_path, None, None, None, false, false).unwrap(),
+        )
+    }
+
+    #[test]
+    fn test_take_defaults() {
+        let workspace_path = temp_dir().join("workspace-0");
+        std::fs::create_dir_all(&workspace_path).unwrap();
+
+        let config = load_config(Some(workspace_path));
 
         assert_eq!(config.threads, *LOGICAL_CPUS)
     }
@@ -769,7 +773,7 @@ mod tests {
         create_tmp_file("threads: 2\nphp-version: \"7.4.0\"", &workspace_path, "yaml");
         create_tmp_file("{\"threads\": 1,\"php-version\":\"8.1.0\"}", &workspace_path, "json");
 
-        let config = Configuration::load(Some(workspace_path), None, None, None, false, false).unwrap();
+        let config = load_config(Some(workspace_path));
 
         assert_eq!(config.threads, 3);
         assert_eq!(config.php_version.to_string(), DEFAULT_PHP_VERSION.to_string())
@@ -783,7 +787,7 @@ mod tests {
 
         create_named_tmp_file("threads = 3", &workspace_path, CONFIGURATION_DIST_FILE_NAME, "toml");
 
-        let config = Configuration::load(Some(workspace_path.clone()), None, None, None, false, false).unwrap();
+        let config = load_config(Some(workspace_path.clone()));
 
         assert_eq!(config.threads, 3);
         assert_eq!(config.config_file, Some(workspace_path.join("mago.dist.toml")));
@@ -798,7 +802,7 @@ mod tests {
         create_tmp_file("threads = 5", &workspace_path, "toml");
         create_named_tmp_file("threads = 3", &workspace_path, CONFIGURATION_DIST_FILE_NAME, "toml");
 
-        let config = Configuration::load(Some(workspace_path.clone()), None, None, None, false, false).unwrap();
+        let config = load_config(Some(workspace_path.clone()));
 
         assert_eq!(config.threads, 5);
         assert_eq!(config.config_file, Some(workspace_path.join("mago.toml")));
@@ -815,16 +819,7 @@ mod tests {
 
         create_named_tmp_file("threads = 3", &xdg_config_home_path, CONFIGURATION_DIST_FILE_NAME, "toml");
 
-        let config = temp_env::with_vars(
-            [
-                ("HOME", None::<PathBuf>),
-                ("XDG_CONFIG_HOME", Some(xdg_config_home_path)),
-                ("MAGO_THREADS", None),
-                ("MAGO_PHP_VERSION", None),
-                ("MAGO_ALLOW_UNSUPPORTED_PHP_VERSION", None),
-            ],
-            || Configuration::load(Some(workspace_path), None, None, None, false, false).unwrap(),
-        );
+        let config = load_config(Some(workspace_path));
 
         assert_eq!(config.config_file, None);
         assert_eq!(config.threads, *LOGICAL_CPUS);
