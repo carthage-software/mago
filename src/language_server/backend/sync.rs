@@ -61,7 +61,6 @@ impl Backend {
                 let diagnostics = build_diagnostics(&workspace.database, &analysis_result, lint_issues);
                 let publish_count = diagnostics.values().map(|v| v.len()).sum::<usize>();
                 *self.state.lock().unwrap() = BackendState::Ready(workspace);
-                self.publish(diagnostics).await;
                 tracing::info!(elapsed = ?started.elapsed(), diagnostics = publish_count, "ready");
             }
             Ok(Err(err)) => {
@@ -276,22 +275,30 @@ impl Backend {
     }
 
     async fn publish(&self, diagnostics: HashMap<Url, Vec<Diagnostic>>) {
-        let stale: Vec<Url> = {
+        let (stale, changed) = {
             let mut guard = self.state.lock().unwrap();
-            if let BackendState::Ready(workspace) = &mut *guard {
-                let stale: Vec<Url> =
-                    workspace.last_diagnostics.keys().filter(|url| !diagnostics.contains_key(*url)).cloned().collect();
-                workspace.last_diagnostics = diagnostics.clone();
-                stale
-            } else {
+            let BackendState::Ready(workspace) = &mut *guard else {
                 return;
+            };
+            let stale: Vec<Url> =
+                workspace.last_diagnostics.keys().filter(|url| !diagnostics.contains_key(*url)).cloned().collect();
+            let changed: Vec<(Url, Vec<Diagnostic>)> = diagnostics
+                .into_iter()
+                .filter(|(url, diags)| workspace.last_diagnostics.get(url) != Some(diags))
+                .collect();
+            for url in &stale {
+                workspace.last_diagnostics.remove(url);
             }
+            for (url, diags) in &changed {
+                workspace.last_diagnostics.insert(url.clone(), diags.clone());
+            }
+            (stale, changed)
         };
 
         for url in stale {
             self.client.publish_diagnostics(url, vec![], None).await;
         }
-        for (url, diags) in diagnostics {
+        for (url, diags) in changed {
             self.client.publish_diagnostics(url, diags, None).await;
         }
     }
