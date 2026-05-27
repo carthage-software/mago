@@ -11,10 +11,10 @@ use mago_codex::symbol::SymbolKind;
 use mago_codex::ttype::TType;
 use mago_database::file::File as MagoFile;
 use mago_names::ResolvedNames;
-use tower_lsp::lsp_types::Hover;
-use tower_lsp::lsp_types::HoverContents;
-use tower_lsp::lsp_types::MarkupContent;
-use tower_lsp::lsp_types::MarkupKind;
+use tower_lsp_server::ls_types::Hover;
+use tower_lsp_server::ls_types::HoverContents;
+use tower_lsp_server::ls_types::MarkupContent;
+use tower_lsp_server::ls_types::MarkupKind;
 
 use crate::language_server::capabilities::lookup;
 use crate::language_server::position::range_at_offsets;

@@ -10,8 +10,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use foldhash::HashMap;
-use tower_lsp::lsp_types::Diagnostic;
-use tower_lsp::lsp_types::Url;
+use tower_lsp_server::ls_types::Diagnostic;
+use tower_lsp_server::ls_types::Uri;
 
 use std::borrow::Cow;
 use std::path::Path;
@@ -49,8 +49,8 @@ pub struct WorkspaceState {
     pub service: IncrementalAnalysisService,
     pub linter: LinterContext,
     pub config: Arc<ServerConfig>,
-    pub open_documents: HashMap<Url, OpenDocument>,
-    pub last_diagnostics: HashMap<Url, Vec<Diagnostic>>,
+    pub open_documents: HashMap<Uri, OpenDocument>,
+    pub last_diagnostics: HashMap<Uri, Vec<Diagnostic>>,
     /// Per-file derived data; lint issues, name index, fold ranges,
     /// AST node spans; all built in one parse + resolve pass per
     /// file content change. See [`super::file_analysis::FileAnalysis`].

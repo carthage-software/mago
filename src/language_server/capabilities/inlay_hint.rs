@@ -16,9 +16,9 @@ use mago_database::file::File as MagoFile;
 use mago_names::ResolvedNames;
 use mago_syntax::token::Token;
 use mago_syntax::token::TokenKind;
-use tower_lsp::lsp_types::InlayHint;
-use tower_lsp::lsp_types::InlayHintKind;
-use tower_lsp::lsp_types::InlayHintLabel;
+use tower_lsp_server::ls_types::InlayHint;
+use tower_lsp_server::ls_types::InlayHintKind;
+use tower_lsp_server::ls_types::InlayHintLabel;
 
 use crate::language_server::capabilities::lookup;
 use crate::language_server::position::position_at_offset;

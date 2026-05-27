@@ -7,8 +7,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use mago_database::file::FileId;
-use tower_lsp::lsp_types::InitializeParams;
-use tower_lsp::lsp_types::Url;
+use tower_lsp_server::ls_types::InitializeParams;
+use tower_lsp_server::ls_types::Uri;
 
 /// Resolve the workspace root from `initialize` params, in the order the
 /// LSP spec recommends: `workspaceFolders`, then deprecated `rootUri`, then
@@ -17,16 +17,16 @@ use tower_lsp::lsp_types::Url;
 pub fn workspace_root(params: &InitializeParams) -> Option<PathBuf> {
     if let Some(folders) = &params.workspace_folders
         && let Some(first) = folders.first()
-        && let Ok(path) = first.uri.to_file_path()
+        && let Some(path) = first.uri.to_file_path()
     {
-        return Some(path);
+        return Some(path.into_owned());
     }
 
     #[allow(deprecated)]
     if let Some(uri) = &params.root_uri
-        && let Ok(path) = uri.to_file_path()
+        && let Some(path) = uri.to_file_path()
     {
-        return Some(path);
+        return Some(path.into_owned());
     }
 
     #[allow(deprecated)]
@@ -52,6 +52,6 @@ pub fn file_id_for(workspace: &Path, path: &Path) -> FileId {
 
 /// Convert a filesystem path to an LSP `file://` URL.
 #[allow(dead_code)]
-pub fn url_for_path(path: &Path) -> Option<Url> {
-    Url::from_file_path(path).ok()
+pub fn url_for_path(path: &Path) -> Option<Uri> {
+    Uri::from_file_path(path)
 }

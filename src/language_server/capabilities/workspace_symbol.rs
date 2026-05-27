@@ -13,16 +13,17 @@ use mago_database::DatabaseReader;
 use mago_database::file::FileType;
 use mago_span::Span;
 use mago_word::Word;
-use tower_lsp::lsp_types::Location;
-use tower_lsp::lsp_types::SymbolInformation;
-use tower_lsp::lsp_types::SymbolKind as LspSymbolKind;
-use tower_lsp::lsp_types::Url;
+use tower_lsp_server::ls_types::Location;
+use tower_lsp_server::ls_types::SymbolInformation;
+use tower_lsp_server::ls_types::SymbolKind as LspSymbolKind;
+use tower_lsp_server::ls_types::Uri;
+use tower_lsp_server::ls_types::WorkspaceSymbolResponse;
 
 use crate::language_server::position::range_at_offsets;
 
 const MAX_RESULTS: usize = 256;
 
-pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str) -> Vec<SymbolInformation> {
+pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str) -> WorkspaceSymbolResponse {
     let needle = query.as_bytes().to_ascii_lowercase();
     let mut out = Vec::new();
 
@@ -45,7 +46,7 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str
             });
         }
         if out.len() >= MAX_RESULTS {
-            return out;
+            return WorkspaceSymbolResponse::Flat(out);
         }
     }
 
@@ -71,7 +72,7 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str
             });
         }
         if out.len() >= MAX_RESULTS {
-            return out;
+            return WorkspaceSymbolResponse::Flat(out);
         }
     }
 
@@ -94,11 +95,11 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, query: &str
             });
         }
         if out.len() >= MAX_RESULTS {
-            return out;
+            return WorkspaceSymbolResponse::Flat(out);
         }
     }
 
-    out
+    WorkspaceSymbolResponse::Flat(out)
 }
 
 /// Substring match against the lowercased FQCN/FQN.
@@ -128,7 +129,7 @@ fn classlike_kind(k: MagoSymbolKind) -> LspSymbolKind {
 fn span_to_location(database: &Database<'_>, span: Span) -> Option<Location> {
     let file = database.get(&span.file_id).ok()?;
     let path = file.path.as_ref()?;
-    let url = Url::from_file_path(path).ok()?;
+    let url = Uri::from_file_path(path)?;
     let range = range_at_offsets(&file, span.start.offset, span.end.offset);
     Some(Location { uri: url, range })
 }

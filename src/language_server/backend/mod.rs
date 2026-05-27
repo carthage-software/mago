@@ -6,10 +6,10 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use tower_lsp::Client;
-use tower_lsp::LanguageServer;
-use tower_lsp::jsonrpc::Result as JsonRpcResult;
-use tower_lsp::lsp_types::*;
+use tower_lsp_server::Client;
+use tower_lsp_server::LanguageServer;
+use tower_lsp_server::jsonrpc::Result as JsonRpcResult;
+use tower_lsp_server::ls_types::*;
 
 use crate::language_server::ServerConfig;
 use crate::language_server::capabilities;
@@ -36,7 +36,6 @@ impl Backend {
     }
 }
 
-#[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> JsonRpcResult<InitializeResult> {
         if let Some(root) = workspace_root(&params) {
@@ -55,6 +54,7 @@ impl LanguageServer for Backend {
                 name: "mago-server".into(),
                 version: Some(env!("CARGO_PKG_VERSION").into()),
             }),
+            offset_encoding: None,
         })
     }
 
@@ -213,7 +213,7 @@ impl LanguageServer for Backend {
         })
     }
 
-    async fn symbol(&self, params: WorkspaceSymbolParams) -> JsonRpcResult<Option<Vec<SymbolInformation>>> {
+    async fn symbol(&self, params: WorkspaceSymbolParams) -> JsonRpcResult<Option<WorkspaceSymbolResponse>> {
         traced("workspace_symbol", || {
             Ok(self.with_workspace(|ws| {
                 capabilities::workspace_symbol::compute(&ws.database, ws.service.codebase(), &params.query)

@@ -6,15 +6,16 @@
 //! the issue.
 
 use foldhash::HashMap;
-use tower_lsp::lsp_types::CodeAction;
-use tower_lsp::lsp_types::CodeActionKind;
-use tower_lsp::lsp_types::CodeActionOrCommand;
-use tower_lsp::lsp_types::CodeActionParams;
-use tower_lsp::lsp_types::Diagnostic;
-use tower_lsp::lsp_types::Range;
-use tower_lsp::lsp_types::TextEdit;
-use tower_lsp::lsp_types::Url;
-use tower_lsp::lsp_types::WorkspaceEdit;
+use tower_lsp_server::ls_types::CodeAction;
+use tower_lsp_server::ls_types::CodeActionKind;
+use tower_lsp_server::ls_types::CodeActionOrCommand;
+use tower_lsp_server::ls_types::CodeActionParams;
+use tower_lsp_server::ls_types::Diagnostic;
+use tower_lsp_server::ls_types::NumberOrString;
+use tower_lsp_server::ls_types::Range;
+use tower_lsp_server::ls_types::TextEdit;
+use tower_lsp_server::ls_types::Uri;
+use tower_lsp_server::ls_types::WorkspaceEdit;
 
 use mago_database::Database;
 use mago_database::DatabaseReader;
@@ -59,7 +60,7 @@ pub fn compute(workspace: &WorkspaceState, params: &CodeActionParams) -> Vec<Cod
     actions
 }
 
-fn issue_overlaps(workspace: &WorkspaceState, issue: &Issue, uri: &Url, requested: Range) -> bool {
+fn issue_overlaps(workspace: &WorkspaceState, issue: &Issue, uri: &Uri, requested: Range) -> bool {
     let primary = primary_annotation(issue);
     let Some(primary) = primary else {
         return false;
@@ -70,7 +71,7 @@ fn issue_overlaps(workspace: &WorkspaceState, issue: &Issue, uri: &Url, requeste
     let Some(path) = &file.path else {
         return false;
     };
-    let Ok(issue_uri) = Url::from_file_path(path) else {
+    let Some(issue_uri) = Uri::from_file_path(path) else {
         return false;
     };
     if issue_uri != *uri {
@@ -81,11 +82,11 @@ fn issue_overlaps(workspace: &WorkspaceState, issue: &Issue, uri: &Url, requeste
 }
 
 fn issue_to_actions(database: &Database<'_>, issue: &Issue) -> Vec<CodeActionOrCommand> {
-    let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::default();
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::default();
     for (file_id, edits) in &issue.edits {
         let Ok(file) = database.get(file_id) else { continue };
         let Some(path) = &file.path else { continue };
-        let Ok(target_uri) = Url::from_file_path(path) else { continue };
+        let Some(target_uri) = Uri::from_file_path(path) else { continue };
 
         let converted: Vec<TextEdit> = edits.iter().map(|e| convert_edit(&file, e)).collect();
         if converted.is_empty() {
@@ -133,7 +134,7 @@ fn issue_to_diagnostic(database: &Database<'_>, issue: &Issue) -> Option<Diagnos
     Some(Diagnostic {
         range,
         severity: Some(crate::language_server::diagnostics::level_to_severity(issue.level)),
-        code: issue.code.clone().map(tower_lsp::lsp_types::NumberOrString::String),
+        code: issue.code.clone().map(NumberOrString::String),
         source: Some("mago".into()),
         message: issue.message.clone(),
         ..Diagnostic::default()

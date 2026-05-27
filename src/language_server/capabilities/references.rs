@@ -33,8 +33,8 @@ use mago_database::file::File as MagoFile;
 use mago_database::file::FileType;
 use mago_span::Span;
 use mago_syntax::token::TokenKind;
-use tower_lsp::lsp_types::Location;
-use tower_lsp::lsp_types::Url;
+use tower_lsp_server::ls_types::Location;
+use tower_lsp_server::ls_types::Uri;
 
 use crate::language_server::capabilities::lookup;
 use crate::language_server::position::range_at_offsets;
@@ -73,7 +73,7 @@ pub fn compute(
     for arc_file in candidates {
         let Some(analysis) = workspace.file_analysis_for(arc_file.id) else { continue };
         let Some(path) = arc_file.path.as_ref() else { continue };
-        let Ok(url) = Url::from_file_path(path) else { continue };
+        let Some(url) = Uri::from_file_path(path) else { continue };
 
         for (start, end, name, _) in analysis.resolved().iter() {
             if !name.eq_ignore_ascii_case(target_fqn) {
@@ -125,7 +125,7 @@ fn same_file_variable_locations(file: &MagoFile, raw: &[u8]) -> Vec<Location> {
     let Some(path) = file.path.as_ref() else {
         return Vec::new();
     };
-    let Ok(url) = Url::from_file_path(path) else {
+    let Some(url) = Uri::from_file_path(path) else {
         return Vec::new();
     };
     lookup::lex(file)

@@ -32,8 +32,8 @@ use mago_syntax::ast::Try;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::walker::Walker;
 use mago_syntax::walker::walk_program;
-use tower_lsp::lsp_types::FoldingRange;
-use tower_lsp::lsp_types::FoldingRangeKind;
+use tower_lsp_server::ls_types::FoldingRange;
+use tower_lsp_server::ls_types::FoldingRangeKind;
 
 use crate::language_server::linter::LinterContext;
 

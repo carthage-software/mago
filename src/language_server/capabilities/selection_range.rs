@@ -3,8 +3,8 @@
 //! ([`super::super::file_analysis::FileAnalysis::node_spans`]).
 
 use mago_database::file::File as MagoFile;
-use tower_lsp::lsp_types::Range;
-use tower_lsp::lsp_types::SelectionRange;
+use tower_lsp_server::ls_types::Range;
+use tower_lsp_server::ls_types::SelectionRange;
 
 use crate::language_server::file_analysis::FileAnalysis;
 use crate::language_server::position::range_at_offsets;

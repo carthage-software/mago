@@ -12,12 +12,12 @@ use mago_database::file::File as MagoFile;
 use mago_database::file::FileType;
 use mago_span::Span;
 use mago_syntax::token::TokenKind;
-use tower_lsp::lsp_types::CompletionItem;
-use tower_lsp::lsp_types::CompletionItemKind;
-use tower_lsp::lsp_types::Documentation;
-use tower_lsp::lsp_types::InsertTextFormat;
-use tower_lsp::lsp_types::MarkupContent;
-use tower_lsp::lsp_types::MarkupKind;
+use tower_lsp_server::ls_types::CompletionItem;
+use tower_lsp_server::ls_types::CompletionItemKind;
+use tower_lsp_server::ls_types::Documentation;
+use tower_lsp_server::ls_types::InsertTextFormat;
+use tower_lsp_server::ls_types::MarkupContent;
+use tower_lsp_server::ls_types::MarkupKind;
 
 use crate::language_server::capabilities::lookup;
 use crate::language_server::state::ExpressionTypeIndex;

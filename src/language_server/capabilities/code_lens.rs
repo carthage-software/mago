@@ -9,10 +9,10 @@
 
 use mago_database::file::File as MagoFile;
 use mago_database::file::FileId;
-use tower_lsp::lsp_types::CodeLens;
-use tower_lsp::lsp_types::Command;
-use tower_lsp::lsp_types::Position;
-use tower_lsp::lsp_types::Range;
+use tower_lsp_server::ls_types::CodeLens;
+use tower_lsp_server::ls_types::Command;
+use tower_lsp_server::ls_types::Position;
+use tower_lsp_server::ls_types::Range;
 
 use crate::language_server::state::WorkspaceState;
 
