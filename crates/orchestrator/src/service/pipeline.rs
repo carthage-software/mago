@@ -9,6 +9,7 @@ use std::time::Instant;
 use bumpalo::Bump;
 use foldhash::HashSet;
 use mago_php_version::PHPVersion;
+use rayon::iter::Either;
 use rayon::prelude::*;
 
 use mago_codex::metadata::CodebaseMetadata;
@@ -220,12 +221,12 @@ where
         let source_count = source_files.len();
 
         let mut compile_parallel_duration = Duration::ZERO;
-        let partial_codebases: Vec<CodebaseMetadata> = measure!(
+        let (patches, partial_codebases): (Vec<CodebaseMetadata>, Vec<CodebaseMetadata>) = measure!(
             trace_enabled,
             compile_parallel_duration,
             source_files
                 .into_par_iter()
-                .map_init(Bump::new, |arena, file| -> Result<CodebaseMetadata, OrchestratorError> {
+                .map_init(Bump::new, |arena, file| -> (CodebaseMetadata, bool) {
                     let program = parse_file_with_settings(arena, &file, parser_settings);
                     if program.has_errors() {
                         tracing::warn!(
@@ -248,16 +249,23 @@ where
                         compiling_bar.inc(1);
                     }
 
-                    Ok(metadata)
+                    (metadata, file.file_type.is_patch())
                 })
-                .collect::<Result<Vec<_>, _>>()?
+                .partition_map(|(metadata, is_patch)| if is_patch {
+                    Either::Left(metadata)
+                } else {
+                    Either::Right(metadata)
+                })
         );
 
         let mut merged_codex = self.codebase;
         let mut merge_duration = Duration::ZERO;
         measure!(trace_enabled, merge_duration, {
-            for partial in partial_codebases {
-                merged_codex.extend(partial);
+            for codebase in &partial_codebases {
+                merged_codex.extend_ref(codebase);
+            }
+            for patch in patches {
+                merged_codex.apply_patches(patch);
             }
         });
 

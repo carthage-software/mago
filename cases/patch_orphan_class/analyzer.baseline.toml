@@ -1,0 +1,6 @@
+variant = "strict"
+
+[[entries."patch.php".issues]]
+code = "patch-introduces-new-symbol"
+start_line = 2
+end_line = 5

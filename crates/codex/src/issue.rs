@@ -25,6 +25,18 @@ pub(crate) enum ScanningIssueKind {
     InvalidInheritorsTag,
     InvalidMixinTag,
     CircularTypeImport,
+    PatchKindMismatch,
+    PatchHierarchyMismatch,
+    PatchDeclaresTrait,
+    PatchIntroducesNewSymbol,
+    PatchIntroducesNewMethod,
+    PatchIntroducesNewProperty,
+    PatchIntroducesNewConstant,
+    PatchEnumCasesIgnored,
+    PatchPropertyStructuralMismatch,
+    PatchConstantStructuralMismatch,
+    PatchMethodStructuralMismatch,
+    PatchFunctionParameterMismatch,
 }
 
 impl From<ScanningIssueKind> for String {

@@ -1,0 +1,21 @@
+variant = "strict"
+
+[[entries."patch.php".issues]]
+code = "patch-kind-mismatch"
+start_line = 2
+end_line = 2
+
+[[entries."patch.php".issues]]
+code = "patch-kind-mismatch"
+start_line = 4
+end_line = 7
+
+[[entries."patch.php".issues]]
+code = "patch-kind-mismatch"
+start_line = 9
+end_line = 12
+
+[[entries."source.php".issues]]
+code = "invalid-property-write"
+start_line = 11
+end_line = 11

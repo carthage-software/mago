@@ -240,6 +240,28 @@ impl Symbols {
         }
     }
 
+    /// Like [`extend`](Self::extend) but skips entries whose key is in `skip`.
+    #[inline]
+    pub fn extend_except(&mut self, other: Symbols, skip: &WordSet) {
+        self.namespaces.extend(other.namespaces);
+        for (entry, kind) in other.all {
+            if !skip.contains(&entry) {
+                self.all.entry(entry).or_insert(kind);
+            }
+        }
+    }
+
+    /// Like [`extend_ref`](Self::extend_ref) but skips entries whose key is in `skip`.
+    #[inline]
+    pub fn extend_ref_except(&mut self, other: &Symbols, skip: &WordSet) {
+        self.namespaces.extend(other.namespaces.iter().copied());
+        for (entry, kind) in &other.all {
+            if !skip.contains(entry) {
+                self.all.entry(*entry).or_insert(*kind);
+            }
+        }
+    }
+
     /// Removes a symbol by its FQCN.
     ///
     /// Note: does not remove namespaces (they may be shared by other symbols).
