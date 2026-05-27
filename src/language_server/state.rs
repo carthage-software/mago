@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use foldhash::HashMap;
+use mago_database::file::FileType;
 use tower_lsp_server::ls_types::Diagnostic;
 use tower_lsp_server::ls_types::Uri;
 
@@ -123,6 +124,9 @@ impl WorkspaceState {
                 self.file_analyses.remove(&file_id);
                 continue;
             };
+            if file.file_type != FileType::Host {
+                continue;
+            }
             let hash = xxhash_rust::xxh3::xxh3_64(&file.contents);
             let analysis = Arc::new(file_analysis::build(&file, &self.linter, with_semantics));
             self.file_analyses.insert(file_id, (hash, analysis));
