@@ -13,9 +13,9 @@ use mago_database::file::File as MagoFile;
 use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
 use mago_php_version::PHPVersion;
-use tower_lsp::lsp_types::Position;
-use tower_lsp::lsp_types::Range;
-use tower_lsp::lsp_types::TextEdit;
+use tower_lsp_server::ls_types::Position;
+use tower_lsp_server::ls_types::Range;
+use tower_lsp_server::ls_types::TextEdit;
 
 pub fn compute(file: &MagoFile, php_version: PHPVersion, settings: FormatSettings) -> Option<TextEdit> {
     let arena = Bump::new();

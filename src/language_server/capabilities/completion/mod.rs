@@ -16,7 +16,7 @@ use mago_database::Database;
 use mago_database::file::File as MagoFile;
 use mago_syntax::token::Token;
 use mago_syntax::token::TokenKind;
-use tower_lsp::lsp_types::CompletionResponse;
+use tower_lsp_server::ls_types::CompletionResponse;
 
 use crate::language_server::capabilities::lookup;
 use crate::language_server::state::ExpressionTypeIndex;

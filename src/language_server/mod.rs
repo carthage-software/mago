@@ -14,8 +14,8 @@ use std::sync::Arc;
 
 use tokio::io::AsyncRead;
 use tokio::io::AsyncWrite;
-use tower_lsp::LspService;
-use tower_lsp::Server;
+use tower_lsp_server::LspService;
+use tower_lsp_server::Server;
 
 mod backend;
 mod capabilities;

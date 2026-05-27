@@ -11,8 +11,8 @@ use mago_database::DatabaseReader;
 use mago_database::file::File as MagoFile;
 use mago_span::Span;
 use mago_syntax::token::TokenKind;
-use tower_lsp::lsp_types::DocumentLink;
-use tower_lsp::lsp_types::Url;
+use tower_lsp_server::ls_types::DocumentLink;
+use tower_lsp_server::ls_types::Uri;
 
 use crate::language_server::capabilities::lookup;
 use crate::language_server::position::range_at_offsets;
@@ -106,8 +106,8 @@ fn resolve(codebase: &CodebaseMetadata, kind: UseKind, name: &[u8]) -> Option<Sp
     }
 }
 
-fn file_url(database: &Database<'_>, span: Span) -> Option<Url> {
+fn file_url(database: &Database<'_>, span: Span) -> Option<Uri> {
     let file = database.get(&span.file_id).ok()?;
     let path = file.path.as_ref()?;
-    Url::from_file_path(path).ok()
+    Uri::from_file_path(path)
 }

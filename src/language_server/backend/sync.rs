@@ -7,10 +7,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use foldhash::HashMap;
-use tower_lsp::jsonrpc::Result as JsonRpcResult;
-use tower_lsp::lsp_types::Diagnostic;
-use tower_lsp::lsp_types::MessageType;
-use tower_lsp::lsp_types::Url;
+use tower_lsp_server::jsonrpc::Result as JsonRpcResult;
+use tower_lsp_server::ls_types::Diagnostic;
+use tower_lsp_server::ls_types::MessageType;
+use tower_lsp_server::ls_types::Uri;
 
 use mago_database::DatabaseReader;
 use mago_database::file::File as MagoFile;
@@ -151,10 +151,11 @@ impl Backend {
         }
     }
 
-    pub(super) async fn apply_buffer_open(&self, uri: Url, text: String, version: i32) {
-        let Ok(path) = uri.to_file_path() else {
+    pub(super) async fn apply_buffer_open(&self, uri: Uri, text: String, version: i32) {
+        let Some(path) = uri.to_file_path() else {
             return;
         };
+        let path = path.into_owned();
         self.apply_change_atomic(move |workspace| {
             let logical = logical_name_for(&workspace.root, &path);
             let virtual_file = workspace.database.get_id(logical.as_bytes()).is_none();
@@ -162,7 +163,7 @@ impl Backend {
                 let file = MagoFile::new(
                     Cow::Owned(logical.into_bytes()),
                     FileType::Host,
-                    Some(path.clone()),
+                    Some(path),
                     Cow::Owned(text.into_bytes()),
                 );
                 workspace.database.add(file)
@@ -177,7 +178,7 @@ impl Backend {
         .await;
     }
 
-    pub(super) async fn apply_buffer_change(&self, uri: Url, text: String, version: i32) {
+    pub(super) async fn apply_buffer_change(&self, uri: Uri, text: String, version: i32) {
         self.apply_change_atomic(move |workspace| {
             let Some(open) = workspace.open_documents.get_mut(&uri) else {
                 return Vec::new();
@@ -189,10 +190,11 @@ impl Backend {
         .await;
     }
 
-    pub(super) async fn apply_buffer_close(&self, uri: Url) {
-        let Ok(path) = uri.to_file_path() else {
+    pub(super) async fn apply_buffer_close(&self, uri: Uri) {
+        let Some(path) = uri.to_file_path() else {
             return;
         };
+        let path = path.into_owned();
         self.apply_change_atomic(move |workspace| {
             let Some(open) = workspace.open_documents.remove(&uri) else {
                 return Vec::new();
@@ -207,10 +209,11 @@ impl Backend {
         .await;
     }
 
-    pub(super) async fn apply_disk_change(&self, uri: Url) {
-        let Ok(path) = uri.to_file_path() else {
+    pub(super) async fn apply_disk_change(&self, uri: Uri) {
+        let Some(path) = uri.to_file_path() else {
             return;
         };
+        let path = path.into_owned();
         self.apply_change_atomic(move |workspace| {
             if workspace.open_documents.contains_key(&uri) {
                 return Vec::new();
@@ -229,10 +232,11 @@ impl Backend {
         .await;
     }
 
-    pub(super) async fn apply_disk_delete(&self, uri: Url) {
-        let Ok(path) = uri.to_file_path() else {
+    pub(super) async fn apply_disk_delete(&self, uri: Uri) {
+        let Some(path) = uri.to_file_path() else {
             return;
         };
+        let path = path.into_owned();
         self.apply_change_atomic(move |workspace| {
             let id = file_id_for(&workspace.root, &path);
             if workspace.database.delete(id) { vec![id] } else { Vec::new() }
@@ -240,7 +244,7 @@ impl Backend {
         .await;
     }
 
-    pub(super) fn with_file<F, R>(&self, uri: &Url, f: F) -> Option<R>
+    pub(super) fn with_file<F, R>(&self, uri: &Uri, f: F) -> Option<R>
     where
         F: FnOnce(&MagoFile, &WorkspaceState) -> R,
     {
@@ -274,15 +278,15 @@ impl Backend {
         Some(f(workspace))
     }
 
-    async fn publish(&self, diagnostics: HashMap<Url, Vec<Diagnostic>>) {
+    async fn publish(&self, diagnostics: HashMap<Uri, Vec<Diagnostic>>) {
         let (stale, changed) = {
             let mut guard = self.state.lock().unwrap();
             let BackendState::Ready(workspace) = &mut *guard else {
                 return;
             };
-            let stale: Vec<Url> =
+            let stale: Vec<Uri> =
                 workspace.last_diagnostics.keys().filter(|url| !diagnostics.contains_key(*url)).cloned().collect();
-            let changed: Vec<(Url, Vec<Diagnostic>)> = diagnostics
+            let changed: Vec<(Uri, Vec<Diagnostic>)> = diagnostics
                 .into_iter()
                 .filter(|(url, diags)| workspace.last_diagnostics.get(url) != Some(diags))
                 .collect();
@@ -321,8 +325,8 @@ where
     result
 }
 
-pub(super) fn file_for_uri(workspace: &WorkspaceState, uri: &Url) -> Option<Arc<MagoFile>> {
-    let path = uri.to_file_path().ok()?;
+pub(super) fn file_for_uri(workspace: &WorkspaceState, uri: &Uri) -> Option<Arc<MagoFile>> {
+    let path = uri.to_file_path()?;
     let id = file_id_for(&workspace.root, &path);
     workspace.database.get(&id).ok()
 }

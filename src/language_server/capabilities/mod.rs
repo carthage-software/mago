@@ -14,29 +14,29 @@
 //! 2. Wire it through [`crate::backend::Backend`] alongside the others.
 //! 3. Advertise the capability from [`server_capabilities`].
 
-use tower_lsp::lsp_types::CodeActionKind;
-use tower_lsp::lsp_types::CodeActionOptions;
-use tower_lsp::lsp_types::CodeActionProviderCapability;
-use tower_lsp::lsp_types::CodeLensOptions;
-use tower_lsp::lsp_types::CompletionOptions;
-use tower_lsp::lsp_types::DocumentLinkOptions;
-use tower_lsp::lsp_types::FoldingRangeProviderCapability;
-use tower_lsp::lsp_types::HoverProviderCapability;
-use tower_lsp::lsp_types::OneOf;
-use tower_lsp::lsp_types::RenameOptions;
-use tower_lsp::lsp_types::SelectionRangeProviderCapability;
-use tower_lsp::lsp_types::SemanticTokenType;
-use tower_lsp::lsp_types::SemanticTokensFullOptions;
-use tower_lsp::lsp_types::SemanticTokensLegend;
-use tower_lsp::lsp_types::SemanticTokensOptions;
-use tower_lsp::lsp_types::SemanticTokensServerCapabilities;
-use tower_lsp::lsp_types::ServerCapabilities;
-use tower_lsp::lsp_types::SignatureHelpOptions;
-use tower_lsp::lsp_types::TextDocumentSyncCapability;
-use tower_lsp::lsp_types::TextDocumentSyncKind;
-use tower_lsp::lsp_types::TextDocumentSyncOptions;
-use tower_lsp::lsp_types::TextDocumentSyncSaveOptions;
-use tower_lsp::lsp_types::WorkDoneProgressOptions;
+use tower_lsp_server::ls_types::CodeActionKind;
+use tower_lsp_server::ls_types::CodeActionOptions;
+use tower_lsp_server::ls_types::CodeActionProviderCapability;
+use tower_lsp_server::ls_types::CodeLensOptions;
+use tower_lsp_server::ls_types::CompletionOptions;
+use tower_lsp_server::ls_types::DocumentLinkOptions;
+use tower_lsp_server::ls_types::FoldingRangeProviderCapability;
+use tower_lsp_server::ls_types::HoverProviderCapability;
+use tower_lsp_server::ls_types::OneOf;
+use tower_lsp_server::ls_types::RenameOptions;
+use tower_lsp_server::ls_types::SelectionRangeProviderCapability;
+use tower_lsp_server::ls_types::SemanticTokenType;
+use tower_lsp_server::ls_types::SemanticTokensFullOptions;
+use tower_lsp_server::ls_types::SemanticTokensLegend;
+use tower_lsp_server::ls_types::SemanticTokensOptions;
+use tower_lsp_server::ls_types::SemanticTokensServerCapabilities;
+use tower_lsp_server::ls_types::ServerCapabilities;
+use tower_lsp_server::ls_types::SignatureHelpOptions;
+use tower_lsp_server::ls_types::TextDocumentSyncCapability;
+use tower_lsp_server::ls_types::TextDocumentSyncKind;
+use tower_lsp_server::ls_types::TextDocumentSyncOptions;
+use tower_lsp_server::ls_types::TextDocumentSyncSaveOptions;
+use tower_lsp_server::ls_types::WorkDoneProgressOptions;
 
 pub mod code_action;
 pub mod code_lens;

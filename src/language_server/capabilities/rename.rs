@@ -10,11 +10,11 @@ use foldhash::HashMap;
 
 use mago_database::file::File as MagoFile;
 use mago_names::ResolvedNames;
-use tower_lsp::lsp_types::PrepareRenameResponse;
-use tower_lsp::lsp_types::Range;
-use tower_lsp::lsp_types::TextEdit;
-use tower_lsp::lsp_types::Url;
-use tower_lsp::lsp_types::WorkspaceEdit;
+use tower_lsp_server::ls_types::PrepareRenameResponse;
+use tower_lsp_server::ls_types::Range;
+use tower_lsp_server::ls_types::TextEdit;
+use tower_lsp_server::ls_types::Uri;
+use tower_lsp_server::ls_types::WorkspaceEdit;
 
 use crate::language_server::capabilities::lookup;
 use crate::language_server::position::range_at_offsets;
@@ -55,7 +55,7 @@ pub fn compute(
         return None;
     }
 
-    let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::default();
+    let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::default();
     for loc in locations {
         changes
             .entry(loc.uri)

@@ -13,10 +13,10 @@ use mago_codex::ttype::TType;
 use mago_database::file::File as MagoFile;
 use mago_names::ResolvedNames;
 use mago_syntax::token::TokenKind;
-use tower_lsp::lsp_types::ParameterInformation;
-use tower_lsp::lsp_types::ParameterLabel;
-use tower_lsp::lsp_types::SignatureHelp;
-use tower_lsp::lsp_types::SignatureInformation;
+use tower_lsp_server::ls_types::ParameterInformation;
+use tower_lsp_server::ls_types::ParameterLabel;
+use tower_lsp_server::ls_types::SignatureHelp;
+use tower_lsp_server::ls_types::SignatureInformation;
 
 use crate::language_server::capabilities::lookup;
 

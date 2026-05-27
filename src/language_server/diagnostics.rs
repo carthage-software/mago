@@ -1,12 +1,12 @@
 //! Issue → LSP `Diagnostic` conversion and publish helpers.
 
 use foldhash::HashMap;
-use tower_lsp::lsp_types::Diagnostic;
-use tower_lsp::lsp_types::DiagnosticRelatedInformation;
-use tower_lsp::lsp_types::DiagnosticSeverity;
-use tower_lsp::lsp_types::Location;
-use tower_lsp::lsp_types::NumberOrString;
-use tower_lsp::lsp_types::Url;
+use tower_lsp_server::ls_types::Diagnostic;
+use tower_lsp_server::ls_types::DiagnosticRelatedInformation;
+use tower_lsp_server::ls_types::DiagnosticSeverity;
+use tower_lsp_server::ls_types::Location;
+use tower_lsp_server::ls_types::NumberOrString;
+use tower_lsp_server::ls_types::Uri;
 
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_database::Database;
@@ -28,11 +28,11 @@ pub fn build_diagnostics<'a, I>(
     database: &Database<'_>,
     result: &AnalysisResult,
     lint_issues: I,
-) -> HashMap<Url, Vec<Diagnostic>>
+) -> HashMap<Uri, Vec<Diagnostic>>
 where
     I: IntoIterator<Item = &'a IssueCollection>,
 {
-    let mut by_url: HashMap<Url, Vec<Diagnostic>> = HashMap::default();
+    let mut by_url: HashMap<Uri, Vec<Diagnostic>> = HashMap::default();
 
     for issue in result.issues.iter() {
         push_issue(database, &mut by_url, issue);
@@ -47,7 +47,7 @@ where
     by_url
 }
 
-fn push_issue(database: &Database<'_>, by_url: &mut HashMap<Url, Vec<Diagnostic>>, issue: &Issue) {
+fn push_issue(database: &Database<'_>, by_url: &mut HashMap<Uri, Vec<Diagnostic>>, issue: &Issue) {
     let Some(annotation) = primary_annotation(issue) else {
         return;
     };
@@ -60,7 +60,7 @@ fn push_issue(database: &Database<'_>, by_url: &mut HashMap<Url, Vec<Diagnostic>
         return;
     };
 
-    let Ok(url) = Url::from_file_path(path) else {
+    let Some(url) = Uri::from_file_path(path) else {
         return;
     };
 
@@ -107,7 +107,7 @@ fn secondary_related_info(database: &Database<'_>, issue: &Issue) -> Vec<Diagnos
         let Some(path) = &file.path else {
             continue;
         };
-        let Ok(url) = Url::from_file_path(path) else {
+        let Some(url) = Uri::from_file_path(path) else {
             continue;
         };
 

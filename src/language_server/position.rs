@@ -10,8 +10,8 @@
 //! ship the negotiated `general.positionEncodings` capability.
 
 use mago_database::file::File as MagoFile;
-use tower_lsp::lsp_types::Position;
-use tower_lsp::lsp_types::Range;
+use tower_lsp_server::ls_types::Position;
+use tower_lsp_server::ls_types::Range;
 
 /// Convert a byte offset in `file` to an LSP [`Position`].
 #[must_use]

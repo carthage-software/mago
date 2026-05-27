@@ -8,8 +8,8 @@ use mago_database::Database;
 use mago_database::DatabaseReader;
 use mago_names::ResolvedNames;
 use mago_span::Span;
-use tower_lsp::lsp_types::Location;
-use tower_lsp::lsp_types::Url;
+use tower_lsp_server::ls_types::Location;
+use tower_lsp_server::ls_types::Uri;
 
 use crate::language_server::position::range_at_offsets;
 
@@ -40,7 +40,7 @@ fn resolve_span(codebase: &CodebaseMetadata, fqcn: &[u8]) -> Option<Span> {
 fn span_to_location(database: &Database<'_>, span: Span) -> Option<Location> {
     let file = database.get(&span.file_id).ok()?;
     let path = file.path.as_ref()?;
-    let url = Url::from_file_path(path).ok()?;
+    let url = Uri::from_file_path(path)?;
     let range = range_at_offsets(&file, span.start.offset, span.end.offset);
     Some(Location { uri: url, range })
 }
