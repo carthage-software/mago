@@ -30,6 +30,8 @@ use crate::exclusion::Exclusion;
 use crate::file::File;
 use crate::file::FileId;
 use crate::file::FileType;
+use crate::loader::calculate_pattern_specificity;
+use crate::loader::resolve_file_type;
 use crate::utils::bytes_to_path;
 
 const DEFAULT_POLL_INTERVAL_MS: u64 = 1000;
@@ -63,13 +65,27 @@ pub struct DatabaseWatcher<'config> {
     watcher: Option<RecommendedWatcher>,
     watched_paths: Vec<PathBuf>,
     receiver: Option<Receiver<Vec<ChangedFile>>>,
+    /// Configured host base paths paired with their loader-style specificity score.
+    ///
+    /// Carrying the score (computed via [`calculate_pattern_specificity`] over the original
+    /// pattern, before stripping any glob suffix) is what lets the watcher and the loader
+    /// agree on which [`FileType`] a newly-added file should get.
+    host_base_paths: Vec<(PathBuf, usize)>,
+    include_base_paths: Vec<(PathBuf, usize)>,
 }
 
 impl<'config> DatabaseWatcher<'config> {
     #[inline]
     #[must_use]
     pub fn new(database: Database<'config>) -> Self {
-        Self { database, watcher: None, watched_paths: Vec::new(), receiver: None }
+        Self {
+            database,
+            watcher: None,
+            watched_paths: Vec::new(),
+            receiver: None,
+            host_base_paths: Vec::new(),
+            include_base_paths: Vec::new(),
+        }
     }
 
     /// Starts watching for file changes in the configured directories.
@@ -130,17 +146,26 @@ impl<'config> DatabaseWatcher<'config> {
         // receive change events for files under that directory).
         let mut unique_watch_paths = HashSet::new();
 
+        let mut host_base_paths = Vec::new();
         for path in &config.paths {
+            // Compute specificity on the original pattern (with glob intact); the watch path
+            // strips trailing globs so the watcher can recurse into a real directory.
+            let specificity = calculate_pattern_specificity(path.as_ref());
             let watch_path = Self::extract_watch_path(path.as_ref());
             let absolute_path = if watch_path.is_absolute() { watch_path } else { config.workspace.join(watch_path) };
 
+            let canonical = absolute_path.canonicalize().unwrap_or_else(|_| absolute_path.clone());
+            host_base_paths.push((canonical, specificity));
             unique_watch_paths.insert(absolute_path);
         }
 
+        let mut include_base_paths = Vec::new();
         for path in &config.includes {
+            let specificity = calculate_pattern_specificity(path.as_ref());
             let watch_path = Self::extract_watch_path(path.as_ref());
             let absolute_path = if watch_path.is_absolute() { watch_path } else { config.workspace.join(watch_path) };
-
+            let canonical = absolute_path.canonicalize().unwrap_or_else(|_| absolute_path.clone());
+            include_base_paths.push((canonical, specificity));
             unique_watch_paths.insert(absolute_path);
         }
 
@@ -182,6 +207,8 @@ impl<'config> DatabaseWatcher<'config> {
         self.watcher = Some(watcher);
         self.watched_paths = watched_paths;
         self.receiver = Some(rx);
+        self.host_base_paths = host_base_paths;
+        self.include_base_paths = include_base_paths;
 
         Ok(())
     }
@@ -197,6 +224,8 @@ impl<'config> DatabaseWatcher<'config> {
         }
         self.watched_paths.clear();
         self.receiver = None;
+        self.host_base_paths.clear();
+        self.include_base_paths.clear();
     }
 
     /// Checks if the watcher is currently active.
@@ -363,7 +392,12 @@ impl<'config> DatabaseWatcher<'config> {
 
                     let Ok(file) = self.database.get(&changed_file.id) else {
                         if changed_file.path.exists() {
-                            match File::read(&workspace, &changed_file.path, FileType::Host) {
+                            let new_file_type = classify_added_file(
+                                &changed_file.path,
+                                &self.host_base_paths,
+                                &self.include_base_paths,
+                            );
+                            match File::read(&workspace, &changed_file.path, new_file_type) {
                                 Ok(file) => {
                                     self.database.add(file);
                                     tracing::debug!("Added new file to database: {}", changed_file.path.display());
@@ -484,5 +518,83 @@ impl Drop for DatabaseWatcher<'_> {
     #[inline]
     fn drop(&mut self) {
         self.stop();
+    }
+}
+
+/// Picks the [`FileType`] for a newly-discovered file based on which configured base path
+/// it lives under.
+///
+/// Computes the per-tier maximum specificity over every base path the file matched (paired
+/// with the pattern's [`calculate_pattern_specificity`] score) and delegates to
+/// [`resolve_file_type`] for the actual conflict resolution. The watcher and the loader
+/// therefore reach the same `FileType` for the same file under the same configuration —
+/// see the helper's docs for the priority rules.
+fn classify_added_file(path: &Path, host_bases: &[(PathBuf, usize)], include_bases: &[(PathBuf, usize)]) -> FileType {
+    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let max_spec = |bases: &[(PathBuf, usize)]| {
+        bases.iter().filter(|(b, _)| canonical.starts_with(b.as_path())).map(|(_, s)| *s).max()
+    };
+
+    resolve_file_type((max_spec(host_bases), max_spec(include_bases)))
+}
+
+#[cfg(test)]
+mod classify_added_file_tests {
+    use super::*;
+
+    fn bases(items: &[&str]) -> Vec<(PathBuf, usize)> {
+        items.iter().map(|p| (PathBuf::from(p), calculate_pattern_specificity(p.as_bytes()))).collect()
+    }
+
+    #[test]
+    fn defaults_to_host_when_no_base_matches() {
+        let ft = classify_added_file(Path::new("/ws/orphan/foo.php"), &bases(&["/ws/src"]), &bases(&["/ws/stubs"]));
+        assert_eq!(ft, FileType::Host);
+    }
+
+    #[test]
+    fn vendored_when_only_include_matches() {
+        // Regression test: prior to this fix the watcher hardcoded `FileType::Host` for
+        // every newly-discovered file, so a fresh PHP file dropped into an `includes`
+        // directory at runtime was wrongly added as source and linted as such.
+        let ft = classify_added_file(Path::new("/ws/stubs/foo.php"), &bases(&["/ws/src"]), &bases(&["/ws/stubs"]));
+        assert_eq!(ft, FileType::Vendored);
+    }
+
+    #[test]
+    fn host_when_only_host_matches() {
+        let ft = classify_added_file(Path::new("/ws/src/foo.php"), &bases(&["/ws/src"]), &bases(&["/ws/stubs"]));
+        assert_eq!(ft, FileType::Host);
+    }
+
+    #[test]
+    fn matches_loader_at_equal_specificity_for_same_dir_under_both() {
+        // The same directory configured under both `paths` and `includes`: vendored wins,
+        // matching the loader's "vendored beats host at equal specificity" rule. Catches
+        // the divergence the original watcher hit (it was awarding the file to host).
+        let ft = classify_added_file(Path::new("/ws/shared/foo.php"), &bases(&["/ws/shared"]), &bases(&["/ws/shared"]));
+        assert_eq!(ft, FileType::Vendored);
+    }
+
+    #[test]
+    fn include_wins_when_strictly_more_specific() {
+        // An include path nested inside a host path overrides for files under the nested
+        // path. Matches the loader's "vendored beats host when strictly more specific".
+        let ft = classify_added_file(
+            Path::new("/ws/src/vendor/stub.php"),
+            &bases(&["/ws/src"]),
+            &bases(&["/ws/src/vendor"]),
+        );
+        assert_eq!(ft, FileType::Vendored);
+    }
+
+    #[test]
+    fn exact_host_file_beats_directory_include_via_loader_score() {
+        // Catches the second divergence: with the component-count heuristic the watcher
+        // treated `src/` and `src/foo.php` as equally specific (both 2 components) and
+        // gave the file to vendored; the loader-aligned specificity score (file × 1000
+        // beats dir × 100) instead keeps it on host.
+        let ft = classify_added_file(Path::new("/ws/src/foo.php"), &bases(&["/ws/src/foo.php"]), &bases(&["/ws/src"]));
+        assert_eq!(ft, FileType::Host);
     }
 }

@@ -148,7 +148,11 @@ impl<'config> DatabaseLoader<'config> {
         )?;
 
         let mut all_files: HashMap<FileId, File> = HashMap::default();
-        let mut file_decisions: HashMap<FileId, (FileType, usize)> = HashMap::default();
+        // Per-file maximum specificity for each tier the file matched. `None` in a slot means
+        // the file did not match any configured pattern in that tier; otherwise it carries the
+        // best specificity score that tier could offer, scored by `calculate_pattern_specificity`.
+        let mut file_specificities: HashMap<FileId, (Option<usize>, Option<usize>)> = HashMap::default();
+        let bump_spec = |slot: &mut Option<usize>, s: usize| *slot = Some(slot.map_or(s, |e| e.max(s)));
 
         // Process host files (from paths)
         for file_with_spec in host_files_with_spec {
@@ -156,7 +160,7 @@ impl<'config> DatabaseLoader<'config> {
             let specificity = file_with_spec.specificity;
 
             all_files.insert(file_id, file_with_spec.file);
-            file_decisions.insert(file_id, (FileType::Host, specificity));
+            bump_spec(&mut file_specificities.entry(file_id).or_insert((None, None)).0, specificity);
         }
 
         // When stdin override is set, ensure that the file is in the database
@@ -191,7 +195,7 @@ impl<'config> DatabaseLoader<'config> {
                 if let Entry::Vacant(e) = all_files.entry(file_id) {
                     e.insert(file);
 
-                    file_decisions.insert(file_id, (FileType::Host, usize::MAX));
+                    bump_spec(&mut file_specificities.entry(file_id).or_insert((None, None)).0, usize::MAX);
                 }
             }
         }
@@ -201,22 +205,14 @@ impl<'config> DatabaseLoader<'config> {
             let vendored_specificity = file_with_spec.specificity;
 
             all_files.entry(file_id).or_insert(file_with_spec.file);
-
-            match file_decisions.get(&file_id) {
-                Some((FileType::Host, host_specificity)) if vendored_specificity < *host_specificity => {
-                    // Keep Host
-                }
-                _ => {
-                    file_decisions.insert(file_id, (FileType::Vendored, vendored_specificity));
-                }
-            }
+            bump_spec(&mut file_specificities.entry(file_id).or_insert((None, None)).1, vendored_specificity);
         }
 
-        db.reserve(file_decisions.len() + self.memory_sources.len());
+        db.reserve(file_specificities.len() + self.memory_sources.len());
 
-        for (file_id, (final_type, _)) in file_decisions {
+        for (file_id, specificities) in file_specificities {
             if let Some(mut file) = all_files.remove(&file_id) {
-                file.file_type = final_type;
+                file.file_type = resolve_file_type(specificities);
                 db.add(file);
             }
         }
@@ -297,7 +293,7 @@ impl<'config> DatabaseLoader<'config> {
             let is_glob_pattern = !resolved_path.exists()
                 && (root.contains(&b'*') || root.contains(&b'?') || root.contains(&b'[') || root.contains(&b'{'));
 
-            let specificity = Self::calculate_pattern_specificity(root.as_ref());
+            let specificity = calculate_pattern_specificity(root.as_ref());
             if is_glob_pattern {
                 // Handle as glob pattern
                 let pattern = if root_path.is_absolute() {
@@ -443,38 +439,54 @@ impl<'config> DatabaseLoader<'config> {
 
         Ok(files)
     }
+}
 
-    /// Calculates how specific a pattern is for a given file path.
-    ///
-    /// Examples:
-    ///
-    /// - "src/b.php" matching src/b.php: ~2000 (exact file, 2 components)
-    /// - "src/" matching src/b.php: ~100 (directory, 1 component)
-    /// - "src" matching src/b.php: ~100 (directory, 1 component)
-    fn calculate_pattern_specificity(pattern: &[u8]) -> usize {
-        let pattern_path = bytes_to_path(pattern);
+/// Calculates how specific a pattern is for a given file path.
+///
+/// Examples:
+///
+/// - "src/b.php" matching src/b.php: ~2000 (exact file, 2 components)
+/// - "src/" matching src/b.php: ~100 (directory, 1 component)
+/// - "src" matching src/b.php: ~100 (directory, 1 component)
+pub(crate) fn calculate_pattern_specificity(pattern: &[u8]) -> usize {
+    let pattern_path = bytes_to_path(pattern);
 
-        let component_count = pattern_path.components().count();
-        let is_glob =
-            pattern.contains(&b'*') || pattern.contains(&b'?') || pattern.contains(&b'[') || pattern.contains(&b'{');
+    let component_count = pattern_path.components().count();
+    let is_glob =
+        pattern.contains(&b'*') || pattern.contains(&b'?') || pattern.contains(&b'[') || pattern.contains(&b'{');
 
-        if is_glob {
-            let non_wildcard_components = pattern_path
-                .components()
-                .filter(|c| {
-                    let s = c.as_os_str().to_string_lossy();
-                    !s.contains('*') && !s.contains('?') && !s.contains('[') && !s.contains('{')
-                })
-                .count();
-            non_wildcard_components * 10
-        } else if pattern_path.is_file()
-            || pattern_path.extension().is_some()
-            || pattern.rsplit(|&b| b == b'.').next().is_some_and(|ext| ext.eq_ignore_ascii_case(b"php"))
-        {
-            component_count * 1000
-        } else {
-            component_count * 100
-        }
+    if is_glob {
+        let non_wildcard_components = pattern_path
+            .components()
+            .filter(|c| {
+                let s = c.as_os_str().to_string_lossy();
+                !s.contains('*') && !s.contains('?') && !s.contains('[') && !s.contains('{')
+            })
+            .count();
+        non_wildcard_components * 10
+    } else if pattern_path.is_file()
+        || pattern_path.extension().is_some()
+        || pattern.rsplit(|&b| b == b'.').next().is_some_and(|ext| ext.eq_ignore_ascii_case(b"php"))
+    {
+        component_count * 1000
+    } else {
+        component_count * 100
+    }
+}
+
+/// Picks the final [`FileType`] for a file that matched configured base paths in one or
+/// more tiers.
+///
+/// `host_specificity` and `vendored_specificity` are the maximum specificity scores of any
+/// matching base path in each tier, or `None` if no base path in that tier matched.
+/// Vendored wins over Host at equal-or-more specificity; Host wins only when strictly more
+/// specific. When nothing matches the result is `Host`.
+pub(crate) fn resolve_file_type((host_specificity, vendored_specificity): (Option<usize>, Option<usize>)) -> FileType {
+    match (host_specificity, vendored_specificity) {
+        (Some(h), Some(v)) if v < h => FileType::Host,
+        (_, Some(_)) => FileType::Vendored,
+        (Some(_), None) => FileType::Host,
+        (None, None) => FileType::Host,
     }
 }
 
@@ -515,30 +527,54 @@ mod tests {
     }
 
     #[test]
-    fn test_specificity_calculation_exact_file() {
-        let spec = DatabaseLoader::calculate_pattern_specificity(b"src/b.php");
-        assert!(spec >= 2000, "Exact file should have high specificity, got {spec}");
+    fn defaults_to_host_when_nothing_matches() {
+        assert_eq!(resolve_file_type((None, None)), FileType::Host);
     }
 
     #[test]
-    fn test_specificity_calculation_directory() {
-        let spec = DatabaseLoader::calculate_pattern_specificity(b"src/");
-        assert!((100..1000).contains(&spec), "Directory should have moderate specificity, got {spec}");
+    fn host_only_match_yields_host() {
+        assert_eq!(resolve_file_type((Some(100), None)), FileType::Host);
     }
 
     #[test]
-    fn test_specificity_calculation_glob() {
-        let spec = DatabaseLoader::calculate_pattern_specificity(b"src/*.php");
-        assert!(spec < 100, "Glob pattern should have low specificity, got {spec}");
+    fn vendored_only_match_yields_vendored() {
+        assert_eq!(resolve_file_type((None, Some(100))), FileType::Vendored);
     }
 
     #[test]
-    fn test_specificity_calculation_deeper_path() {
-        let shallow_spec = DatabaseLoader::calculate_pattern_specificity(b"src/");
-        let deep_spec = DatabaseLoader::calculate_pattern_specificity(b"src/foo/bar/");
-        assert!(deep_spec > shallow_spec, "Deeper path should have higher specificity");
+    fn vendored_beats_host_at_equal_specificity() {
+        assert_eq!(resolve_file_type((Some(100), Some(100))), FileType::Vendored);
     }
 
+    #[test]
+    fn vendored_beats_host_when_more_specific() {
+        assert_eq!(resolve_file_type((Some(100), Some(2000))), FileType::Vendored);
+    }
+
+    #[test]
+    fn host_beats_vendored_only_when_strictly_more_specific() {
+        assert_eq!(resolve_file_type((Some(2000), Some(100))), FileType::Host);
+    }
+
+    #[test]
+    fn exact_file_path_beats_directory_at_same_component_count() {
+        assert!(calculate_pattern_specificity(b"src/foo.php") > calculate_pattern_specificity(b"src/foo"));
+    }
+
+    #[test]
+    fn directory_beats_glob_at_same_non_wildcard_count() {
+        assert!(calculate_pattern_specificity(b"src/") > calculate_pattern_specificity(b"src/**/*.php"));
+    }
+
+    #[test]
+    fn deeper_path_beats_shallower_at_same_kind() {
+        assert!(calculate_pattern_specificity(b"src/inner/") > calculate_pattern_specificity(b"src/"));
+    }
+
+    #[test]
+    fn extensionless_phpish_pattern_treated_as_file() {
+        assert_eq!(calculate_pattern_specificity(b"src/foo.PHP"), calculate_pattern_specificity(b"src/foo.php"),);
+    }
     #[test]
     fn test_exact_file_vs_directory() {
         let temp_dir = TempDir::new().unwrap();
