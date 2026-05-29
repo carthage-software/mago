@@ -91,7 +91,5 @@ jobs:
       - name: miri test (formatter, class-formatting slice)
         run: cargo +${{ steps.toolchain.outputs.version }} miri test -p mago-formatter class_
 
-      - name: miri test (analyzer, generics slice)
-        env:
-          MIRIFLAGS: -Zmiri-disable-isolation
-        run: cargo +${{ steps.toolchain.outputs.version }} miri test -p mago-analyzer generics
+      - name: miri test (analyzer, generics lib unit tests)
+        run: cargo +${{ steps.toolchain.outputs.version }} miri test -p mago-analyzer --lib -- template var
