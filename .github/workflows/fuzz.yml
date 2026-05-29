@@ -10,6 +10,9 @@ concurrency:
   group: fuzz-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FUZZ_TARGET: x86_64-unknown-linux-gnu
+
 jobs:
   fuzz:
     name: ${{ matrix.crate }} / ${{ matrix.target }}
@@ -43,6 +46,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ steps.toolchain.outputs.version }}
+          targets: ${{ env.FUZZ_TARGET }}
 
       - name: cache rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -81,6 +85,7 @@ jobs:
           cargo +${{ steps.toolchain.outputs.version }} fuzz run "${{ matrix.target }}" \
             "fuzz/corpus/${{ matrix.target }}" \
             ${{ matrix.seeds }} \
+            --target ${{ env.FUZZ_TARGET }} \
             -- \
             -max_total_time=${{ steps.duration.outputs.seconds }} \
             -timeout=25 \
