@@ -1,0 +1,97 @@
+name: Miri
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "37 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: miri-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pr:
+    name: Miri (parser core)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: resolve toolchain version
+        id: toolchain
+        shell: bash
+        run: echo "version=$(cat nightly-version)" >> "$GITHUB_OUTPUT"
+
+      - name: install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.version }}
+          components: miri, rust-src
+
+      - name: cache rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: miri-${{ steps.toolchain.outputs.version }}
+          cache-on-failure: true
+
+      - name: miri setup
+        run: cargo +${{ steps.toolchain.outputs.version }} miri setup
+
+      - name: miri test (parser core)
+        run: |
+          cargo +${{ steps.toolchain.outputs.version }} miri test \
+            -p mago-syntax \
+            -p mago-twig-syntax
+
+  nightly:
+    name: Miri (full suites)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: resolve toolchain version
+        id: toolchain
+        shell: bash
+        run: echo "version=$(cat nightly-version)" >> "$GITHUB_OUTPUT"
+
+      - name: install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.version }}
+          components: miri, rust-src
+
+      - name: cache rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: miri-${{ steps.toolchain.outputs.version }}
+          cache-on-failure: true
+
+      - name: miri setup
+        run: cargo +${{ steps.toolchain.outputs.version }} miri setup
+
+      - name: miri test (linter, full)
+        run: cargo +${{ steps.toolchain.outputs.version }} miri test -p mago-linter
+
+      - name: miri test (formatter, class-formatting slice)
+        run: cargo +${{ steps.toolchain.outputs.version }} miri test -p mago-formatter class_
+
+      - name: miri test (analyzer, generics slice)
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation
+        run: cargo +${{ steps.toolchain.outputs.version }} miri test -p mago-analyzer generics
