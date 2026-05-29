@@ -115,13 +115,13 @@ impl Word {
         #[cfg(feature = "sso")]
         // SAFETY: the `tag` field aliases the first byte of either union arm, and inline
         // bytes are always initialized at construction; when `tag == TAG_HEAP`, `heap.ptr`
-        // is the address of an `Entry` written by the interner, so the deref and `as_bytes`
-        // (whose contract is documented on `Entry::as_bytes`) are sound.
+        // is the address of an `Entry` written by the interner, so the deref and `Entry::bytes`
+        // (whose contract is documented on `Entry::bytes`) are sound.
         unsafe {
             let tag = self.repr.inline.tag;
             if tag == TAG_HEAP {
                 let entry = self.repr.heap.ptr as *const Entry;
-                (*entry).as_bytes()
+                Entry::bytes(entry)
             } else {
                 &self.repr.inline.bytes[..tag as usize]
             }
@@ -131,7 +131,7 @@ impl Word {
         // SAFETY: `repr.ptr` is the NonNull written at construction; the entry it points to
         // lives for the lifetime of the process.
         unsafe {
-            self.repr.ptr.as_ref().as_bytes()
+            Entry::bytes(self.repr.ptr.as_ptr())
         }
     }
 

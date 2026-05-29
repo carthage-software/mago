@@ -16,7 +16,7 @@ use crate::bumpalloc::LeakyBumpAlloc;
 ///
 /// ```text
 /// | hash: u64 | len: u32 | _pad: u32 | bytes: [u8; len] |
-///   ^ Entry                            ^ Entry::as_bytes()
+///   ^ Entry                            ^ Entry::bytes()
 /// ```
 #[repr(C)]
 pub(crate) struct Entry {
@@ -26,20 +26,24 @@ pub(crate) struct Entry {
 }
 
 impl Entry {
-    /// Returns the raw byte slice that follows this header in the arena.
+    /// Returns the interned byte slice that follows an entry's header in the arena.
+    ///
+    /// Takes a raw pointer rather than `&self` on purpose: a `&Entry` carries provenance
+    /// over only the header, so reading the trailing bytes through it is out of bounds
+    /// under Stacked Borrows. `ptr` comes straight from the arena allocation and carries
+    /// provenance over the whole header-plus-bytes block.
     ///
     /// # Safety
-    /// The caller must ensure this `Entry` was constructed by the interner — i.e., the
-    /// `len` bytes immediately after `self` are valid initialized memory belonging to
-    /// the leaked arena.
+    ///
+    /// `ptr` must point at an `Entry` produced by the interner: a header followed by `len`
+    /// initialized bytes inside the leaked arena, with provenance over that whole block.
     #[allow(clippy::multiple_unsafe_ops_per_block)]
-    pub(crate) unsafe fn as_bytes(&self) -> &'static [u8] {
-        // SAFETY: by the function's contract this `Entry` was produced by the interner, so
-        // exactly `self.len` initialized bytes follow the header in the leaked arena, and the
-        // result borrows from a region that lives for the lifetime of the process.
+    pub(crate) unsafe fn bytes(ptr: *const Entry) -> &'static [u8] {
+        // SAFETY: `ptr` is a valid pointer to an `Entry` header, so reading the `len` field is safe.
         unsafe {
-            let ptr = (self as *const Entry).add(1).cast::<u8>();
-            std::slice::from_raw_parts(ptr, self.len as usize)
+            let len = (*ptr).len as usize;
+            let data = ptr.cast::<u8>().add(std::mem::size_of::<Entry>());
+            std::slice::from_raw_parts(data, len)
         }
     }
 }
@@ -97,17 +101,16 @@ impl Shard {
                 break;
             }
 
-            // SAFETY: every non-null slot in `entries` points at an `Entry` written by this
-            // shard's previous `intern` call; the arena outlives the program, so the deref
-            // is valid.
-            let entry: &Entry = unsafe { &*slot };
-            if entry.hash == hash && entry.len as usize == bytes.len() {
-                // SAFETY: the `Entry` came from this shard's interner — see `Entry::as_bytes`.
-                let existing = unsafe { entry.as_bytes() };
-                if existing == bytes {
-                    // SAFETY: `slot` was checked non-null above.
-                    return unsafe { NonNull::new_unchecked(slot) };
-                }
+            // SAFETY: every non-null slot points at an `Entry` written by a previous `intern`
+            // call; the arena outlives the program. Reading the header fields and trailing
+            // bytes through the raw `slot` keeps its whole-block provenance (see `Entry::bytes`).
+            let matched = unsafe {
+                (*slot).hash == hash && (*slot).len as usize == bytes.len() && Entry::bytes(slot) == bytes
+            };
+
+            if matched {
+                // SAFETY: `slot` was checked non-null above.
+                return unsafe { NonNull::new_unchecked(slot) };
             }
 
             probe += 1;
