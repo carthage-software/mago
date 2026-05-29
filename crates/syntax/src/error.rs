@@ -21,11 +21,28 @@ pub enum SyntaxError {
     UnexpectedEndOfFile(FileId, Position),
 }
 
+/// The token kinds a parser expected at the point an error was raised.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub enum Expected {
+    Exactly(TokenKind),
+    OneOf(&'static [TokenKind]),
+}
+
+impl Expected {
+    #[must_use]
+    pub fn kinds(&self) -> &[TokenKind] {
+        match self {
+            Expected::Exactly(kind) => std::slice::from_ref(kind),
+            Expected::OneOf(kinds) => kinds,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub enum ParseError {
     SyntaxError(SyntaxError),
-    UnexpectedEndOfFile(Box<[TokenKind]>, FileId, Position),
-    UnexpectedToken(Box<[TokenKind]>, TokenKind, Span),
+    UnexpectedEndOfFile(Expected, FileId, Position),
+    UnexpectedToken(Expected, TokenKind, Span),
     UnclosedLiteralString(LiteralStringKind, Span),
     RecursionLimitExceeded(Span),
 }
@@ -97,7 +114,7 @@ impl std::fmt::Display for ParseError {
                 return write!(f, "{e}");
             }
             ParseError::UnexpectedEndOfFile(expected, _, _) => {
-                let expected = expected.iter().map(ToString::to_string).collect::<Vec<_>>().join("`, `");
+                let expected = expected.kinds().iter().map(ToString::to_string).collect::<Vec<_>>().join("`, `");
 
                 if expected.is_empty() {
                     "Unexpected end of file".to_string()
@@ -108,7 +125,7 @@ impl std::fmt::Display for ParseError {
                 }
             }
             ParseError::UnexpectedToken(expected, found, _) => {
-                let expected = expected.iter().map(ToString::to_string).collect::<Vec<_>>().join("`, `");
+                let expected = expected.kinds().iter().map(ToString::to_string).collect::<Vec<_>>().join("`, `");
 
                 let found = found.to_string();
 

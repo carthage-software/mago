@@ -65,7 +65,7 @@ impl<'arena> Parser<'_, 'arena> {
         loop {
             match self.stream.peek_kind(0)? {
                 Some(kind) if kind == close_kind => break,
-                None => return Err(self.stream.unexpected(None, &[close_kind])),
+                None => return Err(self.stream.unexpected_kind(None, close_kind)),
                 _ => {}
             }
 
@@ -83,13 +83,13 @@ impl<'arena> Parser<'_, 'arena> {
         }
 
         let Some(current) = self.stream.lookahead(0)? else {
-            return Err(self.stream.unexpected(None, &[close_kind]));
+            return Err(self.stream.unexpected_kind(None, close_kind));
         };
 
         if current.kind == close_kind {
             self.stream.consume()?;
         } else {
-            self.errors.push(self.stream.unexpected(Some(current), &[close_kind]));
+            self.errors.push(self.stream.unexpected_kind(Some(current), close_kind));
         }
 
         Ok(TokenSeparatedSequenceResult {

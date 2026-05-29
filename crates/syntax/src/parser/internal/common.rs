@@ -28,7 +28,7 @@ impl<'arena> Parser<'_, 'arena> {
 
     /// Expects and consumes one of the given token kinds.
     #[inline]
-    pub(crate) fn expect_one_of_keyword(&mut self, kinds: &[TokenKind]) -> Result<Keyword<'arena>, ParseError> {
+    pub(crate) fn expect_one_of_keyword(&mut self, kinds: &'static [TokenKind]) -> Result<Keyword<'arena>, ParseError> {
         let token = self.stream.consume()?;
         if kinds.contains(&token.kind) {
             Ok(Keyword { span: token.span_for(self.stream.file_id()), value: token.value })

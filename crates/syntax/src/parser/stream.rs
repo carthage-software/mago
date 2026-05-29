@@ -13,6 +13,7 @@ use mago_syntax_core::parser::LookaheadBuf;
 use crate::ast::sequence::Sequence;
 use crate::ast::trivia::Trivia;
 use crate::ast::trivia::TriviaKind;
+use crate::error::Expected;
 use crate::error::ParseError;
 use crate::error::SyntaxError;
 use crate::lexer::Lexer;
@@ -98,23 +99,18 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
                 return Ok(token);
             }
 
-            return Err(self.unexpected(Some(token), &[kind]));
+            return Err(self.unexpected_kind(Some(token), kind));
         }
 
         // Slow path: buffer empty, fill it.
         let current_kind = self.peek_kind(0)?;
         match current_kind {
             Some(k) if k == kind => self.consume(),
-            Some(_) => {
-                // The kind we just peeked guarantees a token is buffered, so `lookahead(0)`
-                // must yield `Some`; if the lexer somehow disagrees we surface an EOF error
-                // rather than panicking.
-                match self.lookahead(0)? {
-                    Some(token) => Err(self.unexpected(Some(token), &[kind])),
-                    None => Err(self.unexpected(None, &[kind])),
-                }
-            }
-            None => Err(self.unexpected(None, &[kind])),
+            Some(_) => match self.lookahead(0)? {
+                Some(token) => Err(self.unexpected_kind(Some(token), kind)),
+                None => Err(self.unexpected_kind(None, kind)),
+            },
+            None => Err(self.unexpected_kind(None, kind)),
         }
     }
 
@@ -225,15 +221,27 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
         }
     }
 
-    /// Creates a `ParseError` for an unexpected token or EOF.
+    /// Creates a `ParseError` for an unexpected token or EOF, given one or more expected kinds.
     #[inline]
     #[must_use]
-    pub fn unexpected(&self, found: Option<Token<'_>>, expected: &[TokenKind]) -> ParseError {
-        let expected_kinds: Box<[TokenKind]> = expected.into();
+    pub fn unexpected(&self, found: Option<Token<'_>>, expected: &'static [TokenKind]) -> ParseError {
+        self.unexpected_with(found, Expected::OneOf(expected))
+    }
+
+    /// Creates a `ParseError` for an unexpected token or EOF when a single, runtime-known kind was expected.
+    #[inline]
+    #[must_use]
+    pub fn unexpected_kind(&self, found: Option<Token<'_>>, expected: TokenKind) -> ParseError {
+        self.unexpected_with(found, Expected::Exactly(expected))
+    }
+
+    #[inline]
+    #[must_use]
+    fn unexpected_with(&self, found: Option<Token<'_>>, expected: Expected) -> ParseError {
         if let Some(token) = found {
-            ParseError::UnexpectedToken(expected_kinds, token.kind, token.span_for(self.file_id()))
+            ParseError::UnexpectedToken(expected, token.kind, token.span_for(self.file_id()))
         } else {
-            ParseError::UnexpectedEndOfFile(expected_kinds, self.file_id(), self.current_position())
+            ParseError::UnexpectedEndOfFile(expected, self.file_id(), self.current_position())
         }
     }
 
