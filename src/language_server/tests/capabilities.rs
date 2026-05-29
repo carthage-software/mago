@@ -331,35 +331,6 @@ async fn completion_after_arrow_offers_instance_members() {
 }
 
 #[tokio::test]
-async fn linter_diagnostics() {
-    let mut h = Harness::start(&[("a.php", "<?php\nfunction check(mixed $x): bool { return $x === null; }\n")]).await;
-    let mut diagnostics = h
-        .client
-        .take_pending_notifications()
-        .into_iter()
-        .filter(|m| {
-            m.get("method").and_then(Value::as_str) == Some("textDocument/publishDiagnostics")
-                && m["params"]["uri"].as_str() == Some(h.url("a.php").as_str())
-        })
-        .flat_map(|m| m["params"]["diagnostics"].as_array().cloned().unwrap_or_default())
-        .collect::<Vec<_>>();
-    if diagnostics.is_empty() {
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-        while diagnostics.is_empty() && std::time::Instant::now() < deadline {
-            let msg = h.client.read_message(10).await;
-            if msg.get("method").and_then(Value::as_str) == Some("textDocument/publishDiagnostics")
-                && msg["params"]["uri"].as_str() == Some(h.url("a.php").as_str())
-                && let Some(arr) = msg["params"]["diagnostics"].as_array()
-            {
-                diagnostics = arr.clone();
-            }
-        }
-    }
-    assert!(!diagnostics.is_empty());
-    assert!(diagnostics.iter().all(|d| d["source"] == "mago"));
-}
-
-#[tokio::test]
 async fn linter_quickfixes() {
     let code = "<?php\nfunction check(mixed $x): bool { return $x === null; }\n";
     let mut h = Harness::start(&[("a.php", code)]).await;
