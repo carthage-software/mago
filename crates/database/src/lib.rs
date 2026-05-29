@@ -92,6 +92,7 @@ pub mod exclusion;
 pub mod file;
 pub mod loader;
 pub mod matcher;
+pub mod membership;
 pub mod watcher;
 
 mod operation;

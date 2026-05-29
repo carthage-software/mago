@@ -26,6 +26,7 @@ use mago_database::exclusion::Exclusion;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
 use mago_database::loader::DatabaseLoader;
+use mago_database::membership::WorkspaceMatcher;
 use mago_linter::integration::IntegrationSet;
 use mago_linter::settings::Settings as LinterSettings;
 use mago_orchestrator::service::incremental_analysis::IncrementalAnalysisService;
@@ -50,17 +51,13 @@ pub enum BackendState {
 pub struct WorkspaceState {
     pub root: PathBuf,
     pub database: Database<'static>,
+    pub matcher: WorkspaceMatcher,
     pub service: IncrementalAnalysisService,
     pub linter: LinterContext,
     pub config: Arc<ServerConfig>,
     pub open_documents: HashMap<Uri, OpenDocument>,
     pub last_diagnostics: HashMap<Uri, Vec<Diagnostic>>,
-    /// Per-file derived data; lint issues, name index, fold ranges,
-    /// AST node spans; all built in one parse + resolve pass per
-    /// file content change. See [`super::file_analysis::FileAnalysis`].
     pub file_analyses: HashMap<FileId, (u64, Arc<FileAnalysis>)>,
-    /// Per-expression class-name index. Empty when [`ServerConfig::analyzer`]
-    /// is `false`.
     pub artifact_cache: HashMap<FileId, (u64, ExpressionTypeIndex)>,
 }
 
@@ -173,7 +170,13 @@ pub fn build_workspace(root: PathBuf, config: Arc<ServerConfig>) -> Result<(Work
         glob,
     };
 
-    let database = load_workspace_database(&root, configuration, prelude_db)?;
+    let db_configuration = build_database_configuration(&root, configuration);
+    let matcher = WorkspaceMatcher::from_configuration(&db_configuration)
+        .map_err(|err| format!("compile source matcher: {err}"))?;
+    let database = DatabaseLoader::new(db_configuration)
+        .with_database(prelude_db)
+        .load()
+        .map_err(|err| format!("load database: {err}"))?;
 
     let mut service = IncrementalAnalysisService::new(
         database.read_only(),
@@ -195,6 +198,7 @@ pub fn build_workspace(root: PathBuf, config: Arc<ServerConfig>) -> Result<(Work
     let workspace = WorkspaceState {
         root,
         database,
+        matcher,
         service,
         linter,
         config,
@@ -207,15 +211,10 @@ pub fn build_workspace(root: PathBuf, config: Arc<ServerConfig>) -> Result<(Work
     Ok((workspace, analysis_result))
 }
 
-/// Load the workspace database the same way `mago lint` / `mago analyze`
-/// would: honour `[source].paths`, `includes`, `excludes`, `extensions`,
-/// and the glob matcher options. The prelude database is merged in as
-/// the analysis baseline.
-fn load_workspace_database(
-    root: &Path,
-    configuration: &Configuration,
-    prelude_db: Database<'static>,
-) -> Result<Database<'static>, String> {
+/// Build the [`DatabaseConfiguration`] the LSP uses to scan the workspace,
+/// honouring `[source].paths`, `includes`, `excludes`, `extensions`, and the
+/// glob matcher options exactly as `mago lint` / `mago analyze` would.
+fn build_database_configuration(root: &Path, configuration: &Configuration) -> DatabaseConfiguration<'static> {
     let source = &configuration.source;
     let workspace = Cow::<'static, Path>::Owned(root.to_path_buf());
 
@@ -253,17 +252,5 @@ fn load_workspace_database(
         })
         .collect();
 
-    let db_configuration = DatabaseConfiguration {
-        workspace,
-        paths,
-        includes,
-        excludes,
-        extensions,
-        glob: source.glob.to_database_settings(),
-    };
-
-    DatabaseLoader::new(db_configuration)
-        .with_database(prelude_db)
-        .load()
-        .map_err(|err| format!("load database: {err}"))
+    DatabaseConfiguration { workspace, paths, includes, excludes, extensions, glob: source.glob.to_database_settings() }
 }

@@ -48,6 +48,14 @@ impl Backend {
     pub fn new(client: Client, config: Arc<ServerConfig>) -> Self {
         Self { client, config, state: Arc::new(Mutex::new(BackendState::Uninitialized)) }
     }
+
+    fn tracks(&self, uri: &Uri) -> bool {
+        let Some(path) = uri.to_file_path() else {
+            return false;
+        };
+
+        self.with_workspace(|workspace| workspace.matcher.contains(path.as_ref())).unwrap_or(true)
+    }
 }
 
 impl LanguageServer for Backend {
@@ -98,22 +106,39 @@ impl LanguageServer for Backend {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let TextDocumentItem { uri, text, version, .. } = params.text_document;
+        if !self.tracks(&uri) {
+            return;
+        }
+
         self.apply_buffer_open(uri, text, version).await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let uri = params.text_document.uri;
+        if !self.tracks(&uri) {
+            return;
+        }
+
         let Some(change) = params.content_changes.into_iter().next_back() else {
             return;
         };
+
         self.apply_buffer_change(uri, change.text, params.text_document.version).await;
     }
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        if !self.tracks(&params.text_document.uri) {
+            return;
+        }
+
         self.apply_buffer_close(params.text_document.uri).await;
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
+        if !self.tracks(&params.text_document.uri) {
+            return;
+        }
+
         self.apply_disk_change(params.text_document.uri).await;
     }
 
