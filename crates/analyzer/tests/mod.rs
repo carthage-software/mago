@@ -2503,6 +2503,7 @@ test_case!(issue_1885, crate::framework::check_missing_type_hints_settings());
 test_case!(issue_1888);
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_all_test_cases_are_ran() {
     let test_case_file = include_str!("mod.rs");
     let test_cases_dir = fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/cases")).unwrap();

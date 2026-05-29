@@ -524,6 +524,7 @@ fn preserves_non_utf8_identifiers() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn test_all_test_cases_are_ran() {
     let test_case_file = include_str!("mod.rs");
     let test_cases_dir = fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/cases")).unwrap();
