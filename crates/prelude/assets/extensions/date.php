@@ -1,89 +1,89 @@
 <?php
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_ATOM = "Y-m-d\\TH:i:sP";
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_COOKIE = 'l, d-M-Y H:i:s T';
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_ISO8601 = "Y-m-d\\TH:i:sO";
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_ISO8601_EXPANDED = "X-m-d\\TH:i:sP";
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_RFC822 = 'D, d M y H:i:s O';
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_RFC850 = 'l, d-M-y H:i:s T';
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_RFC1036 = 'D, d M y H:i:s O';
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_RFC1123 = 'D, d M Y H:i:s O';
 
 /**
- * @var string
+ * @var non-empty-string
  */
 #[Deprecated(since: '8.5', message: 'as this format ignores the associated timezone and always uses GMT')]
 const DATE_RFC7231 = "D, d M Y H:i:s \\G\\M\\T";
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_RFC2822 = 'D, d M Y H:i:s O';
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_RFC3339 = "Y-m-d\\TH:i:sP";
 
 /**
- * @var string
+ * @var non-empty-string
  */
 const DATE_RFC3339_EXTENDED = "Y-m-d\\TH:i:s.vP";
 
-/** @var string */
+/** @var non-empty-string */
 const DATE_RSS = DATE_RFC1123;
 
-/** @var string */
+/** @var non-empty-string */
 const DATE_W3C = DATE_RFC3339;
 
 /**
  * @var int
  * @deprecated
  */
-const SUNFUNCS_RET_TIMESTAMP = UNKNOWN;
+const SUNFUNCS_RET_TIMESTAMP = 0;
 
 /**
  * @var int
  * @deprecated
  */
-const SUNFUNCS_RET_STRING = UNKNOWN;
+const SUNFUNCS_RET_STRING = 1;
 
 /**
  * @var int
  * @deprecated
  */
-const SUNFUNCS_RET_DOUBLE = UNKNOWN;
+const SUNFUNCS_RET_DOUBLE = 2;
 
 function strtotime(string $datetime, ?int $baseTimestamp = null): int|false {}
 
@@ -292,35 +292,56 @@ function date_sun_info(int $timestamp, float $latitude, float $longitude): array
 
 interface DateTimeInterface
 {
+    /** @var non-empty-string */
     public const string ATOM = DATE_ATOM;
 
+    /** @var non-empty-string */
     public const string COOKIE = DATE_COOKIE;
 
+    /** @var non-empty-string */
     public const string ISO8601 = DATE_ISO8601;
 
+    /** @var non-empty-string */
     public const string ISO8601_EXPANDED = DATE_ISO8601_EXPANDED;
 
+    /** @var non-empty-string */
     public const string RFC822 = DATE_RFC822;
 
+    /** @var non-empty-string */
     public const string RFC850 = DATE_RFC850;
 
+    /** @var non-empty-string */
     public const string RFC1036 = DATE_RFC1036;
 
+    /** @var non-empty-string */
     public const string RFC1123 = DATE_RFC1123;
 
+    /** @var non-empty-string */
     #[Deprecated(since: '8.5', message: 'as this format ignores the associated timezone and always uses GMT')]
     public const string RFC7231 = DATE_RFC7231;
 
+    /** @var non-empty-string */
     public const string RFC2822 = DATE_RFC2822;
 
+    /** @var non-empty-string */
     public const string RFC3339 = DATE_RFC3339;
 
+    /** @var non-empty-string */
     public const string RFC3339_EXTENDED = DATE_RFC3339_EXTENDED;
 
+    /** @var non-empty-string */
     public const string RSS = DATE_RSS;
 
+    /** @var non-empty-string */
     public const string W3C = DATE_W3C;
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @param string $format
+     *
+     * @return ($format is non-empty-string ? non-empty-string : string)
+     */
     public function format(string $format): string;
 
     public function getTimezone(): DateTimeZone;
@@ -377,6 +398,13 @@ class DateTime implements DateTimeInterface
      */
     public static function getLastErrors(): array|false {}
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @param string $format
+     *
+     * @return ($format is non-empty-string ? non-empty-string : string)
+     */
     public function format(string $format): string {}
 
     public function modify(string $modifier): DateTime {}
