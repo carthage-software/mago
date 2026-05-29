@@ -50,7 +50,7 @@ pub struct Template<'arena> {
     pub source_text: &'arena [u8],
     pub trivia: Sequence<'arena, Trivia<'arena>>,
     pub statements: Sequence<'arena, Statement<'arena>>,
-    pub errors: BVec<'arena, ParseError>,
+    pub errors: BVec<'arena, ParseError<'arena>>,
 }
 
 impl Template<'_> {

@@ -42,25 +42,25 @@ impl SyntaxError {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub enum ParseError {
+pub enum ParseError<'arena> {
     SyntaxError(SyntaxError),
     /// Generic "unexpected token" with a human-readable expectation string.
-    UnexpectedToken(Vec<u8>, Span),
+    UnexpectedToken(&'arena [u8], Span),
     /// Reached end-of-input while still expecting something.
-    UnexpectedEof(FileId, Vec<u8>, Position),
+    UnexpectedEof(FileId, &'arena [u8], Position),
     /// A tag name that the parser does not know.
-    UnknownTag(Vec<u8>, Span),
+    UnknownTag(&'arena [u8], Span),
     /// A closing tag (e.g. `endif`) whose kind does not match the open tag.
     MismatchedEndTag {
-        expected: Vec<u8>,
-        got: Vec<u8>,
+        expected: &'arena [u8],
+        got: &'arena [u8],
         span: Span,
     },
     /// A generic syntax-level error produced by tag or expression parsers.
-    Message(Vec<u8>, Span),
+    Message(&'arena [u8], Span),
 }
 
-impl ParseError {
+impl ParseError<'_> {
     #[must_use]
     pub fn message(&self) -> String {
         self.to_string()
@@ -83,7 +83,7 @@ impl fmt::Display for SyntaxError {
     }
 }
 
-impl fmt::Display for ParseError {
+impl fmt::Display for ParseError<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ParseError::SyntaxError(err) => write!(f, "{err}"),
@@ -113,7 +113,7 @@ impl std::error::Error for SyntaxError {
     }
 }
 
-impl std::error::Error for ParseError {
+impl std::error::Error for ParseError<'_> {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             ParseError::SyntaxError(err) => Some(err),
@@ -122,7 +122,7 @@ impl std::error::Error for ParseError {
     }
 }
 
-impl From<SyntaxError> for ParseError {
+impl<'arena> From<SyntaxError> for ParseError<'arena> {
     fn from(err: SyntaxError) -> Self {
         ParseError::SyntaxError(err)
     }
@@ -144,7 +144,7 @@ impl HasSpan for SyntaxError {
     }
 }
 
-impl HasSpan for ParseError {
+impl HasSpan for ParseError<'_> {
     fn span(&self) -> Span {
         match self {
             ParseError::SyntaxError(err) => err.span(),

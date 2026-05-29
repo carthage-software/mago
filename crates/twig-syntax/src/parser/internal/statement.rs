@@ -35,7 +35,7 @@ impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_statements<T>(
         &mut self,
         terminator: &T,
-    ) -> Result<Sequence<'arena, Statement<'arena>>, ParseError>
+    ) -> Result<Sequence<'arena, Statement<'arena>>, ParseError<'arena>>
     where
         T: Terminator,
     {
@@ -59,7 +59,7 @@ impl<'arena> Parser<'_, 'arena> {
                     };
                     if name_tok.kind != TwigTokenKind::Name {
                         return Err(ParseError::UnexpectedToken(
-                            b"a block tag must start with a tag name".to_vec(),
+                            b"a block tag must start with a tag name",
                             self.stream.span_of(&name_tok),
                         ));
                     }
@@ -79,7 +79,9 @@ impl<'arena> Parser<'_, 'arena> {
                 }
                 _ => {
                     return Err(ParseError::UnexpectedToken(
-                        format!("unexpected token {:?} at statement level", token.kind).into_bytes(),
+                        self.arena.alloc_slice_copy(
+                            format!("unexpected token {:?} at statement level", token.kind).as_bytes(),
+                        ),
                         self.stream.span_of(&token),
                     ));
                 }

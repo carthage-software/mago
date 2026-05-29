@@ -11,7 +11,7 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         open_tag_tok: TwigToken<'arena>,
         keyword_tok: TwigToken<'arena>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError<'arena>> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let keyword = self.keyword_from(&keyword_tok);
         let message = self.parse_expression()?;
@@ -21,8 +21,10 @@ impl<'arena> Parser<'_, 'arena> {
             let option_tok = self.stream.consume()?;
             if !(option_tok.value == b"package" || option_tok.value == b"version") {
                 return Err(ParseError::UnexpectedToken(
-                    format!("unknown option `{}` on `deprecated`", String::from_utf8_lossy(option_tok.value))
-                        .into_bytes(),
+                    self.arena.alloc_slice_copy(
+                        format!("unknown option `{}` on `deprecated`", String::from_utf8_lossy(option_tok.value))
+                            .as_bytes(),
+                    ),
                     self.stream.span_of(&option_tok),
                 ));
             }

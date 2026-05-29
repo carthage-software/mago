@@ -16,7 +16,7 @@ impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_conditional(
         &mut self,
         condition: Expression<'arena>,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError<'arena>> {
         let q_tok = self.stream.consume()?;
         let question_mark = self.stream.span_of(&q_tok);
 
@@ -62,7 +62,10 @@ impl<'arena> Parser<'_, 'arena> {
     /// into a single `QuestionColon` token; we split its span into the
     /// question-mark half and the colon half so the AST still reports
     /// both positions.
-    pub(crate) fn parse_elvis(&mut self, condition: Expression<'arena>) -> Result<Expression<'arena>, ParseError> {
+    pub(crate) fn parse_elvis(
+        &mut self,
+        condition: Expression<'arena>,
+    ) -> Result<Expression<'arena>, ParseError<'arena>> {
         let qc_tok = self.stream.consume()?;
         let full = self.stream.span_of(&qc_tok);
         let mid = Position::new(full.start.offset + 1);

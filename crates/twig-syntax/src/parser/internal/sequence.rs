@@ -27,10 +27,10 @@ impl<'arena> Parser<'_, 'arena> {
         open_kind: TwigTokenKind,
         close_kind: TwigTokenKind,
         parse_element: F,
-    ) -> Result<DelimitedSequenceResult<'arena, T>, ParseError>
+    ) -> Result<DelimitedSequenceResult<'arena, T>, ParseError<'arena>>
     where
         T: HasSpan,
-        F: FnMut(&mut Self) -> Result<T, ParseError>,
+        F: FnMut(&mut Self) -> Result<T, ParseError<'arena>>,
     {
         self.parse_token_separated_sequence(open_kind, close_kind, TwigTokenKind::Comma, parse_element)
     }
@@ -44,10 +44,10 @@ impl<'arena> Parser<'_, 'arena> {
         close_kind: TwigTokenKind,
         separator_kind: TwigTokenKind,
         mut parse_element: F,
-    ) -> Result<DelimitedSequenceResult<'arena, T>, ParseError>
+    ) -> Result<DelimitedSequenceResult<'arena, T>, ParseError<'arena>>
     where
         T: HasSpan,
-        F: FnMut(&mut Self) -> Result<T, ParseError>,
+        F: FnMut(&mut Self) -> Result<T, ParseError<'arena>>,
     {
         let open = self.stream.eat_span(open_kind)?;
 

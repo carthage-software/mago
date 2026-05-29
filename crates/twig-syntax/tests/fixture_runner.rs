@@ -240,6 +240,7 @@ fn verbose() -> bool {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn fixtures_match_upstream_accept_reject() {
     let collected = collect_fixtures();
     assert!(!collected.fixtures.is_empty(), "no fixtures found in {}", fixtures_dir().display());
@@ -314,6 +315,7 @@ fn fixtures_match_upstream_accept_reject() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn excluded_fixtures_are_explicit_and_self_consistent() {
     let collected = collect_fixtures();
     for (p, reason) in &collected.excluded {
@@ -340,6 +342,7 @@ fn excluded_fixtures_are_explicit_and_self_consistent() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn fixtures_roundtrip_for_accepted_templates() {
     let collected = collect_fixtures();
     let mut disagreements: Vec<String> = Vec::new();

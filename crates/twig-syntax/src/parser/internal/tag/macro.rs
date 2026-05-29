@@ -12,7 +12,7 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         open_tag_tok: TwigToken<'arena>,
         keyword_tok: TwigToken<'arena>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError<'arena>> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let keyword = self.keyword_from(&keyword_tok);
         let name = self.expect_flexible_identifier(b"expected macro name")?;
@@ -30,8 +30,8 @@ impl<'arena> Parser<'_, 'arena> {
         let end_kw_tok = self.stream.expect_name(b"expected `endmacro`")?;
         if end_kw_tok.value != b"endmacro" {
             return Err(ParseError::MismatchedEndTag {
-                expected: b"endmacro".to_vec(),
-                got: end_kw_tok.value.to_vec(),
+                expected: b"endmacro",
+                got: end_kw_tok.value,
                 span: self.stream.span_of(&end_kw_tok),
             });
         }
@@ -39,8 +39,8 @@ impl<'arena> Parser<'_, 'arena> {
         let end_name = if let Some(closing_tok) = self.stream.try_consume(TwigTokenKind::Name)? {
             if closing_tok.value != name.value {
                 return Err(ParseError::MismatchedEndTag {
-                    expected: name.value.to_vec(),
-                    got: closing_tok.value.to_vec(),
+                    expected: name.value,
+                    got: closing_tok.value,
                     span: self.stream.span_of(&closing_tok),
                 });
             }
@@ -66,7 +66,7 @@ impl<'arena> Parser<'_, 'arena> {
         }))
     }
 
-    fn parse_macro_argument(&mut self) -> Result<MacroArgument<'arena>, ParseError> {
+    fn parse_macro_argument(&mut self) -> Result<MacroArgument<'arena>, ParseError<'arena>> {
         let name = self.expect_flexible_identifier(b"expected macro argument name")?;
         let (equal, default) = if let Some(eq_tok) = self.stream.try_consume(TwigTokenKind::Equal)? {
             let value = self.parse_expression()?;

@@ -36,7 +36,7 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         open_tag: TwigToken<'arena>,
         keyword: TwigToken<'arena>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError<'arena>> {
         match keyword.value {
             b"if" => self.parse_if(open_tag, keyword),
             b"for" => self.parse_for(open_tag, keyword),

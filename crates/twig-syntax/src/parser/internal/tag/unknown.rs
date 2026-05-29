@@ -11,7 +11,7 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         open_tag_tok: TwigToken<'arena>,
         keyword_tok: TwigToken<'arena>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError<'arena>> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let name = self.identifier_from(&keyword_tok);
         loop {
@@ -21,7 +21,7 @@ impl<'arena> Parser<'_, 'arena> {
             if self.stream.has_reached_eof()? {
                 return Err(ParseError::UnexpectedEof(
                     self.stream.file_id(),
-                    b"expected `%}` closing tag".to_vec(),
+                    b"expected `%}` closing tag",
                     open_tag_tok.start,
                 ));
             }

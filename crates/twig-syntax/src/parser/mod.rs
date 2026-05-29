@@ -54,7 +54,7 @@ pub struct Parser<'input, 'arena> {
     pub(crate) settings: ParserSettings,
     pub(crate) state: State,
     pub(crate) stream: TokenStream<'arena>,
-    pub(crate) errors: BVec<'arena, ParseError>,
+    pub(crate) errors: BVec<'arena, ParseError<'arena>>,
     _input: std::marker::PhantomData<&'input ()>,
 }
 

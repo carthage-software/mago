@@ -13,7 +13,7 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         open_tag_tok: TwigToken<'arena>,
         keyword_tok: TwigToken<'arena>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError<'arena>> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let keyword = self.keyword_from(&keyword_tok);
         let type_tok = self.stream.expect_name(b"expected `function`, `filter`, or `test`")?;
@@ -23,7 +23,9 @@ impl<'arena> Parser<'_, 'arena> {
             b"test" => GuardKind::Test,
             other => {
                 return Err(ParseError::UnexpectedToken(
-                    format!("unsupported guard type `{}`", String::from_utf8_lossy(other)).into_bytes(),
+                    self.arena.alloc_slice_copy(
+                        format!("unsupported guard type `{}`", String::from_utf8_lossy(other)).as_bytes(),
+                    ),
                     self.stream.span_of(&type_tok),
                 ));
             }
@@ -58,8 +60,8 @@ impl<'arena> Parser<'_, 'arena> {
                 let end_kw_tok = self.stream.expect_name(b"expected `endguard`")?;
                 if end_kw_tok.value != b"endguard" {
                     return Err(ParseError::MismatchedEndTag {
-                        expected: b"endguard".to_vec(),
-                        got: end_kw_tok.value.to_vec(),
+                        expected: b"endguard",
+                        got: end_kw_tok.value,
                         span: self.stream.span_of(&end_kw_tok),
                     });
                 }
@@ -74,8 +76,8 @@ impl<'arena> Parser<'_, 'arena> {
             }
             other => {
                 return Err(ParseError::MismatchedEndTag {
-                    expected: b"endguard".to_vec(),
-                    got: other.to_vec(),
+                    expected: b"endguard",
+                    got: other,
                     span: self.stream.span_of(&next_name_tok),
                 });
             }

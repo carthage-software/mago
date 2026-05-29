@@ -10,7 +10,7 @@ use crate::token::TwigTokenKind;
 impl<'arena> Parser<'_, 'arena> {
     /// Parse an interpolated double-quoted string, producing a sequence of
     /// literal chunks and `#{ ... }` interpolations.
-    pub(crate) fn parse_interpolated_string(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub(crate) fn parse_interpolated_string(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
         let start_tok = self.stream.consume()?;
         let open_quote = self.stream.span_of(&start_tok);
         let mut parts = self.new_vec();
@@ -47,7 +47,9 @@ impl<'arena> Parser<'_, 'arena> {
                 }
                 _ => {
                     return Err(ParseError::UnexpectedToken(
-                        format!("unexpected token {:?} in interpolated string", token.kind).into_bytes(),
+                        self.arena.alloc_slice_copy(
+                            format!("unexpected token {:?} in interpolated string", token.kind).as_bytes(),
+                        ),
                         self.stream.span_of(&token),
                     ));
                 }

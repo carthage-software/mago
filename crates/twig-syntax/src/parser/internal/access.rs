@@ -26,7 +26,7 @@ impl<'arena> Parser<'_, 'arena> {
         object: Expression<'arena>,
         dot: Span,
         null_safe: bool,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError<'arena>> {
         let token = self
             .stream
             .lookahead(0)?
@@ -56,7 +56,7 @@ impl<'arena> Parser<'_, 'arena> {
             }
             _ => {
                 return Err(ParseError::UnexpectedToken(
-                    b"expected attribute name or number after `.`".to_vec(),
+                    b"expected attribute name or number after `.`",
                     self.stream.span_of(&token),
                 ));
             }
@@ -98,7 +98,7 @@ impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_bracket_access(
         &mut self,
         object: Expression<'arena>,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError<'arena>> {
         let lb_tok = self.stream.consume()?;
         let left_bracket = self.stream.span_of(&lb_tok);
 
@@ -148,7 +148,7 @@ impl<'arena> Parser<'_, 'arena> {
     fn parse_optional_expression_until(
         &mut self,
         terminator: TwigTokenKind,
-    ) -> Result<Option<&'arena Expression<'arena>>, ParseError> {
+    ) -> Result<Option<&'arena Expression<'arena>>, ParseError<'arena>> {
         if self.stream.is_at(terminator)? {
             return Ok(None);
         }

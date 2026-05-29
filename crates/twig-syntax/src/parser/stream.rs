@@ -163,7 +163,7 @@ impl<'arena> TokenStream<'arena> {
     /// Consume and return the next significant token. Errors on EOF or
     /// lexer failure.
     #[inline]
-    pub fn consume(&mut self) -> Result<TwigToken<'arena>, ParseError> {
+    pub fn consume(&mut self) -> Result<TwigToken<'arena>, ParseError<'arena>> {
         match self.advance() {
             Some(Ok(token)) => Ok(token),
             Some(Err(error)) => Err(error.into()),
@@ -173,7 +173,7 @@ impl<'arena> TokenStream<'arena> {
 
     /// Consume iff the next token has the given kind.
     #[inline]
-    pub fn eat(&mut self, kind: TwigTokenKind) -> Result<TwigToken<'arena>, ParseError> {
+    pub fn eat(&mut self, kind: TwigTokenKind) -> Result<TwigToken<'arena>, ParseError<'arena>> {
         if let Some(token) = self.buffer.get(0) {
             if token.kind == kind {
                 let _ = self.buffer.pop_front();
@@ -195,13 +195,13 @@ impl<'arena> TokenStream<'arena> {
     }
 
     #[inline]
-    pub fn consume_span(&mut self) -> Result<Span, ParseError> {
+    pub fn consume_span(&mut self) -> Result<Span, ParseError<'arena>> {
         let file_id = self.file_id();
         self.consume().map(|t| t.span_for(file_id))
     }
 
     #[inline]
-    pub fn eat_span(&mut self, kind: TwigTokenKind) -> Result<Span, ParseError> {
+    pub fn eat_span(&mut self, kind: TwigTokenKind) -> Result<Span, ParseError<'arena>> {
         let file_id = self.file_id();
         self.eat(kind).map(|t| t.span_for(file_id))
     }
@@ -223,7 +223,7 @@ impl<'arena> TokenStream<'arena> {
 
     /// Is the next token of the given kind?
     #[inline]
-    pub fn is_at(&mut self, kind: TwigTokenKind) -> Result<bool, ParseError> {
+    pub fn is_at(&mut self, kind: TwigTokenKind) -> Result<bool, ParseError<'arena>> {
         if let Some(t) = self.buffer.get(0) {
             return Ok(t.kind == kind);
         }
@@ -233,7 +233,7 @@ impl<'arena> TokenStream<'arena> {
 
     /// Look at the Nth-ahead significant token (0 = next).
     #[inline]
-    pub fn lookahead(&mut self, n: usize) -> Result<Option<TwigToken<'arena>>, ParseError> {
+    pub fn lookahead(&mut self, n: usize) -> Result<Option<TwigToken<'arena>>, ParseError<'arena>> {
         if n < self.buffer.len() {
             return Ok(self.buffer.get(n));
         }
@@ -247,7 +247,7 @@ impl<'arena> TokenStream<'arena> {
 
     /// Kind of the Nth-ahead significant token (0 = next).
     #[inline]
-    pub fn peek_kind(&mut self, n: usize) -> Result<Option<TwigTokenKind>, ParseError> {
+    pub fn peek_kind(&mut self, n: usize) -> Result<Option<TwigTokenKind>, ParseError<'arena>> {
         if n < self.buffer.len() {
             return Ok(self.buffer.get(n).map(|t| t.kind));
         }
@@ -262,11 +262,11 @@ impl<'arena> TokenStream<'arena> {
     /// Build a `ParseError` describing an unexpected token / EOF.
     #[inline]
     #[must_use]
-    pub fn unexpected(&self, found: Option<TwigToken<'_>>, expected: &[TwigTokenKind]) -> ParseError {
-        let msg: Vec<u8> = if expected.is_empty() {
-            b"unexpected token".to_vec()
+    pub fn unexpected(&self, found: Option<TwigToken<'_>>, expected: &[TwigTokenKind]) -> ParseError<'arena> {
+        let msg: &'arena [u8] = if expected.is_empty() {
+            b"unexpected token"
         } else {
-            format!("expected one of {expected:?}").into_bytes()
+            self.arena.alloc_slice_copy(format!("expected one of {expected:?}").as_bytes())
         };
 
         match found {
@@ -277,19 +277,19 @@ impl<'arena> TokenStream<'arena> {
 
     /// Alias for [`is_at`].
     #[inline]
-    pub fn is_kind(&mut self, kind: TwigTokenKind) -> Result<bool, ParseError> {
+    pub fn is_kind(&mut self, kind: TwigTokenKind) -> Result<bool, ParseError<'arena>> {
         self.is_at(kind)
     }
 
     /// Try to consume a token of the given kind; return it if matched.
     #[inline]
-    pub fn try_consume(&mut self, kind: TwigTokenKind) -> Result<Option<TwigToken<'arena>>, ParseError> {
+    pub fn try_consume(&mut self, kind: TwigTokenKind) -> Result<Option<TwigToken<'arena>>, ParseError<'arena>> {
         if self.peek_kind(0)? == Some(kind) { self.consume().map(Some) } else { Ok(None) }
     }
 
     /// Try to consume a `Name` token with the given literal value.
     #[inline]
-    pub fn try_consume_name(&mut self, name: &[u8]) -> Result<Option<TwigToken<'arena>>, ParseError> {
+    pub fn try_consume_name(&mut self, name: &[u8]) -> Result<Option<TwigToken<'arena>>, ParseError<'arena>> {
         match self.lookahead(0)? {
             Some(tok) if tok.kind == TwigTokenKind::Name && tok.value == name => self.consume().map(Some),
             _ => Ok(None),
@@ -297,29 +297,33 @@ impl<'arena> TokenStream<'arena> {
     }
 
     /// Eat with a custom expectation message (used for diagnostics).
-    pub fn expect_kind(&mut self, kind: TwigTokenKind, what: &[u8]) -> Result<TwigToken<'arena>, ParseError> {
+    pub fn expect_kind(
+        &mut self,
+        kind: TwigTokenKind,
+        what: &'static [u8],
+    ) -> Result<TwigToken<'arena>, ParseError<'arena>> {
         match self.lookahead(0)? {
             Some(tok) if tok.kind == kind => self.consume(),
-            Some(tok) => Err(ParseError::UnexpectedToken(what.to_vec(), self.span_of(&tok))),
-            None => Err(ParseError::UnexpectedEof(self.file_id(), what.to_vec(), self.position)),
+            Some(tok) => Err(ParseError::UnexpectedToken(what, self.span_of(&tok))),
+            None => Err(ParseError::UnexpectedEof(self.file_id(), what, self.position)),
         }
     }
 
-    pub fn expect_name(&mut self, what: &[u8]) -> Result<TwigToken<'arena>, ParseError> {
+    pub fn expect_name(&mut self, what: &'static [u8]) -> Result<TwigToken<'arena>, ParseError<'arena>> {
         self.expect_kind(TwigTokenKind::Name, what)
     }
 
     /// Expect a `Name` token with a specific literal value (e.g. `in`, `as`).
-    pub fn expect_name_value(&mut self, expected: &[u8]) -> Result<TwigToken<'arena>, ParseError> {
+    pub fn expect_name_value(&mut self, expected: &[u8]) -> Result<TwigToken<'arena>, ParseError<'arena>> {
         match self.lookahead(0)? {
             Some(tok) if tok.kind == TwigTokenKind::Name && tok.value == expected => self.consume(),
             Some(tok) => Err(ParseError::UnexpectedToken(
-                format!("expected `{}`", String::from_utf8_lossy(expected)).into_bytes(),
+                self.arena.alloc_slice_copy(format!("expected `{}`", String::from_utf8_lossy(expected)).as_bytes()),
                 self.span_of(&tok),
             )),
             None => Err(ParseError::UnexpectedEof(
                 self.file_id(),
-                format!("expected `{}`", String::from_utf8_lossy(expected)).into_bytes(),
+                self.arena.alloc_slice_copy(format!("expected `{}`", String::from_utf8_lossy(expected)).as_bytes()),
                 self.position,
             )),
         }
@@ -328,19 +332,19 @@ impl<'arena> TokenStream<'arena> {
     /// Accept a `Name` token, or a word-keyword token that can also appear
     /// as an identifier (`in`, `not`, `is`, `and`, `or`, `xor`, `matches`,
     /// `divisible by`, etc.).
-    pub fn expect_flex_name(&mut self, what: &[u8]) -> Result<TwigToken<'arena>, ParseError> {
+    pub fn expect_flex_name(&mut self, what: &'static [u8]) -> Result<TwigToken<'arena>, ParseError<'arena>> {
         match self.lookahead(0)? {
             Some(tok) if tok.kind == TwigTokenKind::Name || is_keyword_usable_as_name(tok.kind) => self.consume(),
-            Some(tok) => Err(ParseError::UnexpectedToken(what.to_vec(), self.span_of(&tok))),
-            None => Err(ParseError::UnexpectedEof(self.file_id(), what.to_vec(), self.position)),
+            Some(tok) => Err(ParseError::UnexpectedToken(what, self.span_of(&tok))),
+            None => Err(ParseError::UnexpectedEof(self.file_id(), what, self.position)),
         }
     }
 
-    pub fn expect_name_or_null(&mut self, what: &[u8]) -> Result<TwigToken<'arena>, ParseError> {
+    pub fn expect_name_or_null(&mut self, what: &'static [u8]) -> Result<TwigToken<'arena>, ParseError<'arena>> {
         self.expect_flex_name(what)
     }
 
-    pub fn is_start_of_primary(&mut self) -> Result<bool, ParseError> {
+    pub fn is_start_of_primary(&mut self) -> Result<bool, ParseError<'arena>> {
         let Some(kind) = self.peek_kind(0)? else { return Ok(false) };
         Ok(matches!(
             kind,
@@ -360,51 +364,51 @@ impl<'arena> TokenStream<'arena> {
     }
 
     #[inline]
-    pub fn expect_block_start(&mut self) -> Result<TwigToken<'arena>, ParseError> {
+    pub fn expect_block_start(&mut self) -> Result<TwigToken<'arena>, ParseError<'arena>> {
         match self.lookahead(0)? {
             Some(tok) if tok.kind.is_open_block() => self.consume(),
-            Some(tok) => Err(ParseError::UnexpectedToken(b"expected `{%`".to_vec(), self.span_of(&tok))),
-            None => Err(ParseError::UnexpectedEof(self.file_id(), b"expected `{%`".to_vec(), self.position)),
+            Some(tok) => Err(ParseError::UnexpectedToken(b"expected `{%`", self.span_of(&tok))),
+            None => Err(ParseError::UnexpectedEof(self.file_id(), b"expected `{%`", self.position)),
         }
     }
 
     #[inline]
-    pub fn expect_block_end(&mut self) -> Result<Span, ParseError> {
+    pub fn expect_block_end(&mut self) -> Result<Span, ParseError<'arena>> {
         match self.lookahead(0)? {
             Some(tok) if tok.kind.is_close_block() => {
                 let span = self.span_of(&tok);
                 self.consume()?;
                 Ok(span)
             }
-            Some(tok) => Err(ParseError::UnexpectedToken(b"expected `%}`".to_vec(), self.span_of(&tok))),
-            None => Err(ParseError::UnexpectedEof(self.file_id(), b"expected `%}`".to_vec(), self.position)),
+            Some(tok) => Err(ParseError::UnexpectedToken(b"expected `%}`", self.span_of(&tok))),
+            None => Err(ParseError::UnexpectedEof(self.file_id(), b"expected `%}`", self.position)),
         }
     }
 
     #[inline]
-    pub fn expect_variable_end(&mut self) -> Result<Span, ParseError> {
+    pub fn expect_variable_end(&mut self) -> Result<Span, ParseError<'arena>> {
         match self.lookahead(0)? {
             Some(tok) if tok.kind.is_close_variable() => {
                 let span = self.span_of(&tok);
                 self.consume()?;
                 Ok(span)
             }
-            Some(tok) => Err(ParseError::UnexpectedToken(b"expected `}}`".to_vec(), self.span_of(&tok))),
-            None => Err(ParseError::UnexpectedEof(self.file_id(), b"expected `}}`".to_vec(), self.position)),
+            Some(tok) => Err(ParseError::UnexpectedToken(b"expected `}}`", self.span_of(&tok))),
+            None => Err(ParseError::UnexpectedEof(self.file_id(), b"expected `}}`", self.position)),
         }
     }
 
     #[inline]
-    pub fn is_block_end(&mut self) -> Result<bool, ParseError> {
+    pub fn is_block_end(&mut self) -> Result<bool, ParseError<'arena>> {
         Ok(self.peek_kind(0)?.is_some_and(TwigTokenKind::is_close_block))
     }
 
     #[inline]
-    pub fn expect_eof(&mut self) -> Result<(), ParseError> {
+    pub fn expect_eof(&mut self) -> Result<(), ParseError<'arena>> {
         match self.lookahead(0)? {
             None => Ok(()),
             Some(tok) => Err(ParseError::UnexpectedToken(
-                format!("expected end of template, got {:?}", tok.kind).into_bytes(),
+                self.arena.alloc_slice_copy(format!("expected end of template, got {:?}", tok.kind).as_bytes()),
                 self.span_of(&tok),
             )),
         }

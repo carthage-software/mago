@@ -10,7 +10,7 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         operand: Expression<'arena>,
         pipe: mago_span::Span,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError<'arena>> {
         let name = self.expect_identifier(b"expected filter name after `|`")?;
         let argument_list = self.parse_optional_argument_list()?;
         Ok(Expression::Filter(Filter { operand: self.alloc(operand), pipe, name, argument_list }))

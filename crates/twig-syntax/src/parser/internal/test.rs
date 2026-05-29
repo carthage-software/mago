@@ -12,7 +12,7 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         operand: Expression<'arena>,
         is_keyword: crate::ast::Keyword<'arena>,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError<'arena>> {
         let mut not_keyword = None;
         if let Some(token) = self.stream.lookahead(0)?
             && matches!(token.kind, TwigTokenKind::Not | TwigTokenKind::Name)

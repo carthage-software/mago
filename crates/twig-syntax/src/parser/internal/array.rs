@@ -12,7 +12,7 @@ use crate::token::TwigTokenKind;
 
 impl<'arena> Parser<'_, 'arena> {
     /// Parse an array literal: `[ elements ]`.
-    pub(crate) fn parse_array(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub(crate) fn parse_array(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
         let result = self.parse_comma_separated_sequence(
             TwigTokenKind::LeftBracket,
             TwigTokenKind::RightBracket,
@@ -28,7 +28,7 @@ impl<'arena> Parser<'_, 'arena> {
 
     /// Parse a single array element: a value, a variadic (`...`) element,
     /// or a missing element (for destructuring holes like `[, second]`).
-    pub(crate) fn parse_array_element(&mut self) -> Result<ArrayElement<'arena>, ParseError> {
+    pub(crate) fn parse_array_element(&mut self) -> Result<ArrayElement<'arena>, ParseError<'arena>> {
         match self.stream.peek_kind(0)? {
             Some(TwigTokenKind::DotDotDot) => {
                 let ellipsis = self.stream.consume_span()?;

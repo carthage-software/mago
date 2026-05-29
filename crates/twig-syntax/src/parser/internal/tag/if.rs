@@ -13,7 +13,7 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         open_tag_tok: TwigToken<'arena>,
         keyword_tok: TwigToken<'arena>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError<'arena>> {
         let first_open_tag = self.stream.span_of(&open_tag_tok);
         let first_keyword = self.keyword_from(&keyword_tok);
 
@@ -67,8 +67,8 @@ impl<'arena> Parser<'_, 'arena> {
                     let end_kw_tok = self.stream.expect_name(b"expected `endif`")?;
                     if end_kw_tok.value != b"endif" {
                         return Err(ParseError::MismatchedEndTag {
-                            expected: b"endif".to_vec(),
-                            got: end_kw_tok.value.to_vec(),
+                            expected: b"endif",
+                            got: end_kw_tok.value,
                             span: self.stream.span_of(&end_kw_tok),
                         });
                     }
@@ -102,7 +102,9 @@ impl<'arena> Parser<'_, 'arena> {
                 }
                 other => {
                     return Err(ParseError::UnexpectedToken(
-                        format!("unexpected separator `{}` in `if`", String::from_utf8_lossy(other)).into_bytes(),
+                        self.arena.alloc_slice_copy(
+                            format!("unexpected separator `{}` in `if`", String::from_utf8_lossy(other)).as_bytes(),
+                        ),
                         self.stream.span_of(&name_tok),
                     ));
                 }

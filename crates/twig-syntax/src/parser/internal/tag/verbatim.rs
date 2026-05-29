@@ -10,7 +10,7 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         open_tag_tok: TwigToken<'arena>,
         keyword_tok: TwigToken<'arena>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError<'arena>> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let keyword = self.keyword_from(&keyword_tok);
         let close_tag = self.stream.expect_block_end()?;
@@ -31,8 +31,8 @@ impl<'arena> Parser<'_, 'arena> {
         };
         if end_kw_tok.value != expected {
             return Err(ParseError::MismatchedEndTag {
-                expected: expected.to_vec(),
-                got: end_kw_tok.value.to_vec(),
+                expected: expected,
+                got: end_kw_tok.value,
                 span: self.stream.span_of(&end_kw_tok),
             });
         }

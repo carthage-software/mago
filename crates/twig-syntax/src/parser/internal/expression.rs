@@ -20,7 +20,7 @@ use crate::token::TwigTokenKind;
 impl<'arena> Parser<'_, 'arena> {
     /// Parse an expression with the lowest (zero) minimum precedence.
     #[inline]
-    pub(crate) fn parse_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub(crate) fn parse_expression(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
         self.parse_expression_with_precedence(0)
     }
 
@@ -28,7 +28,7 @@ impl<'arena> Parser<'_, 'arena> {
     pub(crate) fn parse_expression_with_precedence(
         &mut self,
         min_precedence: u32,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError<'arena>> {
         let mut left = self.parse_prefix()?;
         while let Some(token) = self.stream.lookahead(0)? {
             // Assignment (`=`): right-associative, lowest precedence.
@@ -122,7 +122,7 @@ impl<'arena> Parser<'_, 'arena> {
         Ok(left)
     }
 
-    fn parse_prefix(&mut self) -> Result<Expression<'arena>, ParseError> {
+    fn parse_prefix(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
         let unary: Option<(UnaryOperator<'arena>, u32)> = match token.kind {
@@ -149,7 +149,7 @@ impl<'arena> Parser<'_, 'arena> {
         self.parse_primary()
     }
 
-    fn parse_primary(&mut self) -> Result<Expression<'arena>, ParseError> {
+    fn parse_primary(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
         match token.kind {
@@ -186,8 +186,10 @@ impl<'arena> Parser<'_, 'arena> {
                 Ok(Expression::Name(Name { name: token.value, span: self.stream.span_of(&token) }))
             }
             _ => Err(ParseError::UnexpectedToken(
-                format!("unexpected token {:?} of value {:?}", token.kind, String::from_utf8_lossy(token.value))
-                    .into_bytes(),
+                self.arena.alloc_slice_copy(
+                    format!("unexpected token {:?} of value {:?}", token.kind, String::from_utf8_lossy(token.value))
+                        .as_bytes(),
+                ),
                 self.stream.span_of(&token),
             )),
         }
@@ -195,7 +197,7 @@ impl<'arena> Parser<'_, 'arena> {
 
     /// Implicit string concatenation: `'a' 'b'` and `'a' "b"` become a
     /// `StringConcat` binary operation.
-    fn maybe_extend_string(&mut self, first: Expression<'arena>) -> Result<Expression<'arena>, ParseError> {
+    fn maybe_extend_string(&mut self, first: Expression<'arena>) -> Result<Expression<'arena>, ParseError<'arena>> {
         let mut left = first;
         while let Some(token) = self.stream.lookahead(0)? {
             match token.kind {

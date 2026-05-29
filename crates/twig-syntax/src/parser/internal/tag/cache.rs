@@ -13,7 +13,7 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         open_tag_tok: TwigToken<'arena>,
         keyword_tok: TwigToken<'arena>,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError<'arena>> {
         let open_tag = self.stream.span_of(&open_tag_tok);
         let keyword = self.keyword_from(&keyword_tok);
         let key = self.parse_expression()?;
@@ -37,8 +37,8 @@ impl<'arena> Parser<'_, 'arena> {
         let end_kw_tok = self.stream.expect_name(b"expected `endcache`")?;
         if end_kw_tok.value != b"endcache" {
             return Err(ParseError::MismatchedEndTag {
-                expected: b"endcache".to_vec(),
-                got: end_kw_tok.value.to_vec(),
+                expected: b"endcache",
+                got: end_kw_tok.value,
                 span: self.stream.span_of(&end_kw_tok),
             });
         }
@@ -59,7 +59,7 @@ impl<'arena> Parser<'_, 'arena> {
         }))
     }
 
-    fn parse_cache_option(&mut self, keyword: Keyword<'arena>) -> Result<CacheOption<'arena>, ParseError> {
+    fn parse_cache_option(&mut self, keyword: Keyword<'arena>) -> Result<CacheOption<'arena>, ParseError<'arena>> {
         let lp_tok = self.stream.expect_kind(TwigTokenKind::LeftParen, b"expected `(`")?;
         let left_parenthesis = self.stream.span_of(&lp_tok);
         let value = self.parse_expression()?;

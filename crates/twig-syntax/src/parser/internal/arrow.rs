@@ -14,7 +14,7 @@ impl<'arena> Parser<'_, 'arena> {
     /// arrow function's parameter list, or an empty-parameter arrow.
     /// Handles: `()`, `( expr )`, `( name ) => body`, `(a, b) => body`,
     /// `() => body`.
-    pub(crate) fn parse_group(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub(crate) fn parse_group(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
         let lp_tok = self.stream.consume()?;
         let left_parenthesis = self.stream.span_of(&lp_tok);
 
@@ -69,14 +69,11 @@ impl<'arena> Parser<'_, 'arena> {
         &mut self,
         left_parenthesis: mago_span::Span,
         inner: Expression<'arena>,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError<'arena>> {
         let mut parameters = self.new_vec();
         let mut commas = self.new_vec();
         let Expression::Name(n) = &inner else {
-            return Err(ParseError::UnexpectedToken(
-                b"arrow function parameters must be simple names".to_vec(),
-                inner.span(),
-            ));
+            return Err(ParseError::UnexpectedToken(b"arrow function parameters must be simple names", inner.span()));
         };
         parameters.push(Identifier { span: n.span, value: n.name });
 

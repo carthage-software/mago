@@ -12,12 +12,12 @@ use crate::token::TwigTokenKind;
 impl<'arena> Parser<'_, 'arena> {
     /// Parse an optional `(arg, ...)` list - returns `None` when the next
     /// token is not `(`.
-    pub(crate) fn parse_optional_argument_list(&mut self) -> Result<Option<ArgumentList<'arena>>, ParseError> {
+    pub(crate) fn parse_optional_argument_list(&mut self) -> Result<Option<ArgumentList<'arena>>, ParseError<'arena>> {
         if self.stream.is_at(TwigTokenKind::LeftParen)? { Ok(Some(self.parse_argument_list()?)) } else { Ok(None) }
     }
 
     /// Parse `(arg, arg, ...)` including the surrounding parens.
-    pub(crate) fn parse_argument_list(&mut self) -> Result<ArgumentList<'arena>, ParseError> {
+    pub(crate) fn parse_argument_list(&mut self) -> Result<ArgumentList<'arena>, ParseError<'arena>> {
         let result = self.parse_comma_separated_sequence(
             TwigTokenKind::LeftParen,
             TwigTokenKind::RightParen,
@@ -29,7 +29,7 @@ impl<'arena> Parser<'_, 'arena> {
 
     /// Parse a single argument - `name = value`, `name: value`, `...value`
     /// or a plain positional expression.
-    pub(crate) fn parse_argument(&mut self) -> Result<Argument<'arena>, ParseError> {
+    pub(crate) fn parse_argument(&mut self) -> Result<Argument<'arena>, ParseError<'arena>> {
         let is_named = self.stream.peek_kind(0)? == Some(TwigTokenKind::Name)
             && matches!(self.stream.peek_kind(1)?, Some(TwigTokenKind::Equal) | Some(TwigTokenKind::Colon));
         if is_named {

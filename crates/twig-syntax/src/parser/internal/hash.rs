@@ -11,7 +11,7 @@ use crate::token::TwigTokenKind;
 
 impl<'arena> Parser<'_, 'arena> {
     /// Parse a hash map literal: `{ a: 1, 'b': 2, ...rest }`.
-    pub(crate) fn parse_hash_map(&mut self) -> Result<Expression<'arena>, ParseError> {
+    pub(crate) fn parse_hash_map(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
         let result = self.parse_comma_separated_sequence(
             TwigTokenKind::LeftBrace,
             TwigTokenKind::RightBrace,
@@ -27,7 +27,7 @@ impl<'arena> Parser<'_, 'arena> {
 
     /// Parse a single hash map entry - a spread (`...expr`), a shorthand
     /// (`name`, `{ a, b }`), or a full `key: value` pair.
-    pub(crate) fn parse_hash_map_entry(&mut self) -> Result<HashMapEntry<'arena>, ParseError> {
+    pub(crate) fn parse_hash_map_entry(&mut self) -> Result<HashMapEntry<'arena>, ParseError<'arena>> {
         if let Some(dots_tok) = self.stream.try_consume(TwigTokenKind::DotDotDot)? {
             let ellipsis = Some(self.stream.span_of(&dots_tok));
             let value = self.parse_expression()?;
@@ -72,8 +72,10 @@ impl<'arena> Parser<'_, 'arena> {
             }
             _ => {
                 return Err(ParseError::UnexpectedToken(
-                    format!("invalid hash key: {:?} {:?}", key_tok.kind, String::from_utf8_lossy(key_tok.value))
-                        .into_bytes(),
+                    self.arena.alloc_slice_copy(
+                        format!("invalid hash key: {:?} {:?}", key_tok.kind, String::from_utf8_lossy(key_tok.value))
+                            .as_bytes(),
+                    ),
                     self.stream.span_of(&key_tok),
                 ));
             }
