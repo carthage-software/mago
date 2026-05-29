@@ -277,7 +277,9 @@ impl<'config> DatabaseLoader<'config> {
             }
         };
 
-        let mut paths_to_process: Vec<(PathBuf, usize)> = Vec::new();
+        // The bool flags a path that was named exactly (a literal file on disk) rather than
+        // discovered by walking a configured directory. Such paths bypass the extension filter.
+        let mut paths_to_process: Vec<(PathBuf, usize, bool)> = Vec::new();
 
         for root in roots {
             // Check if this is a glob pattern (contains glob metacharacters).
@@ -314,7 +316,7 @@ impl<'config> DatabaseLoader<'config> {
                                         // TempDir / glob return /var/… but canonicalize gives
                                         // /private/var/…).  Fall back to the original on error.
                                         let canonical = path.canonicalize().unwrap_or(path);
-                                        paths_to_process.push((canonical, specificity));
+                                        paths_to_process.push((canonical, specificity, false));
                                     }
                                 }
                                 Err(e) => {
@@ -329,6 +331,15 @@ impl<'config> DatabaseLoader<'config> {
                 }
             } else {
                 let canonical_root = resolved_path.canonicalize().unwrap_or(resolved_path);
+
+                // A path that resolves to a regular file was named explicitly rather than
+                // discovered by walking a directory. Honor it verbatim, bypassing the extension
+                // filter so extensionless PHP files (e.g. `bin/console`) can be loaded.
+                if canonical_root.is_file() {
+                    paths_to_process.push((canonical_root, specificity, true));
+                    continue;
+                }
+
                 let has_dir_prunes = !dir_prune_globs.is_empty();
                 let has_path_prunes = !canonical_excludes.is_empty();
                 let walker = WalkDir::new(&canonical_root).follow_links(true).into_iter().filter_entry(|entry| {
@@ -361,7 +372,7 @@ impl<'config> DatabaseLoader<'config> {
                     match entry {
                         Ok(entry) => {
                             if !entry.file_type().is_dir() {
-                                paths_to_process.push((entry.into_path(), specificity));
+                                paths_to_process.push((entry.into_path(), specificity, false));
                             }
                         }
                         Err(err) => {
@@ -384,16 +395,18 @@ impl<'config> DatabaseLoader<'config> {
         let has_glob_excludes = !glob_excludes.is_empty();
         let files: Vec<FileWithSpecificity> = paths_to_process
             .into_par_iter()
-            .filter_map(|(path, specificity)| {
+            .filter_map(|(path, specificity, skip_ext_check)| {
                 if has_glob_excludes
                     && (glob_excludes.is_match(&path) || glob_excludes.is_match(workspace_relative_str(&path)))
                 {
                     return None;
                 }
 
-                let ext = path.extension()?;
-                if !extensions.contains(ext) {
-                    return None;
+                if !skip_ext_check {
+                    let ext = path.extension()?;
+                    if !extensions.contains(ext) {
+                        return None;
+                    }
                 }
 
                 if has_path_excludes {
@@ -423,7 +436,7 @@ impl<'config> DatabaseLoader<'config> {
                     let file = File::new(
                         Cow::Owned(logical_name.into_bytes()),
                         file_type,
-                        Some(path.clone()),
+                        Some(path),
                         Cow::Owned(override_content.clone()),
                     );
 
@@ -861,5 +874,35 @@ mod tests {
             db.files().any(|f| name_str(&f.name).contains("Real.php")),
             "Real.php still reachable despite the loop"
         );
+    }
+
+    #[test]
+    fn test_exact_extensionless_file_is_loaded() {
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "bin/console", "<?php\n// entrypoint");
+
+        // `bin/console` has no extension, so it would be filtered out when discovered by
+        // walking a directory. Naming it exactly must bypass the extension requirement.
+        let config = create_test_config(&temp_dir, vec!["bin/console"], vec![]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let file = db.files().find(|f| name_str(&f.name).ends_with("bin/console")).unwrap();
+        assert_eq!(file.file_type, FileType::Host);
+        assert_eq!(file.contents.as_ref(), b"<?php\n// entrypoint");
+    }
+
+    #[test]
+    fn test_extensionless_file_in_directory_is_skipped() {
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "bin/console", "<?php");
+        create_test_file(&temp_dir, "bin/run.php", "<?php");
+
+        // Walking the directory must still honor the extension filter: only `run.php` loads.
+        let config = create_test_config(&temp_dir, vec!["bin"], vec![]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let names: Vec<String> = db.files().map(|f| name_str(&f.name).into_owned()).collect();
+        assert!(names.iter().any(|n| n.ends_with("bin/run.php")), "run.php should be loaded, got {names:?}");
+        assert!(!names.iter().any(|n| n.ends_with("bin/console")), "extensionless console should be skipped");
     }
 }
