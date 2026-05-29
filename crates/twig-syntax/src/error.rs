@@ -122,7 +122,7 @@ impl std::error::Error for ParseError<'_> {
     }
 }
 
-impl<'arena> From<SyntaxError> for ParseError<'arena> {
+impl From<SyntaxError> for ParseError<'_> {
     fn from(err: SyntaxError) -> Self {
         ParseError::SyntaxError(err)
     }

@@ -29,9 +29,10 @@ impl<'arena> Parser<'_, 'arena> {
             b"raw" => b"endraw",
             _ => b"endverbatim",
         };
+
         if end_kw_tok.value != expected {
             return Err(ParseError::MismatchedEndTag {
-                expected: expected,
+                expected,
                 got: end_kw_tok.value,
                 span: self.stream.span_of(&end_kw_tok),
             });
