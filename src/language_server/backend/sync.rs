@@ -5,8 +5,12 @@
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
 
 use foldhash::HashMap;
+use mago_codex::reference::SymbolReferences;
+use mago_orchestrator::error::OrchestratorError;
+use tokio::task;
 use tower_lsp_server::jsonrpc::Result as JsonRpcResult;
 use tower_lsp_server::ls_types::Diagnostic;
 use tower_lsp_server::ls_types::MessageType;
@@ -30,11 +34,11 @@ use super::Backend;
 
 impl Backend {
     pub(super) async fn bootstrap(&self, root: PathBuf) {
-        let started = std::time::Instant::now();
+        let started = Instant::now();
         tracing::info!(root = %root.display(), "bootstrap starting");
 
         let config = Arc::clone(&self.config);
-        let outcome = tokio::task::spawn_blocking(move || build_workspace(root, config)).await;
+        let outcome = task::spawn_blocking(move || build_workspace(root, config)).await;
 
         match outcome {
             Ok(Ok((mut workspace, mut analysis_result))) => {
@@ -43,16 +47,18 @@ impl Backend {
                     issues = analysis_result.issues.len(),
                     "analyzer pass complete",
                 );
+
                 let ignore_set = CompiledIgnoreSet::compile(
                     &self.config.configuration.analyzer.ignore,
                     self.config.configuration.source.glob.to_database_settings(),
                 );
+
                 analysis_result.issues.filter_out_ignored(&ignore_set, |file_id| {
                     workspace.database.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
                 });
 
                 if workspace.config.linter {
-                    let lint_started = std::time::Instant::now();
+                    let lint_started = Instant::now();
                     analyze_all_workspace_files(&mut workspace);
                     tracing::info!(elapsed = ?lint_started.elapsed(), "file analysis pass complete");
                 }
@@ -88,9 +94,9 @@ impl Backend {
         F: FnOnce(&mut WorkspaceState) -> Vec<FileId> + Send + 'static,
     {
         let cfg = self.config.clone();
-        let started = std::time::Instant::now();
+        let started = Instant::now();
         let state = Arc::clone(&self.state);
-        let outcome = tokio::task::spawn_blocking(move || -> Result<_, mago_orchestrator::error::OrchestratorError> {
+        let outcome = task::spawn_blocking(move || -> Result<_, OrchestratorError> {
             let mut guard = state.lock().unwrap();
             let BackendState::Ready(workspace) = &mut *guard else {
                 return Ok(None);
@@ -105,7 +111,7 @@ impl Backend {
             let mut result = if workspace.config.analyzer {
                 workspace.service.analyze_incremental(Some(&changed))?
             } else {
-                mago_analyzer::analysis_result::AnalysisResult::new(mago_codex::reference::SymbolReferences::new())
+                mago_analyzer::analysis_result::AnalysisResult::new(SymbolReferences::new())
             };
 
             let ignore_set = CompiledIgnoreSet::compile(
@@ -172,6 +178,7 @@ impl Backend {
                 workspace.database.update(id, Cow::Owned(text.into_bytes()));
                 id
             };
+
             workspace.open_documents.insert(uri, OpenDocument { file_id, virtual_file, version });
             vec![file_id]
         })
@@ -183,6 +190,7 @@ impl Backend {
             let Some(open) = workspace.open_documents.get_mut(&uri) else {
                 return Vec::new();
             };
+
             open.version = version;
             workspace.database.update(open.file_id, Cow::Owned(text.into_bytes()));
             vec![open.file_id]
@@ -194,11 +202,13 @@ impl Backend {
         let Some(path) = uri.to_file_path() else {
             return;
         };
+
         let path = path.into_owned();
         self.apply_change_atomic(move |workspace| {
             let Some(open) = workspace.open_documents.remove(&uri) else {
                 return Vec::new();
             };
+
             if open.virtual_file {
                 workspace.database.delete(open.file_id);
             } else if let Ok(file) = MagoFile::read(&workspace.root, &path, FileType::Host) {
@@ -218,9 +228,11 @@ impl Backend {
             if workspace.open_documents.contains_key(&uri) {
                 return Vec::new();
             }
+
             let Ok(file) = MagoFile::read(&workspace.root, &path, FileType::Host) else {
                 return Vec::new();
             };
+
             let id = file.id;
             if workspace.database.get(&id).is_ok() {
                 workspace.database.update(id, file.contents);
@@ -236,6 +248,7 @@ impl Backend {
         let Some(path) = uri.to_file_path() else {
             return;
         };
+
         let path = path.into_owned();
         self.apply_change_atomic(move |workspace| {
             let id = file_id_for(&workspace.root, &path);
@@ -252,6 +265,7 @@ impl Backend {
         let BackendState::Ready(workspace) = &*guard else {
             return None;
         };
+
         let file = file_for_uri(workspace, uri)?;
         Some(f(&file, workspace))
     }
@@ -264,6 +278,7 @@ impl Backend {
         let BackendState::Ready(workspace) = &*guard else {
             return None;
         };
+
         Some(f(workspace))
     }
 
@@ -275,6 +290,7 @@ impl Backend {
         let BackendState::Ready(workspace) = &mut *guard else {
             return None;
         };
+
         Some(f(workspace))
     }
 
@@ -284,18 +300,22 @@ impl Backend {
             let BackendState::Ready(workspace) = &mut *guard else {
                 return;
             };
+
             let stale: Vec<Uri> =
                 workspace.last_diagnostics.keys().filter(|url| !diagnostics.contains_key(*url)).cloned().collect();
             let changed: Vec<(Uri, Vec<Diagnostic>)> = diagnostics
                 .into_iter()
                 .filter(|(url, diags)| workspace.last_diagnostics.get(url) != Some(diags))
                 .collect();
+
             for url in &stale {
                 workspace.last_diagnostics.remove(url);
             }
+
             for (url, diags) in &changed {
                 workspace.last_diagnostics.insert(url.clone(), diags.clone());
             }
+
             (stale, changed)
         };
 
@@ -314,7 +334,7 @@ pub(super) fn traced<T, F>(name: &'static str, f: F) -> JsonRpcResult<T>
 where
     F: FnOnce() -> JsonRpcResult<T>,
 {
-    let started = std::time::Instant::now();
+    let started = Instant::now();
     let result = f();
     let elapsed = started.elapsed();
     if elapsed.as_millis() >= 50 {

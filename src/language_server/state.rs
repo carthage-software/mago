@@ -6,16 +6,17 @@
 //! enabled by the [`super::ServerConfig`]), and transitions to
 //! [`BackendState::Ready`].
 
+use std::borrow::Cow;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use clap::ColorChoice;
 use foldhash::HashMap;
-use mago_database::file::FileType;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::object::TObject;
 use tower_lsp_server::ls_types::Diagnostic;
 use tower_lsp_server::ls_types::Uri;
-
-use std::borrow::Cow;
-use std::path::Path;
 
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_database::Database;
@@ -23,12 +24,14 @@ use mago_database::DatabaseConfiguration;
 use mago_database::DatabaseReader;
 use mago_database::exclusion::Exclusion;
 use mago_database::file::FileId;
+use mago_database::file::FileType;
 use mago_database::loader::DatabaseLoader;
 use mago_linter::integration::IntegrationSet;
 use mago_linter::settings::Settings as LinterSettings;
 use mago_orchestrator::service::incremental_analysis::IncrementalAnalysisService;
 use mago_prelude::Prelude;
 use mago_word::Word;
+use xxhash_rust::xxh3;
 
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
@@ -73,7 +76,7 @@ impl WorkspaceState {
         }
 
         let file = self.database.get(&file_id).ok()?;
-        let hash = xxhash_rust::xxh3::xxh3_64(&file.contents);
+        let hash = xxh3::xxh3_64(&file.contents);
 
         if let Some((cached_hash, _)) = self.artifact_cache.get(&file_id)
             && *cached_hash == hash
@@ -100,7 +103,7 @@ impl WorkspaceState {
     /// spans all share this.
     pub fn file_analysis_for(&mut self, file_id: FileId) -> Option<Arc<FileAnalysis>> {
         let file = self.database.get(&file_id).ok()?;
-        let hash = xxhash_rust::xxh3::xxh3_64(&file.contents);
+        let hash = xxh3::xxh3_64(&file.contents);
 
         if let Some((cached_hash, analysis)) = self.file_analyses.get(&file_id)
             && *cached_hash == hash
@@ -127,7 +130,7 @@ impl WorkspaceState {
             if file.file_type != FileType::Host {
                 continue;
             }
-            let hash = xxhash_rust::xxh3::xxh3_64(&file.contents);
+            let hash = xxh3::xxh3_64(&file.contents);
             let analysis = Arc::new(file_analysis::build(&file, &self.linter, with_semantics));
             self.file_analyses.insert(file_id, (hash, analysis));
         }
@@ -135,9 +138,6 @@ impl WorkspaceState {
 }
 
 fn build_index(artifacts: &mago_analyzer::artifacts::AnalysisArtifacts) -> ExpressionTypeIndex {
-    use mago_codex::ttype::atomic::TAtomic;
-    use mago_codex::ttype::atomic::object::TObject;
-
     let mut by_span: HashMap<(u32, u32), Vec<Word>> = HashMap::default();
     for (span, ty) in artifacts.expression_types.iter() {
         let mut classes: Vec<Word> = Vec::new();
@@ -148,10 +148,12 @@ fn build_index(artifacts: &mago_analyzer::artifacts::AnalysisArtifacts) -> Expre
                 _ => {}
             }
         }
+
         if !classes.is_empty() {
             by_span.insert(*span, classes);
         }
     }
+
     ExpressionTypeIndex { by_span }
 }
 
@@ -162,8 +164,7 @@ pub fn build_workspace(root: PathBuf, config: Arc<ServerConfig>) -> Result<(Work
 
     let configuration = &config.configuration;
     let parser_settings = configuration.parser.to_settings();
-    let analyzer_settings =
-        configuration.analyzer.to_settings(configuration.php_version, clap::ColorChoice::Never, false);
+    let analyzer_settings = configuration.analyzer.to_settings(configuration.php_version, ColorChoice::Never, false);
     let glob = configuration.source.glob.to_database_settings();
     let linter_settings = LinterSettings {
         php_version: configuration.php_version,

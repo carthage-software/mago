@@ -61,12 +61,14 @@ pub fn compute(database: &Database<'_>, codebase: &CodebaseMetadata, file: &Mago
                 j += 1;
                 continue;
             }
+
             if matches!(t.kind, TokenKind::As) {
                 while j < tokens.len()
                     && !matches!(tokens[j].kind, TokenKind::Comma | TokenKind::Semicolon | TokenKind::LeftBrace)
                 {
                     j += 1;
                 }
+
                 continue;
             }
 

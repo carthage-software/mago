@@ -9,6 +9,7 @@ use std::sync::Arc;
 use clap::Parser;
 
 use mago_analyzer::plugin::create_registry_with_plugins;
+use tokio::runtime::Builder;
 
 use crate::config::Configuration;
 use crate::error::Error;
@@ -64,6 +65,33 @@ pub struct LanguageServerCommand {
 
 impl LanguageServerCommand {
     pub fn execute(self, configuration: Configuration) -> Result<ExitCode, Error> {
+        if std::env::var("MAGO_EXPERIMENTAL_SERVER").is_err() {
+            tracing::error!(
+                "The `language-server` subcommand is a work in progress. To run it, set the environment variable `MAGO_EXPERIMENTAL_SERVER=1` and try again."
+            );
+            tracing::error!(
+                "The set of advertised capabilities, the wire behaviour, the flags below, and even the existence of this subcommand can change or disappear without notice."
+            );
+            tracing::error!(
+                "There are no compatibility guarantees until mago 2.0. if you need a stable editor integration, wait for that release."
+            );
+            tracing::error!(
+                "If you want to help shape the LSP, or if you have a specific editor integration in mind, please open an issue or a PR."
+            );
+
+            return Ok(ExitCode::FAILURE);
+        } else {
+            tracing::warn!(
+                "The `language-server` subcommand is a work in progress. The set of advertised capabilities, the wire behaviour, the flags below, and even the existence of this subcommand can change or disappear without notice."
+            );
+            tracing::warn!(
+                "There are no compatibility guarantees until mago 2.0. if you need a stable editor integration, wait for that release."
+            );
+            tracing::warn!(
+                "If you want to help shape the LSP, or if you have a specific editor integration in mind, please open an issue or a PR."
+            );
+        }
+
         let plugin_registry = Arc::new(create_registry_with_plugins(
             &configuration.analyzer.plugins,
             configuration.analyzer.disable_default_plugins,
@@ -77,8 +105,7 @@ impl LanguageServerCommand {
             plugin_registry,
         };
 
-        let runtime =
-            tokio::runtime::Builder::new_multi_thread().enable_all().build().map_err(Error::BuildingRuntime)?;
+        let runtime = Builder::new_multi_thread().enable_all().build().map_err(Error::BuildingRuntime)?;
         runtime.block_on(crate::language_server::run(config));
         Ok(ExitCode::SUCCESS)
     }

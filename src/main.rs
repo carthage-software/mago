@@ -69,7 +69,6 @@ mod commands;
 mod config;
 mod consts;
 mod error;
-#[cfg(feature = "language-server")]
 mod language_server;
 mod macros;
 mod service;
@@ -256,7 +255,6 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         MagoCommand::Analyze(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::Guard(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
-        #[cfg(feature = "language-server")]
         MagoCommand::LanguageServer(cmd) => cmd.execute(configuration),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")

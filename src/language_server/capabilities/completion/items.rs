@@ -36,16 +36,20 @@ pub(super) fn variable_items(
         if !matches!(token.kind, TokenKind::Variable) {
             continue;
         }
+
         if token.start.offset < scope_start || token.start.offset >= offset {
             continue;
         }
+
         let name = mago_bytes::trim_start_byte(token.value, b'$');
         if !name.starts_with(prefix) {
             continue;
         }
+
         if !seen.insert(name) {
             continue;
         }
+
         let name_str = String::from_utf8_lossy(name).into_owned();
         out.push(CompletionItem {
             label: format!("${name_str}"),
@@ -53,6 +57,7 @@ pub(super) fn variable_items(
             insert_text: Some(name_str),
             ..CompletionItem::default()
         });
+
         if out.len() >= MAX_RESULTS {
             break;
         }
@@ -69,6 +74,7 @@ pub(super) fn instance_member_items(
     let Some(type_index) = type_index else {
         return Vec::new();
     };
+
     let Some(class_words) = type_index.by_span.get(&receiver_span) else {
         return Vec::new();
     };
@@ -79,10 +85,12 @@ pub(super) fn instance_member_items(
         if let Some(meta) = codebase.get_class_like(class.as_bytes()) {
             push_unique(&mut out, &mut seen, collect_class_members(codebase, meta, prefix, false));
         }
+
         if out.len() >= MAX_RESULTS {
             break;
         }
     }
+
     out
 }
 
@@ -90,6 +98,7 @@ pub(super) fn static_member_items(codebase: &CodebaseMetadata, class: &[u8], pre
     if matches!(class, b"self" | b"static" | b"parent") {
         return Vec::new();
     }
+
     codebase.get_class_like(class).map(|meta| collect_class_members(codebase, meta, prefix, true)).unwrap_or_default()
 }
 
@@ -109,19 +118,23 @@ pub(super) fn bare_items(
             None => true,
         }
     };
+
     let mut out = Vec::new();
 
     for (key, meta) in codebase.class_likes.iter() {
         if out.len() >= MAX_RESULTS {
             break;
         }
+
         if !is_user_symbol(database, meta.span) {
             continue;
         }
+
         let display = local_name(meta.original_name.as_bytes());
         if !display.to_ascii_lowercase().starts_with(&needle) || !in_scope(key.as_bytes()) {
             continue;
         }
+
         out.push(make_class_item(meta, display));
     }
 
@@ -129,14 +142,17 @@ pub(super) fn bare_items(
         if matches!(meta.kind, FunctionLikeKind::Method) || out.len() >= MAX_RESULTS {
             continue;
         }
+
         if !is_user_symbol(database, meta.span) {
             continue;
         }
+
         let display: &[u8] = meta.original_name.as_bytes();
         let local = local_name(display);
         if !local.to_ascii_lowercase().starts_with(&needle) || !in_scope(name.as_bytes()) {
             continue;
         }
+
         let local_str = String::from_utf8_lossy(local).into_owned();
         out.push(CompletionItem {
             label: local_str.clone(),
@@ -152,12 +168,15 @@ pub(super) fn bare_items(
         if out.len() >= MAX_RESULTS {
             break;
         }
+
         if !is_user_symbol(database, meta.span) || !name.as_bytes().to_ascii_lowercase().starts_with(&needle) {
             continue;
         }
+
         if !in_scope(name.as_bytes()) {
             continue;
         }
+
         out.push(CompletionItem {
             label: String::from_utf8_lossy(local_name(name.as_bytes())).into_owned(),
             kind: Some(CompletionItemKind::CONSTANT),
@@ -184,17 +203,21 @@ pub(super) fn qualified_items(
         if out.len() >= MAX_RESULTS {
             break;
         }
+
         if !is_user_symbol(database, meta.span) {
             continue;
         }
+
         let lc = key.as_bytes();
         if !lc.starts_with(&want_prefix) {
             continue;
         }
+
         let suffix = &lc[want_prefix.len()..];
         if suffix.contains(&b'\\') || !suffix.starts_with(&needle) {
             continue;
         }
+
         let display = local_name(meta.original_name.as_bytes());
         out.push(make_class_item(meta, display));
     }
@@ -217,17 +240,20 @@ fn collect_class_members(
             if !s.to_ascii_lowercase().starts_with(&needle) {
                 continue;
             }
+
             out.push(CompletionItem {
                 label: String::from_utf8_lossy(s).into_owned(),
                 kind: Some(CompletionItemKind::CONSTANT),
                 ..CompletionItem::default()
             });
         }
+
         for name in meta.enum_cases.keys() {
             let s = name.as_bytes();
             if !s.to_ascii_lowercase().starts_with(&needle) {
                 continue;
             }
+
             out.push(CompletionItem {
                 label: String::from_utf8_lossy(s).into_owned(),
                 kind: Some(CompletionItemKind::ENUM_MEMBER),
@@ -240,6 +266,7 @@ fn collect_class_members(
             if !visible.to_ascii_lowercase().starts_with(&needle) {
                 continue;
             }
+
             let detail = codebase
                 .get_class_like(declaring_class.as_bytes())
                 .and_then(|c| c.properties.get(name))
@@ -258,10 +285,12 @@ fn collect_class_members(
         if !name.as_bytes().to_ascii_lowercase().starts_with(&needle) {
             continue;
         }
+
         let Some(method) = codebase.get_method(mid.get_class_name().as_bytes(), mid.get_method_name().as_bytes())
         else {
             continue;
         };
+
         let display: &[u8] = method.original_name.as_bytes();
         let display_str = String::from_utf8_lossy(display).into_owned();
         out.push(CompletionItem {
@@ -272,6 +301,7 @@ fn collect_class_members(
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             ..CompletionItem::default()
         });
+
         if out.len() >= MAX_RESULTS {
             break;
         }
@@ -290,18 +320,22 @@ fn render_signature(meta: &FunctionLikeMetadata, name: &[u8]) -> String {
         if !first {
             sig.push_str(", ");
         }
+
         first = false;
         if let Some(ty) = &p.type_metadata {
             let _ = write!(sig, "{}", BytesDisplay(ty.type_union.get_id().as_bytes()));
             sig.push(' ');
         }
+
         let _ = write!(sig, "{}", BytesDisplay(p.name.0.as_bytes()));
     }
+
     sig.push(')');
     if let Some(rt) = &meta.return_type_metadata {
         sig.push_str(": ");
         let _ = write!(sig, "{}", BytesDisplay(rt.type_union.get_id().as_bytes()));
     }
+
     sig
 }
 
@@ -321,6 +355,7 @@ fn make_class_item(meta: &ClassLikeMetadata, display: &[u8]) -> CompletionItem {
         M::Trait => CompletionItemKind::CLASS,
         M::Enum => CompletionItemKind::ENUM,
     };
+
     CompletionItem {
         label: String::from_utf8_lossy(display).into_owned(),
         kind: Some(kind),

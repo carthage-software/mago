@@ -55,6 +55,7 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use mago_reporting::baseline::BaselineChangeEntry;
 use serde::Serialize;
 
 use bumpalo::Bump;
@@ -211,8 +212,8 @@ pub struct IssueProcessor {
 
 #[derive(Serialize)]
 struct VerifyBaselineOutput<'a> {
-    new_issues: &'a [mago_reporting::baseline::BaselineChangeEntry],
-    removed_issues: &'a [mago_reporting::baseline::BaselineChangeEntry],
+    new_issues: &'a [BaselineChangeEntry],
+    removed_issues: &'a [BaselineChangeEntry],
 }
 
 /// Baseline-aware issue processor for incremental issue adoption.

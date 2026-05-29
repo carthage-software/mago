@@ -242,6 +242,9 @@ simdutf8 = { version = "0.1.5" }
 anyhow = "1"
 pulldown-cmark = "0.13"
 tera = "1.20"
+temp-env = "0.3.6"
+tower-lsp-server = { version = "0.23.0" }
+tokio = { version = "1", features = ["rt-multi-thread", "io-std"] }
 
 [dependencies]
 mago-word = { workspace = true }
@@ -262,8 +265,8 @@ mago-algebra = { workspace = true }
 mago-codex = { workspace = true }
 mago-guard = { workspace = true }
 mago-orchestrator = { workspace = true }
-mago-semantics = { workspace = true, optional = true }
-mago-span = { workspace = true, optional = true }
+mago-semantics = { workspace = true }
+mago-span = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }
@@ -292,11 +295,11 @@ unicode-width = { workspace = true }
 notify = { workspace = true }
 dhat = { workspace = true, optional = true }
 schemars = { workspace = true }
-foldhash = { workspace = true, optional = true }
-xxhash-rust = { workspace = true, optional = true }
-memchr = { workspace = true, optional = true }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std", "io-util", "sync", "time", "signal"], optional = true }
-tower-lsp-server = { version = "0.23.0", optional = true }
+foldhash = { workspace = true }
+xxhash-rust = { workspace = true }
+memchr = { workspace = true }
+tokio = { workspace = true }
+tower-lsp-server = { workspace = true }
 
 [[test]]
 name = "suite"
@@ -305,9 +308,10 @@ harness = false
 [dev-dependencies]
 libtest-mimic = { workspace = true }
 serde = { workspace = true }
-temp-env = "0.3.6"
+temp-env = { workspace = true }
 pretty_assertions = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-std", "io-util", "time"] }
 
 [build-dependencies]
 mago-prelude = { workspace = true, features = ["build"] }
@@ -317,15 +321,6 @@ mimalloc = { version = "0.1.47" }
 
 [features]
 dhat-heap = ["dhat"]
-language-server = [
-    "dep:tower-lsp-server",
-    "dep:tokio",
-    "dep:foldhash",
-    "dep:xxhash-rust",
-    "dep:memchr",
-    "dep:mago-semantics",
-    "dep:mago-span",
-]
 
 [profile.release]
 opt-level = 3

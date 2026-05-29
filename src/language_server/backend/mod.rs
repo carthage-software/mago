@@ -12,8 +12,22 @@ use tower_lsp_server::jsonrpc::Result as JsonRpcResult;
 use tower_lsp_server::ls_types::*;
 
 use crate::language_server::ServerConfig;
-use crate::language_server::capabilities;
+use crate::language_server::capabilities::code_action;
+use crate::language_server::capabilities::code_lens;
+use crate::language_server::capabilities::completion;
+use crate::language_server::capabilities::definition;
+use crate::language_server::capabilities::document_link;
+use crate::language_server::capabilities::folding_range;
+use crate::language_server::capabilities::formatting;
+use crate::language_server::capabilities::hover;
+use crate::language_server::capabilities::inlay_hint;
+use crate::language_server::capabilities::references;
+use crate::language_server::capabilities::rename;
+use crate::language_server::capabilities::selection_range;
+use crate::language_server::capabilities::semantic_tokens;
 use crate::language_server::capabilities::server_capabilities;
+use crate::language_server::capabilities::signature_help;
+use crate::language_server::capabilities::workspace_symbol;
 use crate::language_server::position::offset_at_position;
 use crate::language_server::state::BackendState;
 use crate::language_server::workspace::workspace_root;
@@ -74,6 +88,7 @@ impl LanguageServer for Backend {
                     .unwrap(),
                 ),
             };
+
             if let Err(err) = client.register_capability(vec![registration]).await {
                 client.log_message(MessageType::ERROR, format!("mago-server: register watcher: {err}")).await;
             }
@@ -121,8 +136,9 @@ impl LanguageServer for Backend {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
                 let file_id = file.id;
                 let analysis = ws.file_analysis_for(file_id)?;
-                Some(capabilities::folding_range::compute(&analysis))
+                Some(folding_range::compute(&analysis))
             });
+
             Ok(result.flatten())
         })
     }
@@ -135,10 +151,9 @@ impl LanguageServer for Backend {
 
             let php_version = self.config.configuration.php_version;
             let settings = self.config.configuration.formatter.settings;
+
             Ok(self
-                .with_file(&params.text_document.uri, |file, _| {
-                    capabilities::formatting::compute(file, php_version, settings)
-                })
+                .with_file(&params.text_document.uri, |file, _| formatting::compute(file, php_version, settings))
                 .flatten()
                 .map(|edit| vec![edit]))
         })
@@ -151,8 +166,9 @@ impl LanguageServer for Backend {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
                 let analysis = ws.file_analysis_for(file.id)?;
-                capabilities::hover::compute(ws.service.codebase(), analysis.resolved(), &file, offset)
+                hover::compute(ws.service.codebase(), analysis.resolved(), &file, offset)
             });
+
             Ok(result.flatten())
         })
     }
@@ -164,9 +180,10 @@ impl LanguageServer for Backend {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
                 let analysis = ws.file_analysis_for(file.id)?;
-                capabilities::definition::compute(&ws.database, ws.service.codebase(), analysis.resolved(), offset)
+                definition::compute(&ws.database, ws.service.codebase(), analysis.resolved(), offset)
                     .map(GotoDefinitionResponse::Scalar)
             });
+
             Ok(result.flatten())
         })
     }
@@ -178,15 +195,16 @@ impl LanguageServer for Backend {
                 let file_id = file.id;
                 let analysis = ws.file_analysis_for(file_id)?;
                 let offsets: Vec<u32> = params.positions.iter().map(|p| offset_at_position(&file, *p)).collect();
-                Some(capabilities::selection_range::compute(&analysis, &file, &offsets))
+                Some(selection_range::compute(&analysis, &file, &offsets))
             });
+
             Ok(result.flatten())
         })
     }
 
     async fn code_action(&self, params: CodeActionParams) -> JsonRpcResult<Option<CodeActionResponse>> {
         traced("code_action", || {
-            let result = self.with_workspace(|ws| Some(capabilities::code_action::compute(ws, &params)));
+            let result = self.with_workspace(|ws| Some(code_action::compute(ws, &params)));
             Ok(result.flatten())
         })
     }
@@ -194,7 +212,7 @@ impl LanguageServer for Backend {
     async fn semantic_tokens_full(&self, params: SemanticTokensParams) -> JsonRpcResult<Option<SemanticTokensResult>> {
         traced("semantic_tokens_full", || {
             Ok(self.with_file(&params.text_document.uri, |file, _| {
-                let data = capabilities::semantic_tokens::compute(file);
+                let data = semantic_tokens::compute(file);
                 SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data })
             }))
         })
@@ -207,17 +225,16 @@ impl LanguageServer for Backend {
             let result = self.with_workspace_mut(|ws| {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
-                Some(capabilities::references::compute(ws, &file, offset, include_decl))
+                Some(references::compute(ws, &file, offset, include_decl))
             });
+
             Ok(result.flatten())
         })
     }
 
     async fn symbol(&self, params: WorkspaceSymbolParams) -> JsonRpcResult<Option<WorkspaceSymbolResponse>> {
         traced("workspace_symbol", || {
-            Ok(self.with_workspace(|ws| {
-                capabilities::workspace_symbol::compute(&ws.database, ws.service.codebase(), &params.query)
-            }))
+            Ok(self.with_workspace(|ws| workspace_symbol::compute(&ws.database, ws.service.codebase(), &params.query)))
         })
     }
 
@@ -231,8 +248,9 @@ impl LanguageServer for Backend {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
                 let analysis = ws.file_analysis_for(file.id)?;
-                capabilities::signature_help::compute(ws.service.codebase(), analysis.resolved(), &file, offset)
+                signature_help::compute(ws.service.codebase(), analysis.resolved(), &file, offset)
             });
+
             Ok(result.flatten())
         })
     }
@@ -242,13 +260,15 @@ impl LanguageServer for Backend {
             if !self.config.analyzer {
                 return Ok(None);
             }
+
             let result = self.with_workspace_mut(|ws| {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
                 let start = offset_at_position(&file, params.range.start);
                 let end = offset_at_position(&file, params.range.end);
                 let analysis = ws.file_analysis_for(file.id)?;
-                Some(capabilities::inlay_hint::compute(ws.service.codebase(), analysis.resolved(), &file, start, end))
+                Some(inlay_hint::compute(ws.service.codebase(), analysis.resolved(), &file, start, end))
             });
+
             Ok(result.flatten())
         })
     }
@@ -259,8 +279,9 @@ impl LanguageServer for Backend {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
                 let offset = offset_at_position(&file, params.position);
                 let analysis = ws.file_analysis_for(file.id)?;
-                capabilities::rename::prepare(analysis.resolved(), &file, offset)
+                rename::prepare(analysis.resolved(), &file, offset)
             });
+
             Ok(result.flatten())
         })
     }
@@ -272,8 +293,9 @@ impl LanguageServer for Backend {
             let result = self.with_workspace_mut(|ws| {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
-                capabilities::rename::compute(ws, &file, offset, new_name)
+                rename::compute(ws, &file, offset, new_name)
             });
+
             Ok(result.flatten())
         })
     }
@@ -282,8 +304,9 @@ impl LanguageServer for Backend {
         traced("document_link", || {
             let result = self.with_workspace(|ws| {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
-                Some(capabilities::document_link::compute(&ws.database, ws.service.codebase(), &file))
+                Some(document_link::compute(&ws.database, ws.service.codebase(), &file))
             });
+
             Ok(result.flatten())
         })
     }
@@ -293,11 +316,13 @@ impl LanguageServer for Backend {
             if !self.config.analyzer {
                 return Ok(None);
             }
+
             let result = self.with_workspace_mut(|ws| {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
                 let id = file.id;
-                Some(capabilities::code_lens::compute(ws, &file, id))
+                Some(code_lens::compute(ws, &file, id))
             });
+
             Ok(result.flatten())
         })
     }
@@ -310,14 +335,9 @@ impl LanguageServer for Backend {
                 let offset = offset_at_position(&file, position);
                 let file_id = file.id;
                 let type_index = ws.type_index_for(file_id).cloned();
-                Some(capabilities::completion::compute(
-                    &ws.database,
-                    ws.service.codebase(),
-                    type_index.as_ref(),
-                    &file,
-                    offset,
-                ))
+                Some(completion::compute(&ws.database, ws.service.codebase(), type_index.as_ref(), &file, offset))
             });
+
             Ok(result.flatten())
         })
     }

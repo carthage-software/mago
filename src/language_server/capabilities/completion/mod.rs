@@ -60,6 +60,7 @@ pub fn compute(
         Context::Qualified { qualifier, prefix } => items::qualified_items(database, codebase, qualifier, prefix),
         Context::Bare { prefix } => items::bare_items(database, codebase, file, offset, prefix),
     };
+
     CompletionResponse::Array(items)
 }
 
@@ -69,6 +70,7 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
         if lookup::is_trivia(t.kind) {
             continue;
         }
+
         let start = t.start.offset;
         let end = start + t.value.len() as u32;
         if start <= offset && offset <= end {

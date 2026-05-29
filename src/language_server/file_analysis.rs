@@ -32,6 +32,7 @@ use mago_syntax::ast::Try;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::walker::Walker;
 use mago_syntax::walker::walk_program;
+use memchr::memmem;
 use tower_lsp_server::ls_types::FoldingRange;
 use tower_lsp_server::ls_types::FoldingRangeKind;
 
@@ -109,6 +110,7 @@ pub fn build(file: &MagoFile, linter_ctx: &LinterContext, with_semantics: bool) 
         let checker = SemanticsChecker::new(linter_ctx.settings.php_version);
         lint_issues.extend(checker.check(file, program, &resolved));
     }
+
     let linter = Linter::from_registry(arena_ref, Arc::clone(&linter_ctx.registry), linter_ctx.settings.php_version);
     lint_issues.extend(linter.lint(file, program, &resolved));
 
@@ -161,39 +163,51 @@ impl<'arena> Walker<'arena, 'arena, SpanCollectCtx<'_>> for SpanCollector {
     fn walk_in_block(&self, n: &'arena Block<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_block_like(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_class(&self, n: &'arena Class<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_block_like(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_interface(&self, n: &'arena Interface<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_block_like(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_trait(&self, n: &'arena Trait<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_block_like(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_enum(&self, n: &'arena Enum<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_block_like(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_match(&self, n: &'arena Match<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_block_like(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_switch(&self, n: &'arena Switch<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_block_like(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_namespace(&self, n: &'arena Namespace<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_node(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_function(&self, n: &'arena Function<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_node(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_method(&self, n: &'arena Method<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_node(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_closure(&self, n: &'arena Closure<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_node(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_if(&self, n: &'arena If<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_node(n.span().start.offset, n.span().end.offset);
     }
+
     fn walk_in_try(&self, n: &'arena Try<'arena>, c: &mut SpanCollectCtx<'_>) {
         c.record_node(n.span().start.offset, n.span().end.offset);
     }
@@ -202,10 +216,10 @@ impl<'arena> Walker<'arena, 'arena, SpanCollectCtx<'_>> for SpanCollector {
 fn push_comment_ranges(file: &MagoFile, out: &mut Vec<FoldingRange>) {
     let text = file.contents.as_ref();
     let mut search_start = 0;
-    while let Some(rel_open) = memchr::memmem::find(&text[search_start..], b"/*") {
+    while let Some(rel_open) = memmem::find(&text[search_start..], b"/*") {
         let open = search_start + rel_open;
         let after = open + 2;
-        if let Some(rel_close) = memchr::memmem::find(&text[after..], b"*/") {
+        if let Some(rel_close) = memmem::find(&text[after..], b"*/") {
             let close_end = after + rel_close + 2;
             let start_line = file.line_number(open as u32);
             let end_line = file.line_number(close_end as u32);
@@ -219,6 +233,7 @@ fn push_comment_ranges(file: &MagoFile, out: &mut Vec<FoldingRange>) {
                     collapsed_text: None,
                 });
             }
+
             search_start = close_end;
         } else {
             break;

@@ -38,9 +38,11 @@ pub fn compute(workspace: &WorkspaceState, params: &CodeActionParams) -> Vec<Cod
             if issue.edits.is_empty() {
                 continue;
             }
+
             if !issue_overlaps(workspace, issue, request_uri, request_range) {
                 continue;
             }
+
             actions.extend(issue_to_actions(&workspace.database, issue));
         }
     }
@@ -50,9 +52,11 @@ pub fn compute(workspace: &WorkspaceState, params: &CodeActionParams) -> Vec<Cod
             if issue.edits.is_empty() {
                 continue;
             }
+
             if !issue_overlaps(workspace, issue, request_uri, request_range) {
                 continue;
             }
+
             actions.extend(issue_to_actions(&workspace.database, issue));
         }
     }
@@ -65,18 +69,23 @@ fn issue_overlaps(workspace: &WorkspaceState, issue: &Issue, uri: &Uri, requeste
     let Some(primary) = primary else {
         return false;
     };
+
     let Ok(file) = workspace.database.get(&primary.span.file_id) else {
         return false;
     };
+
     let Some(path) = &file.path else {
         return false;
     };
+
     let Some(issue_uri) = Uri::from_file_path(path) else {
         return false;
     };
+
     if issue_uri != *uri {
         return false;
     }
+
     let issue_range = range_at_offsets(&file, primary.span.start.offset, primary.span.end.offset);
     ranges_overlap(issue_range, requested)
 }
