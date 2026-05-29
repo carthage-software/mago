@@ -1,0 +1,95 @@
+name: Fuzz
+
+on:
+  pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: fuzz-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    name: ${{ matrix.crate }} / ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { crate: syntax, target: parser, seeds: "../analyzer/tests/cases ../formatter/tests/cases" }
+          - { crate: syntax, target: lexer, seeds: "../analyzer/tests/cases ../formatter/tests/cases" }
+          - { crate: type-syntax, target: parser, seeds: "fuzz/seeds/parser" }
+          - { crate: type-syntax, target: lexer, seeds: "fuzz/seeds/lexer" }
+          - { crate: twig-syntax, target: parser, seeds: "fuzz/seeds/parser" }
+          - { crate: twig-syntax, target: lexer, seeds: "fuzz/seeds/lexer" }
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: resolve toolchain version
+        id: toolchain
+        shell: bash
+        run: echo "version=$(cat nightly-version)" >> "$GITHUB_OUTPUT"
+
+      - name: install rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.toolchain.outputs.version }}
+
+      - name: cache rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/${{ matrix.crate }}/fuzz
+          shared-key: fuzz-${{ matrix.crate }}-${{ steps.toolchain.outputs.version }}
+          cache-on-failure: true
+
+      - name: install cargo-fuzz
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
+
+      - name: resolve fuzz duration
+        id: duration
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "seconds=1800" >> "$GITHUB_OUTPUT"
+          else
+            echo "seconds=60" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: restore accumulated corpus
+        uses: actions/cache@v4
+        with:
+          path: crates/${{ matrix.crate }}/fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.crate }}-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.crate }}-${{ matrix.target }}-
+
+      - name: fuzz
+        working-directory: crates/${{ matrix.crate }}
+        run: |
+          mkdir -p "fuzz/corpus/${{ matrix.target }}"
+          cargo +${{ steps.toolchain.outputs.version }} fuzz run "${{ matrix.target }}" \
+            "fuzz/corpus/${{ matrix.target }}" \
+            ${{ matrix.seeds }} \
+            -- \
+            -max_total_time=${{ steps.duration.outputs.seconds }} \
+            -timeout=25 \
+            -rss_limit_mb=4096
+
+      - name: upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts-${{ matrix.crate }}-${{ matrix.target }}
+          path: crates/${{ matrix.crate }}/fuzz/artifacts/${{ matrix.target }}/
+          if-no-files-found: ignore
