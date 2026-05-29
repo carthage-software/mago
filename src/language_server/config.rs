@@ -5,6 +5,7 @@
 //! and which `mago.toml` settings drive the analyzer, linter, and
 //! formatter.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use mago_analyzer::plugin::PluginRegistry;
@@ -41,6 +42,12 @@ pub struct ServerConfig {
     /// and `[analyzer].disable_default_plugins`. Built once at startup
     /// because plugin lookup is lossy and the LSP doesn't reload config.
     pub plugin_registry: Arc<PluginRegistry>,
+
+    /// Workspace directory from an explicit `--workspace` flag. When set it
+    /// takes precedence over the client's `rootUri`, so the bootstrap honours
+    /// the same root as `mago lint` / `mago analyze`. `None` when the flag was
+    /// omitted, in which case the client-provided root is used.
+    pub workspace_override: Option<PathBuf>,
 }
 
 impl Default for ServerConfig {
@@ -51,6 +58,7 @@ impl Default for ServerConfig {
             formatter: true,
             configuration: Configuration::from_workspace(std::env::current_dir().unwrap_or_default()),
             plugin_registry: Arc::new(PluginRegistry::with_library_providers()),
+            workspace_override: None,
         }
     }
 }

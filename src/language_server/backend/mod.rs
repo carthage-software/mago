@@ -52,7 +52,8 @@ impl Backend {
 
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> JsonRpcResult<InitializeResult> {
-        if let Some(root) = workspace_root(&params) {
+        let root = self.config.workspace_override.clone().or_else(|| workspace_root(&params));
+        if let Some(root) = root {
             self.client
                 .log_message(MessageType::INFO, format!("mago-server: workspace root = {}", root.display()))
                 .await;

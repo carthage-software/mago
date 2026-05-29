@@ -3,6 +3,7 @@
 //! Editors invoke this as a child process. The flags here let an editor
 //! pick a trimmed-down profile when it only needs a subset of the server.
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -64,7 +65,7 @@ pub struct LanguageServerCommand {
 }
 
 impl LanguageServerCommand {
-    pub fn execute(self, configuration: Configuration) -> Result<ExitCode, Error> {
+    pub fn execute(self, configuration: Configuration, workspace_override: Option<PathBuf>) -> Result<ExitCode, Error> {
         if std::env::var("MAGO_EXPERIMENTAL_SERVER").is_err() {
             tracing::error!(
                 "The `language-server` subcommand is a work in progress. To run it, set the environment variable `MAGO_EXPERIMENTAL_SERVER=1` and try again."
@@ -103,6 +104,7 @@ impl LanguageServerCommand {
             formatter: !self.no_formatter,
             configuration,
             plugin_registry,
+            workspace_override,
         };
 
         let runtime = Builder::new_multi_thread().enable_all().build().map_err(Error::BuildingRuntime)?;
