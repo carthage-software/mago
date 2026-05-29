@@ -76,7 +76,7 @@ impl<'arena> Identifier<'arena> {
     pub fn last_segment(&self) -> &'arena [u8] {
         let value = self.value();
 
-        match value.iter().position(|b| *b == b'\\') {
+        match memchr::memrchr(b'\\', value) {
             Some(pos) => &value[pos + 1..],
             None => value,
         }
@@ -108,5 +108,26 @@ impl HasSpan for QualifiedIdentifier<'_> {
 impl HasSpan for FullyQualifiedIdentifier<'_> {
     fn span(&self) -> Span {
         self.span
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn identifier(value: &'static [u8]) -> Identifier<'static> {
+        Identifier::FullyQualified(FullyQualifiedIdentifier { span: Span::dummy(0, value.len() as u32), value })
+    }
+
+    #[test]
+    fn last_segment_returns_the_final_namespace_segment() {
+        assert_eq!(identifier(b"\\Illuminate\\Database\\Eloquent\\Attributes\\Scope").last_segment(), b"Scope");
+        assert_eq!(identifier(b"Foo\\Bar").last_segment(), b"Bar");
+        assert_eq!(identifier(b"\\Foo").last_segment(), b"Foo");
+    }
+
+    #[test]
+    fn last_segment_returns_the_whole_value_when_unqualified() {
+        assert_eq!(identifier(b"Scope").last_segment(), b"Scope");
     }
 }
