@@ -7,6 +7,16 @@ use serde_json::json;
 
 use super::harness::Harness;
 
+/// Completion responses serialize either as a bare array or as a
+/// `CompletionList` object; normalize both to the item array.
+fn completion_array(result: &Value) -> Value {
+    if result.is_array() {
+        result.clone()
+    } else {
+        result.get("items").cloned().unwrap_or_else(|| Value::Array(Vec::new()))
+    }
+}
+
 const SAMPLE: &str = "<?php
 namespace App;
 
@@ -225,7 +235,8 @@ async fn completion_variables() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 4, 6).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"$alpha") && labels.contains(&"$alphabet"));
 }
 
@@ -238,7 +249,8 @@ async fn completion_classes_bare_prefix() {
     .await;
     h.open("c.php", "<?php\nnamespace App;\n\n$g = new G\n").await;
     let result = h.at("textDocument/completion", "c.php", 3, 11).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"Greeter") && labels.contains(&"Goodbye"), "got {labels:?}");
 }
 
@@ -248,7 +260,8 @@ async fn completion_methods_on_this() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 6, 16).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"hello") && labels.contains(&"howdy"), "got {labels:?}");
 }
 
@@ -258,7 +271,8 @@ async fn completion_methods_typed_param() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 7, 9).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"hello") && labels.contains(&"howdy"), "got {labels:?}");
 }
 
@@ -268,7 +282,8 @@ async fn completion_properties_typed_param() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 4, 9).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"alpha"), "got {labels:?}");
 }
 
@@ -278,7 +293,8 @@ async fn completion_static_constants() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 6, 14).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"ACTIVE") && labels.contains(&"ARCHIVED"), "got {labels:?}");
 }
 
@@ -288,7 +304,8 @@ async fn completion_static_offers_static_members_only() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 7, 5).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"make") && labels.contains(&"TAG"), "expected static members, got {labels:?}");
     assert!(!labels.contains(&"open"), "instance method must not appear after `::`, got {labels:?}");
 }
@@ -299,7 +316,8 @@ async fn completion_instance_offers_instance_members_only() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 7, 8).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"open"), "expected instance method, got {labels:?}");
     assert!(!labels.contains(&"make"), "static method must not appear after `->`, got {labels:?}");
 }
@@ -310,7 +328,8 @@ async fn completion_does_not_offer_anonymous_classes() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 3, 10).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"Real"), "expected the named class, got {labels:?}");
     assert!(!labels.iter().any(|l| l.starts_with('{')), "anonymous classes must not appear, got {labels:?}");
 }
@@ -321,7 +340,8 @@ async fn completion_variables_skip_the_partial_being_typed() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 3, 6).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"$table"), "expected the in-scope variable, got {labels:?}");
     assert!(!labels.contains(&"$t"), "the partial being typed must not be offered, got {labels:?}");
 }
@@ -332,7 +352,8 @@ async fn completion_variable_edit_preserves_the_dollar_sign() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 3, 6).await;
-    let item = result
+    let r = completion_array(&result);
+    let item = r
         .as_array()
         .unwrap()
         .iter()
@@ -352,7 +373,8 @@ async fn completion_qualified_includes_sub_namespace_classes() {
     h.open("lib.php", lib).await;
     h.open("c.php", consumer).await;
     let result = h.at("textDocument/completion", "c.php", 1, 5).await;
-    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
     assert!(labels.contains(&"Bar\\Qux"), "expected the sub-namespace class, got {labels:?}");
 }
 
@@ -385,8 +407,9 @@ async fn completion_after_lone_dollar_offers_local_variables() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 5, 5).await;
+    let r = completion_array(&result);
     let labels: Vec<String> =
-        result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("").to_string()).collect();
+        r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("").to_string()).collect();
     assert!(labels.iter().any(|l| l == "$alpha"), "expected $alpha in {labels:?}");
     assert!(labels.iter().any(|l| l == "$beta"), "expected $beta in {labels:?}");
 }
@@ -397,8 +420,9 @@ async fn completion_after_arrow_offers_instance_members() {
     let mut h = Harness::start(&[("a.php", code)]).await;
     h.open("a.php", code).await;
     let result = h.at("textDocument/completion", "a.php", 8, 15).await;
+    let r = completion_array(&result);
     let labels: Vec<String> =
-        result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("").to_string()).collect();
+        r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("").to_string()).collect();
     assert!(labels.iter().any(|l| l == "name"), "expected `name` property in {labels:?}");
     assert!(labels.iter().any(|l| l == "hello"), "expected `hello` method in {labels:?}");
     assert!(!labels.iter().any(|l| l.starts_with('$')), "did not expect variables in {labels:?}");
@@ -424,4 +448,42 @@ async fn linter_quickfixes() {
             assert!(action["kind"].as_str().unwrap_or("").contains("quickfix"));
         }
     }
+}
+
+#[tokio::test]
+async fn completion_ranks_acronym_above_substring() {
+    let lib = "<?php\nnamespace App;\nclass GetAllTransactionsQueryHandler {}\nclass Gauge {}\n";
+    let consumer = "<?php\nnamespace App;\n\n$x = new GATQH\n";
+    let mut h = Harness::start(&[("lib.php", lib), ("c.php", consumer)]).await;
+    h.open("c.php", consumer).await;
+    let result = h.at("textDocument/completion", "c.php", 3, 14).await;
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    assert_eq!(labels.first().copied(), Some("GetAllTransactionsQueryHandler"), "got {labels:?}");
+}
+
+#[tokio::test]
+async fn completion_after_new_offers_classes_not_functions() {
+    let lib = "<?php\nnamespace App;\nclass Allocator {}\nfunction all_things(): void {}\n";
+    let consumer = "<?php\nnamespace App;\n\n$x = new All\n";
+    let mut h = Harness::start(&[("lib.php", lib), ("c.php", consumer)]).await;
+    h.open("c.php", consumer).await;
+    let result = h.at("textDocument/completion", "c.php", 3, 12).await;
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    assert!(labels.contains(&"Allocator"), "expected the class, got {labels:?}");
+    assert!(!labels.contains(&"all_things"), "functions must not appear after `new`, got {labels:?}");
+}
+
+#[tokio::test]
+async fn completion_inserts_fqcn_for_out_of_namespace_class() {
+    let lib = "<?php\nnamespace App\\Models;\nclass User {}\n";
+    let consumer = "<?php\nnamespace App;\n\n$x = new User\n";
+    let mut h = Harness::start(&[("lib.php", lib), ("c.php", consumer)]).await;
+    h.open("c.php", consumer).await;
+    let result = h.at("textDocument/completion", "c.php", 3, 13).await;
+    let r = completion_array(&result);
+    let item =
+        r.as_array().unwrap().iter().find(|i| i["label"].as_str() == Some("User")).expect("expected User completion");
+    assert_eq!(item["insertText"].as_str(), Some("\\App\\Models\\User"), "got {item:?}");
 }

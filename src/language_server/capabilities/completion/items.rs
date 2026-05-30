@@ -26,6 +26,8 @@ use crate::language_server::capabilities::lookup;
 use crate::language_server::state::ExpressionTypeIndex;
 
 use super::MAX_RESULTS;
+use super::matcher;
+use super::matcher::Score;
 
 pub(super) fn variable_items(
     tokens: &[mago_syntax::token::Token<'_>],
@@ -113,8 +115,8 @@ pub(super) fn bare_items(
     file: &MagoFile,
     offset: u32,
     prefix: &[u8],
+    classes_only: bool,
 ) -> Vec<CompletionItem> {
-    let needle = prefix.to_ascii_lowercase();
     let namespace = lookup::namespace_at_offset(file, offset).unwrap_or_default();
     let ns_lc = if namespace.is_empty() { None } else { Some(namespace.to_ascii_lowercase()) };
     let in_scope = |full: &[u8]| -> bool {
@@ -124,76 +126,72 @@ pub(super) fn bare_items(
         }
     };
 
-    let mut out = Vec::new();
+    let mut scored: Vec<(Score, CompletionItem)> = Vec::new();
 
-    for (key, meta) in codebase.class_likes.iter() {
-        if out.len() >= MAX_RESULTS {
-            break;
-        }
-
+    for (_, meta) in codebase.class_likes.iter() {
         if !is_user_symbol(database, meta.span) || is_synthetic_name(meta.original_name.as_bytes()) {
             continue;
         }
 
-        let display = local_name(meta.original_name.as_bytes());
-        if !display.to_ascii_lowercase().starts_with(&needle) || !in_scope(key.as_bytes()) {
+        let short = local_name(meta.original_name.as_bytes());
+        let Some(score) = matcher::score(prefix, short) else {
             continue;
-        }
+        };
 
-        out.push(make_class_item(meta, display));
+        scored.push((score, make_class_item(meta, &namespace)));
     }
 
-    for ((_, name), meta) in codebase.function_likes.iter() {
-        if out.len() >= MAX_RESULTS {
-            break;
+    if !classes_only {
+        for ((_, name), meta) in codebase.function_likes.iter() {
+            if !matches!(meta.kind, FunctionLikeKind::Function) || !is_user_symbol(database, meta.span) {
+                continue;
+            }
+
+            if !in_scope(name.as_bytes()) {
+                continue;
+            }
+
+            let local = local_name(meta.original_name.as_bytes());
+            let Some(score) = matcher::score(prefix, local) else {
+                continue;
+            };
+
+            let local_str = String::from_utf8_lossy(local).into_owned();
+            scored.push((
+                score,
+                CompletionItem {
+                    label: local_str.clone(),
+                    kind: Some(CompletionItemKind::FUNCTION),
+                    detail: Some(render_signature(meta, local)),
+                    insert_text: Some(format!("{local_str}($1)")),
+                    insert_text_format: Some(InsertTextFormat::SNIPPET),
+                    ..CompletionItem::default()
+                },
+            ));
         }
 
-        if !matches!(meta.kind, FunctionLikeKind::Function) {
-            continue;
-        }
+        for (name, meta) in codebase.constants.iter() {
+            if !is_user_symbol(database, meta.span) || !in_scope(name.as_bytes()) {
+                continue;
+            }
 
-        if !is_user_symbol(database, meta.span) {
-            continue;
-        }
+            let local = local_name(name.as_bytes());
+            let Some(score) = matcher::score(prefix, local) else {
+                continue;
+            };
 
-        let display: &[u8] = meta.original_name.as_bytes();
-        let local = local_name(display);
-        if !local.to_ascii_lowercase().starts_with(&needle) || !in_scope(name.as_bytes()) {
-            continue;
+            scored.push((
+                score,
+                CompletionItem {
+                    label: String::from_utf8_lossy(local).into_owned(),
+                    kind: Some(CompletionItemKind::CONSTANT),
+                    ..CompletionItem::default()
+                },
+            ));
         }
-
-        let local_str = String::from_utf8_lossy(local).into_owned();
-        out.push(CompletionItem {
-            label: local_str.clone(),
-            kind: Some(CompletionItemKind::FUNCTION),
-            detail: Some(render_signature(meta, local)),
-            insert_text: Some(format!("{local_str}($1)")),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..CompletionItem::default()
-        });
     }
 
-    for (name, meta) in codebase.constants.iter() {
-        if out.len() >= MAX_RESULTS {
-            break;
-        }
-
-        if !is_user_symbol(database, meta.span) || !name.as_bytes().to_ascii_lowercase().starts_with(&needle) {
-            continue;
-        }
-
-        if !in_scope(name.as_bytes()) {
-            continue;
-        }
-
-        out.push(CompletionItem {
-            label: String::from_utf8_lossy(local_name(name.as_bytes())).into_owned(),
-            kind: Some(CompletionItemKind::CONSTANT),
-            ..CompletionItem::default()
-        });
-    }
-
-    out
+    finalize(scored)
 }
 
 pub(super) fn qualified_items(
@@ -202,7 +200,6 @@ pub(super) fn qualified_items(
     qualifier: &[u8],
     prefix: &[u8],
 ) -> Vec<CompletionItem> {
-    let needle = prefix.to_ascii_lowercase();
     let want_prefix = if qualifier.is_empty() {
         Vec::new()
     } else {
@@ -211,30 +208,39 @@ pub(super) fn qualified_items(
         want
     };
 
-    let mut out = Vec::new();
+    let mut scored: Vec<(Score, CompletionItem)> = Vec::new();
     for (key, meta) in codebase.class_likes.iter() {
-        if out.len() >= MAX_RESULTS {
-            break;
-        }
-
         if !is_user_symbol(database, meta.span) || is_synthetic_name(meta.original_name.as_bytes()) {
             continue;
         }
 
-        let lc = key.as_bytes();
-        if !lc.starts_with(&want_prefix) {
+        if !key.as_bytes().starts_with(&want_prefix) {
             continue;
         }
 
-        if !lc[want_prefix.len()..].starts_with(&needle) {
+        let fqcn = meta.original_name.as_bytes();
+        let rel = &fqcn[want_prefix.len().min(fqcn.len())..];
+        let Some(score) = matcher::score(prefix, rel) else {
             continue;
-        }
+        };
 
-        let display = &meta.original_name.as_bytes()[want_prefix.len().min(meta.original_name.as_bytes().len())..];
-        out.push(make_class_item(meta, display));
+        scored.push((score, qualified_class_item(meta, rel)));
     }
 
-    out
+    finalize(scored)
+}
+
+fn finalize(mut scored: Vec<(Score, CompletionItem)>) -> Vec<CompletionItem> {
+    scored.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.label.cmp(&b.1.label)));
+    scored.truncate(MAX_RESULTS);
+    scored
+        .into_iter()
+        .map(|(score, mut item)| {
+            item.sort_text = Some(score.sort_text());
+            item.filter_text = Some(item.label.clone());
+            item
+        })
+        .collect()
 }
 
 fn collect_class_members(
@@ -368,24 +374,54 @@ fn push_unique(out: &mut Vec<CompletionItem>, seen: &mut foldhash::HashSet<Strin
     }
 }
 
-fn make_class_item(meta: &ClassLikeMetadata, display: &[u8]) -> CompletionItem {
+fn make_class_item(meta: &ClassLikeMetadata, current_namespace: &[u8]) -> CompletionItem {
+    let fqcn = meta.original_name.as_bytes();
+    let short = local_name(fqcn);
+    let namespace = match memchr::memrchr(b'\\', fqcn) {
+        Some(i) => &fqcn[..i],
+        None => &[][..],
+    };
+
+    let insert_text = (!namespace.eq_ignore_ascii_case(current_namespace)).then(|| {
+        let mut text = String::with_capacity(fqcn.len() + 1);
+        text.push('\\');
+        text.push_str(&String::from_utf8_lossy(fqcn));
+        text
+    });
+
+    CompletionItem {
+        label: String::from_utf8_lossy(short).into_owned(),
+        kind: Some(class_item_kind(meta)),
+        insert_text,
+        documentation: Some(class_documentation(meta)),
+        ..CompletionItem::default()
+    }
+}
+
+fn qualified_class_item(meta: &ClassLikeMetadata, display: &[u8]) -> CompletionItem {
+    CompletionItem {
+        label: String::from_utf8_lossy(display).into_owned(),
+        kind: Some(class_item_kind(meta)),
+        documentation: Some(class_documentation(meta)),
+        ..CompletionItem::default()
+    }
+}
+
+fn class_item_kind(meta: &ClassLikeMetadata) -> CompletionItemKind {
     use mago_codex::symbol::SymbolKind as M;
-    let kind = match meta.kind {
+    match meta.kind {
         M::Class => CompletionItemKind::CLASS,
         M::Interface => CompletionItemKind::INTERFACE,
         M::Trait => CompletionItemKind::CLASS,
         M::Enum => CompletionItemKind::ENUM,
-    };
-
-    CompletionItem {
-        label: String::from_utf8_lossy(display).into_owned(),
-        kind: Some(kind),
-        documentation: Some(Documentation::MarkupContent(MarkupContent {
-            kind: MarkupKind::PlainText,
-            value: String::from_utf8_lossy(meta.original_name.as_bytes()).into_owned(),
-        })),
-        ..CompletionItem::default()
     }
+}
+
+fn class_documentation(meta: &ClassLikeMetadata) -> Documentation {
+    Documentation::MarkupContent(MarkupContent {
+        kind: MarkupKind::PlainText,
+        value: String::from_utf8_lossy(meta.original_name.as_bytes()).into_owned(),
+    })
 }
 
 fn is_user_symbol(database: &Database<'_>, span: Span) -> bool {

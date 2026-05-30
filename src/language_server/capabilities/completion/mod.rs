@@ -7,7 +7,7 @@
 //!   hierarchy are offered.
 //! - **Static member** (`Class::<prefix>`); constants, enum cases, methods.
 //! - **Bare identifier**; global functions, constants, class-likes
-//!   (case-insensitive prefix match).
+//!   (scored by the [`matcher`]).
 //! - **Qualified** (`Foo\<prefix>`, `\\<prefix>`); namespace-scoped
 //!   class-like search.
 
@@ -16,6 +16,7 @@ use mago_database::Database;
 use mago_database::file::File as MagoFile;
 use mago_syntax::token::Token;
 use mago_syntax::token::TokenKind;
+use tower_lsp_server::ls_types::CompletionList;
 use tower_lsp_server::ls_types::CompletionResponse;
 
 use crate::language_server::capabilities::lookup;
@@ -31,6 +32,7 @@ fn byte_before(file: &MagoFile, offset: u32) -> Option<u8> {
 }
 
 mod items;
+mod matcher;
 
 const MAX_RESULTS: usize = 50;
 
@@ -40,7 +42,7 @@ pub(super) enum Context<'a> {
     InstanceMember { receiver_span: (u32, u32), prefix: &'a [u8] },
     StaticMember { class: &'a [u8], prefix: &'a [u8] },
     Qualified { qualifier: &'a [u8], prefix: &'a [u8] },
-    Bare { prefix: &'a [u8] },
+    Bare { prefix: &'a [u8], classes_only: bool },
 }
 
 pub fn compute(
@@ -63,10 +65,12 @@ pub fn compute(
         }
         Context::StaticMember { class, prefix } => items::static_member_items(codebase, class, prefix),
         Context::Qualified { qualifier, prefix } => items::qualified_items(database, codebase, qualifier, prefix),
-        Context::Bare { prefix } => items::bare_items(database, codebase, file, offset, prefix),
+        Context::Bare { prefix, classes_only } => {
+            items::bare_items(database, codebase, file, offset, prefix, classes_only)
+        }
     };
 
-    CompletionResponse::Array(items)
+    CompletionResponse::List(CompletionList { is_incomplete: true, items })
 }
 
 fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Context<'a> {
@@ -110,14 +114,14 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
                     return Context::InstanceMember { receiver_span, prefix: b"" };
                 }
 
-                return Context::Bare { prefix: b"" };
+                return Context::Bare { prefix: b"", classes_only: false };
             }
             TokenKind::ColonColon => {
                 if let Some(class) = static_receiver_before(tokens, current_idx) {
                     return Context::StaticMember { class, prefix: b"" };
                 }
 
-                return Context::Bare { prefix: b"" };
+                return Context::Bare { prefix: b"", classes_only: false };
             }
             _ => {}
         }
@@ -131,7 +135,8 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
         if let Some(receiver_span) = receiver_before(tokens, prev_idx.unwrap()) {
             return Context::InstanceMember { receiver_span, prefix };
         }
-        return Context::Bare { prefix };
+
+        return Context::Bare { prefix, classes_only: false };
     }
 
     if matches!(prev, Some(TokenKind::ColonColon))
@@ -142,10 +147,10 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
     }
 
     match cur.kind {
-        TokenKind::Identifier => Context::Bare { prefix: cur.value },
+        TokenKind::Identifier => Context::Bare { prefix: cur.value, classes_only: expects_class_name(prev) },
         TokenKind::QualifiedIdentifier => match rsplit_once_byte(cur.value, b'\\') {
             Some((qual, last)) => Context::Qualified { qualifier: qual, prefix: last },
-            None => Context::Bare { prefix: cur.value },
+            None => Context::Bare { prefix: cur.value, classes_only: expects_class_name(prev) },
         },
         TokenKind::FullyQualifiedIdentifier => {
             let stripped = mago_bytes::trim_start_byte(cur.value, b'\\');
@@ -165,8 +170,15 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
             }
             _ => Context::Qualified { qualifier: b"", prefix: b"" },
         },
-        _ => Context::Bare { prefix: b"" },
+        _ => Context::Bare { prefix: b"", classes_only: false },
     }
+}
+
+fn expects_class_name(prev: Option<TokenKind>) -> bool {
+    matches!(
+        prev,
+        Some(TokenKind::New | TokenKind::Instanceof | TokenKind::Extends | TokenKind::Implements | TokenKind::Catch)
+    )
 }
 
 fn rsplit_once_byte(s: &[u8], byte: u8) -> Option<(&[u8], &[u8])> {
@@ -190,7 +202,7 @@ fn classify_after_punctuation<'a>(
     });
 
     let Some(prev_idx) = prev_idx else {
-        return Context::Bare { prefix: b"" };
+        return Context::Bare { prefix: b"", classes_only: false };
     };
 
     let prev_kind = tokens[prev_idx].kind;
@@ -199,7 +211,8 @@ fn classify_after_punctuation<'a>(
         if let Some(receiver_span) = receiver_before(tokens, prev_idx) {
             return Context::InstanceMember { receiver_span, prefix: b"" };
         }
-        return Context::Bare { prefix: b"" };
+
+        return Context::Bare { prefix: b"", classes_only: false };
     }
 
     if matches!(prev_kind, TokenKind::ColonColon)
@@ -208,7 +221,7 @@ fn classify_after_punctuation<'a>(
         return Context::StaticMember { class, prefix: b"" };
     }
 
-    Context::Bare { prefix: b"" }
+    Context::Bare { prefix: b"", classes_only: expects_class_name(Some(prev_kind)) }
 }
 
 fn receiver_before(tokens: &[Token<'_>], arrow_idx: usize) -> Option<(u32, u32)> {
@@ -232,13 +245,16 @@ fn walk_chain_start(tokens: &[Token<'_>], end_idx: usize) -> u32 {
         if idx == 0 {
             return start_offset;
         }
+
         let mut k = idx - 1;
         while k > 0 && lookup::is_trivia(tokens[k].kind) {
             k -= 1;
         }
+
         if lookup::is_trivia(tokens[k].kind) {
             return start_offset;
         }
+
         match tokens[k].kind {
             TokenKind::MinusGreaterThan | TokenKind::QuestionMinusGreaterThan | TokenKind::ColonColon => {
                 if k == 0 {
@@ -263,6 +279,7 @@ fn static_receiver_before<'a>(tokens: &'a [Token<'a>], colon_idx: usize) -> Opti
         if lookup::is_trivia(tokens[k].kind) {
             continue;
         }
+
         return match tokens[k].kind {
             TokenKind::Self_ | TokenKind::Static | TokenKind::Parent => Some(tokens[k].value),
             TokenKind::Identifier | TokenKind::QualifiedIdentifier | TokenKind::FullyQualifiedIdentifier => {
@@ -283,5 +300,6 @@ fn enclosing_function_start(tokens: &[Token<'_>], offset: u32) -> u32 {
             return t.start.offset;
         }
     }
+
     0
 }
