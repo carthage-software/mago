@@ -200,9 +200,9 @@ mod tests {
 
     #[test]
     fn sort_text_orders_by_tier_then_length() {
-        let exact = score(b"Foo", b"Foo").unwrap();
-        let prefix = score(b"Fo", b"Foo").unwrap();
-        let longer = score(b"Fo", b"FooBarBaz").unwrap();
+        let exact = score(b"Qux", b"Qux").unwrap();
+        let prefix = score(b"Qu", b"Qux").unwrap();
+        let longer = score(b"Qu", b"QuxBarBaz").unwrap();
         assert!(exact.sort_text() < prefix.sort_text());
         assert!(prefix.sort_text() < longer.sort_text());
     }
