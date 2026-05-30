@@ -15,6 +15,7 @@ workspace = true
 [dependencies]
 mago-span = { workspace = true }
 mago-syntax = { workspace = true }
+mago-word = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
 foldhash = { workspace = true }

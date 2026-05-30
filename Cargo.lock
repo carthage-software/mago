@@ -1829,6 +1829,7 @@ dependencies = [
  "foldhash 0.2.0",
  "mago-span",
  "mago-syntax",
+ "mago-word",
  "memchr",
  "serde",
  "strum 0.28.0",

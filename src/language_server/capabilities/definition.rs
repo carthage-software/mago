@@ -1,7 +1,8 @@
 //! `textDocument/definition`.
 //!
-//! Resolves the identifier under the cursor via [`mago_names::ResolvedNames`]
-//! and converts the resulting metadata span into an LSP [`Location`].
+//! Resolves the identifier under the cursor to its fully-qualified name, looks
+//! up that symbol's declaration span in the codebase, and converts it to an LSP
+//! [`Location`].
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_database::Database;
@@ -20,21 +21,8 @@ pub fn compute(
     offset: u32,
 ) -> Option<Location> {
     let (_, _, fqcn, _) = resolved.at_offset(offset)?;
-    let span = resolve_span(codebase, fqcn)?;
+    let span = codebase.span_of(fqcn)?;
     span_to_location(database, span)
-}
-
-fn resolve_span(codebase: &CodebaseMetadata, fqcn: &[u8]) -> Option<Span> {
-    if let Some(meta) = codebase.get_class_like(fqcn) {
-        return Some(meta.name_span.unwrap_or(meta.span));
-    }
-    if let Some(meta) = codebase.get_function(fqcn) {
-        return Some(meta.name_span.unwrap_or(meta.span));
-    }
-    if let Some(meta) = codebase.get_constant(fqcn) {
-        return Some(meta.span);
-    }
-    None
 }
 
 fn span_to_location(database: &Database<'_>, span: Span) -> Option<Location> {

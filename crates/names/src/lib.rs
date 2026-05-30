@@ -101,6 +101,23 @@ impl<'arena> ResolvedNames<'arena> {
         self.names.iter().map(|(&start, &(end, (name, imported)))| (start, end, name, imported))
     }
 
+    /// Byte ranges `(start, end)` of every entry whose resolved name matches
+    /// `fqcn`, compared case-insensitively (PHP name resolution is). This
+    /// matches aliased uses too: `use Bar as Qux; Qux\G` resolves to `Bar\G`, so
+    /// searching for `Bar\G` finds it where a raw text scan would not.
+    ///
+    /// `exclude_offset` drops the entry starting at that offset, e.g. to omit a
+    /// declaration from its own reference list; pass `None` to keep every match.
+    #[must_use]
+    pub fn references_to(&self, fqcn: &[u8], exclude_offset: Option<u32>) -> Vec<(u32, u32)> {
+        self.iter()
+            .filter(|(start, _, _, _)| exclude_offset.is_some_and(|offset| offset != *start))
+            .filter_map(
+                |(start, end, name, _)| if eq_ignore_ascii_case(name, fqcn) { Some((start, end)) } else { None },
+            )
+            .collect()
+    }
+
     /// Inserts a resolution result into the map (intended for internal use).
     ///
     /// The full source span of the identifier is stored, so [`at_offset`](Self::at_offset)
@@ -117,4 +134,11 @@ impl<'arena> ResolvedNames<'arena> {
     pub fn all(&self) -> HashSet<(&u32, &(&'arena [u8], bool))> {
         self.names.iter().map(|(k, (_, inner))| (k, inner)).collect()
     }
+}
+
+/// Case-insensitive byte equality, routing equal-length inputs through
+/// `mago_word`'s SIMD prefix comparison.
+#[inline]
+fn eq_ignore_ascii_case(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && mago_word::starts_with_ignore_case(a, b)
 }

@@ -389,6 +389,26 @@ impl CodebaseMetadata {
         self.constants.get(&lowercase_name)
     }
 
+    /// The declaration name span of a top-level symbol named `name`: a
+    /// class-like (class/interface/trait/enum), a function, or a constant.
+    ///
+    /// Prefers the symbol's name span over its full declaration span, so callers
+    /// land on the identifier rather than the whole declaration body. The lookup
+    /// is case-insensitive, like every symbol lookup here.
+    #[inline]
+    #[must_use]
+    pub fn span_of(&self, name: &[u8]) -> Option<Span> {
+        if let Some(meta) = self.get_class_like(name) {
+            return Some(meta.name_span.unwrap_or(meta.span));
+        }
+
+        if let Some(meta) = self.get_function(name) {
+            return Some(meta.name_span.unwrap_or(meta.span));
+        }
+
+        self.get_constant(name).map(|meta| meta.span)
+    }
+
     /// Retrieves metadata for a class constant.
     /// Class name is case-insensitive, constant name is case-sensitive.
     #[inline]

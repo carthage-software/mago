@@ -262,6 +262,13 @@ impl HasPosition for Position {
     }
 }
 
+impl HasPosition for u32 {
+    #[inline]
+    fn position(&self) -> Position {
+        Position::new(*self)
+    }
+}
+
 impl HasSpan for Span {
     #[inline]
     fn span(&self) -> Span {
