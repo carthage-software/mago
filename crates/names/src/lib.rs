@@ -111,7 +111,7 @@ impl<'arena> ResolvedNames<'arena> {
     #[must_use]
     pub fn references_to(&self, fqcn: &[u8], exclude_offset: Option<u32>) -> Vec<(u32, u32)> {
         self.iter()
-            .filter(|(start, _, _, _)| exclude_offset.is_some_and(|offset| offset != *start))
+            .filter(|(start, _, _, _)| exclude_offset.is_none_or(|offset| offset != *start))
             .filter_map(
                 |(start, end, name, _)| if eq_ignore_ascii_case(name, fqcn) { Some((start, end)) } else { None },
             )
