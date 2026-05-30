@@ -104,9 +104,8 @@ impl Shard {
             // SAFETY: every non-null slot points at an `Entry` written by a previous `intern`
             // call; the arena outlives the program. Reading the header fields and trailing
             // bytes through the raw `slot` keeps its whole-block provenance (see `Entry::bytes`).
-            let matched = unsafe {
-                (*slot).hash == hash && (*slot).len as usize == bytes.len() && Entry::bytes(slot) == bytes
-            };
+            let matched =
+                unsafe { (*slot).hash == hash && (*slot).len as usize == bytes.len() && Entry::bytes(slot) == bytes };
 
             if matched {
                 // SAFETY: `slot` was checked non-null above.
