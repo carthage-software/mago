@@ -11,7 +11,7 @@
       let
         pkgs = import nixpkgs { inherit system; };
         isDarwin = pkgs.stdenv.isDarwin;
-        toolchain = "1.95.0";
+        toolchain = "1.96.0";
         php = pkgs.php84;
         composer = pkgs.php84Packages.composer;
       in
