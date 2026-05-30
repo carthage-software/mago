@@ -19,6 +19,7 @@ use mago_syntax::token::TokenKind;
 use tower_lsp_server::ls_types::CompletionResponse;
 
 use crate::language_server::capabilities::lookup;
+use crate::language_server::position::range_at_offsets;
 use crate::language_server::state::ExpressionTypeIndex;
 
 fn byte_before(file: &MagoFile, offset: u32) -> Option<u8> {
@@ -52,7 +53,11 @@ pub fn compute(
     let tokens = lookup::lex(file);
     let context = classify(file, &tokens, offset);
     let items = match context {
-        Context::Variable { prefix, scope_start } => items::variable_items(&tokens, scope_start, offset, prefix),
+        Context::Variable { prefix, scope_start } => {
+            let replace = range_at_offsets(file, offset.saturating_sub(prefix.len() as u32 + 1), offset);
+
+            items::variable_items(&tokens, scope_start, offset, prefix, replace)
+        }
         Context::InstanceMember { receiver_span, prefix } => {
             items::instance_member_items(codebase, type_index, receiver_span, prefix)
         }
@@ -149,6 +154,17 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
                 None => Context::Qualified { qualifier: b"", prefix: stripped },
             }
         }
+        TokenKind::NamespaceSeparator => match prev_idx.map(|j| &tokens[j]) {
+            Some(name)
+                if matches!(
+                    name.kind,
+                    TokenKind::Identifier | TokenKind::QualifiedIdentifier | TokenKind::FullyQualifiedIdentifier
+                ) =>
+            {
+                Context::Qualified { qualifier: mago_bytes::trim_start_byte(name.value, b'\\'), prefix: b"" }
+            }
+            _ => Context::Qualified { qualifier: b"", prefix: b"" },
+        },
         _ => Context::Bare { prefix: b"" },
     }
 }

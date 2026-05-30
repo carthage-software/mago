@@ -14,10 +14,13 @@ use mago_span::Span;
 use mago_syntax::token::TokenKind;
 use tower_lsp_server::ls_types::CompletionItem;
 use tower_lsp_server::ls_types::CompletionItemKind;
+use tower_lsp_server::ls_types::CompletionTextEdit;
 use tower_lsp_server::ls_types::Documentation;
 use tower_lsp_server::ls_types::InsertTextFormat;
 use tower_lsp_server::ls_types::MarkupContent;
 use tower_lsp_server::ls_types::MarkupKind;
+use tower_lsp_server::ls_types::Range;
+use tower_lsp_server::ls_types::TextEdit;
 
 use crate::language_server::capabilities::lookup;
 use crate::language_server::state::ExpressionTypeIndex;
@@ -29,6 +32,7 @@ pub(super) fn variable_items(
     scope_start: u32,
     offset: u32,
     prefix: &[u8],
+    replace: Range,
 ) -> Vec<CompletionItem> {
     let mut seen = foldhash::HashSet::default();
     let mut out = Vec::new();
@@ -37,7 +41,8 @@ pub(super) fn variable_items(
             continue;
         }
 
-        if token.start.offset < scope_start || token.start.offset >= offset {
+        let token_end = token.start.offset + token.value.len() as u32;
+        if token.start.offset < scope_start || token.start.offset >= offset || token_end >= offset {
             continue;
         }
 
@@ -50,11 +55,11 @@ pub(super) fn variable_items(
             continue;
         }
 
-        let name_str = String::from_utf8_lossy(name).into_owned();
+        let label = format!("${}", String::from_utf8_lossy(name));
         out.push(CompletionItem {
-            label: format!("${name_str}"),
             kind: Some(CompletionItemKind::VARIABLE),
-            insert_text: Some(name_str),
+            text_edit: Some(CompletionTextEdit::Edit(TextEdit { range: replace, new_text: label.clone() })),
+            label,
             ..CompletionItem::default()
         });
 
@@ -126,7 +131,7 @@ pub(super) fn bare_items(
             break;
         }
 
-        if !is_user_symbol(database, meta.span) {
+        if !is_user_symbol(database, meta.span) || is_synthetic_name(meta.original_name.as_bytes()) {
             continue;
         }
 
@@ -139,7 +144,11 @@ pub(super) fn bare_items(
     }
 
     for ((_, name), meta) in codebase.function_likes.iter() {
-        if matches!(meta.kind, FunctionLikeKind::Method) || out.len() >= MAX_RESULTS {
+        if out.len() >= MAX_RESULTS {
+            break;
+        }
+
+        if !matches!(meta.kind, FunctionLikeKind::Function) {
             continue;
         }
 
@@ -194,17 +203,21 @@ pub(super) fn qualified_items(
     prefix: &[u8],
 ) -> Vec<CompletionItem> {
     let needle = prefix.to_ascii_lowercase();
-    let qual_lc = qualifier.to_ascii_lowercase();
-    let mut want_prefix = qual_lc;
-    want_prefix.push(b'\\');
-    let mut out = Vec::new();
+    let want_prefix = if qualifier.is_empty() {
+        Vec::new()
+    } else {
+        let mut want = qualifier.to_ascii_lowercase();
+        want.push(b'\\');
+        want
+    };
 
+    let mut out = Vec::new();
     for (key, meta) in codebase.class_likes.iter() {
         if out.len() >= MAX_RESULTS {
             break;
         }
 
-        if !is_user_symbol(database, meta.span) {
+        if !is_user_symbol(database, meta.span) || is_synthetic_name(meta.original_name.as_bytes()) {
             continue;
         }
 
@@ -213,12 +226,11 @@ pub(super) fn qualified_items(
             continue;
         }
 
-        let suffix = &lc[want_prefix.len()..];
-        if suffix.contains(&b'\\') || !suffix.starts_with(&needle) {
+        if !lc[want_prefix.len()..].starts_with(&needle) {
             continue;
         }
 
-        let display = local_name(meta.original_name.as_bytes());
+        let display = &meta.original_name.as_bytes()[want_prefix.len().min(meta.original_name.as_bytes().len())..];
         out.push(make_class_item(meta, display));
     }
 
@@ -260,25 +272,29 @@ fn collect_class_members(
                 ..CompletionItem::default()
             });
         }
-    } else {
-        for (name, declaring_class) in meta.appearing_property_ids.iter() {
-            let visible = mago_bytes::trim_start_byte(name.as_bytes(), b'$');
-            if !visible.to_ascii_lowercase().starts_with(&needle) {
-                continue;
-            }
+    }
 
-            let detail = codebase
-                .get_class_like(declaring_class.as_bytes())
-                .and_then(|c| c.properties.get(name))
-                .and_then(|p| p.type_metadata.as_ref())
-                .map(|t| String::from_utf8_lossy(t.type_union.get_id().as_bytes()).into_owned());
-            out.push(CompletionItem {
-                label: String::from_utf8_lossy(visible).into_owned(),
-                kind: Some(CompletionItemKind::FIELD),
-                detail,
-                ..CompletionItem::default()
-            });
+    for (name, declaring_class) in meta.appearing_property_ids.iter() {
+        let visible = mago_bytes::trim_start_byte(name.as_bytes(), b'$');
+        if !visible.to_ascii_lowercase().starts_with(&needle) {
+            continue;
         }
+
+        let property = codebase.get_class_like(declaring_class.as_bytes()).and_then(|c| c.properties.get(name));
+        let is_static = property.is_some_and(|p| p.flags.is_static());
+        if is_static != static_access {
+            continue;
+        }
+
+        let detail = property
+            .and_then(|p| p.type_metadata.as_ref())
+            .map(|t| String::from_utf8_lossy(t.type_union.get_id().as_bytes()).into_owned());
+        let label = if static_access {
+            format!("${}", String::from_utf8_lossy(visible))
+        } else {
+            String::from_utf8_lossy(visible).into_owned()
+        };
+        out.push(CompletionItem { label, kind: Some(CompletionItemKind::FIELD), detail, ..CompletionItem::default() });
     }
 
     for (name, mid) in meta.appearing_method_ids.iter() {
@@ -290,6 +306,11 @@ fn collect_class_members(
         else {
             continue;
         };
+
+        let is_static = method.method_metadata.as_ref().is_some_and(|m| m.is_static);
+        if is_static != static_access {
+            continue;
+        }
 
         let display: &[u8] = method.original_name.as_bytes();
         let display_str = String::from_utf8_lossy(display).into_owned();
@@ -369,6 +390,10 @@ fn make_class_item(meta: &ClassLikeMetadata, display: &[u8]) -> CompletionItem {
 
 fn is_user_symbol(database: &Database<'_>, span: Span) -> bool {
     database.get(&span.file_id).map(|f| !matches!(f.file_type, FileType::Builtin)).unwrap_or(false)
+}
+
+fn is_synthetic_name(name: &[u8]) -> bool {
+    name.first() == Some(&b'{')
 }
 
 fn local_name(full: &[u8]) -> &[u8] {

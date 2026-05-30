@@ -283,6 +283,80 @@ async fn completion_static_constants() {
 }
 
 #[tokio::test]
+async fn completion_static_offers_static_members_only() {
+    let code = "<?php\nclass Box {\n    public static function make(): void {}\n    public function open(): void {}\n    public const string TAG = 'x';\n}\n\nBox::\n";
+    let mut h = Harness::start(&[("a.php", code)]).await;
+    h.open("a.php", code).await;
+    let result = h.at("textDocument/completion", "a.php", 7, 5).await;
+    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    assert!(labels.contains(&"make") && labels.contains(&"TAG"), "expected static members, got {labels:?}");
+    assert!(!labels.contains(&"open"), "instance method must not appear after `::`, got {labels:?}");
+}
+
+#[tokio::test]
+async fn completion_instance_offers_instance_members_only() {
+    let code = "<?php\nclass Box {\n    public static function make(): void {}\n    public function open(): void {}\n}\n\nfunction run(Box $b): void {\n    $b->\n}\n";
+    let mut h = Harness::start(&[("a.php", code)]).await;
+    h.open("a.php", code).await;
+    let result = h.at("textDocument/completion", "a.php", 7, 8).await;
+    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    assert!(labels.contains(&"open"), "expected instance method, got {labels:?}");
+    assert!(!labels.contains(&"make"), "static method must not appear after `->`, got {labels:?}");
+}
+
+#[tokio::test]
+async fn completion_does_not_offer_anonymous_classes() {
+    let code = "<?php\nclass Real {}\n$x = new class {};\n$y = new R\n";
+    let mut h = Harness::start(&[("a.php", code)]).await;
+    h.open("a.php", code).await;
+    let result = h.at("textDocument/completion", "a.php", 3, 10).await;
+    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    assert!(labels.contains(&"Real"), "expected the named class, got {labels:?}");
+    assert!(!labels.iter().any(|l| l.starts_with('{')), "anonymous classes must not appear, got {labels:?}");
+}
+
+#[tokio::test]
+async fn completion_variables_skip_the_partial_being_typed() {
+    let code = "<?php\nfunction demo(): void {\n    $table = 1;\n    $t\n}\n";
+    let mut h = Harness::start(&[("a.php", code)]).await;
+    h.open("a.php", code).await;
+    let result = h.at("textDocument/completion", "a.php", 3, 6).await;
+    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    assert!(labels.contains(&"$table"), "expected the in-scope variable, got {labels:?}");
+    assert!(!labels.contains(&"$t"), "the partial being typed must not be offered, got {labels:?}");
+}
+
+#[tokio::test]
+async fn completion_variable_edit_preserves_the_dollar_sign() {
+    let code = "<?php\nfunction demo(): void {\n    $table = 1;\n    $t\n}\n";
+    let mut h = Harness::start(&[("a.php", code)]).await;
+    h.open("a.php", code).await;
+    let result = h.at("textDocument/completion", "a.php", 3, 6).await;
+    let item = result
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["label"].as_str() == Some("$table"))
+        .expect("expected $table completion");
+    // The edit rewrites the whole `$table`, including the `$`, over the typed range.
+    assert_eq!(item["textEdit"]["newText"].as_str(), Some("$table"), "got {item:?}");
+    assert_eq!(item["textEdit"]["range"]["start"]["character"].as_u64(), Some(4), "should replace from the `$`");
+    assert_eq!(item["textEdit"]["range"]["end"]["character"].as_u64(), Some(6));
+}
+
+#[tokio::test]
+async fn completion_qualified_includes_sub_namespace_classes() {
+    let lib = "<?php\nnamespace Foo\\Bar;\nclass Qux {}\n";
+    let consumer = "<?php\n\\Foo\\\n";
+    let mut h = Harness::start(&[("lib.php", lib), ("c.php", consumer)]).await;
+    h.open("lib.php", lib).await;
+    h.open("c.php", consumer).await;
+    let result = h.at("textDocument/completion", "c.php", 1, 5).await;
+    let labels: Vec<&str> = result.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    assert!(labels.contains(&"Bar\\Qux"), "expected the sub-namespace class, got {labels:?}");
+}
+
+#[tokio::test]
 async fn selection_range() {
     let code = "<?php\nclass A {\n    public function f(): void {\n        echo 1;\n    }\n}\n";
     let mut h = Harness::start(&[("a.php", code)]).await;
