@@ -11,9 +11,9 @@ use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::ttype::TType;
 use mago_database::Database;
 use mago_database::DatabaseReader;
-use mago_database::file::File as MagoFile;
 use mago_database::file::FileType;
-use mago_names::ResolvedNames;
+use mago_names::kind::NameKind;
+use mago_names::scope::NamespaceScope;
 use mago_span::Span;
 use mago_syntax::token::TokenKind;
 use tower_lsp_server::ls_types::CompletionItem;
@@ -26,15 +26,11 @@ use tower_lsp_server::ls_types::MarkupKind;
 use tower_lsp_server::ls_types::Range;
 use tower_lsp_server::ls_types::TextEdit;
 
-use crate::language_server::capabilities::lookup;
 use crate::language_server::state::ExpressionTypeIndex;
 
 use super::MAX_RESULTS;
 use super::matcher;
 use super::matcher::Score;
-
-/// Lower-cased FQCN -> short name in scope, for every `use` import.
-type ImportMap = HashMap<Vec<u8>, Vec<u8>>;
 
 pub(super) fn variable_items(
     tokens: &[mago_syntax::token::Token<'_>],
@@ -116,83 +112,33 @@ pub(super) fn instance_member_items(
 
 pub(super) fn static_member_items(
     codebase: &CodebaseMetadata,
-    resolved: &ResolvedNames<'_>,
-    file: &MagoFile,
-    offset: u32,
+    scope: &NamespaceScope,
     class: &[u8],
-    class_offset: u32,
     prefix: &[u8],
 ) -> Vec<CompletionItem> {
     if matches!(class, b"self" | b"static" | b"parent") {
         return Vec::new();
     }
 
-    let Some(meta) = resolve_class(codebase, resolved, file, offset, class, class_offset) else {
+    // The receiver is a name written in source; the scope resolves it to its
+    // FQCN exactly as PHP would (aliases, namespace relativity, leading `\`).
+    let (fqcn, _) = scope.resolve_str(NameKind::Default, class);
+    let Some(meta) = codebase.get_class_like(&fqcn) else {
         return Vec::new();
     };
 
     finalize(collect_class_members(codebase, meta, prefix, true))
 }
 
-/// Resolve a class-like receiver written at the cursor to its metadata.
-fn resolve_class<'a>(
-    codebase: &'a CodebaseMetadata,
-    resolved: &ResolvedNames<'_>,
-    file: &MagoFile,
-    offset: u32,
-    name: &[u8],
-    name_offset: u32,
-) -> Option<&'a ClassLikeMetadata> {
-    if let Some((_, _, fqcn, _)) = resolved.at_offset(name_offset)
-        && let Some(meta) = codebase.get_class_like(fqcn)
-    {
-        return Some(meta);
-    }
-
-    if let Some(meta) = codebase.get_class_like(name) {
-        return Some(meta);
-    }
-
-    let (first, rest) = match memchr::memchr(b'\\', name) {
-        Some(i) => (&name[..i], &name[i..]),
-        None => (name, &[][..]),
-    };
-
-    for import in lookup::imports_at_offset(file, offset) {
-        if import.kind == lookup::ImportKind::Class && import.alias.eq_ignore_ascii_case(first) {
-            let mut fqcn = import.fqcn_lower.clone();
-            fqcn.extend_from_slice(rest);
-            if let Some(meta) = codebase.get_class_like(&fqcn) {
-                return Some(meta);
-            }
-        }
-    }
-
-    if let Some(ns) = lookup::namespace_at_offset(file, offset).filter(|ns| !ns.is_empty()) {
-        let mut fqcn = ns;
-        fqcn.push(b'\\');
-        fqcn.extend_from_slice(name);
-        if let Some(meta) = codebase.get_class_like(&fqcn) {
-            return Some(meta);
-        }
-    }
-
-    None
-}
-
 pub(super) fn bare_items(
     database: &Database<'_>,
     codebase: &CodebaseMetadata,
-    file: &MagoFile,
-    offset: u32,
+    scope: &NamespaceScope,
     prefix: &[u8],
     classes_only: bool,
 ) -> Vec<CompletionItem> {
-    let namespace = lookup::namespace_at_offset(file, offset).unwrap_or_default();
-    let current_ns = split_namespace(&namespace);
-
-    let imports = lookup::imports_at_offset(file, offset);
-    let import_map: ImportMap = imports.into_iter().map(|i| (i.fqcn_lower, i.alias)).collect();
+    let namespace = scope.namespace_name().unwrap_or_default();
+    let current_ns = split_namespace(namespace);
 
     let in_scope = |full: &[u8]| -> bool {
         if namespace.is_empty() {
@@ -211,18 +157,19 @@ pub(super) fn bare_items(
         }
 
         let fqcn = meta.original_name.as_bytes();
-        let Some(score) = matcher::score(prefix, local_name(fqcn)) else {
+        let short = local_name(fqcn);
+        let Some(score) = matcher::score(prefix, short) else {
             continue;
         };
 
-        let score = score.with_locality(
-            import_map.contains_key(&fqcn.to_ascii_lowercase()),
-            is_vendor(database, meta.span),
-            distance_up_down(&current_ns, fqcn).0,
-            distance_up_down(&current_ns, fqcn).1,
-        );
+        // What the short name resolves to here decides both ranking (is it
+        // imported?) and insertion (can we drop the leading `\`?).
+        let (resolved, imported) = scope.resolve_str(NameKind::Default, short);
+        let resolves_here = resolved.eq_ignore_ascii_case(fqcn);
+        let (up, down) = distance_up_down(&current_ns, fqcn);
+        let score = score.with_locality(imported, is_vendor(database, meta.span), up, down);
 
-        scored.push((score, make_class_item(meta, &namespace, &import_map)));
+        scored.push((score, make_class_item(meta, short, resolves_here)));
     }
 
     if !classes_only {
@@ -241,13 +188,9 @@ pub(super) fn bare_items(
                 continue;
             };
 
+            let (_, imported) = scope.resolve_str(NameKind::Function, local);
             let (up, down) = distance_up_down(&current_ns, fqcn);
-            let score = score.with_locality(
-                import_map.contains_key(&fqcn.to_ascii_lowercase()),
-                is_vendor(database, meta.span),
-                up,
-                down,
-            );
+            let score = score.with_locality(imported, is_vendor(database, meta.span), up, down);
 
             let local_str = String::from_utf8_lossy(local).into_owned();
             scored.push((
@@ -274,13 +217,9 @@ pub(super) fn bare_items(
                 continue;
             };
 
+            let (_, imported) = scope.resolve_str(NameKind::Constant, local);
             let (up, down) = distance_up_down(&current_ns, fqcn);
-            let score = score.with_locality(
-                import_map.contains_key(&fqcn.to_ascii_lowercase()),
-                is_vendor(database, meta.span),
-                up,
-                down,
-            );
+            let score = score.with_locality(imported, is_vendor(database, meta.span), up, down);
 
             scored.push((
                 score,
@@ -476,24 +415,20 @@ fn render_signature(meta: &FunctionLikeMetadata, name: &[u8]) -> String {
     sig
 }
 
-fn make_class_item(meta: &ClassLikeMetadata, current_namespace: &[u8], import_map: &ImportMap) -> CompletionItem {
+/// Build a class completion. `resolves_here` is true when typing the short name
+/// at the cursor already resolves to this class (it is imported or lives in the
+/// current namespace); otherwise the item inserts the leading-`\` FQCN.
+fn make_class_item(meta: &ClassLikeMetadata, short: &[u8], resolves_here: bool) -> CompletionItem {
     let fqcn = meta.original_name.as_bytes();
-    let short = local_name(fqcn);
-    let namespace = namespace_of(fqcn);
-
-    let (label, insert_text) = if let Some(alias) = import_map.get(&fqcn.to_ascii_lowercase()) {
-        (String::from_utf8_lossy(alias).into_owned(), None)
-    } else if namespace.eq_ignore_ascii_case(current_namespace) {
-        (String::from_utf8_lossy(short).into_owned(), None)
-    } else {
+    let insert_text = (!resolves_here).then(|| {
         let mut text = String::with_capacity(fqcn.len() + 1);
         text.push('\\');
         text.push_str(&String::from_utf8_lossy(fqcn));
-        (String::from_utf8_lossy(short).into_owned(), Some(text))
-    };
+        text
+    });
 
     CompletionItem {
-        label,
+        label: String::from_utf8_lossy(short).into_owned(),
         kind: Some(class_item_kind(meta)),
         insert_text,
         documentation: Some(class_documentation(meta)),
@@ -558,7 +493,9 @@ fn split_namespace(ns: &[u8]) -> Vec<&[u8]> {
 }
 
 /// Namespace tree distance from the cursor namespace `current` to the namespace
-/// of `fqcn`, as `(steps up to the common ancestor, steps back down)`.
+/// of `fqcn`, as `(steps up to the common ancestor, steps back down)`. A name
+/// in the same namespace is `(0, 0)`; in the parent `(1, 0)`; a sibling
+/// namespace `(1, 1)`; the grandparent `(2, 0)`.
 fn distance_up_down(current: &[&[u8]], fqcn: &[u8]) -> (u16, u16) {
     let candidate = namespace_of(fqcn);
     let cand = split_namespace(candidate);

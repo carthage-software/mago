@@ -13,6 +13,7 @@ use mago_database::file::File as MagoFile;
 use mago_linter::Linter;
 use mago_names::ResolvedNames;
 use mago_names::resolver::NameResolver;
+use mago_names::scope::NamespaceScope;
 use mago_reporting::IssueCollection;
 use mago_semantics::SemanticsChecker;
 use mago_span::HasSpan;
@@ -26,6 +27,8 @@ use mago_syntax::ast::Interface;
 use mago_syntax::ast::Match;
 use mago_syntax::ast::Method;
 use mago_syntax::ast::Namespace;
+use mago_syntax::ast::Program;
+use mago_syntax::ast::Statement;
 use mago_syntax::ast::Switch;
 use mago_syntax::ast::Trait;
 use mago_syntax::ast::Try;
@@ -51,6 +54,10 @@ pub struct FileAnalysis {
     /// `_arena`. Accessed only via [`Self::resolved`], which downcasts
     /// to a `'self`-bound reference.
     resolved: ResolvedNames<'static>,
+    /// Per-namespace import scopes, sorted by start offset, each covering
+    /// `[start, end)`. Owned (no arena borrow), so completion can resolve names
+    /// exactly as the resolver did without re-parsing `use` statements.
+    scopes: Vec<(u32, u32, NamespaceScope)>,
     /// Boxed so the `Bump`'s address is stable across moves of
     /// `FileAnalysis`. Treated as frozen storage after construction:
     /// nothing reaches it, nothing allocates, nothing resets. When the
@@ -84,6 +91,54 @@ impl FileAnalysis {
     pub fn resolved(&self) -> &ResolvedNames<'_> {
         &self.resolved
     }
+
+    /// The import scope in effect at `offset` (aliases plus the current
+    /// namespace), or the global scope when the offset lies outside every
+    /// namespace declaration.
+    pub fn scope_at(&self, offset: u32) -> NamespaceScope {
+        self.scopes
+            .iter()
+            .find(|(start, end, _)| *start <= offset && offset < *end)
+            .map(|(_, _, scope)| scope.clone())
+            .unwrap_or_default()
+    }
+}
+
+/// Build the import scope for every namespace in the program (and a global
+/// scope for code outside any namespace), reusing the name resolver's own
+/// [`NamespaceScope::populate_from_use`]. Each entry covers `[start, end)`.
+fn collect_scopes(program: &Program<'_>, file_size: u32) -> Vec<(u32, u32, NamespaceScope)> {
+    let mut out = Vec::new();
+    let mut global = NamespaceScope::global();
+    let mut saw_namespace = false;
+
+    for statement in program.statements.iter() {
+        match statement {
+            Statement::Namespace(namespace) => {
+                saw_namespace = true;
+                let mut scope = match &namespace.name {
+                    Some(name) => NamespaceScope::for_namespace(name.value().to_vec()),
+                    None => NamespaceScope::global(),
+                };
+                for inner in namespace.statements().iter() {
+                    if let Statement::Use(r#use) = inner {
+                        scope.populate_from_use(r#use);
+                    }
+                }
+                let span = namespace.span();
+                out.push((span.start.offset, span.end.offset, scope));
+            }
+            Statement::Use(r#use) => global.populate_from_use(r#use),
+            _ => {}
+        }
+    }
+
+    if !saw_namespace {
+        out.push((0, file_size, global));
+    }
+
+    out.sort_by_key(|(start, _, _)| *start);
+    out
 }
 
 /// Run one parse + resolve pass over `file` and extract every per-file
@@ -104,6 +159,7 @@ pub fn build(file: &MagoFile, linter_ctx: &LinterContext, with_semantics: bool) 
 
     let program = parse_file_with_settings(arena_ref, file, linter_ctx.parser_settings);
     let resolved = NameResolver::new(arena_ref).resolve(program);
+    let scopes = collect_scopes(program, file.size);
 
     let mut lint_issues = IssueCollection::new();
     if with_semantics {
@@ -125,6 +181,7 @@ pub fn build(file: &MagoFile, linter_ctx: &LinterContext, with_semantics: bool) 
         fold_ranges: span_ctx.fold_ranges,
         node_spans: span_ctx.node_spans,
         resolved,
+        scopes,
         _arena: arena,
     }
 }
