@@ -14,6 +14,7 @@
 use mago_codex::metadata::CodebaseMetadata;
 use mago_database::Database;
 use mago_database::file::File as MagoFile;
+use mago_names::ResolvedNames;
 use mago_syntax::token::Token;
 use mago_syntax::token::TokenKind;
 use tower_lsp_server::ls_types::CompletionList;
@@ -40,7 +41,7 @@ const MAX_RESULTS: usize = 50;
 pub(super) enum Context<'a> {
     Variable { prefix: &'a [u8], scope_start: u32 },
     InstanceMember { receiver_span: (u32, u32), prefix: &'a [u8] },
-    StaticMember { class: &'a [u8], prefix: &'a [u8] },
+    StaticMember { class: &'a [u8], class_offset: u32, prefix: &'a [u8] },
     Qualified { qualifier: &'a [u8], prefix: &'a [u8] },
     Bare { prefix: &'a [u8], classes_only: bool },
 }
@@ -49,6 +50,7 @@ pub fn compute(
     database: &Database<'_>,
     codebase: &CodebaseMetadata,
     type_index: Option<&ExpressionTypeIndex>,
+    resolved: &ResolvedNames<'_>,
     file: &MagoFile,
     offset: u32,
 ) -> CompletionResponse {
@@ -63,7 +65,9 @@ pub fn compute(
         Context::InstanceMember { receiver_span, prefix } => {
             items::instance_member_items(codebase, type_index, receiver_span, prefix)
         }
-        Context::StaticMember { class, prefix } => items::static_member_items(codebase, class, prefix),
+        Context::StaticMember { class, class_offset, prefix } => {
+            items::static_member_items(codebase, resolved, file, offset, class, class_offset, prefix)
+        }
         Context::Qualified { qualifier, prefix } => items::qualified_items(database, codebase, qualifier, prefix),
         Context::Bare { prefix, classes_only } => {
             items::bare_items(database, codebase, file, offset, prefix, classes_only)
@@ -83,7 +87,11 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
         let start = t.start.offset;
         let end = start + t.value.len() as u32;
         if start <= offset && offset <= end {
-            current_idx = Some(i);
+            let starts_here_after_prev = offset == start
+                && current_idx.is_some_and(|c| tokens[c].start.offset + tokens[c].value.len() as u32 == offset);
+            if !starts_here_after_prev {
+                current_idx = Some(i);
+            }
         }
         if start > offset {
             break;
@@ -117,8 +125,8 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
                 return Context::Bare { prefix: b"", classes_only: false };
             }
             TokenKind::ColonColon => {
-                if let Some(class) = static_receiver_before(tokens, current_idx) {
-                    return Context::StaticMember { class, prefix: b"" };
+                if let Some((class, class_offset)) = static_receiver_before(tokens, current_idx) {
+                    return Context::StaticMember { class, class_offset, prefix: b"" };
                 }
 
                 return Context::Bare { prefix: b"", classes_only: false };
@@ -140,10 +148,10 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
     }
 
     if matches!(prev, Some(TokenKind::ColonColon))
-        && let Some(class) = static_receiver_before(tokens, prev_idx.unwrap())
+        && let Some((class, class_offset)) = static_receiver_before(tokens, prev_idx.unwrap())
     {
         let prefix: &[u8] = if matches!(cur.kind, TokenKind::Identifier) { cur.value } else { b"" };
-        return Context::StaticMember { class, prefix };
+        return Context::StaticMember { class, class_offset, prefix };
     }
 
     match cur.kind {
@@ -216,9 +224,9 @@ fn classify_after_punctuation<'a>(
     }
 
     if matches!(prev_kind, TokenKind::ColonColon)
-        && let Some(class) = static_receiver_before(tokens, prev_idx)
+        && let Some((class, class_offset)) = static_receiver_before(tokens, prev_idx)
     {
-        return Context::StaticMember { class, prefix: b"" };
+        return Context::StaticMember { class, class_offset, prefix: b"" };
     }
 
     Context::Bare { prefix: b"", classes_only: expects_class_name(Some(prev_kind)) }
@@ -272,7 +280,10 @@ fn walk_chain_start(tokens: &[Token<'_>], end_idx: usize) -> u32 {
     }
 }
 
-fn static_receiver_before<'a>(tokens: &'a [Token<'a>], colon_idx: usize) -> Option<&'a [u8]> {
+/// The static receiver written before `::`, as `(name, start offset)`. The
+/// offset lets the caller look the receiver up in [`ResolvedNames`] to recover
+/// its fully-qualified name (handling `use` aliases and namespace relativity).
+fn static_receiver_before<'a>(tokens: &'a [Token<'a>], colon_idx: usize) -> Option<(&'a [u8], u32)> {
     let mut k = colon_idx;
     while k > 0 {
         k -= 1;
@@ -280,10 +291,11 @@ fn static_receiver_before<'a>(tokens: &'a [Token<'a>], colon_idx: usize) -> Opti
             continue;
         }
 
+        let start = tokens[k].start.offset;
         return match tokens[k].kind {
-            TokenKind::Self_ | TokenKind::Static | TokenKind::Parent => Some(tokens[k].value),
+            TokenKind::Self_ | TokenKind::Static | TokenKind::Parent => Some((tokens[k].value, start)),
             TokenKind::Identifier | TokenKind::QualifiedIdentifier | TokenKind::FullyQualifiedIdentifier => {
-                Some(mago_bytes::trim_start_byte(tokens[k].value, b'\\'))
+                Some((mago_bytes::trim_start_byte(tokens[k].value, b'\\'), start))
             }
             _ => None,
         };

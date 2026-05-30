@@ -89,6 +89,168 @@ pub fn namespace_at_offset(file: &MagoFile, offset: u32) -> Option<Vec<u8>> {
     entry.namespaces.iter().find(|r| r.start <= offset && offset < r.end).map(|r| r.name.clone().into_vec())
 }
 
+/// What a `use` statement imports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportKind {
+    Class,
+    Function,
+    Constant,
+}
+
+/// One name brought into scope by a `use` statement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Import {
+    pub fqcn_lower: Vec<u8>,
+    pub alias: Vec<u8>,
+    pub kind: ImportKind,
+}
+
+/// Collect every `use` import declared before `offset`. Handles aliases
+/// (`as`), grouped imports (`use Foo\{Bar, Baz as Q}`), and the `function` /
+/// `const` variants. Backed by the same cached token scan as [`lex`].
+pub fn imports_at_offset(file: &MagoFile, offset: u32) -> Vec<Import> {
+    let entry = cached_entry(file);
+    let bytes = file.contents.as_ref();
+    let toks = &entry.tokens;
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < toks.len() {
+        if toks[i].start >= offset {
+            break;
+        }
+        if matches!(toks[i].kind, TokenKind::Use) {
+            i = parse_use(toks, bytes, i + 1, &mut out);
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+fn parse_use(toks: &[RawToken], bytes: &[u8], mut j: usize, out: &mut Vec<Import>) -> usize {
+    j = skip_trivia(toks, j);
+    let mut kind = ImportKind::Class;
+    match toks.get(j).map(|t| t.kind) {
+        Some(TokenKind::Function) => {
+            kind = ImportKind::Function;
+            j = skip_trivia(toks, j + 1);
+        }
+        Some(TokenKind::Const) => {
+            kind = ImportKind::Constant;
+            j = skip_trivia(toks, j + 1);
+        }
+        _ => {}
+    }
+
+    loop {
+        let (path, nj) = read_name(toks, bytes, j);
+        j = skip_trivia(toks, nj);
+
+        match toks.get(j).map(|t| t.kind) {
+            Some(TokenKind::LeftBrace) => {
+                let prefix = trim_path(&path);
+                j = skip_trivia(toks, j + 1);
+                loop {
+                    let (sub, sj) = read_name(toks, bytes, j);
+                    j = skip_trivia(toks, sj);
+                    let trimmed = trim_path(&sub);
+                    let mut alias = last_segment(&trimmed).to_vec();
+                    if matches!(toks.get(j).map(|t| t.kind), Some(TokenKind::As)) {
+                        j = skip_trivia(toks, j + 1);
+                        let (al, aj) = read_name(toks, bytes, j);
+                        alias = trim_path(&al);
+                        j = skip_trivia(toks, aj);
+                    }
+                    let mut fqcn = prefix.clone();
+                    fqcn.push(b'\\');
+                    fqcn.extend_from_slice(&trimmed);
+                    push_import(out, fqcn, alias, kind);
+
+                    match toks.get(j).map(|t| t.kind) {
+                        Some(TokenKind::Comma) => {
+                            j = skip_trivia(toks, j + 1);
+                            if matches!(toks.get(j).map(|t| t.kind), Some(TokenKind::RightBrace)) {
+                                j += 1;
+                                break;
+                            }
+                        }
+                        Some(TokenKind::RightBrace) => {
+                            j += 1;
+                            break;
+                        }
+                        _ => break,
+                    }
+                }
+                j = skip_trivia(toks, j);
+                return match toks.get(j).map(|t| t.kind) {
+                    Some(TokenKind::Semicolon) => j + 1,
+                    _ => j,
+                };
+            }
+            Some(TokenKind::As) => {
+                j = skip_trivia(toks, j + 1);
+                let (al, aj) = read_name(toks, bytes, j);
+                push_import(out, trim_path(&path), trim_path(&al), kind);
+                j = skip_trivia(toks, aj);
+            }
+            _ => {
+                let p = trim_path(&path);
+                let alias = last_segment(&p).to_vec();
+                push_import(out, p, alias, kind);
+            }
+        }
+
+        match toks.get(j).map(|t| t.kind) {
+            Some(TokenKind::Comma) => j = skip_trivia(toks, j + 1),
+            Some(TokenKind::Semicolon) => return j + 1,
+            _ => return j,
+        }
+    }
+}
+
+fn push_import(out: &mut Vec<Import>, fqcn: Vec<u8>, alias: Vec<u8>, kind: ImportKind) {
+    if fqcn.is_empty() || alias.is_empty() {
+        return;
+    }
+    out.push(Import { fqcn_lower: fqcn.to_ascii_lowercase(), alias, kind });
+}
+
+fn read_name(toks: &[RawToken], bytes: &[u8], mut j: usize) -> (Vec<u8>, usize) {
+    let mut name = Vec::new();
+    while let Some(t) = toks.get(j) {
+        match t.kind {
+            TokenKind::Identifier
+            | TokenKind::QualifiedIdentifier
+            | TokenKind::FullyQualifiedIdentifier
+            | TokenKind::NamespaceSeparator => {
+                name.extend_from_slice(&bytes[t.start as usize..t.end as usize]);
+                j += 1;
+            }
+            _ => break,
+        }
+    }
+    (name, j)
+}
+
+fn skip_trivia(toks: &[RawToken], mut j: usize) -> usize {
+    while toks.get(j).is_some_and(|t| is_trivia(t.kind)) {
+        j += 1;
+    }
+    j
+}
+
+fn trim_path(path: &[u8]) -> Vec<u8> {
+    let trimmed = path.strip_prefix(b"\\").unwrap_or(path);
+    trimmed.strip_suffix(b"\\").unwrap_or(trimmed).to_vec()
+}
+
+fn last_segment(path: &[u8]) -> &[u8] {
+    match memchr::memrchr(b'\\', path) {
+        Some(i) => &path[i + 1..],
+        None => path,
+    }
+}
+
 /// Lex `file` into a token vector. Backed by the per-file [`CacheEntry`]
 /// so repeated capability calls on the same file skip the state-machine
 /// lex entirely; the only per-call cost is the `Vec<Token<'_>>`

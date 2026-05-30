@@ -361,7 +361,15 @@ impl LanguageServer for Backend {
                 let offset = offset_at_position(&file, position);
                 let file_id = file.id;
                 let type_index = ws.type_index_for(file_id).cloned();
-                Some(completion::compute(&ws.database, ws.service.codebase(), type_index.as_ref(), &file, offset))
+                let analysis = ws.file_analysis_for(file_id)?;
+                Some(completion::compute(
+                    &ws.database,
+                    ws.service.codebase(),
+                    type_index.as_ref(),
+                    analysis.resolved(),
+                    &file,
+                    offset,
+                ))
             });
 
             Ok(result.flatten())

@@ -1,5 +1,8 @@
 //! Item builders for each [`super::Context`].
 
+use std::collections::hash_map::Entry;
+
+use foldhash::HashMap;
 use mago_bytes::BytesDisplay;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -10,6 +13,7 @@ use mago_database::Database;
 use mago_database::DatabaseReader;
 use mago_database::file::File as MagoFile;
 use mago_database::file::FileType;
+use mago_names::ResolvedNames;
 use mago_span::Span;
 use mago_syntax::token::TokenKind;
 use tower_lsp_server::ls_types::CompletionItem;
@@ -28,6 +32,9 @@ use crate::language_server::state::ExpressionTypeIndex;
 use super::MAX_RESULTS;
 use super::matcher;
 use super::matcher::Score;
+
+/// Lower-cased FQCN -> short name in scope, for every `use` import.
+type ImportMap = HashMap<Vec<u8>, Vec<u8>>;
 
 pub(super) fn variable_items(
     tokens: &[mago_syntax::token::Token<'_>],
@@ -86,27 +93,91 @@ pub(super) fn instance_member_items(
         return Vec::new();
     };
 
-    let mut out: Vec<CompletionItem> = Vec::new();
-    let mut seen = foldhash::HashSet::default();
+    let mut best: HashMap<String, (Score, CompletionItem)> = HashMap::default();
     for class in class_words {
         if let Some(meta) = codebase.get_class_like(class.as_bytes()) {
-            push_unique(&mut out, &mut seen, collect_class_members(codebase, meta, prefix, false));
-        }
-
-        if out.len() >= MAX_RESULTS {
-            break;
+            for (score, item) in collect_class_members(codebase, meta, prefix, false) {
+                match best.entry(item.label.clone()) {
+                    Entry::Occupied(mut e) => {
+                        if score < e.get().0 {
+                            e.insert((score, item));
+                        }
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert((score, item));
+                    }
+                }
+            }
         }
     }
 
-    out
+    finalize(best.into_values().collect())
 }
 
-pub(super) fn static_member_items(codebase: &CodebaseMetadata, class: &[u8], prefix: &[u8]) -> Vec<CompletionItem> {
+pub(super) fn static_member_items(
+    codebase: &CodebaseMetadata,
+    resolved: &ResolvedNames<'_>,
+    file: &MagoFile,
+    offset: u32,
+    class: &[u8],
+    class_offset: u32,
+    prefix: &[u8],
+) -> Vec<CompletionItem> {
     if matches!(class, b"self" | b"static" | b"parent") {
         return Vec::new();
     }
 
-    codebase.get_class_like(class).map(|meta| collect_class_members(codebase, meta, prefix, true)).unwrap_or_default()
+    let Some(meta) = resolve_class(codebase, resolved, file, offset, class, class_offset) else {
+        return Vec::new();
+    };
+
+    finalize(collect_class_members(codebase, meta, prefix, true))
+}
+
+/// Resolve a class-like receiver written at the cursor to its metadata.
+fn resolve_class<'a>(
+    codebase: &'a CodebaseMetadata,
+    resolved: &ResolvedNames<'_>,
+    file: &MagoFile,
+    offset: u32,
+    name: &[u8],
+    name_offset: u32,
+) -> Option<&'a ClassLikeMetadata> {
+    if let Some((_, _, fqcn, _)) = resolved.at_offset(name_offset)
+        && let Some(meta) = codebase.get_class_like(fqcn)
+    {
+        return Some(meta);
+    }
+
+    if let Some(meta) = codebase.get_class_like(name) {
+        return Some(meta);
+    }
+
+    let (first, rest) = match memchr::memchr(b'\\', name) {
+        Some(i) => (&name[..i], &name[i..]),
+        None => (name, &[][..]),
+    };
+
+    for import in lookup::imports_at_offset(file, offset) {
+        if import.kind == lookup::ImportKind::Class && import.alias.eq_ignore_ascii_case(first) {
+            let mut fqcn = import.fqcn_lower.clone();
+            fqcn.extend_from_slice(rest);
+            if let Some(meta) = codebase.get_class_like(&fqcn) {
+                return Some(meta);
+            }
+        }
+    }
+
+    if let Some(ns) = lookup::namespace_at_offset(file, offset).filter(|ns| !ns.is_empty()) {
+        let mut fqcn = ns;
+        fqcn.push(b'\\');
+        fqcn.extend_from_slice(name);
+        if let Some(meta) = codebase.get_class_like(&fqcn) {
+            return Some(meta);
+        }
+    }
+
+    None
 }
 
 pub(super) fn bare_items(
@@ -118,12 +189,18 @@ pub(super) fn bare_items(
     classes_only: bool,
 ) -> Vec<CompletionItem> {
     let namespace = lookup::namespace_at_offset(file, offset).unwrap_or_default();
-    let ns_lc = if namespace.is_empty() { None } else { Some(namespace.to_ascii_lowercase()) };
+    let current_ns = split_namespace(&namespace);
+
+    let imports = lookup::imports_at_offset(file, offset);
+    let import_map: ImportMap = imports.into_iter().map(|i| (i.fqcn_lower, i.alias)).collect();
+
     let in_scope = |full: &[u8]| -> bool {
-        match &ns_lc {
-            Some(ns) => full.starts_with(ns) && full.get(ns.len()) == Some(&b'\\') || !full.contains(&b'\\'),
-            None => true,
+        if namespace.is_empty() {
+            return true;
         }
+        let ns = namespace.to_ascii_lowercase();
+        let lc = full.to_ascii_lowercase();
+        (lc.starts_with(&ns) && lc.get(ns.len()) == Some(&b'\\')) || !lc.contains(&b'\\')
     };
 
     let mut scored: Vec<(Score, CompletionItem)> = Vec::new();
@@ -133,12 +210,19 @@ pub(super) fn bare_items(
             continue;
         }
 
-        let short = local_name(meta.original_name.as_bytes());
-        let Some(score) = matcher::score(prefix, short) else {
+        let fqcn = meta.original_name.as_bytes();
+        let Some(score) = matcher::score(prefix, local_name(fqcn)) else {
             continue;
         };
 
-        scored.push((score, make_class_item(meta, &namespace)));
+        let score = score.with_locality(
+            import_map.contains_key(&fqcn.to_ascii_lowercase()),
+            is_vendor(database, meta.span),
+            distance_up_down(&current_ns, fqcn).0,
+            distance_up_down(&current_ns, fqcn).1,
+        );
+
+        scored.push((score, make_class_item(meta, &namespace, &import_map)));
     }
 
     if !classes_only {
@@ -151,10 +235,19 @@ pub(super) fn bare_items(
                 continue;
             }
 
-            let local = local_name(meta.original_name.as_bytes());
+            let fqcn = meta.original_name.as_bytes();
+            let local = local_name(fqcn);
             let Some(score) = matcher::score(prefix, local) else {
                 continue;
             };
+
+            let (up, down) = distance_up_down(&current_ns, fqcn);
+            let score = score.with_locality(
+                import_map.contains_key(&fqcn.to_ascii_lowercase()),
+                is_vendor(database, meta.span),
+                up,
+                down,
+            );
 
             let local_str = String::from_utf8_lossy(local).into_owned();
             scored.push((
@@ -175,10 +268,19 @@ pub(super) fn bare_items(
                 continue;
             }
 
-            let local = local_name(name.as_bytes());
+            let fqcn = name.as_bytes();
+            let local = local_name(fqcn);
             let Some(score) = matcher::score(prefix, local) else {
                 continue;
             };
+
+            let (up, down) = distance_up_down(&current_ns, fqcn);
+            let score = score.with_locality(
+                import_map.contains_key(&fqcn.to_ascii_lowercase()),
+                is_vendor(database, meta.span),
+                up,
+                down,
+            );
 
             scored.push((
                 score,
@@ -224,6 +326,7 @@ pub(super) fn qualified_items(
             continue;
         };
 
+        let score = score.with_locality(false, is_vendor(database, meta.span), 0, 0);
         scored.push((score, qualified_class_item(meta, rel)));
     }
 
@@ -248,43 +351,48 @@ fn collect_class_members(
     meta: &ClassLikeMetadata,
     prefix: &[u8],
     static_access: bool,
-) -> Vec<CompletionItem> {
-    let needle = prefix.to_ascii_lowercase();
+) -> Vec<(Score, CompletionItem)> {
     let mut out = Vec::new();
 
     if static_access {
         for name in meta.constants.keys() {
             let s = name.as_bytes();
-            if !s.to_ascii_lowercase().starts_with(&needle) {
+            let Some(score) = matcher::score(prefix, s) else {
                 continue;
-            }
+            };
 
-            out.push(CompletionItem {
-                label: String::from_utf8_lossy(s).into_owned(),
-                kind: Some(CompletionItemKind::CONSTANT),
-                ..CompletionItem::default()
-            });
+            out.push((
+                score,
+                CompletionItem {
+                    label: String::from_utf8_lossy(s).into_owned(),
+                    kind: Some(CompletionItemKind::CONSTANT),
+                    ..CompletionItem::default()
+                },
+            ));
         }
 
         for name in meta.enum_cases.keys() {
             let s = name.as_bytes();
-            if !s.to_ascii_lowercase().starts_with(&needle) {
+            let Some(score) = matcher::score(prefix, s) else {
                 continue;
-            }
+            };
 
-            out.push(CompletionItem {
-                label: String::from_utf8_lossy(s).into_owned(),
-                kind: Some(CompletionItemKind::ENUM_MEMBER),
-                ..CompletionItem::default()
-            });
+            out.push((
+                score,
+                CompletionItem {
+                    label: String::from_utf8_lossy(s).into_owned(),
+                    kind: Some(CompletionItemKind::ENUM_MEMBER),
+                    ..CompletionItem::default()
+                },
+            ));
         }
     }
 
     for (name, declaring_class) in meta.appearing_property_ids.iter() {
         let visible = mago_bytes::trim_start_byte(name.as_bytes(), b'$');
-        if !visible.to_ascii_lowercase().starts_with(&needle) {
+        let Some(score) = matcher::score(prefix, visible) else {
             continue;
-        }
+        };
 
         let property = codebase.get_class_like(declaring_class.as_bytes()).and_then(|c| c.properties.get(name));
         let is_static = property.is_some_and(|p| p.flags.is_static());
@@ -300,13 +408,16 @@ fn collect_class_members(
         } else {
             String::from_utf8_lossy(visible).into_owned()
         };
-        out.push(CompletionItem { label, kind: Some(CompletionItemKind::FIELD), detail, ..CompletionItem::default() });
+        out.push((
+            score,
+            CompletionItem { label, kind: Some(CompletionItemKind::FIELD), detail, ..CompletionItem::default() },
+        ));
     }
 
     for (name, mid) in meta.appearing_method_ids.iter() {
-        if !name.as_bytes().to_ascii_lowercase().starts_with(&needle) {
+        let Some(score) = matcher::score(prefix, name.as_bytes()) else {
             continue;
-        }
+        };
 
         let Some(method) = codebase.get_method(mid.get_class_name().as_bytes(), mid.get_method_name().as_bytes())
         else {
@@ -320,18 +431,17 @@ fn collect_class_members(
 
         let display: &[u8] = method.original_name.as_bytes();
         let display_str = String::from_utf8_lossy(display).into_owned();
-        out.push(CompletionItem {
-            label: display_str.clone(),
-            kind: Some(CompletionItemKind::METHOD),
-            detail: Some(render_signature(method, display)),
-            insert_text: Some(format!("{display_str}($1)")),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
-            ..CompletionItem::default()
-        });
-
-        if out.len() >= MAX_RESULTS {
-            break;
-        }
+        out.push((
+            score,
+            CompletionItem {
+                label: display_str.clone(),
+                kind: Some(CompletionItemKind::METHOD),
+                detail: Some(render_signature(method, display)),
+                insert_text: Some(format!("{display_str}($1)")),
+                insert_text_format: Some(InsertTextFormat::SNIPPET),
+                ..CompletionItem::default()
+            },
+        ));
     }
 
     out
@@ -366,31 +476,24 @@ fn render_signature(meta: &FunctionLikeMetadata, name: &[u8]) -> String {
     sig
 }
 
-fn push_unique(out: &mut Vec<CompletionItem>, seen: &mut foldhash::HashSet<String>, items: Vec<CompletionItem>) {
-    for item in items {
-        if seen.insert(item.label.clone()) {
-            out.push(item);
-        }
-    }
-}
-
-fn make_class_item(meta: &ClassLikeMetadata, current_namespace: &[u8]) -> CompletionItem {
+fn make_class_item(meta: &ClassLikeMetadata, current_namespace: &[u8], import_map: &ImportMap) -> CompletionItem {
     let fqcn = meta.original_name.as_bytes();
     let short = local_name(fqcn);
-    let namespace = match memchr::memrchr(b'\\', fqcn) {
-        Some(i) => &fqcn[..i],
-        None => &[][..],
-    };
+    let namespace = namespace_of(fqcn);
 
-    let insert_text = (!namespace.eq_ignore_ascii_case(current_namespace)).then(|| {
+    let (label, insert_text) = if let Some(alias) = import_map.get(&fqcn.to_ascii_lowercase()) {
+        (String::from_utf8_lossy(alias).into_owned(), None)
+    } else if namespace.eq_ignore_ascii_case(current_namespace) {
+        (String::from_utf8_lossy(short).into_owned(), None)
+    } else {
         let mut text = String::with_capacity(fqcn.len() + 1);
         text.push('\\');
         text.push_str(&String::from_utf8_lossy(fqcn));
-        text
-    });
+        (String::from_utf8_lossy(short).into_owned(), Some(text))
+    };
 
     CompletionItem {
-        label: String::from_utf8_lossy(short).into_owned(),
+        label,
         kind: Some(class_item_kind(meta)),
         insert_text,
         documentation: Some(class_documentation(meta)),
@@ -428,6 +531,10 @@ fn is_user_symbol(database: &Database<'_>, span: Span) -> bool {
     database.get(&span.file_id).map(|f| !matches!(f.file_type, FileType::Builtin)).unwrap_or(false)
 }
 
+fn is_vendor(database: &Database<'_>, span: Span) -> bool {
+    database.get(&span.file_id).map(|f| matches!(f.file_type, FileType::Vendored)).unwrap_or(false)
+}
+
 fn is_synthetic_name(name: &[u8]) -> bool {
     name.first() == Some(&b'{')
 }
@@ -437,4 +544,27 @@ fn local_name(full: &[u8]) -> &[u8] {
         Some(i) => &full[i + 1..],
         None => full,
     }
+}
+
+fn namespace_of(fqcn: &[u8]) -> &[u8] {
+    match memchr::memrchr(b'\\', fqcn) {
+        Some(i) => &fqcn[..i],
+        None => &[],
+    }
+}
+
+fn split_namespace(ns: &[u8]) -> Vec<&[u8]> {
+    if ns.is_empty() { Vec::new() } else { ns.split(|&b| b == b'\\').collect() }
+}
+
+/// Namespace tree distance from the cursor namespace `current` to the namespace
+/// of `fqcn`, as `(steps up to the common ancestor, steps back down)`.
+fn distance_up_down(current: &[&[u8]], fqcn: &[u8]) -> (u16, u16) {
+    let candidate = namespace_of(fqcn);
+    let cand = split_namespace(candidate);
+    let mut k = 0;
+    while k < current.len() && k < cand.len() && current[k].eq_ignore_ascii_case(cand[k]) {
+        k += 1;
+    }
+    ((current.len() - k) as u16, (cand.len() - k) as u16)
 }

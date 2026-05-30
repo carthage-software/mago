@@ -487,3 +487,82 @@ async fn completion_inserts_fqcn_for_out_of_namespace_class() {
         r.as_array().unwrap().iter().find(|i| i["label"].as_str() == Some("User")).expect("expected User completion");
     assert_eq!(item["insertText"].as_str(), Some("\\App\\Models\\User"), "got {item:?}");
 }
+
+#[tokio::test]
+async fn completion_static_member_substring_matches() {
+    let code = "<?php\nenum InvoiceStatus {\n    case Draft;\n    case Finalized;\n    case Uncollectible;\n}\n\n$x = InvoiceStatus::a\n";
+    let mut h = Harness::start(&[("a.php", code)]).await;
+    h.open("a.php", code).await;
+    let result = h.at("textDocument/completion", "a.php", 7, 20).await;
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    assert!(labels.contains(&"Draft"), "expected Draft (contains a), got {labels:?}");
+    assert!(labels.contains(&"Finalized"), "expected Finalized (contains a), got {labels:?}");
+    assert!(labels.contains(&"cases"), "expected cases() method (contains a), got {labels:?}");
+}
+
+#[tokio::test]
+async fn completion_imported_class_inserts_short_name() {
+    let lib = "<?php\nnamespace App\\Enum;\nenum InvoiceStatus {\n    case Draft;\n}\n";
+    let consumer = "<?php\nnamespace App\\Service;\nuse App\\Enum\\InvoiceStatus;\n\nfunction demo(): void {\n    $x = InvoiceS\n}\n";
+    let mut h = Harness::start(&[("lib.php", lib), ("c.php", consumer)]).await;
+    h.open("lib.php", lib).await;
+    h.open("c.php", consumer).await;
+    let result = h.at("textDocument/completion", "c.php", 5, 17).await;
+    let r = completion_array(&result);
+    let item = r
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["label"].as_str() == Some("InvoiceStatus"))
+        .expect("expected InvoiceStatus completion");
+    assert!(item["insertText"].is_null(), "imported class should insert its short name, got {item:?}");
+}
+
+#[tokio::test]
+async fn completion_classifies_identifier_touching_closing_paren() {
+    let lib = "<?php\nnamespace App;\nclass InvoiceStatus {}\n";
+    let consumer = "<?php\nnamespace App;\n\nfunction demo(): void {\n    find(InvoiceS)\n}\n";
+    let mut h = Harness::start(&[("lib.php", lib), ("c.php", consumer)]).await;
+    h.open("lib.php", lib).await;
+    h.open("c.php", consumer).await;
+    let result = h.at("textDocument/completion", "c.php", 4, 17).await;
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    assert!(labels.contains(&"InvoiceStatus"), "identifier touching `)` should still complete, got {labels:?}");
+}
+
+#[tokio::test]
+async fn completion_ranks_local_namespace_before_distant() {
+    let near = "<?php\nnamespace App\\Service;\nclass Invoicer {}\n";
+    let far = "<?php\nnamespace Other\\Deep\\Place;\nclass Invoicer {}\n";
+    let consumer = "<?php\nnamespace App\\Service;\n\nfunction demo(): void {\n    $x = Invoice\n}\n";
+    let mut h = Harness::start(&[("near.php", near), ("far.php", far), ("c.php", consumer)]).await;
+    h.open("near.php", near).await;
+    h.open("far.php", far).await;
+    h.open("c.php", consumer).await;
+    let result = h.at("textDocument/completion", "c.php", 4, 15).await;
+    let r = completion_array(&result);
+    let items = r.as_array().unwrap();
+    let first = items
+        .iter()
+        .find(|i| i["label"].as_str() == Some("Invoicer"))
+        .and_then(|i| i["documentation"]["value"].as_str())
+        .expect("expected an Invoicer completion");
+    assert_eq!(first, "App\\Service\\Invoicer", "same-namespace Invoicer should rank first, got {first:?}");
+}
+
+#[tokio::test]
+async fn completion_static_member_on_imported_short_name() {
+    let lib =
+        "<?php\nnamespace App\\Enum;\nenum InvoiceStatus {\n    case Draft;\n    case Paid;\n    case Finalized;\n}\n";
+    let consumer = "<?php\nnamespace App\\Service;\nuse App\\Enum\\InvoiceStatus;\n\nfunction demo(): void {\n    $x = InvoiceStatus::Pa\n}\n";
+    let mut h = Harness::start(&[("lib.php", lib), ("c.php", consumer)]).await;
+    h.open("lib.php", lib).await;
+    h.open("c.php", consumer).await;
+    let result = h.at("textDocument/completion", "c.php", 5, 26).await;
+    let r = completion_array(&result);
+    let labels: Vec<&str> = r.as_array().unwrap().iter().map(|i| i["label"].as_str().unwrap_or("")).collect();
+    assert!(labels.contains(&"Paid"), "imported short name should resolve enum cases, got {labels:?}");
+    assert!(!labels.is_empty(), "imported short name receiver must resolve, got {labels:?}");
+}
