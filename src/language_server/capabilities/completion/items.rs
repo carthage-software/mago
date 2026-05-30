@@ -151,7 +151,7 @@ pub(super) fn bare_items(
 
     let mut scored: Vec<(Score, CompletionItem)> = Vec::new();
 
-    for (_, meta) in codebase.class_likes.iter() {
+    for meta in codebase.class_likes.values() {
         if !is_user_symbol(database, meta.span) || is_synthetic_name(meta.original_name.as_bytes()) {
             continue;
         }

@@ -86,8 +86,8 @@ impl VersionConstraint {
             return true;
         }
 
-        let min = range.min.map_or(PHPVersion::from_version_id(0), |v| v);
-        let max = range.max.map_or(PHPVersion::from_version_id(u32::MAX), |v| v);
+        let min = range.min.unwrap_or(PHPVersion::from_version_id(0));
+        let max = range.max.unwrap_or(PHPVersion::from_version_id(u32::MAX));
 
         if min > max {
             return true;
