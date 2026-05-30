@@ -13,6 +13,7 @@ use std::process;
 use serde_json::Value;
 use serde_json::json;
 use tempfile::TempDir;
+use tower_lsp_server::ls_types::Uri;
 
 use super::client::LspClient;
 use crate::language_server::ServerConfig;
@@ -170,6 +171,9 @@ impl Drop for Harness {
 }
 
 pub fn url(path: &Path) -> String {
-    let display = path.display().to_string();
-    if display.starts_with('/') { format!("file://{display}") } else { format!("file:///{display}") }
+    let Some(uri) = Uri::from_file_path(path) else {
+        panic!("test workspace path is not absolute: {}", path.display());
+    };
+
+    uri.to_string()
 }
