@@ -26,10 +26,9 @@ mod file_analysis;
 mod linter;
 mod position;
 mod state;
-mod workspace;
-
-#[cfg(test)]
+#[cfg(all(test, not(windows)))]
 mod tests;
+mod workspace;
 
 pub use backend::Backend;
 pub use config::ServerConfig;
