@@ -132,6 +132,7 @@ impl BaselineReportingArgs {
         baseline_variant: BaselineVariant,
         editor_url: Option<String>,
         config_minimum_fail_level: Level,
+        scoped_analysis: bool,
     ) -> BaselineIssueProcessor {
         BaselineIssueProcessor {
             baseline_path: if self.ignore_baseline {
@@ -148,7 +149,12 @@ impl BaselineReportingArgs {
             remove_outdated_baseline_entries: self.remove_outdated_baseline_entries,
             fail_on_out_of_sync_baseline: self.fail_on_out_of_sync_baseline,
             baseline_variant,
-            issue_processor: self.reporting.get_processor(color_choice, editor_url, config_minimum_fail_level),
+            issue_processor: self.reporting.get_processor(
+                color_choice,
+                editor_url,
+                config_minimum_fail_level,
+                scoped_analysis,
+            ),
         }
     }
 }

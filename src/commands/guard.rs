@@ -254,6 +254,7 @@ impl GuardCommand {
             baseline_variant,
             editor_url,
             configuration.guard.minimum_fail_level,
+            !self.path.is_empty() || self.stdin_input,
         );
 
         let (exit_code, _) = processor.process_issues(&orchestrator, &mut database, result.issues)?;

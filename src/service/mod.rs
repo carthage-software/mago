@@ -208,6 +208,8 @@ pub struct IssueProcessor {
     /// When set, file paths in diagnostic output become clickable links in
     /// terminals that support OSC 8 hyperlinks.
     pub editor_url: Option<String>,
+
+    pub scoped_analysis: bool,
 }
 
 #[derive(Serialize)]
@@ -480,12 +482,19 @@ impl IssueProcessor {
         if status.baseline_dead_issues > 0 {
             let dead = status.baseline_dead_issues;
             let noun = if dead == 1 { "entry" } else { "entries" };
-            tracing::warn!(
-                "Your baseline file contains {dead} {noun} for issues that no longer exist. Consider regenerating it with `--generate-baseline`."
-            );
 
-            if fail_on_out_of_sync_baseline {
-                return Ok(ExitCode::FAILURE);
+            if self.scoped_analysis {
+                tracing::info!(
+                    "Your baseline file contains {dead} {noun} not seen in this run. This was a scoped run, so they may simply be outside the analyzed set. Re-run an unscoped check before regenerating with `--generate-baseline`."
+                );
+            } else {
+                tracing::warn!(
+                    "Your baseline file contains {dead} {noun} for issues that no longer exist. Consider regenerating it with `--generate-baseline`."
+                );
+
+                if fail_on_out_of_sync_baseline {
+                    return Ok(ExitCode::FAILURE);
+                }
             }
         }
 
@@ -858,12 +867,31 @@ impl BaselineIssueProcessor {
             );
         }
         let comparison = baseline.compare_with_issues(&issues, read_database);
+        let scoped_with_no_new_issues = self.issue_processor.scoped_analysis && comparison.new_issues.is_empty();
 
         if comparison.is_up_to_date {
             tracing::info!("Baseline is up to date.");
 
             if self.issue_processor.reporting_format == ReportingFormat::Json {
                 let output = VerifyBaselineOutput { new_issues: &[], removed_issues: &[] };
+                println!(
+                    "{}",
+                    serde_json::to_string(&output).expect("failed to serialize baseline verification output")
+                );
+            }
+
+            Ok(true)
+        } else if scoped_with_no_new_issues {
+            if !comparison.removed_issues.is_empty() {
+                let removed = comparison.removed_issues.len();
+                let noun = if removed == 1 { "entry" } else { "entries" };
+                tracing::info!(
+                    "{removed} baseline {noun} were not seen in this scoped run; they may simply be outside the analyzed set. Re-run an unscoped check before regenerating the baseline."
+                );
+            }
+
+            if self.issue_processor.reporting_format == ReportingFormat::Json {
+                let output = VerifyBaselineOutput { new_issues: &[], removed_issues: &comparison.removed_issues };
                 println!(
                     "{}",
                     serde_json::to_string(&output).expect("failed to serialize baseline verification output")

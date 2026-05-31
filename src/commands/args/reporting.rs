@@ -205,6 +205,7 @@ impl ReportingArgs {
         color_choice: ColorChoice,
         editor_url: Option<String>,
         config_minimum_fail_level: Level,
+        scoped_analysis: bool,
     ) -> IssueProcessor {
         IssueProcessor {
             fixable_only: self.fixable_only,
@@ -222,6 +223,7 @@ impl ReportingArgs {
             retain_code: self.retain_code.clone(),
             color_choice,
             editor_url,
+            scoped_analysis,
         }
     }
 }

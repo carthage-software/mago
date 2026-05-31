@@ -148,7 +148,7 @@ impl AstCommand {
             let editor_url = configuration.editor_url.take();
             let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
-            self.reporting.get_processor(color_choice, editor_url, Level::Error).process_issues(
+            self.reporting.get_processor(color_choice, editor_url, Level::Error, false).process_issues(
                 &orchestrator,
                 &mut database,
                 issues,
@@ -190,7 +190,7 @@ impl AstCommand {
 
                     let (exit_code, _) = self
                         .reporting
-                        .get_processor(color_choice, editor_url, Level::Error)
+                        .get_processor(color_choice, editor_url, Level::Error, false)
                         .process_issues(&orchestrator, &mut database, IssueCollection::from([issue]), None, false)?;
 
                     return Ok(exit_code);

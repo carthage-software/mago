@@ -301,6 +301,7 @@ impl LintCommand {
             baseline_variant,
             editor_url,
             configuration.linter.minimum_fail_level,
+            self.staged || !self.path.is_empty() || self.stdin_input,
         );
 
         let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
