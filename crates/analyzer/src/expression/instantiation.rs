@@ -155,7 +155,7 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 
         argument_list.analyze(context, block_context, artifacts)?;
 
-        return Ok(get_object());
+        return Ok(wrap_atomic(classname.get_object_type(context.codebase)));
     };
 
     let Some(metadata) = context.codebase.get_class_like(fq_classname.as_bytes()) else {

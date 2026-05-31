@@ -241,6 +241,13 @@ pub fn get_union_from_type_ast(
                 }
             }
 
+            let object_and_callable = (matches!(intersection.left, Type::Object(_))
+                && matches!(intersection.right, Type::Callable(_)))
+                || (matches!(intersection.left, Type::Callable(_)) && matches!(intersection.right, Type::Object(_)));
+            if object_and_callable {
+                return Ok(wrap_atomic(TAtomic::Object(TObject::new_has_method(word("__invoke")))));
+            }
+
             let left = get_union_from_type_ast(intersection.left, scope, type_context, classname)?;
             let right = get_union_from_type_ast(intersection.right, scope, type_context, classname)?;
 
@@ -1096,7 +1103,7 @@ fn get_class_string_type_from_ast(
             let mut class_strings = vec![];
             for constraint in constraint_union.types.into_owned() {
                 match constraint {
-                    TAtomic::Object(TObject::Named(_) | TObject::Enum(_))
+                    TAtomic::Object(TObject::Named(_) | TObject::Enum(_) | TObject::HasMethod(_))
                     | TAtomic::Reference(TReference::Symbol { .. })
                     | TAtomic::Alias(_) => class_strings
                         .push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::of_type(kind, constraint)))),

@@ -88,6 +88,12 @@ pub fn cast_atomic_to_callable<'atomic>(
         }
     }
 
+    if let TAtomic::Object(TObject::HasMethod(has_method)) = atomic
+        && has_method.has_method(b"__invoke")
+    {
+        return Some(Cow::Owned(TCallable::Signature(TCallableSignature::mixed(false))));
+    }
+
     if let TAtomic::Array(TArray::List(TList { known_elements: Some(known_elements), .. })) = atomic {
         return handle_array_callable(known_elements, codebase, template_result);
     }
