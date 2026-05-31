@@ -307,6 +307,7 @@ test_case!(redundant_grouping_parens);
 test_case!(preserve_logical_grouping_parens);
 test_case!(preserve_logical_grouping_parens_disabled);
 test_case!(null_type_hint_null_pipe_last);
+test_case!(null_type_hint_question_reorders_null_last);
 test_case!(comment_placement_binary);
 test_case!(comment_placement_conditional);
 test_case!(comment_placement_conditional_preserve);

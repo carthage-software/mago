@@ -1486,7 +1486,8 @@ impl<'arena> Format<'arena> for Hint<'arena> {
                             Document::String(b"?"),
                             non_null_hint.format(f),
                         ])
-                    } else if f.settings.null_type_hint.is_null_pipe_last()
+                    } else if (f.settings.null_type_hint.is_null_pipe_last()
+                        || f.settings.null_type_hint.is_question())
                         // Only reorder at top-level unions; nested unions are handled by the top-level's tree traversal.
                         && !matches!(f.parent_node(), Node::Hint(Hint::Union(_)))
                         && union_needs_null_reorder(self)

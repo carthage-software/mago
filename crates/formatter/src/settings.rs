@@ -809,8 +809,8 @@ generate_formatter_settings! {
     /// ```php
     /// function foo(
     ///     ?string $a,
-    ///     null|int|string $b,
-    ///     int|null|string $c,
+    ///     int|string|null $b,
+    ///     int|string|null $c,
     /// ) {}
     /// ```
     ///
