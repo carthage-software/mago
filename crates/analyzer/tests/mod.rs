@@ -682,6 +682,7 @@ test_case!(method_signature_edge_cases);
 test_case!(method_signature_parameter_names);
 test_case!(method_signature_template_substitution);
 test_case!(inherited_property_template_substitution);
+test_case!(implements_this_type_template_argument);
 test_case!(multi_level_template_inheritance);
 test_case!(true_ident);
 test_case!(eliminate_true_and_false_from_scalar);

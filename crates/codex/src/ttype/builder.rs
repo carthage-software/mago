@@ -954,7 +954,16 @@ fn get_reference_from_ast(
     if let Some(generics) = generics {
         let mut parameters = vec![];
         for generic in &generics.entries {
-            let generic_type = get_union_from_type_ast(&generic.inner, scope, type_context, classname)?;
+            let mut generic_type = get_union_from_type_ast(&generic.inner, scope, type_context, classname)?;
+
+            for atomic in generic_type.types.to_mut() {
+                if let TAtomic::Object(TObject::Named(named)) = atomic
+                    && named.is_this
+                {
+                    named.name = classname.unwrap_or_else(|| word("static"));
+                    named.is_this = false;
+                }
+            }
 
             parameters.push(generic_type);
         }
