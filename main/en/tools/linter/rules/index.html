@@ -1843,8 +1843,9 @@ $className = \App\Models\User::class;
 <details class="rule" name="rule" id="no-parameter-shadowing">
 <summary><code class="rule__code">no-parameter-shadowing</code><a class="rule__anchor" href="#no-parameter-shadowing" aria-label="Permalink to no-parameter-shadowing">¶</a><span class="rule__level rule__level--warning">warning</span></summary>
 <div class="rule__body">
-<p>Detects when a function or method parameter is shadowed by a loop variable
-or catch variable, making the original parameter value inaccessible.</p>
+<p>Detects when a function or method parameter is shadowed by a loop variable,
+a catch variable, or a <code>global</code>/<code>static</code> declaration, making the original
+parameter value inaccessible.</p>
 <hr class="rule__separator">
 <div class="rule-examples">
 <div class="rule-example rule-example--bad">
@@ -7455,7 +7456,9 @@ branches (if/else, loops, match arms, try paths, switch cases) don't pair up
 with writes in sibling branches, so this rule produces no false positives for
 code like <code>if ($cond) { $x = 1; } else { $x = 2; } return $x;</code>.</p>
 <p>Variables whose name starts with an underscore (<code>$_</code>, <code>$_foo</code>) are ignored.
-Variables declared via <code>global</code> or <code>static</code> are also ignored.</p>
+A <code>global</code> or <code>static</code> declaration counts as an overwrite, so a plain
+assignment whose value is discarded by a following <code>global</code>/<code>static</code> of the
+same name is reported; assignments to the bound variable afterwards are not.</p>
 <p>The rule analyses one function-like scope at a time. It bails out of any scope
 that uses variable variables (<code>$$x</code>, <code>${expr}</code>) or calls <code>extract()</code>.</p>
 <hr class="rule__separator">
