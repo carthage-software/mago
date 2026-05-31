@@ -12,25 +12,12 @@ use tower_lsp_server::jsonrpc::Result as JsonRpcResult;
 use tower_lsp_server::ls_types::*;
 
 use crate::language_server::ServerConfig;
-use crate::language_server::capabilities::code_action;
-use crate::language_server::capabilities::code_lens;
-use crate::language_server::capabilities::completion;
-use crate::language_server::capabilities::definition;
-use crate::language_server::capabilities::document_link;
-use crate::language_server::capabilities::folding_range;
-use crate::language_server::capabilities::formatting;
-use crate::language_server::capabilities::hover;
-use crate::language_server::capabilities::inlay_hint;
-use crate::language_server::capabilities::references;
 use crate::language_server::capabilities::rename;
-use crate::language_server::capabilities::selection_range;
-use crate::language_server::capabilities::semantic_tokens;
 use crate::language_server::capabilities::server_capabilities;
-use crate::language_server::capabilities::signature_help;
-use crate::language_server::capabilities::workspace_symbol;
+use crate::language_server::codec;
 use crate::language_server::position::offset_at_position;
 use crate::language_server::state::BackendState;
-use crate::language_server::workspace::workspace_root;
+use crate::language_server::workspace::workspace_roots;
 
 mod sync;
 
@@ -54,21 +41,26 @@ impl Backend {
             return false;
         };
 
-        self.with_workspace(|workspace| workspace.matcher.contains(path.as_ref())).unwrap_or(true)
+        self.with_registry(|registry| registry.tracks(path.as_ref())).unwrap_or(true)
     }
 }
 
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> JsonRpcResult<InitializeResult> {
-        let root = self.config.workspace_override.clone().or_else(|| workspace_root(&params));
-        if let Some(root) = root {
-            self.client
-                .log_message(MessageType::INFO, format!("mago-server: workspace root = {}", root.display()))
-                .await;
-
-            self.bootstrap(root).await;
-        } else {
+        let roots = match &self.config.workspace_override {
+            Some(root) => vec![root.clone()],
+            None => workspace_roots(&params),
+        };
+        if roots.is_empty() {
             self.client.log_message(MessageType::WARNING, "mago-server: no workspace root provided").await;
+        } else {
+            for root in &roots {
+                self.client
+                    .log_message(MessageType::INFO, format!("mago-server: workspace root = {}", root.display()))
+                    .await;
+            }
+
+            self.bootstrap(roots).await;
         }
 
         Ok(InitializeResult {
@@ -102,6 +94,19 @@ impl LanguageServer for Backend {
                 client.log_message(MessageType::ERROR, format!("mago-server: register watcher: {err}")).await;
             }
         });
+    }
+
+    async fn did_change_workspace_folders(&self, params: DidChangeWorkspaceFoldersParams) {
+        for removed in params.event.removed {
+            if let Some(path) = removed.uri.to_file_path() {
+                self.remove_workspace_folder(path.into_owned()).await;
+            }
+        }
+        for added in params.event.added {
+            if let Some(path) = added.uri.to_file_path() {
+                self.add_workspace_folder(path.into_owned()).await;
+            }
+        }
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
@@ -158,11 +163,10 @@ impl LanguageServer for Backend {
 
     async fn folding_range(&self, params: FoldingRangeParams) -> JsonRpcResult<Option<Vec<FoldingRange>>> {
         traced("folding_range", || {
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&params.text_document.uri, |ws| {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
-                let file_id = file.id;
-                let analysis = ws.file_analysis_for(file_id)?;
-                Some(folding_range::compute(&analysis))
+                let ranges = ws.server.get_folding_ranges(file.id);
+                Some(codec::folding_ranges(&file, ranges))
             });
 
             Ok(result.flatten())
@@ -175,11 +179,10 @@ impl LanguageServer for Backend {
                 return Ok(None);
             }
 
-            let php_version = self.config.configuration.php_version;
-            let settings = self.config.configuration.formatter.settings;
-
             Ok(self
-                .with_file(&params.text_document.uri, |file, _| formatting::compute(file, php_version, settings))
+                .with_file(&params.text_document.uri, |file, ws| {
+                    ws.server.get_formatting(file.id).map(|document| codec::formatting(file, document))
+                })
                 .flatten()
                 .map(|edit| vec![edit]))
         })
@@ -188,11 +191,11 @@ impl LanguageServer for Backend {
     async fn hover(&self, params: HoverParams) -> JsonRpcResult<Option<Hover>> {
         traced("hover", || {
             let TextDocumentPositionParams { text_document, position } = params.text_document_position_params;
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&text_document.uri, |ws| {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
-                let analysis = ws.file_analysis_for(file.id)?;
-                hover::compute(ws.service.codebase(), analysis.resolved(), &file, offset)
+                let info = ws.server.get_context(file.id, offset)?;
+                Some(codec::hover(&file, info))
             });
 
             Ok(result.flatten())
@@ -202,12 +205,11 @@ impl LanguageServer for Backend {
     async fn goto_definition(&self, params: GotoDefinitionParams) -> JsonRpcResult<Option<GotoDefinitionResponse>> {
         traced("goto_definition", || {
             let TextDocumentPositionParams { text_document, position } = params.text_document_position_params;
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&text_document.uri, |ws| {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
-                let analysis = ws.file_analysis_for(file.id)?;
-                definition::compute(&ws.database, ws.service.codebase(), analysis.resolved(), offset)
-                    .map(GotoDefinitionResponse::Scalar)
+                let location = ws.server.get_definition(file.id, offset)?;
+                codec::location(ws.database(), &location).map(GotoDefinitionResponse::Scalar)
             });
 
             Ok(result.flatten())
@@ -216,12 +218,11 @@ impl LanguageServer for Backend {
 
     async fn selection_range(&self, params: SelectionRangeParams) -> JsonRpcResult<Option<Vec<SelectionRange>>> {
         traced("selection_range", || {
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&params.text_document.uri, |ws| {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
-                let file_id = file.id;
-                let analysis = ws.file_analysis_for(file_id)?;
                 let offsets: Vec<u32> = params.positions.iter().map(|p| offset_at_position(&file, *p)).collect();
-                Some(selection_range::compute(&analysis, &file, &offsets))
+                let ranges = ws.server.get_selection_ranges(file.id, &offsets);
+                Some(codec::selection_ranges(&file, ranges))
             });
 
             Ok(result.flatten())
@@ -230,17 +231,26 @@ impl LanguageServer for Backend {
 
     async fn code_action(&self, params: CodeActionParams) -> JsonRpcResult<Option<CodeActionResponse>> {
         traced("code_action", || {
-            let result = self.with_workspace(|ws| Some(code_action::compute(ws, &params)));
+            let result = self.with_workspace_for_uri(&params.text_document.uri, |ws| {
+                let file = file_for_uri(ws, &params.text_document.uri)?;
+                let start = offset_at_position(&file, params.range.start);
+                let end = offset_at_position(&file, params.range.end);
+                let actions = ws.server.get_code_actions(file.id, start, end);
+                Some(codec::code_actions(ws.database(), actions))
+            });
             Ok(result.flatten())
         })
     }
 
     async fn semantic_tokens_full(&self, params: SemanticTokensParams) -> JsonRpcResult<Option<SemanticTokensResult>> {
         traced("semantic_tokens_full", || {
-            Ok(self.with_file(&params.text_document.uri, |file, _| {
-                let data = semantic_tokens::compute(file);
-                SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data })
-            }))
+            Ok(self
+                .with_workspace_mut_for_uri(&params.text_document.uri, |ws| {
+                    let file = file_for_uri(ws, &params.text_document.uri)?;
+                    let data = codec::semantic_tokens(&file, ws.server.get_semantic_tokens(file.id));
+                    Some(SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data }))
+                })
+                .flatten())
         })
     }
 
@@ -248,10 +258,11 @@ impl LanguageServer for Backend {
         traced("references", || {
             let TextDocumentPositionParams { text_document, position } = params.text_document_position;
             let include_decl = params.context.include_declaration;
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&text_document.uri, |ws| {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
-                Some(references::compute(ws, &file, offset, include_decl))
+                let references = ws.server.get_references(file.id, offset, include_decl);
+                Some(codec::locations(ws.database(), &references))
             });
 
             Ok(result.flatten())
@@ -260,7 +271,14 @@ impl LanguageServer for Backend {
 
     async fn symbol(&self, params: WorkspaceSymbolParams) -> JsonRpcResult<Option<WorkspaceSymbolResponse>> {
         traced("workspace_symbol", || {
-            Ok(self.with_workspace(|ws| workspace_symbol::compute(&ws.database, ws.service.codebase(), &params.query)))
+            Ok(self.with_registry(|registry| {
+                let mut all = Vec::new();
+                for ws in registry.iter() {
+                    let items = ws.server.get_symbols(&params.query);
+                    all.extend(codec::symbols(ws.database(), items));
+                }
+                WorkspaceSymbolResponse::Flat(all)
+            }))
         })
     }
 
@@ -270,11 +288,10 @@ impl LanguageServer for Backend {
                 return Ok(None);
             }
             let TextDocumentPositionParams { text_document, position } = params.text_document_position_params;
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&text_document.uri, |ws| {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
-                let analysis = ws.file_analysis_for(file.id)?;
-                signature_help::compute(ws.service.codebase(), analysis.resolved(), &file, offset)
+                ws.server.get_signature_help(file.id, offset).map(codec::signature_help)
             });
 
             Ok(result.flatten())
@@ -287,12 +304,12 @@ impl LanguageServer for Backend {
                 return Ok(None);
             }
 
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&params.text_document.uri, |ws| {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
                 let start = offset_at_position(&file, params.range.start);
                 let end = offset_at_position(&file, params.range.end);
-                let analysis = ws.file_analysis_for(file.id)?;
-                Some(inlay_hint::compute(ws.service.codebase(), analysis.resolved(), &file, start, end))
+                let hints = ws.server.get_inlay_hints(file.id, start, end);
+                Some(codec::inlay_hints(&file, hints))
             });
 
             Ok(result.flatten())
@@ -301,7 +318,7 @@ impl LanguageServer for Backend {
 
     async fn prepare_rename(&self, params: TextDocumentPositionParams) -> JsonRpcResult<Option<PrepareRenameResponse>> {
         traced("prepare_rename", || {
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&params.text_document.uri, |ws| {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
                 let offset = offset_at_position(&file, params.position);
                 let analysis = ws.file_analysis_for(file.id)?;
@@ -316,7 +333,7 @@ impl LanguageServer for Backend {
         traced("rename", || {
             let TextDocumentPositionParams { text_document, position } = params.text_document_position;
             let new_name = params.new_name;
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&text_document.uri, |ws| {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
                 rename::compute(ws, &file, offset, new_name)
@@ -328,9 +345,10 @@ impl LanguageServer for Backend {
 
     async fn document_link(&self, params: DocumentLinkParams) -> JsonRpcResult<Option<Vec<DocumentLink>>> {
         traced("document_link", || {
-            let result = self.with_workspace(|ws| {
+            let result = self.with_workspace_for_uri(&params.text_document.uri, |ws| {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
-                Some(document_link::compute(&ws.database, ws.service.codebase(), &file))
+                let links = ws.server.get_document_links(file.id);
+                Some(codec::document_links(&file, ws.database(), links))
             });
 
             Ok(result.flatten())
@@ -343,10 +361,10 @@ impl LanguageServer for Backend {
                 return Ok(None);
             }
 
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&params.text_document.uri, |ws| {
                 let file = file_for_uri(ws, &params.text_document.uri)?;
-                let id = file.id;
-                Some(code_lens::compute(ws, &file, id))
+                let lenses = ws.server.get_lens(file.id);
+                Some(codec::code_lens(&file, lenses))
             });
 
             Ok(result.flatten())
@@ -356,20 +374,10 @@ impl LanguageServer for Backend {
     async fn completion(&self, params: CompletionParams) -> JsonRpcResult<Option<CompletionResponse>> {
         traced("completion", || {
             let TextDocumentPositionParams { text_document, position } = params.text_document_position;
-            let result = self.with_workspace_mut(|ws| {
+            let result = self.with_workspace_mut_for_uri(&text_document.uri, |ws| {
                 let file = file_for_uri(ws, &text_document.uri)?;
                 let offset = offset_at_position(&file, position);
-                let file_id = file.id;
-                let type_index = ws.type_index_for(file_id).cloned();
-                let scope = ws.file_analysis_for(file_id)?.scope_at(offset);
-                Some(completion::compute(
-                    &ws.database,
-                    ws.service.codebase(),
-                    type_index.as_ref(),
-                    &scope,
-                    &file,
-                    offset,
-                ))
+                Some(codec::completion(&file, ws.server.get_completion(file.id, offset)))
             });
 
             Ok(result.flatten())

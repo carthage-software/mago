@@ -5,11 +5,9 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::sync::Arc;
 
 use clap::Parser;
 
-use mago_analyzer::plugin::create_registry_with_plugins;
 use tokio::runtime::Builder;
 
 use crate::config::Configuration;
@@ -93,17 +91,11 @@ impl LanguageServerCommand {
             );
         }
 
-        let plugin_registry = Arc::new(create_registry_with_plugins(
-            &configuration.analyzer.plugins,
-            configuration.analyzer.disable_default_plugins,
-        ));
-
         let config = ServerConfig {
             analyzer: !self.no_analyzer,
             linter: !self.no_linter,
             formatter: !self.no_formatter,
             configuration,
-            plugin_registry,
             workspace_override,
         };
 

@@ -1541,6 +1541,7 @@ dependencies = [
  "mago-prelude",
  "mago-reporting",
  "mago-semantics",
+ "mago-server",
  "mago-span",
  "mago-syntax",
  "mago-syntax-core",
@@ -1910,6 +1911,31 @@ dependencies = [
  "mago-reporting",
  "mago-span",
  "mago-syntax",
+]
+
+[[package]]
+name = "mago-server"
+version = "1.29.0"
+dependencies = [
+ "bumpalo",
+ "foldhash 0.2.0",
+ "mago-analyzer",
+ "mago-bytes",
+ "mago-codex",
+ "mago-database",
+ "mago-formatter",
+ "mago-linter",
+ "mago-names",
+ "mago-orchestrator",
+ "mago-php-version",
+ "mago-reporting",
+ "mago-semantics",
+ "mago-span",
+ "mago-syntax",
+ "mago-syntax-core",
+ "mago-word",
+ "memchr",
+ "xxhash-rust",
 ]
 
 [[package]]

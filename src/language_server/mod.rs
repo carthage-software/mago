@@ -19,11 +19,10 @@ use tower_lsp_server::Server;
 
 mod backend;
 mod capabilities;
+mod codec;
 pub(crate) mod config;
 mod diagnostics;
 mod document;
-mod file_analysis;
-mod linter;
 mod position;
 mod state;
 #[cfg(all(test, not(windows)))]

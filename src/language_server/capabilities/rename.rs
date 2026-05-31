@@ -7,16 +7,16 @@
 //! renames at the bare identifier level are safest for now.
 
 use foldhash::HashMap;
-
-use mago_database::file::File as MagoFile;
-use mago_names::ResolvedNames;
 use tower_lsp_server::ls_types::PrepareRenameResponse;
-use tower_lsp_server::ls_types::Range;
 use tower_lsp_server::ls_types::TextEdit;
 use tower_lsp_server::ls_types::Uri;
 use tower_lsp_server::ls_types::WorkspaceEdit;
 
-use crate::language_server::capabilities::lookup;
+use mago_database::file::File as MagoFile;
+use mago_names::ResolvedNames;
+use mago_server::lookup;
+
+use crate::language_server::codec;
 use crate::language_server::position::range_at_offsets;
 use crate::language_server::state::WorkspaceState;
 
@@ -50,17 +50,23 @@ pub fn compute(
         return None;
     }
 
-    let locations = crate::language_server::capabilities::references::compute(workspace, file, offset, true);
-    if locations.is_empty() {
+    let references = workspace.server.get_references(file.id, offset, true);
+    if references.is_empty() {
         return None;
     }
 
     let mut changes: HashMap<Uri, Vec<TextEdit>> = HashMap::default();
-    for loc in locations {
-        changes
-            .entry(loc.uri)
-            .or_default()
-            .push(TextEdit { range: Range { start: loc.range.start, end: loc.range.end }, new_text: new_name.clone() });
+    for reference in references {
+        if let Some(location) = codec::location(workspace.database(), &reference) {
+            changes
+                .entry(location.uri)
+                .or_default()
+                .push(TextEdit { range: location.range, new_text: new_name.clone() });
+        }
+    }
+
+    if changes.is_empty() {
+        return None;
     }
 
     Some(WorkspaceEdit {
@@ -76,5 +82,6 @@ fn is_valid_php_identifier(name: &str) -> bool {
     if !(first.is_ascii_alphabetic() || first == '_') {
         return false;
     }
+
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }

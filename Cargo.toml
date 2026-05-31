@@ -179,6 +179,7 @@ mago-collector = { path = "crates/collector", version = "1.29.0" }
 mago-database = { path = "crates/database", version = "1.29.0" }
 mago-guard = { path = "crates/guard", version = "1.29.0" }
 mago-orchestrator = { path = "crates/orchestrator", version = "1.29.0" }
+mago-server = { path = "crates/server", version = "1.29.0" }
 tracing = { version = "0.1.40" }
 foldhash = "0.2"
 serde_json = { version = "1.0.138" }
@@ -265,6 +266,7 @@ mago-algebra = { workspace = true }
 mago-codex = { workspace = true }
 mago-guard = { workspace = true }
 mago-orchestrator = { workspace = true }
+mago-server = { workspace = true }
 mago-semantics = { workspace = true }
 mago-span = { workspace = true }
 serde = { workspace = true }

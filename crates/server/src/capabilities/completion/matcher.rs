@@ -200,21 +200,24 @@ mod tests {
 
     #[test]
     fn sort_text_orders_by_tier_then_length() {
-        let exact = score(b"Qux", b"Qux").unwrap();
-        let prefix = score(b"Qu", b"Qux").unwrap();
-        let longer = score(b"Qu", b"QuxBarBaz").unwrap();
-        assert!(exact.sort_text() < prefix.sort_text());
-        assert!(prefix.sort_text() < longer.sort_text());
+        // Compare `Option` values directly so the test stays free of `unwrap`.
+        let exact = score(b"Qux", b"Qux").map(|s| s.sort_text());
+        let prefix = score(b"Qu", b"Qux").map(|s| s.sort_text());
+        let longer = score(b"Qu", b"QuxBarBaz").map(|s| s.sort_text());
+        assert!(exact < prefix);
+        assert!(prefix < longer);
     }
 
     #[test]
     fn locality_orders_within_a_tier() {
-        let imported = score(b"In", b"Invoice").unwrap().with_locality(true, false, 5, 5);
-        let same_ns = score(b"In", b"Invoice").unwrap().with_locality(false, false, 0, 0);
-        let parent = score(b"In", b"Invoice").unwrap().with_locality(false, false, 1, 0);
-        let sibling = score(b"In", b"Invoice").unwrap().with_locality(false, false, 1, 1);
-        let grandparent = score(b"In", b"Invoice").unwrap().with_locality(false, false, 2, 0);
-        let vendor = score(b"In", b"Invoice").unwrap().with_locality(false, true, 0, 0);
+        let with =
+            |imported, vendor, up, down| score(b"In", b"Invoice").map(|s| s.with_locality(imported, vendor, up, down));
+        let imported = with(true, false, 5, 5);
+        let same_ns = with(false, false, 0, 0);
+        let parent = with(false, false, 1, 0);
+        let sibling = with(false, false, 1, 1);
+        let grandparent = with(false, false, 2, 0);
+        let vendor = with(false, true, 0, 0);
 
         assert!(imported < same_ns);
         assert!(same_ns < parent);

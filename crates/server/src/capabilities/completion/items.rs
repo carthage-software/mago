@@ -1,4 +1,5 @@
-//! Item builders for each [`super::Context`].
+//! Item builders for each [`super::Context`], producing domain
+//! [`CompletionEntry`]s (the protocol layer turns them into LSP items).
 
 use std::collections::hash_map::Entry;
 
@@ -14,31 +15,26 @@ use mago_database::DatabaseReader;
 use mago_database::file::FileType;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
-use mago_span::Span;
+use mago_span::Span as FileSpan;
+use mago_syntax::token::Token;
 use mago_syntax::token::TokenKind;
-use tower_lsp_server::ls_types::CompletionItem;
-use tower_lsp_server::ls_types::CompletionItemKind;
-use tower_lsp_server::ls_types::CompletionTextEdit;
-use tower_lsp_server::ls_types::Documentation;
-use tower_lsp_server::ls_types::InsertTextFormat;
-use tower_lsp_server::ls_types::MarkupContent;
-use tower_lsp_server::ls_types::MarkupKind;
-use tower_lsp_server::ls_types::Range;
-use tower_lsp_server::ls_types::TextEdit;
 
-use crate::language_server::state::ExpressionTypeIndex;
+use crate::domain::CompletionEntry;
+use crate::domain::CompletionKind;
+use crate::domain::Range;
+use crate::server::ExpressionTypeIndex;
 
 use super::MAX_RESULTS;
 use super::matcher;
 use super::matcher::Score;
 
 pub(super) fn variable_items(
-    tokens: &[mago_syntax::token::Token<'_>],
+    tokens: &[Token<'_>],
     scope_start: u32,
     offset: u32,
     prefix: &[u8],
     replace: Range,
-) -> Vec<CompletionItem> {
+) -> Vec<CompletionEntry> {
     let mut seen = foldhash::HashSet::default();
     let mut out = Vec::new();
     for token in tokens {
@@ -61,12 +57,7 @@ pub(super) fn variable_items(
         }
 
         let label = format!("${}", String::from_utf8_lossy(name));
-        out.push(CompletionItem {
-            kind: Some(CompletionItemKind::VARIABLE),
-            text_edit: Some(CompletionTextEdit::Edit(TextEdit { range: replace, new_text: label.clone() })),
-            label,
-            ..CompletionItem::default()
-        });
+        out.push(CompletionEntry { replace: Some(replace), ..CompletionEntry::new(label, CompletionKind::Variable) });
 
         if out.len() >= MAX_RESULTS {
             break;
@@ -80,7 +71,7 @@ pub(super) fn instance_member_items(
     type_index: Option<&ExpressionTypeIndex>,
     receiver_span: (u32, u32),
     prefix: &[u8],
-) -> Vec<CompletionItem> {
+) -> Vec<CompletionEntry> {
     let Some(type_index) = type_index else {
         return Vec::new();
     };
@@ -89,18 +80,18 @@ pub(super) fn instance_member_items(
         return Vec::new();
     };
 
-    let mut best: HashMap<String, (Score, CompletionItem)> = HashMap::default();
+    let mut best: HashMap<String, (Score, CompletionEntry)> = HashMap::default();
     for class in class_words {
         if let Some(meta) = codebase.get_class_like(class.as_bytes()) {
-            for (score, item) in collect_class_members(codebase, meta, prefix, false) {
-                match best.entry(item.label.clone()) {
+            for (score, entry) in collect_class_members(codebase, meta, prefix, false) {
+                match best.entry(entry.label.clone()) {
                     Entry::Occupied(mut e) => {
                         if score < e.get().0 {
-                            e.insert((score, item));
+                            e.insert((score, entry));
                         }
                     }
                     Entry::Vacant(e) => {
-                        e.insert((score, item));
+                        e.insert((score, entry));
                     }
                 }
             }
@@ -115,7 +106,7 @@ pub(super) fn static_member_items(
     scope: &NamespaceScope,
     class: &[u8],
     prefix: &[u8],
-) -> Vec<CompletionItem> {
+) -> Vec<CompletionEntry> {
     if matches!(class, b"self" | b"static" | b"parent") {
         return Vec::new();
     }
@@ -136,7 +127,7 @@ pub(super) fn bare_items(
     scope: &NamespaceScope,
     prefix: &[u8],
     classes_only: bool,
-) -> Vec<CompletionItem> {
+) -> Vec<CompletionEntry> {
     let namespace = scope.namespace_name().unwrap_or_default();
     let current_ns = split_namespace(namespace);
 
@@ -149,7 +140,7 @@ pub(super) fn bare_items(
         (lc.starts_with(&ns) && lc.get(ns.len()) == Some(&b'\\')) || !lc.contains(&b'\\')
     };
 
-    let mut scored: Vec<(Score, CompletionItem)> = Vec::new();
+    let mut scored: Vec<(Score, CompletionEntry)> = Vec::new();
 
     for meta in codebase.class_likes.values() {
         if !is_user_symbol(database, meta.span) || is_synthetic_name(meta.original_name.as_bytes()) {
@@ -195,13 +186,11 @@ pub(super) fn bare_items(
             let local_str = String::from_utf8_lossy(local).into_owned();
             scored.push((
                 score,
-                CompletionItem {
-                    label: local_str.clone(),
-                    kind: Some(CompletionItemKind::FUNCTION),
+                CompletionEntry {
                     detail: Some(render_signature(meta, local)),
                     insert_text: Some(format!("{local_str}($1)")),
-                    insert_text_format: Some(InsertTextFormat::SNIPPET),
-                    ..CompletionItem::default()
+                    snippet: true,
+                    ..CompletionEntry::new(local_str.clone(), CompletionKind::Function)
                 },
             ));
         }
@@ -223,11 +212,7 @@ pub(super) fn bare_items(
 
             scored.push((
                 score,
-                CompletionItem {
-                    label: String::from_utf8_lossy(local).into_owned(),
-                    kind: Some(CompletionItemKind::CONSTANT),
-                    ..CompletionItem::default()
-                },
+                CompletionEntry::new(String::from_utf8_lossy(local).into_owned(), CompletionKind::Constant),
             ));
         }
     }
@@ -240,7 +225,7 @@ pub(super) fn qualified_items(
     codebase: &CodebaseMetadata,
     qualifier: &[u8],
     prefix: &[u8],
-) -> Vec<CompletionItem> {
+) -> Vec<CompletionEntry> {
     let want_prefix = if qualifier.is_empty() {
         Vec::new()
     } else {
@@ -249,7 +234,7 @@ pub(super) fn qualified_items(
         want
     };
 
-    let mut scored: Vec<(Score, CompletionItem)> = Vec::new();
+    let mut scored: Vec<(Score, CompletionEntry)> = Vec::new();
     for (key, meta) in codebase.class_likes.iter() {
         if !is_user_symbol(database, meta.span) || is_synthetic_name(meta.original_name.as_bytes()) {
             continue;
@@ -272,15 +257,15 @@ pub(super) fn qualified_items(
     finalize(scored)
 }
 
-fn finalize(mut scored: Vec<(Score, CompletionItem)>) -> Vec<CompletionItem> {
+fn finalize(mut scored: Vec<(Score, CompletionEntry)>) -> Vec<CompletionEntry> {
     scored.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.label.cmp(&b.1.label)));
     scored.truncate(MAX_RESULTS);
     scored
         .into_iter()
-        .map(|(score, mut item)| {
-            item.sort_text = Some(score.sort_text());
-            item.filter_text = Some(item.label.clone());
-            item
+        .map(|(score, mut entry)| {
+            entry.sort_text = Some(score.sort_text());
+            entry.filter_text = Some(entry.label.clone());
+            entry
         })
         .collect()
 }
@@ -290,7 +275,7 @@ fn collect_class_members(
     meta: &ClassLikeMetadata,
     prefix: &[u8],
     static_access: bool,
-) -> Vec<(Score, CompletionItem)> {
+) -> Vec<(Score, CompletionEntry)> {
     let mut out = Vec::new();
 
     if static_access {
@@ -300,14 +285,7 @@ fn collect_class_members(
                 continue;
             };
 
-            out.push((
-                score,
-                CompletionItem {
-                    label: String::from_utf8_lossy(s).into_owned(),
-                    kind: Some(CompletionItemKind::CONSTANT),
-                    ..CompletionItem::default()
-                },
-            ));
+            out.push((score, CompletionEntry::new(String::from_utf8_lossy(s).into_owned(), CompletionKind::Constant)));
         }
 
         for name in meta.enum_cases.keys() {
@@ -318,11 +296,7 @@ fn collect_class_members(
 
             out.push((
                 score,
-                CompletionItem {
-                    label: String::from_utf8_lossy(s).into_owned(),
-                    kind: Some(CompletionItemKind::ENUM_MEMBER),
-                    ..CompletionItem::default()
-                },
+                CompletionEntry::new(String::from_utf8_lossy(s).into_owned(), CompletionKind::EnumMember),
             ));
         }
     }
@@ -347,10 +321,7 @@ fn collect_class_members(
         } else {
             String::from_utf8_lossy(visible).into_owned()
         };
-        out.push((
-            score,
-            CompletionItem { label, kind: Some(CompletionItemKind::FIELD), detail, ..CompletionItem::default() },
-        ));
+        out.push((score, CompletionEntry { detail, ..CompletionEntry::new(label, CompletionKind::Field) }));
     }
 
     for (name, mid) in meta.appearing_method_ids.iter() {
@@ -372,13 +343,11 @@ fn collect_class_members(
         let display_str = String::from_utf8_lossy(display).into_owned();
         out.push((
             score,
-            CompletionItem {
-                label: display_str.clone(),
-                kind: Some(CompletionItemKind::METHOD),
+            CompletionEntry {
                 detail: Some(render_signature(method, display)),
                 insert_text: Some(format!("{display_str}($1)")),
-                insert_text_format: Some(InsertTextFormat::SNIPPET),
-                ..CompletionItem::default()
+                snippet: true,
+                ..CompletionEntry::new(display_str.clone(), CompletionKind::Method)
             },
         ));
     }
@@ -418,7 +387,7 @@ fn render_signature(meta: &FunctionLikeMetadata, name: &[u8]) -> String {
 /// Build a class completion. `resolves_here` is true when typing the short name
 /// at the cursor already resolves to this class (it is imported or lives in the
 /// current namespace); otherwise the item inserts the leading-`\` FQCN.
-fn make_class_item(meta: &ClassLikeMetadata, short: &[u8], resolves_here: bool) -> CompletionItem {
+fn make_class_item(meta: &ClassLikeMetadata, short: &[u8], resolves_here: bool) -> CompletionEntry {
     let fqcn = meta.original_name.as_bytes();
     let insert_text = (!resolves_here).then(|| {
         let mut text = String::with_capacity(fqcn.len() + 1);
@@ -427,46 +396,39 @@ fn make_class_item(meta: &ClassLikeMetadata, short: &[u8], resolves_here: bool) 
         text
     });
 
-    CompletionItem {
-        label: String::from_utf8_lossy(short).into_owned(),
-        kind: Some(class_item_kind(meta)),
+    CompletionEntry {
         insert_text,
         documentation: Some(class_documentation(meta)),
-        ..CompletionItem::default()
+        ..CompletionEntry::new(String::from_utf8_lossy(short).into_owned(), class_item_kind(meta))
     }
 }
 
-fn qualified_class_item(meta: &ClassLikeMetadata, display: &[u8]) -> CompletionItem {
-    CompletionItem {
-        label: String::from_utf8_lossy(display).into_owned(),
-        kind: Some(class_item_kind(meta)),
+fn qualified_class_item(meta: &ClassLikeMetadata, display: &[u8]) -> CompletionEntry {
+    CompletionEntry {
         documentation: Some(class_documentation(meta)),
-        ..CompletionItem::default()
+        ..CompletionEntry::new(String::from_utf8_lossy(display).into_owned(), class_item_kind(meta))
     }
 }
 
-fn class_item_kind(meta: &ClassLikeMetadata) -> CompletionItemKind {
+fn class_item_kind(meta: &ClassLikeMetadata) -> CompletionKind {
     use mago_codex::symbol::SymbolKind as M;
     match meta.kind {
-        M::Class => CompletionItemKind::CLASS,
-        M::Interface => CompletionItemKind::INTERFACE,
-        M::Trait => CompletionItemKind::CLASS,
-        M::Enum => CompletionItemKind::ENUM,
+        M::Class => CompletionKind::Class,
+        M::Interface => CompletionKind::Interface,
+        M::Trait => CompletionKind::Class,
+        M::Enum => CompletionKind::Enum,
     }
 }
 
-fn class_documentation(meta: &ClassLikeMetadata) -> Documentation {
-    Documentation::MarkupContent(MarkupContent {
-        kind: MarkupKind::PlainText,
-        value: String::from_utf8_lossy(meta.original_name.as_bytes()).into_owned(),
-    })
+fn class_documentation(meta: &ClassLikeMetadata) -> String {
+    String::from_utf8_lossy(meta.original_name.as_bytes()).into_owned()
 }
 
-fn is_user_symbol(database: &Database<'_>, span: Span) -> bool {
+fn is_user_symbol(database: &Database<'_>, span: FileSpan) -> bool {
     database.get(&span.file_id).map(|f| !matches!(f.file_type, FileType::Builtin)).unwrap_or(false)
 }
 
-fn is_vendor(database: &Database<'_>, span: Span) -> bool {
+fn is_vendor(database: &Database<'_>, span: FileSpan) -> bool {
     database.get(&span.file_id).map(|f| matches!(f.file_type, FileType::Vendored)).unwrap_or(false)
 }
 

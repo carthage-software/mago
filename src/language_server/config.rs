@@ -6,9 +6,6 @@
 //! formatter.
 
 use std::path::PathBuf;
-use std::sync::Arc;
-
-use mago_analyzer::plugin::PluginRegistry;
 
 use crate::config::Configuration;
 
@@ -38,11 +35,6 @@ pub struct ServerConfig {
     /// patterns the LSP feeds into the database loader.
     pub configuration: Configuration,
 
-    /// Pre-built analyzer plugin registry. Honours `[analyzer].plugins`
-    /// and `[analyzer].disable_default_plugins`. Built once at startup
-    /// because plugin lookup is lossy and the LSP doesn't reload config.
-    pub plugin_registry: Arc<PluginRegistry>,
-
     /// Workspace directory from an explicit `--workspace` flag. When set it
     /// takes precedence over the client's `rootUri`, so the bootstrap honours
     /// the same root as `mago lint` / `mago analyze`. `None` when the flag was
@@ -57,7 +49,6 @@ impl Default for ServerConfig {
             linter: true,
             formatter: true,
             configuration: Configuration::from_workspace(std::env::current_dir().unwrap_or_default()),
-            plugin_registry: Arc::new(PluginRegistry::with_library_providers()),
             workspace_override: None,
         }
     }

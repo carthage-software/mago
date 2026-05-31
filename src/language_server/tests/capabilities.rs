@@ -566,3 +566,85 @@ async fn completion_static_member_on_imported_short_name() {
     assert!(labels.contains(&"Paid"), "imported short name should resolve enum cases, got {labels:?}");
     assert!(!labels.is_empty(), "imported short name receiver must resolve, got {labels:?}");
 }
+
+#[tokio::test]
+async fn multi_workspace_symbol_spans_every_folder() {
+    let mut h = Harness::start_multi(&[
+        ("alpha", &[("a.php", "<?php\nnamespace Alpha;\nclass AlphaService {}\n")]),
+        ("beta", &[("b.php", "<?php\nnamespace Beta;\nclass BetaService {}\n")]),
+    ])
+    .await;
+    let result = h.request("workspace/symbol", json!({ "query": "Service" })).await;
+    let names: Vec<&str> = result.as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap_or("")).collect();
+    assert!(names.iter().any(|n| n.ends_with("AlphaService")), "missing symbol from first folder, got {names:?}");
+    assert!(names.iter().any(|n| n.ends_with("BetaService")), "missing symbol from second folder, got {names:?}");
+}
+
+#[tokio::test]
+async fn multi_workspace_hover_routes_to_owning_folder() {
+    let mut h = Harness::start_multi(&[
+        ("alpha", &[("a.php", "<?php\nnamespace Alpha;\nfinal class AlphaThing {}\n")]),
+        ("beta", &[("b.php", "<?php\nnamespace Beta;\nfinal class BetaThing {}\n")]),
+    ])
+    .await;
+
+    let alpha = h.at_uri("textDocument/hover", &h.url_in("alpha", "a.php"), 2, 13).await;
+    let alpha_value = alpha["contents"]["value"].as_str().unwrap_or("");
+    assert!(alpha_value.contains("AlphaThing"), "hover in first folder failed, got {alpha_value:?}");
+
+    let beta = h.at_uri("textDocument/hover", &h.url_in("beta", "b.php"), 2, 13).await;
+    let beta_value = beta["contents"]["value"].as_str().unwrap_or("");
+    assert!(beta_value.contains("BetaThing"), "hover in second folder failed, got {beta_value:?}");
+}
+
+#[tokio::test]
+async fn multi_workspace_applies_per_folder_config() {
+    // The `tabs` folder ships its own mago.toml turning on tab indentation;
+    // the `spaces` folder has none and inherits the (spaces) default. Each
+    // workspace must format according to its own discovered config.
+    let messy = "<?php\n\nfunction demo(): void {\necho 1;\n}\n";
+    let mut h = Harness::start_multi(&[
+        ("tabs", &[("a.php", messy), ("mago.toml", "[formatter]\nuse-tabs = true\n")]),
+        ("spaces", &[("a.php", messy)]),
+    ])
+    .await;
+
+    let tabs_uri = h.url_in("tabs", "a.php");
+    let tabs = h
+        .request(
+            "textDocument/formatting",
+            json!({ "textDocument": { "uri": tabs_uri }, "options": { "tabSize": 4, "insertSpaces": true } }),
+        )
+        .await;
+    let tabs_text = tabs[0]["newText"].as_str().unwrap_or("");
+    assert!(tabs_text.contains('\t'), "the `tabs` workspace config should format with tabs, got {tabs_text:?}");
+
+    let spaces_uri = h.url_in("spaces", "a.php");
+    let spaces = h
+        .request(
+            "textDocument/formatting",
+            json!({ "textDocument": { "uri": spaces_uri }, "options": { "tabSize": 4, "insertSpaces": true } }),
+        )
+        .await;
+    let spaces_text = spaces[0]["newText"].as_str().unwrap_or("");
+    assert!(!spaces_text.contains('\t'), "the `spaces` workspace should not use tabs, got {spaces_text:?}");
+}
+
+#[tokio::test]
+async fn multi_workspace_handles_dynamic_folder_add() {
+    let mut h =
+        Harness::start_multi(&[("alpha", &[("a.php", "<?php\nnamespace Alpha;\nclass AlphaThing {}\n")])]).await;
+
+    let before = h.request("workspace/symbol", json!({ "query": "BetaThing" })).await;
+    let before_names: Vec<&str> = before.as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap_or("")).collect();
+    assert!(!before_names.iter().any(|n| n.ends_with("BetaThing")), "beta should not exist yet, got {before_names:?}");
+
+    h.add_folder("beta", &[("b.php", "<?php\nnamespace Beta;\nclass BetaThing {}\n")]).await;
+
+    let after = h.request("workspace/symbol", json!({ "query": "BetaThing" })).await;
+    let after_names: Vec<&str> = after.as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap_or("")).collect();
+    assert!(
+        after_names.iter().any(|n| n.ends_with("BetaThing")),
+        "beta should be added dynamically, got {after_names:?}"
+    );
+}

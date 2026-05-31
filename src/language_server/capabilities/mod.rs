@@ -37,23 +37,10 @@ use tower_lsp_server::ls_types::TextDocumentSyncKind;
 use tower_lsp_server::ls_types::TextDocumentSyncOptions;
 use tower_lsp_server::ls_types::TextDocumentSyncSaveOptions;
 use tower_lsp_server::ls_types::WorkDoneProgressOptions;
+use tower_lsp_server::ls_types::WorkspaceFoldersServerCapabilities;
+use tower_lsp_server::ls_types::WorkspaceServerCapabilities;
 
-pub mod code_action;
-pub mod code_lens;
-pub mod completion;
-pub mod definition;
-pub mod document_link;
-pub mod folding_range;
-pub mod formatting;
-pub mod hover;
-pub mod inlay_hint;
-pub mod lookup;
-pub mod references;
 pub mod rename;
-pub mod selection_range;
-pub mod semantic_tokens;
-pub mod signature_help;
-pub mod workspace_symbol;
 
 /// Build the [`ServerCapabilities`] block to advertise during `initialize`.
 ///
@@ -109,20 +96,32 @@ pub fn server_capabilities(config: &super::ServerConfig) -> ServerCapabilities {
             SemanticTokensOptions {
                 work_done_progress_options: WorkDoneProgressOptions::default(),
                 legend: SemanticTokensLegend {
-                    token_types: semantic_tokens::TOKEN_TYPES.to_vec(),
+                    token_types: vec![
+                        SemanticTokenType::KEYWORD,
+                        SemanticTokenType::COMMENT,
+                        SemanticTokenType::STRING,
+                        SemanticTokenType::NUMBER,
+                        SemanticTokenType::OPERATOR,
+                        SemanticTokenType::VARIABLE,
+                        SemanticTokenType::FUNCTION,
+                        SemanticTokenType::TYPE,
+                        SemanticTokenType::NAMESPACE,
+                        SemanticTokenType::PARAMETER,
+                        SemanticTokenType::PROPERTY,
+                    ],
                     token_modifiers: vec![],
                 },
                 range: Some(false),
                 full: Some(SemanticTokensFullOptions::Bool(true)),
             },
         )),
+        workspace: Some(WorkspaceServerCapabilities {
+            workspace_folders: Some(WorkspaceFoldersServerCapabilities {
+                supported: Some(true),
+                change_notifications: Some(OneOf::Left(true)),
+            }),
+            file_operations: None,
+        }),
         ..ServerCapabilities::default()
     }
-}
-
-/// Re-export the semantic-token type ordering, used both in the legend and by
-/// the encoder.
-#[allow(dead_code)]
-pub fn token_type_index(ty: SemanticTokenType) -> Option<u32> {
-    semantic_tokens::TOKEN_TYPES.iter().position(|t| *t == ty).map(|i| i as u32)
 }

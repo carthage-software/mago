@@ -8,33 +8,35 @@ use std::path::PathBuf;
 
 use mago_database::file::FileId;
 use tower_lsp_server::ls_types::InitializeParams;
-use tower_lsp_server::ls_types::Uri;
 
-/// Resolve the workspace root from `initialize` params, in the order the
-/// LSP spec recommends: `workspaceFolders`, then deprecated `rootUri`, then
-/// deprecated `rootPath`.
+/// Resolve every workspace root from `initialize` params, in the order the
+/// LSP spec recommends: all `workspaceFolders`, then the deprecated single
+/// `rootUri`, then the deprecated `rootPath`. Returns one entry per open
+/// project so the server can drive a [`Server`](mago_server::Server) per root.
 #[must_use]
-pub fn workspace_root(params: &InitializeParams) -> Option<PathBuf> {
+pub fn workspace_roots(params: &InitializeParams) -> Vec<PathBuf> {
     if let Some(folders) = &params.workspace_folders
-        && let Some(first) = folders.first()
-        && let Some(path) = first.uri.to_file_path()
+        && !folders.is_empty()
     {
-        return Some(path.into_owned());
+        let roots: Vec<PathBuf> = folders.iter().filter_map(|f| f.uri.to_file_path().map(|p| p.into_owned())).collect();
+        if !roots.is_empty() {
+            return roots;
+        }
     }
 
     #[allow(deprecated)]
     if let Some(uri) = &params.root_uri
         && let Some(path) = uri.to_file_path()
     {
-        return Some(path.into_owned());
+        return vec![path.into_owned()];
     }
 
     #[allow(deprecated)]
     if let Some(root) = &params.root_path {
-        return Some(PathBuf::from(root));
+        return vec![PathBuf::from(root)];
     }
 
-    None
+    Vec::new()
 }
 
 /// Compute the workspace-relative logical name used by `mago_database` to
@@ -48,10 +50,4 @@ pub fn logical_name_for(workspace: &Path, path: &Path) -> String {
 #[must_use]
 pub fn file_id_for(workspace: &Path, path: &Path) -> FileId {
     FileId::new(logical_name_for(workspace, path).as_bytes())
-}
-
-/// Convert a filesystem path to an LSP `file://` URL.
-#[allow(dead_code)]
-pub fn url_for_path(path: &Path) -> Option<Uri> {
-    Uri::from_file_path(path)
 }

@@ -5,161 +5,167 @@
 //! the workspace, builds the database, runs an initial full analysis (if
 //! enabled by the [`super::ServerConfig`]), and transitions to
 //! [`BackendState::Ready`].
+//!
+//! The analysis state itself; the database, the analysis service, and the
+//! per-file caches; lives in a transport-agnostic [`mago_server::Server`].
+//! [`WorkspaceState`] wraps one such server with the LSP-specific bookkeeping
+//! (open buffers, last-published diagnostics) and a few thin delegating
+//! accessors so the capability handlers keep stable call sites.
 
 use std::borrow::Cow;
+use std::cmp::Reverse;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use clap::ColorChoice;
 use foldhash::HashMap;
-use mago_codex::ttype::atomic::TAtomic;
-use mago_codex::ttype::atomic::object::TObject;
 use tower_lsp_server::ls_types::Diagnostic;
 use tower_lsp_server::ls_types::Uri;
 
 use mago_analyzer::analysis_result::AnalysisResult;
+use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_database::Database;
 use mago_database::DatabaseConfiguration;
-use mago_database::DatabaseReader;
 use mago_database::exclusion::Exclusion;
 use mago_database::file::FileId;
-use mago_database::file::FileType;
 use mago_database::loader::DatabaseLoader;
 use mago_database::membership::WorkspaceMatcher;
 use mago_linter::integration::IntegrationSet;
 use mago_linter::settings::Settings as LinterSettings;
-use mago_orchestrator::service::incremental_analysis::IncrementalAnalysisService;
 use mago_prelude::Prelude;
-use mago_word::Word;
-use xxhash_rust::xxh3;
+use mago_server::Features;
+use mago_server::FileAnalysis;
+use mago_server::Server;
+use mago_server::Settings as ServerSettings;
 
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
 use crate::language_server::ServerConfig;
 use crate::language_server::document::OpenDocument;
-use crate::language_server::file_analysis;
-use crate::language_server::file_analysis::FileAnalysis;
-use crate::language_server::linter::LinterContext;
 
 #[allow(clippy::large_enum_variant)]
 pub enum BackendState {
     Uninitialized,
-    Ready(WorkspaceState),
+    Ready(WorkspaceRegistry),
+}
+
+/// All open workspaces, one [`WorkspaceState`] per editor workspace folder.
+///
+/// Requests are routed to the workspace whose root is the longest path prefix
+/// of the target file, so nested folders resolve to the most specific project.
+pub struct WorkspaceRegistry {
+    workspaces: Vec<WorkspaceState>,
+}
+
+impl WorkspaceRegistry {
+    /// Build a registry from per-folder workspaces, ordered so longest-prefix
+    /// routing picks the most specific root first.
+    #[must_use]
+    pub fn new(mut workspaces: Vec<WorkspaceState>) -> Self {
+        sort_by_root_len(&mut workspaces);
+        Self { workspaces }
+    }
+
+    /// Add a workspace, keeping longest-prefix routing order.
+    pub fn add(&mut self, workspace: WorkspaceState) {
+        self.workspaces.push(workspace);
+        sort_by_root_len(&mut self.workspaces);
+    }
+
+    /// Remove and return the workspace rooted exactly at `root`, if present.
+    pub fn remove(&mut self, root: &Path) -> Option<WorkspaceState> {
+        let index = self.workspaces.iter().position(|ws| ws.root == root)?;
+        Some(self.workspaces.remove(index))
+    }
+
+    /// Whether a workspace is already rooted exactly at `root`.
+    #[must_use]
+    pub fn contains_root(&self, root: &Path) -> bool {
+        self.workspaces.iter().any(|ws| ws.root == root)
+    }
+
+    /// The workspace owning `path` (longest root prefix), if any.
+    #[must_use]
+    pub fn for_path(&self, path: &Path) -> Option<&WorkspaceState> {
+        self.workspaces.iter().find(|ws| path.starts_with(&ws.root))
+    }
+
+    /// The workspace owning `path` (longest root prefix), mutably.
+    pub fn for_path_mut(&mut self, path: &Path) -> Option<&mut WorkspaceState> {
+        self.workspaces.iter_mut().find(|ws| path.starts_with(&ws.root))
+    }
+
+    /// Whether any workspace's source matcher accepts `path`.
+    #[must_use]
+    pub fn tracks(&self, path: &Path) -> bool {
+        self.workspaces.iter().any(|ws| ws.matcher.contains(path))
+    }
+
+    /// Iterate every workspace (e.g. for cross-workspace symbol search).
+    pub fn iter(&self) -> impl Iterator<Item = &WorkspaceState> + '_ {
+        self.workspaces.iter()
+    }
+}
+
+/// Order workspaces by descending root-path length so longest-prefix routing
+/// resolves a path to its most specific (deepest) workspace.
+fn sort_by_root_len(workspaces: &mut [WorkspaceState]) {
+    workspaces.sort_by_key(|b| Reverse(b.root.as_os_str().len()));
 }
 
 pub struct WorkspaceState {
     pub root: PathBuf,
-    pub database: Database<'static>,
     pub matcher: WorkspaceMatcher,
-    pub service: IncrementalAnalysisService,
-    pub linter: LinterContext,
-    pub config: Arc<ServerConfig>,
+    pub server: Server,
+    /// This workspace's own configuration, discovered from `{root}/mago.*` on
+    /// `initialize` (or inherited from the launch config when the folder has
+    /// none). Drives ignore patterns, globs, and formatter settings.
+    pub configuration: Configuration,
+    /// Global feature switches (from the CLI flags), shared by all workspaces.
+    pub features: Features,
     pub open_documents: HashMap<Uri, OpenDocument>,
     pub last_diagnostics: HashMap<Uri, Vec<Diagnostic>>,
-    pub file_analyses: HashMap<FileId, (u64, Arc<FileAnalysis>)>,
-    pub artifact_cache: HashMap<FileId, (u64, ExpressionTypeIndex)>,
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct ExpressionTypeIndex {
-    pub by_span: HashMap<(u32, u32), Vec<Word>>,
 }
 
 impl WorkspaceState {
-    pub fn type_index_for(&mut self, file_id: FileId) -> Option<&ExpressionTypeIndex> {
-        if !self.config.analyzer {
-            return None;
-        }
-
-        let file = self.database.get(&file_id).ok()?;
-        let hash = xxh3::xxh3_64(&file.contents);
-
-        if let Some((cached_hash, _)) = self.artifact_cache.get(&file_id)
-            && *cached_hash == hash
-        {
-            return self.artifact_cache.get(&file_id).map(|(_, idx)| idx);
-        }
-
-        let (_, artifacts) = self.service.analyze_file_with_artifacts(file_id)?;
-        let index = build_index(&artifacts);
-        self.artifact_cache.insert(file_id, (hash, index));
-        self.artifact_cache.get(&file_id).map(|(_, idx)| idx)
-    }
-
+    /// Drop cached derived data for the given files.
     pub fn invalidate_artifacts(&mut self, files: &[FileId]) {
-        for id in files {
-            self.artifact_cache.remove(id);
-            self.file_analyses.remove(id);
-        }
+        self.server.invalidate_artifacts(files);
     }
 
-    /// Return the [`FileAnalysis`] for `file_id`, building it on a cache
-    /// miss. Single parse + resolve per content hash; capability handlers
-    /// that need lint issues / name resolution / fold ranges / AST node
-    /// spans all share this.
+    /// Return the [`FileAnalysis`] for `file_id`, building it on a cache miss.
     pub fn file_analysis_for(&mut self, file_id: FileId) -> Option<Arc<FileAnalysis>> {
-        let file = self.database.get(&file_id).ok()?;
-        let hash = xxh3::xxh3_64(&file.contents);
-
-        if let Some((cached_hash, analysis)) = self.file_analyses.get(&file_id)
-            && *cached_hash == hash
-        {
-            return Some(Arc::clone(analysis));
-        }
-
-        let with_semantics = !self.config.analyzer;
-        let analysis = Arc::new(file_analysis::build(&file, &self.linter, with_semantics));
-        self.file_analyses.insert(file_id, (hash, Arc::clone(&analysis)));
-        Some(analysis)
+        self.server.file_analysis_for(file_id)
     }
 
-    /// Build (or rebuild) the analysis for every changed file. Called
-    /// from `apply_change_atomic` so per-file derived data is fresh by
-    /// the time the next capability request comes in.
+    /// Build (or rebuild) the analysis for every changed file.
     pub fn refresh_analyses(&mut self, file_ids: &[FileId]) {
-        let with_semantics = !self.config.analyzer;
-        for &file_id in file_ids {
-            let Ok(file) = self.database.get(&file_id) else {
-                self.file_analyses.remove(&file_id);
-                continue;
-            };
-            if file.file_type != FileType::Host {
-                continue;
-            }
-            let hash = xxh3::xxh3_64(&file.contents);
-            let analysis = Arc::new(file_analysis::build(&file, &self.linter, with_semantics));
-            self.file_analyses.insert(file_id, (hash, analysis));
-        }
+        self.server.refresh_analyses(file_ids);
+    }
+
+    /// Borrow the workspace file database.
+    #[must_use]
+    pub fn database(&self) -> &Database<'static> {
+        self.server.database()
+    }
+
+    /// Mutably borrow the workspace file database.
+    pub fn database_mut(&mut self) -> &mut Database<'static> {
+        self.server.database_mut()
     }
 }
 
-fn build_index(artifacts: &mago_analyzer::artifacts::AnalysisArtifacts) -> ExpressionTypeIndex {
-    let mut by_span: HashMap<(u32, u32), Vec<Word>> = HashMap::default();
-    for (span, ty) in artifacts.expression_types.iter() {
-        let mut classes: Vec<Word> = Vec::new();
-        for atomic in ty.types.iter() {
-            match atomic {
-                TAtomic::Object(TObject::Named(n)) => classes.push(n.name),
-                TAtomic::Object(TObject::Enum(e)) => classes.push(e.name),
-                _ => {}
-            }
-        }
-
-        if !classes.is_empty() {
-            by_span.insert(*span, classes);
-        }
-    }
-
-    ExpressionTypeIndex { by_span }
-}
-
-pub fn build_workspace(root: PathBuf, config: Arc<ServerConfig>) -> Result<(WorkspaceState, AnalysisResult), String> {
+pub fn build_workspace(
+    root: PathBuf,
+    server_config: Arc<ServerConfig>,
+) -> Result<(WorkspaceState, AnalysisResult), String> {
     let root = root.canonicalize().unwrap_or(root);
     let prelude = Prelude::decode(PRELUDE_BYTES).map_err(|e| format!("decode prelude: {e}"))?;
     let Prelude { database: prelude_db, metadata, symbol_references } = prelude;
 
-    let configuration = &config.configuration;
+    let configuration = resolve_workspace_configuration(&root, &server_config);
+
     let parser_settings = configuration.parser.to_settings();
     let analyzer_settings = configuration.analyzer.to_settings(configuration.php_version, ColorChoice::Never, false);
     let glob = configuration.source.glob.to_database_settings();
@@ -170,7 +176,7 @@ pub fn build_workspace(root: PathBuf, config: Arc<ServerConfig>) -> Result<(Work
         glob,
     };
 
-    let db_configuration = build_database_configuration(&root, configuration);
+    let db_configuration = build_database_configuration(&root, &configuration);
     let matcher = WorkspaceMatcher::from_configuration(&db_configuration)
         .map_err(|err| format!("compile source matcher: {err}"))?;
     let database = DatabaseLoader::new(db_configuration)
@@ -178,37 +184,72 @@ pub fn build_workspace(root: PathBuf, config: Arc<ServerConfig>) -> Result<(Work
         .load()
         .map_err(|err| format!("load database: {err}"))?;
 
-    let mut service = IncrementalAnalysisService::new(
-        database.read_only(),
-        metadata,
-        symbol_references,
-        analyzer_settings,
-        parser_settings,
-        Arc::clone(&config.plugin_registry),
-    );
+    let features =
+        Features { analyzer: server_config.analyzer, linter: server_config.linter, formatter: server_config.formatter };
+    let plugin_registry = Arc::new(create_registry_with_plugins(
+        &configuration.analyzer.plugins,
+        configuration.analyzer.disable_default_plugins,
+    ));
 
-    let linter = LinterContext::new(linter_settings, parser_settings);
-
-    let analysis_result = if config.analyzer {
-        service.analyze().map_err(|err| format!("initial analyze: {err}"))?
-    } else {
-        AnalysisResult::new(mago_codex::reference::SymbolReferences::new())
+    let settings = ServerSettings {
+        php_version: configuration.php_version,
+        features,
+        parser: parser_settings,
+        analyzer: analyzer_settings,
+        linter: linter_settings,
+        formatter: configuration.formatter.settings,
+        plugin_registry,
     };
+
+    let mut server = Server::new(database, metadata, symbol_references, settings);
+    let analysis_result = server.analyze().map_err(|err| format!("initial analyze: {err}"))?;
 
     let workspace = WorkspaceState {
         root,
-        database,
         matcher,
-        service,
-        linter,
-        config,
+        server,
+        configuration,
+        features,
         open_documents: HashMap::default(),
         last_diagnostics: HashMap::default(),
-        file_analyses: HashMap::default(),
-        artifact_cache: HashMap::default(),
     };
 
     Ok((workspace, analysis_result))
+}
+
+/// Resolve the configuration for a workspace folder.
+///
+/// If the folder has its own `mago.{toml,json,yaml,yml}`, that file is loaded
+/// directly (no global `~/.config` fallback search, so the result depends only
+/// on the workspace). Otherwise the launch-time configuration is inherited.
+fn resolve_workspace_configuration(root: &Path, server_config: &ServerConfig) -> Configuration {
+    let Some(file) = find_workspace_config_file(root) else {
+        return server_config.configuration.clone();
+    };
+
+    match Configuration::load(
+        Some(root.to_path_buf()),
+        Some(&file),
+        None,
+        None,
+        server_config.configuration.allow_unsupported_php_version,
+        true,
+    ) {
+        Ok(configuration) => configuration,
+        Err(err) => {
+            tracing::warn!(
+                root = %root.display(),
+                error = %err,
+                "failed to load workspace configuration; inheriting launch defaults",
+            );
+            server_config.configuration.clone()
+        }
+    }
+}
+
+/// First `mago.{toml,json,yaml,yml}` directly under `root`, if any.
+fn find_workspace_config_file(root: &Path) -> Option<PathBuf> {
+    ["mago.toml", "mago.json", "mago.yaml", "mago.yml"].into_iter().map(|name| root.join(name)).find(|p| p.is_file())
 }
 
 /// Build the [`DatabaseConfiguration`] the LSP uses to scan the workspace,

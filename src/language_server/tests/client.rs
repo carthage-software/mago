@@ -38,12 +38,6 @@ impl LspClient {
         }
     }
 
-    /// Drain notifications received since the last call.
-    #[allow(dead_code)] // used by capabilities tests, not lifecycle tests
-    pub fn take_pending_notifications(&mut self) -> Vec<Value> {
-        std::mem::take(&mut self.pending_notifications)
-    }
-
     pub async fn send_request(&mut self, method: &str, params: Value) -> i64 {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 

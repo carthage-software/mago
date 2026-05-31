@@ -1,6 +1,6 @@
-//! Long-lived linter context shared with [`super::file_analysis`].
+//! Long-lived linter context shared with [`crate::file_analysis`].
 //!
-//! The actual lint pass lives in [`super::file_analysis::build`] so the
+//! The actual lint pass lives in [`crate::file_analysis::build`] so the
 //! parse + resolve work is shared with the rest of the per-file derived
 //! data. This module just owns the rule registry + settings.
 
@@ -18,6 +18,7 @@ pub struct LinterContext {
 }
 
 impl LinterContext {
+    #[must_use]
     pub fn new(settings: LinterSettings, parser_settings: ParserSettings) -> Self {
         let registry = Arc::new(RuleRegistry::build(&settings, None, false));
         Self { settings, parser_settings, registry }

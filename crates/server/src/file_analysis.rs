@@ -36,16 +36,17 @@ use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::walker::Walker;
 use mago_syntax::walker::walk_program;
 use memchr::memmem;
-use tower_lsp_server::ls_types::FoldingRange;
-use tower_lsp_server::ls_types::FoldingRangeKind;
 
-use crate::language_server::linter::LinterContext;
+use crate::Range;
+use crate::domain::FoldKind;
+use crate::domain::FoldRange;
+use crate::linter::LinterContext;
 
 /// Owned, cacheable view of one file. Built by [`build`]; held on the
 /// workspace state for every file that's ever been touched.
 pub struct FileAnalysis {
     pub lint_issues: IssueCollection,
-    pub fold_ranges: Vec<FoldingRange>,
+    pub fold_ranges: Vec<FoldRange>,
     /// AST node spans (block-like constructs) sorted by start. Used by
     /// `selection_range` to answer "what spans contain this offset?"
     /// without re-walking the AST.
@@ -80,7 +81,7 @@ impl std::fmt::Debug for FileAnalysis {
             .field("fold_ranges", &self.fold_ranges.len())
             .field("node_spans", &self.node_spans.len())
             .field("resolved_names", &self.resolved.len())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -88,6 +89,7 @@ impl FileAnalysis {
     /// Borrow the resolved-name map. The lifetime is rebound to `&self`
     /// (covariance on `ResolvedNames<'a>`'s lifetime parameter), so the
     /// returned reference can't outlive the owning analysis.
+    #[must_use]
     pub fn resolved(&self) -> &ResolvedNames<'_> {
         &self.resolved
     }
@@ -95,6 +97,7 @@ impl FileAnalysis {
     /// The import scope in effect at `offset` (aliases plus the current
     /// namespace), or the global scope when the offset lies outside every
     /// namespace declaration.
+    #[must_use]
     pub fn scope_at(&self, offset: u32) -> NamespaceScope {
         self.scopes
             .iter()
@@ -147,6 +150,7 @@ fn collect_scopes(program: &Program<'_>, file_size: u32) -> Vec<(u32, u32, Names
 /// `with_semantics = true` runs the [`SemanticsChecker`] alongside the
 /// rule pass; set it only when the analyzer isn't running on the same
 /// file (otherwise semantic issues get reported twice).
+#[must_use]
 pub fn build(file: &MagoFile, linter_ctx: &LinterContext, with_semantics: bool) -> FileAnalysis {
     let arena: Box<Bump> = Box::new(Bump::new());
 
@@ -170,47 +174,40 @@ pub fn build(file: &MagoFile, linter_ctx: &LinterContext, with_semantics: bool) 
     let linter = Linter::from_registry(arena_ref, Arc::clone(&linter_ctx.registry), linter_ctx.settings.php_version);
     lint_issues.extend(linter.lint(file, program, &resolved));
 
-    let mut span_ctx = SpanCollectCtx { fold_ranges: Vec::new(), node_spans: Vec::new(), file };
+    let mut span_ctx = SpanCollectCtx { fold_ranges: Vec::new(), node_ranges: Vec::new(), file };
     walk_program(&SpanCollector, program, &mut span_ctx);
     push_comment_ranges(file, &mut span_ctx.fold_ranges);
-    span_ctx.node_spans.sort_unstable();
-    span_ctx.node_spans.dedup();
+    span_ctx.node_ranges.sort_unstable();
+    span_ctx.node_ranges.dedup();
 
     FileAnalysis {
         lint_issues,
         fold_ranges: span_ctx.fold_ranges,
-        node_spans: span_ctx.node_spans,
+        node_spans: span_ctx.node_ranges,
         resolved,
         scopes,
         _arena: arena,
     }
 }
 
-struct SpanCollectCtx<'a> {
-    fold_ranges: Vec<FoldingRange>,
-    node_spans: Vec<(u32, u32)>,
-    file: &'a MagoFile,
+struct SpanCollectCtx<'file> {
+    fold_ranges: Vec<FoldRange>,
+    node_ranges: Vec<(u32, u32)>,
+    file: &'file MagoFile,
 }
 
 impl SpanCollectCtx<'_> {
     fn record_block_like(&mut self, start: u32, end: u32) {
-        self.node_spans.push((start, end));
+        self.node_ranges.push((start, end));
         let start_line = self.file.line_number(start);
         let end_line = self.file.line_number(end);
         if end_line > start_line {
-            self.fold_ranges.push(FoldingRange {
-                start_line,
-                start_character: None,
-                end_line,
-                end_character: None,
-                kind: None,
-                collapsed_text: None,
-            });
+            self.fold_ranges.push(FoldRange { range: Range::new(start, end), kind: None });
         }
     }
 
     fn record_node(&mut self, start: u32, end: u32) {
-        self.node_spans.push((start, end));
+        self.node_ranges.push((start, end));
     }
 }
 
@@ -270,7 +267,7 @@ impl<'arena> Walker<'arena, 'arena, SpanCollectCtx<'_>> for SpanCollector {
     }
 }
 
-fn push_comment_ranges(file: &MagoFile, out: &mut Vec<FoldingRange>) {
+fn push_comment_ranges(file: &MagoFile, out: &mut Vec<FoldRange>) {
     let text = file.contents.as_ref();
     let mut search_start = 0;
     while let Some(rel_open) = memmem::find(&text[search_start..], b"/*") {
@@ -281,14 +278,7 @@ fn push_comment_ranges(file: &MagoFile, out: &mut Vec<FoldingRange>) {
             let start_line = file.line_number(open as u32);
             let end_line = file.line_number(close_end as u32);
             if end_line > start_line {
-                out.push(FoldingRange {
-                    start_line,
-                    start_character: None,
-                    end_line,
-                    end_character: None,
-                    kind: Some(FoldingRangeKind::Comment),
-                    collapsed_text: None,
-                });
+                out.push(FoldRange { range: Range::new(open as u32, close_end as u32), kind: Some(FoldKind::Comment) });
             }
 
             search_start = close_end;

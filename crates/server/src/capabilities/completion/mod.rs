@@ -1,28 +1,59 @@
-//! `textDocument/completion`.
+//! `get_completion`: context-sensitive completion candidates.
 //!
 //! Five contexts:
-//! - **Variable** (`$<prefix>`); variables in the enclosing function scope.
-//! - **Instance member** (`$obj-><prefix>`); receiver type comes from
-//!   analyzer artifacts; methods, properties and constants of the class
-//!   hierarchy are offered.
-//! - **Static member** (`Class::<prefix>`); constants, enum cases, methods.
-//! - **Bare identifier**; global functions, constants, class-likes
-//!   (scored by the [`matcher`]).
-//! - **Qualified** (`Foo\<prefix>`, `\\<prefix>`); namespace-scoped
-//!   class-like search.
+//! - **Variable** (`$<prefix>`): variables in the enclosing function scope.
+//! - **Instance member** (`$obj-><prefix>`): receiver type comes from analyzer
+//!   artifacts; methods, properties, and constants of the hierarchy are offered.
+//! - **Static member** (`Class::<prefix>`): constants, enum cases, methods.
+//! - **Bare identifier**: global functions, constants, class-likes (scored by
+//!   the [`matcher`]).
+//! - **Qualified** (`Foo\<prefix>`, `\<prefix>`): namespace-scoped class search.
+
+mod items;
+mod matcher;
 
 use mago_codex::metadata::CodebaseMetadata;
-use mago_database::Database;
+use mago_database::DatabaseReader;
 use mago_database::file::File as MagoFile;
+use mago_database::file::FileId;
 use mago_names::scope::NamespaceScope;
 use mago_syntax::token::Token;
 use mago_syntax::token::TokenKind;
-use tower_lsp_server::ls_types::CompletionList;
-use tower_lsp_server::ls_types::CompletionResponse;
 
-use crate::language_server::capabilities::lookup;
-use crate::language_server::position::range_at_offsets;
-use crate::language_server::state::ExpressionTypeIndex;
+use crate::Server;
+use crate::domain::CompletionEntry;
+use crate::domain::CompletionList;
+use crate::domain::Range;
+use crate::lookup;
+use crate::server::ExpressionTypeIndex;
+
+const MAX_RESULTS: usize = 50;
+
+#[derive(Debug)]
+enum Context<'a> {
+    Variable { prefix: &'a [u8], scope_start: u32 },
+    InstanceMember { receiver_span: (u32, u32), prefix: &'a [u8] },
+    StaticMember { class: &'a [u8], prefix: &'a [u8] },
+    Qualified { qualifier: &'a [u8], prefix: &'a [u8] },
+    Bare { prefix: &'a [u8], classes_only: bool },
+}
+
+impl Server {
+    /// Completion candidates for the cursor at `offset` in `file_id`.
+    pub fn get_completion(&mut self, file_id: FileId, offset: u32) -> CompletionList {
+        let Ok(file) = self.database().get(&file_id) else {
+            return CompletionList::default();
+        };
+        let type_index = self.type_index_for(file_id).cloned();
+        let scope = match self.file_analysis_for(file_id) {
+            Some(analysis) => analysis.scope_at(offset),
+            None => return CompletionList::default(),
+        };
+
+        let items = compute(self.database(), self.codebase(), type_index.as_ref(), &scope, &file, offset);
+        CompletionList { is_incomplete: true, items }
+    }
+}
 
 fn byte_before(file: &MagoFile, offset: u32) -> Option<u8> {
     if offset == 0 {
@@ -32,34 +63,19 @@ fn byte_before(file: &MagoFile, offset: u32) -> Option<u8> {
     file.contents.get((offset - 1) as usize).copied()
 }
 
-mod items;
-mod matcher;
-
-const MAX_RESULTS: usize = 50;
-
-#[derive(Debug)]
-pub(super) enum Context<'a> {
-    Variable { prefix: &'a [u8], scope_start: u32 },
-    InstanceMember { receiver_span: (u32, u32), prefix: &'a [u8] },
-    StaticMember { class: &'a [u8], prefix: &'a [u8] },
-    Qualified { qualifier: &'a [u8], prefix: &'a [u8] },
-    Bare { prefix: &'a [u8], classes_only: bool },
-}
-
-pub fn compute(
-    database: &Database<'_>,
+fn compute(
+    database: &mago_database::Database<'_>,
     codebase: &CodebaseMetadata,
     type_index: Option<&ExpressionTypeIndex>,
     scope: &NamespaceScope,
     file: &MagoFile,
     offset: u32,
-) -> CompletionResponse {
+) -> Vec<CompletionEntry> {
     let tokens = lookup::lex(file);
     let context = classify(file, &tokens, offset);
-    let items = match context {
+    match context {
         Context::Variable { prefix, scope_start } => {
-            let replace = range_at_offsets(file, offset.saturating_sub(prefix.len() as u32 + 1), offset);
-
+            let replace = Range::new(offset.saturating_sub(prefix.len() as u32 + 1), offset);
             items::variable_items(&tokens, scope_start, offset, prefix, replace)
         }
         Context::InstanceMember { receiver_span, prefix } => {
@@ -68,9 +84,7 @@ pub fn compute(
         Context::StaticMember { class, prefix } => items::static_member_items(codebase, scope, class, prefix),
         Context::Qualified { qualifier, prefix } => items::qualified_items(database, codebase, qualifier, prefix),
         Context::Bare { prefix, classes_only } => items::bare_items(database, codebase, scope, prefix, classes_only),
-    };
-
-    CompletionResponse::List(CompletionList { is_incomplete: true, items })
+    }
 }
 
 fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Context<'a> {
@@ -134,9 +148,11 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
     let prev_idx = (0..current_idx).rev().find(|j| !lookup::is_trivia(tokens[*j].kind));
     let prev = prev_idx.map(|j| tokens[j].kind);
 
-    if matches!(prev, Some(TokenKind::MinusGreaterThan) | Some(TokenKind::QuestionMinusGreaterThan)) {
+    if matches!(prev, Some(TokenKind::MinusGreaterThan) | Some(TokenKind::QuestionMinusGreaterThan))
+        && let Some(prev_idx) = prev_idx
+    {
         let prefix: &[u8] = if matches!(cur.kind, TokenKind::Identifier) { cur.value } else { b"" };
-        if let Some(receiver_span) = receiver_before(tokens, prev_idx.unwrap()) {
+        if let Some(receiver_span) = receiver_before(tokens, prev_idx) {
             return Context::InstanceMember { receiver_span, prefix };
         }
 
@@ -144,7 +160,8 @@ fn classify<'a>(file: &MagoFile, tokens: &'a [Token<'a>], offset: u32) -> Contex
     }
 
     if matches!(prev, Some(TokenKind::ColonColon))
-        && let Some(class) = static_receiver_before(tokens, prev_idx.unwrap())
+        && let Some(prev_idx) = prev_idx
+        && let Some(class) = static_receiver_before(tokens, prev_idx)
     {
         let prefix: &[u8] = if matches!(cur.kind, TokenKind::Identifier) { cur.value } else { b"" };
         return Context::StaticMember { class, prefix };

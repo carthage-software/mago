@@ -1,7 +1,5 @@
-//! `textDocument/hover`.
-//!
-//! Resolves the identifier under the cursor via [`mago_names::ResolvedNames`]
-//! and renders a Markdown summary sourced from [`mago_codex::metadata::CodebaseMetadata`].
+//! `get_context`: resolve the identifier (or variable) under the cursor and
+//! render a Markdown summary of it for hover.
 
 use mago_bytes::BytesDisplay;
 use mago_codex::metadata::CodebaseMetadata;
@@ -9,38 +7,33 @@ use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::symbol::SymbolKind;
 use mago_codex::ttype::TType;
-use mago_database::file::File as MagoFile;
-use mago_names::ResolvedNames;
-use tower_lsp_server::ls_types::Hover;
-use tower_lsp_server::ls_types::HoverContents;
-use tower_lsp_server::ls_types::MarkupContent;
-use tower_lsp_server::ls_types::MarkupKind;
+use mago_database::DatabaseReader;
+use mago_database::file::FileId;
 
-use crate::language_server::capabilities::lookup;
-use crate::language_server::position::range_at_offsets;
+use crate::Server;
+use crate::domain::HoverInfo;
+use crate::domain::Range;
+use crate::lookup;
 
-pub fn compute(
-    codebase: &CodebaseMetadata,
-    resolved: &ResolvedNames<'_>,
-    file: &MagoFile,
-    offset: u32,
-) -> Option<Hover> {
-    if let Some((start, end, fqcn, _)) = resolved.at_offset(offset) {
-        let markdown = render(codebase, fqcn)?;
-        return Some(Hover {
-            contents: HoverContents::Markup(MarkupContent { kind: MarkupKind::Markdown, value: markdown }),
-            range: Some(range_at_offsets(file, start, end)),
-        });
+impl Server {
+    /// Hover context for the token covering `offset` in `file_id`: rendered
+    /// markdown plus the token's span. Resolves named symbols against the
+    /// codebase, and falls back to a plain summary for `$variable`s.
+    pub fn get_context(&mut self, file_id: FileId, offset: u32) -> Option<HoverInfo> {
+        let file = self.database().get(&file_id).ok()?;
+        let analysis = self.file_analysis_for(file_id)?;
+
+        if let Some((start, end, fqcn, _)) = analysis.resolved().at_offset(offset) {
+            let markdown = render(self.codebase(), fqcn)?;
+            return Some(HoverInfo { markdown, range: Range::new(start, end) });
+        }
+
+        let var = lookup::variable_at_offset(&file, offset)?;
+        Some(HoverInfo {
+            markdown: format!("```php\n${}\n```\n\n*variable*", BytesDisplay(var.name)),
+            range: Range::new(var.start, var.end),
+        })
     }
-
-    let var = lookup::variable_at_offset(file, offset)?;
-    Some(Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: format!("```php\n${}\n```\n\n*variable*", BytesDisplay(var.name)),
-        }),
-        range: Some(range_at_offsets(file, var.start, var.end)),
-    })
 }
 
 fn render(codebase: &CodebaseMetadata, fqcn: &[u8]) -> Option<String> {

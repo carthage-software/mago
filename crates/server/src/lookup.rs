@@ -21,11 +21,11 @@ use mago_syntax_core::input::Input;
 /// directly. Variables are not tracked there, so this byte-level scan
 /// handles the only case the resolution map can't.
 #[derive(Debug, Clone, Copy)]
-pub struct VarAtCursor<'a> {
+pub struct VarAtCursor<'file> {
     /// Identifier text including the leading `$`.
-    pub raw: &'a [u8],
+    pub raw: &'file [u8],
     /// Identifier text without the leading `$`.
-    pub name: &'a [u8],
+    pub name: &'file [u8],
     pub start: u32,
     pub end: u32,
 }
@@ -33,6 +33,7 @@ pub struct VarAtCursor<'a> {
 /// Find the variable token (`$foo`) whose span covers `offset`. Operates
 /// on file bytes directly: walks back from the cursor to the `$` and
 /// forward to the end of the identifier. No lex required.
+#[must_use]
 pub fn variable_at_offset(file: &MagoFile, offset: u32) -> Option<VarAtCursor<'_>> {
     let bytes = file.contents.as_ref();
     let off = offset as usize;
@@ -78,10 +79,12 @@ fn is_var_char(b: u8) -> bool {
     b == b'_' || b.is_ascii_alphanumeric()
 }
 
-/// Lex `file` into a token vector. Backed by the per-file [`CacheEntry`]
-/// so repeated capability calls on the same file skip the state-machine
-/// lex entirely; the only per-call cost is the `Vec<Token<'_>>`
-/// reconstruction from cached offsets.
+/// Lex `file` into a token vector.
+///
+/// Backed by the per-file [`CacheEntry`] so repeated capability calls on the
+/// same file skip the state-machine lex entirely; the only per-call cost is
+/// the `Vec<Token<'_>>` reconstruction from cached offsets.
+#[must_use]
 pub fn lex(file: &MagoFile) -> Vec<Token<'_>> {
     let entry = cached_entry(file);
     let bytes = file.contents.as_ref();
@@ -96,10 +99,11 @@ pub fn lex(file: &MagoFile) -> Vec<Token<'_>> {
         .collect()
 }
 
-/// Drop cached lex entries for the given files. Called from the backend
-/// when files change so the next [`lex`] call rebuilds. The hash-check
-/// path also catches stale entries, but eager invalidation prevents the
-/// cache from growing with versions of the same file.
+/// Drop cached lex entries for the given files.
+///
+/// Called when files change so the next [`lex`] call rebuilds. The hash-check
+/// path also catches stale entries, but eager invalidation prevents the cache
+/// from growing with versions of the same file.
 pub fn invalidate(file_ids: &[FileId]) {
     if let Ok(mut guard) = cache().lock() {
         for id in file_ids {
@@ -109,6 +113,7 @@ pub fn invalidate(file_ids: &[FileId]) {
 }
 
 /// Returns `true` if a token is whitespace or a comment.
+#[must_use]
 pub fn is_trivia(kind: TokenKind) -> bool {
     matches!(
         kind,
