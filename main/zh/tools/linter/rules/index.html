@@ -4009,7 +4009,7 @@ class Foo
 <details class="rule" name="rule" id="no-fully-qualified-global-class-like">
 <summary><code class="rule__code">no-fully-qualified-global-class-like</code><a class="rule__anchor" href="#no-fully-qualified-global-class-like" aria-label="no-fully-qualified-global-class-like 的永久链接">¶</a><span class="rule__level rule__level--help">help</span></summary>
 <div class="rule__body">
-<p>Disallows fully-qualified class-like references within a namespace.</p>
+<p>Disallows fully-qualified class-like references that could be imported instead.</p>
 <p>Instead of using the backslash prefix (e.g., <code>new \DateTime()</code> or <code>\Exception</code>
 in a type hint), prefer an explicit <code>use</code> import statement. This improves
 readability and keeps imports centralized at the top of the file.</p>
@@ -4051,7 +4051,7 @@ function foo(DateTime $dt): Exception {}
 <details class="rule" name="rule" id="no-fully-qualified-global-constant">
 <summary><code class="rule__code">no-fully-qualified-global-constant</code><a class="rule__anchor" href="#no-fully-qualified-global-constant" aria-label="no-fully-qualified-global-constant 的永久链接">¶</a><span class="rule__level rule__level--help">help</span></summary>
 <div class="rule__body">
-<p>Disallows fully-qualified references to global constants within a namespace.</p>
+<p>Disallows fully-qualified references to global constants that could be shortened or imported.</p>
 <p>Instead of using the backslash prefix (e.g., <code>\PHP_VERSION</code>),
 prefer an explicit <code>use const</code> import statement. This improves
 readability and keeps imports centralized at the top of the file.</p>
@@ -4088,7 +4088,7 @@ $version = PHP_VERSION;
 <details class="rule" name="rule" id="no-fully-qualified-global-function">
 <summary><code class="rule__code">no-fully-qualified-global-function</code><a class="rule__anchor" href="#no-fully-qualified-global-function" aria-label="no-fully-qualified-global-function 的永久链接">¶</a><span class="rule__level rule__level--help">help</span></summary>
 <div class="rule__body">
-<p>Disallows fully-qualified references to global functions within a namespace.</p>
+<p>Disallows fully-qualified references to global functions that could be shortened or imported.</p>
 <p>Instead of using the backslash prefix (e.g., <code>\strlen()</code>),
 prefer an explicit <code>use function</code> import statement. This improves
 readability and keeps imports centralized at the top of the file.</p>
