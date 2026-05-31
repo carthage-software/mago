@@ -1,6 +1,7 @@
 use foldhash::HashSet;
 
 use mago_codex::identifier::method::MethodIdentifier;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::misc::GenericParent;
@@ -492,7 +493,7 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
     } else if !class_metadata.mixins.is_empty() {
         // Search mixins for the method. If has_magic_call is false, we track that
         // the method was found in a mixin without the required magic method.
-        let mixin_types = collect_mixin_types(class_metadata, outer_object, &class_metadata.mixins);
+        let mixin_types = collect_mixin_types(context.codebase, class_metadata, outer_object, &class_metadata.mixins);
 
         for (mixin_class_name, mixin_object) in mixin_types {
             let Some(mixin_metadata) = context.codebase.get_class_like(mixin_class_name.as_bytes()) else {
@@ -955,21 +956,37 @@ fn type_has_method_assertion(object_type: &TObject, method_name: &[u8]) -> bool 
     }
 }
 
-fn collect_mixin_types<'object>(
+fn collect_mixin_types(
+    codebase: &CodebaseMetadata,
     class_metadata: &ClassLikeMetadata,
-    outer_object: &'object TObject,
-    mixins: &'object [TUnion],
-) -> Vec<(Word, &'object TObject)> {
+    outer_object: &TObject,
+    mixins: &[TUnion],
+) -> Vec<(Word, TObject)> {
     let mut results = Vec::new();
+    let mut visited = HashSet::default();
+    collect_mixin_types_into(codebase, class_metadata, outer_object, mixins, &mut results, &mut visited);
+
+    results
+}
+
+fn collect_mixin_types_into(
+    codebase: &CodebaseMetadata,
+    class_metadata: &ClassLikeMetadata,
+    outer_object: &TObject,
+    mixins: &[TUnion],
+    results: &mut Vec<(Word, TObject)>,
+    visited: &mut HashSet<Word>,
+) {
+    let mut direct: Vec<(Word, &TObject)> = Vec::new();
 
     for mixin_type in mixins {
         for mixin_atomic in mixin_type.types.as_ref() {
             match mixin_atomic {
                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                    results.push((ascii_lowercase_word(named.name.as_bytes()), obj));
+                    direct.push((ascii_lowercase_word(named.name.as_bytes()), obj));
                 }
                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                    results.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
+                    direct.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
                 }
                 TAtomic::GenericParameter(TGenericParameter {
                     parameter_name, constraint, defining_entity, ..
@@ -986,11 +1003,11 @@ fn collect_mixin_types<'object>(
                         for atomic in concrete_type.types.as_ref() {
                             match atomic {
                                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                                    results.push((ascii_lowercase_word(named.name.as_bytes()), obj));
+                                    direct.push((ascii_lowercase_word(named.name.as_bytes()), obj));
                                     resolved = true;
                                 }
                                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                                    results.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
+                                    direct.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
                                     resolved = true;
                                 }
                                 _ => {}
@@ -998,15 +1015,14 @@ fn collect_mixin_types<'object>(
                         }
                     }
 
-                    // Fallback to constraint if we couldn't resolve
                     if !resolved {
                         for constraint_atomic in constraint.types.as_ref() {
                             match constraint_atomic {
                                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                                    results.push((ascii_lowercase_word(named.name.as_bytes()), obj));
+                                    direct.push((ascii_lowercase_word(named.name.as_bytes()), obj));
                                 }
                                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                                    results.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
+                                    direct.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
                                 }
                                 _ => {}
                             }
@@ -1018,5 +1034,17 @@ fn collect_mixin_types<'object>(
         }
     }
 
-    results
+    for (name, obj) in direct {
+        if !visited.insert(name) {
+            continue;
+        }
+
+        results.push((name, obj.clone()));
+
+        if let Some(mixin_metadata) = codebase.get_class_like(name.as_bytes())
+            && !mixin_metadata.mixins.is_empty()
+        {
+            collect_mixin_types_into(codebase, mixin_metadata, obj, &mixin_metadata.mixins, results, visited);
+        }
+    }
 }
