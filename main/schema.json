@@ -7807,7 +7807,7 @@
           "default": true
         },
         "null-type-hint": {
-          "description": "How to format null type hints.\n\nWith `Question`:\n```php\nfunction foo(\n    ?string $a,\n    null|int|string $b,\n    int|null|string $c,\n) {}\n```\n\nWith `NullPipe`:\n```php\nfunction foo(\n    null|string $a,\n    null|int|string $b,\n    int|null|string $c,\n) {}\n```\n\nWith `NullPipeLast`:\n```php\nfunction foo(\n    string|null $a,\n    int|string|null $b,\n    int|string|null $c,\n) {}\n```\n\nDefault: `Question`",
+          "description": "How to format null type hints.\n\nWith `Question`:\n```php\nfunction foo(\n    ?string $a,\n    int|string|null $b,\n    int|string|null $c,\n) {}\n```\n\nWith `NullPipe`:\n```php\nfunction foo(\n    null|string $a,\n    null|int|string $b,\n    int|null|string $c,\n) {}\n```\n\nWith `NullPipeLast`:\n```php\nfunction foo(\n    string|null $a,\n    int|string|null $b,\n    int|string|null $c,\n) {}\n```\n\nDefault: `Question`",
           "$ref": "#/$defs/NullTypeHint",
           "default": "question"
         },
