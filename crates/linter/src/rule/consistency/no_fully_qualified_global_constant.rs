@@ -56,7 +56,7 @@ impl LintRule for NoFullyQualifiedGlobalConstantRule {
             name: "No Fully Qualified Global Constant",
             code: "no-fully-qualified-global-constant",
             description: indoc! {"
-                Disallows fully-qualified references to global constants within a namespace.
+                Disallows fully-qualified references to global constants that could be shortened or imported.
 
                 Instead of using the backslash prefix (e.g., `\\PHP_VERSION`),
                 prefer an explicit `use const` import statement. This improves
@@ -96,10 +96,6 @@ impl LintRule for NoFullyQualifiedGlobalConstantRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        if ctx.scope.get_namespace().is_empty() {
-            return;
-        }
-
         let Node::ConstantAccess(access) = node else {
             return;
         };
@@ -192,13 +188,47 @@ mod tests {
         "#}
     }
 
-    test_lint_success! {
-        name = global_scope_fq_constant_is_not_flagged,
+    test_lint_fix! {
+        name = global_scope_fq_constant_drops_leading_slash,
         rule = NoFullyQualifiedGlobalConstantRule,
         code = indoc! {r#"
             <?php
 
             $version = \PHP_VERSION;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $version = PHP_VERSION;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = global_scope_namespaced_constant_is_imported,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            $v = \App\Config\VERSION;
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            use const App\Config\VERSION;
+
+            $v = VERSION;
+        "#}
+    }
+
+    test_lint_success! {
+        name = global_scope_fq_true_false_null_not_flagged,
+        rule = NoFullyQualifiedGlobalConstantRule,
+        code = indoc! {r#"
+            <?php
+
+            $a = \true;
+            $b = \false;
+            $c = \null;
         "#}
     }
 

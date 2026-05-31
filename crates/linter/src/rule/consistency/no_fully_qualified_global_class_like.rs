@@ -120,7 +120,7 @@ impl LintRule for NoFullyQualifiedGlobalClassLikeRule {
             name: "No Fully Qualified Global Class-Like",
             code: "no-fully-qualified-global-class-like",
             description: indoc! {"
-                Disallows fully-qualified class-like references within a namespace.
+                Disallows fully-qualified class-like references that could be imported instead.
 
                 Instead of using the backslash prefix (e.g., `new \\DateTime()` or `\\Exception`
                 in a type hint), prefer an explicit `use` import statement. This improves
@@ -177,10 +177,6 @@ impl LintRule for NoFullyQualifiedGlobalClassLikeRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        if ctx.scope.get_namespace().is_empty() {
-            return;
-        }
-
         match node {
             Node::Attribute(attribute) => {
                 self.report_if_fq(ctx, attribute.name);
@@ -270,13 +266,18 @@ mod tests {
         "#}
     }
 
-    test_lint_success! {
-        name = global_scope_fq_class_is_not_flagged,
+    test_lint_fix! {
+        name = global_scope_single_segment_fq_drops_leading_slash,
         rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
             $dt = new \DateTime();
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $dt = new DateTime();
         "#}
     }
 
@@ -661,13 +662,18 @@ mod tests {
         "#}
     }
 
-    test_lint_success! {
-        name = global_scope_single_segment_fq_not_flagged,
+    test_lint_fix! {
+        name = global_scope_single_segment_exception_drops_leading_slash,
         rule = NoFullyQualifiedGlobalClassLikeRule,
         code = indoc! {r#"
             <?php
 
-            $dt = new \DateTime();
+            throw new \RuntimeException('boom');
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            throw new RuntimeException('boom');
         "#}
     }
 
@@ -754,6 +760,139 @@ mod tests {
             class Admin {
                 use \Other\Shop;
             }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_global_multi_segment_class_constant,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            declare(strict_types=1);
+
+            return [
+                'activity_model' => \ExternalPackage\Models\Activity::class,
+            ];
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            declare(strict_types=1);
+
+            use ExternalPackage\Models\Activity;
+
+            return [
+                'activity_model' => Activity::class,
+            ];
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_global_multi_segment_no_declare,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            $x = new \Foo\Bar();
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            use Foo\Bar;
+
+            $x = new Bar();
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_global_multi_segment_static_call,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            $x = \App\Services\Mailer::make();
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            use App\Services\Mailer;
+
+            $x = Mailer::make();
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_global_multi_segment_extends,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            class Admin extends \Shop\User {}
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            use Shop\User;
+
+            class Admin extends User {}
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_global_multi_segment_type_hint,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            function handle(\App\Models\User $user): void {}
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            use App\Models\User;
+
+            function handle(User $user): void {}
+        "#}
+    }
+
+    test_lint_failure! {
+        name = global_multi_segment_instanceof_is_flagged,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            $ok = $value instanceof \App\Contracts\Stateful;
+        "#}
+    }
+
+    test_lint_fix! {
+        name = global_single_segment_static_call_drops_leading_slash,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            $dt = \DateTime::createFromFormat('Y', '2024');
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $dt = DateTime::createFromFormat('Y', '2024');
+        "#}
+    }
+
+    test_lint_fix! {
+        name = global_single_segment_type_hint_drops_leading_slash,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            function at(\DateTimeImmutable $when): void {}
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            function at(DateTimeImmutable $when): void {}
         "#}
     }
 }

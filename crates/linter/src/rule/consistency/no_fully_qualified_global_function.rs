@@ -59,7 +59,7 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
             name: "No Fully Qualified Global Function",
             code: "no-fully-qualified-global-function",
             description: indoc! {"
-                Disallows fully-qualified references to global functions within a namespace.
+                Disallows fully-qualified references to global functions that could be shortened or imported.
 
                 Instead of using the backslash prefix (e.g., `\\strlen()`),
                 prefer an explicit `use function` import statement. This improves
@@ -99,10 +99,6 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
     }
 
     fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
-        if ctx.scope.get_namespace().is_empty() {
-            return;
-        }
-
         let identifier = match node {
             Node::FunctionCall(call) => {
                 let Expression::Identifier(identifier) = call.function else {
@@ -273,13 +269,35 @@ mod tests {
         "#}
     }
 
-    test_lint_success! {
-        name = global_scope_fq_function_is_not_flagged,
+    test_lint_fix! {
+        name = global_scope_fq_function_drops_leading_slash,
         rule = NoFullyQualifiedGlobalFunctionRule,
         code = indoc! {r#"
             <?php
 
             $length = \strlen("hello");
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $length = strlen("hello");
+        "#}
+    }
+
+    test_lint_fix! {
+        name = global_scope_namespaced_function_is_imported,
+        rule = NoFullyQualifiedGlobalFunctionRule,
+        code = indoc! {r#"
+            <?php
+
+            $r = \App\Support\camel_case("foo_bar");
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            use function App\Support\camel_case;
+
+            $r = camel_case("foo_bar");
         "#}
     }
 
