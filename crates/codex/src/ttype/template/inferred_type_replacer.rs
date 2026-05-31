@@ -325,6 +325,9 @@ fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebas
                 *template_type.get_template_name_mut() = replaced_template_name;
             }
         },
+        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
+            *Arc::make_mut(constraint) = replace_atomic((**constraint).clone(), template_result, codebase);
+        }
         _ => (),
     }
 
