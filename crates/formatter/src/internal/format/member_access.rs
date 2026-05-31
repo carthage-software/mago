@@ -876,6 +876,15 @@ fn should_inline_first_access<'arena>(
     f: &FormatterState<'_, 'arena>,
     member_access_chain: &MemberAccessChain<'arena>,
 ) -> bool {
+    if let Some(first_access) = member_access_chain.accesses.first() {
+        let base_end = member_access_chain.base.span().end;
+        let first_op_start = first_access.get_operator_span().start;
+
+        if f.has_inner_comment(Span::new(f.file_id(), base_end, first_op_start)) {
+            return false;
+        }
+    }
+
     let preserve_same_line_first_method = f.settings.preserve_breaking_member_access_chain
         && f.settings.preserve_breaking_member_access_chain_first_method_on_same_line
         && member_access_chain.is_first_link_object_method_call()
