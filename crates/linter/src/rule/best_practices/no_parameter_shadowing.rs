@@ -55,8 +55,9 @@ impl LintRule for NoParameterShadowingRule {
             name: "No Parameter Shadowing",
             code: "no-parameter-shadowing",
             description: indoc! {"
-                Detects when a function or method parameter is shadowed by a loop variable
-                or catch variable, making the original parameter value inaccessible.
+                Detects when a function or method parameter is shadowed by a loop variable,
+                a catch variable, or a `global`/`static` declaration, making the original
+                parameter value inaccessible.
             "},
             good_example: indoc! {r"
                 <?php
@@ -124,7 +125,7 @@ impl LintRule for NoParameterShadowingRule {
 
             let mut issue = Issue::new(
                 self.cfg.level(),
-                format!("Parameter `{name_display}` is shadowed by a loop or catch variable."),
+                format!("Parameter `{name_display}` is shadowed by a loop, catch, `global`, or `static` variable."),
             )
             .with_code(self.meta.code)
             .with_annotation(
@@ -141,7 +142,7 @@ impl LintRule for NoParameterShadowingRule {
 
             issue = issue
                 .with_note(
-                    "Reusing a parameter name as a loop or catch variable makes the original value inaccessible.",
+                    "Reusing a parameter name as a loop, catch, `global`, or `static` variable makes the original value inaccessible.",
                 )
                 .with_help(format!("Rename the variable to avoid shadowing the `{name_display}` parameter."));
 
@@ -184,6 +185,21 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for ShadowCollector<'_, 'arena> {
 
     fn walk_in_try_catch_clause(&mut self, clause: &'ast TryCatchClause<'arena>, _: &mut ()) {
         if let Some(var) = &clause.variable {
+            self.check_variable(var.name, var.span);
+        }
+    }
+
+    fn walk_in_global(&mut self, global: &'ast Global<'arena>, _: &mut ()) {
+        for variable in global.variables.iter() {
+            if let Variable::Direct(var) = variable {
+                self.check_variable(var.name, var.span);
+            }
+        }
+    }
+
+    fn walk_in_static(&mut self, r#static: &'ast Static<'arena>, _: &mut ()) {
+        for item in r#static.items.iter() {
+            let var = item.variable();
             self.check_variable(var.name, var.span);
         }
     }
@@ -338,6 +354,48 @@ mod tests {
                     echo $key;
                 }
             };
+        "}
+    }
+
+    test_lint_failure! {
+        name = global_shadows_param,
+        rule = NoParameterShadowingRule,
+        code = indoc! {r"
+            <?php
+
+            function test(int &$out): void {
+                global $out;
+
+                $out = 42;
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = static_shadows_param,
+        rule = NoParameterShadowingRule,
+        code = indoc! {r"
+            <?php
+
+            function test(int $count): void {
+                static $count = 0;
+
+                $count++;
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = global_unrelated_name,
+        rule = NoParameterShadowingRule,
+        code = indoc! {r"
+            <?php
+
+            function test(int $value): void {
+                global $registry;
+
+                $registry[$value] = true;
+            }
         "}
     }
 }

@@ -10,6 +10,7 @@ use mago_syntax::walker::MutWalker;
 
 pub trait Recorder<'arena> {
     fn declare_external(&mut self, name: &'arena [u8]);
+    fn record_external_rebind(&mut self, name: &'arena [u8], span: Span);
     fn record_write(&mut self, name: &'arena [u8], span: Span);
     fn record_read(&mut self, name: &'arena [u8]);
     fn record_read_then_write(&mut self, name: &'arena [u8], span: Span);
@@ -56,6 +57,10 @@ impl<'arena> RedundantRecorder<'arena> {
 
 impl<'arena> Recorder<'arena> for RedundantRecorder<'arena> {
     fn declare_external(&mut self, name: &'arena [u8]) {
+        self.entry(name).do_not_flag = true;
+    }
+
+    fn record_external_rebind(&mut self, name: &'arena [u8], _span: Span) {
         self.entry(name).do_not_flag = true;
     }
 
@@ -156,12 +161,20 @@ impl<'arena> Recorder<'arena> for DeadStoreRecorder<'arena> {
         self.entry(name).do_not_flag = true;
     }
 
+    fn record_external_rebind(&mut self, name: &'arena [u8], span: Span) {
+        self.record_write(name, span);
+        let info = self.entry(name);
+        info.do_not_flag = true;
+        info.pending_write = None;
+    }
+
     fn record_write(&mut self, name: &'arena [u8], span: Span) {
         let arm = self.current_arm();
         let info = self.entry(name);
         let prev = info.pending_write.replace((span, arm));
         if let Some((prev_span, prev_arm)) = prev
             && prev_arm == arm
+            && !info.do_not_flag
         {
             info.dead_stores.push(prev_span);
         }
@@ -238,6 +251,8 @@ pub struct UsageCollector<'arena> {
 
 impl<'arena> Recorder<'arena> for UsageCollector<'arena> {
     fn declare_external(&mut self, _name: &'arena [u8]) {}
+
+    fn record_external_rebind(&mut self, _name: &'arena [u8], _span: Span) {}
 
     fn record_write(&mut self, name: &'arena [u8], _span: Span) {
         self.referenced.insert(name);
@@ -742,7 +757,7 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
     fn walk_global(&mut self, g: &'ast Global<'arena>, _: &mut ()) {
         for v in g.variables.iter() {
             if let Variable::Direct(d) = v {
-                self.rec.declare_external(d.name);
+                self.rec.record_external_rebind(d.name, d.span);
             } else {
                 self.rec.bail();
                 return;
@@ -752,7 +767,8 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
 
     fn walk_static(&mut self, s: &'ast Static<'arena>, ctx: &mut ()) {
         for item in s.items.iter() {
-            self.rec.declare_external(item.variable().name);
+            let variable = item.variable();
+            self.rec.record_external_rebind(variable.name, variable.span);
             if let StaticItem::Concrete(c) = item {
                 self.walk_expression(c.value, ctx);
             }

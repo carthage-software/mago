@@ -65,7 +65,9 @@ impl LintRule for NoDeadStoreRule {
                 code like `if ($cond) { $x = 1; } else { $x = 2; } return $x;`.
 
                 Variables whose name starts with an underscore (`$_`, `$_foo`) are ignored.
-                Variables declared via `global` or `static` are also ignored.
+                A `global` or `static` declaration counts as an overwrite, so a plain
+                assignment whose value is discarded by a following `global`/`static` of the
+                same name is reported; assignments to the bound variable afterwards are not.
 
                 The rule analyses one function-like scope at a time. It bails out of any scope
                 that uses variable variables (`$$x`, `${expr}`) or calls `extract()`.
@@ -116,10 +118,6 @@ impl LintRule for NoDeadStoreRule {
         }
 
         for (name, info) in &usage.info {
-            if info.do_not_flag {
-                continue;
-            }
-
             if variable_usage::is_silenced_name(name) {
                 continue;
             }
@@ -323,6 +321,66 @@ mod tests {
                 }
                 some($k);
                 some($v);
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = store_clobbered_by_global,
+        rule = NoDeadStoreRule,
+        code = indoc! {r#"
+            <?php
+
+            function f() {
+                $v = 42;
+                global $v;
+                $v = compute();
+                return $v;
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = store_clobbered_by_static,
+        rule = NoDeadStoreRule,
+        code = indoc! {r#"
+            <?php
+
+            function f() {
+                $v = 42;
+                static $v;
+                $v = compute();
+                return $v;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = global_then_store_is_not_dead,
+        rule = NoDeadStoreRule,
+        code = indoc! {r#"
+            <?php
+
+            function f() {
+                global $registry;
+                $registry = 1;
+                $registry = 2;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = read_before_global_is_not_dead,
+        rule = NoDeadStoreRule,
+        code = indoc! {r#"
+            <?php
+
+            function f() {
+                $v = 42;
+                echo $v;
+                global $v;
+                $v = 1;
+                return $v;
             }
         "#}
     }
