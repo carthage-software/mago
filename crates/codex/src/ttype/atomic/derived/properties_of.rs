@@ -109,7 +109,15 @@ impl TPropertiesOf {
                         needs_unsealed = true;
                     }
 
-                    for (prop_name, property_metadata) in &class_like_metadata.properties {
+                    for (prop_name, declaring_class) in &class_like_metadata.declaring_property_ids {
+                        let Some(declaring_metadata) = codebase.get_class_like(declaring_class.as_bytes()) else {
+                            continue;
+                        };
+
+                        let Some(property_metadata) = declaring_metadata.properties.get(prop_name) else {
+                            continue;
+                        };
+
                         // Filter by visibility if specified
                         if let Some(required_visibility) = visibility_filter
                             && property_metadata.read_visibility != required_visibility

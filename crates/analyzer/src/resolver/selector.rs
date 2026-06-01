@@ -1,4 +1,5 @@
 use mago_codex::ttype::TType;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -157,6 +158,17 @@ fn resolve_selector_from_type(
 
     let mut resolved_selectors = vec![];
     for atomic in selector_type.types.as_ref() {
+        if let TAtomic::GenericParameter(parameter) = atomic {
+            resolved_selectors.extend(resolve_selector_from_type(
+                context,
+                Some(parameter.get_constraint()),
+                selector_span,
+                kind,
+            ));
+
+            continue;
+        }
+
         if let Some(literal_string) = atomic.get_literal_string_value() {
             resolved_selectors.push(ResolvedSelector::LiteralString(word(literal_string)));
             continue;

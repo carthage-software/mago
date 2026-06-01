@@ -1004,13 +1004,21 @@ fn expand_properties_of(
     let mut target_type = properties_of.get_target_type().clone();
     expand_union(codebase, &mut target_type, options);
 
-    let Some(keyed_array) =
+    let Some(mut keyed_array) =
         TPropertiesOf::get_properties_of_targets(&target_type.types, codebase, properties_of.visibility(), false)
     else {
         return vec![TAtomic::Derived(TDerived::PropertiesOf(properties_of.clone()))];
     };
 
-    vec![keyed_array]
+    let mut skip_keyed_array = false;
+    let mut expanded_parts = vec![];
+    expand_atomic(&mut keyed_array, codebase, options, &mut skip_keyed_array, &mut expanded_parts);
+    if skip_keyed_array {
+        expanded_parts
+    } else {
+        expanded_parts.push(keyed_array);
+        expanded_parts
+    }
 }
 
 #[cold]
