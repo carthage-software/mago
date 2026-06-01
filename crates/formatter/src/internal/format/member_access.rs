@@ -785,22 +785,18 @@ pub(super) fn print_member_access_chain<'arena>(
     let group_id = f.next_id();
 
     let mut last_element_end = member_access_chain.base.span().end;
-    // Handle the first access
 
-    if should_inline_first_access(f, member_access_chain)
-        && let Some((_, first_chain_link)) = accesses_iter.next()
-    {
-        // Format the base object and first method call together
-        parts.push(format_access_operator(
-            f,
-            first_chain_link.get_operator_span(),
-            first_chain_link.get_operator_as_bytes(),
-        ));
+    for _ in 0..inline_prefix_len(f, member_access_chain) {
+        let Some((_, chain_link)) = accesses_iter.next() else {
+            break;
+        };
 
-        let selector = first_chain_link.get_selector();
+        parts.push(format_access_operator(f, chain_link.get_operator_span(), chain_link.get_operator_as_bytes()));
+
+        let selector = chain_link.get_selector();
         parts.push(selector.format(f));
         last_element_end = selector.span().end;
-        if let Some(argument_list) = first_chain_link.get_arguments_list() {
+        if let Some(argument_list) = chain_link.get_arguments_list() {
             let mut formatted_argument_list = vec![in f.arena; print_argument_list(f, argument_list, false, true)];
             if let Some(comments) = f.print_trailing_comments(argument_list.span()) {
                 formatted_argument_list.push(comments);
@@ -870,6 +866,36 @@ pub(super) fn print_member_access_chain<'arena>(
 
     // Wrap everything in a group to manage line breaking
     Document::Group(Group::new(parts).with_id(group_id))
+}
+
+fn inline_prefix_len<'arena>(f: &FormatterState<'_, 'arena>, member_access_chain: &MemberAccessChain<'arena>) -> usize {
+    if !should_inline_first_access(f, member_access_chain) {
+        return 0;
+    }
+
+    if !f.settings.method_chain_breaking_style.is_next_line()
+        && member_access_chain.accesses.first().is_some_and(MemberAccess::is_property_access)
+        && !preserve_breaks_first_method(f, member_access_chain)
+    {
+        for (index, access) in member_access_chain.accesses.iter().enumerate() {
+            if !access.is_property_access() {
+                return index + 1;
+            }
+        }
+    }
+
+    1
+}
+
+fn preserve_breaks_first_method<'arena>(
+    f: &FormatterState<'_, 'arena>,
+    member_access_chain: &MemberAccessChain<'arena>,
+) -> bool {
+    f.settings.preserve_breaking_member_access_chain
+        && !f.settings.preserve_breaking_member_access_chain_first_method_on_same_line
+        && (member_access_chain.is_first_link_already_broken(f)
+            || member_access_chain.has_break_after_first_access(f)
+            || member_access_chain.exceeds_print_width(f))
 }
 
 fn should_inline_first_access<'arena>(
