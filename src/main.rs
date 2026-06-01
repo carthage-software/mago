@@ -70,6 +70,7 @@ mod config;
 mod consts;
 mod error;
 mod extensions;
+mod language_server;
 mod macros;
 mod service;
 mod updater;
@@ -225,6 +226,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         command,
         ..
     } = arguments;
+    let workspace_override = workspace.clone();
 
     let config_load_start = trace_enabled.then(Instant::now);
     let mut configuration = Configuration::load(
@@ -286,6 +288,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         MagoCommand::Guard(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::InspectBaseline(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
+        MagoCommand::LanguageServer(cmd) => cmd.execute(configuration, workspace_override),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }
