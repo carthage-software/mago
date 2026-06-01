@@ -23,6 +23,7 @@ serde = { workspace = true, optional = true }
 unicode-width = { workspace = true }
 mago-allocator = { workspace = true }
 schemars = { workspace = true }
+strum = { workspace = true }
 
 [features]
 default = []
