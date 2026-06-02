@@ -5,6 +5,7 @@ use mago_php_version::PHPVersionRange;
 use serde::Deserialize;
 use serde::Serialize;
 
+use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
 use mago_word::Word;
@@ -12,6 +13,7 @@ use mago_word::WordMap;
 use mago_word::WordSet;
 
 use crate::assertion::Assertion;
+use crate::issue::ScanningIssueKind;
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::class_like::TemplateTypes;
 use crate::metadata::flags::MetadataFlags;
@@ -332,5 +334,173 @@ impl FunctionLikeMetadata {
     #[inline]
     pub fn add_template_type(&mut self, name: Word, constraint: GenericTemplate) {
         self.template_types.insert(name, constraint);
+    }
+
+    /// Applies a patch to this entry in place, refining type information only.
+    ///
+    /// Refined fields — return type, per-parameter types, `@param-out`, default-value types,
+    /// `@throws`, `@template`, and assertions — are each copied only when the patch specifies
+    /// them, so a sparsely-typed patch never erases richer existing information. Structural
+    /// identity (span, file, kind, parameter count, visibility) is left to whichever non-patch
+    /// source declared the symbol. Diagnostics are appended to `patch.issues`; the full set of
+    /// patching rules is documented in the `[source]` patching guide.
+    pub fn apply_patch(&mut self, patch: &mut FunctionLikeMetadata) {
+        // A parameter count or name mismatch means types cannot be mapped positionally;
+        // reject the patch wholesale rather than risk a silent misapply.
+        if self.report_parameter_count_mismatch(patch) || self.report_parameter_name_mismatch(patch) {
+            return;
+        }
+
+        self.report_method_structural_mismatch(patch);
+
+        self.patch_return_type(patch);
+        self.patch_parameters(patch);
+        self.patch_templates(patch);
+        self.patch_throws_and_assertions(patch);
+    }
+
+    /// Reports a parameter count mismatch between the patch and the original.
+    ///
+    /// Returns `true` when the counts differ, in which case the patch must be rejected
+    /// wholesale — there is no sensible positional mapping.
+    fn report_parameter_count_mismatch(&self, patch: &mut FunctionLikeMetadata) -> bool {
+        if patch.parameters.len() == self.parameters.len() {
+            return false;
+        }
+
+        patch.issues.push(
+            Issue::error(format!(
+                "Patch for `{}` declares {} parameter(s) but the original has {}; \
+                 patches cannot change the number of parameters.",
+                patch.original_name,
+                patch.parameters.len(),
+                self.parameters.len(),
+            ))
+            .with_code(ScanningIssueKind::PatchFunctionParameterMismatch)
+            .with_annotation(Annotation::primary(patch.span))
+            .with_help(format!(
+                "Declare exactly {} parameter(s) in the patch to match the original signature. \
+                 Patches refine parameter types only and cannot add or remove parameters.",
+                self.parameters.len(),
+            )),
+        );
+
+        true
+    }
+
+    /// Reports a parameter name mismatch at any position.
+    ///
+    /// Types are refined by position, so a name mismatch (a wrong order, or a patch drifted
+    /// out of sync with the vendor code) would apply them to the wrong parameter. Returns
+    /// `true` on the first mismatch so the patch is rejected wholesale.
+    fn report_parameter_name_mismatch(&self, patch: &mut FunctionLikeMetadata) -> bool {
+        for (index, (base_param, patch_param)) in self.parameters.iter().zip(patch.parameters.iter()).enumerate() {
+            if base_param.name != patch_param.name {
+                patch.issues.push(
+                    Issue::error(format!(
+                        "Patch for `{}` names parameter #{} `{}` but the original declares `{}` there; \
+                         patches refine parameter types by position and the names must match.",
+                        patch.original_name,
+                        index + 1,
+                        patch_param.name.0,
+                        base_param.name.0,
+                    ))
+                    .with_code(ScanningIssueKind::PatchFunctionParameterNameMismatch)
+                    .with_annotation(Annotation::primary(patch_param.name_span))
+                    .with_help(
+                        "Declare the patch's parameters with the same names in the same order as the \
+                         original signature so their types are applied to the intended parameters.",
+                    ),
+                );
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Reports structural method-attribute mismatches.
+    ///
+    /// For methods, visibility, abstract, static, and removing final are all structural
+    /// changes a patch may not make. Adding final is allowed. This is reported as an error
+    /// but does not abort the patch — type annotations are still applied.
+    fn report_method_structural_mismatch(&self, patch: &mut FunctionLikeMetadata) {
+        let (Some(patch_m), Some(base_m)) = (&patch.method_metadata, &self.method_metadata) else {
+            return;
+        };
+
+        let visibility_mismatch = patch_m.visibility != base_m.visibility;
+        let abstract_mismatch = patch_m.is_abstract != base_m.is_abstract;
+        let static_mismatch = patch_m.is_static != base_m.is_static;
+        let final_removed = base_m.is_final && !patch_m.is_final;
+
+        if visibility_mismatch || abstract_mismatch || static_mismatch || final_removed {
+            patch.issues.push(
+                Issue::error(format!(
+                    "Patch for `{}` declares structural attributes (visibility, abstract, static, or \
+                     removing final) that differ from the original; only type annotations are applied.",
+                    patch.original_name,
+                ))
+                .with_code(ScanningIssueKind::PatchMethodStructuralMismatch)
+                .with_annotation(Annotation::primary(patch.span))
+                .with_help(
+                    "Declare the method with the same visibility and the same `abstract`, \
+                     `static`, and `final` modifiers as the original (adding `final` is allowed); \
+                     a patch may only refine the method's types.",
+                ),
+            );
+        }
+    }
+
+    /// Refines the return type (declaration and docblock) when the patch specifies it.
+    fn patch_return_type(&mut self, patch: &FunctionLikeMetadata) {
+        if let Some(decl) = &patch.return_type_declaration_metadata {
+            self.return_type_declaration_metadata = Some(decl.clone());
+        }
+        if let Some(ty) = &patch.return_type_metadata {
+            self.return_type_metadata = Some(ty.clone());
+        }
+    }
+
+    /// Refines per-parameter types by position; each field is copied only when the patch
+    /// specifies it, so a sparsely-typed patch does not erase richer existing information.
+    fn patch_parameters(&mut self, patch: &FunctionLikeMetadata) {
+        for (slot, replacement) in self.parameters.iter_mut().zip(patch.parameters.iter()) {
+            if let Some(decl) = &replacement.type_declaration_metadata {
+                slot.type_declaration_metadata = Some(decl.clone());
+            }
+            if let Some(ty) = &replacement.type_metadata {
+                slot.type_metadata = Some(ty.clone());
+            }
+            if let Some(out) = &replacement.out_type {
+                slot.out_type = Some(out.clone());
+            }
+            if let Some(default) = &replacement.default_type {
+                slot.default_type = Some(default.clone());
+            }
+        }
+    }
+
+    /// Merges `@template` declarations from the patch.
+    fn patch_templates(&mut self, patch: &FunctionLikeMetadata) {
+        if !patch.template_types.is_empty() {
+            self.template_types.extend(patch.template_types.iter().map(|(k, v)| (*k, v.clone())));
+        }
+    }
+
+    /// Replaces `@throws` and `@psalm-assert`-style annotations when the patch declares any.
+    fn patch_throws_and_assertions(&mut self, patch: &FunctionLikeMetadata) {
+        if !patch.thrown_types.is_empty() {
+            self.thrown_types.clone_from(&patch.thrown_types);
+        }
+        if !patch.assertions.is_empty() {
+            self.assertions = patch.assertions.clone();
+        }
+        if !patch.if_true_assertions.is_empty() {
+            self.if_true_assertions = patch.if_true_assertions.clone();
+        }
+        if !patch.if_false_assertions.is_empty() {
+            self.if_false_assertions = patch.if_false_assertions.clone();
+        }
     }
 }

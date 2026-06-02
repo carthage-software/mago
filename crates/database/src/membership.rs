@@ -37,6 +37,7 @@ pub struct WorkspaceMatcher {
     path_excludes: Vec<PathBuf>,
     host_bases: Vec<(PathBuf, usize)>,
     include_bases: Vec<(PathBuf, usize)>,
+    patch_bases: Vec<(PathBuf, usize)>,
 }
 
 impl WorkspaceMatcher {
@@ -98,19 +99,21 @@ impl WorkspaceMatcher {
         };
 
         let include_bases = make_bases(&configuration.includes);
+        let patch_bases = make_bases(&configuration.patches);
 
-        Ok(Self { workspace, extensions, glob_excludes, path_excludes, host_bases, include_bases })
+        Ok(Self { workspace, extensions, glob_excludes, path_excludes, host_bases, include_bases, patch_bases })
     }
 
-    /// Returns the [`FileType`] for `path` if it would be part of the database,
+    /// Returns the [`FileType`] for `file` if it would be part of the database,
     /// or `None` if the path lies outside every configured root or is excluded.
     #[must_use]
-    pub fn classify(&self, path: &Path) -> Option<FileType> {
-        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    pub fn classify(&self, file: &Path) -> Option<FileType> {
+        let canonical = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
 
         let host = max_specificity(&self.host_bases, &canonical);
         let include = max_specificity(&self.include_bases, &canonical);
-        if host.is_none() && include.is_none() {
+        let patch = max_specificity(&self.patch_bases, &canonical);
+        if host.is_none() && include.is_none() && patch.is_none() {
             return None;
         }
 
@@ -119,12 +122,17 @@ impl WorkspaceMatcher {
         }
 
         let extension_ok = canonical.extension().is_some_and(|ext| self.extensions.contains(ext));
-        let exact_base = self.host_bases.iter().chain(self.include_bases.iter()).any(|(base, _)| base == &canonical);
+        let exact_base = self
+            .host_bases
+            .iter()
+            .chain(self.include_bases.iter())
+            .chain(self.patch_bases.iter())
+            .any(|(base, _)| base == &canonical);
         if !extension_ok && !exact_base {
             return None;
         }
 
-        Some(resolve_file_type((host, include)))
+        Some(resolve_file_type(host, include, patch))
     }
 
     /// Returns `true` if `path` would be part of the database.
@@ -203,6 +211,7 @@ mod tests {
             workspace: Cow::Owned(dir.path().to_path_buf()),
             paths: paths.iter().map(|s| Cow::Owned(s.as_bytes().to_vec())).collect(),
             includes: includes.iter().map(|s| Cow::Owned(s.as_bytes().to_vec())).collect(),
+            patches: Vec::new(),
             excludes,
             extensions: vec![Cow::Borrowed(b"php")],
             glob: GlobSettings::default(),
@@ -273,6 +282,30 @@ mod tests {
         let matcher = matcher(&config(&dir, &["src"], &["vendor/foo"], excludes));
 
         assert_eq!(matcher.classify(&dir.path().join("vendor/foo/Lib.php")), None);
+    }
+
+    #[test]
+    fn patch_path_is_tracked_as_patch() {
+        let dir = TempDir::new().unwrap();
+        touch(&dir, "stubs/Override.php");
+        let mut configuration = config(&dir, &["src"], &[], vec![]);
+        configuration.patches = vec![Cow::Owned(b"stubs".to_vec())];
+        let matcher = matcher(&configuration);
+
+        assert_eq!(matcher.classify(&dir.path().join("stubs/Override.php")), Some(FileType::Patch));
+    }
+
+    #[test]
+    fn patch_beats_vendored_at_equal_specificity() {
+        // Mirrors the loader's USER_DEFINED > PATCH > BUILT_IN > VENDORED tier order: a file
+        // covered by both `includes` and `patches` at the same specificity resolves to Patch.
+        let dir = TempDir::new().unwrap();
+        touch(&dir, "lib/Lib.php");
+        let mut configuration = config(&dir, &["src"], &["lib"], vec![]);
+        configuration.patches = vec![Cow::Owned(b"lib".to_vec())];
+        let matcher = matcher(&configuration);
+
+        assert_eq!(matcher.classify(&dir.path().join("lib/Lib.php")), Some(FileType::Patch));
     }
 
     #[test]

@@ -169,12 +169,13 @@ For exact pins, this resolves directly to that release tag. For major or minor p
 
 The `[source]` section controls how Mago discovers and processes files.
 
-### Three categories of paths
+### Four categories of paths
 
-Mago distinguishes between your code, third-party code, and code to ignore entirely:
+Mago distinguishes between your code, third-party code, patches to third-party code, and code to ignore entirely:
 
 - **`paths`** are your source files. Mago analyses, lints, and formats them.
 - **`includes`** are dependencies (typically `vendor`). Mago parses them so it can resolve symbols and types, but never analyses, lints, or rewrites them.
+- **`patches`** are PHP files that override type information for vendored or built-in code. Mago honours their type declarations and PHPDoc — which take precedence over `includes` and built-ins — but never analyses, lints, or formats them. See [Patching vendor types](#patching-vendor-types) for what a patch may change.
 - **`excludes`** are paths or globs Mago ignores entirely. They apply to every tool.
 
 If a file matches both `paths` and `includes`, the more specific pattern wins. Exact file paths are most specific, then deeper directory paths, then shallow ones, then glob patterns. When patterns are equally specific, `includes` wins, which lets you explicitly mark a path as a dependency.
@@ -182,16 +183,18 @@ If a file matches both `paths` and `includes`, the more specific pattern wins. E
 ```toml
 [source]
 paths     = ["src", "tests"]
+patches   = ["patches"]
 includes  = ["vendor"]
 excludes  = ["cache/**", "build/**", "var/**"]
 extensions = ["php"]
 ```
 
-Glob patterns work in all three lists:
+Glob patterns work in all four lists:
 
 ```toml
 [source]
 paths    = ["src/**/*.php"]
+patches  = ["patches/**/*.php"]
 includes = ["vendor/symfony/**/*.php"]   # only Symfony from vendor
 excludes = [
   "**/*_generated.php",
@@ -206,8 +209,34 @@ excludes = [
 | :--- | :--- | :--- | :--- |
 | `paths` | string list | `[]` | Directories or globs for your source code. If empty, the entire workspace is scanned. |
 | `includes` | string list | `[]` | Directories or globs for third-party code Mago should parse but not modify. |
+| `patches` | string list | `[]` | Directories or globs for type patches. Their PHPDoc and type declarations override those from `includes` and built-ins. Not analysed, linted, or formatted. |
 | `excludes` | string list | `[]` | Globs or paths excluded from every tool. |
 | `extensions` | string list | `["php"]` | File extensions treated as PHP. |
+
+### Patching vendor types
+
+A patch is a plain PHP file that redeclares a vendored or built-in symbol by its fully-qualified name. Mago reads only the type information from it; the body is ignored. A patch **refines** an existing symbol — it never replaces it, and it can never make a symbol exist that the vendor code does not already declare.
+
+At most one patch may target a given symbol. If two patches target the same symbol, Mago reports a diagnostic on the conflicting patches rather than silently picking one — merge them into a single patch or remove all but one.
+
+**What a patch may refine**
+
+- Method signatures: parameter types, return type, `@throws`, `@template`, and `@psalm-assert`-style assertions. Each field is applied only when the patch specifies it, so a sparsely-typed patch never erases richer information already known.
+- Property and constant types.
+- Class-level `@template` declarations (existing ones are refined by name, new ones are appended) and type aliases.
+- Magic members: `@method`, `@property`, `@property-read`, and `@property-write` annotations may be added even when no such member exists on the original, because they are pure type annotations for `__call`/`__get`/`__set`.
+
+**What a patch may not change**
+
+Each of these is reported as a diagnostic on the patch file:
+
+- **New members.** A method, property, or constant that does not exist on the symbol or any of its ancestors cannot be introduced (use the magic-member annotations above instead). A method *inherited* from an ancestor may be overridden.
+- **Kind.** The patch must declare the same kind (class, interface, enum, …) as the original; a mismatch rejects the whole patch.
+- **Hierarchy.** `extends`, `implements`, `@require-extends`, and `@require-implements` need not be restated, but if restated must match the original exactly; a mismatch rejects the whole patch.
+- **Trait usage.** `use` trait statements are never valid in a patch.
+- **`readonly class` modifier** and **enum cases** are structural and cannot be changed.
+- **Member modifiers.** Visibility, `static`, `abstract`, property hooks, and removing `final` must match the original (adding `final` is allowed). On a mismatch the modifier change is ignored, but the refined types are still applied.
+- **Parameter count and names.** A method or function patch must declare the same parameters, in the same order, with the same names — types are mapped by position, so any divergence rejects the whole patch.
 
 ### Glob settings
 
@@ -257,7 +286,7 @@ prefer-static-closure = { exclude = ["tests/"] }
 no-global             = { exclude = ["**/*Test.php"] }
 ```
 
-> Use `mago list-files` to verify which files Mago will process. `mago list-files --command formatter` shows what the formatter will touch, `--command analyzer` shows the analyzer's view, and so on.
+> Use `mago list-files` to verify which files Mago will process. `mago list-files --command formatter` shows what the formatter will touch, `--command analyzer` shows the analyzer's view, and so on. This helps verify your `paths`, `includes`, `patches`, and `excludes` configuration is working as expected.
 
 ## `[parser]`
 

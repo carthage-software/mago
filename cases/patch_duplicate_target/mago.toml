@@ -1,0 +1,6 @@
+extends = "../defaults.toml"
+
+[source]
+paths = ["source.php"]
+includes = ["vendor.php"]
+patches = ["patch.php", "patch2.php"]

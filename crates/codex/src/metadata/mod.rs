@@ -8,6 +8,8 @@ use serde::Serialize;
 
 use mago_database::file::File;
 use mago_database::file::FileId;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_span::Span;
 use mago_word::Word;
@@ -20,6 +22,7 @@ use mago_word::word;
 
 use crate::diff::CodebaseDiff;
 use crate::identifier::method::MethodIdentifier;
+use crate::issue::ScanningIssueKind;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::constant::ConstantMetadata;
@@ -98,6 +101,21 @@ pub struct CodebaseMetadata {
     /// Each `FileSignature` contains a hierarchical tree of `DefSignatureNode` representing
     /// top-level symbols (classes, functions, constants) and their nested members (methods, properties).
     pub file_signatures: HashMap<FileId, FileSignature>,
+    /// Per-patch class-like metadata, keyed by FQCN.
+    ///
+    /// Vendor and patch files declare symbols under the same FQCN, so patches cannot share
+    /// the `class_likes` map. At most one patch may target a given symbol; a second patch for
+    /// the same FQCN is diagnosed as a [`PatchDuplicateTarget`](ScanningIssueKind::PatchDuplicateTarget)
+    /// rather than silently overwriting the first. Entries here are folded into `class_likes`
+    /// by [`apply_patches_pass`](Self::apply_patches_pass).
+    pub patch_class_likes: WordMap<ClassLikeMetadata>,
+    /// Per-patch function-like metadata, keyed by `(scope, name)`.
+    ///
+    /// The key matches the existing `function_likes` key shape: the FQCN for methods,
+    /// `empty_word()` for free functions.
+    pub patch_function_likes: HashMap<(Word, Word), FunctionLikeMetadata>,
+    /// Per-patch constant metadata, keyed by FQN.
+    pub patch_constants: WordMap<ConstantMetadata>,
 }
 
 impl CodebaseMetadata {
@@ -1018,6 +1036,9 @@ impl CodebaseMetadata {
         self.safe_symbols.extend(other.safe_symbols);
         self.safe_symbol_members.extend(other.safe_symbol_members);
         self.infer_types_from_usage |= other.infer_types_from_usage;
+        self.merge_patch_class_likes(other.patch_class_likes);
+        self.merge_patch_function_likes(other.patch_function_likes);
+        self.merge_patch_constants(other.patch_constants);
     }
 
     /// Extends this codebase with another by reference, cloning only individual entries.
@@ -1093,6 +1114,183 @@ impl CodebaseMetadata {
         self.safe_symbols.extend(other.safe_symbols.iter().copied());
         self.safe_symbol_members.extend(other.safe_symbol_members.iter().copied());
         self.infer_types_from_usage |= other.infer_types_from_usage;
+        self.merge_patch_class_likes(other.patch_class_likes.iter().map(|(k, v)| (*k, v.clone())));
+        self.merge_patch_function_likes(other.patch_function_likes.iter().map(|(k, v)| (*k, v.clone())));
+        self.merge_patch_constants(other.patch_constants.iter().map(|(k, v)| (*k, v.clone())));
+    }
+
+    /// Merges patch class-likes from another codebase, diagnosing collisions.
+    ///
+    /// At most one patch may target a given symbol. When two patches collide, the first-merged
+    /// entry is kept and a [`PatchDuplicateTarget`](ScanningIssueKind::PatchDuplicateTarget)
+    /// diagnostic referencing both sites is attached to it, rather than letting one silently
+    /// overwrite the other in hash-order.
+    fn merge_patch_class_likes(&mut self, incoming: impl IntoIterator<Item = (Word, ClassLikeMetadata)>) {
+        for (k, v) in incoming {
+            match self.patch_class_likes.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    let diagnostic = duplicate_patch_class_diagnostic(entry.get(), &v);
+                    entry.get_mut().issues.push(diagnostic);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(v);
+                }
+            }
+        }
+    }
+
+    /// Merges patch function-likes from another codebase, diagnosing collisions on free
+    /// functions. Method collisions are subsumed by the enclosing class's duplicate
+    /// diagnostic, so only keys with an empty class component are reported here.
+    fn merge_patch_function_likes(&mut self, incoming: impl IntoIterator<Item = ((Word, Word), FunctionLikeMetadata)>) {
+        for (k, v) in incoming {
+            match self.patch_function_likes.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    if k.0.is_empty() {
+                        let diagnostic = duplicate_patch_function_diagnostic(entry.get(), &v);
+                        entry.get_mut().issues.push(diagnostic);
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(v);
+                }
+            }
+        }
+    }
+
+    /// Merges patch constants from another codebase, diagnosing collisions.
+    fn merge_patch_constants(&mut self, incoming: impl IntoIterator<Item = (Word, ConstantMetadata)>) {
+        for (k, v) in incoming {
+            match self.patch_constants.entry(k) {
+                Entry::Occupied(mut entry) => {
+                    let diagnostic = duplicate_patch_constant_diagnostic(entry.get(), &v);
+                    entry.get_mut().issues.push(diagnostic);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(v);
+                }
+            }
+        }
+    }
+
+    /// Moves every scanned entry of this per-file partial into the patch maps.
+    ///
+    /// Called on a per-file partial right after `scan_program` when the file is a
+    /// [`FileType::Patch`]. Symbols and descendants from a patch partial are dropped — the
+    /// FQCN belongs to whichever non-patch source originally declared it (or it's an orphan
+    /// which `apply_patches_pass` will diagnose later).
+    pub fn convert_partial_to_patch(&mut self) {
+        for (k, v) in std::mem::take(&mut self.class_likes) {
+            self.patch_class_likes.insert(k, v);
+        }
+
+        for (k, v) in std::mem::take(&mut self.function_likes) {
+            self.patch_function_likes.insert(k, v);
+        }
+
+        for (k, v) in std::mem::take(&mut self.constants) {
+            self.patch_constants.insert(k, v);
+        }
+
+        self.symbols = Symbols::new();
+        self.all_class_like_descendants.clear();
+        self.direct_classlike_descendants.clear();
+    }
+
+    /// Folds every entry in the `patch_*` maps into the matching vendor / built-in entry,
+    /// attaching validation diagnostics to the patch entry's `issues` list.
+    ///
+    /// At most one patch may target a given symbol, so each entry is applied directly to its
+    /// target. A patch whose target is user-defined is inert (user definitions win); a patch
+    /// with no matching target is diagnosed as an orphan.
+    ///
+    /// Must be called after all partials have been merged so the slots patches target are
+    /// present.
+    pub fn apply_patches_pass(&mut self) {
+        // `(class, method)` slots where a patch overrides a method inherited from an ancestor.
+        // No function-like exists at these keys yet, so the function loop below materializes
+        // them from the patch's own scanned declaration rather than treating them as orphans.
+        let mut inherited_overrides: HashSet<(Word, Word)> = HashSet::default();
+
+        let class_keys: Vec<Word> = self.patch_class_likes.keys().copied().collect();
+        for fqcn in class_keys {
+            let Some(target) = self.class_likes.get(&fqcn) else {
+                if let Some(p) = self.patch_class_likes.get_mut(&fqcn) {
+                    let diag = orphan_patch_class_diagnostic(p);
+                    p.issues.push(diag);
+                }
+                continue;
+            };
+            // User-defined targets win; the patch entry is inert. Leave any scan-time issues
+            // on it intact — they still belong to the patch source.
+            if target.flags.is_user_defined() {
+                continue;
+            }
+
+            let mut working = target.clone();
+            let inherited =
+                collect_inherited_patch_methods(&working, &self.patch_class_likes[&fqcn], &self.class_likes);
+            inherited_overrides.extend(inherited.iter().map(|method| (fqcn, *method)));
+            if let Some(patch_entry) = self.patch_class_likes.get_mut(&fqcn) {
+                working.apply_patch(patch_entry, &inherited);
+            }
+            self.class_likes.insert(fqcn, working);
+        }
+
+        let func_keys: Vec<(Word, Word)> = self.patch_function_likes.keys().copied().collect();
+        for key in func_keys {
+            let Some(target) = self.function_likes.get(&key) else {
+                if inherited_overrides.contains(&key) {
+                    // The patch overrides a method inherited from an ancestor, so no slot exists
+                    // at `(class, method)` yet. The patch file declares the method in full, so
+                    // promote its scanned function-like as this class's own declaration; the
+                    // class loop has already pointed the declaring/appearing ids at this slot.
+                    if let Some(p) = self.patch_function_likes.get(&key) {
+                        let materialized = p.clone();
+                        self.function_likes.insert(key, materialized);
+                    }
+                    continue;
+                }
+                // Methods of an orphan patch class are covered by the class-level diagnostic;
+                // only free functions need their own orphan diagnostic.
+                if key.0.is_empty()
+                    && let Some(p) = self.patch_function_likes.get_mut(&key)
+                {
+                    let diag = orphan_patch_function_diagnostic(p);
+                    p.issues.push(diag);
+                }
+                continue;
+            };
+            if target.flags.is_user_defined() {
+                continue;
+            }
+
+            let mut working = target.clone();
+            if let Some(patch_entry) = self.patch_function_likes.get_mut(&key) {
+                working.apply_patch(patch_entry);
+            }
+            self.function_likes.insert(key, working);
+        }
+
+        let const_keys: Vec<Word> = self.patch_constants.keys().copied().collect();
+        for fqcn in const_keys {
+            let Some(target) = self.constants.get(&fqcn) else {
+                if let Some(p) = self.patch_constants.get_mut(&fqcn) {
+                    let diag = orphan_patch_constant_diagnostic(p);
+                    p.issues.push(diag);
+                }
+                continue;
+            };
+            if target.flags.is_user_defined() {
+                continue;
+            }
+
+            let mut working = target.clone();
+            if let Some(patch_entry) = self.patch_constants.get(&fqcn) {
+                working.apply_patch(patch_entry);
+            }
+            self.constants.insert(fqcn, working);
+        }
     }
 
     /// Removes all entries that were contributed by the given per-file scan metadata.
@@ -1127,6 +1325,13 @@ impl CodebaseMetadata {
         for k in file_metadata.file_signatures.keys() {
             self.file_signatures.remove(k);
         }
+
+        // Drop any patch entry that originated from a file signature we just removed; a patch
+        // entry's originating file is recorded on its span.
+        let removed_files: HashSet<FileId> = file_metadata.file_signatures.keys().copied().collect();
+        self.patch_class_likes.retain(|_, m| !removed_files.contains(&m.span.file_id));
+        self.patch_function_likes.retain(|_, m| !removed_files.contains(&m.span.file_id));
+        self.patch_constants.retain(|_, m| !removed_files.contains(&m.span.file_id));
     }
 
     /// Extracts the set of keys from this metadata for use with [`remove_entries_by_keys()`].
@@ -1208,6 +1413,13 @@ impl CodebaseMetadata {
         for k in &keys.file_ids {
             self.file_signatures.remove(k);
         }
+
+        // Drop any patch entry that originated from a file signature we just removed; a patch
+        // entry's originating file is recorded on its span.
+        let removed_files: HashSet<FileId> = keys.file_ids.iter().copied().collect();
+        self.patch_class_likes.retain(|_, m| !removed_files.contains(&m.span.file_id));
+        self.patch_function_likes.retain(|_, m| !removed_files.contains(&m.span.file_id));
+        self.patch_constants.retain(|_, m| !removed_files.contains(&m.span.file_id));
     }
 
     /// Takes all issues from the codebase metadata.
@@ -1232,6 +1444,21 @@ impl CodebaseMetadata {
             if user_defined && !meta.flags.is_user_defined() {
                 continue;
             }
+            issues.extend(meta.take_issues());
+        }
+
+        // Patches are user-authored, so their issues are always reported regardless of the
+        // `user_defined` filter. They live in their own maps and never appear in the regular
+        // class_likes/function_likes/constants iteration above.
+        for meta in self.patch_class_likes.values_mut() {
+            issues.extend(meta.take_issues());
+        }
+
+        for meta in self.patch_function_likes.values_mut() {
+            issues.extend(meta.take_issues());
+        }
+
+        for meta in self.patch_constants.values_mut() {
             issues.extend(meta.take_issues());
         }
 
@@ -1261,14 +1488,105 @@ impl Default for CodebaseMetadata {
             safe_symbols: WordSet::default(),
             safe_symbol_members: HashSet::default(),
             file_signatures: HashMap::default(),
+            patch_class_likes: WordMap::default(),
+            patch_function_likes: HashMap::default(),
+            patch_constants: WordMap::default(),
         }
     }
+}
+
+/// Returns the subset of methods declared by `patch` that are inherited by `target` from
+/// an ancestor but not declared on `target` itself. Used by `apply_patch` on class-like
+/// metadata to distinguish patch-declared overrides of inherited methods (allowed) from
+/// patch-introduced new methods (disallowed).
+fn collect_inherited_patch_methods(
+    target: &ClassLikeMetadata,
+    patch: &ClassLikeMetadata,
+    class_likes: &WordMap<ClassLikeMetadata>,
+) -> WordSet {
+    if patch.methods.is_empty() {
+        return WordSet::default();
+    }
+    let ancestor_methods = class_like::collect_ancestor_methods(target, class_likes);
+    patch.methods.iter().filter(|m| ancestor_methods.contains(*m)).copied().collect()
+}
+
+fn duplicate_patch_class_diagnostic(kept: &ClassLikeMetadata, dropped: &ClassLikeMetadata) -> Issue {
+    Issue::error(format!(
+        "Multiple patches target `{}`; at most one patch may target a given symbol.",
+        kept.original_name
+    ))
+    .with_code(ScanningIssueKind::PatchDuplicateTarget)
+    .with_annotation(Annotation::primary(dropped.span).with_message("Duplicate patch for this symbol."))
+    .with_annotation(Annotation::secondary(kept.span).with_message("Already patched here."))
+    .with_help("Merge the conflicting declarations into a single patch, or remove all but one.")
+}
+
+fn duplicate_patch_function_diagnostic(kept: &FunctionLikeMetadata, dropped: &FunctionLikeMetadata) -> Issue {
+    Issue::error(format!(
+        "Multiple patches target function `{}`; at most one patch may target a given symbol.",
+        kept.name
+    ))
+    .with_code(ScanningIssueKind::PatchDuplicateTarget)
+    .with_annotation(Annotation::primary(dropped.span).with_message("Duplicate patch for this function."))
+    .with_annotation(Annotation::secondary(kept.span).with_message("Already patched here."))
+    .with_help("Merge the conflicting declarations into a single patch, or remove all but one.")
+}
+
+fn duplicate_patch_constant_diagnostic(kept: &ConstantMetadata, dropped: &ConstantMetadata) -> Issue {
+    Issue::error(format!(
+        "Multiple patches target constant `{}`; at most one patch may target a given symbol.",
+        kept.name
+    ))
+    .with_code(ScanningIssueKind::PatchDuplicateTarget)
+    .with_annotation(Annotation::primary(dropped.span).with_message("Duplicate patch for this constant."))
+    .with_annotation(Annotation::secondary(kept.span).with_message("Already patched here."))
+    .with_help("Merge the conflicting declarations into a single patch, or remove all but one.")
+}
+
+fn orphan_patch_class_diagnostic(meta: &ClassLikeMetadata) -> Issue {
+    Issue::error(format!(
+        "Patch declares `{}` but no vendored or built-in definition exists to patch.",
+        meta.original_name,
+    ))
+    .with_code(ScanningIssueKind::PatchIntroducesNewSymbol)
+    .with_annotation(Annotation::primary(meta.span))
+    .with_help(
+        "The patch may be misnamed or out-of-date relative to the vendored or built-in definition; \
+         check the symbol name and verify the patch still matches the upstream source.",
+    )
+}
+
+fn orphan_patch_function_diagnostic(meta: &FunctionLikeMetadata) -> Issue {
+    Issue::error(format!(
+        "Patch declares function `{}` but no vendored or built-in definition exists to patch.",
+        meta.name,
+    ))
+    .with_code(ScanningIssueKind::PatchIntroducesNewSymbol)
+    .with_annotation(Annotation::primary(meta.span))
+    .with_help(
+        "The patch may be misnamed or out-of-date relative to the vendored or built-in definition; \
+         check the function name and verify the patch still matches the upstream source.",
+    )
+}
+
+fn orphan_patch_constant_diagnostic(meta: &ConstantMetadata) -> Issue {
+    Issue::error(format!(
+        "Patch declares constant `{}` but no vendored or built-in definition exists to patch.",
+        meta.name,
+    ))
+    .with_code(ScanningIssueKind::PatchIntroducesNewSymbol)
+    .with_annotation(Annotation::primary(meta.span))
+    .with_help(
+        "The patch may be misnamed or out-of-date relative to the vendored or built-in definition; \
+         check the constant name and verify the patch still matches the upstream source.",
+    )
 }
 
 /// Determines which metadata value to keep when merging duplicates.
 ///
 /// Priority:
-///   1. user-defined > built-in > other.
+///   1. user-defined > patch > built-in > other.
 ///   2. non-polyfill > polyfill — tools like rector/phpstan/psalm ship
 ///      skeleton stubs gated by `if (!class_exists('X'))` that should never
 ///      shadow a concrete definition.
@@ -1286,6 +1604,13 @@ fn should_replace_metadata(
 
     if new_is_user_defined != existing_is_user_defined {
         return new_is_user_defined;
+    }
+
+    let new_is_patch = new_flags.is_patch();
+    let existing_is_patch = existing_flags.is_patch();
+
+    if new_is_patch != existing_is_patch {
+        return new_is_patch;
     }
 
     let new_is_built_in = new_flags.is_built_in();
@@ -1346,5 +1671,96 @@ mod should_replace_metadata_tests {
         let builtin = MetadataFlags::BUILTIN;
         assert!(!should_replace_metadata(user, Span::dummy(0, 10), builtin, Span::dummy(0, 10)));
         assert!(should_replace_metadata(builtin, Span::dummy(0, 10), user, Span::dummy(0, 10)));
+    }
+
+    #[test]
+    fn patch_beats_vendored() {
+        let vendored = MetadataFlags::empty();
+        let patch = MetadataFlags::PATCH;
+        assert!(should_replace_metadata(vendored, Span::dummy(0, 100), patch, Span::dummy(0, 100)));
+        assert!(!should_replace_metadata(patch, Span::dummy(0, 100), vendored, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn patch_beats_builtin() {
+        let builtin = MetadataFlags::BUILTIN;
+        let patch = MetadataFlags::PATCH;
+        assert!(should_replace_metadata(builtin, Span::dummy(0, 100), patch, Span::dummy(0, 100)));
+        assert!(!should_replace_metadata(patch, Span::dummy(0, 100), builtin, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn user_defined_beats_patch() {
+        let user = MetadataFlags::USER_DEFINED;
+        let patch = MetadataFlags::PATCH;
+        assert!(!should_replace_metadata(user, Span::dummy(0, 100), patch, Span::dummy(0, 100)));
+        assert!(should_replace_metadata(patch, Span::dummy(0, 100), user, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn patch_does_not_beat_user_defined_even_with_smaller_span() {
+        let user = MetadataFlags::USER_DEFINED;
+        let patch = MetadataFlags::PATCH;
+        assert!(!should_replace_metadata(user, Span::dummy(500, 600), patch, Span::dummy(0, 10)));
+    }
+
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn patch_function_like_leaves_vendor_owning_slot() {
+        // Patches may only refine type information on an existing function-like; they must
+        // never become the slot owner. The non-patch source's span/file id stay put so that
+        // `extract_owned_keys` records vendor-as-owner — otherwise the patch's entry would
+        // outlive a vendor deletion in incremental mode (orphan function-like bug).
+        use crate::metadata::function_like::FunctionLikeKind;
+
+        let name = word("foo");
+        let key = (empty_word(), name);
+        let vendor_span = Span::dummy(0, 100);
+        let patch_span = Span::dummy(500, 600);
+
+        let vendor =
+            FunctionLikeMetadata::new(FunctionLikeKind::Function, name, name, vendor_span, MetadataFlags::empty());
+        let mut codebase = CodebaseMetadata::new();
+        codebase.function_likes.insert(key, vendor);
+
+        let patch = FunctionLikeMetadata::new(FunctionLikeKind::Function, name, name, patch_span, MetadataFlags::PATCH);
+        codebase.patch_function_likes.insert(key, patch);
+
+        codebase.apply_patches_pass();
+
+        let merged = codebase.function_likes.get(&key).expect("function-like must remain after patch");
+        assert_eq!(merged.span, vendor_span, "patch must not move the slot's span");
+        assert!(!merged.flags.is_patch(), "patch must not flip the slot's flags");
+    }
+
+    #[test]
+    fn patch_does_not_apply_to_user_defined_class() {
+        let class_name = word("MyClass");
+        let method_existing = word("doIt");
+
+        let mut user_class =
+            ClassLikeMetadata::new(class_name, class_name, Span::dummy(0, 100), None, MetadataFlags::USER_DEFINED);
+        user_class.methods.insert(method_existing);
+
+        let mut codebase = CodebaseMetadata::new();
+        codebase.class_likes.insert(class_name, user_class);
+
+        let mut patch_class =
+            ClassLikeMetadata::new(class_name, class_name, Span::dummy(0, 50), None, MetadataFlags::PATCH);
+        let method_new = word("patchedMethod");
+        patch_class.methods.insert(method_new);
+
+        codebase.patch_class_likes.insert(class_name, patch_class);
+
+        codebase.apply_patches_pass();
+
+        let class = &codebase.class_likes[&class_name];
+        // Patch must not apply to a user-defined class.
+        assert!(!class.methods.contains(&method_new));
+        // User-defined class must be preserved intact.
+        assert!(class.methods.contains(&method_existing));
+        assert!(class.flags.is_user_defined());
+        // No issues should be emitted.
+        assert!(class.issues.is_empty());
     }
 }

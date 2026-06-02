@@ -36,6 +36,17 @@ pub struct SourceConfiguration {
     #[serde(default)]
     pub includes: Vec<String>,
 
+    /// Paths or glob patterns for patch files that override type information for vendored code.
+    ///
+    /// Patches are plain PHP files that redefine vendor (or built-in) classes, interfaces,
+    /// functions, or constants with corrected PHPDoc / type declarations. Like `includes`,
+    /// patches are not analyzed, linted, or formatted themselves, but their metadata takes
+    /// precedence over both vendored and built-in definitions during analysis.
+    ///
+    /// Defaults to `[]`.
+    #[serde(default)]
+    pub patches: Vec<String>,
+
     /// Patterns to exclude from the scan.
     ///
     /// Defaults to `[]`.
@@ -124,6 +135,7 @@ impl SourceConfiguration {
             workspace,
             paths: vec![],
             includes: vec![],
+            patches: vec![],
             excludes: vec![],
             extensions: vec![PHP_EXTENSION.to_string()],
             glob: GlobConfiguration::default(),

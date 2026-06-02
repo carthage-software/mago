@@ -242,6 +242,9 @@ where
 
                     let mut metadata = scan_program(arena, &file, program, &resolved_names, php_version);
                     metadata.set_file_signature(file.id, file_signature);
+                    if file.file_type.is_patch() {
+                        metadata.convert_partial_to_patch();
+                    }
 
                     arena.reset();
                     if let Some(compiling_bar) = &compiling_bar {
@@ -259,6 +262,7 @@ where
             for partial in partial_codebases {
                 merged_codex.extend(partial);
             }
+            merged_codex.apply_patches_pass();
         });
 
         let mut symbol_references = self.symbol_references;

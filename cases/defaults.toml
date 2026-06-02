@@ -3,6 +3,7 @@
 [source]
 paths = ["source.php"]
 includes = ["vendor.php"]
+patches = ["patch.php"]
 
 [linter]
 baseline = "linter.baseline.toml"

@@ -1,0 +1,11 @@
+variant = "strict"
+
+[[entries."patch.php".issues]]
+code = "patch-declares-trait"
+start_line = 2
+end_line = 5
+
+[[entries."source.php".issues]]
+code = "non-existent-method"
+start_line = 6
+end_line = 6
