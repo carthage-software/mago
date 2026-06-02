@@ -13,10 +13,10 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::ClassLikeMemberSelector;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::PropertyAccess;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::ClassLikeMemberSelector;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::PropertyAccess;
+use mago_syntax::cst::Variable;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;

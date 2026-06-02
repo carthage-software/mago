@@ -5,11 +5,11 @@ use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Call;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::ExpressionStatement;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::Statement;
+use mago_syntax::cst::Call;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::ExpressionStatement;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Statement;
 use mago_word::Word;
 
 use crate::Context;

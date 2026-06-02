@@ -1,8 +1,8 @@
-use mago_syntax::ast::Access;
-use mago_syntax::ast::ClassLikeMemberSelector;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::Access;
+use mago_syntax::cst::ClassLikeMemberSelector;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::Variable;
 
 /// A single step in an access path, representing either the root variable
 /// or one level of array/property access.

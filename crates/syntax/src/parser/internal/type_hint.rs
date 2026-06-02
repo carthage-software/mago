@@ -1,9 +1,9 @@
 use crate::T;
-use crate::ast::ast::Hint;
-use crate::ast::ast::IntersectionHint;
-use crate::ast::ast::NullableHint;
-use crate::ast::ast::ParenthesizedHint;
-use crate::ast::ast::UnionHint;
+use crate::cst::cst::Hint;
+use crate::cst::cst::IntersectionHint;
+use crate::cst::cst::NullableHint;
+use crate::cst::cst::ParenthesizedHint;
+use crate::cst::cst::UnionHint;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

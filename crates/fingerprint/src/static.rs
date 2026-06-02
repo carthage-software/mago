@@ -1,8 +1,8 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Static;
-use mago_syntax::ast::StaticAbstractItem;
-use mago_syntax::ast::StaticConcreteItem;
-use mago_syntax::ast::StaticItem;
+use mago_syntax::cst::Static;
+use mago_syntax::cst::StaticAbstractItem;
+use mago_syntax::cst::StaticConcreteItem;
+use mago_syntax::cst::StaticItem;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

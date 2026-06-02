@@ -7,12 +7,12 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::Call;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
+use mago_syntax::cst::Call;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -117,7 +117,7 @@ impl LintRule for NoUnescapedOutputRule {
                 if function_call.argument_list.arguments.len() == 1
                     && function_call_matches(ctx, function_call, "printf")
                     && let Some(first_arg) =
-                        function_call.argument_list.arguments.first().map(mago_syntax::ast::Argument::value)
+                        function_call.argument_list.arguments.first().map(mago_syntax::cst::Argument::value)
                     && needs_escaping_with_context(first_arg, Some(ctx))
                 {
                     self.report_unescaped_output(ctx, first_arg.span(), "printf function");

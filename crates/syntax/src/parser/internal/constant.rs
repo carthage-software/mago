@@ -1,9 +1,9 @@
 use crate::T;
-use crate::ast::Sequence;
-use crate::ast::ast::AttributeList;
-use crate::ast::ast::Constant;
-use crate::ast::ast::ConstantItem;
-use crate::ast::sequence::TokenSeparatedSequence;
+use crate::cst::Sequence;
+use crate::cst::cst::AttributeList;
+use crate::cst::cst::Constant;
+use crate::cst::cst::ConstantItem;
+use crate::cst::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

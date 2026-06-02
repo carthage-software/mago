@@ -1,8 +1,8 @@
 use bumpalo::Bump;
 
 use mago_span::Span;
-use mago_syntax::ast::Trivia;
-use mago_syntax::ast::TriviaKind;
+use mago_syntax::cst::Trivia;
+use mago_syntax::cst::TriviaKind;
 
 use crate::document::Document;
 use crate::error::ParseError;

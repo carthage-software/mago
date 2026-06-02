@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! wrap {
     ($f:ident, $self:expr, $node:ident, $block:block) => {{
-        let node = mago_syntax::ast::Node::$node($self);
+        let node = mago_syntax::cst::Node::$node($self);
         $f.enter_node(node);
 
         let was_wrapped_in_parens = $f.is_wrapped_in_parens;

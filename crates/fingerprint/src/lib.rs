@@ -4,7 +4,7 @@ use std::hash::Hasher;
 use foldhash::fast::FixedState;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Trivia;
+use mago_syntax::cst::Trivia;
 
 pub mod access;
 pub mod argument;

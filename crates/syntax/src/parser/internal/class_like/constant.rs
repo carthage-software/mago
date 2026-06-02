@@ -1,10 +1,10 @@
 use crate::T;
-use crate::ast::ast::AttributeList;
-use crate::ast::ast::ClassLikeConstant;
-use crate::ast::ast::ClassLikeConstantItem;
-use crate::ast::ast::Modifier;
-use crate::ast::sequence::Sequence;
-use crate::ast::sequence::TokenSeparatedSequence;
+use crate::cst::cst::AttributeList;
+use crate::cst::cst::ClassLikeConstant;
+use crate::cst::cst::ClassLikeConstantItem;
+use crate::cst::cst::Modifier;
+use crate::cst::sequence::Sequence;
+use crate::cst::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

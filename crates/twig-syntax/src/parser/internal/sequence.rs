@@ -2,7 +2,7 @@ use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::ast::TokenSeparatedSequence;
+use crate::cst::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;

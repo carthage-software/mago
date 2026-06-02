@@ -12,10 +12,10 @@
 mod common;
 
 use bumpalo::Bump;
-use mago_twig_syntax::ast::BinaryOperator;
-use mago_twig_syntax::ast::Expression;
-use mago_twig_syntax::ast::Statement;
-use mago_twig_syntax::ast::UnaryOperator;
+use mago_twig_syntax::cst::BinaryOperator;
+use mago_twig_syntax::cst::Expression;
+use mago_twig_syntax::cst::Statement;
+use mago_twig_syntax::cst::UnaryOperator;
 
 use crate::common::parse_and_roundtrip;
 use crate::common::parse_ok;
@@ -46,7 +46,7 @@ fn unary_operator_name<'a>(arena: &'a Bump, src: &'a str) -> String {
     }
 }
 
-fn filter_argument_count(f: &mago_twig_syntax::ast::Filter<'_>) -> usize {
+fn filter_argument_count(f: &mago_twig_syntax::cst::Filter<'_>) -> usize {
     f.argument_list.as_ref().map_or(0, |list| list.arguments.len())
 }
 

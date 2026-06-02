@@ -1,6 +1,6 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::ExpressionStatement;
-use mago_syntax::ast::Statement;
+use mago_syntax::cst::ExpressionStatement;
+use mago_syntax::cst::Statement;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

@@ -10,8 +10,8 @@ use mago_codex::ttype::get_string;
 use mago_codex::ttype::get_unspecified_literal_string;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
-use mago_syntax::ast::CompositeString;
-use mago_syntax::ast::StringPart;
+use mago_syntax::cst::CompositeString;
+use mago_syntax::cst::StringPart;
 use mago_word::Word;
 use mago_word::word;
 

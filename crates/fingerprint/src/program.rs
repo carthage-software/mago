@@ -1,9 +1,9 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Program;
-use mago_syntax::ast::Trivia;
-use mago_syntax::ast::TriviaKind;
+use mago_syntax::cst::Program;
+use mago_syntax::cst::Trivia;
+use mago_syntax::cst::TriviaKind;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

@@ -3,14 +3,14 @@ use bumpalo::vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Array;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Conditional;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::LegacyArray;
-use mago_syntax::ast::List;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
+use mago_syntax::cst::Array;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Conditional;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::LegacyArray;
+use mago_syntax::cst::List;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 use mago_syntax::token::GetPrecedence;
 use mago_syntax::token::Precedence;
 

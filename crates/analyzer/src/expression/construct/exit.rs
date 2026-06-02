@@ -1,7 +1,7 @@
 use mago_codex::ttype::get_int_or_string;
 use mago_codex::ttype::get_never;
-use mago_syntax::ast::DieConstruct;
-use mago_syntax::ast::ExitConstruct;
+use mago_syntax::cst::DieConstruct;
+use mago_syntax::cst::ExitConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

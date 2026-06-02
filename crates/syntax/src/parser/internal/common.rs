@@ -1,6 +1,6 @@
 use mago_database::file::HasFileId;
 
-use crate::ast::ast::Keyword;
+use crate::cst::cst::Keyword;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TokenKind;

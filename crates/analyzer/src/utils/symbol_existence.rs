@@ -1,12 +1,12 @@
-use mago_syntax::ast::ArgumentList;
-use mago_syntax::ast::Binary;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Call;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::Parenthesized;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::cst::ArgumentList;
+use mago_syntax::cst::Binary;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Call;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Parenthesized;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
 use mago_word::Word;
 use mago_word::ascii_lowercase_constant_name_word;
 use mago_word::ascii_lowercase_word;
@@ -70,7 +70,7 @@ fn get_first_literal_string_arg(
     argument_list
         .arguments
         .first()
-        .map(mago_syntax::ast::Argument::value)
+        .map(mago_syntax::cst::Argument::value)
         .and_then(|expr| artifacts.get_expression_type(expr))
         .and_then(|ty| ty.get_single_literal_string_value())
         .map(|s| if constant { ascii_lowercase_constant_name_word(s) } else { ascii_lowercase_word(s) })

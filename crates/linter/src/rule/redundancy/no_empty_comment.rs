@@ -8,10 +8,10 @@ use serde::Serialize;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::TriviaKind;
 use mago_syntax::comments::comment_lines;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
+use mago_syntax::cst::TriviaKind;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;

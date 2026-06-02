@@ -8,7 +8,7 @@ use mago_span::HasSpan;
 use mago_span::Position;
 use mago_span::Span;
 
-use crate::ast::LiteralStringKind;
+use crate::cst::LiteralStringKind;
 use crate::token::TokenKind;
 
 const SYNTAX_ERROR_CODE: &str = "syntax";

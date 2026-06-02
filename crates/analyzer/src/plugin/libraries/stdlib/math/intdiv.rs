@@ -10,9 +10,9 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Argument;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionCall;
+use mago_syntax::cst::Argument;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::FunctionCall;
 
 use crate::code::IssueCode;
 use crate::plugin::context::HookContext;

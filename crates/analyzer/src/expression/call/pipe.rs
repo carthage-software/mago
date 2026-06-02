@@ -1,6 +1,6 @@
 use mago_codex::ttype::template::TemplateResult;
 use mago_span::HasSpan;
-use mago_syntax::ast::Pipe;
+use mago_syntax::cst::Pipe;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

@@ -1,10 +1,10 @@
 use crate::T;
-use crate::ast::ast::Declare;
-use crate::ast::ast::DeclareBody;
-use crate::ast::ast::DeclareColonDelimitedBody;
-use crate::ast::ast::DeclareItem;
-use crate::ast::sequence::Sequence;
-use crate::ast::sequence::TokenSeparatedSequence;
+use crate::cst::cst::Declare;
+use crate::cst::cst::DeclareBody;
+use crate::cst::cst::DeclareColonDelimitedBody;
+use crate::cst::cst::DeclareItem;
+use crate::cst::sequence::Sequence;
+use crate::cst::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

@@ -1,15 +1,15 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::BracedExpressionStringPart;
-use mago_syntax::ast::CompositeString;
-use mago_syntax::ast::DocumentIndentation;
-use mago_syntax::ast::DocumentKind;
-use mago_syntax::ast::DocumentString;
-use mago_syntax::ast::InterpolatedString;
-use mago_syntax::ast::LiteralStringPart;
-use mago_syntax::ast::ShellExecuteString;
-use mago_syntax::ast::StringPart;
+use mago_syntax::cst::BracedExpressionStringPart;
+use mago_syntax::cst::CompositeString;
+use mago_syntax::cst::DocumentIndentation;
+use mago_syntax::cst::DocumentKind;
+use mago_syntax::cst::DocumentString;
+use mago_syntax::cst::InterpolatedString;
+use mago_syntax::cst::LiteralStringPart;
+use mago_syntax::cst::ShellExecuteString;
+use mago_syntax::cst::StringPart;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

@@ -2,10 +2,10 @@ use foldhash::HashMap;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Conditional;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::Trivia;
+use mago_syntax::cst::Conditional;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::Trivia;
 
 use crate::internal::utils::unwrap_parenthesized;
 

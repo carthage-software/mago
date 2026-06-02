@@ -1,10 +1,10 @@
 use crate::T;
-use crate::ast::ast::AttributeList;
-use crate::ast::ast::EnumCase;
-use crate::ast::ast::EnumCaseBackedItem;
-use crate::ast::ast::EnumCaseItem;
-use crate::ast::ast::EnumCaseUnitItem;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::AttributeList;
+use crate::cst::cst::EnumCase;
+use crate::cst::cst::EnumCaseBackedItem;
+use crate::cst::cst::EnumCaseItem;
+use crate::cst::cst::EnumCaseUnitItem;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

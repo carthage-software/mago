@@ -1,6 +1,6 @@
 //! Helpers for inspecting comment trivia.
 
-use crate::ast::Trivia;
+use crate::cst::Trivia;
 
 /// Split a comment's body into newline-delimited lines, retaining the
 /// byte-offset of each line relative to the start of the trivia.

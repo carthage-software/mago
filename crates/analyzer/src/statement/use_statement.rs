@@ -2,10 +2,10 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Identifier;
-use mago_syntax::ast::Use;
-use mago_syntax::ast::UseItems;
-use mago_syntax::ast::UseType;
+use mago_syntax::cst::Identifier;
+use mago_syntax::cst::Use;
+use mago_syntax::cst::UseItems;
+use mago_syntax::cst::UseType;
 use mago_word::concat_word;
 
 use crate::analyzable::Analyzable;

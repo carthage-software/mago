@@ -1,8 +1,8 @@
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Attribute;
-use mago_syntax::ast::AttributeList;
+use mago_syntax::cst::Attribute;
+use mago_syntax::cst::AttributeList;
 use std::hash::Hash;
 
 impl Fingerprintable for AttributeList<'_> {

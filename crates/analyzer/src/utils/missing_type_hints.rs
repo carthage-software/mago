@@ -8,12 +8,12 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::ClassLikeConstant;
-use mago_syntax::ast::FunctionLikeParameter;
-use mago_syntax::ast::FunctionLikeReturnTypeHint;
-use mago_syntax::ast::Hint;
-use mago_syntax::ast::Property;
-use mago_syntax::ast::PropertyItem;
+use mago_syntax::cst::ClassLikeConstant;
+use mago_syntax::cst::FunctionLikeParameter;
+use mago_syntax::cst::FunctionLikeReturnTypeHint;
+use mago_syntax::cst::Hint;
+use mago_syntax::cst::Property;
+use mago_syntax::cst::PropertyItem;
 
 use crate::code::IssueCode;
 use crate::context::Context;

@@ -1,7 +1,7 @@
 use crate::T;
-use crate::ast::ast::Echo;
-use crate::ast::ast::EchoTag;
-use crate::ast::sequence::TokenSeparatedSequence;
+use crate::cst::cst::Echo;
+use crate::cst::cst::EchoTag;
+use crate::cst::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

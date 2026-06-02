@@ -2,16 +2,16 @@ use std::hash::Hash;
 
 use mago_names::ResolvedNames;
 use mago_span::HasSpan;
-use mago_syntax::ast::ArrowFunction;
-use mago_syntax::ast::Closure;
-use mago_syntax::ast::ClosureUseClause;
-use mago_syntax::ast::ClosureUseClauseVariable;
-use mago_syntax::ast::Function;
-use mago_syntax::ast::FunctionLikeParameter;
-use mago_syntax::ast::FunctionLikeParameterDefaultValue;
-use mago_syntax::ast::FunctionLikeParameterList;
-use mago_syntax::ast::FunctionLikeReturnTypeHint;
 use mago_syntax::comments::docblock::PrecedingDocblocks;
+use mago_syntax::cst::ArrowFunction;
+use mago_syntax::cst::Closure;
+use mago_syntax::cst::ClosureUseClause;
+use mago_syntax::cst::ClosureUseClauseVariable;
+use mago_syntax::cst::Function;
+use mago_syntax::cst::FunctionLikeParameter;
+use mago_syntax::cst::FunctionLikeParameterDefaultValue;
+use mago_syntax::cst::FunctionLikeParameterList;
+use mago_syntax::cst::FunctionLikeReturnTypeHint;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

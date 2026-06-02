@@ -1,6 +1,6 @@
 use mago_span::HasSpan;
-use mago_syntax::ast::Block;
-use mago_syntax::ast::Hint;
+use mago_syntax::cst::Block;
+use mago_syntax::cst::Hint;
 
 use crate::internal::consts::CALL_MAGIC_METHOD;
 use crate::internal::consts::CALL_STATIC_MAGIC_METHOD;

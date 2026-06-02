@@ -1,8 +1,8 @@
-use crate::ast::Expression;
-use crate::ast::InterpolatedLiteral;
-use crate::ast::InterpolatedString;
-use crate::ast::Interpolation;
-use crate::ast::StringPart;
+use crate::cst::Expression;
+use crate::cst::InterpolatedLiteral;
+use crate::cst::InterpolatedString;
+use crate::cst::Interpolation;
+use crate::cst::StringPart;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;

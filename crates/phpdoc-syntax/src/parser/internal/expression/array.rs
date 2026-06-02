@@ -1,5 +1,5 @@
 use mago_span::Span;
-use mago_syntax_core::ast::TokenSeparatedSequence;
+use mago_syntax_core::cst::TokenSeparatedSequence;
 
 use crate::cst::expression::ArrayConstant;
 use crate::cst::expression::ArrayConstantItem;

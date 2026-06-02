@@ -5,8 +5,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::ClassLikeConstantSelector;
-use mago_syntax::ast::ClassLikeMemberSelector;
+use mago_syntax::cst::ClassLikeConstantSelector;
+use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_word::Word;
 use mago_word::word;
 

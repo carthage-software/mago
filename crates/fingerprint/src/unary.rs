@@ -1,10 +1,10 @@
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
 use mago_names::ResolvedNames;
-use mago_syntax::ast::UnaryPostfix;
-use mago_syntax::ast::UnaryPostfixOperator;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::cst::UnaryPostfix;
+use mago_syntax::cst::UnaryPostfixOperator;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
 use std::hash::Hash;
 
 impl Fingerprintable for UnaryPrefix<'_> {

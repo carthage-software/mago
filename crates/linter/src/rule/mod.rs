@@ -2,8 +2,8 @@ use serde::de::DeserializeOwned;
 
 use mago_php_version::PHPVersion;
 use mago_reporting::Level;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 
 use crate::context::LintContext;
 use crate::integration::IntegrationSet;

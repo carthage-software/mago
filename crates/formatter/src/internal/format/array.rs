@@ -4,11 +4,11 @@ use bumpalo::vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Array;
-use mago_syntax::ast::ArrayElement;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::LegacyArray;
-use mago_syntax::ast::List;
+use mago_syntax::cst::Array;
+use mago_syntax::cst::ArrayElement;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::LegacyArray;
+use mago_syntax::cst::List;
 
 use crate::document::BreakMode;
 use crate::document::Document;
@@ -332,7 +332,7 @@ fn value_has_internal_break_point<'arena>(expression: &'arena Expression<'arena>
 }
 
 #[inline]
-fn argument_list_is_substantial<'arena>(argument_list: &'arena mago_syntax::ast::ArgumentList<'arena>) -> bool {
+fn argument_list_is_substantial<'arena>(argument_list: &'arena mago_syntax::cst::ArgumentList<'arena>) -> bool {
     if argument_list.arguments.len() >= 2 {
         return true;
     }

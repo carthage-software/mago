@@ -1,7 +1,7 @@
 use mago_span::Position;
 
-use crate::ast::Conditional;
-use crate::ast::Expression;
+use crate::cst::Conditional;
+use crate::cst::Expression;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;

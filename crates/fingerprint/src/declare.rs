@@ -1,10 +1,10 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Declare;
-use mago_syntax::ast::DeclareBody;
-use mago_syntax::ast::DeclareColonDelimitedBody;
-use mago_syntax::ast::DeclareItem;
+use mago_syntax::cst::Declare;
+use mago_syntax::cst::DeclareBody;
+use mago_syntax::cst::DeclareColonDelimitedBody;
+use mago_syntax::cst::DeclareItem;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

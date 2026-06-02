@@ -16,9 +16,9 @@ use mago_database::file::File;
 use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
 use mago_reporting::IssueCollection;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::Program;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
+use mago_syntax::cst::Program;
 
 use crate::context::LintContext;
 use crate::registry::RuleRegistry;

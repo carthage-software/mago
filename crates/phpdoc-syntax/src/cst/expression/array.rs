@@ -1,4 +1,4 @@
-use mago_syntax_core::ast::TokenSeparatedSequence;
+use mago_syntax_core::cst::TokenSeparatedSequence;
 use serde::Serialize;
 
 use mago_span::HasSpan;

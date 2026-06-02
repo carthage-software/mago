@@ -1,7 +1,7 @@
-use mago_syntax::ast::ClassLikeMemberSelector;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::MethodCall;
+use mago_syntax::cst::ClassLikeMemberSelector;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::MethodCall;
 
 use crate::context::LintContext;
 

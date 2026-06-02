@@ -1,14 +1,14 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::MaybeTypedUseItem;
-use mago_syntax::ast::MixedUseItemList;
-use mago_syntax::ast::TypedUseItemList;
-use mago_syntax::ast::TypedUseItemSequence;
-use mago_syntax::ast::Use;
-use mago_syntax::ast::UseItem;
-use mago_syntax::ast::UseItemAlias;
-use mago_syntax::ast::UseItemSequence;
-use mago_syntax::ast::UseItems;
-use mago_syntax::ast::UseType;
+use mago_syntax::cst::MaybeTypedUseItem;
+use mago_syntax::cst::MixedUseItemList;
+use mago_syntax::cst::TypedUseItemList;
+use mago_syntax::cst::TypedUseItemSequence;
+use mago_syntax::cst::Use;
+use mago_syntax::cst::UseItem;
+use mago_syntax::cst::UseItemAlias;
+use mago_syntax::cst::UseItemSequence;
+use mago_syntax::cst::UseItems;
+use mago_syntax::cst::UseType;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

@@ -11,7 +11,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::cst::*;
 use mago_word::Word;
 use mago_word::WordMap;
 

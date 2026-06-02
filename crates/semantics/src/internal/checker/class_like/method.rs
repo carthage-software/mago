@@ -5,10 +5,10 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Hint;
-use mago_syntax::ast::Method;
-use mago_syntax::ast::MethodBody;
-use mago_syntax::ast::Modifier;
+use mago_syntax::cst::Hint;
+use mago_syntax::cst::Method;
+use mago_syntax::cst::MethodBody;
+use mago_syntax::cst::Modifier;
 
 use crate::internal::checker::MAGIC_METHOD_SEMANTICS;
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;

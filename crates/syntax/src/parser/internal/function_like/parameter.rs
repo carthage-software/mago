@@ -1,7 +1,7 @@
 use crate::T;
-use crate::ast::ast::FunctionLikeParameter;
-use crate::ast::ast::FunctionLikeParameterDefaultValue;
-use crate::ast::ast::FunctionLikeParameterList;
+use crate::cst::cst::FunctionLikeParameter;
+use crate::cst::cst::FunctionLikeParameterDefaultValue;
+use crate::cst::cst::FunctionLikeParameterList;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

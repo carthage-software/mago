@@ -13,9 +13,9 @@ use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Identifier;
-use mago_syntax::ast::Trivia;
 use mago_syntax::comments::docblock::PrecedingDocblocks;
+use mago_syntax::cst::Identifier;
+use mago_syntax::cst::Trivia;
 
 use crate::analysis_result::AnalysisResult;
 use crate::artifacts::AnalysisArtifacts;

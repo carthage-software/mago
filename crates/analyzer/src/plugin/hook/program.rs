@@ -1,7 +1,7 @@
 //! Program hooks for intercepting program-level analysis.
 
 use mago_database::file::File;
-use mago_syntax::ast::Program;
+use mago_syntax::cst::Program;
 
 use crate::plugin::context::HookContext;
 use crate::plugin::hook::HookAction;

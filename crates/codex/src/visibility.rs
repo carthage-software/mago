@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use mago_syntax::ast::Modifier;
+use mago_syntax::cst::Modifier;
 
 /// Represents the visibility level of class members (properties, methods, constants) in PHP.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Default, PartialOrd, Ord)]

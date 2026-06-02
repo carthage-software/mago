@@ -63,7 +63,7 @@ use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
-use mago_syntax::ast::*;
+use mago_syntax::cst::*;
 use mago_syntax::lexer::Lexer;
 use mago_syntax_core::input::Input;
 

@@ -1,10 +1,10 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::DirectVariable;
-use mago_syntax::ast::IndirectVariable;
-use mago_syntax::ast::NestedVariable;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::DirectVariable;
+use mago_syntax::cst::IndirectVariable;
+use mago_syntax::cst::NestedVariable;
+use mago_syntax::cst::Variable;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

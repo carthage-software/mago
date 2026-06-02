@@ -1,5 +1,5 @@
 use mago_span::HasSpan;
-use mago_syntax_core::ast::Sequence;
+use mago_syntax_core::cst::Sequence;
 
 use crate::cst::identifier::Identifier;
 use crate::cst::tag::MethodParameterList;

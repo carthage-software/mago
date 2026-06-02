@@ -1,8 +1,8 @@
-use mago_syntax::ast::ClassLikeMemberSelector;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Method;
-use mago_syntax::ast::MethodBody;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::ClassLikeMemberSelector;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Method;
+use mago_syntax::cst::MethodBody;
+use mago_syntax::cst::Variable;
 use mago_syntax::utils::reference::MethodReference;
 use mago_syntax::utils::reference::find_method_references_in_block;
 

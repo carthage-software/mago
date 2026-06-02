@@ -3,8 +3,8 @@ use std::rc::Rc;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_mixed;
 use mago_span::HasSpan;
-use mago_syntax::ast::ArrayAccess;
-use mago_syntax::ast::Expression;
+use mago_syntax::cst::ArrayAccess;
+use mago_syntax::cst::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

@@ -7,9 +7,9 @@ use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_php_version::PHPVersion;
 use mago_span::Span;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::Program;
-use mago_syntax::ast::Trivia;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::Program;
+use mago_syntax::cst::Trivia;
 
 use crate::document::group::GroupIdentifier;
 use crate::document::group::GroupIdentifierBuilder;

@@ -21,11 +21,11 @@ use mago_database::file::HasFileId;
 use mago_span::Position;
 use mago_span::Span;
 
-use crate::ast::Identifier;
-use crate::ast::Keyword;
-use crate::ast::Sequence;
-use crate::ast::Trivia;
-use crate::ast::TriviaKind;
+use crate::cst::Identifier;
+use crate::cst::Keyword;
+use crate::cst::Sequence;
+use crate::cst::Trivia;
+use crate::cst::TriviaKind;
 use crate::error::ParseError;
 use crate::error::SyntaxError;
 use crate::lexer::TwigLexer;
@@ -103,7 +103,7 @@ impl<'arena> TokenStream<'arena> {
     }
 
     /// Drain the trivia accumulator into a [`Sequence`] for attachment to
-    /// a [`Template`](crate::ast::Template).
+    /// a [`Template`](crate::cst::Template).
     #[inline]
     pub fn get_trivia(&mut self) -> Sequence<'arena, Trivia<'arena>> {
         let trivia = std::mem::replace(&mut self.trivia, BVec::new_in(self.arena));

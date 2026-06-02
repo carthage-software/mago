@@ -1,5 +1,5 @@
 use bumpalo::Bump;
-use mago_syntax::ast::Program;
+use mago_syntax::cst::Program;
 use mago_syntax::walker::MutWalker;
 
 use crate::ResolvedNames;

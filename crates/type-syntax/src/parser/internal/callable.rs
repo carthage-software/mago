@@ -1,10 +1,10 @@
 use mago_database::file::HasFileId;
 
-use crate::ast::CallableTypeParameter;
-use crate::ast::CallableTypeParameters;
-use crate::ast::CallableTypeReturnType;
-use crate::ast::CallableTypeSpecification;
-use crate::ast::VariableType;
+use crate::cst::CallableTypeParameter;
+use crate::cst::CallableTypeParameters;
+use crate::cst::CallableTypeReturnType;
+use crate::cst::CallableTypeSpecification;
+use crate::cst::VariableType;
 use crate::error::ParseError;
 use crate::parser::internal::parse_type;
 use crate::parser::internal::parse_type_with_precedence;
@@ -54,7 +54,7 @@ pub fn parse_callable_type_specifications<'arena>(
                     entries.push(entry);
                 }
 
-                mago_syntax_core::ast::Sequence::new(entries)
+                mago_syntax_core::cst::Sequence::new(entries)
             },
             right_parenthesis: stream.eat_span(TypeTokenKind::RightParenthesis)?,
         },

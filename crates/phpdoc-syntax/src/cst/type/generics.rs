@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax_core::ast::Sequence;
+use mago_syntax_core::cst::Sequence;
 
 use crate::cst::r#type::Type;
 

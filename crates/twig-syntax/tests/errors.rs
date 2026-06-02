@@ -218,7 +218,10 @@ fn parse_error_implements_display() {
     assert!(!msg.is_empty());
 }
 
-fn run_with_large_stack<F: FnOnce() + Send + 'static>(f: F) {
+fn run_with_large_stack<F>(f: F)
+where
+    F: FnOnce() + Send + 'static,
+{
     std::thread::Builder::new()
         .stack_size(128 * 1024 * 1024)
         .spawn(f)

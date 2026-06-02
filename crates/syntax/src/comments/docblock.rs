@@ -1,8 +1,8 @@
 use mago_span::HasSpan;
 
-use crate::ast::Program;
-use crate::ast::Trivia;
-use crate::ast::TriviaKind;
+use crate::cst::Program;
+use crate::cst::Trivia;
+use crate::cst::TriviaKind;
 
 /// An iterator that yields docblock trivia nodes preceding a position, walking
 /// backwards through stacked docblocks using the same gap-checking logic as

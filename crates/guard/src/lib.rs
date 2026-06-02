@@ -1,6 +1,6 @@
 use mago_codex::metadata::CodebaseMetadata;
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Program;
+use mago_syntax::cst::Program;
 use mago_syntax::walker::MutWalker;
 
 use crate::context::GuardContext;

@@ -17,18 +17,18 @@ use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_iterable_value_parameter;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Access;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Call;
-use mago_syntax::ast::ClassConstantAccess;
-use mago_syntax::ast::ClassLikeConstantSelector;
-use mago_syntax::ast::Construct;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::LocalIdentifier;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::cst::Access;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Call;
+use mago_syntax::cst::ClassConstantAccess;
+use mago_syntax::cst::ClassLikeConstantSelector;
+use mago_syntax::cst::Construct;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::LocalIdentifier;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::ascii_lowercase_word;
@@ -296,7 +296,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(1)
-                    .map(mago_syntax::ast::Argument::value)
+                    .map(mago_syntax::cst::Argument::value)
                     .and_then(|array_key| get_expression_array_key(artifacts, array_key))
                 {
                     (0, vec![Assertion::HasArrayKey(array_key)])
@@ -309,7 +309,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(0)
-                    .map(mago_syntax::ast::Argument::value)
+                    .map(mago_syntax::cst::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))
                 else {
                     return if_types;
@@ -344,7 +344,7 @@ fn scrape_special_function_call_assertions(
                 .argument_list
                 .arguments
                 .first()
-                .map(mago_syntax::ast::Argument::value)
+                .map(mago_syntax::cst::Argument::value)
                 .and_then(|array_key| get_expression_array_key(artifacts, array_key))
                 .map(|key| (1, vec![Assertion::HasArrayKey(key)])),
             b"is_countable" => Some((0, vec![Assertion::Countable])),
@@ -387,7 +387,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(1)
-                    .map(mago_syntax::ast::Argument::value)
+                    .map(mago_syntax::cst::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))
                     .and_then(|ty| ty.get_single_literal_string_value())?;
 
@@ -398,7 +398,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(1)
-                    .map(mago_syntax::ast::Argument::value)
+                    .map(mago_syntax::cst::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))
                     .and_then(|ty| ty.get_single_literal_string_value())?;
 
@@ -409,7 +409,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(1)
-                    .map(mago_syntax::ast::Argument::value)
+                    .map(mago_syntax::cst::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))?;
 
                 let is_subclass_of_call = name == b"is_subclass_of";
@@ -459,7 +459,7 @@ fn scrape_special_function_call_assertions(
                     .argument_list
                     .arguments
                     .get(1)
-                    .map(mago_syntax::ast::Argument::value)
+                    .map(mago_syntax::cst::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))?;
 
                 let mut value_types = None;
@@ -528,7 +528,7 @@ fn scrape_special_function_call_assertions(
     };
 
     if let Some(argument) =
-        function_call.argument_list.arguments.get(argument_variable_id_position).map(mago_syntax::ast::Argument::value)
+        function_call.argument_list.arguments.get(argument_variable_id_position).map(mago_syntax::cst::Argument::value)
         && let Some((variable_id, needs_isset)) = extract_expression_id(argument)
     {
         let mut assertions = vec![function_assertions];

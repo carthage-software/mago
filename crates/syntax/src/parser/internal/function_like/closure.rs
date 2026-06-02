@@ -1,9 +1,9 @@
 use crate::T;
-use crate::ast::ast::AttributeList;
-use crate::ast::ast::Closure;
-use crate::ast::ast::ClosureUseClause;
-use crate::ast::ast::ClosureUseClauseVariable;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::AttributeList;
+use crate::cst::cst::Closure;
+use crate::cst::cst::ClosureUseClause;
+use crate::cst::cst::ClosureUseClauseVariable;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

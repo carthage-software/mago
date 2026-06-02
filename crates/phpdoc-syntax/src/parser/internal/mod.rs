@@ -1,5 +1,5 @@
 use mago_span::Span;
-use mago_syntax_core::ast::Sequence;
+use mago_syntax_core::cst::Sequence;
 
 use crate::cst::Document;
 use crate::cst::element::Element;
