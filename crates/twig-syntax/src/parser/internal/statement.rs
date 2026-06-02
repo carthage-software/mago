@@ -1,3 +1,6 @@
+use mago_database::file::HasFileId;
+use mago_span::Span;
+
 use crate::ast::Print;
 use crate::ast::Sequence;
 use crate::ast::Statement;
@@ -32,7 +35,32 @@ impl Terminator for BlockTerminator {
 impl<'arena> Parser<'_, 'arena> {
     /// Parse a sequence of top-level statements until `terminator` matches
     /// or EOF is reached.
+    ///
+    /// Block bodies recurse back through here (`parse_statements` ->
+    /// `parse_tag` -> e.g. `parse_if` -> `parse_statements`), so the same
+    /// recursion-depth guard used for expressions bounds block nesting and
+    /// keeps pathologically nested input (e.g. `{% if x %}` repeated) from
+    /// overflowing the native stack.
     pub(crate) fn parse_statements<T>(
+        &mut self,
+        terminator: &T,
+    ) -> Result<Sequence<'arena, Statement<'arena>>, ParseError<'arena>>
+    where
+        T: Terminator,
+    {
+        self.state.recursion_depth += 1;
+        if self.state.recursion_depth > crate::parser::MAX_RECURSION_DEPTH {
+            self.state.recursion_depth -= 1;
+            let position = self.stream.current_position();
+            return Err(ParseError::RecursionLimitExceeded(Span::new(self.stream.file_id(), position, position)));
+        }
+
+        let result = self.parse_statements_inner(terminator);
+        self.state.recursion_depth -= 1;
+        result
+    }
+
+    fn parse_statements_inner<T>(
         &mut self,
         terminator: &T,
     ) -> Result<Sequence<'arena, Statement<'arena>>, ParseError<'arena>>

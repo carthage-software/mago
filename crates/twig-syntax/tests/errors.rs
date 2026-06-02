@@ -217,3 +217,55 @@ fn parse_error_implements_display() {
     let msg = err.message();
     assert!(!msg.is_empty());
 }
+
+fn run_with_large_stack<F: FnOnce() + Send + 'static>(f: F) {
+    std::thread::Builder::new()
+        .stack_size(128 * 1024 * 1024)
+        .spawn(f)
+        .expect("spawn parser thread")
+        .join()
+        .expect("parser thread must not abort (no stack overflow)");
+}
+
+#[test]
+fn parse_deeply_nested_brackets_does_not_overflow() {
+    run_with_large_stack(|| {
+        let mut src = String::from("{{ ");
+        src.push_str(&"[".repeat(5000));
+        src.push_str(" }}");
+        rejects_with(&src, |e| matches!(e, ParseError::RecursionLimitExceeded(..)));
+    });
+}
+
+#[test]
+fn parse_deeply_nested_parens_does_not_overflow() {
+    run_with_large_stack(|| {
+        let mut src = String::from("{{ ");
+        src.push_str(&"(".repeat(5000));
+        src.push_str(" }}");
+        rejects_with(&src, |e| matches!(e, ParseError::RecursionLimitExceeded(..)));
+    });
+}
+
+#[test]
+fn parse_fuzzer_nested_array_argument_does_not_overflow() {
+    run_with_large_stack(|| {
+        let mut src = String::from("{{ date(date = ");
+        src.push_str(&"[".repeat(5000));
+        src.push_str(") }}");
+        let arena = Bump::new();
+        let _ = parse(&arena, &src);
+    });
+}
+
+#[test]
+fn parse_deeply_nested_blocks_does_not_overflow() {
+    run_with_large_stack(|| {
+        let mut src = String::new();
+        for _ in 0..5000 {
+            src.push_str("{% if x %}");
+        }
+        let arena = Bump::new();
+        let _ = parse(&arena, &src);
+    });
+}

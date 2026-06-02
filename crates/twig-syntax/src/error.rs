@@ -58,6 +58,10 @@ pub enum ParseError<'arena> {
     },
     /// A generic syntax-level error produced by tag or expression parsers.
     Message(&'arena [u8], Span),
+    /// Expression nesting exceeded the maximum supported recursion depth.
+    /// Guards the recursive-descent parser against stack overflow on
+    /// pathologically nested input.
+    RecursionLimitExceeded(Span),
 }
 
 impl ParseError<'_> {
@@ -103,6 +107,7 @@ impl fmt::Display for ParseError<'_> {
                 )
             }
             ParseError::Message(msg, _) => f.write_str(&String::from_utf8_lossy(msg)),
+            ParseError::RecursionLimitExceeded(_) => f.write_str("Maximum recursion depth exceeded"),
         }
     }
 }
@@ -153,6 +158,7 @@ impl HasSpan for ParseError<'_> {
             ParseError::UnknownTag(_, s) => *s,
             ParseError::MismatchedEndTag { span, .. } => *span,
             ParseError::Message(_, s) => *s,
+            ParseError::RecursionLimitExceeded(s) => *s,
         }
     }
 }

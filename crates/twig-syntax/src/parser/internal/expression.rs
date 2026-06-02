@@ -1,4 +1,6 @@
+use mago_database::file::HasFileId;
 use mago_span::HasSpan;
+use mago_span::Span;
 
 use crate::ast::Binary;
 use crate::ast::BinaryOperator;
@@ -26,6 +28,22 @@ impl<'arena> Parser<'_, 'arena> {
 
     /// Precedence-climbing expression parser.
     pub(crate) fn parse_expression_with_precedence(
+        &mut self,
+        min_precedence: u32,
+    ) -> Result<Expression<'arena>, ParseError<'arena>> {
+        self.state.recursion_depth += 1;
+        if self.state.recursion_depth > crate::parser::MAX_RECURSION_DEPTH {
+            self.state.recursion_depth -= 1;
+            let position = self.stream.current_position();
+            return Err(ParseError::RecursionLimitExceeded(Span::new(self.stream.file_id(), position, position)));
+        }
+
+        let result = self.parse_expression_with_precedence_inner(min_precedence);
+        self.state.recursion_depth -= 1;
+        result
+    }
+
+    fn parse_expression_with_precedence_inner(
         &mut self,
         min_precedence: u32,
     ) -> Result<Expression<'arena>, ParseError<'arena>> {
