@@ -20,6 +20,7 @@ pub enum ParseError {
     UnexpectedEndOfFile(FileId, Vec<TypeTokenKind>, Position),
     UnexpectedToken(Vec<TypeTokenKind>, TypeTokenKind, Span),
     UnclosedLiteralString(Span),
+    RecursionLimitExceeded(Span),
 }
 
 impl ParseError {
@@ -52,6 +53,9 @@ impl ParseError {
             ParseError::UnclosedLiteralString(_) => {
                 "String literals within type declarations must be closed with a matching quote.".to_string()
             }
+            ParseError::RecursionLimitExceeded(_) => {
+                "The type is nested too deeply for the parser to process.".to_string()
+            }
         }
     }
 
@@ -71,6 +75,9 @@ impl ParseError {
             }
             ParseError::UnclosedLiteralString(_) => {
                 "Add a closing quote (`'` or `\"`) to complete the string literal.".to_string()
+            }
+            ParseError::RecursionLimitExceeded(_) => {
+                "Simplify the type by reducing how deeply it is nested.".to_string()
             }
         }
     }
@@ -95,6 +102,7 @@ impl HasSpan for ParseError {
             ParseError::UnexpectedEndOfFile(file_id, _, position) => Span::new(*file_id, *position, *position),
             ParseError::UnexpectedToken(_, _, span) => *span,
             ParseError::UnclosedLiteralString(span) => *span,
+            ParseError::RecursionLimitExceeded(span) => *span,
         }
     }
 }
@@ -127,6 +135,9 @@ impl std::fmt::Display for ParseError {
             }
             ParseError::UnclosedLiteralString(_) => {
                 write!(f, "Unclosed string literal in type")
+            }
+            ParseError::RecursionLimitExceeded(_) => {
+                write!(f, "Maximum recursion depth exceeded")
             }
         }
     }

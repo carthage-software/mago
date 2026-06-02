@@ -25,7 +25,12 @@ pub struct TypeTokenStream<'arena> {
     file_id: FileId,
     buffer: LookaheadBuf<TypeToken<'arena>, 64>,
     position: Position,
+    depth: u16,
 }
+
+/// Maximum recursion depth for type parsing. Prevents stack overflow on
+/// pathologically nested types.
+pub(crate) const MAX_RECURSION_DEPTH: u16 = 512;
 
 impl<'arena> TypeTokenStream<'arena> {
     /// Creates a new `TypeTokenStream` wrapping the given `TypeLexer`.
@@ -33,7 +38,29 @@ impl<'arena> TypeTokenStream<'arena> {
     pub fn new(arena: &'arena Bump, lexer: TypeLexer<'arena>) -> TypeTokenStream<'arena> {
         let position = lexer.current_position();
         let file_id = lexer.file_id();
-        TypeTokenStream { arena, lexer, file_id, buffer: LookaheadBuf::new(), position }
+        TypeTokenStream { arena, lexer, file_id, buffer: LookaheadBuf::new(), position, depth: 0 }
+    }
+
+    /// Enter one level of parser recursion, returning an error if the maximum
+    /// supported depth would be exceeded. Every successful call must be paired
+    /// with a [`leave_recursion`](Self::leave_recursion).
+    #[inline]
+    pub fn enter_recursion(&mut self) -> Result<(), ParseError> {
+        self.depth += 1;
+        if self.depth > MAX_RECURSION_DEPTH {
+            self.depth -= 1;
+            let position = self.current_position();
+            return Err(ParseError::RecursionLimitExceeded(Span::new(self.file_id, position, position)));
+        }
+
+        Ok(())
+    }
+
+    /// Leave one level of parser recursion previously entered via
+    /// [`enter_recursion`](Self::enter_recursion).
+    #[inline]
+    pub fn leave_recursion(&mut self) {
+        self.depth -= 1;
     }
 
     /// Consume the next token and return its [`Span`]. Equivalent to

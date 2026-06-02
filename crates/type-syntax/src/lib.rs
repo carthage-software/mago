@@ -195,6 +195,24 @@ mod tests {
     }
 
     #[test]
+    fn test_deeply_nested_type_does_not_overflow() {
+        std::thread::Builder::new()
+            .stack_size(128 * 1024 * 1024)
+            .spawn(|| {
+                let input = "(".repeat(5000);
+                assert!(
+                    matches!(do_parse(&input), Err(ParseError::RecursionLimitExceeded(_))),
+                    "expected RecursionLimitExceeded for deeply nested parentheses"
+                );
+
+                let _ = do_parse("44[899[inT is(((((((((((((((((((((((((((((((((");
+            })
+            .expect("spawn parser thread")
+            .join()
+            .expect("parser thread must not abort (no stack overflow)");
+    }
+
+    #[test]
     fn test_parse_simple_union() {
         match do_parse("int|string") {
             Ok(ty) => match ty {

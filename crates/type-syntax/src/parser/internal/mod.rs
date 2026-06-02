@@ -140,6 +140,16 @@ pub fn parse_type_with_precedence<'arena>(
     stream: &mut TypeTokenStream<'arena>,
     min_precedence: TypePrecedence,
 ) -> Result<Type<'arena>, ParseError> {
+    stream.enter_recursion()?;
+    let result = parse_type_with_precedence_inner(stream, min_precedence);
+    stream.leave_recursion();
+    result
+}
+
+fn parse_type_with_precedence_inner<'arena>(
+    stream: &mut TypeTokenStream<'arena>,
+    min_precedence: TypePrecedence,
+) -> Result<Type<'arena>, ParseError> {
     let mut inner = parse_primary_type(stream)?;
 
     loop {
