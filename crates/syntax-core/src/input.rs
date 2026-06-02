@@ -410,6 +410,52 @@ impl<'src> Input<'src> {
         (pos - start, false)
     }
 
+    /// Scans bytes starting at `offset_from_current` while they are members of `table`, without consuming.
+    /// Returns the length of the matching run.
+    #[inline(always)]
+    #[must_use]
+    pub fn scan_while(&self, offset_from_current: usize, table: &[bool; 256]) -> usize {
+        let bytes = self.bytes;
+        let len = self.length;
+        let start = self.offset + offset_from_current;
+        let mut pos = start;
+
+        while pos < len {
+            // SAFETY: `pos < len` was just checked.
+            let b = unsafe { *bytes.get_unchecked(pos) };
+            if !table[b as usize] {
+                break;
+            }
+
+            pos += 1;
+        }
+
+        pos.saturating_sub(start)
+    }
+
+    /// Scans bytes starting at `offset_from_current` until a whitespace byte is found, without consuming.
+    /// Returns the length of the non-whitespace run.
+    #[inline(always)]
+    #[must_use]
+    pub fn scan_until_whitespace(&self, offset_from_current: usize) -> usize {
+        let bytes = self.bytes;
+        let len = self.length;
+        let start = self.offset + offset_from_current;
+        let mut pos = start;
+
+        while pos < len {
+            // SAFETY: `pos < len` was just checked.
+            let b = unsafe { *bytes.get_unchecked(pos) };
+            if WHITESPACE_TABLE[b as usize] {
+                break;
+            }
+
+            pos += 1;
+        }
+
+        pos.saturating_sub(start)
+    }
+
     /// Reads the next `n` characters without advancing the position.
     ///
     /// # Arguments
