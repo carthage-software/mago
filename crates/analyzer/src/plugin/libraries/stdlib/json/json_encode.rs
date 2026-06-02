@@ -6,9 +6,9 @@ use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::union::TUnion;
-use mago_syntax::ast::Binary;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Expression;
+use mago_syntax::cst::Binary;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Expression;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;

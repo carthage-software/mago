@@ -1,5 +1,5 @@
 use crate::T;
-use crate::ast::ast::Throw;
+use crate::cst::cst::Throw;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

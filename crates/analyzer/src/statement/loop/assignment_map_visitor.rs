@@ -1,17 +1,17 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
-use mago_syntax::ast::ArgumentList;
-use mago_syntax::ast::ArrowFunction;
-use mago_syntax::ast::Assignment;
-use mago_syntax::ast::Closure;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::MethodCall;
-use mago_syntax::ast::MethodPartialApplication;
-use mago_syntax::ast::Statement;
-use mago_syntax::ast::UnaryPostfix;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::Unset;
+use mago_syntax::cst::ArgumentList;
+use mago_syntax::cst::ArrowFunction;
+use mago_syntax::cst::Assignment;
+use mago_syntax::cst::Closure;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::MethodCall;
+use mago_syntax::cst::MethodPartialApplication;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::UnaryPostfix;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::Unset;
 use mago_syntax::walker::MutWalker;
 use mago_word::Word;
 

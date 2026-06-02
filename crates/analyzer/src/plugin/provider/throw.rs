@@ -5,7 +5,7 @@
 
 use foldhash::HashSet;
 
-use mago_syntax::ast::Expression;
+use mago_syntax::cst::Expression;
 use mago_word::Word;
 
 use crate::plugin::context::InvocationInfo;

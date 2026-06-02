@@ -1,6 +1,6 @@
 use crate::T;
-use crate::ast::ast::Goto;
-use crate::ast::ast::Label;
+use crate::cst::cst::Goto;
+use crate::cst::cst::Label;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

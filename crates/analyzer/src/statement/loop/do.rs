@@ -8,7 +8,7 @@ use mago_algebra::saturate_clauses;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::DoWhile;
+use mago_syntax::cst::DoWhile;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

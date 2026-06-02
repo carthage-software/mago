@@ -1,5 +1,5 @@
-use crate::ast::Sequence;
-use crate::ast::Statement;
+use crate::cst::Sequence;
+use crate::cst::Statement;
 
 /// Determine if a statement contains only definitions.
 #[inline]

@@ -1,7 +1,7 @@
 //! Tag dispatcher. Each `{% name ... %}` tag has its own module under
 //! `parser::internal::tag::*`; every parser is a method on `Parser`.
 
-use crate::ast::Statement;
+use crate::cst::Statement;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigToken;

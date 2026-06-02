@@ -8,8 +8,8 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;
@@ -63,7 +63,7 @@ impl LintRule for NoTrailingSpaceRule {
             bad_example: indoc! {r"
                 <?php
 
-                // This is a comment with trailing whitespace.  
+                // This is a comment with trailing whitespace. 
             "},
             category: Category::Consistency,
             requirements: RuleRequirements::None,

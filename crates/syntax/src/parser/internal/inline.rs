@@ -1,6 +1,6 @@
 use crate::T;
-use crate::ast::ast::Inline;
-use crate::ast::ast::InlineKind;
+use crate::cst::cst::Inline;
+use crate::cst::cst::InlineKind;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

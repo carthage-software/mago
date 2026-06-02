@@ -7,11 +7,11 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::Assignment;
-use mago_syntax::ast::AssignmentOperator;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
+use mago_syntax::cst::Assignment;
+use mago_syntax::cst::AssignmentOperator;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;

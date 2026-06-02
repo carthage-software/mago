@@ -9,10 +9,10 @@ use mago_codex::ttype::combiner::CombinerOptions;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Break;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::LiteralInteger;
+use mago_syntax::cst::Break;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::LiteralInteger;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

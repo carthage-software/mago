@@ -3,7 +3,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::FunctionLikeParameter;
+use mago_syntax::cst::FunctionLikeParameter;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
 
@@ -109,8 +109,8 @@ fn report_parameter<'arena>(
 
 pub mod utils {
     use foldhash::HashSet;
-    use mago_syntax::ast::Expression;
-    use mago_syntax::ast::Statement;
+    use mago_syntax::cst::Expression;
+    use mago_syntax::cst::Statement;
     use mago_syntax::walker::Walker;
 
     use crate::context::Context;
@@ -262,38 +262,38 @@ pub mod utils {
     pub(super) mod internal {
         use super::is_predefined_variable;
 
-        use mago_syntax::ast::AnonymousClass;
-        use mago_syntax::ast::ArrayElement;
-        use mago_syntax::ast::ArrowFunction;
-        use mago_syntax::ast::Assignment;
-        use mago_syntax::ast::AssignmentOperator;
-        use mago_syntax::ast::Binary;
-        use mago_syntax::ast::Class;
-        use mago_syntax::ast::Closure;
-        use mago_syntax::ast::Conditional;
-        use mago_syntax::ast::DirectVariable;
-        use mago_syntax::ast::DoWhile;
-        use mago_syntax::ast::Enum;
-        use mago_syntax::ast::Expression;
-        use mago_syntax::ast::For;
-        use mago_syntax::ast::ForeachKeyValueTarget;
-        use mago_syntax::ast::ForeachValueTarget;
-        use mago_syntax::ast::Function;
-        use mago_syntax::ast::FunctionCall;
-        use mago_syntax::ast::Global;
-        use mago_syntax::ast::If;
-        use mago_syntax::ast::Interface;
-        use mago_syntax::ast::MatchDefaultArm;
-        use mago_syntax::ast::MatchExpressionArm;
-        use mago_syntax::ast::Namespace;
-        use mago_syntax::ast::StaticAbstractItem;
-        use mago_syntax::ast::StaticConcreteItem;
-        use mago_syntax::ast::SwitchDefaultCase;
-        use mago_syntax::ast::SwitchExpressionCase;
-        use mago_syntax::ast::Trait;
-        use mago_syntax::ast::TryCatchClause;
-        use mago_syntax::ast::Variable;
-        use mago_syntax::ast::While;
+        use mago_syntax::cst::AnonymousClass;
+        use mago_syntax::cst::ArrayElement;
+        use mago_syntax::cst::ArrowFunction;
+        use mago_syntax::cst::Assignment;
+        use mago_syntax::cst::AssignmentOperator;
+        use mago_syntax::cst::Binary;
+        use mago_syntax::cst::Class;
+        use mago_syntax::cst::Closure;
+        use mago_syntax::cst::Conditional;
+        use mago_syntax::cst::DirectVariable;
+        use mago_syntax::cst::DoWhile;
+        use mago_syntax::cst::Enum;
+        use mago_syntax::cst::Expression;
+        use mago_syntax::cst::For;
+        use mago_syntax::cst::ForeachKeyValueTarget;
+        use mago_syntax::cst::ForeachValueTarget;
+        use mago_syntax::cst::Function;
+        use mago_syntax::cst::FunctionCall;
+        use mago_syntax::cst::Global;
+        use mago_syntax::cst::If;
+        use mago_syntax::cst::Interface;
+        use mago_syntax::cst::MatchDefaultArm;
+        use mago_syntax::cst::MatchExpressionArm;
+        use mago_syntax::cst::Namespace;
+        use mago_syntax::cst::StaticAbstractItem;
+        use mago_syntax::cst::StaticConcreteItem;
+        use mago_syntax::cst::SwitchDefaultCase;
+        use mago_syntax::cst::SwitchExpressionCase;
+        use mago_syntax::cst::Trait;
+        use mago_syntax::cst::TryCatchClause;
+        use mago_syntax::cst::Variable;
+        use mago_syntax::cst::While;
         use mago_syntax::walker::Walker;
 
         use crate::context::Context;

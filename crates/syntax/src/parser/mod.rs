@@ -6,8 +6,8 @@ use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_syntax_core::input::Input;
 
-use crate::ast::Program;
-use crate::ast::sequence::Sequence;
+use crate::cst::Program;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::lexer::Lexer;
 use crate::parser::stream::TokenStream;

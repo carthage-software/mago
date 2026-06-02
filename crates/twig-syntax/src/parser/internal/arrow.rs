@@ -1,10 +1,10 @@
 use mago_span::HasSpan;
 
-use crate::ast::ArrowFunction;
-use crate::ast::Expression;
-use crate::ast::Identifier;
-use crate::ast::Parenthesized;
-use crate::ast::TokenSeparatedSequence;
+use crate::cst::ArrowFunction;
+use crate::cst::Expression;
+use crate::cst::Identifier;
+use crate::cst::Parenthesized;
+use crate::cst::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;

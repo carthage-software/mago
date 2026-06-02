@@ -1,5 +1,5 @@
 use crate::T;
-use crate::ast::ast::MagicConstant;
+use crate::cst::cst::MagicConstant;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

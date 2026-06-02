@@ -6,8 +6,8 @@ use mago_word::word;
 use mago_codex::identifier::method::MethodIdentifier;
 
 use mago_span::HasSpan;
-use mago_syntax::ast::Method;
-use mago_syntax::ast::MethodBody;
+use mago_syntax::cst::Method;
+use mago_syntax::cst::MethodBody;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

@@ -1,21 +1,21 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Break;
-use mago_syntax::ast::Continue;
-use mago_syntax::ast::DoWhile;
-use mago_syntax::ast::For;
-use mago_syntax::ast::ForBody;
-use mago_syntax::ast::ForColonDelimitedBody;
-use mago_syntax::ast::Foreach;
-use mago_syntax::ast::ForeachBody;
-use mago_syntax::ast::ForeachColonDelimitedBody;
-use mago_syntax::ast::ForeachKeyValueTarget;
-use mago_syntax::ast::ForeachTarget;
-use mago_syntax::ast::ForeachValueTarget;
-use mago_syntax::ast::While;
-use mago_syntax::ast::WhileBody;
-use mago_syntax::ast::WhileColonDelimitedBody;
+use mago_syntax::cst::Break;
+use mago_syntax::cst::Continue;
+use mago_syntax::cst::DoWhile;
+use mago_syntax::cst::For;
+use mago_syntax::cst::ForBody;
+use mago_syntax::cst::ForColonDelimitedBody;
+use mago_syntax::cst::Foreach;
+use mago_syntax::cst::ForeachBody;
+use mago_syntax::cst::ForeachColonDelimitedBody;
+use mago_syntax::cst::ForeachKeyValueTarget;
+use mago_syntax::cst::ForeachTarget;
+use mago_syntax::cst::ForeachValueTarget;
+use mago_syntax::cst::While;
+use mago_syntax::cst::WhileBody;
+use mago_syntax::cst::WhileColonDelimitedBody;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

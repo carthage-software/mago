@@ -3,10 +3,10 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Match;
-use mago_syntax::ast::MatchArm;
-use mago_syntax::ast::Switch;
-use mago_syntax::ast::SwitchCase;
+use mago_syntax::cst::Match;
+use mago_syntax::cst::MatchArm;
+use mago_syntax::cst::Switch;
+use mago_syntax::cst::SwitchCase;
 
 use crate::internal::context::Context;
 

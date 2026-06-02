@@ -1,5 +1,5 @@
-use crate::ast::Autoescape;
-use crate::ast::Statement;
+use crate::cst::Autoescape;
+use crate::cst::Statement;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;

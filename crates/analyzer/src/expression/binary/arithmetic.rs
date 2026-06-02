@@ -22,8 +22,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Binary;
-use mago_syntax::ast::BinaryOperator;
+use mago_syntax::cst::Binary;
+use mago_syntax::cst::BinaryOperator;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

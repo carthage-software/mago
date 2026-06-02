@@ -3,19 +3,19 @@ use mago_span::Position;
 use mago_span::Span;
 use mago_syntax_core::utils::parse_literal_integer;
 
-use crate::ast::ArrayType;
-use crate::ast::AssociativeArrayType;
-use crate::ast::Identifier;
-use crate::ast::ListType;
-use crate::ast::NonEmptyArrayType;
-use crate::ast::NonEmptyListType;
-use crate::ast::ShapeAdditionalFields;
-use crate::ast::ShapeField;
-use crate::ast::ShapeFieldKey;
-use crate::ast::ShapeKey;
-use crate::ast::ShapeType;
-use crate::ast::ShapeTypeKind;
-use crate::ast::Type;
+use crate::cst::ArrayType;
+use crate::cst::AssociativeArrayType;
+use crate::cst::Identifier;
+use crate::cst::ListType;
+use crate::cst::NonEmptyArrayType;
+use crate::cst::NonEmptyListType;
+use crate::cst::ShapeAdditionalFields;
+use crate::cst::ShapeField;
+use crate::cst::ShapeFieldKey;
+use crate::cst::ShapeKey;
+use crate::cst::ShapeType;
+use crate::cst::ShapeTypeKind;
+use crate::cst::Type;
 use crate::error::ParseError;
 use crate::parser::internal::eat_member_identifier;
 use crate::parser::internal::generic::parse_generic_parameters_or_none;
@@ -175,7 +175,7 @@ pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
                 fields.push(field);
             }
 
-            mago_syntax_core::ast::Sequence::new(fields)
+            mago_syntax_core::cst::Sequence::new(fields)
         },
         additional_fields: {
             if stream.is_at(TypeTokenKind::Ellipsis)? {

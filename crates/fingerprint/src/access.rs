@@ -1,15 +1,15 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Access;
-use mago_syntax::ast::ClassConstantAccess;
-use mago_syntax::ast::ClassLikeConstantSelector;
-use mago_syntax::ast::ClassLikeMemberExpressionSelector;
-use mago_syntax::ast::ClassLikeMemberSelector;
-use mago_syntax::ast::ConstantAccess;
-use mago_syntax::ast::NullSafePropertyAccess;
-use mago_syntax::ast::PropertyAccess;
-use mago_syntax::ast::StaticPropertyAccess;
+use mago_syntax::cst::Access;
+use mago_syntax::cst::ClassConstantAccess;
+use mago_syntax::cst::ClassLikeConstantSelector;
+use mago_syntax::cst::ClassLikeMemberExpressionSelector;
+use mago_syntax::cst::ClassLikeMemberSelector;
+use mago_syntax::cst::ConstantAccess;
+use mago_syntax::cst::NullSafePropertyAccess;
+use mago_syntax::cst::PropertyAccess;
+use mago_syntax::cst::StaticPropertyAccess;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

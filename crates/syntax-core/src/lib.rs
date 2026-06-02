@@ -1,4 +1,4 @@
-pub mod ast;
+pub mod cst;
 pub mod input;
 pub mod macros;
 pub mod parser;

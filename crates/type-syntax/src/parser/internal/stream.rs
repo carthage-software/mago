@@ -52,20 +52,20 @@ impl<'arena> TypeTokenStream<'arena> {
         Ok(Span::new(self.file_id, token.start, token.end()))
     }
 
-    /// Consume the next token and wrap it as a [`Keyword`](crate::ast::Keyword).
+    /// Consume the next token and wrap it as a [`Keyword`](crate::cst::Keyword).
     #[inline]
-    pub fn consume_keyword(&mut self) -> Result<crate::ast::Keyword<'arena>, ParseError> {
+    pub fn consume_keyword(&mut self) -> Result<crate::cst::Keyword<'arena>, ParseError> {
         let token = self.consume()?;
         let span = Span::new(self.file_id, token.start, token.end());
-        Ok(crate::ast::Keyword { span, value: token.value })
+        Ok(crate::cst::Keyword { span, value: token.value })
     }
 
-    /// Eat a token of `kind` and wrap it as a [`Keyword`](crate::ast::Keyword).
+    /// Eat a token of `kind` and wrap it as a [`Keyword`](crate::cst::Keyword).
     #[inline]
-    pub fn eat_keyword(&mut self, kind: TypeTokenKind) -> Result<crate::ast::Keyword<'arena>, ParseError> {
+    pub fn eat_keyword(&mut self, kind: TypeTokenKind) -> Result<crate::cst::Keyword<'arena>, ParseError> {
         let token = self.eat(kind)?;
         let span = Span::new(self.file_id, token.start, token.end());
-        Ok(crate::ast::Keyword { span, value: token.value })
+        Ok(crate::cst::Keyword { span, value: token.value })
     }
 
     /// Arena-allocate a value and return an `&'arena T` reference.

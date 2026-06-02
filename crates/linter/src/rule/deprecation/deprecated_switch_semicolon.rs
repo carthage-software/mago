@@ -1,5 +1,5 @@
 use indoc::indoc;
-use mago_syntax::ast::SwitchCaseSeparator;
+use mago_syntax::cst::SwitchCaseSeparator;
 use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -11,8 +11,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;

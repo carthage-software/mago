@@ -10,7 +10,7 @@ use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Program;
+use mago_syntax::cst::Program;
 use mago_text_edit::TextEdit;
 use mago_text_edit::TextRange;
 

@@ -3,11 +3,11 @@ use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::ArrayElement;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::List;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::cst::ArrayElement;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::List;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
 
 use crate::internal::context::Context;
 

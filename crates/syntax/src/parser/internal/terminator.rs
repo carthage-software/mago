@@ -1,8 +1,8 @@
 use mago_database::file::HasFileId;
 
 use crate::T;
-use crate::ast::ast::ClosingTag;
-use crate::ast::ast::Terminator;
+use crate::cst::cst::ClosingTag;
+use crate::cst::cst::Terminator;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TokenKind;

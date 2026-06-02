@@ -1,4 +1,4 @@
-use mago_syntax::ast::Construct;
+use mago_syntax::cst::Construct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

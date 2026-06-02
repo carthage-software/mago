@@ -1,10 +1,10 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::FullyQualifiedIdentifier;
-use mago_syntax::ast::Identifier;
-use mago_syntax::ast::LocalIdentifier;
-use mago_syntax::ast::QualifiedIdentifier;
+use mago_syntax::cst::FullyQualifiedIdentifier;
+use mago_syntax::cst::Identifier;
+use mago_syntax::cst::LocalIdentifier;
+use mago_syntax::cst::QualifiedIdentifier;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

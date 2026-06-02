@@ -1,10 +1,10 @@
 use mago_database::file::HasFileId;
 
 use crate::T;
-use crate::ast::ast::FullyQualifiedIdentifier;
-use crate::ast::ast::Identifier;
-use crate::ast::ast::LocalIdentifier;
-use crate::ast::ast::QualifiedIdentifier;
+use crate::cst::cst::FullyQualifiedIdentifier;
+use crate::cst::cst::Identifier;
+use crate::cst::cst::LocalIdentifier;
+use crate::cst::cst::QualifiedIdentifier;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

@@ -1,6 +1,6 @@
 use mago_codex::ttype::get_literal_int;
 use mago_codex::ttype::get_string;
-use mago_syntax::ast::PrintConstruct;
+use mago_syntax::cst::PrintConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

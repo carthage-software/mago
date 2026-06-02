@@ -4,8 +4,8 @@ use mago_codex::ttype::get_true;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::IssetConstruct;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::IssetConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

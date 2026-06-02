@@ -4,11 +4,11 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Modifier;
-use mago_syntax::ast::ModifierSequenceExt;
-use mago_syntax::ast::Property;
-use mago_syntax::ast::PropertyHookBody;
-use mago_syntax::ast::PropertyItem;
+use mago_syntax::cst::Modifier;
+use mago_syntax::cst::ModifierSequenceExt;
+use mago_syntax::cst::Property;
+use mago_syntax::cst::PropertyHookBody;
+use mago_syntax::cst::PropertyItem;
 
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;
 use crate::internal::context::Context;

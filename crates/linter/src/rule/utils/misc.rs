@@ -1,14 +1,14 @@
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Access;
-use mago_syntax::ast::Block;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Method;
-use mago_syntax::ast::MethodBody;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::Return;
-use mago_syntax::ast::Statement;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::Access;
+use mago_syntax::cst::Block;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Method;
+use mago_syntax::cst::MethodBody;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::Return;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::Variable;
 
 /// Returns the minimal span for a class-like node (just keyword + name).
 ///

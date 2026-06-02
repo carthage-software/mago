@@ -2,11 +2,11 @@
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-use mago_syntax::ast::Class;
-use mago_syntax::ast::Enum;
-use mago_syntax::ast::Function;
-use mago_syntax::ast::Interface;
-use mago_syntax::ast::Trait;
+use mago_syntax::cst::Class;
+use mago_syntax::cst::Enum;
+use mago_syntax::cst::Function;
+use mago_syntax::cst::Interface;
+use mago_syntax::cst::Trait;
 
 use crate::plugin::context::HookContext;
 use crate::plugin::hook::HookResult;

@@ -12,16 +12,16 @@ use mago_word::concat_word;
 use mago_word::word;
 
 use mago_bytes::trim_start_byte;
-use mago_syntax::ast::Constant;
-use mago_syntax::ast::Declare;
-use mago_syntax::ast::EchoTag;
-use mago_syntax::ast::Namespace;
-use mago_syntax::ast::NamespaceBody;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::Use;
-use mago_syntax::ast::UseItem;
-use mago_syntax::ast::UseItems;
-use mago_syntax::ast::UseType;
+use mago_syntax::cst::Constant;
+use mago_syntax::cst::Declare;
+use mago_syntax::cst::EchoTag;
+use mago_syntax::cst::Namespace;
+use mago_syntax::cst::NamespaceBody;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::Use;
+use mago_syntax::cst::UseItem;
+use mago_syntax::cst::UseItems;
+use mago_syntax::cst::UseType;
 use mago_text_edit::TextEdit;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

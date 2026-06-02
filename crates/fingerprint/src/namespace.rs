@@ -1,9 +1,9 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Namespace;
-use mago_syntax::ast::NamespaceBody;
-use mago_syntax::ast::NamespaceImplicitBody;
+use mago_syntax::cst::Namespace;
+use mago_syntax::cst::NamespaceBody;
+use mago_syntax::cst::NamespaceImplicitBody;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

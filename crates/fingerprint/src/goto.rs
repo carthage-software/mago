@@ -1,8 +1,8 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Goto;
-use mago_syntax::ast::Label;
+use mago_syntax::cst::Goto;
+use mago_syntax::cst::Label;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

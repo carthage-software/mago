@@ -1,0 +1,26 @@
+use serde::Serialize;
+
+use mago_span::HasSpan;
+use mago_span::Span;
+
+use crate::cst::generics::SingleGenericParameter;
+use crate::cst::keyword::Keyword;
+
+/// The `new<X>` utility type.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct NewType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameter: SingleGenericParameter<'arena>,
+}
+
+impl HasSpan for NewType<'_> {
+    fn span(&self) -> Span {
+        self.keyword.span().join(self.parameter.span())
+    }
+}
+
+impl std::fmt::Display for NewType<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}<{}>", self.keyword, self.parameter)
+    }
+}

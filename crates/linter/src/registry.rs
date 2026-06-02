@@ -1,5 +1,5 @@
 use mago_database::matcher::ExclusionMatcher;
-use mago_syntax::ast::NodeKind;
+use mago_syntax::cst::NodeKind;
 
 use crate::integration::Integration;
 use crate::integration::IntegrationSet;

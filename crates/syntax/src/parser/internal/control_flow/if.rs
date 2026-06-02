@@ -1,13 +1,13 @@
 use crate::T;
-use crate::ast::ast::If;
-use crate::ast::ast::IfBody;
-use crate::ast::ast::IfColonDelimitedBody;
-use crate::ast::ast::IfColonDelimitedBodyElseClause;
-use crate::ast::ast::IfColonDelimitedBodyElseIfClause;
-use crate::ast::ast::IfStatementBody;
-use crate::ast::ast::IfStatementBodyElseClause;
-use crate::ast::ast::IfStatementBodyElseIfClause;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::If;
+use crate::cst::cst::IfBody;
+use crate::cst::cst::IfColonDelimitedBody;
+use crate::cst::cst::IfColonDelimitedBodyElseClause;
+use crate::cst::cst::IfColonDelimitedBodyElseIfClause;
+use crate::cst::cst::IfStatementBody;
+use crate::cst::cst::IfStatementBodyElseClause;
+use crate::cst::cst::IfStatementBodyElseIfClause;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

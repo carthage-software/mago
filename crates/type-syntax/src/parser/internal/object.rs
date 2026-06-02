@@ -1,8 +1,8 @@
-use crate::ast::ShapeField;
-use crate::ast::ShapeFieldKey;
-use crate::ast::Type;
-use crate::ast::object::ObjectProperties;
-use crate::ast::object::ObjectType;
+use crate::cst::ShapeField;
+use crate::cst::ShapeFieldKey;
+use crate::cst::Type;
+use crate::cst::object::ObjectProperties;
+use crate::cst::object::ObjectType;
 use crate::error::ParseError;
 use crate::parser::internal::array_like::parse_shape_field_key;
 use crate::parser::internal::parse_type;
@@ -47,7 +47,7 @@ pub fn parse_object_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result
                     fields.push(field);
                 }
 
-                mago_syntax_core::ast::Sequence::new(fields)
+                mago_syntax_core::cst::Sequence::new(fields)
             },
             ellipsis: if stream.is_at(TypeTokenKind::Ellipsis)? { Some(stream.consume_span()?) } else { None },
             right_brace: stream.eat_span(TypeTokenKind::RightBrace)?,

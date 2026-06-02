@@ -2,8 +2,8 @@ use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Hint;
-use mago_syntax::ast::Try;
+use mago_syntax::cst::Hint;
+use mago_syntax::cst::Try;
 
 use crate::internal::context::Context;
 

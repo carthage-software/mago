@@ -7,7 +7,7 @@ mod runner {
 
     use mago_database::file::File;
 
-    use mago_syntax::ast::*;
+    use mago_syntax::cst::*;
     use mago_syntax::parser::parse_file;
 
     pub fn smoke_test(name: &'static str, code: &'static str) {

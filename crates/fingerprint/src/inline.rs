@@ -1,5 +1,5 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Inline;
+use mago_syntax::cst::Inline;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -31,7 +31,7 @@ mod tests {
     use mago_database::file::FileId;
     use mago_span::Position;
     use mago_span::Span;
-    use mago_syntax::ast::ast::inline::InlineKind;
+    use mago_syntax::cst::cst::inline::InlineKind;
 
     use super::*;
 

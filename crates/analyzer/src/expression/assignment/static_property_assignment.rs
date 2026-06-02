@@ -12,7 +12,7 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::StaticPropertyAccess;
+use mago_syntax::cst::StaticPropertyAccess;
 use mago_word::Word;
 
 use crate::artifacts::AnalysisArtifacts;

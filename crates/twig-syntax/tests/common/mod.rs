@@ -20,7 +20,7 @@ use bumpalo::Bump;
 
 use mago_database::file::FileId;
 use mago_syntax_core::input::Input;
-use mago_twig_syntax::ast::Template;
+use mago_twig_syntax::cst::Template;
 use mago_twig_syntax::error::ParseError;
 use mago_twig_syntax::error::SyntaxError;
 use mago_twig_syntax::lexer::TwigLexer;

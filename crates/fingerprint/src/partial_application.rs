@@ -1,8 +1,8 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::FunctionPartialApplication;
-use mago_syntax::ast::MethodPartialApplication;
-use mago_syntax::ast::PartialApplication;
-use mago_syntax::ast::StaticMethodPartialApplication;
+use mago_syntax::cst::FunctionPartialApplication;
+use mago_syntax::cst::MethodPartialApplication;
+use mago_syntax::cst::PartialApplication;
+use mago_syntax::cst::StaticMethodPartialApplication;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

@@ -1,8 +1,8 @@
 use crate::T;
-use crate::ast::ast::Namespace;
-use crate::ast::ast::NamespaceBody;
-use crate::ast::ast::NamespaceImplicitBody;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::Namespace;
+use crate::cst::cst::NamespaceBody;
+use crate::cst::cst::NamespaceImplicitBody;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

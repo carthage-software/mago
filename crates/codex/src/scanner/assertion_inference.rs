@@ -1,15 +1,15 @@
 use std::collections::BTreeMap;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Block;
-use mago_syntax::ast::Call;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::Statement;
-use mago_syntax::ast::UnaryPrefixOperator;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Block;
+use mago_syntax::cst::Call;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::UnaryPrefixOperator;
+use mago_syntax::cst::Variable;
 use mago_word::Word;
 use mago_word::WordSet;
 use mago_word::word;

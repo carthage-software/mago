@@ -6,15 +6,15 @@ use bumpalo::vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::ClassLikeMember;
-use mago_syntax::ast::EnumCaseItem;
-use mago_syntax::ast::Method;
-use mago_syntax::ast::Modifier;
-use mago_syntax::ast::ModifierSequenceExt;
-use mago_syntax::ast::PlainProperty;
-use mago_syntax::ast::Property;
-use mago_syntax::ast::PropertyItem;
-use mago_syntax::ast::Sequence;
+use mago_syntax::cst::ClassLikeMember;
+use mago_syntax::cst::EnumCaseItem;
+use mago_syntax::cst::Method;
+use mago_syntax::cst::Modifier;
+use mago_syntax::cst::ModifierSequenceExt;
+use mago_syntax::cst::PlainProperty;
+use mago_syntax::cst::Property;
+use mago_syntax::cst::PropertyItem;
+use mago_syntax::cst::Sequence;
 
 use crate::document::Document;
 use crate::document::Group;

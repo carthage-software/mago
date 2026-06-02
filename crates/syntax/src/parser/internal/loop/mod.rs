@@ -1,6 +1,6 @@
 use crate::T;
-use crate::ast::ast::Break;
-use crate::ast::ast::Continue;
+use crate::cst::cst::Break;
+use crate::cst::cst::Continue;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

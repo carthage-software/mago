@@ -1,5 +1,5 @@
 use mago_span::Span;
-use mago_syntax_core::ast::TokenSeparatedSequence;
+use mago_syntax_core::cst::TokenSeparatedSequence;
 
 use crate::cst::identifier::Identifier;
 use crate::cst::tag::ExtendsTagValue;

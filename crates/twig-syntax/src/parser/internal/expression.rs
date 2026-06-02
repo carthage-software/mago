@@ -2,16 +2,16 @@ use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::ast::Binary;
-use crate::ast::BinaryOperator;
-use crate::ast::Bool;
-use crate::ast::Expression;
-use crate::ast::Name;
-use crate::ast::Null;
-use crate::ast::Number;
-use crate::ast::StringLiteral;
-use crate::ast::Unary;
-use crate::ast::UnaryOperator;
+use crate::cst::Binary;
+use crate::cst::BinaryOperator;
+use crate::cst::Bool;
+use crate::cst::Expression;
+use crate::cst::Name;
+use crate::cst::Null;
+use crate::cst::Number;
+use crate::cst::StringLiteral;
+use crate::cst::Unary;
+use crate::cst::UnaryOperator;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::stream::is_keyword_usable_as_name;
@@ -108,7 +108,7 @@ impl<'arena> Parser<'_, 'arena> {
 
             if token.kind == TwigTokenKind::LeftParen && can_call(&left) {
                 let argument_list = self.parse_argument_list()?;
-                left = Expression::Call(crate::ast::Call { callee: self.alloc(left), argument_list });
+                left = Expression::Call(crate::cst::Call { callee: self.alloc(left), argument_list });
                 continue;
             }
 
@@ -124,7 +124,7 @@ impl<'arena> Parser<'_, 'arena> {
                 let fat_arrow = self.stream.span_of(&arrow_tok);
                 let parameters = self.arrow_parameters_from(&left);
                 let body = self.parse_expression()?;
-                left = Expression::ArrowFunction(crate::ast::ArrowFunction {
+                left = Expression::ArrowFunction(crate::cst::ArrowFunction {
                     left_parenthesis: None,
                     parameters,
                     right_parenthesis: None,

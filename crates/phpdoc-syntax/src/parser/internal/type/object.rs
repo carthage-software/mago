@@ -1,4 +1,4 @@
-use mago_syntax_core::ast::Sequence;
+use mago_syntax_core::cst::Sequence;
 
 use crate::cst::r#type::ShapeField;
 use crate::cst::r#type::ShapeFieldKey;

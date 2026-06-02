@@ -30,8 +30,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::ArgumentList;
-use mago_syntax::ast::Instantiation;
+use mago_syntax::cst::ArgumentList;
+use mago_syntax::cst::Instantiation;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -533,7 +533,7 @@ pub fn analyze_anonymous_class_constructor<'ctx, 'arena>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class_like_metadata: &'ctx mago_codex::metadata::class_like::ClassLikeMetadata,
-    argument_list: Option<&mago_syntax::ast::ArgumentList<'arena>>,
+    argument_list: Option<&mago_syntax::cst::ArgumentList<'arena>>,
     instantiation_span: Span,
 ) -> Result<(), AnalysisError> {
     let classlike_name = class_like_metadata.name;

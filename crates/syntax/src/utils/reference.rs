@@ -1,30 +1,30 @@
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::ast::Argument;
-use crate::ast::ArgumentList;
-use crate::ast::Array;
-use crate::ast::ArrayElement;
-use crate::ast::Block;
-use crate::ast::Call;
-use crate::ast::ClassLikeMemberSelector;
-use crate::ast::Expression;
-use crate::ast::ForBody;
-use crate::ast::ForeachBody;
-use crate::ast::ForeachTarget;
-use crate::ast::IfBody;
-use crate::ast::LegacyArray;
-use crate::ast::List;
-use crate::ast::MatchArm;
-use crate::ast::MethodCall;
-use crate::ast::MethodPartialApplication;
-use crate::ast::PartialApplication;
-use crate::ast::Statement;
-use crate::ast::StaticMethodCall;
-use crate::ast::StaticMethodPartialApplication;
-use crate::ast::SwitchCase;
-use crate::ast::WhileBody;
-use crate::ast::Yield;
+use crate::cst::Argument;
+use crate::cst::ArgumentList;
+use crate::cst::Array;
+use crate::cst::ArrayElement;
+use crate::cst::Block;
+use crate::cst::Call;
+use crate::cst::ClassLikeMemberSelector;
+use crate::cst::Expression;
+use crate::cst::ForBody;
+use crate::cst::ForeachBody;
+use crate::cst::ForeachTarget;
+use crate::cst::IfBody;
+use crate::cst::LegacyArray;
+use crate::cst::List;
+use crate::cst::MatchArm;
+use crate::cst::MethodCall;
+use crate::cst::MethodPartialApplication;
+use crate::cst::PartialApplication;
+use crate::cst::Statement;
+use crate::cst::StaticMethodCall;
+use crate::cst::StaticMethodPartialApplication;
+use crate::cst::SwitchCase;
+use crate::cst::WhileBody;
+use crate::cst::Yield;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum MethodReference<'ast, 'arena> {

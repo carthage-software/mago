@@ -1,6 +1,6 @@
 use crate::T;
-use crate::ast::ast::Block;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::Block;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

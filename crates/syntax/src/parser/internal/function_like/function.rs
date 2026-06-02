@@ -1,7 +1,7 @@
 use crate::T;
-use crate::ast::ast::AttributeList;
-use crate::ast::ast::Function;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::AttributeList;
+use crate::cst::cst::Function;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

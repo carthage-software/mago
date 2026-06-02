@@ -2,12 +2,12 @@ use mago_database::file::HasFileId;
 use mago_span::Span;
 
 use crate::T;
-use crate::ast::ast::AttributeList;
-use crate::ast::ast::ClassLikeMember;
-use crate::ast::ast::ClassLikeMemberExpressionSelector;
-use crate::ast::ast::ClassLikeMemberSelector;
-use crate::ast::ast::Modifier;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::AttributeList;
+use crate::cst::cst::ClassLikeMember;
+use crate::cst::cst::ClassLikeMemberExpressionSelector;
+use crate::cst::cst::ClassLikeMemberSelector;
+use crate::cst::cst::Modifier;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

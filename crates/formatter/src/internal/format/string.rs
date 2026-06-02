@@ -1,7 +1,7 @@
 use bumpalo::Bump;
 use bumpalo::collections::Vec;
 
-use mago_syntax::ast::LiteralStringKind;
+use mago_syntax::cst::LiteralStringKind;
 
 use crate::internal::FormatterState;
 

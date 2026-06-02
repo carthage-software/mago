@@ -1,13 +1,13 @@
 use mago_php_version::PHPVersion;
-use mago_syntax::ast::ArgumentList;
-use mago_syntax::ast::AttributeList;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::LiteralInteger;
-use mago_syntax::ast::LiteralString;
-use mago_syntax::ast::Sequence;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::cst::ArgumentList;
+use mago_syntax::cst::AttributeList;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::LiteralInteger;
+use mago_syntax::cst::LiteralString;
+use mago_syntax::cst::Sequence;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
 use mago_word::Word;
 use mago_word::word;
 
@@ -165,7 +165,7 @@ fn apply_claim<'arena>(
     have_type: &mut bool,
 ) {
     let positional: Vec<&Expression<'_>> =
-        argument_list.arguments.iter().map(mago_syntax::ast::Argument::value).collect();
+        argument_list.arguments.iter().map(mago_syntax::cst::Argument::value).collect();
 
     let parse_version = |expr: &Expression<'_>| literal_u32(expr).map(decode_decimal_version_id);
 

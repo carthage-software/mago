@@ -7,11 +7,11 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::Argument;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::cst::Argument;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
+use mago_syntax::cst::UnaryPrefixOperator;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;

@@ -3,8 +3,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Extends;
-use mago_syntax::ast::Implements;
+use mago_syntax::cst::Extends;
+use mago_syntax::cst::Implements;
 
 use crate::internal::consts::RESERVED_KEYWORDS;
 use crate::internal::consts::SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED;

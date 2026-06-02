@@ -2,11 +2,11 @@ use bumpalo::collections::Vec;
 use bumpalo::vec;
 
 use mago_span::HasSpan;
-use mago_syntax::ast::FunctionLikeParameter;
-use mago_syntax::ast::FunctionLikeParameterList;
-use mago_syntax::ast::Modifier;
-use mago_syntax::ast::ModifierSequenceExt;
-use mago_syntax::ast::Sequence;
+use mago_syntax::cst::FunctionLikeParameter;
+use mago_syntax::cst::FunctionLikeParameterList;
+use mago_syntax::cst::Modifier;
+use mago_syntax::cst::ModifierSequenceExt;
+use mago_syntax::cst::Sequence;
 
 use crate::document::BreakMode;
 use crate::document::Document;

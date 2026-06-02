@@ -36,9 +36,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::ArrayAccess;
-use mago_syntax::ast::ArrayAppend;
-use mago_syntax::ast::Expression;
+use mago_syntax::cst::ArrayAccess;
+use mago_syntax::cst::ArrayAppend;
+use mago_syntax::cst::Expression;
 
 use crate::code::IssueCode;
 use crate::context::Context;

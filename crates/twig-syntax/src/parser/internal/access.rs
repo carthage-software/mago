@@ -1,14 +1,14 @@
 use mago_span::Span;
 
-use crate::ast::Call;
-use crate::ast::Expression;
-use crate::ast::GetAttribute;
-use crate::ast::GetItem;
-use crate::ast::Identifier;
-use crate::ast::MethodCall;
-use crate::ast::Name;
-use crate::ast::Number;
-use crate::ast::Slice;
+use crate::cst::Call;
+use crate::cst::Expression;
+use crate::cst::GetAttribute;
+use crate::cst::GetItem;
+use crate::cst::Identifier;
+use crate::cst::MethodCall;
+use crate::cst::Name;
+use crate::cst::Number;
+use crate::cst::Slice;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::stream::is_keyword_usable_as_name;

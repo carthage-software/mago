@@ -1,8 +1,8 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::ClosingTag;
-use mago_syntax::ast::FullOpeningTag;
-use mago_syntax::ast::OpeningTag;
-use mago_syntax::ast::ShortOpeningTag;
+use mago_syntax::cst::ClosingTag;
+use mago_syntax::cst::FullOpeningTag;
+use mago_syntax::cst::OpeningTag;
+use mago_syntax::cst::ShortOpeningTag;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

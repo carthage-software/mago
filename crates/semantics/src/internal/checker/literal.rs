@@ -2,7 +2,7 @@ use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Literal;
+use mago_syntax::cst::Literal;
 
 use crate::internal::context::Context;
 

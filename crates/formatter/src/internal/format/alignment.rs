@@ -6,15 +6,15 @@
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::ClassLikeConstant;
-use mago_syntax::ast::ClassLikeMember;
-use mago_syntax::ast::EnumCaseItem;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Modifier;
-use mago_syntax::ast::Property;
-use mago_syntax::ast::PropertyItem;
-use mago_syntax::ast::Sequence;
-use mago_syntax::ast::Statement;
+use mago_syntax::cst::ClassLikeConstant;
+use mago_syntax::cst::ClassLikeMember;
+use mago_syntax::cst::EnumCaseItem;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Modifier;
+use mago_syntax::cst::Property;
+use mago_syntax::cst::PropertyItem;
+use mago_syntax::cst::Sequence;
+use mago_syntax::cst::Statement;
 
 use crate::internal::FormatterState;
 use crate::internal::format::misc::has_new_line_in_range;

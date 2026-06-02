@@ -1,5 +1,5 @@
 use crate::T;
-use crate::ast::ast::FunctionLikeReturnTypeHint;
+use crate::cst::cst::FunctionLikeReturnTypeHint;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
