@@ -179,6 +179,19 @@ mod tests {
 
         let _ = do_parse("3.eint");
         let _ = do_parse("3.e");
+
+        match do_parse(".1") {
+            Ok(Type::LiteralFloat(LiteralFloatType { value, raw, .. })) => {
+                assert_eq!(*value, 0.1);
+                assert_eq!(raw, b".1".as_slice());
+            }
+            other => panic!("expected `.1` to parse as LiteralFloat 0.1, got: {other:?}"),
+        }
+
+        let _ = do_parse(".1E");
+        let _ = do_parse(".1e");
+        let _ = do_parse(".1e+");
+        let _ = do_parse(".1E.111.12E1ra");
     }
 
     #[test]
