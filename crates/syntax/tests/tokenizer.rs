@@ -1072,6 +1072,29 @@ fn test_braced_dynamic_array_key_in_string_interpolation() -> Result<(), SyntaxE
 }
 
 #[test]
+fn test_brace_in_nested_string_in_braced_interpolation() -> Result<(), SyntaxError> {
+    let code = r#"<?= "{$a["}"]}";"#;
+    let expected = &[
+        TokenKind::EchoTag,
+        TokenKind::Whitespace,
+        TokenKind::DoubleQuote,
+        TokenKind::StringPart,
+        TokenKind::LeftBrace,
+        TokenKind::Variable,
+        TokenKind::LeftBracket,
+        TokenKind::LiteralString,
+        TokenKind::RightBracket,
+        TokenKind::RightBrace,
+        TokenKind::DoubleQuote,
+        TokenKind::Semicolon,
+    ];
+
+    test_lexer(code.as_bytes(), expected).map_err(|err| {
+        panic!("unexpected error: {err}");
+    })
+}
+
+#[test]
 fn test_braced_string_interpolation() -> Result<(), SyntaxError> {
     let code = r#"<?= "a {$a} b";"#;
     let expected = &[

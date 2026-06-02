@@ -1570,6 +1570,16 @@ fn read_until_end_of_variable_interpolation(input: &Input, from: usize) -> u32 {
     offset as u32
 }
 
+/// Scan forward from a `{$`/`${` brace interpolation to the offset just past
+/// its matching `}` (tracking `{`/`}` nesting), or to end-of-input if the
+/// interpolation is never closed.
+///
+/// The expression inside `{$...}` is real PHP and may contain nested string
+/// literals - e.g. `"{$a["key"]}"` - whose own `{`/`}` bytes must not be
+/// counted as interpolation braces (consider `"{$a["}"]}"`). Nested `'`, `"`,
+/// and `` ` `` strings are therefore skipped wholesale, honouring `\` escapes,
+/// so a `}` inside a nested string neither closes the interpolation early nor
+/// is miscounted.
 #[inline]
 fn read_until_end_of_brace_interpolation(input: &Input, from: usize) -> u32 {
     let total = input.len();
@@ -1582,7 +1592,7 @@ fn read_until_end_of_brace_interpolation(input: &Input, from: usize) -> u32 {
         if abs >= total {
             break;
         }
-        match input.read_at(abs) {
+        match *input.read_at(abs) {
             b'}' => {
                 offset += 1;
                 if nesting == 0 {
@@ -1594,6 +1604,23 @@ fn read_until_end_of_brace_interpolation(input: &Input, from: usize) -> u32 {
             b'{' => {
                 offset += 1;
                 nesting += 1;
+            }
+            quote @ (b'\'' | b'"' | b'`') => {
+                offset += 1;
+                loop {
+                    let abs = base + offset;
+                    if abs >= total {
+                        break;
+                    }
+                    match *input.read_at(abs) {
+                        b'\\' => offset += 2,
+                        b if b == quote => {
+                            offset += 1;
+                            break;
+                        }
+                        _ => offset += 1,
+                    }
+                }
             }
             _ => {
                 offset += 1;
