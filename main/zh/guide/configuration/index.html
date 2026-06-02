@@ -701,7 +701,7 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <p><code>version</code> 目前是可选项。未来某个 Mago 版本可能在未设置时开始警告,以提醒项目为最终的 2.0 升级做准备。</p>
 <h2 id="source"><code>[source]</code></h2>
 <p><code>[source]</code> 小节控制 Mago 如何发现和处理文件。</p>
-<h3 id="three-categories-of-paths">三类路径</h3>
+<h3 id="four-categories-of-paths">三类路径</h3>
 <p>Mago 区分你的代码、第三方代码,以及完全要忽略的代码:</p>
 <ul>
 <li><strong><code>paths</code></strong> 是你的源码文件。Mago 会对它们进行分析、lint 和格式化。</li>
@@ -732,7 +732,7 @@ excludes = [
 <tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">在所有工具中都被排除的 glob 或路径。</td></tr>
 <tr><td style="text-align: left"><code>extensions</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>["php"]</code></td><td style="text-align: left">视为 PHP 的文件扩展名。</td></tr>
 </tbody></table>
-<h3 id="glob-settings">Glob 设置</h3>
+<h3 id="patching-vendor-types">Glob 设置</h3>
 <p><code>[source.glob]</code> 用于调整 glob 的匹配方式。自 1.19 起可用。</p>
 <pre><code class="language-toml">[source.glob]
 literal-separator = true     # `*` 不匹配 `/`;用 `**` 进行递归匹配
@@ -749,7 +749,7 @@ empty-alternates  = false    # 为 true 时,`{,a}` 匹配 "" 和 "a"
 <blockquote>
 <p><code>mago init</code> 生成的项目会设置 <code>literal-separator = true</code>。它让 <code>*</code> 的行为符合大多数用户的预期,即与 <code>.gitignore</code> 一样只匹配单层目录。</p>
 </blockquote>
-<h3 id="tool-specific-excludes">工具特定的排除</h3>
+<h3 id="glob-settings">工具特定的排除</h3>
 <p>每个工具都有自己的可选 <code>excludes</code>。它们是叠加的:文件只要匹配全局列表或工具特定列表中的任意一项,就会被排除。</p>
 <pre><code class="language-toml">[source]
 paths    = ["src", "tests"]
@@ -772,7 +772,7 @@ no-global             = { exclude = ["**/*Test.php"] }
 <blockquote>
 <p>用 <code>mago list-files</code> 来确认 Mago 实际会处理的文件。<code>mago list-files --command formatter</code> 显示格式化器会触及的文件,<code>--command analyzer</code> 显示分析器的视角,以此类推。</p>
 </blockquote>
-<h2 id="parser"><code>[parser]</code></h2>
+<h2 id="tool-specific-excludes"><code>[parser]</code></h2>
 <pre><code class="language-toml">[parser]
 enable-short-tags = false
 </code></pre>
@@ -780,7 +780,7 @@ enable-short-tags = false
 <tr><td style="text-align: left"><code>enable-short-tags</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">是否在 <code>&lt;?php</code> 和 <code>&lt;?=</code> 之外识别短开标签 <code>&lt;?</code>。等同于 PHP 的 <code>short_open_tag</code> ini 指令。</td></tr>
 </tbody></table>
 <p>当你的 <code>.php</code> 文件包含字面量 <code>&lt;?xml</code> 声明,或并非真正 PHP 的模板片段时,可关闭短开标签。设置 <code>enable-short-tags = false</code> 后,像 <code>&lt;?xml version="1.0"?&gt;</code> 这样的序列会被当作内联文本而不是解析错误。代价是:任何依赖 <code>&lt;?</code> 作为 PHP 开标签的代码不再被识别。</p>
-<h2 id="editor-integration">编辑器集成</h2>
+<h2 id="parser">编辑器集成</h2>
 <p>Mago 可以把诊断输出中的文件路径渲染为 <a href="https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda">OSC 8 超链接</a>。在终端里点击路径,你的编辑器会在对应的行号和列号上打开文件。受支持的终端包括 iTerm2、WezTerm、Kitty、Windows Terminal、Ghostty 以及其他若干款。</p>
 <p>Mago 会在可能的情况下自动检测正在运行的编辑器。在 macOS 上读取 <code>__CFBundleIdentifier</code>;其他平台上检查 <code>TERM_PROGRAM</code>。下列编辑器开箱即被识别:</p>
 <ul>
@@ -820,7 +820,7 @@ enable-short-tags = false
 <p>只有在输出是启用了颜色的终端时,超链接才会被渲染。当输出被管道接收或设置了 <code>--colors=never</code> 时,超链接会被自动抑制,不会干扰脚本或 CI。</p>
 </blockquote>
 <p>超链接在 <code>rich</code>(默认)、<code>medium</code>、<code>short</code> 和 <code>emacs</code> 报告格式中出现。机器可读格式(<code>json</code>、<code>github</code>、<code>gitlab</code>、<code>checkstyle</code>、<code>sarif</code>)不受影响。</p>
-<h2 id="tool-specific-configuration">工具特定的配置</h2>
+<h2 id="editor-integration">工具特定的配置</h2>
 <p>每个工具都有自己的参考页面,涵盖该工具的选项:</p>
 <ul>
 <li><a href="../../../../main/zh/tools/linter/configuration-reference">Linter</a></li>
@@ -828,7 +828,7 @@ enable-short-tags = false
 <li><a href="../../../../main/zh/tools/analyzer/configuration-reference">分析器</a></li>
 <li><a href="../../../../main/zh/tools/guard/configuration-reference">Guard</a></li>
 </ul>
-<h2 id="inspecting-the-merged-configuration">检视合并后的配置</h2>
+<h2 id="tool-specific-configuration">检视合并后的配置</h2>
 <p><code>mago config</code> 打印 Mago 实际使用的配置,即把默认值、每一层 <code>extends</code>、环境变量和 CLI 参数合并之后的结果。当某些行为不符合预期时很有用。</p>
 <pre><code class="language-sh">mago config                       # 以美化 JSON 格式输出完整配置
 mago config --show linter         # 仅输出 [linter] 小节
@@ -892,7 +892,7 @@ mago config --schema --show linter
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#three-categories-of-paths">三类路径</a>
+      <a class="doc-toc__link" href="#four-categories-of-paths">三类路径</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
@@ -900,27 +900,27 @@ mago config --schema --show linter
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#glob-settings">Glob 设置</a>
+      <a class="doc-toc__link" href="#patching-vendor-types">Glob 设置</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#tool-specific-excludes">工具特定的排除</a>
+      <a class="doc-toc__link" href="#glob-settings">工具特定的排除</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#parser">[parser]</a>
+      <a class="doc-toc__link" href="#tool-specific-excludes">[parser]</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#editor-integration">编辑器集成</a>
+      <a class="doc-toc__link" href="#parser">编辑器集成</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#tool-specific-configuration">工具特定的配置</a>
+      <a class="doc-toc__link" href="#editor-integration">工具特定的配置</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#inspecting-the-merged-configuration">检视合并后的配置</a>
+      <a class="doc-toc__link" href="#tool-specific-configuration">检视合并后的配置</a>
     </li>
     
   </ol>

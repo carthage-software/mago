@@ -59,6 +59,7 @@
         "workspace": "/home/runner/work/mago/mago",
         "paths": [],
         "includes": [],
+        "patches": [],
         "excludes": [],
         "extensions": [
           "php"
@@ -1043,6 +1044,14 @@
         },
         "includes": {
           "description": "Paths or glob patterns for non-user defined files to include in the scan.\n\nSupports both directory paths and glob patterns (same as `paths`).\n\nDefaults to `[]`.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "patches": {
+          "description": "Paths or glob patterns for patch files that override type information for vendored code.\n\nPatches are plain PHP files that redefine vendor (or built-in) classes, interfaces,\nfunctions, or constants with corrected PHPDoc / type declarations. Like `includes`,\npatches are not analyzed, linted, or formatted themselves, but their metadata takes\nprecedence over both vendored and built-in definitions during analysis.\n\nDefaults to `[]`.",
           "type": "array",
           "items": {
             "type": "string"

@@ -674,7 +674,7 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <p><code>version</code> est actuellement optionnel. Une future version de Mago pourrait commencer à émettre un avertissement quand il est absent, afin de préparer les projets à l'éventuelle montée vers la 2.0.</p>
 <h2 id="source"><code>[source]</code></h2>
 <p>La section <code>[source]</code> contrôle la manière dont Mago découvre et traite les fichiers.</p>
-<h3 id="three-categories-of-paths">Trois catégories de chemins</h3>
+<h3 id="four-categories-of-paths">Trois catégories de chemins</h3>
 <p>Mago distingue votre code, le code tiers et le code à ignorer entièrement :</p>
 <ul>
 <li><strong><code>paths</code></strong> sont vos fichiers source. Mago les analyse, les linte et les formate.</li>
@@ -705,7 +705,7 @@ excludes = [
 <tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left">liste de strings</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Globs ou chemins exclus de tous les outils.</td></tr>
 <tr><td style="text-align: left"><code>extensions</code></td><td style="text-align: left">liste de strings</td><td style="text-align: left"><code>["php"]</code></td><td style="text-align: left">Extensions de fichiers traitées comme du PHP.</td></tr>
 </tbody></table>
-<h3 id="glob-settings">Réglages des globs</h3>
+<h3 id="patching-vendor-types">Réglages des globs</h3>
 <p><code>[source.glob]</code> ajuste la façon dont les globs correspondent. Disponible depuis 1.19.</p>
 <pre><code class="language-toml">[source.glob]
 literal-separator = true     # `*` does not match `/`; use `**` for recursion
@@ -722,7 +722,7 @@ empty-alternates  = false    # `{,a}` matches "" and "a" when true
 <blockquote>
 <p>Les projets générés par <code>mago init</code> mettent <code>literal-separator = true</code>. Cela fait que <code>*</code> se comporte comme la plupart des utilisateurs s'y attendent, en ne correspondant qu'à un seul niveau de répertoire, comme dans <code>.gitignore</code>.</p>
 </blockquote>
-<h3 id="tool-specific-excludes">Exclusions par outil</h3>
+<h3 id="glob-settings">Exclusions par outil</h3>
 <p>Chaque outil a son propre <code>excludes</code> optionnel. Ils sont additifs : un fichier est exclu s'il correspond à la liste globale ou à la liste spécifique à l'outil.</p>
 <pre><code class="language-toml">[source]
 paths    = ["src", "tests"]
@@ -745,7 +745,7 @@ no-global             = { exclude = ["**/*Test.php"] }
 <blockquote>
 <p>Utilisez <code>mago list-files</code> pour vérifier quels fichiers Mago va traiter. <code>mago list-files --command formatter</code> montre ce que le formateur va toucher, <code>--command analyzer</code> montre la vue de l'analyseur, et ainsi de suite.</p>
 </blockquote>
-<h2 id="parser"><code>[parser]</code></h2>
+<h2 id="tool-specific-excludes"><code>[parser]</code></h2>
 <pre><code class="language-toml">[parser]
 enable-short-tags = false
 </code></pre>
@@ -753,7 +753,7 @@ enable-short-tags = false
 <tr><td style="text-align: left"><code>enable-short-tags</code></td><td style="text-align: left">boolean</td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Indique s'il faut reconnaître la balise courte <code>&lt;?</code> en plus de <code>&lt;?php</code> et <code>&lt;?=</code>. Équivalent à la directive ini PHP <code>short_open_tag</code>.</td></tr>
 </tbody></table>
 <p>Désactivez les balises ouvertes courtes lorsque vos fichiers <code>.php</code> contiennent des déclarations littérales <code>&lt;?xml</code> ou des fragments de modèles qui ne sont pas du PHP. Avec <code>enable-short-tags = false</code>, des séquences telles que <code>&lt;?xml version="1.0"?&gt;</code> sont traitées comme du texte intégré plutôt que comme des erreurs d'analyse. Le compromis : tout code qui s'appuie sur <code>&lt;?</code> comme balise d'ouverture PHP ne sera plus reconnu.</p>
-<h2 id="editor-integration">Intégration éditeur</h2>
+<h2 id="parser">Intégration éditeur</h2>
 <p>Mago peut afficher les chemins de fichiers dans la sortie de diagnostic sous forme de <a href="https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda">liens hypertextes OSC 8</a>. Cliquez sur le chemin dans votre terminal et votre éditeur ouvre le fichier à la bonne ligne et la bonne colonne. Les terminaux pris en charge incluent iTerm2, WezTerm, Kitty, Windows Terminal, Ghostty, et quelques autres.</p>
 <p>Mago détecte automatiquement l'éditeur en cours d'exécution quand c'est possible. Sur macOS, il lit <code>__CFBundleIdentifier</code> ; ailleurs il vérifie <code>TERM_PROGRAM</code>. Les éditeurs suivants sont reconnus directement :</p>
 <ul>
@@ -793,7 +793,7 @@ enable-short-tags = false
 <p>Les liens hypertextes ne sont rendus que lorsque la sortie est un terminal avec les couleurs activées. Ils sont automatiquement supprimés quand la sortie est redirigée vers un pipe ou que <code>--colors=never</code> est utilisé, afin de ne pas interférer avec les scripts ou la CI.</p>
 </blockquote>
 <p>Les liens hypertextes apparaissent dans les formats de rapport <code>rich</code> (par défaut), <code>medium</code>, <code>short</code> et <code>emacs</code>. Les formats lisibles par machine (<code>json</code>, <code>github</code>, <code>gitlab</code>, <code>checkstyle</code>, <code>sarif</code>) ne sont pas affectés.</p>
-<h2 id="tool-specific-configuration">Configuration spécifique aux outils</h2>
+<h2 id="editor-integration">Configuration spécifique aux outils</h2>
 <p>Chaque outil a sa propre page de référence couvrant ses options :</p>
 <ul>
 <li><a href="../../../../main/fr/tools/linter/configuration-reference">Linter</a></li>
@@ -801,7 +801,7 @@ enable-short-tags = false
 <li><a href="../../../../main/fr/tools/analyzer/configuration-reference">Analyseur</a></li>
 <li><a href="../../../../main/fr/tools/guard/configuration-reference">Guard</a></li>
 </ul>
-<h2 id="inspecting-the-merged-configuration">Inspecter la configuration fusionnée</h2>
+<h2 id="tool-specific-configuration">Inspecter la configuration fusionnée</h2>
 <p><code>mago config</code> affiche la configuration que Mago utilise réellement, après fusion des défauts, de chaque couche <code>extends</code>, des variables d'environnement et des drapeaux CLI. Pratique quand quelque chose ne se comporte pas comme prévu.</p>
 <pre><code class="language-sh">mago config                       # full config as pretty-printed JSON
 mago config --show linter         # only the [linter] section
@@ -865,7 +865,7 @@ mago config --schema --show linter
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#three-categories-of-paths">Trois catégories de chemins</a>
+      <a class="doc-toc__link" href="#four-categories-of-paths">Trois catégories de chemins</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
@@ -873,27 +873,27 @@ mago config --schema --show linter
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#glob-settings">Réglages des globs</a>
+      <a class="doc-toc__link" href="#patching-vendor-types">Réglages des globs</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#tool-specific-excludes">Exclusions par outil</a>
+      <a class="doc-toc__link" href="#glob-settings">Exclusions par outil</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#parser">[parser]</a>
+      <a class="doc-toc__link" href="#tool-specific-excludes">[parser]</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#editor-integration">Intégration éditeur</a>
+      <a class="doc-toc__link" href="#parser">Intégration éditeur</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#tool-specific-configuration">Configuration spécifique aux outils</a>
+      <a class="doc-toc__link" href="#editor-integration">Configuration spécifique aux outils</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#inspecting-the-merged-configuration">Inspecter la configuration fusionnée</a>
+      <a class="doc-toc__link" href="#tool-specific-configuration">Inspecter la configuration fusionnée</a>
     </li>
     
   </ol>

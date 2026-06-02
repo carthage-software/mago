@@ -672,23 +672,26 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <p><code>version</code> is currently optional. A future Mago release may start warning when it is missing, to prepare projects for the eventual 2.0 upgrade.</p>
 <h2 id="source"><code>[source]</code></h2>
 <p>The <code>[source]</code> section controls how Mago discovers and processes files.</p>
-<h3 id="three-categories-of-paths">Three categories of paths</h3>
-<p>Mago distinguishes between your code, third-party code, and code to ignore entirely:</p>
+<h3 id="four-categories-of-paths">Four categories of paths</h3>
+<p>Mago distinguishes between your code, third-party code, patches to third-party code, and code to ignore entirely:</p>
 <ul>
 <li><strong><code>paths</code></strong> are your source files. Mago analyses, lints, and formats them.</li>
 <li><strong><code>includes</code></strong> are dependencies (typically <code>vendor</code>). Mago parses them so it can resolve symbols and types, but never analyses, lints, or rewrites them.</li>
+<li><strong><code>patches</code></strong> are PHP files that override type information for vendored or built-in code. Mago honours their type declarations and PHPDoc — which take precedence over <code>includes</code> and built-ins — but never analyses, lints, or formats them. See <a href="#patching-vendor-types">Patching vendor types</a> for what a patch may change.</li>
 <li><strong><code>excludes</code></strong> are paths or globs Mago ignores entirely. They apply to every tool.</li>
 </ul>
 <p>If a file matches both <code>paths</code> and <code>includes</code>, the more specific pattern wins. Exact file paths are most specific, then deeper directory paths, then shallow ones, then glob patterns. When patterns are equally specific, <code>includes</code> wins, which lets you explicitly mark a path as a dependency.</p>
 <pre><code class="language-toml">[source]
 paths     = ["src", "tests"]
+patches   = ["patches"]
 includes  = ["vendor"]
 excludes  = ["cache/**", "build/**", "var/**"]
 extensions = ["php"]
 </code></pre>
-<p>Glob patterns work in all three lists:</p>
+<p>Glob patterns work in all four lists:</p>
 <pre><code class="language-toml">[source]
 paths    = ["src/**/*.php"]
+patches  = ["patches/**/*.php"]
 includes = ["vendor/symfony/**/*.php"]   # only Symfony from vendor
 excludes = [
   "**/*_generated.php",
@@ -700,9 +703,31 @@ excludes = [
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>paths</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Directories or globs for your source code. If empty, the entire workspace is scanned.</td></tr>
 <tr><td style="text-align: left"><code>includes</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Directories or globs for third-party code Mago should parse but not modify.</td></tr>
+<tr><td style="text-align: left"><code>patches</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Directories or globs for type patches. Their PHPDoc and type declarations override those from <code>includes</code> and built-ins. Not analysed, linted, or formatted.</td></tr>
 <tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Globs or paths excluded from every tool.</td></tr>
 <tr><td style="text-align: left"><code>extensions</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>["php"]</code></td><td style="text-align: left">File extensions treated as PHP.</td></tr>
 </tbody></table>
+<h3 id="patching-vendor-types">Patching vendor types</h3>
+<p>A patch is a plain PHP file that redeclares a vendored or built-in symbol by its fully-qualified name. Mago reads only the type information from it; the body is ignored. A patch <strong>refines</strong> an existing symbol — it never replaces it, and it can never make a symbol exist that the vendor code does not already declare.</p>
+<p>At most one patch may target a given symbol. If two patches target the same symbol, Mago reports a diagnostic on the conflicting patches rather than silently picking one — merge them into a single patch or remove all but one.</p>
+<p><strong>What a patch may refine</strong></p>
+<ul>
+<li>Method signatures: parameter types, return type, <code>@throws</code>, <code>@template</code>, and <code>@psalm-assert</code>-style assertions. Each field is applied only when the patch specifies it, so a sparsely-typed patch never erases richer information already known.</li>
+<li>Property and constant types.</li>
+<li>Class-level <code>@template</code> declarations (existing ones are refined by name, new ones are appended) and type aliases.</li>
+<li>Magic members: <code>@method</code>, <code>@property</code>, <code>@property-read</code>, and <code>@property-write</code> annotations may be added even when no such member exists on the original, because they are pure type annotations for <code>__call</code>/<code>__get</code>/<code>__set</code>.</li>
+</ul>
+<p><strong>What a patch may not change</strong></p>
+<p>Each of these is reported as a diagnostic on the patch file:</p>
+<ul>
+<li><strong>New members.</strong> A method, property, or constant that does not exist on the symbol or any of its ancestors cannot be introduced (use the magic-member annotations above instead). A method <em>inherited</em> from an ancestor may be overridden.</li>
+<li><strong>Kind.</strong> The patch must declare the same kind (class, interface, enum, …) as the original; a mismatch rejects the whole patch.</li>
+<li><strong>Hierarchy.</strong> <code>extends</code>, <code>implements</code>, <code>@require-extends</code>, and <code>@require-implements</code> need not be restated, but if restated must match the original exactly; a mismatch rejects the whole patch.</li>
+<li><strong>Trait usage.</strong> <code>use</code> trait statements are never valid in a patch.</li>
+<li><strong><code>readonly class</code> modifier</strong> and <strong>enum cases</strong> are structural and cannot be changed.</li>
+<li><strong>Member modifiers.</strong> Visibility, <code>static</code>, <code>abstract</code>, property hooks, and removing <code>final</code> must match the original (adding <code>final</code> is allowed). On a mismatch the modifier change is ignored, but the refined types are still applied.</li>
+<li><strong>Parameter count and names.</strong> A method or function patch must declare the same parameters, in the same order, with the same names — types are mapped by position, so any divergence rejects the whole patch.</li>
+</ul>
 <h3 id="glob-settings">Glob settings</h3>
 <p><code>[source.glob]</code> tunes how globs match. Available since 1.19.</p>
 <pre><code class="language-toml">[source.glob]
@@ -741,7 +766,7 @@ prefer-static-closure = { exclude = ["tests/"] }
 no-global             = { exclude = ["**/*Test.php"] }
 </code></pre>
 <blockquote>
-<p>Use <code>mago list-files</code> to verify which files Mago will process. <code>mago list-files --command formatter</code> shows what the formatter will touch, <code>--command analyzer</code> shows the analyzer's view, and so on.</p>
+<p>Use <code>mago list-files</code> to verify which files Mago will process. <code>mago list-files --command formatter</code> shows what the formatter will touch, <code>--command analyzer</code> shows the analyzer's view, and so on. This helps verify your <code>paths</code>, <code>includes</code>, <code>patches</code>, and <code>excludes</code> configuration is working as expected.</p>
 </blockquote>
 <h2 id="parser"><code>[parser]</code></h2>
 <pre><code class="language-toml">[parser]
@@ -863,11 +888,15 @@ mago config --schema --show linter
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
-      <a class="doc-toc__link" href="#three-categories-of-paths">Three categories of paths</a>
+      <a class="doc-toc__link" href="#four-categories-of-paths">Four categories of paths</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#reference">Reference</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#patching-vendor-types">Patching vendor types</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
