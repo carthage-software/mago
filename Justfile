@@ -89,6 +89,7 @@ publish:
     cargo publish -p mago-span
     cargo publish -p mago-reporting
     cargo publish -p mago-syntax-core
+    cargo publish -p mago-phpdoc-syntax
     cargo publish -p mago-syntax
     cargo publish -p mago-collector
     cargo publish -p mago-type-syntax

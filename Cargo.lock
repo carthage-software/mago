@@ -1751,6 +1751,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-phpdoc-syntax"
+version = "1.29.0"
+dependencies = [
+ "bumpalo",
+ "indoc",
+ "mago-database",
+ "mago-span",
+ "mago-syntax-core",
+ "memchr",
+ "ordered-float",
+ "serde",
+ "strum 0.28.0",
+]
+
+[[package]]
 name = "mago-prelude"
 version = "1.29.0"
 dependencies = [
