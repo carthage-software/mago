@@ -21,5 +21,6 @@ mago-phpdoc-syntax = { workspace = true }
 bumpalo = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
+paste = { workspace = true }
 ordered-float = { workspace = true, features = ["serde", "rand"] }
 memchr = { workspace = true }
