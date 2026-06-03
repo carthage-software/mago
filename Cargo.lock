@@ -1687,6 +1687,7 @@ dependencies = [
  "mago-syntax-core",
  "memchr",
  "ordered-float",
+ "paste",
  "serde",
  "strum 0.28.0",
 ]
