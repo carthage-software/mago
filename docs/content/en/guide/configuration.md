@@ -235,7 +235,7 @@ Each of these is reported as a diagnostic on the patch file:
 - **Hierarchy.** `extends`, `implements`, `@require-extends`, and `@require-implements` need not be restated, but if restated must match the original exactly; a mismatch rejects the whole patch.
 - **Trait usage.** `use` trait statements are never valid in a patch.
 - **`readonly class` modifier** and **enum cases** are structural and cannot be changed.
-- **Member modifiers.** Visibility, `static`, `abstract`, property hooks, and removing `final` must match the original (adding `final` is allowed). On a mismatch the modifier change is ignored, but the refined types are still applied.
+- **Member modifiers.** Visibility, `static`, property hooks, and removing `final` must match the original (adding `final` is allowed). On a mismatch the modifier change is ignored, but the refined types are still applied. `abstract` is not enforced: a method patch may end in `;` (the natural signature-only form) or in a `{}` body regardless of the original, and the difference is silently ignored.
 - **Parameter count and names.** A method or function patch must declare the same parameters, in the same order, with the same names — types are mapped by position, so any divergence rejects the whole patch.
 
 ### Glob settings

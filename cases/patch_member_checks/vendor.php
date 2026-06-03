@@ -7,7 +7,7 @@ abstract class VendorClass
     const ALLOW_ADDING_FINAL = 3;
     const ALLOW_ADDING_TYPE = 4;
 
-    public function disallowMakingAbstract(): void {}
+    public function allowMarkingAbstract(): void {}
     final public function disallowRemovingFinal(): void {}
     public function disallowAddingStatic(): void {}
     public static function disallowRemovingStatic(): void {}
