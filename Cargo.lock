@@ -1676,6 +1676,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-hir"
+version = "1.29.0"
+dependencies = [
+ "bumpalo",
+ "mago-database",
+ "mago-phpdoc-syntax",
+ "mago-span",
+ "mago-syntax",
+ "mago-syntax-core",
+ "memchr",
+ "ordered-float",
+ "serde",
+ "strum 0.28.0",
+]
+
+[[package]]
 name = "mago-linter"
 version = "1.29.0"
 dependencies = [
