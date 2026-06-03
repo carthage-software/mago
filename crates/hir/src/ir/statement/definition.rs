@@ -188,7 +188,6 @@ pub struct Class<'arena, S, D, E> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-#[repr(u32)]
 pub enum ConstantFlags {
     Internal = 1 << 2,
     API = 1 << 3,

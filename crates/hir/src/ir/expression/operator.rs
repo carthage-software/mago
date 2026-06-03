@@ -53,7 +53,7 @@ pub enum BinaryOperator {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[serde(tag = "type", content = "value")]
-pub enum PrefixUnaryOperator {
+pub enum UnaryPrefixOperator {
     ErrorControl, // `@$expr`
     Reference,    // `&$expr`
     ArrayCast,    // `(array) $expr`
@@ -74,7 +74,7 @@ pub enum PrefixUnaryOperator {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[serde(tag = "type", content = "value")]
-pub enum PostfixUnaryOperator {
+pub enum UnaryPostfixOperator {
     PostIncrement, // `$expr++`
     PostDecrement, // `$expr--`
 }
