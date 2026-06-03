@@ -4,7 +4,7 @@ use mago_syntax::cst;
 use crate::ir::r#type::Type;
 use crate::ir::r#type::TypeKind;
 use crate::lower::Lowering;
-use crate::lower::resolution::kind::ResolutionKind;
+use crate::lower::resolution::namespace::NameResolutionKind;
 
 impl<'arena> Lowering<'arena> {
     pub(crate) fn lower_type(&self, hint: &'arena cst::Hint<'arena>) -> &'arena Type<'arena> {
@@ -14,7 +14,7 @@ impl<'arena> Lowering<'arena> {
     fn lower_type_kind(&self, hint: &'arena cst::Hint<'arena>) -> TypeKind<'arena> {
         match hint {
             cst::Hint::Identifier(identifier) => {
-                TypeKind::Identifier(self.lower_identifier(identifier, Some(ResolutionKind::Default)))
+                TypeKind::Named(self.lower_identifier(identifier, Some(NameResolutionKind::Default)))
             }
             cst::Hint::Parenthesized(parenthesized) => self.lower_type_kind(parenthesized.hint),
             cst::Hint::Nullable(nullable) => {

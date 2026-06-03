@@ -24,7 +24,7 @@ use crate::ir::expression::definition::DefinitionExpression;
 use crate::ir::expression::definition::DefinitionExpressionKind;
 use crate::ir::expression::operator::BinaryOperator;
 use crate::lower::Lowering;
-use crate::lower::resolution::kind::ResolutionKind;
+use crate::lower::resolution::namespace::NameResolutionKind;
 
 pub mod definition;
 pub mod operator;
@@ -78,10 +78,10 @@ impl<'arena> Lowering<'arena> {
                 cst::Expression::Static(_) => ExpressionKind::Static,
                 cst::Expression::Self_(_) => ExpressionKind::Self_,
                 cst::Expression::Identifier(identifier) => {
-                    ExpressionKind::Identifier(self.lower_identifier(identifier, Some(ResolutionKind::Default)))
+                    ExpressionKind::Identifier(self.lower_identifier(identifier, Some(NameResolutionKind::Default)))
                 }
                 cst::Expression::ConstantAccess(constant_access) => ExpressionKind::Constant(
-                    self.lower_identifier(&constant_access.name, Some(ResolutionKind::Constant)),
+                    self.lower_identifier(&constant_access.name, Some(NameResolutionKind::Constant)),
                 ),
                 cst::Expression::Instantiation(instantiation) => {
                     ExpressionKind::Instantiation(self.lower_instantiation(instantiation))
@@ -409,7 +409,7 @@ impl<'arena> Lowering<'arena> {
             cst::Expression::Identifier(identifier) => self.arena.alloc(Expression {
                 meta: (),
                 span: identifier.span(),
-                kind: ExpressionKind::Identifier(self.lower_identifier(identifier, Some(ResolutionKind::Function))),
+                kind: ExpressionKind::Identifier(self.lower_identifier(identifier, Some(NameResolutionKind::Function))),
             }),
             _ => self.arena.alloc(self.lower_expression(callee)),
         }

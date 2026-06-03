@@ -211,10 +211,10 @@ impl<'arena> Lowering<'arena> {
             return_by_reference: function.ampersand.is_some(),
             return_type,
             return_type_annotation: None,
-            throws: &[],
-            asserts: &[],
-            asserts_if_true: &[],
-            asserts_if_false: &[],
+            throws_annotations: &[],
+            assert_annotations: &[],
+            assert_if_true_annotations: &[],
+            assert_if_false_annotations: &[],
             body,
         })
     }

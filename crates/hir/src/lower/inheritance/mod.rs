@@ -6,7 +6,7 @@ use crate::ir::inheritance::ExtendsOne;
 use crate::ir::inheritance::ExtendsOneOrMore;
 use crate::ir::inheritance::Implements;
 use crate::lower::Lowering;
-use crate::lower::resolution::kind::ResolutionKind;
+use crate::lower::resolution::namespace::NameResolutionKind;
 
 impl<'arena> Lowering<'arena> {
     pub(crate) fn lower_extends_one(
@@ -14,7 +14,7 @@ impl<'arena> Lowering<'arena> {
         extends: &'arena cst::Extends<'arena>,
     ) -> Option<&'arena ExtendsOne<'arena>> {
         let parent = extends.types.first()?;
-        let r#type = self.lower_identifier(parent, Some(ResolutionKind::Default));
+        let r#type = self.lower_identifier(parent, Some(NameResolutionKind::Default));
 
         Some(self.arena.alloc(ExtendsOne { span: extends.span(), r#type }))
     }
@@ -41,7 +41,7 @@ impl<'arena> Lowering<'arena> {
         types: &'arena cst::TokenSeparatedSequence<'arena, cst::Identifier<'arena>>,
     ) -> &'arena [Identifier<'arena>] {
         self.arena.alloc_slice_fill_iter(
-            types.iter().map(|identifier| self.lower_identifier(identifier, Some(ResolutionKind::Default))),
+            types.iter().map(|identifier| self.lower_identifier(identifier, Some(NameResolutionKind::Default))),
         )
     }
 }

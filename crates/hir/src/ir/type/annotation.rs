@@ -6,7 +6,9 @@ use serde::Serialize;
 use mago_span::HasSpan;
 use mago_span::Span;
 
+use crate::ir::generics::TypeParameterDefiningEntity;
 use crate::ir::identifier::Identifier;
+use crate::ir::name::Name;
 use crate::ir::variable::DirectVariable;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -18,7 +20,8 @@ pub struct TypeAnnotation<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[serde(tag = "kind", content = "value")]
 pub enum TypeAnnotationKind<'arena> {
-    Reference(IdentifierTypeAnnotation<'arena>),
+    Named(NamedTypeAnnotation<'arena>),
+    GenericParameter(GenericParameterAnnotation<'arena>),
     Union(&'arena [TypeAnnotationKind<'arena>]),
     Intersection(&'arena [TypeAnnotationKind<'arena>]),
     Array(bool, &'arena TypeAnnotationKind<'arena>, &'arena TypeAnnotationKind<'arena>),
@@ -64,9 +67,16 @@ pub enum TypeAnnotationKind<'arena> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct IdentifierTypeAnnotation<'arena> {
+pub struct NamedTypeAnnotation<'arena> {
     pub name: Identifier<'arena>,
     pub type_arguments: &'arena [TypeAnnotationKind<'arena>],
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct GenericParameterAnnotation<'arena> {
+    pub name: Name<'arena>,
+    pub defining_entity: TypeParameterDefiningEntity<'arena>,
+    pub bound: Option<&'arena TypeAnnotation<'arena>>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
