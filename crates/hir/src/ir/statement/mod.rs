@@ -6,11 +6,14 @@ use mago_span::Span;
 use crate::ir::expression::Expression;
 use crate::ir::identifier::Identifier;
 use crate::ir::name::Name;
+use crate::ir::statement::annotation::VariableBindingAnnotation;
 use crate::ir::statement::definition::DefinitionStatement;
 use crate::ir::r#type::Type;
+use crate::ir::r#type::annotation::TypeAnnotation;
 use crate::ir::variable::DirectVariable;
 use crate::ir::variable::Variable;
 
+pub mod annotation;
 pub mod definition;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -42,8 +45,9 @@ pub enum StatementKind<'arena, S, D, E> {
     Return(Option<&'arena Expression<'arena, S, D, E>>),
     Expression(&'arena Expression<'arena, S, D, E>),
     Echo(&'arena [Expression<'arena, S, D, E>]),
-    Global(&'arena [Variable<'arena, S, D, E>]),
+    Global(&'arena [GlobalItem<'arena, S, D, E>]),
     Static(&'arena [StaticItem<'arena, S, D, E>]),
+    VariableBindingAnnotation(&'arena VariableBindingAnnotation<'arena>),
     HaltCompiler,
     Unset(&'arena [Expression<'arena, S, D, E>]),
     Noop,
@@ -119,7 +123,14 @@ pub struct Namespace<'arena, S, D, E> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct StaticItem<'arena, S, D, E> {
     pub variable: DirectVariable<'arena>,
+    pub type_annotation: Option<&'arena TypeAnnotation<'arena>>,
     pub value: Option<&'arena Expression<'arena, S, D, E>>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct GlobalItem<'arena, S, D, E> {
+    pub variable: Variable<'arena, S, D, E>,
+    pub type_annotation: Option<&'arena TypeAnnotation<'arena>>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]

@@ -36,6 +36,7 @@ use crate::ir::literal::LiteralStringKind;
 use crate::lower::Lowering;
 use crate::lower::resolution::namespace::NameResolutionKind;
 
+pub mod annotation;
 pub mod definition;
 pub mod operator;
 pub mod selector;
@@ -240,12 +241,7 @@ impl<'arena> Lowering<'arena> {
         let left = self.arena.alloc(self.lower_expression(assignment.lhs));
         let right = self.arena.alloc(self.lower_expression(assignment.rhs));
 
-        self.arena.alloc(Assignment {
-            left,
-            operator: self.lower_assignment_operator(&assignment.operator),
-            type_annotation: None,
-            right,
-        })
+        self.arena.alloc(Assignment { left, operator: self.lower_assignment_operator(&assignment.operator), right })
     }
 
     pub(crate) fn lower_conditional(
