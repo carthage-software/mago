@@ -1,10 +1,13 @@
+use bumpalo::collections::Vec;
 use mago_phpdoc_syntax::cst::tag::MethodTagValue;
 use mago_phpdoc_syntax::cst::tag::PropertyTagValue;
 use mago_phpdoc_syntax::cst::tag::TypeAliasImportTagValue;
 use mago_phpdoc_syntax::cst::tag::TypeAliasTagValue;
 use mago_span::HasSpan;
 
+use crate::ir::generics::TypeParameterDefiningEntity;
 use crate::ir::generics::Variance;
+use crate::ir::identifier::Identifier;
 use crate::ir::member::annotation::ImportedTypeAliasAnnotation;
 use crate::ir::member::annotation::MethodAnnotation;
 use crate::ir::member::annotation::PropertyAnnotation;
@@ -38,30 +41,36 @@ impl<'arena> Lowering<'arena> {
     }
 
     pub(crate) fn lower_method_annotation(
-        &self,
+        &mut self,
         method: &'arena MethodTagValue<'arena>,
+        owner: Identifier<'arena>,
     ) -> MethodAnnotation<'arena, (), (), ()> {
-        let type_parameters: &'arena [_] = match method.templates {
-            Some(templates) => self.arena.alloc_slice_fill_iter(
-                templates
-                    .entries
-                    .iter()
-                    .map(|entry| self.lower_type_parameter_annotation(&entry.template, Variance::Invariant)),
-            ),
-            None => &[],
-        };
+        let name = self.phpdoc_name(&method.name);
+        self.type_resolution.enter_scope(TypeParameterDefiningEntity::Method(owner, name));
+
+        let mut type_parameters = Vec::new_in(self.arena);
+        if let Some(templates) = method.templates {
+            for entry in templates.entries.iter() {
+                let annotation = self.lower_type_parameter_annotation(&entry.template, Variance::Invariant);
+                self.type_resolution.add_template(entry.template.name.value, annotation.bound);
+                type_parameters.push(annotation);
+            }
+        }
 
         let parameters = self.arena.alloc_slice_fill_iter(
             method.parameters.entries.iter().map(|parameter| self.lower_parameter_annotation(parameter)),
         );
+        let return_type = method.return_type.map(|return_type| self.lower_type_annotation(return_type));
+
+        self.type_resolution.leave_scope();
 
         MethodAnnotation {
             span: method.span(),
             r#static: method.r#static.is_some(),
-            name: self.phpdoc_name(&method.name),
-            type_parameters,
+            name,
+            type_parameters: type_parameters.into_bump_slice(),
             parameters,
-            return_type: method.return_type.map(|return_type| self.lower_type_annotation(return_type)),
+            return_type,
         }
     }
 

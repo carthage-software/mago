@@ -462,26 +462,31 @@ impl<'arena> Lowering<'arena> {
         };
 
         let parameters: &[CallableParameter<'arena>] = match &callable.specification {
-            Some(specification) => self.arena.alloc_slice_fill_iter(
-                specification.parameters.entries.iter().map(|parameter| CallableParameter {
-                    r#type: parameter
-                        .parameter_type
-                        .as_ref()
-                        .map(|parameter_type| self.lower_type_annotation(parameter_type)),
-                    variadic: parameter.ellipsis.is_some(),
-                    by_reference: parameter.ampersand.is_some(),
-                    variable: parameter
-                        .variable
-                        .as_ref()
-                        .map(|variable| DirectVariable { span: variable.span, name: variable.value }),
-                    has_default: parameter.equals.is_some(),
-                }),
-            ),
+            Some(specification) => {
+                self.arena.alloc_slice_fill_iter(specification.parameters.entries.iter().map(|parameter| {
+                    CallableParameter {
+                        r#type: parameter
+                            .parameter_type
+                            .as_ref()
+                            .map(|parameter_type| self.lower_type_annotation(parameter_type)),
+                        variadic: parameter.ellipsis.is_some(),
+                        by_reference: parameter.ampersand.is_some(),
+                        variable: parameter
+                            .variable
+                            .as_ref()
+                            .map(|variable| DirectVariable { span: variable.span, name: variable.value }),
+                        has_default: parameter.equals.is_some(),
+                    }
+                }))
+            }
             None => &[],
         };
 
         let r#return = callable.specification.as_ref().and_then(|specification| {
-            specification.return_type.as_ref().map(|return_type| self.alloc_type_annotation_kind(return_type.return_type))
+            specification
+                .return_type
+                .as_ref()
+                .map(|return_type| self.alloc_type_annotation_kind(return_type.return_type))
         });
 
         TypeAnnotationKind::Callable(CallableTypeAnnotation { kind, parameters, r#return })

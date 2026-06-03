@@ -1,7 +1,8 @@
 use mago_span::Span;
 use serde::Serialize;
 
-use crate::ir::{identifier::Identifier, name::Name};
+use crate::ir::identifier::Identifier;
+use crate::ir::name::Name;
 
 pub mod annotation;
 
@@ -19,4 +20,3 @@ pub enum TypeParameterDefiningEntity<'arena> {
     Method(Identifier<'arena>, Name<'arena>),
     Closure(Span),
 }
-

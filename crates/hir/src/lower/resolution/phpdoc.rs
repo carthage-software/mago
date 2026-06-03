@@ -2,7 +2,8 @@ use bumpalo::Bump;
 
 use mago_phpdoc_syntax::PHPDocParser;
 use mago_phpdoc_syntax::cst::Document;
-use mago_span::{HasSpan, Span};
+use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::comments::docblock::get_docblock_before_position;
 use mago_syntax::cst::Trivia;
 

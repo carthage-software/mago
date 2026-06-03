@@ -24,6 +24,15 @@ impl<'arena> PHPDocParser<'arena> {
         let otherwise = self.parse_type_with_precedence(TypePrecedence::Conditional)?;
         let otherwise = self.alloc(otherwise);
 
-        Ok(Type::Conditional(ConditionalType { subject, is, not, target, question_mark, then, colon, r#else: otherwise }))
+        Ok(Type::Conditional(ConditionalType {
+            subject,
+            is,
+            not,
+            target,
+            question_mark,
+            then,
+            colon,
+            r#else: otherwise,
+        }))
     }
 }

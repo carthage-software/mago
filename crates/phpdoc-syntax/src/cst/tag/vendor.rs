@@ -4,9 +4,9 @@ use strum::Display;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
 #[serde(rename_all = "lowercase")]
 pub enum TagVendor {
-    Psalm,
-    PhpStan,
     Phan,
+    PhpStan,
+    Psalm,
     Mago,
 }
 
