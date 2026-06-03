@@ -8,19 +8,19 @@ use crate::ir::r#type::annotation::IdentifierTypeAnnotation;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ImplementsAnnotation<'arena> {
     pub span: Span,
-    pub types: IdentifierTypeAnnotation<'arena>,
+    pub r#type: IdentifierTypeAnnotation<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ExtendsAnnotation<'arena> {
     pub span: Span,
-    pub types: IdentifierTypeAnnotation<'arena>,
+    pub r#type: IdentifierTypeAnnotation<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct UseAnnotation<'arena> {
     pub span: Span,
-    pub types: IdentifierTypeAnnotation<'arena>,
+    pub r#type: IdentifierTypeAnnotation<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -44,7 +44,7 @@ pub struct RequireImplementsAnnotation<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct MixinAnnotation<'arena> {
     pub span: Span,
-    pub types: IdentifierTypeAnnotation<'arena>,
+    pub r#type: IdentifierTypeAnnotation<'arena>,
 }
 
 impl HasSpan for ImplementsAnnotation<'_> {

@@ -8,8 +8,8 @@ use crate::ir::argument::PartialArgument;
 use crate::ir::expression::definition::DefinitionExpression;
 use crate::ir::expression::operator::AssignmentOperator;
 use crate::ir::expression::operator::BinaryOperator;
-use crate::ir::expression::operator::PostfixUnaryOperator;
-use crate::ir::expression::operator::PrefixUnaryOperator;
+use crate::ir::expression::operator::UnaryPostfixOperator;
+use crate::ir::expression::operator::UnaryPrefixOperator;
 use crate::ir::expression::selector::ConstantSelector;
 use crate::ir::expression::selector::MemberSelector;
 use crate::ir::identifier::Identifier;
@@ -32,10 +32,11 @@ pub struct Expression<'arena, S, D, E> {
 #[serde(tag = "kind", content = "value")]
 pub enum ExpressionKind<'arena, S, D, E> {
     Binary(&'arena Binary<'arena, S, D, E>),
-    UnaryPrefix(&'arena PrefixUnary<'arena, S, D, E>),
-    UnaryPostfix(&'arena PostfixUnary<'arena, S, D, E>),
+    UnaryPrefix(&'arena UnaryPrefix<'arena, S, D, E>),
+    UnaryPostfix(&'arena UnaryPostfix<'arena, S, D, E>),
     Literal(&'arena Literal<'arena>),
     CompositeString(&'arena [CompositeStringPart<'arena, S, D, E>]),
+    ShellExecute(&'arena [CompositeStringPart<'arena, S, D, E>]),
     Assignment(&'arena Assignment<'arena, S, D, E>),
     Conditional(&'arena Conditional<'arena, S, D, E>),
     Array(&'arena [ArrayElement<'arena, S, D, E>]),
@@ -66,6 +67,7 @@ pub enum ExpressionKind<'arena, S, D, E> {
     Static,
     Match(&'arena Match<'arena, S, D, E>),
     Identifier(Identifier<'arena>),
+    SyntaxError,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -84,15 +86,15 @@ pub struct Binary<'arena, S, D, E> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct PrefixUnary<'arena, S, D, E> {
-    pub operator: PrefixUnaryOperator,
+pub struct UnaryPrefix<'arena, S, D, E> {
+    pub operator: UnaryPrefixOperator,
     pub operand: &'arena Expression<'arena, S, D, E>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct PostfixUnary<'arena, S, D, E> {
+pub struct UnaryPostfix<'arena, S, D, E> {
     pub operand: &'arena Expression<'arena, S, D, E>,
-    pub operator: PostfixUnaryOperator,
+    pub operator: UnaryPostfixOperator,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -155,6 +157,7 @@ pub enum Access<'arena, S, D, E> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[serde(tag = "type", content = "value")]
 pub enum Yield<'arena, S, D, E> {
+    Nothing,
     Expression(&'arena Expression<'arena, S, D, E>),
     Pair(&'arena Expression<'arena, S, D, E>, &'arena Expression<'arena, S, D, E>),
     From(&'arena Expression<'arena, S, D, E>),
