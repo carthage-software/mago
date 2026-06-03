@@ -725,7 +725,7 @@ excludes = [
 <li><strong>Hierarchy.</strong> <code>extends</code>, <code>implements</code>, <code>@require-extends</code>, and <code>@require-implements</code> need not be restated, but if restated must match the original exactly; a mismatch rejects the whole patch.</li>
 <li><strong>Trait usage.</strong> <code>use</code> trait statements are never valid in a patch.</li>
 <li><strong><code>readonly class</code> modifier</strong> and <strong>enum cases</strong> are structural and cannot be changed.</li>
-<li><strong>Member modifiers.</strong> Visibility, <code>static</code>, <code>abstract</code>, property hooks, and removing <code>final</code> must match the original (adding <code>final</code> is allowed). On a mismatch the modifier change is ignored, but the refined types are still applied.</li>
+<li><strong>Member modifiers.</strong> Visibility, <code>static</code>, property hooks, and removing <code>final</code> must match the original (adding <code>final</code> is allowed). On a mismatch the modifier change is ignored, but the refined types are still applied. <code>abstract</code> is not enforced: a method patch may end in <code>;</code> (the natural signature-only form) or in a <code>{}</code> body regardless of the original, and the difference is silently ignored.</li>
 <li><strong>Parameter count and names.</strong> A method or function patch must declare the same parameters, in the same order, with the same names — types are mapped by position, so any divergence rejects the whole patch.</li>
 </ul>
 <h3 id="glob-settings">Glob settings</h3>
