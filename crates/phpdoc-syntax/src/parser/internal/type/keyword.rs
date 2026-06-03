@@ -38,6 +38,7 @@ pub enum TypeKeyword {
     IntMaskOf,
     UnspecifiedLiteralInt,
     ClassString,
+    ClassLikeString,
     NeverReturn,
     NegativeInt,
     NonZeroInt,
@@ -384,6 +385,7 @@ fn lookup_len16(bytes: &[u8]) -> Option<TypeKeyword> {
 fn lookup_len17(bytes: &[u8]) -> Option<TypeKeyword> {
     match bytes[0] | 0x20 {
         b'a' if eq(bytes, b"associative-array") => Some(TypeKeyword::AssociativeArray),
+        b'c' if eq(bytes, b"class-like-string") => Some(TypeKeyword::ClassLikeString),
         b's' if eq(bytes, b"stringable-object") => Some(TypeKeyword::StringableObject),
         _ => None,
     }

@@ -10,12 +10,14 @@ use crate::ir::variable::DirectVariable;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ThrowsAnnotation<'arena> {
     pub span: Span,
-    pub types: &'arena [TypeAnnotation<'arena>],
+    pub r#type: &'arena TypeAnnotation<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct AssertAnnotation<'arena> {
     pub span: Span,
+    pub negated: bool,
+    pub equality: bool,
     pub r#type: &'arena TypeAnnotation<'arena>,
     pub target: AssertAnnotationTarget<'arena>,
 }
@@ -27,6 +29,12 @@ pub enum AssertAnnotationTarget<'arena> {
     Property(DirectVariable<'arena>, Name<'arena>),
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct SelfOutAnnotation<'arena> {
+    pub span: Span,
+    pub r#type: &'arena TypeAnnotation<'arena>,
+}
+
 impl HasSpan for ThrowsAnnotation<'_> {
     fn span(&self) -> Span {
         self.span
@@ -34,6 +42,12 @@ impl HasSpan for ThrowsAnnotation<'_> {
 }
 
 impl HasSpan for AssertAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for SelfOutAnnotation<'_> {
     fn span(&self) -> Span {
         self.span
     }

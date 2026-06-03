@@ -1,3 +1,5 @@
+pub mod annotation;
+
 use mago_span::HasSpan;
 use mago_syntax::cst;
 
@@ -46,6 +48,7 @@ impl<'arena> Lowering<'arena> {
             asserts: &[],
             asserts_if_true: &[],
             asserts_if_false: &[],
+            self_out_annotation: None,
             body,
         }
     }

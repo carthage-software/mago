@@ -43,11 +43,12 @@ pub enum TypeAnnotationKind<'arena> {
     String(StringTypeAnnotation<'arena>),
     StringableObject,
     Object,
+    ObjectShape(ObjectShapeTypeAnnotation<'arena>),
     Numeric,
     MemberReference(Identifier<'arena>, MemberReferenceSelector<'arena>),
     AliasReference(Identifier<'arena>, Name<'arena>),
-    Shape(&'arena [ShapeTypeAnnotationField<'arena>], &'arena [TypeAnnotationKind<'arena>]),
-    Callable(CallableTypeKind, Option<&'arena CallableSignature<'arena>>),
+    Shape(ShapeTypeAnnotation<'arena>),
+    Callable(CallableTypeAnnotation<'arena>),
     Variable(DirectVariable<'arena>),
     Conditional(ConditionalTypeAnnotation<'arena>),
     KeyOf(&'arena TypeAnnotationKind<'arena>),
@@ -130,6 +131,7 @@ pub struct StringTypeAnnotation<'arena> {
     pub non_empty: bool,
     pub numeric: bool,
     pub truthy: bool,
+    pub callable: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -151,14 +153,24 @@ pub enum CallableTypeKind {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct CallableSignature<'arena> {
-    pub parameters: &'arena [TypeAnnotationKind<'arena>],
+pub struct CallableParameter<'arena> {
+    pub r#type: Option<&'arena TypeAnnotation<'arena>>,
+    pub variadic: bool,
+    pub by_reference: bool,
+    pub variable: Option<DirectVariable<'arena>>,
+    pub has_default: bool,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct CallableTypeAnnotation<'arena> {
+    pub kind: CallableTypeKind,
+    pub parameters: &'arena [CallableParameter<'arena>],
     pub r#return: Option<&'arena TypeAnnotationKind<'arena>>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ConditionalTypeAnnotation<'arena> {
-    pub annotation: &'arena TypeAnnotationKind<'arena>,
+    pub target: &'arena TypeAnnotationKind<'arena>,
     pub subject: &'arena TypeAnnotationKind<'arena>,
     pub is_negated: bool,
     pub then: &'arena TypeAnnotationKind<'arena>,
@@ -178,6 +190,24 @@ pub struct ShapeTypeAnnotationField<'arena> {
     pub key: ShapeTypeAnnotationKey<'arena>,
     pub optional: bool,
     pub value: TypeAnnotationKind<'arena>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ShapeTypeAnnotation<'arena> {
+    pub fields: &'arena [ShapeTypeAnnotationField<'arena>],
+    pub additional_fields: Option<ShapeTypeAnnotationAdditionalFields<'arena>>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ShapeTypeAnnotationAdditionalFields<'arena> {
+    pub key_type: &'arena TypeAnnotationKind<'arena>,
+    pub value_type: &'arena TypeAnnotationKind<'arena>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ObjectShapeTypeAnnotation<'arena> {
+    pub fields: &'arena [ShapeTypeAnnotationField<'arena>],
+    pub sealed: bool,
 }
 
 impl HasSpan for TypeAnnotation<'_> {

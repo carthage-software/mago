@@ -1,3 +1,5 @@
+use mago_phpdoc_syntax::cst::expression::ConstantExpression;
+use mago_phpdoc_syntax::cst::expression::UnaryPrefixConstantOperator;
 use mago_span::HasSpan;
 use mago_syntax::cst;
 
@@ -23,6 +25,14 @@ use crate::ir::expression::Yield;
 use crate::ir::expression::definition::DefinitionExpression;
 use crate::ir::expression::definition::DefinitionExpressionKind;
 use crate::ir::expression::operator::BinaryOperator;
+use crate::ir::expression::operator::UnaryPrefixOperator;
+use crate::ir::expression::selector::ConstantSelector;
+use crate::ir::literal::Literal;
+use crate::ir::literal::LiteralFloat;
+use crate::ir::literal::LiteralInteger;
+use crate::ir::literal::LiteralKind;
+use crate::ir::literal::LiteralString;
+use crate::ir::literal::LiteralStringKind;
 use crate::lower::Lowering;
 use crate::lower::resolution::namespace::NameResolutionKind;
 
@@ -119,6 +129,74 @@ impl<'arena> Lowering<'arena> {
                 }
             },
         }
+    }
+
+    pub(crate) fn lower_constant_expression(
+        &self,
+        expression: &'arena ConstantExpression<'arena>,
+    ) -> Expression<'arena, (), (), ()> {
+        let kind = match expression {
+            ConstantExpression::Integer(integer) => ExpressionKind::Literal(self.arena.alloc(Literal {
+                span: integer.span,
+                kind: LiteralKind::Integer(LiteralInteger { raw: integer.raw, value: Some(integer.value) }),
+            })),
+            ConstantExpression::Float(float) => ExpressionKind::Literal(self.arena.alloc(Literal {
+                span: float.span,
+                kind: LiteralKind::Float(LiteralFloat { raw: float.raw, value: float.value }),
+            })),
+            ConstantExpression::String(string) => ExpressionKind::Literal(self.arena.alloc(Literal {
+                span: string.span,
+                kind: LiteralKind::String(LiteralString {
+                    kind: if string.raw.starts_with(b"'") {
+                        LiteralStringKind::SingleQuoted
+                    } else {
+                        LiteralStringKind::DoubleQuoted
+                    },
+                    raw: string.raw,
+                    value: Some(string.value),
+                }),
+            })),
+            ConstantExpression::True(keyword) => {
+                ExpressionKind::Literal(self.arena.alloc(Literal { span: keyword.span, kind: LiteralKind::True }))
+            }
+            ConstantExpression::False(keyword) => {
+                ExpressionKind::Literal(self.arena.alloc(Literal { span: keyword.span, kind: LiteralKind::False }))
+            }
+            ConstantExpression::Null(keyword) => {
+                ExpressionKind::Literal(self.arena.alloc(Literal { span: keyword.span, kind: LiteralKind::Null }))
+            }
+            ConstantExpression::UnaryPrefix(unary) => ExpressionKind::UnaryPrefix(self.arena.alloc(UnaryPrefix {
+                operator: match unary.operator {
+                    UnaryPrefixConstantOperator::Plus(_) => UnaryPrefixOperator::Plus,
+                    UnaryPrefixConstantOperator::Negation(_) => UnaryPrefixOperator::Negation,
+                },
+                operand: self.arena.alloc(self.lower_constant_expression(unary.operand)),
+            })),
+            ConstantExpression::ConstantAccess(constant) => {
+                ExpressionKind::Constant(self.resolve_phpdoc_identifier(&constant.name, NameResolutionKind::Constant))
+            }
+            ConstantExpression::ClassLikeConstantAccess(access) => {
+                ExpressionKind::Access(self.arena.alloc(Access::ClassConstant(
+                    self.arena.alloc(Expression {
+                        meta: (),
+                        span: access.class.span,
+                        kind: ExpressionKind::Identifier(self.resolve_phpdoc_class(&access.class)),
+                    }),
+                    ConstantSelector::Name(self.phpdoc_name(&access.constant)),
+                )))
+            }
+            ConstantExpression::Array(array) => {
+                ExpressionKind::Array(self.arena.alloc_slice_fill_iter(array.items.iter().map(|item| match item.key {
+                    Some(key) => ArrayElement::KeyValue(
+                        self.arena.alloc(self.lower_constant_expression(key)),
+                        self.arena.alloc(self.lower_constant_expression(item.value)),
+                    ),
+                    None => ArrayElement::Value(self.arena.alloc(self.lower_constant_expression(item.value))),
+                })))
+            }
+        };
+
+        Expression { meta: (), span: expression.span(), kind }
     }
 
     pub(crate) fn lower_binary(&mut self, binary: &'arena cst::Binary<'arena>) -> &'arena Binary<'arena, (), (), ()> {

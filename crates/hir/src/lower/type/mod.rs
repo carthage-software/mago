@@ -1,6 +1,8 @@
 use mago_span::HasSpan;
 use mago_syntax::cst;
 
+pub mod annotation;
+
 use crate::ir::r#type::Type;
 use crate::ir::r#type::TypeKind;
 use crate::lower::Lowering;

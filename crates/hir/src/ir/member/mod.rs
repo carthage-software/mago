@@ -5,6 +5,7 @@ use mago_span::Span;
 
 use crate::ir::attribute::Attribute;
 use crate::ir::effect::annotation::AssertAnnotation;
+use crate::ir::effect::annotation::SelfOutAnnotation;
 use crate::ir::effect::annotation::ThrowsAnnotation;
 use crate::ir::expression::Expression;
 use crate::ir::flags::Flags;
@@ -104,6 +105,7 @@ pub struct Method<'arena, S, D, E> {
     pub asserts: &'arena [AssertAnnotation<'arena>],
     pub asserts_if_true: &'arena [AssertAnnotation<'arena>],
     pub asserts_if_false: &'arena [AssertAnnotation<'arena>],
+    pub self_out_annotation: Option<&'arena SelfOutAnnotation<'arena>>,
     pub body: Option<&'arena Statement<'arena, S, D, E>>,
 }
 

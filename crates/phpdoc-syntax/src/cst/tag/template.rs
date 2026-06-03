@@ -12,7 +12,6 @@ use crate::cst::r#type::Type;
 pub struct TemplateTagValue<'arena> {
     pub name: Identifier<'arena>,
     pub bound: Option<TemplateTagValueBound<'arena>>,
-    pub lower_bound: Option<TemplateTagValueLowerBound<'arena>>,
     pub default: Option<TemplateTagValueDefault<'arena>>,
     pub description: Option<Text<'arena>>,
 }
@@ -42,7 +41,6 @@ impl HasSpan for TemplateTagValue<'_> {
             .as_ref()
             .map(HasSpan::span)
             .or_else(|| self.default.as_ref().map(HasSpan::span))
-            .or_else(|| self.lower_bound.as_ref().map(HasSpan::span))
             .or_else(|| self.bound.as_ref().map(HasSpan::span))
             .unwrap_or_else(|| self.name.span());
 

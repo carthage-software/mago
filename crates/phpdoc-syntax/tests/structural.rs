@@ -100,7 +100,6 @@ fn parses_template_with_bound_and_default() {
     let Some(bound) = &template.bound else { panic!("expected a bound") };
     assert_eq!(bound.keyword.value, b"of");
     assert!(matches!(bound.r#type, Type::Object(_)));
-    assert!(template.lower_bound.is_none());
     let Some(default) = &template.default else { panic!("expected a default") };
     assert!(matches!(default.r#type, Type::Reference(_)));
 }

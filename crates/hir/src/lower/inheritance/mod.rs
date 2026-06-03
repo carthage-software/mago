@@ -1,3 +1,5 @@
+pub mod annotation;
+
 use mago_span::HasSpan;
 use mago_syntax::cst;
 

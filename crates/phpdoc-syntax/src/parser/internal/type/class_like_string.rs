@@ -1,3 +1,4 @@
+use crate::cst::r#type::ClassLikeStringType;
 use crate::cst::r#type::ClassStringType;
 use crate::cst::r#type::EnumStringType;
 use crate::cst::r#type::InterfaceStringType;
@@ -11,6 +12,15 @@ impl<'arena> PHPDocParser<'arena> {
         let keyword = self.parse_keyword()?;
 
         Ok(Type::ClassString(ClassStringType { keyword, parameter: self.parse_single_generic_parameter_or_none()? }))
+    }
+
+    pub(crate) fn parse_class_like_string_type(&mut self) -> Result<Type<'arena>, ParseError> {
+        let keyword = self.parse_keyword()?;
+
+        Ok(Type::ClassLikeString(ClassLikeStringType {
+            keyword,
+            parameter: self.parse_single_generic_parameter_or_none()?,
+        }))
     }
 
     pub(crate) fn parse_interface_string_type(&mut self) -> Result<Type<'arena>, ParseError> {

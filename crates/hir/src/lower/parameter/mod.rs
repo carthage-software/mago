@@ -1,3 +1,5 @@
+pub mod annotation;
+
 use mago_syntax::cst;
 
 use crate::ir::parameter::Parameter;
