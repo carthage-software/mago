@@ -12,11 +12,6 @@ end_line = 5
 
 [[entries."patch.php".issues]]
 code = "patch-method-structural-mismatch"
-start_line = 9
-end_line = 9
-
-[[entries."patch.php".issues]]
-code = "patch-method-structural-mismatch"
 start_line = 10
 end_line = 10
 

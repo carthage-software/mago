@@ -421,31 +421,36 @@ impl FunctionLikeMetadata {
 
     /// Reports structural method-attribute mismatches.
     ///
-    /// For methods, visibility, abstract, static, and removing final are all structural
-    /// changes a patch may not make. Adding final is allowed. This is reported as an error
-    /// but does not abort the patch — type annotations are still applied.
+    /// For methods, visibility, static, and removing final are all structural changes a patch
+    /// may not make. Adding final is allowed. This is reported as an error but does not abort
+    /// the patch — type annotations are still applied.
+    ///
+    /// `abstract` is deliberately excluded: it is implied by writing the method with a trailing
+    /// `;` instead of a `{}` body — the idiomatic form for a signature-only type patch — rather
+    /// than being an explicit modifier the author chose. The patch never changes the original's
+    /// abstractness either way, so a difference is harmless and would only produce a spurious
+    /// error for the natural patch syntax.
     fn report_method_structural_mismatch(&self, patch: &mut FunctionLikeMetadata) {
         let (Some(patch_m), Some(base_m)) = (&patch.method_metadata, &self.method_metadata) else {
             return;
         };
 
         let visibility_mismatch = patch_m.visibility != base_m.visibility;
-        let abstract_mismatch = patch_m.is_abstract != base_m.is_abstract;
         let static_mismatch = patch_m.is_static != base_m.is_static;
         let final_removed = base_m.is_final && !patch_m.is_final;
 
-        if visibility_mismatch || abstract_mismatch || static_mismatch || final_removed {
+        if visibility_mismatch || static_mismatch || final_removed {
             patch.issues.push(
                 Issue::error(format!(
-                    "Patch for `{}` declares structural attributes (visibility, abstract, static, or \
+                    "Patch for `{}` declares structural attributes (visibility, static, or \
                      removing final) that differ from the original; only type annotations are applied.",
                     patch.original_name,
                 ))
                 .with_code(ScanningIssueKind::PatchMethodStructuralMismatch)
                 .with_annotation(Annotation::primary(patch.span))
                 .with_help(
-                    "Declare the method with the same visibility and the same `abstract`, \
-                     `static`, and `final` modifiers as the original (adding `final` is allowed); \
+                    "Declare the method with the same visibility and the same `static` and \
+                     `final` modifiers as the original (adding `final` is allowed); \
                      a patch may only refine the method's types.",
                 ),
             );
