@@ -3,7 +3,7 @@ use bumpalo::Bump;
 use mago_syntax::cst::Program;
 
 use crate::ir::IR;
-use crate::lower::resolution::NamespaceResolution;
+use crate::lower::resolution::namespace::NamespaceResolution;
 
 pub mod argument;
 pub mod attribute;
@@ -26,12 +26,12 @@ pub mod variable;
 #[derive(Debug)]
 pub struct Lowering<'arena> {
     pub(crate) arena: &'arena Bump,
-    pub(crate) resolution: NamespaceResolution<'arena>,
+    pub(crate) namespace_resolution: NamespaceResolution<'arena>,
 }
 
 impl<'arena> Lowering<'arena> {
     pub fn new(arena: &'arena Bump) -> Lowering<'arena> {
-        Lowering { arena, resolution: NamespaceResolution::new_in(arena) }
+        Lowering { arena, namespace_resolution: NamespaceResolution::new_in(arena) }
     }
 
     #[must_use]

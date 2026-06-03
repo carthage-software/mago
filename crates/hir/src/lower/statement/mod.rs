@@ -59,7 +59,7 @@ impl<'arena> Lowering<'arena> {
                 cst::Statement::Foreach(foreach) => StatementKind::Foreach(self.lower_foreach(foreach)),
                 cst::Statement::Namespace(namespace) => StatementKind::Namespace(self.lower_namespace(namespace)),
                 cst::Statement::Use(r#use) => {
-                    self.resolution.populate_from_use(r#use);
+                    self.namespace_resolution.populate_from_use(r#use);
 
                     StatementKind::Noop
                 }
@@ -351,9 +351,9 @@ impl<'arena> Lowering<'arena> {
             None => None,
         };
 
-        self.resolution.enter_namespace(namespace.name.as_ref().map(|identifier| identifier.value()));
+        self.namespace_resolution.enter_namespace(namespace.name.as_ref().map(|identifier| identifier.value()));
         let statement = self.statements_to_statement(namespace.statements().as_slice(), namespace.namespace.span());
-        self.resolution.leave_namespace();
+        self.namespace_resolution.leave_namespace();
 
         self.arena.alloc(Namespace { name, statement })
     }

@@ -3,48 +3,48 @@ use serde::Serialize;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::ir::r#type::annotation::IdentifierTypeAnnotation;
+use crate::ir::r#type::annotation::NamedTypeAnnotation;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ImplementsAnnotation<'arena> {
     pub span: Span,
-    pub r#type: IdentifierTypeAnnotation<'arena>,
+    pub r#type: NamedTypeAnnotation<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ExtendsAnnotation<'arena> {
     pub span: Span,
-    pub r#type: IdentifierTypeAnnotation<'arena>,
+    pub r#type: NamedTypeAnnotation<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct UseAnnotation<'arena> {
     pub span: Span,
-    pub r#type: IdentifierTypeAnnotation<'arena>,
+    pub r#type: NamedTypeAnnotation<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct SealedAnnotation<'arena> {
     pub span: Span,
-    pub types: &'arena [IdentifierTypeAnnotation<'arena>],
+    pub types: &'arena [NamedTypeAnnotation<'arena>],
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct RequireExtendsAnnotation<'arena> {
     pub span: Span,
-    pub r#type: IdentifierTypeAnnotation<'arena>,
+    pub r#type: NamedTypeAnnotation<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct RequireImplementsAnnotation<'arena> {
     pub span: Span,
-    pub r#type: IdentifierTypeAnnotation<'arena>,
+    pub r#type: NamedTypeAnnotation<'arena>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct MixinAnnotation<'arena> {
     pub span: Span,
-    pub r#type: IdentifierTypeAnnotation<'arena>,
+    pub r#type: NamedTypeAnnotation<'arena>,
 }
 
 impl HasSpan for ImplementsAnnotation<'_> {

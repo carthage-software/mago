@@ -14,7 +14,7 @@ pub struct ThrowsAnnotation<'arena> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-pub struct AssertsAnnotation<'arena> {
+pub struct AssertAnnotation<'arena> {
     pub span: Span,
     pub r#type: &'arena TypeAnnotation<'arena>,
     pub target: AssertAnnotationTarget<'arena>,
@@ -33,7 +33,7 @@ impl HasSpan for ThrowsAnnotation<'_> {
     }
 }
 
-impl HasSpan for AssertsAnnotation<'_> {
+impl HasSpan for AssertAnnotation<'_> {
     fn span(&self) -> Span {
         self.span
     }

@@ -14,7 +14,7 @@ use crate::ir::member::TraitUseAdaptation;
 use crate::ir::member::TraitUseAliasAdaptation;
 use crate::ir::member::TraitUsePrecedenceAdaptation;
 use crate::lower::Lowering;
-use crate::lower::resolution::kind::ResolutionKind;
+use crate::lower::resolution::namespace::NameResolutionKind;
 
 impl<'arena> Lowering<'arena> {
     pub(crate) fn lower_method(&mut self, method: &'arena cst::Method<'arena>) -> Method<'arena, (), (), ()> {
@@ -164,7 +164,7 @@ impl<'arena> Lowering<'arena> {
         match adaptation {
             cst::TraitUseAdaptation::Precedence(precedence) => {
                 let r#trait =
-                    self.lower_identifier(&precedence.method_reference.trait_name, Some(ResolutionKind::Default));
+                    self.lower_identifier(&precedence.method_reference.trait_name, Some(NameResolutionKind::Default));
                 let method = self.lower_name(&precedence.method_reference.method_name);
                 let instead_of = self.lower_class_reference_list(&precedence.trait_names);
 
@@ -174,7 +174,7 @@ impl<'arena> Lowering<'arena> {
                 let (r#trait, method) = match &alias.method_reference {
                     cst::TraitUseMethodReference::Identifier(identifier) => (None, self.lower_name(identifier)),
                     cst::TraitUseMethodReference::Absolute(absolute) => (
-                        Some(self.lower_identifier(&absolute.trait_name, Some(ResolutionKind::Default))),
+                        Some(self.lower_identifier(&absolute.trait_name, Some(NameResolutionKind::Default))),
                         self.lower_name(&absolute.method_name),
                     ),
                 };

@@ -4,7 +4,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ir::attribute::Attribute;
-use crate::ir::effect::annotation::AssertsAnnotation;
+use crate::ir::effect::annotation::AssertAnnotation;
 use crate::ir::effect::annotation::ThrowsAnnotation;
 use crate::ir::expression::Expression;
 use crate::ir::flags::Flags;
@@ -101,9 +101,9 @@ pub struct Method<'arena, S, D, E> {
     pub return_type: Option<&'arena Type<'arena>>,
     pub return_type_annotation: Option<&'arena TypeAnnotation<'arena>>,
     pub throws: &'arena [ThrowsAnnotation<'arena>],
-    pub asserts: &'arena [AssertsAnnotation<'arena>],
-    pub asserts_if_true: &'arena [AssertsAnnotation<'arena>],
-    pub asserts_if_false: &'arena [AssertsAnnotation<'arena>],
+    pub asserts: &'arena [AssertAnnotation<'arena>],
+    pub asserts_if_true: &'arena [AssertAnnotation<'arena>],
+    pub asserts_if_false: &'arena [AssertAnnotation<'arena>],
     pub body: Option<&'arena Statement<'arena, S, D, E>>,
 }
 

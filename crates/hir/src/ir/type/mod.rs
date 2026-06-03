@@ -16,7 +16,7 @@ pub struct Type<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[serde(tag = "kind", content = "value")]
 pub enum TypeKind<'arena> {
-    Identifier(Identifier<'arena>),
+    Named(Identifier<'arena>),
     Union(&'arena [TypeKind<'arena>]),
     Intersection(&'arena [TypeKind<'arena>]),
     Null,

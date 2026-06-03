@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::ir::argument::Argument;
 use crate::ir::attribute::Attribute;
-use crate::ir::effect::annotation::AssertsAnnotation;
+use crate::ir::effect::annotation::AssertAnnotation;
 use crate::ir::effect::annotation::ThrowsAnnotation;
 use crate::ir::expression::Expression;
 use crate::ir::generics::annotation::TypeParameterAnnotation;
@@ -45,10 +45,10 @@ pub struct ArrowFunction<'arena, S, D, E> {
     pub return_by_reference: bool,
     pub return_type: Option<&'arena Type<'arena>>,
     pub return_type_annotation: Option<&'arena TypeAnnotation<'arena>>,
-    pub throws: &'arena [ThrowsAnnotation<'arena>],
-    pub asserts: &'arena [AssertsAnnotation<'arena>],
-    pub asserts_if_true: &'arena [AssertsAnnotation<'arena>],
-    pub asserts_if_false: &'arena [AssertsAnnotation<'arena>],
+    pub throws_annotations: &'arena [ThrowsAnnotation<'arena>],
+    pub assert_annotations: &'arena [AssertAnnotation<'arena>],
+    pub assert_if_true_annotations: &'arena [AssertAnnotation<'arena>],
+    pub assert_if_false_annotations: &'arena [AssertAnnotation<'arena>],
     pub expression: &'arena Expression<'arena, S, D, E>,
 }
 
@@ -67,10 +67,10 @@ pub struct Closure<'arena, S, D, E> {
     pub return_by_reference: bool,
     pub return_type: Option<&'arena Type<'arena>>,
     pub return_type_annotation: Option<&'arena TypeAnnotation<'arena>>,
-    pub throws: &'arena [ThrowsAnnotation<'arena>],
-    pub asserts: &'arena [AssertsAnnotation<'arena>],
-    pub asserts_if_true: &'arena [AssertsAnnotation<'arena>],
-    pub asserts_if_false: &'arena [AssertsAnnotation<'arena>],
+    pub throws_annotations: &'arena [ThrowsAnnotation<'arena>],
+    pub assert_annotations: &'arena [AssertAnnotation<'arena>],
+    pub assert_if_true_annotations: &'arena [AssertAnnotation<'arena>],
+    pub assert_if_false_annotations: &'arena [AssertAnnotation<'arena>],
     pub use_variables: &'arena [ClosureUseClauseVariable<'arena>],
     pub body: &'arena Statement<'arena, S, D, E>,
 }
