@@ -128,6 +128,7 @@ impl<'arena> PHPDocParser<'arena> {
                 self.parse_properties_of_type(crate::cst::r#type::PropertiesOfFilter::Protected)?
             }
             TypeKeyword::ClassString => self.parse_class_string_type()?,
+            TypeKeyword::ClassLikeString => self.parse_class_like_string_type()?,
             TypeKeyword::InterfaceString => self.parse_interface_string_type()?,
             TypeKeyword::EnumString => self.parse_enum_string_type()?,
             TypeKeyword::TraitString => self.parse_trait_string_type()?,

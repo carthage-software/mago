@@ -5,6 +5,7 @@ use mago_span::Span;
 
 use crate::ir::argument::Argument;
 use crate::ir::argument::PartialArgument;
+use crate::ir::expression::annotation::Annotation;
 use crate::ir::expression::definition::DefinitionExpression;
 use crate::ir::expression::operator::AssignmentOperator;
 use crate::ir::expression::operator::BinaryOperator;
@@ -14,9 +15,9 @@ use crate::ir::expression::selector::ConstantSelector;
 use crate::ir::expression::selector::MemberSelector;
 use crate::ir::identifier::Identifier;
 use crate::ir::literal::Literal;
-use crate::ir::r#type::annotation::TypeAnnotation;
 use crate::ir::variable::Variable;
 
+pub mod annotation;
 pub mod definition;
 pub mod operator;
 pub mod selector;
@@ -38,6 +39,7 @@ pub enum ExpressionKind<'arena, S, D, E> {
     CompositeString(&'arena [CompositeStringPart<'arena, S, D, E>]),
     ShellExecute(&'arena [CompositeStringPart<'arena, S, D, E>]),
     Assignment(&'arena Assignment<'arena, S, D, E>),
+    Annotation(&'arena Annotation<'arena, S, D, E>),
     Conditional(&'arena Conditional<'arena, S, D, E>),
     Array(&'arena [ArrayElement<'arena, S, D, E>]),
     List(&'arena [ArrayElement<'arena, S, D, E>]),
@@ -74,7 +76,6 @@ pub enum ExpressionKind<'arena, S, D, E> {
 pub struct Assignment<'arena, S, D, E> {
     pub left: &'arena Expression<'arena, S, D, E>,
     pub operator: Option<AssignmentOperator>,
-    pub type_annotation: Option<&'arena TypeAnnotation<'arena>>,
     pub right: &'arena Expression<'arena, S, D, E>,
 }
 

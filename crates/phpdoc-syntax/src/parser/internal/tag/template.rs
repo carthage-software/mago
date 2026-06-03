@@ -2,7 +2,6 @@ use crate::cst::tag::TagValue;
 use crate::cst::tag::TemplateTagValue;
 use crate::cst::tag::TemplateTagValueBound;
 use crate::cst::tag::TemplateTagValueDefault;
-use crate::cst::tag::TemplateTagValueLowerBound;
 use crate::error::ParseError;
 use crate::parser::PHPDocParser;
 use crate::token::TokenKind;
@@ -24,16 +23,6 @@ impl<'arena> PHPDocParser<'arena> {
             None
         };
 
-        let lower_bound = if self.stream.is_at_value(b"super") {
-            let keyword = self.parse_keyword()?;
-            let r#type = self.parse_type()?;
-            let r#type = self.alloc(r#type);
-
-            Some(TemplateTagValueLowerBound { keyword, r#type })
-        } else {
-            None
-        };
-
         let default = if self.stream.is_at(TokenKind::Equals) {
             let equals = self.stream.consume_span()?;
             let r#type = self.parse_type()?;
@@ -46,7 +35,7 @@ impl<'arena> PHPDocParser<'arena> {
 
         let description = if parse_description { self.parse_optional_description(true)? } else { None };
 
-        Ok(TemplateTagValue { name, bound, lower_bound, default, description })
+        Ok(TemplateTagValue { name, bound, default, description })
     }
 
     pub(crate) fn parse_template_tag(&mut self) -> Result<TagValue<'arena>, ParseError> {

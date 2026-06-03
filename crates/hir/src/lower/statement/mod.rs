@@ -1,3 +1,4 @@
+use bumpalo::collections::Vec;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst;
@@ -8,6 +9,7 @@ use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
 use crate::ir::statement::For;
 use crate::ir::statement::Foreach;
+use crate::ir::statement::GlobalItem;
 use crate::ir::statement::If;
 use crate::ir::statement::Namespace;
 use crate::ir::statement::Statement;
@@ -18,10 +20,13 @@ use crate::ir::statement::SwitchCase;
 use crate::ir::statement::Try;
 use crate::ir::statement::TryCatchClause;
 use crate::ir::statement::While;
+use crate::ir::statement::annotation::VariableBindingAnnotation;
 use crate::ir::statement::definition::DefinitionStatement;
 use crate::ir::statement::definition::DefinitionStatementKind;
+use crate::ir::variable::Variable;
 use crate::lower::Lowering;
 
+pub mod annotation;
 pub mod definition;
 
 impl<'arena> Lowering<'arena> {
@@ -29,88 +34,147 @@ impl<'arena> Lowering<'arena> {
         &mut self,
         statement: &'arena cst::Statement<'arena>,
     ) -> Statement<'arena, (), (), ()> {
-        Statement {
-            meta: (),
-            span: statement.span(),
-            kind: match statement {
-                cst::Statement::Expression(expression) => {
-                    StatementKind::Expression(self.lower_expression_statement(expression))
-                }
-                cst::Statement::Block(block) => StatementKind::Sequence(self.lower_block(block)),
-                cst::Statement::Noop(_) | cst::Statement::ClosingTag(_) | cst::Statement::OpeningTag(_) => {
-                    StatementKind::Noop
-                }
-                cst::Statement::HaltCompiler(_) => StatementKind::HaltCompiler,
-                cst::Statement::Unset(unset) => StatementKind::Unset(self.lower_unset(unset)),
-                cst::Statement::Echo(echo) => StatementKind::Echo(self.lower_echo(echo)),
-                cst::Statement::EchoTag(echo_tag) => StatementKind::Echo(self.lower_echo_tag(echo_tag)),
-                cst::Statement::Return(r#return) => StatementKind::Return(self.lower_return(r#return)),
-                cst::Statement::Goto(goto) => StatementKind::Goto(self.lower_name(&goto.label)),
-                cst::Statement::Label(label) => StatementKind::Label(self.lower_name(&label.name)),
-                cst::Statement::Continue(r#continue) => {
-                    StatementKind::Continue(self.lower_optional_expression(r#continue.level))
-                }
-                cst::Statement::Break(r#break) => StatementKind::Break(self.lower_optional_expression(r#break.level)),
-                cst::Statement::If(r#if) => StatementKind::If(self.lower_if(r#if)),
-                cst::Statement::Switch(switch) => StatementKind::Switch(self.lower_switch(switch)),
-                cst::Statement::While(r#while) => StatementKind::While(self.lower_while(r#while)),
-                cst::Statement::DoWhile(do_while) => StatementKind::DoWhile(self.lower_do_while(do_while)),
-                cst::Statement::For(r#for) => StatementKind::For(self.lower_for(r#for)),
-                cst::Statement::Foreach(foreach) => StatementKind::Foreach(self.lower_foreach(foreach)),
-                cst::Statement::Namespace(namespace) => StatementKind::Namespace(self.lower_namespace(namespace)),
-                cst::Statement::Use(r#use) => {
-                    self.namespace_resolution.populate_from_use(r#use);
+        let document = self.phpdoc_resolution.get(statement.span());
+        let mut bindings = self.collect_var_bindings(document.as_ref());
+        let span = statement.span();
 
-                    StatementKind::Noop
+        let kind = if bindings.is_empty() {
+            self.lower_statement_kind(statement)
+        } else {
+            match statement {
+                cst::Statement::Expression(expression) => {
+                    let lowered = self.lower_expression_statement(expression);
+
+                    StatementKind::Expression(self.fold_assignment_statement(lowered, &mut bindings))
                 }
-                cst::Statement::Inline(inline) => StatementKind::Inline(inline.value),
-                cst::Statement::Class(class) => StatementKind::Definition(self.arena.alloc(DefinitionStatement {
-                    meta: (),
-                    kind: DefinitionStatementKind::Class(self.lower_class(class)),
-                })),
-                cst::Statement::Interface(interface) => {
-                    StatementKind::Definition(self.arena.alloc(DefinitionStatement {
-                        meta: (),
-                        kind: DefinitionStatementKind::Interface(self.lower_interface(interface)),
-                    }))
+                cst::Statement::Return(r#return) => {
+                    let lowered = self.lower_return(r#return);
+
+                    StatementKind::Return(self.fold_returned_expression(lowered, &mut bindings))
                 }
-                cst::Statement::Trait(r#trait) => StatementKind::Definition(self.arena.alloc(DefinitionStatement {
-                    meta: (),
-                    kind: DefinitionStatementKind::Trait(self.lower_trait(r#trait)),
-                })),
-                cst::Statement::Enum(r#enum) => StatementKind::Definition(self.arena.alloc(DefinitionStatement {
+                cst::Statement::Foreach(foreach) => {
+                    let mut folded = *self.lower_foreach(foreach);
+                    folded.value = self.fold_assignment_target(folded.value, &mut bindings);
+                    folded.key = folded.key.map(|key| self.fold_assignment_target(key, &mut bindings));
+
+                    StatementKind::Foreach(self.arena.alloc(folded))
+                }
+                cst::Statement::Static(r#static) => {
+                    StatementKind::Static(self.arena.alloc_slice_fill_iter(r#static.items.iter().map(|item| {
+                        let mut item = self.lower_static_item(item);
+                        item.type_annotation = bindings.take_named(item.variable.name);
+                        item
+                    })))
+                }
+                cst::Statement::Global(global) => {
+                    StatementKind::Global(self.arena.alloc_slice_fill_iter(global.variables.iter().map(|variable| {
+                        let mut item = self.lower_global_item(variable);
+                        if let Variable::Direct(direct) = item.variable {
+                            item.type_annotation = bindings.take_named(direct.name);
+                        }
+
+                        item
+                    })))
+                }
+                _ => self.lower_statement_kind(statement),
+            }
+        };
+
+        if bindings.named.is_empty() {
+            return Statement { meta: (), span, kind };
+        }
+
+        let mut statements = Vec::new_in(self.arena);
+        for (variable, type_annotation, _, span) in bindings.named {
+            statements.push(Statement {
+                meta: (),
+                span,
+                kind: StatementKind::VariableBindingAnnotation(
+                    self.arena.alloc(VariableBindingAnnotation { variable, type_annotation }),
+                ),
+            });
+        }
+
+        statements.push(Statement { meta: (), span, kind });
+
+        Statement { meta: (), span, kind: StatementKind::Sequence(statements.into_bump_slice()) }
+    }
+
+    fn lower_statement_kind(&mut self, statement: &'arena cst::Statement<'arena>) -> StatementKind<'arena, (), (), ()> {
+        match statement {
+            cst::Statement::Expression(expression) => {
+                StatementKind::Expression(self.lower_expression_statement(expression))
+            }
+            cst::Statement::Block(block) => StatementKind::Sequence(self.lower_block(block)),
+            cst::Statement::Noop(_) | cst::Statement::ClosingTag(_) | cst::Statement::OpeningTag(_) => {
+                StatementKind::Noop
+            }
+            cst::Statement::HaltCompiler(_) => StatementKind::HaltCompiler,
+            cst::Statement::Unset(unset) => StatementKind::Unset(self.lower_unset(unset)),
+            cst::Statement::Echo(echo) => StatementKind::Echo(self.lower_echo(echo)),
+            cst::Statement::EchoTag(echo_tag) => StatementKind::Echo(self.lower_echo_tag(echo_tag)),
+            cst::Statement::Return(r#return) => StatementKind::Return(self.lower_return(r#return)),
+            cst::Statement::Goto(goto) => StatementKind::Goto(self.lower_name(&goto.label)),
+            cst::Statement::Label(label) => StatementKind::Label(self.lower_name(&label.name)),
+            cst::Statement::Continue(r#continue) => {
+                StatementKind::Continue(self.lower_optional_expression(r#continue.level))
+            }
+            cst::Statement::Break(r#break) => StatementKind::Break(self.lower_optional_expression(r#break.level)),
+            cst::Statement::If(r#if) => StatementKind::If(self.lower_if(r#if)),
+            cst::Statement::Switch(switch) => StatementKind::Switch(self.lower_switch(switch)),
+            cst::Statement::While(r#while) => StatementKind::While(self.lower_while(r#while)),
+            cst::Statement::DoWhile(do_while) => StatementKind::DoWhile(self.lower_do_while(do_while)),
+            cst::Statement::For(r#for) => StatementKind::For(self.lower_for(r#for)),
+            cst::Statement::Foreach(foreach) => StatementKind::Foreach(self.lower_foreach(foreach)),
+            cst::Statement::Namespace(namespace) => StatementKind::Namespace(self.lower_namespace(namespace)),
+            cst::Statement::Use(r#use) => {
+                self.namespace_resolution.populate_from_use(r#use);
+
+                StatementKind::Noop
+            }
+            cst::Statement::Inline(inline) => StatementKind::Inline(inline.value),
+            cst::Statement::Class(class) => StatementKind::Definition(self.arena.alloc(DefinitionStatement {
+                meta: (),
+                kind: DefinitionStatementKind::Class(self.lower_class(class)),
+            })),
+            cst::Statement::Interface(interface) => StatementKind::Definition(self.arena.alloc(DefinitionStatement {
+                meta: (),
+                kind: DefinitionStatementKind::Interface(self.lower_interface(interface)),
+            })),
+            cst::Statement::Trait(r#trait) => StatementKind::Definition(self.arena.alloc(DefinitionStatement {
+                meta: (),
+                kind: DefinitionStatementKind::Trait(self.lower_trait(r#trait)),
+            })),
+            cst::Statement::Enum(r#enum) => {
+                StatementKind::Definition(self.arena.alloc(DefinitionStatement {
                     meta: (),
                     kind: DefinitionStatementKind::Enum(self.lower_enum(r#enum)),
-                })),
-                cst::Statement::Constant(constant) => {
-                    StatementKind::Definition(self.arena.alloc(DefinitionStatement {
-                        meta: (),
-                        kind: DefinitionStatementKind::Constant(self.lower_constant(constant)),
-                    }))
-                }
-                cst::Statement::Function(function) => {
-                    StatementKind::Definition(self.arena.alloc(DefinitionStatement {
-                        meta: (),
-                        kind: DefinitionStatementKind::Function(self.lower_function(function)),
-                    }))
-                }
-                cst::Statement::Declare(declare) => StatementKind::Declare(self.lower_declare(declare)),
-                cst::Statement::Try(r#try) => StatementKind::Try(self.lower_try(r#try)),
-                cst::Statement::Global(global) => StatementKind::Global(
-                    self.arena
-                        .alloc_slice_fill_iter(global.variables.iter().map(|variable| self.lower_variable(variable))),
-                ),
-                cst::Statement::Static(r#static) => StatementKind::Static(
-                    self.arena.alloc_slice_fill_iter(r#static.items.iter().map(|item| self.lower_static_item(item))),
-                ),
-                _ => {
-                    debug_assert!(false, "unhandled statement kind: {:?}", statement);
+                }))
+            }
+            cst::Statement::Constant(constant) => StatementKind::Definition(self.arena.alloc(DefinitionStatement {
+                meta: (),
+                kind: DefinitionStatementKind::Constant(self.lower_constant(constant)),
+            })),
+            cst::Statement::Function(function) => StatementKind::Definition(self.arena.alloc(DefinitionStatement {
+                meta: (),
+                kind: DefinitionStatementKind::Function(self.lower_function(function)),
+            })),
+            cst::Statement::Declare(declare) => StatementKind::Declare(self.lower_declare(declare)),
+            cst::Statement::Try(r#try) => StatementKind::Try(self.lower_try(r#try)),
+            cst::Statement::Global(global) => StatementKind::Global(
+                self.arena
+                    .alloc_slice_fill_iter(global.variables.iter().map(|variable| self.lower_global_item(variable))),
+            ),
+            cst::Statement::Static(r#static) => StatementKind::Static(
+                self.arena.alloc_slice_fill_iter(r#static.items.iter().map(|item| self.lower_static_item(item))),
+            ),
+            _ => {
+                debug_assert!(false, "unhandled statement kind: {:?}", statement);
 
-                    // SAFETY: This code is unreachable because all possible statement kinds have been handled in the match arms above.
-                    // The debug assertion ensures that if an unhandled statement kind is encountered during development, it will be caught and fixed.
-                    unsafe { std::hint::unreachable_unchecked() }
-                }
-            },
+                // SAFETY: This code is unreachable because all possible statement kinds have been handled in the match arms above.
+                // The debug assertion ensures that if an unhandled statement kind is encountered during development, it will be caught and fixed.
+                unsafe { std::hint::unreachable_unchecked() }
+            }
         }
     }
 
@@ -381,13 +445,18 @@ impl<'arena> Lowering<'arena> {
     fn lower_static_item(&mut self, item: &'arena cst::StaticItem<'arena>) -> StaticItem<'arena, (), (), ()> {
         match item {
             cst::StaticItem::Abstract(item) => {
-                StaticItem { variable: self.lower_direct_variable(&item.variable), value: None }
+                StaticItem { variable: self.lower_direct_variable(&item.variable), type_annotation: None, value: None }
             }
             cst::StaticItem::Concrete(item) => StaticItem {
                 variable: self.lower_direct_variable(&item.variable),
+                type_annotation: None,
                 value: Some(self.arena.alloc(self.lower_expression(item.value))),
             },
         }
+    }
+
+    fn lower_global_item(&mut self, variable: &'arena cst::Variable<'arena>) -> GlobalItem<'arena, (), (), ()> {
+        GlobalItem { variable: self.lower_variable(variable), type_annotation: None }
     }
 
     pub(crate) fn lower_try(&mut self, r#try: &'arena cst::Try<'arena>) -> &'arena Try<'arena, (), (), ()> {

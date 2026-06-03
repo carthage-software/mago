@@ -15,7 +15,7 @@ pub struct ConditionalType<'arena> {
     pub question_mark: Span,
     pub then: &'arena Type<'arena>,
     pub colon: Span,
-    pub otherwise: &'arena Type<'arena>,
+    pub r#else: &'arena Type<'arena>,
 }
 
 impl ConditionalType<'_> {
@@ -27,7 +27,7 @@ impl ConditionalType<'_> {
 
 impl HasSpan for ConditionalType<'_> {
     fn span(&self) -> Span {
-        self.subject.span().join(self.otherwise.span())
+        self.subject.span().join(self.r#else.span())
     }
 }
 
@@ -41,7 +41,7 @@ impl std::fmt::Display for ConditionalType<'_> {
             self.not.as_ref().map(|k| format!(" {k}")).unwrap_or_default(),
             self.target,
             self.then,
-            self.otherwise
+            self.r#else
         )
     }
 }

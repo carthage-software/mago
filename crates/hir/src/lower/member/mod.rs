@@ -1,7 +1,10 @@
+pub mod annotation;
+
 use mago_span::HasSpan;
 use mago_syntax::cst;
 
-use crate::ir::flags::Flags;
+use crate::ir::generics::TypeParameterDefiningEntity;
+use crate::ir::identifier::Identifier;
 use crate::ir::member::ClassLikeConstant;
 use crate::ir::member::ClassLikeConstantItem;
 use crate::ir::member::EnumCase;
@@ -17,12 +20,23 @@ use crate::lower::Lowering;
 use crate::lower::resolution::namespace::NameResolutionKind;
 
 impl<'arena> Lowering<'arena> {
-    pub(crate) fn lower_method(&mut self, method: &'arena cst::Method<'arena>) -> Method<'arena, (), (), ()> {
+    pub(crate) fn lower_method(
+        &mut self,
+        method: &'arena cst::Method<'arena>,
+        owner: Identifier<'arena>,
+    ) -> Method<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&method.attribute_lists);
         let modifiers = self.lower_modifiers(&method.modifiers);
         let name = self.lower_name(&method.name);
-        let parameters = self.lower_parameter_list(&method.parameter_list);
         let return_type = method.return_type_hint.as_ref().map(|hint| self.lower_type(&hint.hint));
+
+        let document = self.phpdoc_resolution.get(method.span());
+        self.type_resolution.enter_scope(TypeParameterDefiningEntity::Method(owner, name));
+        let annotations = self.lower_function_like_annotations(document.as_ref());
+
+        let lowered_parameters = self.lower_parameter_list(&method.parameter_list);
+        let parameters =
+            self.merge_parameter_annotations(lowered_parameters, annotations.parameters, annotations.parameter_outs);
         let body = match &method.body {
             cst::MethodBody::Abstract(_) => None,
             cst::MethodBody::Concrete(block) => {
@@ -30,22 +44,25 @@ impl<'arena> Lowering<'arena> {
             }
         };
 
+        self.type_resolution.leave_scope();
+
         Method {
             span: method.span(),
             attributes,
-            flags: Flags::new(),
+            flags: self.detect_marker_flags(document.as_ref()).method_flags(),
             modifiers,
             name,
-            type_parameter_annotations: &[],
+            type_parameter_annotations: annotations.type_parameters,
             parameters,
-            where_constraint_annotations: &[],
+            where_constraint_annotations: annotations.where_constraints,
             return_by_reference: method.ampersand.is_some(),
             return_type,
-            return_type_annotation: None,
-            throws: &[],
-            asserts: &[],
-            asserts_if_true: &[],
-            asserts_if_false: &[],
+            return_type_annotation: annotations.return_type,
+            throws: annotations.throws,
+            asserts: annotations.asserts,
+            asserts_if_true: annotations.asserts_if_true,
+            asserts_if_false: annotations.asserts_if_false,
+            self_out_annotation: annotations.self_out,
             body,
         }
     }
@@ -57,15 +74,17 @@ impl<'arena> Lowering<'arena> {
         let attributes = self.lower_attribute_lists(&property.attribute_lists);
         let modifiers = self.lower_modifiers(&property.modifiers);
         let r#type = property.hint.as_ref().map(|hint| self.lower_type(hint));
+        let document = self.phpdoc_resolution.get(property.span());
+        let type_annotation = self.lower_var_annotation(document.as_ref());
         let items = self.arena.alloc_slice_fill_iter(property.items.iter().map(|item| self.lower_property_item(item)));
 
         Property {
             span: property.span(),
             attributes,
-            flags: Flags::new(),
+            flags: self.detect_marker_flags(document.as_ref()).property_flags(),
             modifiers,
             r#type,
-            type_annotation: None,
+            type_annotation,
             items,
         }
     }
@@ -77,16 +96,18 @@ impl<'arena> Lowering<'arena> {
         let attributes = self.lower_attribute_lists(&property.attribute_lists);
         let modifiers = self.lower_modifiers(&property.modifiers);
         let r#type = property.hint.as_ref().map(|hint| self.lower_type(hint));
+        let document = self.phpdoc_resolution.get(property.span());
+        let type_annotation = self.lower_var_annotation(document.as_ref());
         let item = self.lower_property_item(&property.item);
         let hooks = self.lower_property_hooks(&property.hook_list);
 
         HookedProperty {
             span: property.span(),
             attributes,
-            flags: Flags::new(),
+            flags: self.detect_marker_flags(document.as_ref()).property_flags(),
             modifiers,
             r#type,
-            type_annotation: None,
+            type_annotation,
             item,
             hooks,
         }
@@ -111,11 +132,12 @@ impl<'arena> Lowering<'arena> {
         let attributes = self.lower_attribute_lists(&constant.attribute_lists);
         let modifiers = self.lower_modifiers(&constant.modifiers);
         let r#type = constant.hint.as_ref().map(|hint| self.lower_type(hint));
+        let type_annotation = self.lower_var_annotation(self.phpdoc_resolution.get(constant.span()).as_ref());
         let items = self
             .arena
             .alloc_slice_fill_iter(constant.items.iter().map(|item| self.lower_class_like_constant_item(item)));
 
-        ClassLikeConstant { span: constant.span(), attributes, modifiers, r#type, type_annotation: None, items }
+        ClassLikeConstant { span: constant.span(), attributes, modifiers, r#type, type_annotation, items }
     }
 
     fn lower_class_like_constant_item(
@@ -154,7 +176,9 @@ impl<'arena> Lowering<'arena> {
             ),
         };
 
-        TraitUse { span: trait_use.span(), use_annotation: &[], traits, adaptations }
+        let use_annotation = self.lower_use_annotations(self.phpdoc_resolution.get(trait_use.span()).as_ref());
+
+        TraitUse { span: trait_use.span(), use_annotation, traits, adaptations }
     }
 
     fn lower_trait_use_adaptation(

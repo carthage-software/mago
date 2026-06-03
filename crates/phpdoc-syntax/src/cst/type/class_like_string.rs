@@ -105,3 +105,28 @@ impl std::fmt::Display for TraitStringType<'_> {
         }
     }
 }
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+pub struct ClassLikeStringType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameter: Option<SingleGenericParameter<'arena>>,
+}
+
+impl HasSpan for ClassLikeStringType<'_> {
+    fn span(&self) -> Span {
+        match &self.parameter {
+            Some(parameter) => self.keyword.span.join(parameter.span()),
+            None => self.keyword.span,
+        }
+    }
+}
+
+impl std::fmt::Display for ClassLikeStringType<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(parameter) = &self.parameter {
+            write!(f, "{}<{}>", self.keyword, parameter)
+        } else {
+            write!(f, "{}", self.keyword)
+        }
+    }
+}

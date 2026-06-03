@@ -36,8 +36,17 @@ pub struct MethodAnnotation<'arena, S, D, E> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[serde(tag = "type", content = "value")]
+pub enum PropertyAnnotationKind {
+    Read,
+    Write,
+    ReadWrite,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct PropertyAnnotation<'arena> {
     pub span: Span,
+    pub kind: PropertyAnnotationKind,
     pub r#type: Option<&'arena TypeAnnotation<'arena>>,
     pub variable: DirectVariable<'arena>,
 }
