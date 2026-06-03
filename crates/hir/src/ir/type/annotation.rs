@@ -45,7 +45,7 @@ pub enum TypeAnnotationKind<'arena> {
     Object,
     Numeric,
     MemberReference(Identifier<'arena>, MemberReferenceSelector<'arena>),
-    AliasReference(Identifier<'arena>, Identifier<'arena>),
+    AliasReference(Identifier<'arena>, Name<'arena>),
     Shape(&'arena [ShapeTypeAnnotationField<'arena>], &'arena [TypeAnnotationKind<'arena>]),
     Callable(CallableTypeKind, Option<&'arena CallableSignature<'arena>>),
     Variable(DirectVariable<'arena>),
@@ -83,9 +83,9 @@ pub struct GenericParameterAnnotation<'arena> {
 #[serde(tag = "type", content = "value")]
 pub enum MemberReferenceSelector<'arena> {
     Wildcard,
-    Exact(Identifier<'arena>),
-    StartsWith(Identifier<'arena>),
-    EndsWith(Identifier<'arena>),
+    Exact(Name<'arena>),
+    StartsWith(Name<'arena>),
+    EndsWith(Name<'arena>),
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -170,7 +170,7 @@ pub struct ConditionalTypeAnnotation<'arena> {
 pub enum ShapeTypeAnnotationKey<'arena> {
     String(&'arena [u8]),
     Integer(i64),
-    ClassLikeConstant(Identifier<'arena>, Identifier<'arena>),
+    ClassLikeConstant(Identifier<'arena>, Name<'arena>),
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
