@@ -155,7 +155,9 @@ inline_modules = "allow"
 mago-syntax-core = { path = "crates/syntax-core", version = "1.29.0" }
 mago-syntax = { path = "crates/syntax", version = "1.29.0" }
 mago-type-syntax = { path = "crates/type-syntax", version = "1.29.0" }
+mago-phpdoc-syntax = { path = "crates/phpdoc-syntax", version = "1.29.0" }
 mago-twig-syntax = { path = "crates/twig-syntax", version = "1.29.0" }
+mago-hir = { path = "crates/hir", version = "1.29.0" }
 mago-casing = { path = "crates/casing", version = "1.29.0" }
 mago-composer = { path = "crates/composer", version = "1.29.0" }
 mago-docblock = { path = "crates/docblock", version = "1.29.0" }
