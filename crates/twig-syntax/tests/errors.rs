@@ -228,6 +228,7 @@ fn run_with_large_stack<F: FnOnce() + Send + 'static>(f: F) {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn parse_deeply_nested_brackets_does_not_overflow() {
     run_with_large_stack(|| {
         let mut src = String::from("{{ ");
@@ -238,6 +239,7 @@ fn parse_deeply_nested_brackets_does_not_overflow() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn parse_deeply_nested_parens_does_not_overflow() {
     run_with_large_stack(|| {
         let mut src = String::from("{{ ");
@@ -248,6 +250,7 @@ fn parse_deeply_nested_parens_does_not_overflow() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn parse_fuzzer_nested_array_argument_does_not_overflow() {
     run_with_large_stack(|| {
         let mut src = String::from("{{ date(date = ");
@@ -259,6 +262,7 @@ fn parse_fuzzer_nested_array_argument_does_not_overflow() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)]
 fn parse_deeply_nested_blocks_does_not_overflow() {
     run_with_large_stack(|| {
         let mut src = String::new();
