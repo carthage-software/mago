@@ -19,8 +19,8 @@ nav_section = "实用方案"
 | Tag | 示例 | 说明 |
 | :--- | :--- | :--- |
 | `latest` | `ghcr.io/carthage-software/mago:latest` | 始终指向最新发布。 |
-| `<version>` | `ghcr.io/carthage-software/mago:1.29.0` | 锁定到精确版本。 |
-| `<major>.<minor>` | `ghcr.io/carthage-software/mago:1.29` | 跟随某个次版本下的最新补丁。 |
+| `<version>` | `ghcr.io/carthage-software/mago:1.30.0` | 锁定到精确版本。 |
+| `<major>.<minor>` | `ghcr.io/carthage-software/mago:1.30` | 跟随某个次版本下的最新补丁。 |
 | `<major>` | `ghcr.io/carthage-software/mago:1` | 跟随某个主版本下的最新发布。 |
 
 镜像支持 `linux/amd64` 和 `linux/arm64`。Docker 会为你的宿主机拉取对应变体。

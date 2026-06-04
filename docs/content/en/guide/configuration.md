@@ -27,7 +27,7 @@ Every release publishes a JSON schema describing the full configuration tree. Ed
 
 The schema is hosted at:
 
-- `https://mago.carthage.software/<version>/schema.json` — pinned to a specific release such as `1.29.0`.
+- `https://mago.carthage.software/<version>/schema.json` — pinned to a specific release such as `1.30.0`.
 - `https://mago.carthage.software/latest/schema.json` — the most recent stable release.
 - `https://mago.carthage.software/main/schema.json` — the development build from `main`.
 
@@ -36,20 +36,20 @@ Pin the URL to the version of Mago you have installed so the schema and your bin
 How you reference it depends on the format:
 
 ```toml
-#:schema https://mago.carthage.software/1.29.0/schema.json
+#:schema https://mago.carthage.software/1.30.0/schema.json
 version = "1"
 php-version = "8.3"
 ```
 
 ```yaml
-# yaml-language-server: $schema=https://mago.carthage.software/1.29.0/schema.json
+# yaml-language-server: $schema=https://mago.carthage.software/1.30.0/schema.json
 version: "1"
 php-version: "8.3"
 ```
 
 ```json
 {
-  "$schema": "https://mago.carthage.software/1.29.0/schema.json",
+  "$schema": "https://mago.carthage.software/1.30.0/schema.json",
   "version": "1",
   "php-version": "8.3"
 }
@@ -135,7 +135,7 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `version` | string | none | Pins the Mago version this project is tested against. Accepts a major (`"1"`), minor (`"1.29"`), or exact (`"1.29.0"`) pin. See [version pinning](#version-pinning). |
+| `version` | string | none | Pins the Mago version this project is tested against. Accepts a major (`"1"`), minor (`"1.30"`), or exact (`"1.30.0"`) pin. See [version pinning](#version-pinning). |
 | `php-version` | string | latest stable | The PHP version Mago should target for parsing and analysis. `mago init` autodetects this from `composer.json` when possible. |
 | `allow-unsupported-php-version` | boolean | `false` | Allow Mago to run on a PHP version it does not officially support. Not recommended. |
 | `no-version-check` | boolean | `false` | Silences the warning emitted when the installed binary drifts from the pinned version. Major-version drift is always fatal. |
@@ -150,8 +150,8 @@ Pinning the version surfaces drift between the installed binary and the project'
 Three pin levels:
 
 - **Major pin** (`version = "1"`): any `1.x.y` satisfies the pin. A bump to `2.x` is a hard error because a new major may ship with incompatible defaults, schema changes, or rule behaviour. This is the default `mago init` writes.
-- **Minor pin** (`version = "1.29"`): any `1.29.y` satisfies the pin. Drift to a different minor warns; drift across majors is still fatal.
-- **Exact pin** (`version = "1.29.0"`): any drift warns; drift across majors is still fatal.
+- **Minor pin** (`version = "1.30"`): any `1.30.y` satisfies the pin. Drift to a different minor warns; drift across majors is still fatal.
+- **Exact pin** (`version = "1.30.0"`): any drift warns; drift across majors is still fatal.
 
 The warning can be silenced with `--no-version-check`, the `MAGO_NO_VERSION_CHECK` environment variable, or `no-version-check = true` in the config. None of those affect major-version drift, which is the entire point of pinning.
 

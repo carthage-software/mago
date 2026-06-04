@@ -27,7 +27,7 @@ Chaque version publie un schéma JSON décrivant l'intégralité de l'arbre de c
 
 Le schéma est hébergé à :
 
-- `https://mago.carthage.software/<version>/schema.json`, épinglé à une release précise comme `1.29.0`.
+- `https://mago.carthage.software/<version>/schema.json`, épinglé à une release précise comme `1.30.0`.
 - `https://mago.carthage.software/latest/schema.json`, la dernière release stable.
 - `https://mago.carthage.software/main/schema.json`, la build de développement depuis `main`.
 
@@ -36,20 +36,20 @@ Le schéma est hébergé à :
 La façon de référencer le schéma dépend du format :
 
 ```toml
-#:schema https://mago.carthage.software/1.29.0/schema.json
+#:schema https://mago.carthage.software/1.30.0/schema.json
 version = "1"
 php-version = "8.3"
 ```
 
 ```yaml
-# yaml-language-server: $schema=https://mago.carthage.software/1.29.0/schema.json
+# yaml-language-server: $schema=https://mago.carthage.software/1.30.0/schema.json
 version: "1"
 php-version: "8.3"
 ```
 
 ```json
 {
-  "$schema": "https://mago.carthage.software/1.29.0/schema.json",
+  "$schema": "https://mago.carthage.software/1.30.0/schema.json",
   "version": "1",
   "php-version": "8.3"
 }
@@ -135,7 +135,7 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 
 | Option | Type | Défaut | Description |
 | :--- | :--- | :--- | :--- |
-| `version` | string | aucun | Fixe la version de Mago contre laquelle ce projet est testé. Accepte un majeur (`"1"`), mineur (`"1.29"`) ou exact (`"1.29.0"`). Voir [épinglage de version](#version-pinning). |
+| `version` | string | aucun | Fixe la version de Mago contre laquelle ce projet est testé. Accepte un majeur (`"1"`), mineur (`"1.30"`) ou exact (`"1.30.0"`). Voir [épinglage de version](#version-pinning). |
 | `php-version` | string | dernière stable | La version PHP que Mago doit cibler pour l'analyse syntaxique et l'analyse. `mago init` la détecte automatiquement depuis `composer.json` quand c'est possible. |
 | `allow-unsupported-php-version` | boolean | `false` | Autoriser Mago à s'exécuter sur une version PHP qu'il ne prend pas officiellement en charge. Non recommandé. |
 | `no-version-check` | boolean | `false` | Désactive l'avertissement émis quand le binaire installé diverge de la version épinglée. Une divergence de version majeure est toujours fatale. |
@@ -150,8 +150,8 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 Trois niveaux d'épinglage :
 
 - **Épinglage majeur** (`version = "1"`) : tout `1.x.y` satisfait l'épinglage. Une montée vers `2.x` est une erreur fatale, car une nouvelle version majeure peut introduire des défauts incompatibles, des changements de schéma ou de comportement de règles. C'est ce que `mago init` écrit par défaut.
-- **Épinglage mineur** (`version = "1.29"`) : tout `1.29.y` satisfait l'épinglage. Une divergence vers un mineur différent émet un avertissement ; une divergence majeure reste fatale.
-- **Épinglage exact** (`version = "1.29.0"`) : toute divergence émet un avertissement ; une divergence majeure reste fatale.
+- **Épinglage mineur** (`version = "1.30"`) : tout `1.30.y` satisfait l'épinglage. Une divergence vers un mineur différent émet un avertissement ; une divergence majeure reste fatale.
+- **Épinglage exact** (`version = "1.30.0"`) : toute divergence émet un avertissement ; une divergence majeure reste fatale.
 
 L'avertissement peut être désactivé avec `--no-version-check`, la variable d'environnement `MAGO_NO_VERSION_CHECK`, ou `no-version-check = true` dans la configuration. Aucun de ces moyens n'affecte la divergence de version majeure, qui est tout l'intérêt de l'épinglage.
 

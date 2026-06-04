@@ -19,8 +19,8 @@ Chaque release publie plusieurs tags pour épingler à la précision souhaitée 
 | Tag | Exemple | Description |
 | :--- | :--- | :--- |
 | `latest` | `ghcr.io/carthage-software/mago:latest` | Pointe toujours vers la release la plus récente. |
-| `<version>` | `ghcr.io/carthage-software/mago:1.29.0` | Épinglé à une version exacte. |
-| `<major>.<minor>` | `ghcr.io/carthage-software/mago:1.29` | Suit le dernier patch d'une version mineure. |
+| `<version>` | `ghcr.io/carthage-software/mago:1.30.0` | Épinglé à une version exacte. |
+| `<major>.<minor>` | `ghcr.io/carthage-software/mago:1.30` | Suit le dernier patch d'une version mineure. |
 | `<major>` | `ghcr.io/carthage-software/mago:1` | Suit la dernière release d'une version majeure. |
 
 L'image prend en charge `linux/amd64` et `linux/arm64`. Docker récupère la bonne variante pour votre hôte.
