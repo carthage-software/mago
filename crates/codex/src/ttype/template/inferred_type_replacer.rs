@@ -18,6 +18,7 @@ use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::combiner;
 use crate::ttype::get_never;
+use crate::ttype::intersect_union_types;
 use crate::ttype::template::TemplateBound;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::bounds::get_most_specific_type_from_bounds;
@@ -147,43 +148,49 @@ fn replace_template_parameter(
             traversed_type
         };
 
-        if let Some(intersection_types) = intersection_types
-            && template_type_inner.types.iter().any(super::super::TType::can_be_intersected)
-        {
-            let replaced_intersection_parts: Vec<TAtomic> = intersection_types
-                .iter()
-                .cloned()
-                .map(|part| replace_atomic(part, template_result, codebase))
-                .collect();
+        if let Some(intersection_types) = intersection_types {
+            if template_type_inner.types.iter().any(TType::can_be_intersected) {
+                let replaced_intersection_parts: Vec<TAtomic> = intersection_types
+                    .iter()
+                    .cloned()
+                    .map(|part| replace_atomic(part, template_result, codebase))
+                    .collect();
 
-            for atomic_template_type in template_type_inner.types.to_mut() {
-                if !atomic_template_type.can_be_intersected() {
-                    continue;
+                for atomic_template_type in template_type_inner.types.to_mut() {
+                    if !atomic_template_type.can_be_intersected() {
+                        continue;
+                    }
+
+                    match atomic_template_type {
+                        TAtomic::Object(TObject::Named(n)) => {
+                            if let Some(existing) = n.get_intersection_types_mut() {
+                                existing.extend(replaced_intersection_parts.clone());
+                            } else {
+                                n.intersection_types = Some(replaced_intersection_parts.clone());
+                            }
+                        }
+                        TAtomic::Iterable(i) => {
+                            if let Some(existing) = i.get_intersection_types_mut() {
+                                existing.extend(replaced_intersection_parts.clone());
+                            } else {
+                                i.intersection_types = Some(replaced_intersection_parts.clone());
+                            }
+                        }
+                        TAtomic::GenericParameter(g) => {
+                            if let Some(existing) = &mut g.intersection_types {
+                                existing.extend(replaced_intersection_parts.clone());
+                            } else {
+                                g.intersection_types = Some(replaced_intersection_parts.clone());
+                            }
+                        }
+                        _ => {}
+                    }
                 }
-
-                match atomic_template_type {
-                    TAtomic::Object(TObject::Named(n)) => {
-                        if let Some(existing) = n.get_intersection_types_mut() {
-                            existing.extend(replaced_intersection_parts.clone());
-                        } else {
-                            n.intersection_types = Some(replaced_intersection_parts.clone());
-                        }
-                    }
-                    TAtomic::Iterable(i) => {
-                        if let Some(existing) = i.get_intersection_types_mut() {
-                            existing.extend(replaced_intersection_parts.clone());
-                        } else {
-                            i.intersection_types = Some(replaced_intersection_parts.clone());
-                        }
-                    }
-                    TAtomic::GenericParameter(g) => {
-                        if let Some(existing) = &mut g.intersection_types {
-                            existing.extend(replaced_intersection_parts.clone());
-                        } else {
-                            g.intersection_types = Some(replaced_intersection_parts.clone());
-                        }
-                    }
-                    _ => {}
+            } else {
+                for part in intersection_types {
+                    let part_type = replace(&wrap_atomic(part.clone()), template_result, codebase);
+                    template_type_inner =
+                        intersect_union_types(&template_type_inner, &part_type, codebase).unwrap_or_else(get_never);
                 }
             }
         }
