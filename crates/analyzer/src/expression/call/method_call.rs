@@ -5,9 +5,11 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
@@ -36,6 +38,7 @@ use crate::invocation::return_type_fetcher::fetch_invocation_return_type;
 use crate::invocation::template_result::populate_template_result_from_invocation;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
+use crate::resolver::method::ResolvedMethod;
 use crate::resolver::method::resolve_method_targets;
 use crate::utils::expression::get_expression_id;
 use crate::visibility::check_method_visibility;
@@ -264,6 +267,18 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
     let method_resolution =
         resolve_method_targets(context, block_context, artifacts, object, selector, is_null_safe, span)?;
 
+    if method_resolution.resolved_methods.is_empty() && !method_resolution.magic_call_methods.is_empty() {
+        return analyze_magic_call_return_type(
+            context,
+            block_context,
+            artifacts,
+            method_resolution.magic_call_methods,
+            method_resolution.template_result,
+            argument_list,
+            span,
+        );
+    }
+
     let mut invocation_targets = vec![];
     for resolved_method in method_resolution.resolved_methods {
         let metadata = context
@@ -333,6 +348,66 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
         artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null()),
         method_resolution.all_methods_non_nullable_return,
     )
+}
+
+/// Infers the result type of an undocumented magic method call from the
+/// declared return type of `__call` (e.g. `static`), since there is no concrete
+/// method to resolve against.
+#[allow(clippy::expect_used)]
+fn analyze_magic_call_return_type<'ctx, 'arena>(
+    context: &mut Context<'ctx, 'arena>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    magic_call_methods: Vec<ResolvedMethod>,
+    template_result: TemplateResult,
+    argument_list: &ArgumentList<'arena>,
+    span: Span,
+) -> Result<(), AnalysisError> {
+    argument_list.analyze(context, block_context, artifacts)?;
+
+    let mut resulting_type: Option<TUnion> = None;
+    for magic_call_method in magic_call_methods {
+        let class_like_metadata = context
+            .codebase
+            .get_class_like(magic_call_method.classname.as_bytes())
+            .expect("class-like metadata should exist for resolved magic call method");
+
+        let method_metadata = context
+            .codebase
+            .get_method_by_id(&magic_call_method.method_identifier)
+            .expect("method metadata should exist for resolved magic call method");
+
+        let target = InvocationTarget::FunctionLike {
+            identifier: FunctionLikeIdentifier::Method(
+                magic_call_method.method_identifier.get_class_name(),
+                magic_call_method.method_identifier.get_method_name(),
+            ),
+            metadata: method_metadata,
+            inferred_return_type: None,
+            method_context: Some(MethodTargetContext {
+                declaring_method_id: Some(magic_call_method.method_identifier),
+                class_like_metadata,
+                class_type: magic_call_method.static_class_type,
+            }),
+            span,
+        };
+
+        let invocation = Invocation::new(target, InvocationArgumentsSource::None(span), span);
+        let return_type = fetch_invocation_return_type(
+            context,
+            block_context,
+            artifacts,
+            &invocation,
+            &template_result,
+            &WordMap::default(),
+        );
+
+        resulting_type = Some(add_optional_union_type(return_type, resulting_type.as_ref(), context.codebase));
+    }
+
+    artifacts.set_expression_type(&span, resulting_type.unwrap_or_else(get_mixed));
+
+    Ok(())
 }
 
 /// Checks if an expression ultimately derives from `$this` through a chain of method calls

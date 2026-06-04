@@ -1490,6 +1490,7 @@ test_case!(classes_enum_cases);
 test_case!(classes_enum_from_basic);
 test_case!(classes_enum_tryfrom_basic);
 test_case!(classes_enum_instantiation);
+test_case!(magic_method_call_return_type);
 test_case!(classes_enum_duplicate_values);
 test_case!(classes_readonly_write_outside);
 test_case!(classes_readonly_write_in_method);

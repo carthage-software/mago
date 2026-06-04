@@ -72,6 +72,9 @@ pub struct MethodResolutionResult {
     pub template_result: TemplateResult,
     /// A list of resolved methods, each with its template result and identifiers.
     pub resolved_methods: Vec<ResolvedMethod>,
+    /// `__call` methods to fall back to when a called method is not declared but
+    /// is handled by a magic `__call`.
+    pub magic_call_methods: Vec<ResolvedMethod>,
     /// True if any selector was dynamic (e.g., from a generic string), making the method name unknown.
     pub has_dynamic_selector: bool,
     /// True if any resolution path involved an object with an ambiguous type (e.g., `mixed`, generic `object`).
@@ -185,6 +188,7 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                 &mut result,
             );
 
+            let mut had_undocumented_magic_call = false;
             for &method_name in &method_names {
                 let resolved_methods = resolve_method_from_object(
                     context,
@@ -212,6 +216,8 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                                     classname,
                                     method_name,
                                 );
+
+                                result.has_invalid_target = true;
                             } else {
                                 report_non_documented_method(
                                     context,
@@ -220,9 +226,9 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                                     classname,
                                     method_name,
                                 );
-                            }
 
-                            result.has_invalid_target = true;
+                                had_undocumented_magic_call = true;
+                            }
                         }
                     } else {
                         // ambiguous
@@ -260,6 +266,10 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
                 }
 
                 result.resolved_methods.extend(resolved_methods);
+            }
+
+            if had_undocumented_magic_call {
+                result.magic_call_methods.extend(resolved_magic_call_method);
             }
         }
     } else {
