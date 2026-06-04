@@ -1993,6 +1993,7 @@ test_case!(generics_template_method_param_overconstrained);
 test_case!(generics_template_pair_swap);
 test_case!(generics_template_unwrap_box_wrong_consumer);
 test_case!(generics_template_void_return_with_t);
+test_case!(generic_reflection);
 
 // Github Issues
 test_case!(issue_659);

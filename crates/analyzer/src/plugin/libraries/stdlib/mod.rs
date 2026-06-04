@@ -8,6 +8,7 @@ pub mod filter;
 pub mod json;
 pub mod math;
 pub mod random;
+pub mod reflection;
 pub mod session;
 pub mod spl;
 pub mod string;
@@ -65,5 +66,9 @@ impl Plugin for StdlibPlugin {
 
         registry.register_method_provider(closure::ClosureGetCurrentProvider);
         registry.register_method_provider(r#enum::EnumCasesProvider);
+        registry.register_method_provider(reflection::ReflectionMethodGetNameProvider);
+        registry.register_method_provider(reflection::ReflectionMethodInvokeProvider);
+
+        registry.register_method_assertion_provider(reflection::ReflectionClassHasMethodAssertionProvider);
     }
 }

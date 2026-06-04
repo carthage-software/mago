@@ -294,6 +294,9 @@ class ReflectionAttribute implements Reflector
     public static function export() {}
 }
 
+/**
+ * @template T of object = object
+ */
 class ReflectionClassConstant implements Reflector
 {
     /**
@@ -302,6 +305,8 @@ class ReflectionClassConstant implements Reflector
     public string $name;
 
     /**
+     * @var class-name<T>
+     *
      * @readonly
      */
     public string $class;
@@ -319,6 +324,12 @@ class ReflectionClassConstant implements Reflector
 
     public const IS_FINAL = 5;
 
+    /**
+     * @param class-string<T>|T $class
+     * @param string $constant
+     *
+     * @throws ReflectionException
+     */
     public function __construct(string|object $class, string $constant) {}
 
     /**
@@ -414,6 +425,9 @@ enum PropertyHookType: string
     case Set = 'set';
 }
 
+/**
+ * @template T of object = object
+ */
 class ReflectionProperty implements Reflector
 {
     public const IS_ABSTRACT = 64;
@@ -442,12 +456,14 @@ class ReflectionProperty implements Reflector
     public string $name;
 
     /**
+     * @var class-name<T>
+     *
      * @readonly
      */
     public string $class;
 
     /**
-     * @param class-string|object $class
+     * @param class-string<T>|T $class
      * @param string $property
      *
      * @throws ReflectionException
@@ -499,7 +515,7 @@ class ReflectionProperty implements Reflector
     public function getModifiers(): int {}
 
     /**
-     * @return ReflectionClass
+     * @return ReflectionClass<T>
      *
      * @pure
      */
@@ -527,6 +543,8 @@ class ReflectionProperty implements Reflector
     public function hasType(): bool {}
 
     /**
+     * @param T
+     *
      * @pure
      */
     public function isInitialized(?object $object = null): bool {}
@@ -541,7 +559,6 @@ class ReflectionProperty implements Reflector
     public function hasDefaultValue(): bool {}
 
     /**
-     *
      * @pure
      */
     public function getDefaultValue(): mixed {}
@@ -594,9 +611,15 @@ class ReflectionProperty implements Reflector
     #[Mago\AvailableSince(80400)]
     public function isProtectedSet(): bool {}
 
+    /**
+     * @param T $object
+     */
     #[Mago\AvailableSince(80400)]
     public function setRawValueWithoutLazyInitialization(object $object, mixed $value): void {}
 
+    /**
+     * @param T $object
+     */
     #[Mago\AvailableSince(80400)]
     public function skipLazyInitialization(object $object): void {}
 
@@ -604,11 +627,20 @@ class ReflectionProperty implements Reflector
 
     public function isFinal(): bool {}
 
+    /**
+     * @param T $object
+     */
     public function isLazy(object $object): bool {}
 
+    /**
+     * @param T $object
+     */
     #[Mago\AvailableSince(80600)]
     public function isReadable(?object $object = null): bool {}
 
+    /**
+     * @param T $object
+     */
     #[Mago\AvailableSince(80600)]
     public function isWriteable(?object $object = null): bool {}
 }
@@ -982,6 +1014,9 @@ class ReflectionFunction extends ReflectionFunctionAbstract
     public function isAnonymous(): bool {}
 }
 
+/**
+ * @template T of object = object
+ */
 class ReflectionMethod extends ReflectionFunctionAbstract
 {
     /**
@@ -990,6 +1025,8 @@ class ReflectionMethod extends ReflectionFunctionAbstract
     public string $name;
 
     /**
+     * @var class-string<T>
+     *
      * @readonly
      */
     public string $class;
@@ -1007,6 +1044,8 @@ class ReflectionMethod extends ReflectionFunctionAbstract
     public const IS_FINAL = 32;
 
     /**
+     * @param class-string<T>|T $objectOrMethod
+     *
      * @throws ReflectionException
      */
     public function __construct(object|string $objectOrMethod, ?string $method = null) {}
@@ -1054,6 +1093,8 @@ class ReflectionMethod extends ReflectionFunctionAbstract
     public function isDestructor(): bool {}
 
     /**
+     * @param T|null $object
+     *
      * @throws ValueError
      * @throws ReflectionException
      */
@@ -1065,13 +1106,15 @@ class ReflectionMethod extends ReflectionFunctionAbstract
     public function getModifiers(): int {}
 
     /**
-     * @param object|null $object
+     * @param T|null $object
      *
      * @throws ReflectionException
      */
     public function invoke($object, ...$args) {}
 
     /**
+     * @param T|null $object
+     *
      * @throws ReflectionException
      */
     public function invokeArgs(?object $object, array $args): mixed {}
@@ -1102,7 +1145,7 @@ class ReflectionMethod extends ReflectionFunctionAbstract
 }
 
 /**
- * @template T of object
+ * @template T of object = object
  */
 class ReflectionClass implements Reflector
 {
@@ -1191,11 +1234,13 @@ class ReflectionClass implements Reflector
      * @throws ReflectionException
      *
      * @pure
+     *
+     * @return ReflectionMethod<T>
      */
     public function getMethod(string $name): ReflectionMethod {}
 
     /**
-     * @return list<ReflectionMethod>
+     * @return list<ReflectionMethod<T>>
      *
      * @pure
      */
@@ -1207,6 +1252,8 @@ class ReflectionClass implements Reflector
     public function hasProperty(string $name): bool {}
 
     /**
+     * @return ReflectionProperty<T>
+     *
      * @throws ReflectionException
      *
      * @pure
@@ -1214,19 +1261,21 @@ class ReflectionClass implements Reflector
     public function getProperty(string $name): ReflectionProperty {}
 
     /**
-     * @return list<ReflectionProperty>
+     * @return list<ReflectionProperty<T>>
      *
      * @pure
      */
     public function getProperties(?int $filter = null): array {}
 
     /**
+     * @return ReflectionClassConstant<T>
+     *
      * @pure
      */
     public function getReflectionConstant(string $name): ReflectionClassConstant|false {}
 
     /**
-     * @return list<ReflectionClassConstant>
+     * @return list<ReflectionClassConstant<T>>
      *
      * @pure
      */
@@ -1320,6 +1369,8 @@ class ReflectionClass implements Reflector
 
     /**
      * @pure
+     *
+     * @assert-if-true T $object
      */
     public function isInstance(object $object): bool {}
 
@@ -1442,27 +1493,53 @@ class ReflectionClass implements Reflector
     #[Mago\AvailableSince(80400)]
     public function newLazyProxy(callable $factory, int $options = 0): object {}
 
+    /**
+     * @param T $object
+     */
     #[Mago\AvailableSince(80400)]
     public function resetAsLazyGhost(object $object, callable $initializer, int $options = 0): void {}
 
+    /**
+     * @param T $object
+     */
     #[Mago\AvailableSince(80400)]
     public function resetAsLazyProxy(object $object, callable $factory, int $options = 0): void {}
 
+    /**
+     * @param T $object
+     */
     #[Mago\AvailableSince(80400)]
     public function initializeLazyObject(object $object): object {}
 
+    /**
+     * @param T $object
+     */
     #[Mago\AvailableSince(80400)]
     public function isUninitializedLazyObject(object $object): bool {}
 
+    /**
+     * @param T $object
+     */
     #[Mago\AvailableSince(80400)]
     public function markLazyObjectAsInitialized(object $object): object {}
 
+    /**
+     * @param T $object
+     */
     #[Mago\AvailableSince(80400)]
     public function getLazyInitializer(object $object): ?callable {}
 }
 
+/**
+ * @template T of object = object
+ *
+ * @extends ReflectionClass<T>
+ */
 class ReflectionObject extends ReflectionClass
 {
+    /**
+     * @param T $object
+     */
     public function __construct(object $object) {}
 }
 
