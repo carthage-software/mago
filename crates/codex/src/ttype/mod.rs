@@ -1182,8 +1182,8 @@ fn intersect_atomic_types(
             if let Some(types) = wider_clone.get_intersection_types_mut() {
                 types.clear();
             }
-            result.add_intersection_type(wider_clone);
 
+            result.add_intersection_type(wider_clone);
             if let Some(wider_intersections) = wider.get_intersection_types() {
                 for i_type in wider_intersections {
                     result.add_intersection_type(i_type.clone());
@@ -1191,6 +1191,41 @@ fn intersect_atomic_types(
             }
         }
         return Some(result);
+    }
+
+    if let (TAtomic::Array(left_array), TAtomic::Array(right_array)) = (type_1, type_2) {
+        let array_has_known_shape = |array: &TArray| match array {
+            TArray::List(list) => list.known_elements.is_some(),
+            TArray::Keyed(keyed) => keyed.known_items.is_some(),
+        };
+
+        if array_has_known_shape(left_array) || array_has_known_shape(right_array) {
+            return None;
+        }
+
+        let (left_key, left_value) = get_array_parameters(left_array, codebase);
+        let (right_key, right_value) = get_array_parameters(right_array, codebase);
+
+        let key = intersect_union_types(&left_key, &right_key, codebase).unwrap_or_else(get_never);
+        let value = intersect_union_types(&left_value, &right_value, codebase).unwrap_or_else(get_never);
+
+        let is_list = left_array.is_list() || right_array.is_list();
+        let non_empty = left_array.is_non_empty() || right_array.is_non_empty();
+
+        if non_empty && (key.is_never() || value.is_never()) {
+            return None;
+        }
+
+        *intersection_performed = true;
+        let array = if is_list {
+            let mut list = TList::new(Arc::new(value));
+            list.non_empty = non_empty;
+            TArray::List(list)
+        } else {
+            TArray::Keyed(TKeyedArray::new_with_parameters(Arc::new(key), Arc::new(value)).with_non_empty(non_empty))
+        };
+
+        return Some(TAtomic::Array(array));
     }
 
     if let (TAtomic::Scalar(TScalar::String(s)), TAtomic::Scalar(TScalar::Numeric))

@@ -45,3 +45,44 @@ function test1945_disjoint(int $in1, string $in2): int
 {
     return intersect1945($in1, $in2);
 }
+
+/**
+ * @param array<int>            $in1
+ * @param non-empty-list<mixed> $in2
+ *
+ * @return non-empty-list<int>
+ *
+ * @throws Exception
+ */
+function test1945_iterable(array $in1, array $in2): array
+{
+    return intersect1945($in1, $in2);
+}
+
+/**
+ * @param array<int>            $in1
+ * @param non-empty-list<mixed> $in2
+ *
+ * @return list<string>
+ *
+ * @throws Exception
+ *
+ * @mago-expect analysis:invalid-return-statement
+ */
+function test1945_iterable_precise(array $in1, array $in2): array
+{
+    return intersect1945($in1, $in2);
+}
+
+/**
+ * @param list<int>    $in1
+ * @param list<string> $in2
+ *
+ * @return list<never>
+ *
+ * @throws Exception
+ */
+function test1945_iterable_empty(array $in1, array $in2): array
+{
+    return intersect1945($in1, $in2);
+}
