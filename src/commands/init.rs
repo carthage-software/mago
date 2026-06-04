@@ -209,7 +209,7 @@ impl AnalyzerStrictnessPreset {
 /// - Analyzer features and options
 const CONFIGURATION_TEMPLATE: &str = r#"#:schema https://mago.carthage.software/{mago_version}/schema.json
 # Welcome to Mago!
-# For full documentation, see https://mago.carthage.software/tools/overview
+# For full documentation, see https://mago.carthage.software/{mago_version}/en/tools/overview/
 version = "1"
 php-version = "{php_version}"
 
