@@ -1148,7 +1148,7 @@ function phpinfo(int $flags = INFO_ALL): bool {}
  *
  * @return ($extension is null ? non-empty-string : non-empty-string|false)
  */
-function phpversion(?string $extension): string|false {}
+function phpversion(?string $extension = null): string|false {}
 
 function phpcredits(int $flags = CREDITS_ALL): bool {}
 
