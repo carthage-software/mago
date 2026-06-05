@@ -64,16 +64,33 @@ impl<'arena> PHPDocParser<'arena> {
             return Ok(ShapeKey::Integer { value, span: token.span_for(self.file_id()) });
         }
 
-        if self.stream.is_at(TokenKind::Minus)
-            && self.stream.lookahead(1).is_some_and(|t| t.kind == TokenKind::LiteralInteger)
+        if self.stream.is_at(TokenKind::LiteralFloat) {
+            let token = self.stream.consume()?;
+
+            return Ok(ShapeKey::String { value: token.value, span: token.span_for(self.file_id()) });
+        }
+
+        if (self.stream.is_at(TokenKind::Minus) || self.stream.is_at(TokenKind::Plus))
+            && self
+                .stream
+                .lookahead(1)
+                .is_some_and(|t| matches!(t.kind, TokenKind::LiteralInteger | TokenKind::LiteralFloat))
         {
             let sign_token = self.stream.consume()?;
+            let is_negative = sign_token.kind == TokenKind::Minus;
             let token = self.stream.consume()?;
-            let raw_value = parse_literal_integer(token.value).unwrap_or(0);
-            let value = i64::try_from(raw_value).unwrap_or(0).checked_neg().unwrap_or(0);
             let end = Position::new(token.start.offset + token.value.len() as u32);
+            let span = Span::new(self.file_id(), sign_token.start, end);
 
-            return Ok(ShapeKey::Integer { value, span: Span::new(self.file_id(), sign_token.start, end) });
+            if token.kind == TokenKind::LiteralInteger {
+                let raw_value = parse_literal_integer(token.value).unwrap_or(0);
+                let magnitude = i64::try_from(raw_value).unwrap_or(0);
+                let value = if is_negative { magnitude.checked_neg().unwrap_or(0) } else { magnitude };
+
+                return Ok(ShapeKey::Integer { value, span });
+            }
+
+            return Ok(ShapeKey::String { value: self.stream.raw_between(sign_token.start, end), span });
         }
 
         if self.stream.is_at(TokenKind::Identifier)

@@ -5,6 +5,7 @@ use mago_span::Span;
 
 use crate::cst::identifier::Identifier;
 use crate::cst::keyword::Keyword;
+use crate::cst::r#type::ReferenceKind;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub enum AliasName<'arena> {
@@ -15,7 +16,7 @@ pub enum AliasName<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct AliasReferenceType<'arena> {
     pub exclamation: Span,
-    pub class: Identifier<'arena>,
+    pub class: ReferenceKind<'arena>,
     pub double_colon: Span,
     pub alias: AliasName<'arena>,
 }

@@ -7,6 +7,7 @@ use mago_phpdoc_syntax::cst::Element;
 use mago_phpdoc_syntax::cst::Tag;
 use mago_phpdoc_syntax::cst::TagValue;
 use mago_phpdoc_syntax::cst::Text;
+use mago_phpdoc_syntax::cst::r#type::ReferenceKind;
 use mago_phpdoc_syntax::cst::r#type::Type;
 
 fn parse<'arena>(arena: &'arena Bump, source: &'arena [u8]) -> Document<'arena> {
@@ -107,7 +108,10 @@ fn ideographic_space_is_part_of_identifiers() {
     assert_eq!(tags.len(), 1);
     let TagValue::Param(param) = &tags[0].value else { panic!("expected param, got {:?}", tags[0].value) };
     let Type::Reference(reference) = param.r#type else { panic!("expected reference, got {:?}", param.r#type) };
-    assert_eq!(reference.identifier.value, "\u{3000}string".as_bytes());
+    let ReferenceKind::Identifier(identifier) = reference.kind else {
+        panic!("expected identifier, got {:?}", reference.kind)
+    };
+    assert_eq!(identifier.value, "\u{3000}string".as_bytes());
     assert_eq!(param.parameter.value, b"$foo");
     let Some(description) = param.description else { panic!("expected a description") };
     assert_eq!(description.value, "中文描述".as_bytes());
@@ -123,11 +127,17 @@ fn ideographic_space_return_and_throws() {
 
     let TagValue::Return(ret) = &tags[0].value else { panic!("expected return, got {:?}", tags[0].value) };
     let Type::Reference(ret_type) = ret.r#type else { panic!("expected reference, got {:?}", ret.r#type) };
-    assert_eq!(ret_type.identifier.value, "\u{3000}int".as_bytes());
+    let ReferenceKind::Identifier(ret_identifier) = ret_type.kind else {
+        panic!("expected identifier, got {:?}", ret_type.kind)
+    };
+    assert_eq!(ret_identifier.value, "\u{3000}int".as_bytes());
 
     let TagValue::Throws(throws) = &tags[1].value else { panic!("expected throws, got {:?}", tags[1].value) };
     let Type::Reference(throws_type) = throws.r#type else { panic!("expected reference, got {:?}", throws.r#type) };
-    assert_eq!(throws_type.identifier.value, "\u{3000}Exception".as_bytes());
+    let ReferenceKind::Identifier(throws_identifier) = throws_type.kind else {
+        panic!("expected identifier, got {:?}", throws_type.kind)
+    };
+    assert_eq!(throws_identifier.value, "\u{3000}Exception".as_bytes());
 }
 
 #[test]

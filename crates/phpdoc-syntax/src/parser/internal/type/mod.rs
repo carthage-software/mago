@@ -1,3 +1,4 @@
+use crate::cst::r#type::ReferenceKind;
 use crate::cst::r#type::Type;
 use crate::cst::variable::Variable;
 use crate::error::ParseError;
@@ -74,6 +75,7 @@ impl<'arena> PHPDocParser<'arena> {
 
         let inner = match next.kind {
             TokenKind::Variable => Type::Variable(Variable::from_token(self.stream.consume()?, file_id)),
+            TokenKind::ThisVariable => Type::ThisVariable(Variable::from_token(self.stream.consume()?, file_id)),
             TokenKind::Question => self.parse_nullable_type()?,
             TokenKind::LeftParenthesis => self.parse_parenthesized_type()?,
             TokenKind::Asterisk => self.parse_wildcard_type()?,
@@ -180,6 +182,21 @@ impl<'arena> PHPDocParser<'arena> {
             TypeKeyword::NonEmptyUnspecifiedLiteralString => {
                 Type::NonEmptyUnspecifiedLiteralString(self.parse_keyword()?)
             }
+            TypeKeyword::Self_ => {
+                let keyword = self.parse_keyword()?;
+
+                self.parse_named_reference(ReferenceKind::Self_(keyword))?
+            }
+            TypeKeyword::Static => {
+                let keyword = self.parse_keyword()?;
+
+                self.parse_named_reference(ReferenceKind::Static(keyword))?
+            }
+            TypeKeyword::Parent => {
+                let keyword = self.parse_keyword()?;
+
+                self.parse_named_reference(ReferenceKind::Parent(keyword))?
+            }
             TypeKeyword::As | TypeKeyword::Is | TypeKeyword::Not | TypeKeyword::Min | TypeKeyword::Max => {
                 self.parse_reference_type()?
             }
@@ -198,6 +215,7 @@ mod tests {
     use mago_span::Span;
 
     use crate::cst::r#type::CallableTypeKind;
+    use crate::cst::r#type::ReferenceKind;
     use crate::cst::r#type::Type;
     use crate::parser::PHPDocParser;
 
@@ -223,7 +241,8 @@ mod tests {
     fn parses_reference_fallback() {
         let arena = Bump::new();
         let Type::Reference(reference) = parse(&arena, b"\\Foo\\Bar") else { panic!() };
-        assert_eq!(reference.identifier.value, b"\\Foo\\Bar");
+        let ReferenceKind::Identifier(identifier) = reference.kind else { panic!() };
+        assert_eq!(identifier.value, b"\\Foo\\Bar");
         assert!(reference.parameters.is_none());
     }
 

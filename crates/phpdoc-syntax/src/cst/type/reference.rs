@@ -3,12 +3,22 @@ use serde::Serialize;
 use mago_span::HasSpan;
 use mago_span::Span;
 
+use crate::cst::Keyword;
 use crate::cst::identifier::Identifier;
 use crate::cst::r#type::generics::GenericParameters;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[serde(tag = "type", content = "value")]
+pub enum ReferenceKind<'arena> {
+    Identifier(Identifier<'arena>),
+    Self_(Keyword<'arena>),
+    Static(Keyword<'arena>),
+    Parent(Keyword<'arena>),
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ReferenceType<'arena> {
-    pub identifier: Identifier<'arena>,
+    pub kind: ReferenceKind<'arena>,
     pub parameters: Option<GenericParameters<'arena>>,
 }
 
@@ -22,7 +32,7 @@ pub enum MemberReferenceSelector<'arena> {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct MemberReferenceType<'arena> {
-    pub class: Identifier<'arena>,
+    pub kind: ReferenceKind<'arena>,
     pub double_colon: Span,
     pub member: MemberReferenceSelector<'arena>,
 }
@@ -38,11 +48,22 @@ pub enum GlobalWildcardSelector<'arena> {
     EndsWith(Span, Identifier<'arena>),
 }
 
+impl HasSpan for ReferenceKind<'_> {
+    fn span(&self) -> Span {
+        match self {
+            ReferenceKind::Identifier(identifier) => identifier.span,
+            ReferenceKind::Self_(keyword) | ReferenceKind::Static(keyword) | ReferenceKind::Parent(keyword) => {
+                keyword.span
+            }
+        }
+    }
+}
+
 impl HasSpan for ReferenceType<'_> {
     fn span(&self) -> Span {
         match &self.parameters {
-            Some(parameters) => self.identifier.span.join(parameters.span()),
-            None => self.identifier.span,
+            Some(parameters) => self.kind.span().join(parameters.span()),
+            None => self.kind.span(),
         }
     }
 }
@@ -60,7 +81,7 @@ impl HasSpan for MemberReferenceSelector<'_> {
 
 impl HasSpan for MemberReferenceType<'_> {
     fn span(&self) -> Span {
-        self.class.span.join(self.member.span())
+        self.kind.span().join(self.member.span())
     }
 }
 
@@ -79,12 +100,23 @@ impl HasSpan for GlobalWildcardType<'_> {
     }
 }
 
+impl std::fmt::Display for ReferenceKind<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReferenceKind::Identifier(identifier) => write!(f, "{identifier}"),
+            ReferenceKind::Self_(keyword) | ReferenceKind::Static(keyword) | ReferenceKind::Parent(keyword) => {
+                write!(f, "{keyword}")
+            }
+        }
+    }
+}
+
 impl std::fmt::Display for ReferenceType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(parameters) = &self.parameters {
-            write!(f, "{}{}", self.identifier, parameters)
+            write!(f, "{}{}", self.kind, parameters)
         } else {
-            write!(f, "{}", self.identifier)
+            write!(f, "{}", self.kind)
         }
     }
 }
@@ -102,7 +134,7 @@ impl std::fmt::Display for MemberReferenceSelector<'_> {
 
 impl std::fmt::Display for MemberReferenceType<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}::{}", self.class, self.member)
+        write!(f, "{}::{}", self.kind, self.member)
     }
 }
 

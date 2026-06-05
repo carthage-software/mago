@@ -4,6 +4,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax_core::cst::Sequence;
 
+use crate::cst::Keyword;
 use crate::cst::expression::ConstantExpression;
 use crate::cst::identifier::Identifier;
 use crate::cst::tag::template::TemplateTagValue;
@@ -14,11 +15,20 @@ use crate::cst::variable::Variable;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct MethodTagValue<'arena> {
     pub r#static: Option<Span>,
+    pub visibility: Option<Visibility<'arena>>,
     pub return_type: Option<&'arena Type<'arena>>,
     pub name: Identifier<'arena>,
     pub templates: Option<&'arena MethodTemplateParameterList<'arena>>,
     pub parameters: &'arena MethodParameterList<'arena>,
     pub description: Option<Text<'arena>>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[serde(tag = "kind", content = "value")]
+pub enum Visibility<'arena> {
+    Public(Keyword<'arena>),
+    Protected(Keyword<'arena>),
+    Private(Keyword<'arena>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]

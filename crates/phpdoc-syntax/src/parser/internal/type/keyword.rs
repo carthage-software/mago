@@ -13,6 +13,7 @@ pub enum TypeKeyword {
     Real,
     True,
     Void,
+    Self_,
     Array,
     False,
     Float,
@@ -20,6 +21,8 @@ pub enum TypeKeyword {
     Never,
     Double,
     KeyOf,
+    Static,
+    Parent,
     Object,
     Scalar,
     String,
@@ -161,6 +164,7 @@ fn lookup_len4(bytes: &[u8]) -> Option<TypeKeyword> {
         b'r' if eq_exact(bytes, b"real") => Some(TypeKeyword::Real),
         b't' if eq(bytes, b"true") => Some(TypeKeyword::True),
         b'v' if eq(bytes, b"void") => Some(TypeKeyword::Void),
+        b's' if eq(bytes, b"self") => Some(TypeKeyword::Self_),
         _ => None,
     }
 }
@@ -195,10 +199,13 @@ fn lookup_len6(bytes: &[u8]) -> Option<TypeKeyword> {
                 Some(TypeKeyword::Scalar)
             } else if eq(bytes, b"string") {
                 Some(TypeKeyword::String)
+            } else if eq(bytes, b"static") {
+                Some(TypeKeyword::Static)
             } else {
                 None
             }
         }
+        b'p' if eq(bytes, b"parent") => Some(TypeKeyword::Parent),
         _ => None,
     }
 }

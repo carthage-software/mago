@@ -5,6 +5,7 @@ use crate::cst::r#type::GlobalWildcardSelector;
 use crate::cst::r#type::GlobalWildcardType;
 use crate::cst::r#type::MemberReferenceSelector;
 use crate::cst::r#type::MemberReferenceType;
+use crate::cst::r#type::ReferenceKind;
 use crate::cst::r#type::ReferenceType;
 use crate::cst::r#type::Type;
 use crate::cst::r#type::WildcardKind;
@@ -40,40 +41,57 @@ impl<'arena> PHPDocParser<'arena> {
         let identifier = Identifier::from_token(self.stream.consume()?, file_id);
 
         if self.stream.is_at(TokenKind::ColonColon) {
-            let double_colon = self.stream.consume_span()?;
+            return self.parse_member_reference(ReferenceKind::Identifier(identifier));
+        }
 
-            let member = if self.stream.is_at(TokenKind::Asterisk) {
-                let asterisk = self.stream.consume_span()?;
-
-                if self.is_at_member_identifier() {
-                    MemberReferenceSelector::EndsWith(
-                        asterisk,
-                        Identifier::from_token(self.eat_member_identifier()?, file_id),
-                    )
-                } else {
-                    MemberReferenceSelector::Wildcard(asterisk)
-                }
-            } else {
-                let member_identifier = Identifier::from_token(self.eat_member_identifier()?, file_id);
-
-                if self.stream.is_at(TokenKind::Asterisk) {
-                    MemberReferenceSelector::StartsWith(member_identifier, self.stream.consume_span()?)
-                } else {
-                    MemberReferenceSelector::Identifier(member_identifier)
-                }
-            };
-
-            Ok(Type::MemberReference(MemberReferenceType { class: identifier, double_colon, member }))
-        } else if self.stream.is_at(TokenKind::Asterisk) {
+        if self.stream.is_at(TokenKind::Asterisk) {
             let asterisk = self.stream.consume_span()?;
 
-            Ok(Type::GlobalWildcardReference(GlobalWildcardType {
+            return Ok(Type::GlobalWildcardReference(GlobalWildcardType {
                 selector: GlobalWildcardSelector::StartsWith(identifier, asterisk),
-            }))
-        } else {
-            let parameters = self.parse_generic_parameters_or_none()?;
-
-            Ok(Type::Reference(ReferenceType { identifier, parameters }))
+            }));
         }
+
+        let parameters = self.parse_generic_parameters_or_none()?;
+
+        Ok(Type::Reference(ReferenceType { kind: ReferenceKind::Identifier(identifier), parameters }))
+    }
+
+    pub(crate) fn parse_named_reference(&mut self, kind: ReferenceKind<'arena>) -> Result<Type<'arena>, ParseError> {
+        if self.stream.is_at(TokenKind::ColonColon) {
+            return self.parse_member_reference(kind);
+        }
+
+        let parameters = self.parse_generic_parameters_or_none()?;
+
+        Ok(Type::Reference(ReferenceType { kind, parameters }))
+    }
+
+    fn parse_member_reference(&mut self, kind: ReferenceKind<'arena>) -> Result<Type<'arena>, ParseError> {
+        let file_id = self.file_id();
+        let double_colon = self.stream.consume_span()?;
+
+        let member = if self.stream.is_at(TokenKind::Asterisk) {
+            let asterisk = self.stream.consume_span()?;
+
+            if self.is_at_member_identifier() {
+                MemberReferenceSelector::EndsWith(
+                    asterisk,
+                    Identifier::from_token(self.eat_member_identifier()?, file_id),
+                )
+            } else {
+                MemberReferenceSelector::Wildcard(asterisk)
+            }
+        } else {
+            let member_identifier = Identifier::from_token(self.eat_member_identifier()?, file_id);
+
+            if self.stream.is_at(TokenKind::Asterisk) {
+                MemberReferenceSelector::StartsWith(member_identifier, self.stream.consume_span()?)
+            } else {
+                MemberReferenceSelector::Identifier(member_identifier)
+            }
+        };
+
+        Ok(Type::MemberReference(MemberReferenceType { kind, double_colon, member }))
     }
 }

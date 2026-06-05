@@ -1,13 +1,10 @@
-use mago_syntax_core::cst::TokenSeparatedSequence;
 use serde::Serialize;
 
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::cst::identifier::Identifier;
 use crate::cst::text::Text;
 use crate::cst::r#type::Type;
-use crate::token::Token;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ExtendsTagValue<'arena> {
@@ -47,14 +44,8 @@ pub struct SealedTagValue<'arena> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct InheritorsTagValue<'arena> {
-    pub span: Span,
-    pub inheritors: TokenSeparatedSequence<'arena, Identifier<'arena>, Token<'arena>>,
-}
-
-impl HasSpan for InheritorsTagValue<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
+    pub r#type: &'arena Type<'arena>,
+    pub description: Option<Text<'arena>>,
 }
 
 macro_rules! single_type_with_description {
@@ -79,4 +70,5 @@ single_type_with_description!(
     RequireExtendsTagValue,
     RequireImplementsTagValue,
     SealedTagValue,
+    InheritorsTagValue,
 );

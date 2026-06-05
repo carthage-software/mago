@@ -119,6 +119,19 @@ fn parses_method_with_static_return_templates_and_parameters() {
 }
 
 #[test]
+fn parses_method_with_static_as_return_type_only() {
+    let arena = Bump::new();
+    let document = parse(&arena, b"/** @method static create() */");
+    let tag = first_tag(&document);
+
+    let TagValue::Method(method) = &tag.value else { panic!() };
+    assert!(method.r#static.is_none());
+    assert!(method.return_type.is_some());
+    assert_eq!(method.name.value, b"create");
+    assert_eq!(method.parameters.entries.len(), 0);
+}
+
+#[test]
 fn parses_method_without_return_type() {
     let arena = Bump::new();
     let document = parse(&arena, b"/** @method getName() */");
@@ -217,13 +230,47 @@ fn parses_type_alias_import() {
 }
 
 #[test]
-fn parses_inheritors_pipe_separated() {
+fn parses_inheritors_as_union_type() {
     let arena = Bump::new();
     let document = parse(&arena, b"/** @inheritors A|B|C */");
     let tag = first_tag(&document);
 
     let TagValue::Inheritors(inheritors) = &tag.value else { panic!() };
-    assert_eq!(inheritors.inheritors.len(), 3);
+    assert!(matches!(inheritors.r#type, Type::Union(_)));
+}
+
+#[test]
+fn parses_inheritors_with_generic_parameters() {
+    let arena = Bump::new();
+    let document = parse(&arena, b"/** @inheritors None<T>|Some<T> */");
+    let tag = first_tag(&document);
+
+    let TagValue::Inheritors(inheritors) = &tag.value else { panic!() };
+    let Type::Union(union) = inheritors.r#type else { panic!() };
+    assert!(matches!(union.left, Type::Reference(_)));
+    assert!(matches!(union.right, Type::Reference(_)));
+}
+
+#[test]
+fn parses_property_with_type() {
+    let arena = Bump::new();
+    let document = parse(&arena, b"/** @property string $name */");
+    let tag = first_tag(&document);
+
+    let TagValue::Property(property) = &tag.value else { panic!() };
+    assert!(property.r#type.is_some());
+    assert_eq!(property.variable.value, b"$name");
+}
+
+#[test]
+fn parses_property_without_type() {
+    let arena = Bump::new();
+    let document = parse(&arena, b"/** @property $name */");
+    let tag = first_tag(&document);
+
+    let TagValue::Property(property) = &tag.value else { panic!() };
+    assert!(property.r#type.is_none());
+    assert_eq!(property.variable.value, b"$name");
 }
 
 #[test]

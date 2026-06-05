@@ -101,6 +101,9 @@ impl<'arena> PHPDocParser<'arena> {
                     | TokenKind::RightBracket
                     | TokenKind::Colon
                     | TokenKind::Equals
+                    | TokenKind::Variable
+                    | TokenKind::Ellipsis
+                    | TokenKind::Ampersand
             ),
         }
     }

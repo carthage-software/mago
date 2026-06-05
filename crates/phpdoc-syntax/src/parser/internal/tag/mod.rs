@@ -61,7 +61,16 @@ impl<'arena> PHPDocParser<'arena> {
             return self.parse_inherit_doc_tag_value();
         }
 
-        match remainder {
+        let mut buffer = [0u8; 48];
+        let name = if remainder.len() <= buffer.len() {
+            buffer[..remainder.len()].copy_from_slice(remainder);
+            buffer[..remainder.len()].make_ascii_lowercase();
+            &buffer[..remainder.len()]
+        } else {
+            remainder
+        };
+
+        match name {
             b"param" => self.parse_param_tag_value(),
             b"param-out" => self.parse_param_out_tag_value(),
             b"param-closure-this" => self.parse_param_closure_this_tag_value(),
