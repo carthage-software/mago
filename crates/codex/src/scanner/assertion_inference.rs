@@ -18,7 +18,7 @@ use crate::assertion::Assertion;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
-use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
 
 type AssertionMap = BTreeMap<Word, Vec<Assertion>>;
@@ -187,7 +187,7 @@ fn parse_instanceof<'arena>(
 
     let class_name = word(resolved_names.get(identifier));
 
-    Some((var, TAtomic::Object(TObject::Named(TNamedObject::new(class_name)))))
+    Some((var, TAtomic::Reference(TReference::Symbol { name: class_name, parameters: None, intersection_types: None })))
 }
 
 fn parse_null_compare<'arena>(

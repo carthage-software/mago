@@ -1070,6 +1070,7 @@ mod tests {
     use crate::populator::populate_codebase;
     use crate::reference::SymbolReferences;
     use crate::scanner::scan_program;
+    use crate::ttype::atomic::alias::ReferenceKind;
     use crate::ttype::atomic::array::TArray;
     use crate::ttype::atomic::array::keyed::TKeyedArray;
     use crate::ttype::atomic::array::list::TList;
@@ -2208,7 +2209,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let alias = TAlias::new(ascii_lowercase_word(b"foo"), word("MyInt"));
+        let alias = TAlias::new(ReferenceKind::Identifier(ascii_lowercase_word(b"foo")), word("MyInt"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
         let mut actual = input;
@@ -2227,7 +2228,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let alias = TAlias::new(ascii_lowercase_word(b"foo"), word("Outer"));
+        let alias = TAlias::new(ReferenceKind::Identifier(ascii_lowercase_word(b"foo")), word("Outer"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
         let mut actual = input;
@@ -2244,7 +2245,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let alias = TAlias::new(ascii_lowercase_word(b"foo"), word("SelfRef"));
+        let alias = TAlias::new(ReferenceKind::Identifier(ascii_lowercase_word(b"foo")), word("SelfRef"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
         let mut actual = input;
@@ -2257,7 +2258,7 @@ mod tests {
     fn test_expand_alias_unknown() {
         let codebase = CodebaseMetadata::new();
 
-        let alias = TAlias::new(word("NonExistent"), word("Unknown"));
+        let alias = TAlias::new(ReferenceKind::Identifier(word("NonExistent")), word("Unknown"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
         let mut actual = input;
@@ -2275,7 +2276,7 @@ mod tests {
         ";
         let codebase = create_test_codebase(code);
 
-        let alias = TAlias::new(ascii_lowercase_word(b"foo"), word("MySelf"));
+        let alias = TAlias::new(ReferenceKind::Identifier(ascii_lowercase_word(b"foo")), word("MySelf"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
         let options = options_with_self("Foo");

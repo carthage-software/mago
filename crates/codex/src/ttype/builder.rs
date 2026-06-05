@@ -33,6 +33,7 @@ use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::alias::ReferenceKind;
 use crate::ttype::atomic::alias::TAlias;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::key::ArrayKey;
@@ -273,7 +274,7 @@ pub fn get_union_from_type_ast(
                 for right_type in &right_types {
                     let mut intersection = left_type.clone();
 
-                    if !intersection.add_intersection_type(right_type.clone()) {
+                    if !intersection.add_intersection_type(right_type.clone_without_intersection_types()) {
                         return Err(TypeError::InvalidType(
                             ttype.to_string(),
                             format!(
@@ -283,6 +284,12 @@ pub fn get_union_from_type_ast(
                             ),
                             ttype.span(),
                         ));
+                    }
+
+                    if let Some(nested_intersections) = right_type.get_intersection_types() {
+                        for nested in nested_intersections {
+                            intersection.add_intersection_type(nested.clone());
+                        }
                     }
 
                     intersection_types.push(intersection);
@@ -413,10 +420,13 @@ pub fn get_union_from_type_ast(
             wrap_atomic(TAtomic::Reference(TReference::Global { selector }))
         }
         Type::AliasReference(alias_reference) => {
-            let class_like_name = if alias_reference.class.value.eq_ignore_ascii_case(b"self")
-                || alias_reference.class.value.eq_ignore_ascii_case(b"static")
-                || alias_reference.class.value.eq(b"this")
-                || alias_reference.class.value.eq(b"$this")
+            let class_value = alias_reference.class.value;
+            let reference = if class_value.eq_ignore_ascii_case(b"parent") {
+                ReferenceKind::Parent(word("parent"))
+            } else if class_value.eq_ignore_ascii_case(b"self")
+                || class_value.eq_ignore_ascii_case(b"static")
+                || class_value.eq(b"this")
+                || class_value.eq(b"$this")
             {
                 let Some(classname) = classname else {
                     return Err(TypeError::InvalidType(
@@ -426,13 +436,15 @@ pub fn get_union_from_type_ast(
                     ));
                 };
 
-                classname
-            } else if alias_reference.class.value.eq_ignore_ascii_case(b"parent") {
-                word("parent")
+                if class_value.eq_ignore_ascii_case(b"static") {
+                    ReferenceKind::Static(classname)
+                } else {
+                    ReferenceKind::Self_(classname)
+                }
             } else {
-                let (class_like_name, _) = scope.resolve(NameKind::Default, alias_reference.class.value);
+                let (class_like_name, _) = scope.resolve(NameKind::Default, class_value);
 
-                ascii_lowercase_word(&class_like_name)
+                ReferenceKind::Identifier(ascii_lowercase_word(&class_like_name))
             };
 
             let alias_name = match alias_reference.alias {
@@ -440,7 +452,7 @@ pub fn get_union_from_type_ast(
                 AliasName::Keyword(keyword) => word(keyword.value),
             };
 
-            wrap_atomic(TAtomic::Alias(TAlias::new(class_like_name, alias_name)))
+            wrap_atomic(TAtomic::Alias(TAlias::new(reference, alias_name)))
         }
         Type::Object(object_type) => wrap_atomic(get_object_from_ast(object_type, scope, type_context, classname)?),
         Type::Shape(shape_type) => wrap_atomic(get_shape_from_ast(shape_type, scope, type_context, classname)?),
@@ -451,13 +463,19 @@ pub fn get_union_from_type_ast(
             let reference_name_atom = word(reference_type.identifier.value);
 
             if let Some((source_class, original_name)) = type_context.get_imported_type_alias(reference_name_atom) {
-                return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(*source_class, *original_name))));
+                return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(
+                    ReferenceKind::Identifier(*source_class),
+                    *original_name,
+                ))));
             }
 
             if type_context.has_type_alias(reference_name_atom)
                 && let Some(class_name) = classname
             {
-                return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(class_name, reference_name_atom))));
+                return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(
+                    ReferenceKind::Identifier(class_name),
+                    reference_name_atom,
+                ))));
             }
 
             wrap_atomic(get_reference_from_ast(

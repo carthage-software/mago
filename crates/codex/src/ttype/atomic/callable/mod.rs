@@ -58,7 +58,7 @@ impl TCallableSignature {
     #[must_use]
     pub fn mixed(is_closure: bool) -> Self {
         TCallableSignature::new(false, is_closure)
-            .with_parameters(vec![TCallableParameter::new(Some(Arc::new(get_mixed())), false, true, true)])
+            .with_parameters(vec![TCallableParameter::new(Some(Arc::new(get_mixed())), false, true, false)])
             .with_return_type(Some(Arc::new(get_mixed())))
     }
 

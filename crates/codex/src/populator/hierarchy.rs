@@ -13,6 +13,7 @@ use crate::reference::SymbolReferences;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::alias::ReferenceKind;
 use crate::ttype::atomic::alias::TAlias;
 use crate::ttype::atomic::populate_atomic_type;
 use crate::ttype::atomic::reference::TReference;
@@ -164,7 +165,10 @@ pub fn populate_class_like_metadata_iterative(
             if source_class.type_aliases.contains_key(&imported_type) {
                 let alias_metadata = TypeMetadata {
                     span: import_span,
-                    type_union: TUnion::from_atomic(TAtomic::Alias(TAlias::new(source_class_name, imported_type))),
+                    type_union: TUnion::from_atomic(TAtomic::Alias(TAlias::new(
+                        ReferenceKind::Identifier(source_class_name),
+                        imported_type,
+                    ))),
                     from_docblock: true,
                     inferred: false,
                 };

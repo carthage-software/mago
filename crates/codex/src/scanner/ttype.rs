@@ -155,12 +155,7 @@ fn get_union_from_hint<'arena>(
 
                     let mut intersection = left_type.clone();
                     if let Some(nested_intersections) = right_type.get_intersection_types() {
-                        let mut right_base = right_type.clone();
-                        if let Some(intersections) = right_base.get_intersection_types_mut() {
-                            intersections.clear();
-                        }
-
-                        intersection.add_intersection_type(right_base);
+                        intersection.add_intersection_type(right_type.clone_without_intersection_types());
                         for nested in nested_intersections {
                             intersection.add_intersection_type(nested.clone());
                         }

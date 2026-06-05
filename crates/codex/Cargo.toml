@@ -23,6 +23,7 @@ mago-word = { workspace = true }
 mago-bytes = { workspace = true }
 mago-span = { workspace = true }
 mago-syntax = { workspace = true }
+mago-hir = { workspace = true }
 mago-type-syntax = { workspace = true }
 mago-names = { workspace = true }
 mago-database = { workspace = true }

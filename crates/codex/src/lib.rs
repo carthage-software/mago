@@ -18,6 +18,7 @@ pub mod diff;
 pub mod differ;
 pub mod flags;
 pub mod identifier;
+pub mod ir_scanner;
 pub mod issue;
 pub mod metadata;
 pub mod misc;

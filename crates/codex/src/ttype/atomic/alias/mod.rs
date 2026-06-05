@@ -9,6 +9,32 @@ use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::union::TUnion;
 
+/// Describes how the class hosting a type alias is referenced.
+///
+/// An alias such as `!self::Member` or `!Acme\Repository::Row` records both the
+/// resolved class name and the keyword (if any) used to reach it, mirroring the
+/// `ReferenceKind` carried by the HIR so the source spelling survives population.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+pub enum ReferenceKind {
+    Identifier(Word),
+    Self_(Word),
+    Static(Word),
+    Parent(Word),
+}
+
+impl ReferenceKind {
+    #[inline]
+    #[must_use]
+    pub const fn class_name(&self) -> Word {
+        match self {
+            ReferenceKind::Identifier(class_name)
+            | ReferenceKind::Self_(class_name)
+            | ReferenceKind::Static(class_name)
+            | ReferenceKind::Parent(class_name) => *class_name,
+        }
+    }
+}
+
 /// Represents a reference to a type alias that needs to be expanded during analysis.
 ///
 /// Unlike regular type expansion during building, `TAlias` preserves the alias
@@ -18,22 +44,28 @@ use crate::ttype::union::TUnion;
 /// - Analysis-time expansion with full codebase context
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
 pub struct TAlias {
-    /// The FQCN of the class where the alias is defined or imported
-    class_name: Word,
+    /// How the class hosting the alias is referenced
+    reference: ReferenceKind,
     /// The name of the type alias
     alias_name: Word,
 }
 
 impl TAlias {
     #[must_use]
-    pub fn new(class_name: Word, alias_name: Word) -> Self {
-        Self { class_name, alias_name }
+    pub const fn new(reference: ReferenceKind, alias_name: Word) -> Self {
+        Self { reference, alias_name }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn get_reference(&self) -> ReferenceKind {
+        self.reference
     }
 
     #[inline]
     #[must_use]
     pub const fn get_class_name(&self) -> Word {
-        self.class_name
+        self.reference.class_name()
     }
 
     #[inline]
@@ -47,14 +79,15 @@ impl TAlias {
     /// Returns None if the alias cannot be resolved.
     #[must_use]
     pub fn resolve<'codebase>(&self, codebase: &'codebase CodebaseMetadata) -> Option<&'codebase TUnion> {
-        let class_like = codebase.get_class_like(self.class_name.as_bytes())?;
+        let class_name = self.reference.class_name();
+        let class_like = codebase.get_class_like(class_name.as_bytes())?;
         if let Some(type_alias) = class_like.type_aliases.get(&self.alias_name) {
             return Some(&type_alias.type_union);
         }
 
         let (source_class, type_alias, _) = class_like.imported_type_aliases.get(&self.alias_name)?;
 
-        let type_metadata = if source_class == &self.class_name {
+        let type_metadata = if source_class == &class_name {
             class_like.type_aliases.get(type_alias)
         } else {
             codebase
@@ -84,7 +117,7 @@ impl TType for TAlias {
     }
 
     fn get_id(&self) -> Word {
-        concat_word!(b"!", self.class_name.as_bytes(), b"::", self.alias_name.as_bytes())
+        concat_word!(b"!", self.reference.class_name().as_bytes(), b"::", self.alias_name.as_bytes())
     }
 
     fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
