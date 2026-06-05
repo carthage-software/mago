@@ -1,4 +1,5 @@
 use bumpalo::collections::Vec;
+use mago_phpdoc_syntax::cst;
 use mago_phpdoc_syntax::cst::tag::MethodTagValue;
 use mago_phpdoc_syntax::cst::tag::PropertyTagValue;
 use mago_phpdoc_syntax::cst::tag::TypeAliasImportTagValue;
@@ -13,10 +14,12 @@ use crate::ir::member::annotation::MethodAnnotation;
 use crate::ir::member::annotation::PropertyAnnotation;
 use crate::ir::member::annotation::PropertyAnnotationKind;
 use crate::ir::member::annotation::TypeAliasAnnotation;
+use crate::ir::modifier::Visibility;
+use crate::ir::modifier::VisibilityKind;
 use crate::ir::variable::DirectVariable;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_type_alias_annotation(
         &self,
         alias: &'arena TypeAliasTagValue<'arena>,
@@ -52,7 +55,7 @@ impl<'arena> Lowering<'arena> {
         if let Some(templates) = method.templates {
             for entry in templates.entries.iter() {
                 let annotation = self.lower_type_parameter_annotation(&entry.template, Variance::Invariant);
-                self.type_resolution.add_template(entry.template.name.value, annotation.bound);
+                self.type_resolution.add_template(annotation.name, annotation.bound, annotation.default);
                 type_parameters.push(annotation);
             }
         }
@@ -67,6 +70,14 @@ impl<'arena> Lowering<'arena> {
         MethodAnnotation {
             span: method.span(),
             r#static: method.r#static.is_some(),
+            visibility: match &method.visibility {
+                Some(v) => match v {
+                    cst::Visibility::Public(k) => Some(Visibility { span: k.span, kind: VisibilityKind::Public }),
+                    cst::Visibility::Protected(k) => Some(Visibility { span: k.span, kind: VisibilityKind::Protected }),
+                    cst::Visibility::Private(k) => Some(Visibility { span: k.span, kind: VisibilityKind::Private }),
+                },
+                None => None,
+            },
             name,
             type_parameters: type_parameters.into_bump_slice(),
             parameters,
@@ -82,7 +93,7 @@ impl<'arena> Lowering<'arena> {
         PropertyAnnotation {
             span: property.span(),
             kind,
-            r#type: Some(self.lower_type_annotation(property.r#type)),
+            r#type: property.r#type.map(|r#type| self.lower_type_annotation(r#type)),
             variable: DirectVariable { span: property.variable.span, name: property.variable.value },
         }
     }

@@ -1,10 +1,11 @@
+use mago_span::HasSpan;
 use mago_syntax::cst;
 
 use crate::ir::hook::Hook;
 use crate::ir::hook::HookBody;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_property_hooks(
         &mut self,
         hook_list: &'arena cst::PropertyHookList<'arena>,
@@ -16,10 +17,17 @@ impl<'arena> Lowering<'arena> {
         let attributes = self.lower_attribute_lists(&hook.attribute_lists);
         let modifiers = self.lower_modifiers(&hook.modifiers);
         let name = self.lower_name(&hook.name);
-        let parameters = match &hook.parameter_list {
+        let lowered_parameters = match &hook.parameter_list {
             Some(parameter_list) => self.lower_parameter_list(parameter_list),
             None => &[],
         };
+
+        let document = self.phpdoc_resolution.get(hook.span());
+        let annotations = self.lower_function_like_annotations(document.as_ref());
+        let parameters =
+            self.merge_parameter_annotations(lowered_parameters, annotations.parameters, annotations.parameter_outs);
+
+        let return_type_annotation = if name.value == b"get" { annotations.return_type } else { None };
 
         Hook {
             attributes,
@@ -28,6 +36,8 @@ impl<'arena> Lowering<'arena> {
             name,
             is_variadic: false,
             parameters,
+            has_docblock: document.is_some(),
+            return_type_annotation,
             body: self.lower_property_hook_body(&hook.body),
         }
     }

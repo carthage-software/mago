@@ -6,7 +6,7 @@ use crate::ir::expression::operator::UnaryPostfixOperator;
 use crate::ir::expression::operator::UnaryPrefixOperator;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_binary_operator(&self, operator: &cst::BinaryOperator<'arena>) -> BinaryOperator {
         match operator {
             cst::BinaryOperator::Addition(_) => BinaryOperator::Addition,

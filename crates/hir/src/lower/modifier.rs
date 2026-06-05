@@ -6,7 +6,7 @@ use crate::ir::modifier::Modifier;
 use crate::ir::modifier::ModifierKind;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_modifiers(&self, modifier: &Sequence<'arena, cst::Modifier<'arena>>) -> &'arena [Modifier] {
         self.arena.alloc_slice_fill_iter(modifier.iter().map(|modifier| self.lower_modifier(modifier)))
     }

@@ -4,7 +4,7 @@ use crate::ir::parameter::annotation::ParameterAnnotation;
 use crate::ir::variable::DirectVariable;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_parameter_annotation(
         &self,
         parameter: &'arena MethodTagValueParameter<'arena>,

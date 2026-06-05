@@ -12,7 +12,7 @@ use crate::ir::effect::annotation::ThrowsAnnotation;
 use crate::ir::variable::DirectVariable;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_throws_annotation(&self, throws: &'arena ThrowsTagValue<'arena>) -> ThrowsAnnotation<'arena> {
         ThrowsAnnotation { span: throws.span(), r#type: self.lower_type_annotation(throws.r#type) }
     }

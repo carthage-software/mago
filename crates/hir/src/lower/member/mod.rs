@@ -10,6 +10,7 @@ use crate::ir::member::ClassLikeConstantItem;
 use crate::ir::member::EnumCase;
 use crate::ir::member::HookedProperty;
 use crate::ir::member::Method;
+use crate::ir::member::MethodFlags;
 use crate::ir::member::Property;
 use crate::ir::member::PropertyItem;
 use crate::ir::member::TraitUse;
@@ -19,19 +20,21 @@ use crate::ir::member::TraitUsePrecedenceAdaptation;
 use crate::lower::Lowering;
 use crate::lower::resolution::namespace::NameResolutionKind;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_method(
         &mut self,
         method: &'arena cst::Method<'arena>,
         owner: Identifier<'arena>,
     ) -> Method<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&method.attribute_lists);
+        let version_constraint = self.lower_version_constraint(&method.attribute_lists);
         let modifiers = self.lower_modifiers(&method.modifiers);
         let name = self.lower_name(&method.name);
         let return_type = method.return_type_hint.as_ref().map(|hint| self.lower_type(&hint.hint));
 
         let document = self.phpdoc_resolution.get(method.span());
-        self.type_resolution.enter_scope(TypeParameterDefiningEntity::Method(owner, name));
+        let is_static = modifiers.iter().any(|modifier| modifier.kind == crate::ir::modifier::ModifierKind::Static);
+        self.type_resolution.enter_scope_with(TypeParameterDefiningEntity::Method(owner, name), is_static);
         let annotations = self.lower_function_like_annotations(document.as_ref());
 
         let lowered_parameters = self.lower_parameter_list(&method.parameter_list);
@@ -44,12 +47,34 @@ impl<'arena> Lowering<'arena> {
             }
         };
 
+        let inferred_assertions = (annotations.asserts.is_empty()
+            && annotations.asserts_if_true.is_empty()
+            && annotations.asserts_if_false.is_empty())
+        .then(|| {
+            let return_expression = match &method.body {
+                cst::MethodBody::Concrete(block) => self.single_return_expression(block),
+                cst::MethodBody::Abstract(_) => None,
+            };
+
+            self.infer_function_like_assertions(return_expression, parameters)
+        })
+        .flatten();
+        let assertions_inferred = inferred_assertions.is_some();
+        let (asserts_if_true, asserts_if_false) =
+            inferred_assertions.unwrap_or((annotations.asserts_if_true, annotations.asserts_if_false));
+
         self.type_resolution.leave_scope();
+
+        let mut flags = self.detect_marker_flags(document.as_ref(), attributes).method_flags();
+        if assertions_inferred {
+            flags.set(MethodFlags::AssertionsInferred);
+        }
 
         Method {
             span: method.span(),
             attributes,
-            flags: self.detect_marker_flags(document.as_ref()).method_flags(),
+            version_constraint,
+            flags,
             modifiers,
             name,
             type_parameter_annotations: annotations.type_parameters,
@@ -60,8 +85,8 @@ impl<'arena> Lowering<'arena> {
             return_type_annotation: annotations.return_type,
             throws: annotations.throws,
             asserts: annotations.asserts,
-            asserts_if_true: annotations.asserts_if_true,
-            asserts_if_false: annotations.asserts_if_false,
+            asserts_if_true,
+            asserts_if_false,
             self_out_annotation: annotations.self_out,
             body,
         }
@@ -77,11 +102,13 @@ impl<'arena> Lowering<'arena> {
         let document = self.phpdoc_resolution.get(property.span());
         let type_annotation = self.lower_var_annotation(document.as_ref());
         let items = self.arena.alloc_slice_fill_iter(property.items.iter().map(|item| self.lower_property_item(item)));
+        let version_constraint = self.lower_version_constraint(&property.attribute_lists);
 
         Property {
             span: property.span(),
             attributes,
-            flags: self.detect_marker_flags(document.as_ref()).property_flags(),
+            version_constraint,
+            flags: self.detect_marker_flags(document.as_ref(), attributes).property_flags(),
             modifiers,
             r#type,
             type_annotation,
@@ -100,11 +127,13 @@ impl<'arena> Lowering<'arena> {
         let type_annotation = self.lower_var_annotation(document.as_ref());
         let item = self.lower_property_item(&property.item);
         let hooks = self.lower_property_hooks(&property.hook_list);
+        let version_constraint = self.lower_version_constraint(&property.attribute_lists);
 
         HookedProperty {
             span: property.span(),
             attributes,
-            flags: self.detect_marker_flags(document.as_ref()).property_flags(),
+            version_constraint,
+            flags: self.detect_marker_flags(document.as_ref(), attributes).property_flags(),
             modifiers,
             r#type,
             type_annotation,
@@ -130,6 +159,7 @@ impl<'arena> Lowering<'arena> {
         constant: &'arena cst::ClassLikeConstant<'arena>,
     ) -> ClassLikeConstant<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&constant.attribute_lists);
+        let version_constraint = self.lower_version_constraint(&constant.attribute_lists);
         let modifiers = self.lower_modifiers(&constant.modifiers);
         let r#type = constant.hint.as_ref().map(|hint| self.lower_type(hint));
         let type_annotation = self.lower_var_annotation(self.phpdoc_resolution.get(constant.span()).as_ref());
@@ -137,7 +167,15 @@ impl<'arena> Lowering<'arena> {
             .arena
             .alloc_slice_fill_iter(constant.items.iter().map(|item| self.lower_class_like_constant_item(item)));
 
-        ClassLikeConstant { span: constant.span(), attributes, modifiers, r#type, type_annotation, items }
+        ClassLikeConstant {
+            span: constant.span(),
+            attributes,
+            version_constraint,
+            modifiers,
+            r#type,
+            type_annotation,
+            items,
+        }
     }
 
     fn lower_class_like_constant_item(
@@ -152,15 +190,17 @@ impl<'arena> Lowering<'arena> {
 
     pub(crate) fn lower_enum_case(&mut self, enum_case: &'arena cst::EnumCase<'arena>) -> EnumCase<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&enum_case.attribute_lists);
+        let version_constraint = self.lower_version_constraint(&enum_case.attribute_lists);
         let span = enum_case.span();
 
         match &enum_case.item {
             cst::EnumCaseItem::Unit(unit) => {
-                EnumCase { span, attributes, name: self.lower_name(&unit.name), value: None }
+                EnumCase { span, attributes, version_constraint, name: self.lower_name(&unit.name), value: None }
             }
             cst::EnumCaseItem::Backed(backed) => EnumCase {
                 span,
                 attributes,
+                version_constraint,
                 name: self.lower_name(&backed.name),
                 value: Some(self.arena.alloc(self.lower_expression(backed.value))),
             },

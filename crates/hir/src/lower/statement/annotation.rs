@@ -32,7 +32,7 @@ impl<'arena> VariableBindings<'arena> {
     }
 }
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn collect_var_bindings(&self, document: Option<&Document<'arena>>) -> VariableBindings<'arena> {
         let mut named = Vec::new_in(self.arena);
         let mut unnamed = None;

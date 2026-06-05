@@ -9,7 +9,7 @@ use crate::ir::literal::LiteralString;
 use crate::ir::literal::LiteralStringKind;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_literal(&self, literal: &'arena cst::Literal<'arena>) -> &'arena Literal<'arena> {
         self.arena.alloc(Literal {
             span: literal.span(),

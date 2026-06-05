@@ -4,6 +4,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ir::r#type::annotation::NamedTypeAnnotation;
+use crate::ir::r#type::annotation::TypeAnnotationKind;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct ImplementsAnnotation<'arena> {
@@ -44,7 +45,7 @@ pub struct RequireImplementsAnnotation<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct MixinAnnotation<'arena> {
     pub span: Span,
-    pub r#type: NamedTypeAnnotation<'arena>,
+    pub r#type: TypeAnnotationKind<'arena>,
 }
 
 impl HasSpan for ImplementsAnnotation<'_> {

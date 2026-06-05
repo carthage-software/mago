@@ -1,5 +1,6 @@
 use serde::Serialize;
 
+use mago_php_version::PHPVersionRange;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -28,6 +29,7 @@ pub mod annotation;
 pub struct EnumCase<'arena, S, D, E> {
     pub span: Span,
     pub attributes: &'arena [Attribute<'arena, S, D, E>],
+    pub version_constraint: &'arena [PHPVersionRange],
     pub name: Name<'arena>,
     pub value: Option<&'arena Expression<'arena, S, D, E>>,
 }
@@ -35,16 +37,19 @@ pub struct EnumCase<'arena, S, D, E> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub enum PropertyFlags {
     Deprecated = 1 << 0,
+    Readonly = 1 << 1,
     Experimental = 1 << 2,
     Final = 1 << 3,
     Internal = 1 << 4,
     API = 1 << 5,
+    HasDocblock = 1 << 15,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Property<'arena, S, D, E> {
     pub span: Span,
     pub attributes: &'arena [Attribute<'arena, S, D, E>],
+    pub version_constraint: &'arena [PHPVersionRange],
     pub flags: Flags<PropertyFlags>,
     pub modifiers: &'arena [Modifier],
     pub r#type: Option<&'arena Type<'arena>>,
@@ -62,6 +67,7 @@ pub struct PropertyItem<'arena, S, D, E> {
 pub struct HookedProperty<'arena, S, D, E> {
     pub span: Span,
     pub attributes: &'arena [Attribute<'arena, S, D, E>],
+    pub version_constraint: &'arena [PHPVersionRange],
     pub flags: Flags<PropertyFlags>,
     pub modifiers: &'arena [Modifier],
     pub r#type: Option<&'arena Type<'arena>>,
@@ -86,12 +92,15 @@ pub enum MethodFlags {
     InheritDoc = 1 << 12,
     NoNamedArguments = 1 << 13,
     MustUse = 1 << 14,
+    HasDocblock = 1 << 15,
+    AssertionsInferred = 1 << 16,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Method<'arena, S, D, E> {
     pub span: Span,
     pub attributes: &'arena [Attribute<'arena, S, D, E>],
+    pub version_constraint: &'arena [PHPVersionRange],
     pub flags: Flags<MethodFlags>,
     pub modifiers: &'arena [Modifier],
     pub name: Name<'arena>,
@@ -113,6 +122,7 @@ pub struct Method<'arena, S, D, E> {
 pub struct ClassLikeConstant<'arena, S, D, E> {
     pub span: Span,
     pub attributes: &'arena [Attribute<'arena, S, D, E>],
+    pub version_constraint: &'arena [PHPVersionRange],
     pub modifiers: &'arena [Modifier],
     pub r#type: Option<&'arena Type<'arena>>,
     pub type_annotation: Option<&'arena TypeAnnotation<'arena>>,

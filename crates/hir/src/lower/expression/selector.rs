@@ -7,7 +7,7 @@ use crate::ir::expression::selector::ConstantSelector;
 use crate::ir::expression::selector::MemberSelector;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_member_selector(
         &mut self,
         selector: &'arena cst::ClassLikeMemberSelector<'arena>,

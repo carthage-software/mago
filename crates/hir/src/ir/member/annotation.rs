@@ -5,6 +5,7 @@ use mago_span::Span;
 
 use crate::ir::generics::annotation::TypeParameterAnnotation;
 use crate::ir::identifier::Identifier;
+use crate::ir::modifier::Visibility;
 use crate::ir::name::Name;
 use crate::ir::parameter::annotation::ParameterAnnotation;
 use crate::ir::r#type::annotation::TypeAnnotation;
@@ -28,6 +29,7 @@ pub struct ImportedTypeAliasAnnotation<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct MethodAnnotation<'arena, S, D, E> {
     pub span: Span,
+    pub visibility: Option<Visibility>,
     pub r#static: bool,
     pub name: Name<'arena>,
     pub type_parameters: &'arena [TypeParameterAnnotation<'arena>],

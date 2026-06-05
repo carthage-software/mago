@@ -6,6 +6,7 @@ use mago_phpdoc_syntax::cst::tag::TagVendor;
 use mago_span::HasSpan;
 use mago_syntax::cst;
 
+use crate::ir::attribute::Attribute;
 use crate::ir::effect::annotation::AssertAnnotation;
 use crate::ir::effect::annotation::SelfOutAnnotation;
 use crate::ir::effect::annotation::ThrowsAnnotation;
@@ -78,6 +79,7 @@ pub(crate) struct FunctionLikeAnnotations<'arena> {
 pub(crate) struct MarkerFlags {
     deprecated: bool,
     not_deprecated: bool,
+    readonly: bool,
     internal: bool,
     api: bool,
     experimental: bool,
@@ -85,6 +87,7 @@ pub(crate) struct MarkerFlags {
     r#final: bool,
     mutation_free: bool,
     external_mutation_free: bool,
+    suspends_fiber: bool,
     no_named_arguments: bool,
     must_use: bool,
     ignore_nullable_return: bool,
@@ -97,6 +100,7 @@ pub(crate) struct MarkerFlags {
     no_seal_methods: bool,
     enum_interface: bool,
     inherit_doc: bool,
+    has_docblock: bool,
 }
 
 impl MarkerFlags {
@@ -131,6 +135,9 @@ impl MarkerFlags {
         }
         if self.no_seal_methods {
             flags.set(ClassFlags::UnsealedMethods);
+        }
+        if self.has_docblock {
+            flags.set(ClassFlags::HasDocblock);
         }
 
         flags
@@ -171,6 +178,9 @@ impl MarkerFlags {
         if self.no_seal_methods {
             flags.set(InterfaceFlags::UnsealedMethods);
         }
+        if self.has_docblock {
+            flags.set(InterfaceFlags::HasDocblock);
+        }
 
         flags
     }
@@ -201,6 +211,9 @@ impl MarkerFlags {
         if self.no_seal_methods {
             flags.set(TraitFlags::UnsealedMethods);
         }
+        if self.has_docblock {
+            flags.set(TraitFlags::HasDocblock);
+        }
 
         flags
     }
@@ -225,6 +238,9 @@ impl MarkerFlags {
         if self.no_seal_methods {
             flags.set(EnumFlags::UnsealedMethods);
         }
+        if self.has_docblock {
+            flags.set(EnumFlags::HasDocblock);
+        }
 
         flags
     }
@@ -246,6 +262,15 @@ impl MarkerFlags {
         if self.pure {
             flags.set(FunctionFlags::Pure);
         }
+        if self.mutation_free {
+            flags.set(FunctionFlags::MutationFree);
+        }
+        if self.external_mutation_free {
+            flags.set(FunctionFlags::ExternalMutationFree);
+        }
+        if self.suspends_fiber {
+            flags.set(FunctionFlags::SuspendsFiber);
+        }
         if self.no_named_arguments {
             flags.set(FunctionFlags::NoNamedArguments);
         }
@@ -257,6 +282,9 @@ impl MarkerFlags {
         }
         if self.ignore_falsable_return {
             flags.set(FunctionFlags::IgnoreFalsableReturnType);
+        }
+        if self.has_docblock {
+            flags.set(FunctionFlags::HasDocblock);
         }
 
         flags
@@ -288,6 +316,9 @@ impl MarkerFlags {
         if self.external_mutation_free {
             flags.set(MethodFlags::ExternalMutationFree);
         }
+        if self.suspends_fiber {
+            flags.set(MethodFlags::SuspendsFiber);
+        }
         if self.no_named_arguments {
             flags.set(MethodFlags::NoNamedArguments);
         }
@@ -303,6 +334,9 @@ impl MarkerFlags {
         if self.inherit_doc {
             flags.set(MethodFlags::InheritDoc);
         }
+        if self.has_docblock {
+            flags.set(MethodFlags::HasDocblock);
+        }
 
         flags
     }
@@ -311,6 +345,9 @@ impl MarkerFlags {
         let mut flags = Flags::new();
         if self.deprecated {
             flags.set(PropertyFlags::Deprecated);
+        }
+        if self.readonly {
+            flags.set(PropertyFlags::Readonly);
         }
         if self.internal {
             flags.set(PropertyFlags::Internal);
@@ -323,6 +360,9 @@ impl MarkerFlags {
         }
         if self.r#final {
             flags.set(PropertyFlags::Final);
+        }
+        if self.has_docblock {
+            flags.set(PropertyFlags::HasDocblock);
         }
 
         flags
@@ -342,12 +382,15 @@ impl MarkerFlags {
         if self.experimental {
             flags.set(ConstantFlags::Experimental);
         }
+        if self.has_docblock {
+            flags.set(ConstantFlags::HasDocblock);
+        }
 
         flags
     }
 }
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_class_like_annotations(
         &mut self,
         document: Option<&Document<'arena>>,
@@ -371,6 +414,45 @@ impl<'arena> Lowering<'arena> {
             for element in document.elements.iter() {
                 let Element::Tag(tag) = element else { continue };
                 let tag = *tag;
+                match &tag.value {
+                    TagValue::TypeAlias(alias) => {
+                        let name = self.phpdoc_name(&alias.alias);
+                        self.type_resolution.add_alias(alias.alias.value, owner, name);
+                        if self.settings.program_wide_type_aliases {
+                            self.type_resolution.add_program_alias(alias.alias.value, owner, name);
+                        }
+                    }
+                    TagValue::TypeAliasImport(import) => {
+                        let local = import
+                            .imported_as
+                            .as_ref()
+                            .map_or(import.imported_alias.value, |imported_as| imported_as.local.value);
+                        let from = self.resolve_phpdoc_class(&import.imported_from);
+                        let name = self.phpdoc_name(&import.imported_alias);
+                        self.type_resolution.add_alias(local, from, name);
+                        if self.settings.re_export_type_aliases {
+                            self.type_resolution.add_program_alias(local, from, name);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            for element in document.elements.iter() {
+                let Element::Tag(tag) = element else { continue };
+                let tag = *tag;
+                match &tag.value {
+                    TagValue::TypeAlias(alias) => type_aliases.push(self.lower_type_alias_annotation(alias)),
+                    TagValue::TypeAliasImport(import) => {
+                        imported_type_aliases.push(self.lower_imported_type_alias_annotation(import));
+                    }
+                    _ => {}
+                }
+            }
+
+            for element in document.elements.iter() {
+                let Element::Tag(tag) = element else { continue };
+                let tag = *tag;
                 if let TagValue::Template(template) = &tag.value {
                     let mut buffer = [0u8; 32];
                     let variance = match self.normalize_tag_name(tag.name.value, &mut buffer) {
@@ -379,30 +461,8 @@ impl<'arena> Lowering<'arena> {
                         _ => Variance::Invariant,
                     };
                     let annotation = self.lower_type_parameter_annotation(template, variance);
-                    self.type_resolution.add_template(template.name.value, annotation.bound);
+                    self.type_resolution.add_template(annotation.name, annotation.bound, annotation.default);
                     type_parameters.push(annotation);
-                }
-            }
-
-            for element in document.elements.iter() {
-                let Element::Tag(tag) = element else { continue };
-                let tag = *tag;
-                match &tag.value {
-                    TagValue::TypeAlias(alias) => {
-                        let annotation = self.lower_type_alias_annotation(alias);
-                        self.type_resolution.add_alias(alias.alias.value, owner, annotation.name);
-                        type_aliases.push(annotation);
-                    }
-                    TagValue::TypeAliasImport(import) => {
-                        let annotation = self.lower_imported_type_alias_annotation(import);
-                        let local = import
-                            .imported_as
-                            .as_ref()
-                            .map_or(import.imported_alias.value, |imported_as| imported_as.local.value);
-                        self.type_resolution.add_alias(local, annotation.from, annotation.name);
-                        imported_type_aliases.push(annotation);
-                    }
-                    _ => {}
                 }
             }
 
@@ -419,7 +479,7 @@ impl<'arena> Lowering<'arena> {
                     TagValue::RequireImplements(value) => {
                         require_implements.extend(self.lower_require_implements_annotation(value));
                     }
-                    TagValue::Mixin(value) => mixins.extend(self.lower_mixin_annotation(value)),
+                    TagValue::Mixin(value) => mixins.push(self.lower_mixin_annotation(value)),
                     TagValue::Sealed(value) => {
                         if sealed.is_none() || tag.vendor > sealed_vendor {
                             sealed_vendor = tag.vendor;
@@ -495,7 +555,7 @@ impl<'arena> Lowering<'arena> {
                     };
 
                     let annotation = self.lower_type_parameter_annotation(template, variance);
-                    self.type_resolution.add_template(template.name.value, annotation.bound);
+                    self.type_resolution.add_template(annotation.name, annotation.bound, annotation.default);
                     type_parameters.push(annotation);
                 }
             }
@@ -515,28 +575,37 @@ impl<'arena> Lowering<'arena> {
                     TagValue::Assert(value) => {
                         let annotation = self.lower_assert_annotation(value);
                         let mut buffer = [0u8; 32];
-                        match self.normalize_tag_name(tag.name.value, &mut buffer) {
-                            b"assertiftrue" => asserts_if_true.push(annotation),
-                            b"assertiffalse" => asserts_if_false.push(annotation),
-                            _ => asserts.push(annotation),
+                        let normalized = self.normalize_tag_name(tag.name.value, &mut buffer);
+                        if normalized.ends_with(b"iftrue") {
+                            asserts_if_true.push(annotation);
+                        } else if normalized.ends_with(b"iffalse") {
+                            asserts_if_false.push(annotation);
+                        } else {
+                            asserts.push(annotation);
                         }
                     }
                     TagValue::AssertMethod(value) => {
                         let annotation = self.lower_assert_method_annotation(value);
                         let mut buffer = [0u8; 32];
-                        match self.normalize_tag_name(tag.name.value, &mut buffer) {
-                            b"assertiftrue" => asserts_if_true.push(annotation),
-                            b"assertiffalse" => asserts_if_false.push(annotation),
-                            _ => asserts.push(annotation),
+                        let normalized = self.normalize_tag_name(tag.name.value, &mut buffer);
+                        if normalized.ends_with(b"iftrue") {
+                            asserts_if_true.push(annotation);
+                        } else if normalized.ends_with(b"iffalse") {
+                            asserts_if_false.push(annotation);
+                        } else {
+                            asserts.push(annotation);
                         }
                     }
                     TagValue::AssertProperty(value) => {
                         let annotation = self.lower_assert_property_annotation(value);
                         let mut buffer = [0u8; 32];
-                        match self.normalize_tag_name(tag.name.value, &mut buffer) {
-                            b"assertiftrue" => asserts_if_true.push(annotation),
-                            b"assertiffalse" => asserts_if_false.push(annotation),
-                            _ => asserts.push(annotation),
+                        let normalized = self.normalize_tag_name(tag.name.value, &mut buffer);
+                        if normalized.ends_with(b"iftrue") {
+                            asserts_if_true.push(annotation);
+                        } else if normalized.ends_with(b"iffalse") {
+                            asserts_if_false.push(annotation);
+                        } else {
+                            asserts.push(annotation);
                         }
                     }
                     TagValue::SelfOut(value) => {
@@ -594,8 +663,9 @@ impl<'arena> Lowering<'arena> {
     ) -> &'arena [Parameter<'arena, (), (), ()>] {
         self.arena.alloc_slice_fill_iter(parameters.iter().map(|parameter| {
             let mut parameter = *parameter;
-            parameter.type_annotation =
-                parameter_types.iter().find(|entry| entry.0 == parameter.variable.name).map(|entry| entry.1);
+            if let Some(entry) = parameter_types.iter().find(|entry| entry.0 == parameter.variable.name) {
+                parameter.type_annotation = Some(entry.1);
+            }
             parameter.out_annotation =
                 parameter_out_types.iter().find(|entry| entry.0 == parameter.variable.name).map(|entry| entry.1);
 
@@ -624,6 +694,33 @@ impl<'arena> Lowering<'arena> {
         annotation
     }
 
+    pub(crate) fn lower_parameter_var_annotation(
+        &self,
+        document: Option<&Document<'arena>>,
+        parameter_name: &[u8],
+    ) -> Option<&'arena TypeAnnotation<'arena>> {
+        let document = document?;
+        let mut annotation = None;
+        let mut vendor: Option<TagVendor> = None;
+        for element in document.elements.iter() {
+            let Element::Tag(tag) = element else { continue };
+            let tag = *tag;
+            let TagValue::Var(value) = &tag.value else { continue };
+
+            let matches_parameter = match &value.variable {
+                Some(variable) => variable.value == parameter_name,
+                None => true,
+            };
+
+            if matches_parameter && (annotation.is_none() || tag.vendor > vendor) {
+                vendor = tag.vendor;
+                annotation = Some(self.lower_type_annotation(value.r#type));
+            }
+        }
+
+        annotation
+    }
+
     pub(crate) fn lower_use_annotations(&self, document: Option<&Document<'arena>>) -> &'arena [UseAnnotation<'arena>] {
         let arena = self.arena;
         let mut uses = Vec::new_in(arena);
@@ -641,6 +738,11 @@ impl<'arena> Lowering<'arena> {
     }
 
     fn normalize_tag_name<'buffer>(&self, name: &[u8], buffer: &'buffer mut [u8; 32]) -> &'buffer [u8] {
+        let name = match TagVendor::from_name(name) {
+            Some(vendor) => name.get(vendor.prefix().len() + 1..).unwrap_or(name),
+            None => name,
+        };
+
         let mut length = 0;
         for &byte in name {
             if byte == b'-' {
@@ -658,37 +760,45 @@ impl<'arena> Lowering<'arena> {
         &buffer[..length]
     }
 
-    pub(crate) fn detect_marker_flags(&self, document: Option<&Document<'arena>>) -> MarkerFlags {
+    pub(crate) fn detect_marker_flags(
+        &self,
+        document: Option<&Document<'arena>>,
+        attributes: &[Attribute<'arena, (), (), ()>],
+    ) -> MarkerFlags {
         let mut markers = MarkerFlags::default();
-        let Some(document) = document else { return markers };
 
-        markers.inherit_doc = document.has_inherit_doc();
-        for element in document.elements.iter() {
-            let Element::Tag(tag) = element else { continue };
-            let tag = *tag;
-            let mut buffer = [0u8; 32];
-            match self.normalize_tag_name(tag.name.value, &mut buffer) {
-                b"deprecated" => markers.deprecated = true,
-                b"notdeprecated" => markers.not_deprecated = true,
-                b"internal" => markers.internal = true,
-                b"api" => markers.api = true,
-                b"experimental" => markers.experimental = true,
-                b"pure" => markers.pure = true,
-                b"final" => markers.r#final = true,
-                b"mutationfree" => markers.mutation_free = true,
-                b"externalmutationfree" => markers.external_mutation_free = true,
-                b"nonamedarguments" => markers.no_named_arguments = true,
-                b"mustuse" => markers.must_use = true,
-                b"ignorenullablereturn" => markers.ignore_nullable_return = true,
-                b"ignorefalsablereturn" => markers.ignore_falsable_return = true,
-                b"consistentconstructor" => markers.consistent_constructor = true,
-                b"consistenttemplates" => markers.consistent_templates = true,
-                b"sealproperties" => markers.seal_properties = true,
-                b"nosealproperties" => markers.no_seal_properties = true,
-                b"sealmethods" => markers.seal_methods = true,
-                b"nosealmethods" => markers.no_seal_methods = true,
-                b"enuminterface" => markers.enum_interface = true,
-                _ => {}
+        if let Some(document) = document {
+            markers.has_docblock = true;
+            markers.inherit_doc = document.has_inherit_doc();
+            for element in document.elements.iter() {
+                let Element::Tag(tag) = element else { continue };
+                let tag = *tag;
+                let mut buffer = [0u8; 32];
+                match self.normalize_tag_name(tag.name.value, &mut buffer) {
+                    b"deprecated" => markers.deprecated = true,
+                    b"notdeprecated" => markers.not_deprecated = true,
+                    b"readonly" => markers.readonly = true,
+                    b"internal" => markers.internal = true,
+                    b"api" => markers.api = true,
+                    b"experimental" => markers.experimental = true,
+                    b"pure" => markers.pure = true,
+                    b"final" => markers.r#final = true,
+                    b"mutationfree" => markers.mutation_free = true,
+                    b"externalmutationfree" => markers.external_mutation_free = true,
+                    b"suspendsfiber" => markers.suspends_fiber = true,
+                    b"nonamedarguments" => markers.no_named_arguments = true,
+                    b"mustuse" => markers.must_use = true,
+                    b"ignorenullablereturn" => markers.ignore_nullable_return = true,
+                    b"ignorefalsablereturn" => markers.ignore_falsable_return = true,
+                    b"consistentconstructor" => markers.consistent_constructor = true,
+                    b"consistenttemplates" => markers.consistent_templates = true,
+                    b"sealproperties" => markers.seal_properties = true,
+                    b"nosealproperties" => markers.no_seal_properties = true,
+                    b"sealmethods" => markers.seal_methods = true,
+                    b"nosealmethods" => markers.no_seal_methods = true,
+                    b"enuminterface" => markers.enum_interface = true,
+                    _ => {}
+                }
             }
         }
 
@@ -696,11 +806,19 @@ impl<'arena> Lowering<'arena> {
             markers.deprecated = false;
         }
 
+        if self.settings.lower_deprecation_attributes
+            && attributes.iter().any(|attribute| attribute.class.value.eq_ignore_ascii_case(b"Deprecated"))
+        {
+            markers.deprecated = true;
+            markers.not_deprecated = false;
+        }
+
         markers
     }
 
     pub(crate) fn lower_class(&mut self, class: &'arena cst::Class<'arena>) -> &'arena Class<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&class.attribute_lists);
+        let version_constraint = self.lower_version_constraint(&class.attribute_lists);
         let modifiers = self.lower_modifiers(&class.modifiers);
         let name = self.lower_declaration_name(&class.name);
         let extends = class.extends.as_ref().and_then(|extends| self.lower_extends_one(extends));
@@ -734,8 +852,10 @@ impl<'arena> Lowering<'arena> {
         self.type_resolution.leave_scope();
 
         self.arena.alloc(Class {
-            flags: self.detect_marker_flags(document.as_ref()).class_flags(),
+            flags: self.detect_marker_flags(document.as_ref(), attributes).class_flags(),
             attributes,
+            version_constraint,
+            attribute_target: self.lower_attribute_target(name.value, &class.attribute_lists),
             name,
             type_parameter_annotations: annotations.type_parameters,
             modifiers,
@@ -745,6 +865,8 @@ impl<'arena> Lowering<'arena> {
             extends_annotations: annotations.extends,
             implements,
             implements_annotations: annotations.implements,
+            require_extends_annotations: annotations.require_extends,
+            require_implements_annotations: annotations.require_implements,
             sealed_annotation: annotations.sealed,
             mixin_annotations: annotations.mixins,
             trait_uses: trait_uses.into_bump_slice(),
@@ -762,6 +884,7 @@ impl<'arena> Lowering<'arena> {
         interface: &'arena cst::Interface<'arena>,
     ) -> &'arena Interface<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&interface.attribute_lists);
+        let version_constraint = self.lower_version_constraint(&interface.attribute_lists);
         let name = self.lower_declaration_name(&interface.name);
         let extends = interface.extends.as_ref().map(|extends| self.lower_extends_one_or_more(extends));
 
@@ -787,14 +910,18 @@ impl<'arena> Lowering<'arena> {
         self.type_resolution.leave_scope();
 
         self.arena.alloc(Interface {
-            flags: self.detect_marker_flags(document.as_ref()).interface_flags(),
+            flags: self.detect_marker_flags(document.as_ref(), attributes).interface_flags(),
             attributes,
+            version_constraint,
+            attribute_target: self.lower_attribute_target(name.value, &interface.attribute_lists),
             name,
             type_parameter_annotations: annotations.type_parameters,
             type_alias_annotations: annotations.type_aliases,
             imported_type_alias_annotations: annotations.imported_type_aliases,
             extends,
             extends_annotations: annotations.extends,
+            require_extends_annotations: annotations.require_extends,
+            require_implements_annotations: annotations.require_implements,
             sealed_annotation: annotations.sealed,
             mixin_annotations: annotations.mixins,
             constants: constants.into_bump_slice(),
@@ -806,6 +933,7 @@ impl<'arena> Lowering<'arena> {
 
     pub(crate) fn lower_trait(&mut self, r#trait: &'arena cst::Trait<'arena>) -> &'arena Trait<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&r#trait.attribute_lists);
+        let version_constraint = self.lower_version_constraint(&r#trait.attribute_lists);
         let name = self.lower_declaration_name(&r#trait.name);
 
         let document = self.phpdoc_resolution.get(r#trait.span());
@@ -836,14 +964,18 @@ impl<'arena> Lowering<'arena> {
         self.type_resolution.leave_scope();
 
         self.arena.alloc(Trait {
-            flags: self.detect_marker_flags(document.as_ref()).trait_flags(),
+            flags: self.detect_marker_flags(document.as_ref(), attributes).trait_flags(),
             attributes,
+            version_constraint,
+            attribute_target: self.lower_attribute_target(name.value, &r#trait.attribute_lists),
             name,
             type_parameter_annotations: annotations.type_parameters,
             type_alias_annotations: annotations.type_aliases,
             imported_type_alias_annotations: annotations.imported_type_aliases,
             require_extends_annotations: annotations.require_extends,
             require_implements_annotations: annotations.require_implements,
+            sealed_annotation: annotations.sealed,
+            mixin_annotations: annotations.mixins,
             trait_uses: trait_uses.into_bump_slice(),
             constants: constants.into_bump_slice(),
             properties: properties.into_bump_slice(),
@@ -856,6 +988,7 @@ impl<'arena> Lowering<'arena> {
 
     pub(crate) fn lower_enum(&mut self, r#enum: &'arena cst::Enum<'arena>) -> &'arena Enum<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&r#enum.attribute_lists);
+        let version_constraint = self.lower_version_constraint(&r#enum.attribute_lists);
         let name = self.lower_declaration_name(&r#enum.name);
         let backing_type = r#enum
             .backing_type_hint
@@ -884,14 +1017,19 @@ impl<'arena> Lowering<'arena> {
         self.type_resolution.leave_scope();
 
         self.arena.alloc(Enum {
-            flags: self.detect_marker_flags(document.as_ref()).enum_flags(),
+            flags: self.detect_marker_flags(document.as_ref(), attributes).enum_flags(),
             attributes,
+            version_constraint,
+            attribute_target: self.lower_attribute_target(name.value, &r#enum.attribute_lists),
             name,
             backing_type,
             type_alias_annotations: annotations.type_aliases,
             imported_type_alias_annotations: annotations.imported_type_aliases,
             implements,
             implements_annotations: annotations.implements,
+            require_extends_annotations: annotations.require_extends,
+            require_implements_annotations: annotations.require_implements,
+            mixin_annotations: annotations.mixins,
             trait_uses: trait_uses.into_bump_slice(),
             constants: constants.into_bump_slice(),
             enum_cases: enum_cases.into_bump_slice(),
@@ -905,6 +1043,7 @@ impl<'arena> Lowering<'arena> {
         function: &'arena cst::Function<'arena>,
     ) -> &'arena Function<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&function.attribute_lists);
+        let version_constraint = self.lower_version_constraint(&function.attribute_lists);
         let name = self.lower_declaration_name(&function.name);
         let return_type = function.return_type_hint.as_ref().map(|hint| self.lower_type(&hint.hint));
 
@@ -917,11 +1056,26 @@ impl<'arena> Lowering<'arena> {
             self.merge_parameter_annotations(lowered_parameters, annotations.parameters, annotations.parameter_outs);
         let body = self.statements_to_statement(function.body.statements.as_slice(), function.body.span());
 
+        let inferred_assertions = (annotations.asserts.is_empty()
+            && annotations.asserts_if_true.is_empty()
+            && annotations.asserts_if_false.is_empty())
+        .then(|| self.infer_function_like_assertions(self.single_return_expression(&function.body), parameters))
+        .flatten();
+        let assertions_inferred = inferred_assertions.is_some();
+        let (assert_if_true_annotations, assert_if_false_annotations) =
+            inferred_assertions.unwrap_or((annotations.asserts_if_true, annotations.asserts_if_false));
+
         self.type_resolution.leave_scope();
+
+        let mut flags = self.detect_marker_flags(document.as_ref(), attributes).function_flags();
+        if assertions_inferred {
+            flags.set(FunctionFlags::AssertionsInferred);
+        }
 
         self.arena.alloc(Function {
             attributes,
-            flags: self.detect_marker_flags(document.as_ref()).function_flags(),
+            version_constraint,
+            flags,
             name,
             type_parameter_annotations: annotations.type_parameters,
             parameters,
@@ -931,8 +1085,8 @@ impl<'arena> Lowering<'arena> {
             return_type_annotation: annotations.return_type,
             throws_annotations: annotations.throws,
             assert_annotations: annotations.asserts,
-            assert_if_true_annotations: annotations.asserts_if_true,
-            assert_if_false_annotations: annotations.asserts_if_false,
+            assert_if_true_annotations,
+            assert_if_false_annotations,
             body,
         })
     }
@@ -942,6 +1096,7 @@ impl<'arena> Lowering<'arena> {
         constant: &'arena cst::Constant<'arena>,
     ) -> &'arena Constant<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&constant.attribute_lists);
+        let version_constraint = self.lower_version_constraint(&constant.attribute_lists);
         let document = self.phpdoc_resolution.get(constant.span());
         let type_annotation = self.lower_var_annotation(document.as_ref());
         let items = self.arena.alloc_slice_fill_iter(constant.items.iter().map(|item| ConstantItem {
@@ -950,8 +1105,9 @@ impl<'arena> Lowering<'arena> {
         }));
 
         self.arena.alloc(Constant {
-            flags: self.detect_marker_flags(document.as_ref()).constant_flags(),
+            flags: self.detect_marker_flags(document.as_ref(), attributes).constant_flags(),
             attributes,
+            version_constraint,
             type_annotation,
             items,
         })

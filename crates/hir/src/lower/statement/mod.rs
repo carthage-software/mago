@@ -4,6 +4,8 @@ use mago_span::Span;
 use mago_syntax::cst;
 
 use crate::ir::expression::Expression;
+use crate::ir::identifier::Identifier;
+use crate::ir::identifier::IdentifierKind;
 use crate::ir::statement::Declare;
 use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
@@ -21,22 +23,30 @@ use crate::ir::statement::Try;
 use crate::ir::statement::TryCatchClause;
 use crate::ir::statement::While;
 use crate::ir::statement::annotation::VariableBindingAnnotation;
+use crate::ir::statement::definition::Constant;
+use crate::ir::statement::definition::ConstantItem;
 use crate::ir::statement::definition::DefinitionStatement;
 use crate::ir::statement::definition::DefinitionStatementKind;
 use crate::ir::variable::Variable;
 use crate::lower::Lowering;
+use crate::lower::settings::DefineConstantLowering;
 
 pub mod annotation;
 pub mod definition;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_statement(
         &mut self,
         statement: &'arena cst::Statement<'arena>,
     ) -> Statement<'arena, (), (), ()> {
         let document = self.phpdoc_resolution.get(statement.span());
-        let mut bindings = self.collect_var_bindings(document.as_ref());
         let span = statement.span();
+
+        if let Some(lowered) = self.lower_define_call(statement, document.as_ref(), span) {
+            return lowered;
+        }
+
+        let mut bindings = self.collect_var_bindings(document.as_ref());
 
         let kind = if bindings.is_empty() {
             self.lower_statement_kind(statement)
@@ -98,6 +108,74 @@ impl<'arena> Lowering<'arena> {
         statements.push(Statement { meta: (), span, kind });
 
         Statement { meta: (), span, kind: StatementKind::Sequence(statements.into_bump_slice()) }
+    }
+
+    fn lower_define_call(
+        &mut self,
+        statement: &'arena cst::Statement<'arena>,
+        document: Option<&mago_phpdoc_syntax::cst::Document<'arena>>,
+        span: Span,
+    ) -> Option<Statement<'arena, (), (), ()>> {
+        if self.settings.define_constant_lowering == DefineConstantLowering::Disabled {
+            return None;
+        }
+
+        let cst::Statement::Expression(expression_statement) = statement else {
+            return None;
+        };
+
+        let cst::Expression::Call(cst::Call::Function(call)) = expression_statement.expression else {
+            return None;
+        };
+
+        let cst::Expression::Identifier(identifier) = call.function else {
+            return None;
+        };
+
+        if identifier.value() != b"define" {
+            return None;
+        }
+
+        let [name_argument, value_argument] = call.argument_list.arguments.as_slice() else {
+            return None;
+        };
+
+        let cst::Expression::Literal(cst::Literal::String(name_string)) = name_argument.value() else {
+            return None;
+        };
+
+        let name_value = name_string.value?;
+        let type_annotation = self.lower_var_annotation(document);
+        let value = self.arena.alloc(self.lower_expression(value_argument.value()));
+        let constant = self.arena.alloc(Constant {
+            flags: self.detect_marker_flags(document, &[]).constant_flags(),
+            attributes: &[],
+            version_constraint: &[],
+            type_annotation,
+            items: self.arena.alloc_slice_copy(&[ConstantItem {
+                name: Identifier { span: name_string.span(), value: name_value, kind: IdentifierKind::Local },
+                value,
+            }]),
+        });
+
+        let definition = StatementKind::Definition(
+            self.arena.alloc(DefinitionStatement { meta: (), kind: DefinitionStatementKind::Constant(constant) }),
+        );
+
+        let constant_statement = Statement { meta: (), span, kind: definition };
+
+        match self.settings.define_constant_lowering {
+            DefineConstantLowering::Statement => Some(constant_statement),
+            DefineConstantLowering::StatementAndCall => {
+                let call_statement = Statement { meta: (), span, kind: self.lower_statement_kind(statement) };
+                Some(Statement {
+                    meta: (),
+                    span,
+                    kind: StatementKind::Sequence(self.arena.alloc_slice_copy(&[constant_statement, call_statement])),
+                })
+            }
+            DefineConstantLowering::Disabled => None,
+        }
     }
 
     fn lower_statement_kind(&mut self, statement: &'arena cst::Statement<'arena>) -> StatementKind<'arena, (), (), ()> {

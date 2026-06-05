@@ -1,16 +1,27 @@
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst;
 
 pub mod annotation;
 
+use crate::ir::identifier::Identifier;
+use crate::ir::identifier::IdentifierKind;
 use crate::ir::r#type::Type;
 use crate::ir::r#type::TypeKind;
 use crate::lower::Lowering;
 use crate::lower::resolution::namespace::NameResolutionKind;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_type(&self, hint: &'arena cst::Hint<'arena>) -> &'arena Type<'arena> {
         self.arena.alloc(Type { span: hint.span(), kind: self.lower_type_kind(hint) })
+    }
+
+    fn enclosing_class_or_static(&self, span: Span) -> Identifier<'arena> {
+        self.type_resolution.enclosing_class().unwrap_or(Identifier {
+            span,
+            value: b"static",
+            kind: IdentifierKind::Local,
+        })
     }
 
     fn lower_type_kind(&self, hint: &'arena cst::Hint<'arena>) -> TypeKind<'arena> {
@@ -41,9 +52,11 @@ impl<'arena> Lowering<'arena> {
             cst::Hint::False(_) => TypeKind::Bool(Some(false)),
             cst::Hint::Array(_) => TypeKind::Array,
             cst::Hint::Callable(_) => TypeKind::Callable,
-            cst::Hint::Static(_) => TypeKind::Static,
-            cst::Hint::Self_(_) => TypeKind::Self_,
-            cst::Hint::Parent(_) => TypeKind::Parent,
+            cst::Hint::Static(keyword) => TypeKind::Static(self.enclosing_class_or_static(keyword.span())),
+            cst::Hint::Self_(keyword) => TypeKind::Self_(self.enclosing_class_or_static(keyword.span())),
+            cst::Hint::Parent(keyword) => {
+                TypeKind::Parent(Identifier { span: keyword.span(), value: b"parent", kind: IdentifierKind::Local })
+            }
             cst::Hint::Void(_) => TypeKind::Void,
             cst::Hint::Never(_) => TypeKind::Never,
             cst::Hint::Float(_) => TypeKind::Float,

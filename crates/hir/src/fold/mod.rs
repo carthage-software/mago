@@ -665,6 +665,8 @@ generate_fold! {
             attributes: folder
                 .arena()
                 .alloc_slice_fill_iter(class.attributes.iter().map(|attribute| folder.fold_attribute(attribute))),
+            version_constraint: class.version_constraint,
+            attribute_target: class.attribute_target,
             name: class.name,
             type_parameter_annotations: class.type_parameter_annotations,
             modifiers: class.modifiers,
@@ -674,6 +676,8 @@ generate_fold! {
             extends_annotations: class.extends_annotations,
             implements: class.implements,
             implements_annotations: class.implements_annotations,
+            require_extends_annotations: class.require_extends_annotations,
+            require_implements_annotations: class.require_implements_annotations,
             sealed_annotation: class.sealed_annotation,
             mixin_annotations: class.mixin_annotations,
             trait_uses: class.trait_uses,
@@ -702,12 +706,16 @@ generate_fold! {
             attributes: folder
                 .arena()
                 .alloc_slice_fill_iter(interface.attributes.iter().map(|attribute| folder.fold_attribute(attribute))),
+            version_constraint: interface.version_constraint,
+            attribute_target: interface.attribute_target,
             name: interface.name,
             type_parameter_annotations: interface.type_parameter_annotations,
             type_alias_annotations: interface.type_alias_annotations,
             imported_type_alias_annotations: interface.imported_type_alias_annotations,
             extends: interface.extends,
             extends_annotations: interface.extends_annotations,
+            require_extends_annotations: interface.require_extends_annotations,
+            require_implements_annotations: interface.require_implements_annotations,
             sealed_annotation: interface.sealed_annotation,
             mixin_annotations: interface.mixin_annotations,
             constants: folder.arena().alloc_slice_fill_iter(
@@ -731,12 +739,16 @@ generate_fold! {
             attributes: folder.arena().alloc_slice_fill_iter(
                 trait_definition.attributes.iter().map(|attribute| folder.fold_attribute(attribute)),
             ),
+            version_constraint: trait_definition.version_constraint,
+            attribute_target: trait_definition.attribute_target,
             name: trait_definition.name,
             type_parameter_annotations: trait_definition.type_parameter_annotations,
             type_alias_annotations: trait_definition.type_alias_annotations,
             imported_type_alias_annotations: trait_definition.imported_type_alias_annotations,
             require_extends_annotations: trait_definition.require_extends_annotations,
             require_implements_annotations: trait_definition.require_implements_annotations,
+            sealed_annotation: trait_definition.sealed_annotation,
+            mixin_annotations: trait_definition.mixin_annotations,
             trait_uses: trait_definition.trait_uses,
             constants: folder.arena().alloc_slice_fill_iter(
                 trait_definition.constants.iter().map(|constant| folder.fold_class_like_constant(constant)),
@@ -763,12 +775,17 @@ generate_fold! {
             attributes: folder.arena().alloc_slice_fill_iter(
                 enum_definition.attributes.iter().map(|attribute| folder.fold_attribute(attribute)),
             ),
+            version_constraint: enum_definition.version_constraint,
+            attribute_target: enum_definition.attribute_target,
             name: enum_definition.name,
             backing_type: enum_definition.backing_type,
             type_alias_annotations: enum_definition.type_alias_annotations,
             imported_type_alias_annotations: enum_definition.imported_type_alias_annotations,
             implements: enum_definition.implements,
             implements_annotations: enum_definition.implements_annotations,
+            require_extends_annotations: enum_definition.require_extends_annotations,
+            require_implements_annotations: enum_definition.require_implements_annotations,
+            mixin_annotations: enum_definition.mixin_annotations,
             trait_uses: enum_definition.trait_uses,
             constants: folder.arena().alloc_slice_fill_iter(
                 enum_definition.constants.iter().map(|constant| folder.fold_class_like_constant(constant)),
@@ -791,6 +808,7 @@ generate_fold! {
             attributes: folder
                 .arena()
                 .alloc_slice_fill_iter(constant.attributes.iter().map(|attribute| folder.fold_attribute(attribute))),
+            version_constraint: constant.version_constraint,
             type_annotation: constant.type_annotation,
             items: folder.arena().alloc_slice_fill_iter(constant.items.iter().map(|item| folder.fold_constant_item(item))),
         }
@@ -805,6 +823,7 @@ generate_fold! {
             attributes: folder
                 .arena()
                 .alloc_slice_fill_iter(function.attributes.iter().map(|attribute| folder.fold_attribute(attribute))),
+            version_constraint: function.version_constraint,
             flags: function.flags,
             name: function.name,
             type_parameter_annotations: function.type_parameter_annotations,
@@ -829,6 +848,7 @@ generate_fold! {
             attributes: folder
                 .arena()
                 .alloc_slice_fill_iter(method.attributes.iter().map(|attribute| folder.fold_attribute(attribute))),
+            version_constraint: method.version_constraint,
             flags: method.flags,
             modifiers: method.modifiers,
             name: method.name,
@@ -855,6 +875,7 @@ generate_fold! {
             attributes: folder
                 .arena()
                 .alloc_slice_fill_iter(property.attributes.iter().map(|attribute| folder.fold_attribute(attribute))),
+            version_constraint: property.version_constraint,
             flags: property.flags,
             modifiers: property.modifiers,
             r#type: property.r#type,
@@ -876,6 +897,7 @@ generate_fold! {
             attributes: folder.arena().alloc_slice_fill_iter(
                 hooked_property.attributes.iter().map(|attribute| folder.fold_attribute(attribute)),
             ),
+            version_constraint: hooked_property.version_constraint,
             flags: hooked_property.flags,
             modifiers: hooked_property.modifiers,
             r#type: hooked_property.r#type,
@@ -891,6 +913,7 @@ generate_fold! {
             attributes: folder.arena().alloc_slice_fill_iter(
                 class_like_constant.attributes.iter().map(|attribute| folder.fold_attribute(attribute)),
             ),
+            version_constraint: class_like_constant.version_constraint,
             modifiers: class_like_constant.modifiers,
             r#type: class_like_constant.r#type,
             type_annotation: class_like_constant.type_annotation,
@@ -913,6 +936,7 @@ generate_fold! {
             attributes: folder
                 .arena()
                 .alloc_slice_fill_iter(enum_case.attributes.iter().map(|attribute| folder.fold_attribute(attribute))),
+            version_constraint: enum_case.version_constraint,
             name: enum_case.name,
             value: enum_case.value.map(|value| &*folder.arena().alloc(folder.fold_expression(value))),
         }
@@ -930,6 +954,8 @@ generate_fold! {
             parameters: folder
                 .arena()
                 .alloc_slice_fill_iter(hook.parameters.iter().map(|parameter| folder.fold_parameter(parameter))),
+            has_docblock: hook.has_docblock,
+            return_type_annotation: hook.return_type_annotation,
             body: hook.body.as_ref().map(|body| match body {
                 HookBody::Expression(expression) => {
                     HookBody::Expression(folder.arena().alloc(folder.fold_expression(expression)))
@@ -961,6 +987,7 @@ generate_fold! {
     MethodAnnotation as method_annotation => {
         MethodAnnotation {
             span: method_annotation.span,
+            visibility: method_annotation.visibility,
             r#static: method_annotation.r#static,
             name: method_annotation.name,
             type_parameters: method_annotation.type_parameters,
@@ -1310,6 +1337,8 @@ generate_fold! {
             attributes: folder.arena().alloc_slice_fill_iter(
                 anonymous_class.attributes.iter().map(|attribute| folder.fold_attribute(attribute)),
             ),
+            version_constraint: anonymous_class.version_constraint,
+            attribute_target: anonymous_class.attribute_target,
             arguments: folder.arena().alloc_slice_fill_iter(
                 anonymous_class.arguments.iter().map(|argument| folder.fold_argument(argument)),
             ),
@@ -1339,8 +1368,10 @@ generate_fold! {
             attributes: folder
                 .arena()
                 .alloc_slice_fill_iter(closure.attributes.iter().map(|attribute| folder.fold_attribute(attribute))),
+            version_constraint: closure.version_constraint,
             is_static: closure.is_static,
             type_parameter_annotations: closure.type_parameter_annotations,
+            inherited_type_parameters: closure.inherited_type_parameters,
             parameters: folder
                 .arena()
                 .alloc_slice_fill_iter(closure.parameters.iter().map(|parameter| folder.fold_parameter(parameter))),
@@ -1351,6 +1382,8 @@ generate_fold! {
             assert_annotations: closure.assert_annotations,
             assert_if_true_annotations: closure.assert_if_true_annotations,
             assert_if_false_annotations: closure.assert_if_false_annotations,
+            assertions_inferred: closure.assertions_inferred,
+            has_docblock: closure.has_docblock,
             use_variables: folder.arena().alloc_slice_fill_iter(closure.use_variables.iter().map(|use_variable| {
                 ClosureUseClauseVariable { is_by_reference: use_variable.is_by_reference, variable: use_variable.variable }
             })),
@@ -1363,8 +1396,10 @@ generate_fold! {
             attributes: folder.arena().alloc_slice_fill_iter(
                 arrow_function.attributes.iter().map(|attribute| folder.fold_attribute(attribute)),
             ),
+            version_constraint: arrow_function.version_constraint,
             is_static: arrow_function.is_static,
             type_parameter_annotations: arrow_function.type_parameter_annotations,
+            inherited_type_parameters: arrow_function.inherited_type_parameters,
             parameters: folder.arena().alloc_slice_fill_iter(
                 arrow_function.parameters.iter().map(|parameter| folder.fold_parameter(parameter)),
             ),
@@ -1375,6 +1410,8 @@ generate_fold! {
             assert_annotations: arrow_function.assert_annotations,
             assert_if_true_annotations: arrow_function.assert_if_true_annotations,
             assert_if_false_annotations: arrow_function.assert_if_false_annotations,
+            assertions_inferred: arrow_function.assertions_inferred,
+            has_docblock: arrow_function.has_docblock,
             expression: folder.arena().alloc(folder.fold_expression(arrow_function.expression)),
         }
     }

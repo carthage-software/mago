@@ -41,16 +41,19 @@ pub mod definition;
 pub mod operator;
 pub mod selector;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_expression(
         &mut self,
         expression: &'arena cst::Expression<'arena>,
     ) -> Expression<'arena, (), (), ()> {
+        if let cst::Expression::Parenthesized(parenthesized) = expression {
+            return self.lower_expression(parenthesized.expression);
+        }
+
         Expression {
             meta: (),
             span: expression.span(),
             kind: match expression {
-                cst::Expression::Parenthesized(expression) => self.lower_expression(expression.expression).kind,
                 cst::Expression::Literal(literal) => ExpressionKind::Literal(self.lower_literal(literal)),
                 cst::Expression::Binary(expression) => ExpressionKind::Binary(self.lower_binary(expression)),
                 cst::Expression::Pipe(pipe) => ExpressionKind::Binary(self.lower_pipe(pipe)),

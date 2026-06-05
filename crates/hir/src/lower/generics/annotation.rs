@@ -7,7 +7,7 @@ use crate::ir::generics::annotation::TypeParameterAnnotation;
 use crate::ir::generics::annotation::WhereConstraintAnnotation;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_type_parameter_annotation(
         &self,
         template: &'arena TemplateTagValue<'arena>,

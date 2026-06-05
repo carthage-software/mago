@@ -45,11 +45,14 @@ pub enum TypeAnnotationKind<'arena> {
     Object,
     ObjectShape(ObjectShapeTypeAnnotation<'arena>),
     Numeric,
+    ArrayKey,
+    Scalar,
     MemberReference(Identifier<'arena>, MemberReferenceSelector<'arena>),
-    AliasReference(Identifier<'arena>, Name<'arena>),
+    AliasReference(ReferenceKind<'arena>, Name<'arena>),
     Shape(ShapeTypeAnnotation<'arena>),
     Callable(CallableTypeAnnotation<'arena>),
     Variable(DirectVariable<'arena>),
+    ThisVariable,
     Conditional(ConditionalTypeAnnotation<'arena>),
     KeyOf(&'arena TypeAnnotationKind<'arena>),
     ValueOf(&'arena TypeAnnotationKind<'arena>),
@@ -68,8 +71,29 @@ pub enum TypeAnnotationKind<'arena> {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[serde(tag = "type", content = "value")]
+pub enum ReferenceKind<'arena> {
+    Identifier(Identifier<'arena>),
+    Self_(Identifier<'arena>),
+    Static(Identifier<'arena>),
+    Parent(Identifier<'arena>),
+}
+
+impl<'arena> ReferenceKind<'arena> {
+    #[must_use]
+    pub fn identifier(&self) -> Identifier<'arena> {
+        match self {
+            ReferenceKind::Identifier(identifier)
+            | ReferenceKind::Self_(identifier)
+            | ReferenceKind::Static(identifier)
+            | ReferenceKind::Parent(identifier) => *identifier,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct NamedTypeAnnotation<'arena> {
-    pub name: Identifier<'arena>,
+    pub kind: ReferenceKind<'arena>,
     pub type_arguments: &'arena [TypeAnnotationKind<'arena>],
 }
 
@@ -196,6 +220,8 @@ pub struct ShapeTypeAnnotationField<'arena> {
 pub struct ShapeTypeAnnotation<'arena> {
     pub fields: &'arena [ShapeTypeAnnotationField<'arena>],
     pub additional_fields: Option<ShapeTypeAnnotationAdditionalFields<'arena>>,
+    pub is_list: bool,
+    pub non_empty: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]

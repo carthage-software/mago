@@ -4,7 +4,7 @@ use crate::ir::variable::DirectVariable;
 use crate::ir::variable::Variable;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_variable(&mut self, variable: &'arena cst::Variable<'arena>) -> Variable<'arena, (), (), ()> {
         match variable {
             cst::Variable::Direct(direct) => Variable::Direct(self.lower_direct_variable(direct)),

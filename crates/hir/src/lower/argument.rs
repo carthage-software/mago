@@ -4,7 +4,7 @@ use crate::ir::argument::Argument;
 use crate::ir::argument::PartialArgument;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_argument_list(
         &mut self,
         argument_list: &'arena cst::ArgumentList<'arena>,

@@ -10,7 +10,7 @@ use crate::ir::inheritance::Implements;
 use crate::lower::Lowering;
 use crate::lower::resolution::namespace::NameResolutionKind;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_extends_one(
         &self,
         extends: &'arena cst::Extends<'arena>,

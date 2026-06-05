@@ -9,6 +9,7 @@ use mago_phpdoc_syntax::cst::r#type::GlobalWildcardSelector;
 use mago_phpdoc_syntax::cst::r#type::IntOrKeyword;
 use mago_phpdoc_syntax::cst::r#type::MemberReferenceSelector as PHPDocMemberReferenceSelector;
 use mago_phpdoc_syntax::cst::r#type::PropertiesOfFilter as PHPDocPropertiesOfFilter;
+use mago_phpdoc_syntax::cst::r#type::ReferenceKind as PHPDocReferenceKind;
 use mago_phpdoc_syntax::cst::r#type::ReferenceType;
 use mago_phpdoc_syntax::cst::r#type::ShapeField;
 use mago_phpdoc_syntax::cst::r#type::ShapeKey;
@@ -31,6 +32,7 @@ use crate::ir::r#type::annotation::MemberReferenceSelector;
 use crate::ir::r#type::annotation::NamedTypeAnnotation;
 use crate::ir::r#type::annotation::ObjectShapeTypeAnnotation;
 use crate::ir::r#type::annotation::PropertiesOfFilter;
+use crate::ir::r#type::annotation::ReferenceKind;
 use crate::ir::r#type::annotation::ShapeTypeAnnotation;
 use crate::ir::r#type::annotation::ShapeTypeAnnotationAdditionalFields;
 use crate::ir::r#type::annotation::ShapeTypeAnnotationField;
@@ -44,7 +46,7 @@ use crate::ir::variable::DirectVariable;
 use crate::lower::Lowering;
 use crate::lower::resolution::namespace::NameResolutionKind;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_type_annotation(&self, ty: &'arena Type<'arena>) -> &'arena TypeAnnotation<'arena> {
         self.arena.alloc(TypeAnnotation { span: ty.span(), kind: self.lower_type_annotation_kind(ty) })
     }
@@ -92,8 +94,8 @@ impl<'arena> Lowering<'arena> {
             Type::Void(_) => TypeAnnotationKind::Void,
             Type::Never(_) => TypeAnnotationKind::Never,
             Type::Resource(_) => TypeAnnotationKind::Resource(None),
-            Type::ClosedResource(_) => TypeAnnotationKind::Resource(Some(false)),
-            Type::OpenResource(_) => TypeAnnotationKind::Resource(Some(true)),
+            Type::ClosedResource(_) => TypeAnnotationKind::Resource(Some(true)),
+            Type::OpenResource(_) => TypeAnnotationKind::Resource(Some(false)),
             Type::True(_) => TypeAnnotationKind::Bool(Some(true)),
             Type::False(_) => TypeAnnotationKind::Bool(Some(false)),
             Type::Bool(_) => TypeAnnotationKind::Bool(None),
@@ -144,9 +146,8 @@ impl<'arena> Lowering<'arena> {
             Type::LiteralString(literal) => {
                 self.string(None, Some(StringLiteral::Specific(literal.value)), false, false, false, false)
             }
-
             Type::MemberReference(member) => TypeAnnotationKind::MemberReference(
-                self.resolve_phpdoc_class(&member.class),
+                self.resolve_member_reference_class(member.kind),
                 self.lower_member_reference_selector(&member.member),
             ),
             Type::AliasReference(alias) => {
@@ -155,7 +156,7 @@ impl<'arena> Lowering<'arena> {
                     AliasName::Keyword(keyword) => Name { span: keyword.span, value: keyword.value },
                 };
 
-                TypeAnnotationKind::AliasReference(self.resolve_phpdoc_class(&alias.class), alias_name)
+                TypeAnnotationKind::AliasReference(self.lower_reference_kind(alias.class), alias_name)
             }
             Type::GlobalWildcardReference(global) => {
                 let selector = match &global.selector {
@@ -181,17 +182,20 @@ impl<'arena> Lowering<'arena> {
                 additional_fields: match &shape.additional_fields {
                     Some(additional_fields) => {
                         let (key_type, value_type) =
-                            self.key_value(additional_fields.parameters.as_ref(), self.alloc_array_key());
+                            self.shape_additional_key_value(additional_fields.parameters.as_ref());
 
                         Some(ShapeTypeAnnotationAdditionalFields { key_type, value_type })
                     }
                     None => None,
                 },
+                is_list: shape.kind.is_list(),
+                non_empty: shape.kind.is_non_empty(),
             }),
             Type::Callable(callable) => self.lower_callable(callable),
             Type::Variable(variable) => {
                 TypeAnnotationKind::Variable(DirectVariable { span: variable.span, name: variable.value })
             }
+            Type::ThisVariable(_) => TypeAnnotationKind::ThisVariable,
             Type::Conditional(conditional) => TypeAnnotationKind::Conditional(ConditionalTypeAnnotation {
                 subject: self.alloc_type_annotation_kind(conditional.subject),
                 target: self.alloc_type_annotation_kind(conditional.target),
@@ -226,7 +230,6 @@ impl<'arena> Lowering<'arena> {
             ),
             Type::Slice(slice) => TypeAnnotationKind::Slice(self.alloc_type_annotation_kind(slice.inner)),
             Type::Wildcard(_) => TypeAnnotationKind::Wildcard,
-
             _ => {
                 debug_assert!(false, "unhandled type annotation kind: {ty:?}");
 
@@ -289,10 +292,11 @@ impl<'arena> Lowering<'arena> {
     }
 
     fn lower_reference(&self, reference: &'arena ReferenceType<'arena>) -> TypeAnnotationKind<'arena> {
-        let identifier = &reference.identifier;
-        let value = identifier.value;
+        if let PHPDocReferenceKind::Identifier(identifier) = reference.kind
+            && reference.parameters.is_none()
+        {
+            let value = identifier.value;
 
-        if reference.parameters.is_none() {
             if let Some((defining_entity, bound)) = self.type_resolution.lookup_template(value) {
                 let name = Name { span: identifier.span, value };
 
@@ -304,14 +308,77 @@ impl<'arena> Lowering<'arena> {
             }
 
             if let Some((source_class, alias_name)) = self.type_resolution.lookup_alias(value) {
-                return TypeAnnotationKind::AliasReference(source_class, alias_name);
+                return TypeAnnotationKind::AliasReference(ReferenceKind::Identifier(source_class), alias_name);
             }
         }
 
-        TypeAnnotationKind::Named(NamedTypeAnnotation {
-            name: self.resolve_phpdoc_class(identifier),
-            type_arguments: self.lower_generic_parameters(reference.parameters.as_ref()),
-        })
+        TypeAnnotationKind::Named(self.named_from_reference_kind(reference.kind, reference.parameters.as_ref()))
+    }
+
+    fn named_from_reference_kind(
+        &self,
+        kind: PHPDocReferenceKind<'arena>,
+        parameters: Option<&'arena GenericParameters<'arena>>,
+    ) -> NamedTypeAnnotation<'arena> {
+        NamedTypeAnnotation {
+            kind: self.lower_reference_kind(kind),
+            type_arguments: self.lower_reference_type_arguments(parameters),
+        }
+    }
+
+    fn lower_reference_kind(&self, kind: PHPDocReferenceKind<'arena>) -> ReferenceKind<'arena> {
+        match kind {
+            PHPDocReferenceKind::Identifier(identifier) => {
+                ReferenceKind::Identifier(self.resolve_phpdoc_class(&identifier))
+            }
+            PHPDocReferenceKind::Self_(keyword) => ReferenceKind::Self_(self.enclosing_class_or_static(keyword.span)),
+            PHPDocReferenceKind::Static(keyword) => ReferenceKind::Static(self.enclosing_class_or_static(keyword.span)),
+            PHPDocReferenceKind::Parent(keyword) => {
+                ReferenceKind::Parent(Identifier { span: keyword.span, value: b"parent", kind: IdentifierKind::Local })
+            }
+        }
+    }
+
+    fn lower_reference_type_arguments(
+        &self,
+        parameters: Option<&'arena GenericParameters<'arena>>,
+    ) -> &'arena [TypeAnnotationKind<'arena>] {
+        match parameters {
+            Some(parameters) => self.arena.alloc_slice_fill_iter(
+                parameters.entries.iter().map(|entry| self.lower_reference_type_argument(&entry.inner)),
+            ),
+            None => &[],
+        }
+    }
+
+    fn lower_reference_type_argument(&self, ty: &'arena Type<'arena>) -> TypeAnnotationKind<'arena> {
+        match ty {
+            Type::ThisVariable(this_variable) => TypeAnnotationKind::Named(NamedTypeAnnotation {
+                kind: ReferenceKind::Static(self.enclosing_class_or_static(this_variable.span)),
+                type_arguments: &[],
+            }),
+            Type::Parenthesized(parenthesized) => self.lower_reference_type_argument(parenthesized.inner),
+            _ => self.lower_type_annotation_kind(ty),
+        }
+    }
+
+    fn resolve_member_reference_class(&self, kind: PHPDocReferenceKind<'arena>) -> Identifier<'arena> {
+        match kind {
+            PHPDocReferenceKind::Parent(keyword) => {
+                Identifier { span: keyword.span, value: b"parent", kind: IdentifierKind::Local }
+            }
+            PHPDocReferenceKind::Self_(keyword) | PHPDocReferenceKind::Static(keyword) => {
+                match self.type_resolution.enclosing_class() {
+                    Some(class) => Identifier {
+                        span: class.span,
+                        value: self.arena.alloc_slice_fill_iter(class.value.iter().map(u8::to_ascii_lowercase)),
+                        kind: class.kind,
+                    },
+                    None => Identifier { span: keyword.span, value: keyword.value, kind: IdentifierKind::Local },
+                }
+            }
+            PHPDocReferenceKind::Identifier(identifier) => self.resolve_phpdoc_class(&identifier),
+        }
     }
 
     pub(crate) fn resolve_phpdoc_class(&self, identifier: &PHPDocIdentifier<'arena>) -> Identifier<'arena> {
@@ -354,6 +421,20 @@ impl<'arena> Lowering<'arena> {
             [] => (default_key, self.alloc_mixed()),
             [value] => (default_key, value),
             [key, value, ..] => (key, value),
+        }
+    }
+
+    fn shape_additional_key_value(
+        &self,
+        parameters: Option<&'arena GenericParameters<'arena>>,
+    ) -> (&'arena TypeAnnotationKind<'arena>, &'arena TypeAnnotationKind<'arena>) {
+        match parameters {
+            None => (self.alloc_array_key(), self.alloc_mixed()),
+            Some(_) => match self.lower_generic_parameters(parameters) {
+                [] => (self.alloc_mixed(), self.alloc_mixed()),
+                [key] => (key, self.alloc_mixed()),
+                [key, value, ..] => (key, value),
+            },
         }
     }
 
@@ -402,21 +483,11 @@ impl<'arena> Lowering<'arena> {
     }
 
     fn array_key_kind(&self) -> TypeAnnotationKind<'arena> {
-        TypeAnnotationKind::Union(
-            self.arena.alloc_slice_copy(&[
-                TypeAnnotationKind::Int(None),
-                self.string(None, None, false, false, false, false),
-            ]),
-        )
+        TypeAnnotationKind::ArrayKey
     }
 
     fn scalar_kind(&self) -> TypeAnnotationKind<'arena> {
-        TypeAnnotationKind::Union(self.arena.alloc_slice_copy(&[
-            TypeAnnotationKind::Int(None),
-            TypeAnnotationKind::Float(None),
-            self.string(None, None, false, false, false, false),
-            TypeAnnotationKind::Bool(None),
-        ]))
+        TypeAnnotationKind::Scalar
     }
 
     fn string(
@@ -534,10 +605,9 @@ impl<'arena> Lowering<'arena> {
     pub(crate) fn lower_named_type(&self, ty: &'arena Type<'arena>) -> Option<NamedTypeAnnotation<'arena>> {
         match ty {
             Type::Parenthesized(parenthesized) => self.lower_named_type(parenthesized.inner),
-            Type::Reference(reference) => Some(NamedTypeAnnotation {
-                name: self.resolve_phpdoc_class(&reference.identifier),
-                type_arguments: self.lower_generic_parameters(reference.parameters.as_ref()),
-            }),
+            Type::Reference(reference) => {
+                Some(self.named_from_reference_kind(reference.kind, reference.parameters.as_ref()))
+            }
             _ => None,
         }
     }

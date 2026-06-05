@@ -7,7 +7,7 @@ use crate::ir::attribute::Attribute;
 use crate::lower::Lowering;
 use crate::lower::resolution::namespace::NameResolutionKind;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_attribute_lists(
         &mut self,
         attribute_lists: &'arena cst::Sequence<'arena, cst::AttributeList<'arena>>,

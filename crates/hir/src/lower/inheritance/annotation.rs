@@ -15,10 +15,9 @@ use crate::ir::inheritance::annotation::RequireExtendsAnnotation;
 use crate::ir::inheritance::annotation::RequireImplementsAnnotation;
 use crate::ir::inheritance::annotation::SealedAnnotation;
 use crate::ir::inheritance::annotation::UseAnnotation;
-use crate::ir::r#type::annotation::NamedTypeAnnotation;
 use crate::lower::Lowering;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn lower_extends_annotation(
         &self,
         extends: &'arena ExtendsTagValue<'arena>,
@@ -51,11 +50,8 @@ impl<'arena> Lowering<'arena> {
         Some(RequireImplementsAnnotation { span: require.span(), r#type: self.lower_named_type(require.r#type)? })
     }
 
-    pub(crate) fn lower_mixin_annotation(
-        &self,
-        mixin: &'arena MixinTagValue<'arena>,
-    ) -> Option<MixinAnnotation<'arena>> {
-        Some(MixinAnnotation { span: mixin.span(), r#type: self.lower_named_type(mixin.r#type)? })
+    pub(crate) fn lower_mixin_annotation(&self, mixin: &'arena MixinTagValue<'arena>) -> MixinAnnotation<'arena> {
+        MixinAnnotation { span: mixin.span(), r#type: self.lower_type_annotation_kind(mixin.r#type) }
     }
 
     pub(crate) fn lower_sealed_annotation(&self, sealed: &'arena SealedTagValue<'arena>) -> SealedAnnotation<'arena> {
@@ -66,11 +62,6 @@ impl<'arena> Lowering<'arena> {
         &self,
         inheritors: &'arena InheritorsTagValue<'arena>,
     ) -> SealedAnnotation<'arena> {
-        SealedAnnotation {
-            span: inheritors.span,
-            types: self.arena.alloc_slice_fill_iter(inheritors.inheritors.iter().map(|identifier| {
-                NamedTypeAnnotation { name: self.resolve_phpdoc_class(identifier), type_arguments: &[] }
-            })),
-        }
+        SealedAnnotation { span: inheritors.span(), types: self.lower_named_types(inheritors.r#type) }
     }
 }

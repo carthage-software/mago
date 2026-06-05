@@ -7,7 +7,7 @@ use crate::ir::variable::Variable;
 use crate::lower::Lowering;
 use crate::lower::statement::annotation::VariableBindings;
 
-impl<'arena> Lowering<'arena> {
+impl<'arena> Lowering<'_, 'arena> {
     pub(crate) fn annotate_expression(
         &self,
         expression: &'arena Expression<'arena, (), (), ()>,

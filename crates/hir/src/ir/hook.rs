@@ -6,6 +6,7 @@ use crate::ir::modifier::Modifier;
 use crate::ir::name::Name;
 use crate::ir::parameter::Parameter;
 use crate::ir::statement::Statement;
+use crate::ir::r#type::annotation::TypeAnnotation;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Hook<'arena, S, D, E> {
@@ -15,6 +16,8 @@ pub struct Hook<'arena, S, D, E> {
     pub name: Name<'arena>,
     pub is_variadic: bool,
     pub parameters: &'arena [Parameter<'arena, S, D, E>],
+    pub has_docblock: bool,
+    pub return_type_annotation: Option<&'arena TypeAnnotation<'arena>>,
     pub body: Option<HookBody<'arena, S, D, E>>,
 }
 
