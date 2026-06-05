@@ -1529,6 +1529,7 @@ dependencies = [
  "mago-database",
  "mago-docblock",
  "mago-fingerprint",
+ "mago-hir",
  "mago-names",
  "mago-php-version",
  "mago-reporting",
@@ -1680,7 +1681,9 @@ name = "mago-hir"
 version = "1.29.0"
 dependencies = [
  "bumpalo",
+ "itoa",
  "mago-database",
+ "mago-php-version",
  "mago-phpdoc-syntax",
  "mago-span",
  "mago-syntax",
