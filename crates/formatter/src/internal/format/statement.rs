@@ -43,7 +43,6 @@ use crate::internal::format::alignment::get_statement_alignment;
 use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::misc::has_new_line_in_range;
 use crate::settings::SortOrder;
-use crate::settings::SortUses;
 
 pub fn print_statement_sequence<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
@@ -627,20 +626,16 @@ where
             let b_full_name = join_item_name(f.arena, b.namespace, b.name);
 
             match sort_uses {
-                SortOrder::AlphanumericAscending => {
-                    compare_case_insensitive_bytes(&a_full_name, &b_full_name)
-                }
-                SortOrder::AlphanumericDescending => {
-                    compare_case_insensitive_bytes(&b_full_name, &a_full_name)
-                }
-                SortOrder::LengthAscending => {
-                    a_full_name.len().cmp(&b_full_name.len())
-                        .then_with(|| compare_case_insensitive_bytes(&a_full_name, &b_full_name))
-                }
-                SortOrder::LengthDescending => {
-                    b_full_name.len().cmp(&a_full_name.len())
-                        .then_with(|| compare_case_insensitive_bytes(&a_full_name, &b_full_name))
-                }
+                SortOrder::AlphanumericAscending => compare_case_insensitive_bytes(a_full_name, b_full_name),
+                SortOrder::AlphanumericDescending => compare_case_insensitive_bytes(b_full_name, a_full_name),
+                SortOrder::LengthAscending => a_full_name
+                    .len()
+                    .cmp(&b_full_name.len())
+                    .then_with(|| compare_case_insensitive_bytes(a_full_name, b_full_name)),
+                SortOrder::LengthDescending => b_full_name
+                    .len()
+                    .cmp(&a_full_name.len())
+                    .then_with(|| compare_case_insensitive_bytes(a_full_name, b_full_name)),
                 _ => unreachable!(),
             }
         });
