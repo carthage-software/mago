@@ -1,11 +1,17 @@
-use bumpalo::Bump;
-use bumpalo::collections::Vec;
+use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
 
 use mago_syntax::ast::LiteralStringKind;
 
 use crate::internal::FormatterState;
 
-pub(super) fn print_lowercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, keyword: &'arena [u8]) -> &'arena [u8] {
+pub(super) fn print_lowercase_keyword<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
+    keyword: &'arena [u8],
+) -> &'arena [u8]
+where
+    A: Arena,
+{
     if keyword.iter().all(u8::is_ascii_lowercase) {
         return keyword;
     }
@@ -15,10 +21,16 @@ pub(super) fn print_lowercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, ke
         lowercase_bytes.push(byte.to_ascii_lowercase());
     }
 
-    lowercase_bytes.into_bump_slice()
+    lowercase_bytes.leak()
 }
 
-pub(super) fn print_uppercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, keyword: &'arena [u8]) -> &'arena [u8] {
+pub(super) fn print_uppercase_keyword<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
+    keyword: &'arena [u8],
+) -> &'arena [u8]
+where
+    A: Arena,
+{
     if keyword.iter().all(u8::is_ascii_uppercase) {
         return keyword;
     }
@@ -28,14 +40,17 @@ pub(super) fn print_uppercase_keyword<'arena>(f: &FormatterState<'_, 'arena>, ke
         uppercase_bytes.push(byte.to_ascii_uppercase());
     }
 
-    uppercase_bytes.into_bump_slice()
+    uppercase_bytes.leak()
 }
 
-pub(super) fn print_string<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub(super) fn print_string<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     kind: LiteralStringKind,
     text: &'arena [u8],
-) -> &'arena [u8] {
+) -> &'arena [u8]
+where
+    A: Arena,
+{
     // Strip binary string prefix (b/B) if present
     let (prefix, text_without_prefix): (&[u8], &[u8]) =
         if text.starts_with(b"b") || text.starts_with(b"B") { (&text[..1], &text[1..]) } else { (&[], text) };
@@ -55,7 +70,7 @@ pub(super) fn print_string<'arena>(
             let mut result = Vec::with_capacity_in(inner.len() + 1, f.arena);
             result.extend_from_slice(prefix);
             result.extend_from_slice(inner);
-            result.into_bump_slice()
+            result.leak()
         }
     }
 }
@@ -91,10 +106,13 @@ fn get_preferred_quote(raw: &[u8], enclosing_quote: u8, prefer_single_quote: boo
 ///
 /// # Arguments
 ///
-/// * `arena`: The `Bump` arena to allocate the new bytes in.
+/// * `arena`: The arena to allocate the new bytes in.
 /// * `raw_text`: The raw byte content to process.
 /// * `enclosing_quote`: The quote byte (`b'\''` or `b'"'`) to use for the output.
-pub fn make_string_in<'arena>(arena: &'arena Bump, raw_text: &'arena [u8], enclosing_quote: u8) -> &'arena [u8] {
+pub fn make_string_in<'arena, A>(arena: &'arena A, raw_text: &'arena [u8], enclosing_quote: u8) -> &'arena [u8]
+where
+    A: Arena,
+{
     let mut result = Vec::with_capacity_in(raw_text.len() + 2, arena);
     result.push(enclosing_quote);
 
@@ -127,5 +145,5 @@ pub fn make_string_in<'arena>(arena: &'arena Bump, raw_text: &'arena [u8], enclo
 
     result.push(enclosing_quote);
 
-    result.into_bump_slice()
+    result.leak()
 }

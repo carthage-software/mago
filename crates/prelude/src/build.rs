@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
-use bumpalo::Bump;
+use mago_allocator::Arena;
+use mago_allocator::LocalArena;
 use rust_embed::RustEmbed;
 
 use mago_codex::metadata::CodebaseMetadata;
@@ -23,7 +24,7 @@ use crate::Prelude;
 struct PHPAssets;
 
 pub(crate) fn build_prelude_internal() -> Prelude {
-    let mut arena = Bump::new();
+    let mut arena = LocalArena::new();
     let database = get_prelude_database();
     let read_db = database.read_only();
     let mut metadata = get_prelude_metadata(&mut arena, &read_db);
@@ -72,7 +73,7 @@ fn get_prelude_database() -> mago_database::Database<'static> {
     db
 }
 
-fn get_prelude_metadata(arena: &mut Bump, database: &ReadDatabase) -> CodebaseMetadata {
+fn get_prelude_metadata(arena: &mut LocalArena, database: &ReadDatabase) -> CodebaseMetadata {
     let mut metadata = CodebaseMetadata::default();
     for file in database.files() {
         arena.reset();
@@ -85,7 +86,10 @@ fn get_prelude_metadata(arena: &mut Bump, database: &ReadDatabase) -> CodebaseMe
     metadata
 }
 
-fn scan_file_for_metadata(source_file: &File, arena: &Bump) -> CodebaseMetadata {
+fn scan_file_for_metadata<A>(source_file: &File, arena: &A) -> CodebaseMetadata
+where
+    A: Arena,
+{
     let program = parse_file(arena, source_file);
     if program.has_errors() {
         panic!(

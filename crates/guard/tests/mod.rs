@@ -3,9 +3,9 @@
 use std::borrow::Cow;
 use std::sync::LazyLock;
 
-use bumpalo::Bump;
 use foldhash::HashSet;
 use indoc::indoc;
+use mago_allocator::LocalArena;
 
 use mago_codex::populator::populate_codebase;
 use mago_codex::scanner::scan_program;
@@ -51,7 +51,7 @@ fn test_guard(name: &'static str, code: &'static str, settings: Settings) -> For
     let file_id = database.add(file);
     let source_file = database.get_ref(&file_id).expect("File just added should exist");
 
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let program = parse_file(&arena, source_file);
     if program.has_errors() {
         panic!("Failed to parse code for guard test, errors: {:?}", program.errors);

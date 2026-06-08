@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_names::kind::NameKind;
@@ -42,12 +43,15 @@ pub mod unset;
 pub mod use_statement;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let last_statement_span = context.statement_span;
         context.statement_span = self.span();
 
@@ -221,12 +225,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
 }
 
 #[inline]
-pub fn analyze_statements<'ctx, 'arena>(
+pub fn analyze_statements<'ctx, 'arena, A>(
     statements: &[Statement<'arena>],
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     for statement in statements {
         let is_declaration = statement.is_declaration();
 
@@ -274,12 +281,14 @@ pub fn analyze_statements<'ctx, 'arena>(
 }
 
 /// Checks statement expressions for unused results or lack of side effects.
-fn detect_unused_statement_expressions<'ast, 'arena>(
+fn detect_unused_statement_expressions<'ast, 'arena, A>(
     expression: &'ast Expression<'arena>,
     statement: &'ast Statement<'arena>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     artifacts: &AnalysisArtifacts,
-) {
+) where
+    A: Arena,
+{
     if let Some((issue_kind, name)) = has_unused_must_use(expression, context, artifacts) {
         context.collector.report_with_code(
             issue_kind,
@@ -370,11 +379,14 @@ fn detect_unused_statement_expressions<'ast, 'arena>(
 
 /// Checks if an expression is a call to a `@must-use` function/method
 /// and returns the appropriate issue kind and the name identifier if the result is unused.
-fn has_unused_must_use<'arena>(
+fn has_unused_must_use<'arena, A>(
     expression: &Expression<'arena>,
-    context: &Context<'_, 'arena>,
+    context: &Context<'_, 'arena, A>,
     artifacts: &AnalysisArtifacts,
-) -> Option<(IssueCode, Word)> {
+) -> Option<(IssueCode, Word)>
+where
+    A: Arena,
+{
     let Expression::Call(call_expression) = expression else {
         return None;
     };

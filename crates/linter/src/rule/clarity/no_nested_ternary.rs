@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use mago_span::Span;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -89,7 +90,10 @@ impl LintRule for NoNestedTernaryRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::Conditional(expr) = node else {
             return;
         };
@@ -106,12 +110,14 @@ impl LintRule for NoNestedTernaryRule {
 }
 
 impl NoNestedTernaryRule {
-    fn check_for_nested<'arena>(
+    fn check_for_nested<'arena, A>(
         &self,
-        ctx: &mut LintContext<'_, 'arena>,
+        ctx: &mut LintContext<'_, 'arena, A>,
         outer_op_span: Span,
         expr: &'arena Expression<'arena>,
-    ) {
+    ) where
+        A: Arena,
+    {
         match expr {
             Expression::Parenthesized(Parenthesized { expression, .. }) => {
                 self.check_for_nested(ctx, outer_op_span, expression);
@@ -128,7 +134,10 @@ impl NoNestedTernaryRule {
         }
     }
 
-    fn report_issue(&self, ctx: &mut LintContext, outer_op_span: Span, inner_op_span: Span) {
+    fn report_issue<A>(&self, ctx: &mut LintContext<'_, '_, A>, outer_op_span: Span, inner_op_span: Span)
+    where
+        A: Arena,
+    {
         let issue = Issue::new(
             self.cfg.level,
             "Nested ternary expressions are confusing due to PHP's operator associativity rules.",

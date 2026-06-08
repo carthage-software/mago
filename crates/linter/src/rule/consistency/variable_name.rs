@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use mago_span::Span;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -102,7 +103,10 @@ impl LintRule for VariableNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         match node {
             Node::Assignment(assignment) => {
                 self.check_assignment(ctx, assignment);
@@ -116,7 +120,10 @@ impl LintRule for VariableNameRule {
 }
 
 impl VariableNameRule {
-    fn check_assignment<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, assignment: &Assignment<'arena>) {
+    fn check_assignment<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, assignment: &Assignment<'arena>)
+    where
+        A: Arena,
+    {
         if !assignment.operator.is_assign() {
             return;
         }
@@ -134,7 +141,13 @@ impl VariableNameRule {
         self.check_variable_name(ctx, name, variable.span());
     }
 
-    fn check_parameter<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, parameter: &FunctionLikeParameter<'arena>) {
+    fn check_parameter<'arena, A>(
+        &self,
+        ctx: &mut LintContext<'_, 'arena, A>,
+        parameter: &FunctionLikeParameter<'arena>,
+    ) where
+        A: Arena,
+    {
         if !self.cfg.check_parameters {
             return;
         }
@@ -148,7 +161,10 @@ impl VariableNameRule {
         self.check_variable_name(ctx, name, parameter.variable.span());
     }
 
-    fn check_variable_name(&self, ctx: &mut LintContext<'_, '_>, name: &[u8], span: Span) {
+    fn check_variable_name<A>(&self, ctx: &mut LintContext<'_, '_, A>, name: &[u8], span: Span)
+    where
+        A: Arena,
+    {
         let Some(name_str) = std::str::from_utf8(name).ok() else { return };
         let name = name_str;
         let clean_name = name.trim_start_matches(|c: char| c == '$' || c == '_' || c.is_ascii_digit());

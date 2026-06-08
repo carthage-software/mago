@@ -1,7 +1,8 @@
+use mago_allocator::Arena;
+use mago_allocator::vec_in;
 use std::cmp::Ordering;
 
-use bumpalo::collections::Vec;
-use bumpalo::vec;
+use mago_allocator::vec::Vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -55,7 +56,10 @@ pub(super) fn has_new_line_in_range(text: &[u8], start: u32, end: u32) -> bool {
     text[start as usize..end as usize].contains(&b'\n')
 }
 
-pub(crate) fn get_document_width(doc: &Document<'_>) -> usize {
+pub(crate) fn get_document_width<A>(doc: &Document<'_, A>) -> usize
+where
+    A: Arena,
+{
     match doc {
         Document::String(s) => string_width(s),
         Document::Array(docs) => docs.iter().map(get_document_width).sum(),
@@ -107,11 +111,14 @@ pub(crate) fn get_document_width(doc: &Document<'_>) -> usize {
 /// # Performance
 ///
 /// O(1) for most checks, with potential O(n) recursion for nested expressions
-pub(super) fn should_hug_expression<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub(super) fn should_hug_expression<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     expression: &'arena Expression<'arena>,
     arrow_function_recursion: bool,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if let Expression::Parenthesized(inner) = expression {
         return should_hug_expression(f, inner.expression, arrow_function_recursion);
     }
@@ -232,11 +239,14 @@ pub(super) fn should_hug_expression<'arena>(
     }
 }
 
-pub fn is_breaking_expression<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub fn is_breaking_expression<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     node: &'arena Expression<'arena>,
     arrow_function_recursion: bool,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if let Expression::Parenthesized(inner) = node {
         return is_breaking_expression(f, inner.expression, arrow_function_recursion);
     }
@@ -367,10 +377,13 @@ pub fn is_simple_expression<'arena>(node: &'arena Expression<'arena>) -> bool {
     )
 }
 
-pub fn is_simple_single_line_expression<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub fn is_simple_single_line_expression<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     node: &'arena Expression<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if let Expression::Parenthesized(inner) = node {
         return is_simple_single_line_expression(f, inner.expression);
     }
@@ -559,14 +572,17 @@ fn is_simple_composite_string_argument(composite_string: &CompositeString<'_>, d
     })
 }
 
-pub(super) fn print_colon_delimited_body<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_colon_delimited_body<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     colon: &Span,
     statements: &'arena Sequence<'arena, Statement<'arena>>,
     end_keyword: &'arena Keyword<'arena>,
     terminator: &'arena Terminator<'arena>,
-) -> Document<'arena> {
-    let mut parts = vec![in f.arena;Document::String(b":")];
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    let mut parts = vec_in![f.arena;Document::String(b":")];
 
     let mut printed_statements = print_statement_sequence(f, statements);
     if !printed_statements.is_empty() {
@@ -593,11 +609,14 @@ pub(super) fn print_colon_delimited_body<'arena>(
     Document::Group(Group::new(parts).with_break_mode(BreakMode::Force))
 }
 
-pub(super) fn print_modifiers<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_modifiers<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     modifiers: &'arena Sequence<'arena, Modifier<'arena>>,
-) -> Vec<'arena, Document<'arena>> {
-    let mut printed_modifiers = vec![in f.arena;];
+) -> Vec<'arena, Document<'arena, A>, A>
+where
+    A: Arena,
+{
+    let mut printed_modifiers = vec_in![f.arena;];
 
     if let Some(modifier) = modifiers.get_final() {
         printed_modifiers.push(modifier.format(f));
@@ -626,10 +645,13 @@ pub(super) fn print_modifiers<'arena>(
     Document::join(f.arena, printed_modifiers, Separator::Space)
 }
 
-pub(super) fn print_attribute_list_sequence<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_attribute_list_sequence<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
-) -> Option<Document<'arena>> {
+) -> Option<Document<'arena, A>>
+where
+    A: Arena,
+{
     if attribute_lists.is_empty() {
         return None;
     }
@@ -642,10 +664,10 @@ pub(super) fn print_attribute_list_sequence<'arena>(
             sort_attribute_refs(&mut flat, f.settings.attributes_order);
         }
 
-        let mut contents = vec![in f.arena;];
+        let mut contents = vec_in![f.arena;];
         let last_index = flat.len().saturating_sub(1);
         for (index, attribute) in flat.into_iter().enumerate() {
-            contents.push(Document::Group(Group::new(vec![in f.arena;
+            contents.push(Document::Group(Group::new(vec_in![f.arena;
                 Document::String(b"#["),
                 attribute.format(f),
                 Document::String(b"]"),
@@ -659,7 +681,7 @@ pub(super) fn print_attribute_list_sequence<'arena>(
         return Some(Document::Group(Group::new(contents)));
     }
 
-    let mut lists = vec![in f.arena;];
+    let mut lists = vec_in![f.arena;];
     let mut has_new_line = false;
     let mut has_potentially_long_attribute = false;
 
@@ -687,7 +709,7 @@ pub(super) fn print_attribute_list_sequence<'arena>(
         }
     }
 
-    let mut contents = vec![in f.arena;];
+    let mut contents = vec_in![f.arena;];
     let len = lists.len();
     for (i, attribute_list) in lists.into_iter().enumerate() {
         contents.push(attribute_list);
@@ -700,22 +722,28 @@ pub(super) fn print_attribute_list_sequence<'arena>(
     Some(Document::Group(Group::new(contents)))
 }
 
-pub(super) fn print_clause<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_clause<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     node: &'arena Statement<'arena>,
     force_space: bool,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let clause = node.format(f);
 
     adjust_clause(f, node, clause, force_space)
 }
 
-pub(super) fn adjust_clause<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn adjust_clause<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     node: &'arena Statement<'arena>,
-    clause: Document<'arena>,
+    clause: Document<'arena, A>,
     mut force_space: bool,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let mut is_block = false;
 
     let has_trailing_segment = match f.current_node() {
@@ -746,28 +774,28 @@ pub(super) fn adjust_clause<'arena>(
 
             let is_block_empty = block_is_empty(f, &block.left_brace, &block.right_brace);
             match f.settings.control_brace_style {
-                BraceStyle::SameLine => Document::Array(vec![in f.arena;Document::space(), clause]),
+                BraceStyle::SameLine => Document::Array(vec_in![f.arena;Document::space(), clause]),
                 BraceStyle::NextLine => {
                     if f.settings.inline_empty_control_braces && is_block_empty {
-                        Document::Array(vec![in f.arena; Document::space(), clause])
+                        Document::Array(vec_in![f.arena; Document::space(), clause])
                     } else {
-                        Document::Array(vec![in f.arena; Document::Line(Line::default()), clause])
+                        Document::Array(vec_in![f.arena; Document::Line(Line::default()), clause])
                     }
                 }
                 BraceStyle::AlwaysNextLine => {
                     if f.settings.inline_empty_control_braces && is_block_empty {
-                        Document::Array(vec![in f.arena; Document::space(), clause])
+                        Document::Array(vec_in![f.arena; Document::space(), clause])
                     } else {
-                        Document::Array(vec![in f.arena; Document::Line(Line::hard()), clause])
+                        Document::Array(vec_in![f.arena; Document::Line(Line::hard()), clause])
                     }
                 }
             }
         }
         _ => {
             if force_space {
-                Document::Array(vec![in f.arena; Document::space(), clause])
+                Document::Array(vec_in![f.arena; Document::space(), clause])
             } else {
-                Document::Indent(vec![in f.arena; Document::BreakParent, Document::Line(Line::hard()), clause])
+                Document::Indent(vec_in![f.arena; Document::BreakParent, Document::Line(Line::hard()), clause])
             }
         }
     };
@@ -780,21 +808,24 @@ pub(super) fn adjust_clause<'arena>(
             || f.has_same_line_trailing_comment(node.span())
             || (f.settings.following_clause_on_newline && !is_do_while)
         {
-            Document::Array(vec![in f.arena; clause, Document::Line(Line::hard())])
+            Document::Array(vec_in![f.arena; clause, Document::Line(Line::hard())])
         } else {
-            Document::Array(vec![in f.arena; clause, Document::space()])
+            Document::Array(vec_in![f.arena; clause, Document::space()])
         }
     } else {
         clause
     }
 }
 
-pub(super) fn print_condition<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_condition<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     left_parenthesis: Span,
     condition: &'arena Expression<'arena>,
     right_parenthesis: Span,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let was_in_condition = f.in_condition;
     let was_must_break_condition = f.must_break_condition;
     f.in_condition = true;
@@ -820,8 +851,7 @@ pub(super) fn print_condition<'arena>(
         && !f.has_comment(condition.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
         && !must_break
     {
-        Document::Group(Group::new(vec![
-            in f.arena;
+        Document::Group(Group::new(vec_in![f.arena;
             Document::space(),
             format_token(f, left_parenthesis, b"("),
             condition.format(f),
@@ -831,12 +861,10 @@ pub(super) fn print_condition<'arena>(
         let group_id = f.next_id();
 
         Document::Group(
-            Group::new(vec![
-                in f.arena;
+            Group::new(vec_in![f.arena;
                 Document::space(),
                 format_token(f, left_parenthesis, b"("),
-                Document::IndentIfBreak(IndentIfBreak::new(group_id, vec![
-                    in f.arena;
+                Document::IndentIfBreak(IndentIfBreak::new(group_id, vec_in![f.arena;
                     Document::Line(if must_break { Line::hard() } else { Line::soft() }),
                     condition.format(f),
                 ])),
@@ -854,13 +882,15 @@ pub(super) fn print_condition<'arena>(
     condition
 }
 
-fn collect_attribute_list<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+fn collect_attribute_list<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     attribute_list: &'arena AttributeList<'arena>,
-    lists: &mut Vec<'arena, Document<'arena>>,
+    lists: &mut Vec<'arena, Document<'arena, A>, A>,
     has_new_line: &mut bool,
     has_potentially_long_attribute: &mut bool,
-) {
+) where
+    A: Arena,
+{
     if !*has_potentially_long_attribute {
         for attribute in &attribute_list.attributes {
             *has_potentially_long_attribute =

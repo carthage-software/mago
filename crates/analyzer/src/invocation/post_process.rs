@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -52,8 +53,8 @@ use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::expression::get_expression_id;
 use crate::utils::misc::unwrap_expression;
 
-pub fn post_invocation_process<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn post_invocation_process<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invoication: &Invocation<'ctx, '_, 'arena>,
@@ -61,7 +62,10 @@ pub fn post_invocation_process<'ctx, 'arena>(
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
     apply_assertions: bool,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     update_by_reference_argument_types(context, block_context, artifacts, invoication, template_result, parameters)?;
     clear_object_property_narrowings(context, block_context, invoication, this_variable);
 
@@ -216,8 +220,8 @@ pub fn post_invocation_process<'ctx, 'arena>(
     Ok(())
 }
 
-fn apply_assertion_to_call_context<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn apply_assertion_to_call_context<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
@@ -225,7 +229,9 @@ fn apply_assertion_to_call_context<'ctx, 'arena>(
     assertions: &BTreeMap<Word, Conjunction<Assertion>>,
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
-) {
+) where
+    A: Arena,
+{
     let type_assertions = resolve_invocation_assertion(
         context,
         block_context,
@@ -262,14 +268,17 @@ fn apply_assertion_to_call_context<'ctx, 'arena>(
     );
 }
 
-fn update_by_reference_argument_types<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn update_by_reference_argument_types<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let constraint_type = invocation.target.is_method_call();
 
     for (parameter_offset, parameter_ref) in invocation.target.iter_parameters().enumerate() {
@@ -398,12 +407,14 @@ fn record_by_reference_mutation_in_loop(artifacts: &mut AnalysisArtifacts, varia
 /// remove all narrowed property types for all local object variables when any argument
 /// is an object type. We also clear any clauses that reference property accesses to prevent
 /// stale narrowing from influencing subsequent assertion resolution.
-fn clear_object_property_narrowings<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn clear_object_property_narrowings<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     invocation: &Invocation<'ctx, '_, 'arena>,
     receiver_variable: Option<&[u8]>,
-) {
+) where
+    A: Arena,
+{
     let metadata = invocation.target.get_function_like_metadata();
 
     if let Some(metadata) = metadata
@@ -660,8 +671,8 @@ fn is_superglobal_name(name: &[u8]) -> bool {
     )
 }
 
-fn resolve_invocation_assertion<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn resolve_invocation_assertion<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
@@ -670,7 +681,10 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
     is_unconditional_assert: bool,
-) -> IndexMap<Word, AssertionSet> {
+) -> IndexMap<Word, AssertionSet>
+where
+    A: Arena,
+{
     let mut type_assertions: IndexMap<Word, AssertionSet> = IndexMap::new();
     if assertions.is_empty() {
         return type_assertions;
@@ -1003,13 +1017,16 @@ fn resolve_invocation_assertion<'ctx, 'arena>(
 /// * If a special target is resolved, the tuple is `(None, Some(resolved_id))`.
 /// * If a regular argument is found, it returns the result from `get_argument_for_parameter`.
 /// * If nothing is found, it returns `(None, None)`.
-fn resolve_argument_or_special_target<'ctx, 'ast, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn resolve_argument_or_special_target<'ctx, 'ast, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     parameter_name: Word,
     this_variable: Option<&[u8]>,
-) -> (Option<&'ast Expression<'arena>>, Option<Word>) {
+) -> (Option<&'ast Expression<'arena>>, Option<Word>)
+where
+    A: Arena,
+{
     // First, check if the name refers to a special assertion target like `$this->...`
     if let Some(resolved_id) = resolve_special_assertion_target(block_context, parameter_name, this_variable) {
         return (None, Some(resolved_id));
@@ -1082,13 +1099,16 @@ fn resolve_special_assertion_target(
 /// A tuple containing:
 /// * `Option<&'a Expression>`: The argument's expression AST node, if found.
 /// * `Option<Word>`: The unique ID of the argument expression (e.g., a variable name), if it can be determined.
-fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn get_argument_for_parameter<'ctx, 'ast, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     invocation: &Invocation<'ctx, 'ast, 'arena>,
     mut parameter_offset: Option<usize>,
     mut parameter_name: Option<Word>,
-) -> (Option<&'ast Expression<'arena>>, Option<Word>) {
+) -> (Option<&'ast Expression<'arena>>, Option<Word>)
+where
+    A: Arena,
+{
     // If neither name nor offset is provided, we can't do anything.
     if parameter_name.is_none() && parameter_offset.is_none() {
         return (None, None);
@@ -1180,13 +1200,15 @@ fn get_argument_for_parameter<'ctx, 'ast, 'arena>(
     (Some(argument_expression), argument_id)
 }
 
-fn collect_plugin_throw_types<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn collect_plugin_throw_types<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     identifier: &FunctionLikeIdentifier,
-) {
+) where
+    A: Arena,
+{
     let exceptions = match identifier {
         FunctionLikeIdentifier::Function(name) => context.plugin_registry.get_function_thrown_exceptions(
             context.codebase,
@@ -1215,8 +1237,8 @@ fn collect_plugin_throw_types<'ctx, 'arena>(
     }
 }
 
-fn apply_plugin_assertions<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn apply_plugin_assertions<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
@@ -1225,7 +1247,9 @@ fn apply_plugin_assertions<'ctx, 'arena>(
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
     range: (u32, u32),
-) {
+) where
+    A: Arena,
+{
     let Some(assertions) = context.plugin_registry.get_function_like_assertions(
         context.codebase,
         context.source_file,

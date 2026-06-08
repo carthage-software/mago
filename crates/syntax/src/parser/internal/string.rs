@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use std::vec::Vec;
 
 use mago_database::file::HasFileId;
@@ -23,7 +24,10 @@ use crate::parser::Parser;
 use crate::token::DocumentKind;
 use crate::token::TokenKind;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_string(&mut self) -> Result<CompositeString<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 

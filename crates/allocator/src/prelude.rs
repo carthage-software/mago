@@ -17,3 +17,4 @@ pub use crate::iter::FromIteratorIn;
 #[cfg(feature = "rayon")]
 pub use crate::iter::ParallelCollectIn;
 pub use crate::vec::Vec;
+pub use crate::vec_in;

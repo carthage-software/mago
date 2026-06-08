@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::T;
@@ -16,7 +17,10 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::Precedence;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_array(&mut self) -> Result<Array<'arena>, ParseError> {
         let result = self.parse_comma_separated_sequence(T!["["], T!["]"], |p| p.parse_array_element())?;
 

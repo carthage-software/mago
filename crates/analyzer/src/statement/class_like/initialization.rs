@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::collections::HashSet;
 
 use itertools::Itertools;
@@ -16,13 +17,15 @@ use crate::code::IssueCode;
 use crate::context::Context;
 
 /// Check property initialization for a class-like.
-pub fn check_property_initialization<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn check_property_initialization<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     artifacts: &AnalysisArtifacts,
     class_like_metadata: &'ctx ClassLikeMetadata,
     declaration_span: Span,
     name_span: Option<Span>,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_property_initialization {
         return;
     }
@@ -226,13 +229,16 @@ pub fn check_property_initialization<'ctx>(
 }
 
 /// Determines if a property requires initialization in the constructor.
-fn property_requires_initialization(
+fn property_requires_initialization<A>(
     _name: Word,
     property: &PropertyMetadata,
     class_like_metadata: &ClassLikeMetadata,
     declaring_class_metadata: &ClassLikeMetadata,
-    context: &Context<'_, '_>,
-) -> bool {
+    context: &Context<'_, '_, A>,
+) -> bool
+where
+    A: Arena,
+{
     // Has default value - doesn't need initialization
     if property.flags.has_default() {
         return false;
@@ -299,14 +305,17 @@ fn property_requires_initialization(
 ///
 /// This function uses an iterative approach instead of recursion to avoid stack overflow
 /// in release builds when analyzing deep class hierarchies (common in frameworks like Symfony).
-fn compute_transitive_initializations(
+fn compute_transitive_initializations<A>(
     artifacts: &AnalysisArtifacts,
-    context: &Context<'_, '_>,
+    context: &Context<'_, '_, A>,
     class_name: Word,
     method_name: Word,
     class_is_final: bool,
     trust_all_methods: bool,
-) -> WordSet {
+) -> WordSet
+where
+    A: Arena,
+{
     let mut all_initialized = WordSet::default();
 
     let mut work_queue: Vec<(Word, Word, bool, bool, Word)> =
@@ -399,11 +408,14 @@ fn compute_transitive_initializations(
 /// This function checks all methods listed in `class_initializers` setting
 /// and returns the union of properties they initialize. It also walks up
 /// the inheritance chain to check parent classes for class initializers.
-fn compute_class_initializer_initializations(
+fn compute_class_initializer_initializations<A>(
     artifacts: &AnalysisArtifacts,
-    context: &Context<'_, '_>,
+    context: &Context<'_, '_, A>,
     class_like_metadata: &ClassLikeMetadata,
-) -> WordSet {
+) -> WordSet
+where
+    A: Arena,
+{
     let mut all_initialized = WordSet::default();
 
     // No class initializers configured
@@ -524,7 +536,15 @@ fn compute_class_initializer_initializations(
 
 /// A method is trustworthy if it cannot be overridden by subclasses,
 /// or if it's explicitly listed as a class initializer.
-fn is_method_trustworthy(context: &Context<'_, '_>, class_name: Word, method_name: Word, class_is_final: bool) -> bool {
+fn is_method_trustworthy<A>(
+    context: &Context<'_, '_, A>,
+    class_name: Word,
+    method_name: Word,
+    class_is_final: bool,
+) -> bool
+where
+    A: Arena,
+{
     if class_is_final {
         return true;
     }
@@ -555,12 +575,15 @@ fn is_method_trustworthy(context: &Context<'_, '_>, class_name: Word, method_nam
 /// we trust that a parent class's constructor initializes properties declared in that
 /// same parent class. This is a reasonable assumption - if a class has both typed
 /// properties and a constructor, the constructor should initialize those properties.
-fn check_parent_constructor_initializes(
-    context: &Context<'_, '_>,
+fn check_parent_constructor_initializes<A>(
+    context: &Context<'_, '_, A>,
     artifacts: &AnalysisArtifacts,
     class_like_metadata: &ClassLikeMetadata,
     uninitialized_properties: &[(Word, &PropertyMetadata)],
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let mut current_class = class_like_metadata.direct_parent_class.as_ref();
 
     while let Some(parent_name) = current_class {
@@ -606,13 +629,15 @@ fn check_parent_constructor_initializes(
     false
 }
 
-fn report_missing_constructor(
-    context: &mut Context<'_, '_>,
+fn report_missing_constructor<A>(
+    context: &mut Context<'_, '_, A>,
     class_like_metadata: &ClassLikeMetadata,
     declaration_span: Span,
     name_span: Option<Span>,
     uninitialized_properties: &[(Word, &PropertyMetadata)],
-) {
+) where
+    A: Arena,
+{
     let class_name = &class_like_metadata.original_name;
     let prop_names: Vec<_> = uninitialized_properties.iter().map(|(name, _)| name.to_string()).collect();
     let prop_list = prop_names.join(", ");
@@ -638,14 +663,16 @@ fn report_missing_constructor(
     context.collector.report_with_code(IssueCode::MissingConstructor, issue);
 }
 
-fn report_uninitialized_property(
-    context: &mut Context<'_, '_>,
+fn report_uninitialized_property<A>(
+    context: &mut Context<'_, '_, A>,
     class_like_metadata: &ClassLikeMetadata,
     prop_name: Word,
     prop_span: Option<Span>,
     class_span: Span,
     declaring_class: Option<Word>,
-) {
+) where
+    A: Arena,
+{
     let class_name = &class_like_metadata.original_name;
 
     let mut issue =

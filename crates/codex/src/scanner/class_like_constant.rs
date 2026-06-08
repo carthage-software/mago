@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -28,14 +29,17 @@ use crate::visibility::Visibility;
 use super::super::ttype::union::TUnion;
 
 #[inline]
-pub fn scan_class_like_constants<'arena>(
+pub fn scan_class_like_constants<'arena, A>(
     class_like_metadata: &mut ClassLikeMetadata,
     constant: &'arena ClassLikeConstant<'arena>,
     classname: Option<Word>,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &NamespaceScope,
-) -> Vec<ClassLikeConstantMetadata> {
+) -> Vec<ClassLikeConstantMetadata>
+where
+    A: Arena,
+{
     let verdict = evaluate_version_attributes(&constant.attribute_lists, context, context.php_version);
 
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);

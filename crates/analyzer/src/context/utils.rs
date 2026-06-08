@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
@@ -19,11 +20,13 @@ use crate::context::block::BlockContext;
 /// * `context`: The current analysis context, used for reporting issues.
 /// * `destination_context`: The context into which properties are being merged.
 /// * `source_context`: The context from which properties are being inherited.
-pub(crate) fn inherit_branch_context_properties<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub(crate) fn inherit_branch_context_properties<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     destination_context: &mut BlockContext<'ctx>,
     source_context: &BlockContext<'ctx>,
-) {
+) where
+    A: Arena,
+{
     for (variable, constraint) in &source_context.by_reference_constraints {
         let Some(outer_constraint) = destination_context.by_reference_constraints.get(variable) else {
             destination_context.by_reference_constraints.insert(*variable, constraint.clone());

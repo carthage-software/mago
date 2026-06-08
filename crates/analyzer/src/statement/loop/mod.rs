@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -72,8 +73,8 @@ pub mod r#for;
 pub mod foreach;
 pub mod r#while;
 
-fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_for_or_while_loop<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     initializations: &'ast [&'arena Expression<'arena>],
@@ -82,7 +83,10 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
     statements: &'ast [Statement<'arena>],
     span: Span,
     infinite_loop: bool,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let pre_assigned_var_ids = block_context.assigned_variable_ids.clone();
     block_context.assigned_variable_ids.clear();
     for initialization_expression in initializations {
@@ -159,15 +163,17 @@ fn analyze_for_or_while_loop<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
-fn inherit_loop_block_context<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn inherit_loop_block_context<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &mut BlockContext<'ctx>,
     loop_block_context: BlockContext<'ctx>,
     inner_loop_block_context: BlockContext<'ctx>,
     loop_scope: LoopScope,
     always_enters_loop: bool,
     known_infinite_loop: bool,
-) {
+) where
+    A: Arena,
+{
     let has_break = loop_scope.final_actions.contains(ControlAction::Break);
     let has_continue = loop_scope.final_actions.contains(ControlAction::Continue);
     let has_break_or_continue = has_break || has_continue;
@@ -220,8 +226,8 @@ fn inherit_loop_block_context<'ctx>(
 }
 
 #[allow(clippy::similar_names)]
-fn analyze<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     statements: &'ast [Statement<'arena>],
     pre_conditions: &[&'ast Expression<'arena>],
     post_expressions: Vec<&'ast Expression<'arena>>,
@@ -231,7 +237,10 @@ fn analyze<'ctx, 'ast, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     is_do: bool,
     always_enters_loop: bool,
-) -> Result<(BlockContext<'ctx>, LoopScope), AnalysisError> {
+) -> Result<(BlockContext<'ctx>, LoopScope), AnalysisError>
+where
+    A: Arena,
+{
     let always_enters_loop = Cell::new(always_enters_loop);
 
     let (mut assignment_map, first_variable_id) = get_assignment_map(pre_conditions, &post_expressions, statements);
@@ -1097,8 +1106,8 @@ fn can_condition_be_initially_false(pre_condition: &Expression<'_>, artifacts: &
     }
 }
 
-fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn apply_pre_condition_to_loop_context<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     pre_condition: &Expression<'arena>,
     pre_condition_clauses: &[Clause],
     loop_context: &mut BlockContext<'ctx>,
@@ -1106,7 +1115,10 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     is_do: bool,
     first_application: bool,
-) -> Result<WordSet, AnalysisError> {
+) -> Result<WordSet, AnalysisError>
+where
+    A: Arena,
+{
     let pre_condition_span = pre_condition.span();
     let pre_referenced_variable_ids = std::mem::take(&mut loop_context.conditionally_referenced_variable_ids);
 
@@ -1197,13 +1209,15 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena>(
     Ok(always_assigned_before_loop_body_variables)
 }
 
-fn update_loop_scope_contexts<'ctx>(
+fn update_loop_scope_contexts<'ctx, A>(
     loop_scope: &LoopScope,
     loop_context: &mut BlockContext<'ctx>,
     continue_context: &mut BlockContext<'ctx>,
     pre_outer_context: &BlockContext<'ctx>,
-    context: &Context<'ctx, '_>,
-) {
+    context: &Context<'ctx, '_, A>,
+) where
+    A: Arena,
+{
     if loop_scope.final_actions.contains(ControlAction::Continue) {
         for (variable_id, variable_type) in &loop_scope.redefined_loop_variables {
             continue_context.locals.insert(*variable_id, Rc::clone(variable_type));
@@ -1261,14 +1275,17 @@ fn get_and_expressions<'ast, 'arena>(cond: &'ast Expression<'arena>) -> Vec<&'as
 /// - `TUnion`: The combined type of the values produced by the iterator.
 ///
 /// Reports issues if the iterator type is problematic (e.g., null, scalar, non-traversable object).
-fn analyze_iterator<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_iterator<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     iterator: &'ast Expression<'arena>,
     iterator_variable_id: Option<Word>,
     foreach: &'ast Foreach<'arena>,
-) -> Result<(bool, TUnion, TUnion), AnalysisError> {
+) -> Result<(bool, TUnion, TUnion), AnalysisError>
+where
+    A: Arena,
+{
     let was_inside_general_use = block_context.flags.inside_general_use();
     block_context.flags.set_inside_general_use(true);
     iterator.analyze(context, block_context, artifacts)?;

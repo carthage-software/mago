@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::collections::hash_map::Entry;
 
 use foldhash::HashMap;
@@ -56,8 +57,8 @@ fn is_empty_container_construction(expression: &Expression) -> bool {
 }
 
 /// Analyzes an argument expression and stores its inferred type.
-pub fn analyze_and_store_argument_type<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn analyze_and_store_argument_type<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invocation_target: &InvocationTarget<'ctx>,
@@ -66,7 +67,10 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena>(
     analyzed_argument_types: &mut HashMap<usize, (TUnion, Span)>,
     referenced_parameter: bool,
     closure_parameter_type: Option<&TUnion>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     if argument_offset != usize::MAX && analyzed_argument_types.contains_key(&argument_offset) {
         return Ok(());
     }
@@ -152,14 +156,16 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena>(
 }
 
 /// Verifies an argument's type against the expected parameter type.
-pub fn verify_argument_type<'arena>(
-    context: &mut Context<'_, 'arena>,
+pub fn verify_argument_type<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     input_type: &TUnion,
     parameter_type: &TUnion,
     argument_offset: usize,
     input_expression: &Expression<'arena>,
     invocation_target: &InvocationTarget<'_>,
-) {
+) where
+    A: Arena,
+{
     let target_kind_str = invocation_target.guess_kind();
     let target_name_str = invocation_target.guess_name(context);
 
@@ -434,7 +440,14 @@ pub fn verify_argument_type<'arena>(
 }
 
 /// Gets the element type when unpacking an argument with the spread operator.
-pub fn get_unpacked_argument_type(context: &mut Context<'_, '_>, argument_value_type: &TUnion, span: Span) -> TUnion {
+pub fn get_unpacked_argument_type<A>(
+    context: &mut Context<'_, '_, A>,
+    argument_value_type: &TUnion,
+    span: Span,
+) -> TUnion
+where
+    A: Arena,
+{
     let mut potential_element_types = Vec::new();
     let mut reported_an_error = false;
 

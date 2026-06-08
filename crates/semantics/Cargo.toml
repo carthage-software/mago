@@ -22,4 +22,4 @@ mago-names = { workspace = true }
 mago-database = { workspace = true }
 
 [dev-dependencies]
-bumpalo = { workspace = true }
+mago-allocator = { workspace = true }

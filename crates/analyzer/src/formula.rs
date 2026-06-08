@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use mago_allocator::Arena;
 
 use itertools::Itertools;
 use mago_algebra::AlgebraThresholds;
@@ -56,15 +57,18 @@ use crate::utils::misc::unwrap_expression;
 /// Returns `Some(Vec<Clause>)` representing the logical formula. Returns `None` if the
 /// formula's complexity exceeds the provided `formula_size_threshold` at
 /// any point during the recursive process.
-pub fn get_formula(
+pub fn get_formula<A>(
     conditional_object_id: Span,
     creating_object_id: Span,
     conditional: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     artifacts: &AnalysisArtifacts,
     algebra_thresholds: &AlgebraThresholds,
     formula_size_threshold: u16,
-) -> Option<Vec<Clause>> {
+) -> Option<Vec<Clause>>
+where
+    A: Arena,
+{
     let expression = unwrap_expression(conditional);
 
     if let Expression::Binary(binary) = expression {
@@ -357,13 +361,15 @@ pub fn get_formula(
     if formula.len() > usize::from(formula_size_threshold) { None } else { Some(formula) }
 }
 
-fn add_nullsafe_base_clauses(
+fn add_nullsafe_base_clauses<A>(
     expression: &Expression,
     formula: &mut Vec<Clause>,
     conditional_object_id: Span,
     creating_object_id: Span,
-    assertion_context: AssertionContext<'_, '_>,
-) {
+    assertion_context: AssertionContext<'_, '_, A>,
+) where
+    A: Arena,
+{
     let mut current = Some(unwrap_expression(expression));
     while let Some(expr) = current {
         match expr {
@@ -400,13 +406,15 @@ fn add_nullsafe_base_clauses(
     }
 }
 
-fn push_not_null_clause(
+fn push_not_null_clause<A>(
     base: &Expression,
     formula: &mut Vec<Clause>,
     conditional_object_id: Span,
     creating_object_id: Span,
-    assertion_context: AssertionContext<'_, '_>,
-) {
+    assertion_context: AssertionContext<'_, '_, A>,
+) where
+    A: Arena,
+{
     let Some(base_id) = get_expression_id(
         base,
         assertion_context.this_class_name,
@@ -470,15 +478,18 @@ fn push_not_null_clause(
 /// Returns `None` if the formula's complexity exceeds the provided `formula_size_threshold`,
 /// to avoid performance degradation.
 #[allow(dead_code)]
-pub fn get_disjunctive_equality_formula(
+pub fn get_disjunctive_equality_formula<A>(
     subject: &Expression,
     conditions: Vec<&Expression>,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     artifacts: &AnalysisArtifacts,
     is_identity: bool,
     algebra_thresholds: &AlgebraThresholds,
     formula_size_threshold: u16,
-) -> Option<Vec<Clause>> {
+) -> Option<Vec<Clause>>
+where
+    A: Arena,
+{
     let subject = unwrap_expression(subject);
     let subject_span = subject.span();
 
@@ -567,14 +578,17 @@ fn get_formula_from_assertions(
     )])
 }
 
-pub fn negate_or_synthesize(
+pub fn negate_or_synthesize<A>(
     clauses: Vec<Clause>,
     conditional: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     artifacts: &AnalysisArtifacts,
     algebra_thresholds: &AlgebraThresholds,
     formula_size_threshold: u16,
-) -> Vec<Clause> {
+) -> Vec<Clause>
+where
+    A: Arena,
+{
     match negate_formula(clauses, algebra_thresholds) {
         Some(negated_clauses) => negated_clauses,
         None => match get_formula(
@@ -600,15 +614,18 @@ pub fn negate_or_synthesize(
 }
 
 #[inline]
-fn handle_binary_or_operation(
+fn handle_binary_or_operation<A>(
     conditional_object_id: Span,
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     artifacts: &AnalysisArtifacts,
     algebra_thresholds: &AlgebraThresholds,
     formula_size_threshold: u16,
-) -> Option<Vec<Clause>> {
+) -> Option<Vec<Clause>>
+where
+    A: Arena,
+{
     let left_clauses = get_formula(
         conditional_object_id,
         left.span(),
@@ -633,15 +650,18 @@ fn handle_binary_or_operation(
 }
 
 #[inline]
-fn handle_binary_and_operation(
+fn handle_binary_and_operation<A>(
     conditional_object_id: Span,
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     artifacts: &AnalysisArtifacts,
     algebra_thresholds: &AlgebraThresholds,
     formula_size_threshold: u16,
-) -> Option<Vec<Clause>> {
+) -> Option<Vec<Clause>>
+where
+    A: Arena,
+{
     let mut clauses = get_formula(
         conditional_object_id,
         left.span(),

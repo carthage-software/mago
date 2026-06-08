@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_word::Word;
 use mago_word::word;
 
@@ -30,14 +31,17 @@ use mago_bytes::BytesDisplay;
 ///
 /// `true` if the method is visible, `false` otherwise. An error is reported to the
 /// context buffer if the method is not visible.
-pub fn check_method_visibility<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn check_method_visibility<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     fqcn: &[u8],
     method_name: &[u8],
     access_span: Span,
     member_span: Option<Span>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let declaring_class = context.codebase.get_declaring_method_class(fqcn, method_name).unwrap_or_else(|| word(fqcn));
 
     let Some(method_metadata) = context.codebase.get_declaring_method(fqcn, method_name) else {
@@ -91,14 +95,17 @@ pub fn check_method_visibility<'ctx>(
 
 /// Checks if a property is readable from the current scope and reports a detailed
 /// error if it is not.
-pub fn check_property_read_visibility<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn check_property_read_visibility<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     fqcn: &[u8],
     property_name: &[u8],
     access_span: Span,
     member_span: Option<Span>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let property_name = word(property_name);
 
     let Some(class_metadata) = context.codebase.get_class_like(fqcn) else {
@@ -196,14 +203,17 @@ pub fn check_property_read_visibility<'ctx>(
     is_visible
 }
 
-pub fn check_property_write_visibility<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn check_property_write_visibility<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     fqcn: &[u8],
     property_name: &[u8],
     access_span: Span,
     member_span: Option<Span>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let property_name = word(property_name);
 
     let Some(class_metadata) = context.codebase.get_class_like(fqcn) else {
@@ -297,12 +307,15 @@ pub fn check_property_write_visibility<'ctx>(
     is_visible
 }
 
-fn is_visible_from_scope(
-    context: &Context<'_, '_>,
+fn is_visible_from_scope<A>(
+    context: &Context<'_, '_, A>,
     visibility: Visibility,
     declaring_class_id: &[u8],
     current_class_opt: Option<Word>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     match visibility {
         Visibility::Public => true,
         Visibility::Protected => {
@@ -330,11 +343,14 @@ fn is_visible_from_scope(
 /// Checks if a protected member declared in `declaring_class_id` is accessible from
 /// `current_class_id` via `@require-extends`. This handles the case where a trait has
 /// `@require-extends BaseClass` and `BaseClass` uses another trait that declares the method.
-fn is_visible_via_required_extends(
-    context: &Context<'_, '_>,
+fn is_visible_via_required_extends<A>(
+    context: &Context<'_, '_, A>,
     current_class_id: &[u8],
     declaring_class_id: &[u8],
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let current_class_id_lc = mago_word::ascii_lowercase_word(current_class_id);
 
     let Some(current_metadata) = context.codebase.get_class_like(current_class_id_lc.as_bytes()) else {
@@ -356,12 +372,15 @@ fn is_visible_via_required_extends(
     false
 }
 
-fn can_initialize_readonly_property(
-    context: &Context<'_, '_>,
+fn can_initialize_readonly_property<A>(
+    context: &Context<'_, '_, A>,
     declaring_class_id: &[u8],
     current_class_opt: Option<Word>,
     current_function_opt: Option<&FunctionLikeMetadata>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let is_allowed_method = current_function_opt.is_some_and(|func| {
         // Constructor is always allowed
         if func.method_metadata.as_ref().is_some_and(|m| m.is_constructor) {
@@ -386,8 +405,8 @@ fn can_initialize_readonly_property(
         })
 }
 
-fn report_visibility_issue<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn report_visibility_issue<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     code: IssueCode,
     title: String,
@@ -396,7 +415,9 @@ fn report_visibility_issue<'ctx>(
     member_span: Option<Span>,
     definition_span: Option<Span>,
     help_text: String,
-) {
+) where
+    A: Arena,
+{
     let current_scope_str = if let Some(current_class) = block_context.scope.get_class_like_name() {
         format!("from within `{current_class}`")
     } else {
@@ -427,14 +448,16 @@ fn report_visibility_issue<'ctx>(
     context.collector.report_with_code(code, issue);
 }
 
-fn report_readonly_issue<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn report_readonly_issue<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     code: IssueCode,
     access_span: Span,
     member_span: Option<Span>,
     definition_span: Option<Span>,
-) {
+) where
+    A: Arena,
+{
     let current_scope_str = if let Some(current_class) = block_context.scope.get_class_like_name() {
         format!("from within `{current_class}`")
     } else {

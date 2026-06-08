@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 use mago_database::file::File;
 use mago_linter::Linter;
 use mago_linter::registry::RuleRegistry;
@@ -12,7 +12,7 @@ use mago_syntax::parser::parse_file;
 const CODE: &str = "<?php\n\n// comment with trailing space   \n";
 
 fn lint_with_excludes(filename: &'static str, excludes: &[&str]) -> usize {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let file = File::ephemeral(Cow::Borrowed(filename.as_bytes()), Cow::Borrowed(CODE.as_bytes()));
     let program = parse_file(&arena, &file);
 

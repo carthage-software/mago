@@ -138,7 +138,7 @@ pub fn get_docblock_before_position<'arena>(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use bumpalo::Bump;
+    use mago_allocator::LocalArena;
     use mago_database::file::FileId;
     use mago_span::HasSpan;
 
@@ -151,7 +151,7 @@ mod tests {
         // The parser emits WhiteSpace trivia for all whitespace, so there is no
         // code gap between the docblock's end offset and the class's start offset.
         // This verifies the assumption that strict trivia contiguity == no code gap.
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let program = parse_file_content(&arena, FileId::zero(), b"<?php\n\n/** @return int */\n\nclass Foo {}");
         // statements[0] is the <?php opening tag; statements[1] is the class.
         let class_start = program.statements.iter().nth(1).unwrap().span().start.offset;
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn code_between_docblock_and_function_blocks_attribution() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let program =
             parse_file_content(&arena, FileId::zero(), b"<?php\n/** @return int */\necho 1;\nfunction foo() {}");
         // statements: [0]=OpeningTag, [1]=Echo, [2]=Function

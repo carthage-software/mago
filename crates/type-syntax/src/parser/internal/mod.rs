@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use ordered_float::OrderedFloat;
 
 use mago_database::file::HasFileId;
@@ -69,7 +70,10 @@ pub mod stream;
 
 /// Parses a complete type expression, including unions, intersections, and conditionals.
 #[inline]
-pub fn parse_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Type<'arena>, ParseError> {
+pub fn parse_type<'arena, A>(stream: &mut TypeTokenStream<'arena, A>) -> Result<Type<'arena>, ParseError>
+where
+    A: Arena,
+{
     parse_type_with_precedence(stream, TypePrecedence::Lowest)
 }
 
@@ -77,13 +81,22 @@ pub fn parse_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Type<'
 ///
 /// Accepts plain `Identifier` tokens, the `new` keyword when it is *not* followed by `<`, and
 /// any single-word reserved keyword whose source text has no hyphen.
-pub(crate) fn is_at_member_identifier(stream: &mut TypeTokenStream<'_>) -> Result<bool, ParseError> {
+pub(crate) fn is_at_member_identifier<A>(stream: &mut TypeTokenStream<'_, A>) -> Result<bool, ParseError>
+where
+    A: Arena,
+{
     is_at_member_identifier_at(stream, 0)
 }
 
 /// Like [`is_at_member_identifier`] but peeks `offset` tokens ahead instead of at the current
 /// position. `offset == 0` is equivalent to [`is_at_member_identifier`].
-pub(crate) fn is_at_member_identifier_at(stream: &mut TypeTokenStream<'_>, offset: usize) -> Result<bool, ParseError> {
+pub(crate) fn is_at_member_identifier_at<A>(
+    stream: &mut TypeTokenStream<'_, A>,
+    offset: usize,
+) -> Result<bool, ParseError>
+where
+    A: Arena,
+{
     let Some(token) = stream.lookahead(offset)? else {
         return Ok(false);
     };
@@ -100,9 +113,12 @@ pub(crate) fn is_at_member_identifier_at(stream: &mut TypeTokenStream<'_>, offse
 /// keyword when it is not followed by `<`, or any non-hyphenated reserved keyword. Errors
 /// with `UnexpectedToken` expecting `Identifier` otherwise, so the diagnostic matches the
 /// traditional call site.
-pub(crate) fn eat_member_identifier<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
-) -> Result<TypeToken<'arena>, ParseError> {
+pub(crate) fn eat_member_identifier<'arena, A>(
+    stream: &mut TypeTokenStream<'arena, A>,
+) -> Result<TypeToken<'arena>, ParseError>
+where
+    A: Arena,
+{
     if is_at_member_identifier(stream)? { stream.consume() } else { stream.eat(TypeTokenKind::Identifier) }
 }
 
@@ -111,7 +127,10 @@ pub(crate) fn eat_member_identifier<'arena>(
 /// union, so that `int|string|` or `array{0: int|string|}` parses leniently rather than
 /// erroring on the empty right-hand operand.
 #[inline]
-fn is_at_union_closing_token(stream: &mut TypeTokenStream<'_>) -> Result<bool, ParseError> {
+fn is_at_union_closing_token<A>(stream: &mut TypeTokenStream<'_, A>) -> Result<bool, ParseError>
+where
+    A: Arena,
+{
     Ok(match stream.lookahead(0)?.map(|t| t.kind) {
         None => true,
         Some(kind) => matches!(
@@ -136,20 +155,26 @@ fn is_at_union_closing_token(stream: &mut TypeTokenStream<'_>) -> Result<bool, P
 /// For example, `Closure(): int|string` with:
 /// - `Lowest` precedence: parses as `Union(Closure(): int, string)` (correct PHPStan/Psalm behavior)
 /// - `Callable` precedence: parses only `int`, leaving `|string` for the parent to handle
-pub fn parse_type_with_precedence<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
+pub fn parse_type_with_precedence<'arena, A>(
+    stream: &mut TypeTokenStream<'arena, A>,
     min_precedence: TypePrecedence,
-) -> Result<Type<'arena>, ParseError> {
+) -> Result<Type<'arena>, ParseError>
+where
+    A: Arena,
+{
     stream.enter_recursion()?;
     let result = parse_type_with_precedence_inner(stream, min_precedence);
     stream.leave_recursion();
     result
 }
 
-fn parse_type_with_precedence_inner<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
+fn parse_type_with_precedence_inner<'arena, A>(
+    stream: &mut TypeTokenStream<'arena, A>,
     min_precedence: TypePrecedence,
-) -> Result<Type<'arena>, ParseError> {
+) -> Result<Type<'arena>, ParseError>
+where
+    A: Arena,
+{
     let mut inner = parse_primary_type(stream)?;
 
     loop {
@@ -232,7 +257,10 @@ fn parse_type_with_precedence_inner<'arena>(
 
 /// Parses a primary (atomic) type without consuming any infix operators.
 #[inline]
-fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Type<'arena>, ParseError> {
+fn parse_primary_type<'arena, A>(stream: &mut TypeTokenStream<'arena, A>) -> Result<Type<'arena>, ParseError>
+where
+    A: Arena,
+{
     let next = stream.peek()?;
     let inner = match next.kind {
         TypeTokenKind::Variable => Type::Variable(VariableType::from_token(stream.consume()?, stream.file_id())),
@@ -702,9 +730,12 @@ fn parse_primary_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Ty
     Ok(inner)
 }
 
-pub fn parse_literal_number_type<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
-) -> Result<LiteralIntOrFloatType<'arena>, ParseError> {
+pub fn parse_literal_number_type<'arena, A>(
+    stream: &mut TypeTokenStream<'arena, A>,
+) -> Result<LiteralIntOrFloatType<'arena>, ParseError>
+where
+    A: Arena,
+{
     let next = stream.peek()?;
 
     match next.kind {

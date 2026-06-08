@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use bumpalo::Bump;
+use mago_allocator::Arena;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
@@ -148,14 +148,17 @@ use crate::ttype::wrap_atomic;
 /// - An unsupported type construct is encountered
 /// - Type references cannot be resolved (e.g., `self` outside a class context)
 /// - Invalid type combinations are used (e.g., incompatible intersection types)
-pub fn get_type_from_string<'arena>(
-    arena: &'arena Bump,
+pub fn get_type_from_string<'arena, A>(
+    arena: &'arena A,
     type_string: &'arena [u8],
     span: Span,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
     classname: Option<Word>,
-) -> Result<TUnion, TypeError> {
+) -> Result<TUnion, TypeError>
+where
+    A: Arena,
+{
     let ast = mago_type_syntax::parse_str(arena, span, type_string)?;
 
     get_union_from_type_ast(&ast, scope, type_context, classname)

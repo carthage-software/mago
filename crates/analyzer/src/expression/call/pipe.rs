@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::template::TemplateResult;
 use mago_span::HasSpan;
 use mago_syntax::ast::Pipe;
@@ -12,12 +13,15 @@ use crate::expression::call::function_call::resolve_targets;
 use crate::invocation::InvocationArgumentsSource;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Pipe<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let mut template_result = TemplateResult::default();
 
         let was_inside_pipe_callable = block_context.flags.inside_pipe_callable();

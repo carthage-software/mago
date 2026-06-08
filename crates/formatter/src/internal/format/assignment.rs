@@ -1,5 +1,6 @@
-use bumpalo::collections::Vec;
-use bumpalo::vec;
+use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
+use mago_allocator::vec_in;
 
 use mago_span::HasSpan;
 use mago_syntax::ast::Access;
@@ -99,24 +100,30 @@ enum Layout {
     Fluid,
 }
 
-pub(super) fn print_assignment<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_assignment<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     assignment_node: AssignmentLikeNode<'arena>,
-    lhs: Document<'arena>,
-    operator: Document<'arena>,
+    lhs: Document<'arena, A>,
+    operator: Document<'arena, A>,
     rhs_expression: &'arena Expression<'arena>,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     print_assignment_with_alignment(f, assignment_node, lhs, operator, rhs_expression, None)
 }
 
-pub(super) fn print_assignment_with_alignment<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_assignment_with_alignment<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     assignment_node: AssignmentLikeNode<'arena>,
-    lhs: Document<'arena>,
-    operator: Document<'arena>,
+    lhs: Document<'arena, A>,
+    operator: Document<'arena, A>,
     rhs_expression: &'arena Expression<'arena>,
     alignment: Option<AssignmentAlignment>,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     if let Some(align) = alignment {
         let outer_alignment = f.alignment_context();
         f.set_alignment_context(None);
@@ -126,7 +133,7 @@ pub(super) fn print_assignment_with_alignment<'arena>(
         let padding = if align.name_padding > 0 {
             let mut spaces = Vec::with_capacity_in(align.name_padding, f.arena);
             spaces.resize(align.name_padding, b' ');
-            let spaces = Document::String(spaces.into_bump_slice());
+            let spaces = Document::String(spaces.leak());
 
             if let Some(group_id) = align.break_group_id {
                 Document::IfBreak(IfBreak::new(f.arena, spaces, Document::empty()).with_id(group_id))
@@ -137,8 +144,7 @@ pub(super) fn print_assignment_with_alignment<'arena>(
             Document::empty()
         };
 
-        return Document::Array(vec![
-            in f.arena;
+        return Document::Array(vec_in![f.arena;
             lhs,
             padding,
             Document::space(),
@@ -152,39 +158,34 @@ pub(super) fn print_assignment_with_alignment<'arena>(
     let rhs = rhs_expression.format(f);
 
     match layout {
-        Layout::Chain => Document::Array(vec![
-            in f.arena;
-            Document::Group(Group::new(vec![in f.arena; lhs])),
+        Layout::Chain => Document::Array(vec_in![f.arena;
+            Document::Group(Group::new(vec_in![f.arena; lhs])),
             Document::space(),
             operator,
             Document::Line(Line::default()),
             rhs,
         ]),
-        Layout::ChainTailArrowChain => Document::Array(vec![
-            in f.arena;
-            Document::Group(Group::new(vec![in f.arena; lhs])),
+        Layout::ChainTailArrowChain => Document::Array(vec_in![f.arena;
+            Document::Group(Group::new(vec_in![f.arena; lhs])),
             Document::space(),
             operator,
             rhs,
         ]),
-        Layout::ChainTail => Document::Group(Group::new(vec![
-            in f.arena;
+        Layout::ChainTail => Document::Group(Group::new(vec_in![f.arena;
             lhs,
             Document::space(),
             operator,
-            Document::Indent(vec![in f.arena; Document::Line(Line::hard()), rhs]),
+            Document::Indent(vec_in![f.arena; Document::Line(Line::hard()), rhs]),
         ])),
         Layout::BreakAfterOperator => {
             let id = f.next_id();
 
             Document::Group(
-                Group::new(vec![
-                    in f.arena;
-                    Document::Group(Group::new(vec![in f.arena; lhs])),
+                Group::new(vec_in![f.arena;
+                    Document::Group(Group::new(vec_in![f.arena; lhs])),
                     Document::space(),
                     operator,
-                    Document::IndentIfBreak(IndentIfBreak::new(id, vec![
-                        in f.arena;
+                    Document::IndentIfBreak(IndentIfBreak::new(id, vec_in![f.arena;
                         Document::Line(Line::default()),
                         rhs,
                     ])),
@@ -192,48 +193,47 @@ pub(super) fn print_assignment_with_alignment<'arena>(
                 .with_id(id),
             )
         }
-        Layout::NeverBreakAfterOperator => Document::Group(Group::new(vec![
-            in f.arena;
-            Document::Group(Group::new(vec![in f.arena; lhs])),
+        Layout::NeverBreakAfterOperator => Document::Group(Group::new(vec_in![f.arena;
+            Document::Group(Group::new(vec_in![f.arena; lhs])),
             Document::space(),
             operator,
             Document::space(),
-            Document::Group(Group::new(vec![in f.arena; rhs])),
+            Document::Group(Group::new(vec_in![f.arena; rhs])),
         ])),
-        Layout::BreakLhs => Document::Group(Group::new(vec![
-            in f.arena;
+        Layout::BreakLhs => Document::Group(Group::new(vec_in![f.arena;
             lhs,
             Document::space(),
             operator,
             Document::space(),
-            Document::Group(Group::new(vec![in f.arena; rhs])),
+            Document::Group(Group::new(vec_in![f.arena; rhs])),
         ])),
         Layout::Fluid => {
             let assignment_id = f.next_id();
 
-            Document::Group(Group::new(vec![
-                in f.arena;
+            Document::Group(Group::new(vec_in![f.arena;
                 lhs,
                 Document::space(),
                 operator,
                 Document::Group(
-                    Group::new(vec![
-                        in f.arena;
-                        Document::Indent(vec![in f.arena; Document::Line(Line::default())])
+                    Group::new(vec_in![f.arena;
+                        Document::Indent(vec_in![f.arena; Document::Line(Line::default())])
                     ]).with_id(assignment_id),
                 ),
-                Document::IndentIfBreak(IndentIfBreak::new(assignment_id, vec![in f.arena; rhs])),
+                Document::IndentIfBreak(IndentIfBreak::new(assignment_id, vec_in![f.arena; rhs])),
             ]))
         }
     }
 }
 
-fn choose_layout<'arena>(
-    f: &FormatterState<'_, 'arena>,
-    lhs: &Document<'arena>,
+fn choose_layout<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
+    lhs: &Document<'arena, A>,
     assignment_like_node: &AssignmentLikeNode<'arena>,
     rhs_expression: &'arena Expression<'arena>,
-) -> Layout {
+) -> Layout
+where
+    A: Arena,
+{
     if let Expression::Parenthesized(parenthesized) = rhs_expression {
         return choose_layout(f, lhs, assignment_like_node, parenthesized.expression);
     }
@@ -317,10 +317,13 @@ fn choose_layout<'arena>(
 }
 
 #[inline]
-fn is_member_chain_or_single_arg_call<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn is_member_chain_or_single_arg_call<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     expr: &'arena Expression<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let is_chain = |arena, e| collect_member_access_chain(arena, e).is_some_and(|c| c.is_eligible_for_chaining(f));
 
     if is_chain(f.arena, expr) {
@@ -388,10 +391,13 @@ fn is_arrow_function_variable_declarator(assignment_like_node: &AssignmentLikeNo
 const MIN_OVERLAP_FOR_BREAK: usize = 3;
 
 #[inline]
-fn is_property_like_with_short_key<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn is_property_like_with_short_key<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     assignment_like_node: &AssignmentLikeNode<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let str = match assignment_like_node {
         AssignmentLikeNode::ClassLikeConstantItem(constant_item) => &constant_item.name.value,
         AssignmentLikeNode::ConstantItem(constant_item) => &constant_item.name.value,
@@ -427,11 +433,14 @@ fn is_property_like_with_short_key<'arena>(
 }
 
 #[inline]
-fn should_break_after_operator<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn should_break_after_operator<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     rhs_expression: &'arena Expression<'arena>,
     has_short_key: bool,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if let Expression::Parenthesized(parenthesized) = rhs_expression {
         return should_break_after_operator(f, parenthesized.expression, has_short_key);
     }
@@ -496,17 +505,20 @@ fn should_break_after_operator<'arena>(
 }
 
 #[inline]
-fn is_poorly_breakable_member_or_call_chain<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn is_poorly_breakable_member_or_call_chain<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     rhs_expression: &'arena Expression<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if collect_member_access_chain(f.arena, rhs_expression).is_some_and(|c| c.is_eligible_for_chaining(f)) {
         return false;
     }
 
     let mut is_chain_expression = false;
     let mut is_identifier_or_variable = false;
-    let mut call_argument_lists = vec![in f.arena];
+    let mut call_argument_lists = vec_in![f.arena];
 
     let mut expression = Some(rhs_expression);
     while let Some(node) = expression.take() {
@@ -575,10 +587,13 @@ fn is_poorly_breakable_member_or_call_chain<'arena>(
 }
 
 #[inline]
-fn is_lone_short_argument_list<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn is_lone_short_argument_list<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     argument_list: &'arena ArgumentList<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if let Some(first_argument) = argument_list.arguments.first() {
         if argument_list.arguments.len() == 1 {
             return is_lone_short_argument(f, first_argument.value());
@@ -593,7 +608,13 @@ fn is_lone_short_argument_list<'arena>(
 const LONE_SHORT_ARGUMENT_THRESHOLD_RATE: f32 = 0.25;
 
 #[inline]
-fn is_lone_short_argument<'arena>(f: &FormatterState<'_, 'arena>, argument_value: &'arena Expression<'arena>) -> bool {
+fn is_lone_short_argument<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
+    argument_value: &'arena Expression<'arena>,
+) -> bool
+where
+    A: Arena,
+{
     let argument_span = argument_value.span();
     if f.has_comment(argument_span, CommentFlags::all()) {
         return false;

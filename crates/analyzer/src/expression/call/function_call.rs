@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -27,12 +28,15 @@ use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         if context.plugin_registry.has_function_call_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);
             let result = context.plugin_registry.before_function_call(self, &mut hook_context)?;
@@ -84,13 +88,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
     }
 }
 
-pub(super) fn resolve_targets<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(super) fn resolve_targets<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     expression: &Expression<'arena>,
     template_result: &mut TemplateResult,
-) -> Result<(Vec<InvocationTarget<'ctx>>, bool), AnalysisError> {
+) -> Result<(Vec<InvocationTarget<'ctx>>, bool), AnalysisError>
+where
+    A: Arena,
+{
     if let Expression::Identifier(function_name) = expression {
         let name = word(context.resolved_names.get(function_name));
         let unqualified_name = word(function_name.value());

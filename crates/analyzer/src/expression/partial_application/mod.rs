@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::sync::Arc;
 
 use mago_codex::metadata::CodebaseMetadata;
@@ -25,12 +26,15 @@ pub mod method_partial_application;
 pub mod static_method_partial_application;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PartialApplication<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         match self {
             PartialApplication::Function(function_partial_application) => {
                 function_partial_application.analyze(context, block_context, artifacts)

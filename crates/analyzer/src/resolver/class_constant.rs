@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_word::Word;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -53,14 +54,17 @@ pub struct ConstantResolutionResult {
 }
 
 /// Resolves all possible class constants from a class expression and a constant selector.
-pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn resolve_class_constants<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class_expr: &'ast Expression<'arena>,
     constant_selector: &'ast ClassLikeConstantSelector<'arena>,
     class_expr_is_analyzed: bool,
-) -> Result<ConstantResolutionResult, AnalysisError> {
+) -> Result<ConstantResolutionResult, AnalysisError>
+where
+    A: Arena,
+{
     let mut result = ConstantResolutionResult::default();
 
     // 1. Resolve all possible class names from the expression.
@@ -150,14 +154,17 @@ pub fn resolve_class_constants<'ctx, 'ast, 'arena>(
 }
 
 /// Specific handler for the `::class` magic constant.
-fn handle_class_magic_constant<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn handle_class_magic_constant<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class_resolution: &ResolvedClassname,
     class_expr: &'ast Expression<'arena>,
     selector: &'ast ClassLikeConstantSelector<'arena>,
-) -> Option<TUnion> {
+) -> Option<TUnion>
+where
+    A: Arena,
+{
     if matches!(class_resolution.origin, ResolutionOrigin::AnyString) {
         context.collector.report_with_code(
             IssueCode::InvalidClassConstantOnString,
@@ -241,14 +248,17 @@ fn is_valid_trait_constant_access(origin: &ResolutionOrigin) -> bool {
 }
 
 /// Finds a constant or enum case by name within a class.
-fn find_constant_in_class<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn find_constant_in_class<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     metadata: &'ctx ClassLikeMetadata,
     const_name: Word,
     class_span: Span,
     const_span: Span,
     resolution_origin: &ResolutionOrigin,
-) -> Option<ResolvedConstant> {
+) -> Option<ResolvedConstant>
+where
+    A: Arena,
+{
     if metadata.kind.is_trait() && !is_valid_trait_constant_access(resolution_origin) {
         context.collector.report_with_code(
             IssueCode::DirectTraitConstantAccess,
@@ -364,7 +374,10 @@ fn find_constant_in_class<'ctx>(
 }
 
 /// Reports an error for a class-like that cannot be found in the codebase.
-fn report_non_existent_class(context: &mut Context<'_, '_>, classname: Word, class_span: Span) {
+fn report_non_existent_class<A>(context: &mut Context<'_, '_, A>, classname: Word, class_span: Span)
+where
+    A: Arena,
+{
     let classname = display_class_like_name(context, classname);
 
     context.collector.report_with_code(
@@ -380,13 +393,15 @@ fn report_non_existent_class(context: &mut Context<'_, '_>, classname: Word, cla
     );
 }
 
-fn report_non_existent_constant<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn report_non_existent_constant<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     metadata: &'ctx ClassLikeMetadata,
     const_name: Word,
     class_span: Span,
     const_span: Span,
-) {
+) where
+    A: Arena,
+{
     let class_kind_str = metadata.kind.as_str();
     let class_str = &metadata.original_name;
 
@@ -416,7 +431,10 @@ fn report_non_existent_constant<'ctx>(
 }
 
 /// Reports a warning when a constant is accessed on an ambiguous type like `object` or `class-string`.
-fn report_ambiguous_constant_access<'arena>(context: &mut Context<'_, 'arena>, class_expr: &Expression<'arena>) {
+fn report_ambiguous_constant_access<'arena, A>(context: &mut Context<'_, 'arena, A>, class_expr: &Expression<'arena>)
+where
+    A: Arena,
+{
     context.collector.report_with_code(
         IssueCode::AmbiguousClassLikeConstantAccess,
         Issue::warning("Cannot reliably determine class for constant access due to an ambiguous type.")

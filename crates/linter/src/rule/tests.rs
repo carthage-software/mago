@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use bumpalo::Bump;
+use mago_allocator::prelude::*;
 use mago_database::file::File;
 use mago_names::resolver::NameResolver;
 use mago_syntax::parser::parse_file;
@@ -41,7 +41,7 @@ pub fn run_lint_test<R, F>(
     F: FnOnce(&mut Settings),
     R: LintRule,
 {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let file =
         File::ephemeral(Cow::Borrowed(filename.unwrap_or("test.php").as_bytes()), Cow::Owned(code.as_bytes().to_vec()));
 
@@ -117,7 +117,7 @@ where
 {
     use mago_text_edit::TextEditor;
 
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let file =
         File::ephemeral(Cow::Borrowed(filename.unwrap_or("test.php").as_bytes()), Cow::Owned(code.as_bytes().to_vec()));
 

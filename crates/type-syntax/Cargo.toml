@@ -13,10 +13,10 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+mago-allocator = { workspace = true }
 mago-database = { workspace = true }
 mago-span = { workspace = true }
 mago-syntax-core = { workspace = true }
-bumpalo = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
 ordered-float = { workspace = true, features = ["serde", "rand"] }

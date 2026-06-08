@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::FunctionCall;
@@ -19,13 +20,14 @@ use crate::context::LintContext;
 ///
 /// Returns `Some(name)` with the **first matching name from the input slice** if a
 /// potential resolution matches, or `None` if no match is found.
-pub fn function_call_matches_any<'arena, 'names, S>(
-    context: &LintContext<'_, 'arena>,
+pub fn function_call_matches_any<'arena, 'names, S, A>(
+    context: &LintContext<'_, 'arena, A>,
     call: &FunctionCall<'arena>,
     names: &'names [S],
 ) -> Option<&'names str>
 where
     S: AsRef<str>,
+    A: Arena,
 {
     function_name_matches_any(context, call.function, names)
 }
@@ -35,23 +37,27 @@ where
 /// This is a convenience wrapper around `function_call_matches_any` for checking
 /// against a single function name.
 #[inline]
-pub fn function_call_matches<'arena>(
-    context: &LintContext<'_, 'arena>,
+pub fn function_call_matches<'arena, A>(
+    context: &LintContext<'_, 'arena, A>,
     call: &FunctionCall<'arena>,
     name: &str,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     function_call_matches_any(context, call, std::slice::from_ref(&name)).is_some()
 }
 
 /// The internal implementation that checks if a function name `Expression`
 /// could resolve to one of the provided names.
-fn function_name_matches_any<'arena, 'names, S>(
-    context: &LintContext<'_, 'arena>,
+fn function_name_matches_any<'arena, 'names, S, A>(
+    context: &LintContext<'_, 'arena, A>,
     function: &Expression<'arena>,
     names: &'names [S],
 ) -> Option<&'names str>
 where
     S: AsRef<str>,
+    A: Arena,
 {
     let Expression::Identifier(function_identifier) = function else {
         return None;

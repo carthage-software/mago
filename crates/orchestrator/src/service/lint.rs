@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 
 use mago_database::ReadDatabase;
 use mago_database::file::File;
@@ -105,7 +105,7 @@ impl LintService {
         only: Option<&[String]>,
         include_disabled: bool,
     ) -> IssueCollection {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let program = parse_file_with_settings(&arena, file, self.parser_settings);
         let resolved_names = NameResolver::new(&arena).resolve(program);
 

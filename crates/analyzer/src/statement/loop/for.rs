@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_syntax::ast::For;
 
@@ -9,12 +10,15 @@ use crate::error::AnalysisError;
 use crate::statement::r#loop;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for For<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let infinite_loop = self.initializations.is_empty() && self.conditions.is_empty() && self.increments.is_empty();
 
         r#loop::analyze_for_or_while_loop(

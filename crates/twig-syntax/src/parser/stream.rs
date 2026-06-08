@@ -13,8 +13,7 @@
 use mago_syntax_core::parser::LookaheadBuf;
 use std::fmt::Debug;
 
-use bumpalo::Bump;
-use bumpalo::collections::Vec as BVec;
+use mago_allocator::prelude::*;
 
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
@@ -33,30 +32,36 @@ use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
 
 #[derive(Debug)]
-pub struct TokenStream<'arena> {
-    arena: &'arena Bump,
+pub struct TokenStream<'arena, A>
+where
+    A: Arena,
+{
+    arena: &'arena A,
     lexer: TwigLexer<'arena>,
     /// Non-trivia lookahead buffer pulled on demand from the lexer.
     buffer: LookaheadBuf<TwigToken<'arena>, 8>,
     /// Trivia collected as the lexer is drained.
-    trivia: BVec<'arena, Trivia<'arena>>,
+    trivia: Vec<'arena, Trivia<'arena>, A>,
     /// End position of the most recently consumed significant token.
     position: Position,
     file_id: FileId,
 }
 
-impl<'arena> TokenStream<'arena> {
+impl<'arena, A> TokenStream<'arena, A>
+where
+    A: Arena,
+{
     #[inline]
-    pub fn new(arena: &'arena Bump, lexer: TwigLexer<'arena>) -> Self {
+    pub fn new(arena: &'arena A, lexer: TwigLexer<'arena>) -> Self {
         let position = lexer.current_position();
         let file_id = lexer.file_id();
 
-        Self { arena, lexer, buffer: LookaheadBuf::new(), trivia: BVec::new_in(arena), position, file_id }
+        Self { arena, lexer, buffer: LookaheadBuf::new(), trivia: Vec::new_in(arena), position, file_id }
     }
 
     #[inline]
     #[must_use]
-    pub fn arena(&self) -> &'arena Bump {
+    pub fn arena(&self) -> &'arena A {
         self.arena
     }
 
@@ -106,7 +111,7 @@ impl<'arena> TokenStream<'arena> {
     /// a [`Template`](crate::ast::Template).
     #[inline]
     pub fn get_trivia(&mut self) -> Sequence<'arena, Trivia<'arena>> {
-        let trivia = std::mem::replace(&mut self.trivia, BVec::new_in(self.arena));
+        let trivia = std::mem::replace(&mut self.trivia, Vec::new_in(self.arena));
         Sequence::new(trivia)
     }
 
@@ -118,8 +123,8 @@ impl<'arena> TokenStream<'arena> {
 
     #[inline]
     #[must_use]
-    pub fn bvec<T>(&self) -> BVec<'arena, T> {
-        BVec::new_in(self.arena)
+    pub fn bvec<T>(&self) -> Vec<'arena, T, A> {
+        Vec::new_in(self.arena)
     }
 
     /// Fill the lookahead buffer until it holds at least `n` tokens, or the
@@ -415,7 +420,10 @@ impl<'arena> TokenStream<'arena> {
     }
 }
 
-impl HasFileId for TokenStream<'_> {
+impl<A> HasFileId for TokenStream<'_, A>
+where
+    A: Arena,
+{
     #[inline]
     fn file_id(&self) -> FileId {
         self.file_id

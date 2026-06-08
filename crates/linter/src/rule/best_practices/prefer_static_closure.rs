@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -107,7 +108,10 @@ impl LintRule for PreferStaticClosureRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         // Must be inside a class to have $this available
         if ctx.scope.get_class_like_scope().is_none() {
             return;
@@ -146,7 +150,10 @@ impl LintRule for PreferStaticClosureRule {
 }
 
 impl PreferStaticClosureRule {
-    fn report_issue(&self, ctx: &mut LintContext, keyword_span: Span, kind: &str) {
+    fn report_issue<A>(&self, ctx: &mut LintContext<'_, '_, A>, keyword_span: Span, kind: &str)
+    where
+        A: Arena,
+    {
         let issue =
             Issue::new(self.cfg.level(), format!("This {kind} does not use `$this` and should be declared static."))
                 .with_code(self.meta.code)

@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -17,7 +18,10 @@ pub(crate) struct DelimitedSequenceResult<'arena, T> {
     pub close: Span,
 }
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse a comma-separated, bracketed sequence - the shape used by
     /// every `[ ... ]`, `( ... )`, and `{ ... }` list in Twig (array literals,
     /// argument lists, macro parameters, arrow parameters, ...).

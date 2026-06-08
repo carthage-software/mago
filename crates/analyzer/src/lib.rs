@@ -5,7 +5,7 @@
 #![allow(clippy::pub_use)]
 #![allow(clippy::match_wildcard_for_single_variants)]
 
-use bumpalo::Bump;
+use mago_allocator::Arena;
 
 use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
@@ -51,8 +51,11 @@ mod visibility;
 const COLLECTOR_CATEGORIES: &[&str] = &["analysis", "analyzer", "analyser"];
 
 #[derive(Debug)]
-pub struct Analyzer<'ctx, 'ast, 'arena> {
-    pub arena: &'arena Bump,
+pub struct Analyzer<'ctx, 'ast, 'arena, A>
+where
+    A: Arena,
+{
+    pub arena: &'arena A,
     pub source_file: &'ctx File,
     pub resolved_names: &'ast ResolvedNames<'arena>,
     pub codebase: &'ctx CodebaseMetadata,
@@ -60,9 +63,12 @@ pub struct Analyzer<'ctx, 'ast, 'arena> {
     pub plugin_registry: &'ctx PluginRegistry,
 }
 
-impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
+impl<'ctx, 'ast, 'arena, A> Analyzer<'ctx, 'ast, 'arena, A>
+where
+    A: Arena,
+{
     pub fn new(
-        arena: &'arena Bump,
+        arena: &'arena A,
         source_file: &'ctx File,
         resolved_names: &'ast ResolvedNames<'arena>,
         codebase: &'ctx CodebaseMetadata,
@@ -213,6 +219,7 @@ impl<'ctx, 'ast, 'arena> Analyzer<'ctx, 'ast, 'arena> {
 
 #[cfg(test)]
 mod tests {
+    use mago_allocator::LocalArena;
     use std::borrow::Cow;
     use std::collections::BTreeMap;
     use std::fmt::Write as _;
@@ -277,7 +284,7 @@ mod tests {
     }
 
     fn run_test_case_inner(config: TestCase) {
-        let arena = bumpalo::Bump::new();
+        let arena = LocalArena::new();
         let source_file =
             File::ephemeral(Cow::Borrowed(config.name.as_bytes()), Cow::Borrowed(config.content.as_bytes()));
 

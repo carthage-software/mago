@@ -1,4 +1,5 @@
 use diffy::PatchFormatter;
+use mago_allocator::Arena;
 
 use mago_codex::ttype::TType;
 use mago_codex::ttype::union::TUnion;
@@ -29,7 +30,10 @@ pub mod template;
 /// # Returns
 ///
 /// An `Option<String>` containing the formatted diff if both types are complex, or `None` otherwise.
-pub fn get_type_diff(context: &Context<'_, '_>, container: &TUnion, input: &TUnion) -> Option<String> {
+pub fn get_type_diff<A>(context: &Context<'_, '_, A>, container: &TUnion, input: &TUnion) -> Option<String>
+where
+    A: Arena,
+{
     if !container.is_complex() || !input.is_complex() {
         return None;
     }

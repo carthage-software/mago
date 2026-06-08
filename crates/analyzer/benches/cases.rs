@@ -7,11 +7,11 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
-use bumpalo::Bump;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
+use mago_allocator::LocalArena;
 
 use foldhash::HashSet;
 
@@ -41,7 +41,7 @@ fn analyze_file(path: &Path, content: &str) {
     let file_id = database.add(file);
     let source_file = database.get_ref(&file_id).expect("file just added must exist");
 
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let program = parse_file(&arena, source_file);
     if program.has_errors() {
         panic!("Parse failed for {}: {:?}", path.display(), program.errors);

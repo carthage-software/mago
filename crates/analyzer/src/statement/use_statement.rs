@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -18,12 +19,15 @@ use mago_bytes::BytesDisplay;
 use mago_bytes::trim_start_byte;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Use<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         _block_context: &mut BlockContext<'ctx>,
         _artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         match &self.items {
             UseItems::Sequence(sequence) => {
                 for item in sequence.items.iter() {
@@ -62,13 +66,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Use<'arena> {
     }
 }
 
-fn check_class_like_import(context: &mut Context<'_, '_>, name: &Identifier<'_>, fqn: &[u8]) {
+fn check_class_like_import<A>(context: &mut Context<'_, '_, A>, name: &Identifier<'_>, fqn: &[u8])
+where
+    A: Arena,
+{
     if !context.codebase.class_like_exists(fqn) && !context.codebase.namespace_exists(fqn) {
         report_non_existent_import(context, name.span(), fqn, "class, interface, trait, or enum");
     }
 }
 
-fn check_typed_import(context: &mut Context<'_, '_>, name: &Identifier<'_>, fqn: &[u8], use_type: &UseType<'_>) {
+fn check_typed_import<A>(context: &mut Context<'_, '_, A>, name: &Identifier<'_>, fqn: &[u8], use_type: &UseType<'_>)
+where
+    A: Arena,
+{
     match use_type {
         UseType::Function(_) => {
             if !context.codebase.function_exists(fqn) {
@@ -83,12 +93,14 @@ fn check_typed_import(context: &mut Context<'_, '_>, name: &Identifier<'_>, fqn:
     }
 }
 
-fn check_maybe_typed_import(
-    context: &mut Context<'_, '_>,
+fn check_maybe_typed_import<A>(
+    context: &mut Context<'_, '_, A>,
     name: &Identifier<'_>,
     fqn: &[u8],
     use_type: Option<&UseType<'_>>,
-) {
+) where
+    A: Arena,
+{
     match use_type {
         Some(UseType::Function(_)) => {
             if !context.codebase.function_exists(fqn) {
@@ -108,7 +120,10 @@ fn check_maybe_typed_import(
     }
 }
 
-fn report_non_existent_import(context: &mut Context<'_, '_>, span: Span, fqn: &[u8], symbol_type: &str) {
+fn report_non_existent_import<A>(context: &mut Context<'_, '_, A>, span: Span, fqn: &[u8], symbol_type: &str)
+where
+    A: Arena,
+{
     let fqn = BytesDisplay(fqn);
     context.collector.report_with_code(
         IssueCode::NonExistentUseImport,

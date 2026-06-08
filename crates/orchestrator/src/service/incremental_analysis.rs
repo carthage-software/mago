@@ -2,9 +2,9 @@ use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
 
-use bumpalo::Bump;
 use foldhash::HashMap;
 use foldhash::HashSet;
+use mago_allocator::LocalArena;
 
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
@@ -286,7 +286,7 @@ impl IncrementalAnalysisService {
         let php_version = self.settings.version;
         let per_file_results: Vec<(FileId, u64, CodebaseMetadata)> = source_files
             .into_par_iter()
-            .map_init(Bump::new, |arena, file| {
+            .map_init(LocalArena::new, |arena, file| {
                 let content_hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_ref());
 
                 let program = parse_file_with_settings(arena, &file, parser_settings);
@@ -523,7 +523,7 @@ impl IncrementalAnalysisService {
         let php_version = self.settings.version;
         let new_file_scans: Vec<(FileId, CodebaseMetadata)> = changed_files
             .into_par_iter()
-            .map_init(Bump::new, |arena, file| {
+            .map_init(LocalArena::new, |arena, file| {
                 let program = parse_file_with_settings(arena, file, parser_settings);
                 if program.has_errors() {
                     tracing::warn!(
@@ -935,7 +935,7 @@ impl IncrementalAnalysisService {
     pub fn analyze_file_with_artifacts(&self, file_id: FileId) -> Option<(IssueCollection, AnalysisArtifacts)> {
         let file = self.database.get(&file_id).ok()?;
 
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let program = parse_file_with_settings(&arena, &file, self.parser_settings);
         let resolved_names = NameResolver::new(&arena).resolve(program);
 
@@ -975,7 +975,7 @@ impl IncrementalAnalysisService {
             return IssueCollection::default();
         };
 
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let program = parse_file_with_settings(&arena, &file, self.parser_settings);
         let resolved_names = NameResolver::new(&arena).resolve(program);
 
@@ -1034,7 +1034,7 @@ impl IncrementalAnalysisService {
 
         let results: Vec<(FileId, AnalysisResult)> = host_files
             .into_par_iter()
-            .map_init(Bump::new, |arena, source_file| {
+            .map_init(LocalArena::new, |arena, source_file| {
                 let file_id = source_file.id;
                 let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
 

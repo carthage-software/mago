@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -139,7 +140,10 @@ impl LintRule for NoSideEffectsWithDeclarationsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::Program(program) = node else {
             return;
         };
@@ -184,8 +188,11 @@ struct StatementCollector<'cfg> {
     side_effects: Vec<Span>,
 }
 
-impl<'ast, 'arena> MutWalker<'ast, 'arena, LintContext<'_, 'arena>> for StatementCollector<'_> {
-    fn walk_in_statement(&mut self, statement: &'ast Statement<'arena>, ctx: &mut LintContext<'_, 'arena>) {
+impl<'ast, 'arena, A> MutWalker<'ast, 'arena, LintContext<'_, 'arena, A>> for StatementCollector<'_>
+where
+    A: Arena,
+{
+    fn walk_in_statement(&mut self, statement: &'ast Statement<'arena>, ctx: &mut LintContext<'_, 'arena, A>) {
         match statement {
             _ if statement.is_declaration()
                 && !matches!(statement, Statement::Declare(_) | Statement::Namespace(_)) =>
@@ -208,22 +215,25 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, LintContext<'_, 'arena>> for Statemen
     }
 
     // Stop descent into symbol bodies; we only care about top-level statements.
-    fn walk_class(&mut self, _: &'ast Class<'arena>, _: &mut LintContext<'_, 'arena>) {}
-    fn walk_interface(&mut self, _: &'ast Interface<'arena>, _: &mut LintContext<'_, 'arena>) {}
-    fn walk_trait(&mut self, _: &'ast Trait<'arena>, _: &mut LintContext<'_, 'arena>) {}
-    fn walk_enum(&mut self, _: &'ast Enum<'arena>, _: &mut LintContext<'_, 'arena>) {}
-    fn walk_function(&mut self, _: &'ast Function<'arena>, _: &mut LintContext<'_, 'arena>) {}
-    fn walk_closure(&mut self, _: &'ast Closure<'arena>, _: &mut LintContext<'_, 'arena>) {}
-    fn walk_arrow_function(&mut self, _: &'ast ArrowFunction<'arena>, _: &mut LintContext<'_, 'arena>) {}
-    fn walk_anonymous_class(&mut self, _: &'ast AnonymousClass<'arena>, _: &mut LintContext<'_, 'arena>) {}
+    fn walk_class(&mut self, _: &'ast Class<'arena>, _: &mut LintContext<'_, 'arena, A>) {}
+    fn walk_interface(&mut self, _: &'ast Interface<'arena>, _: &mut LintContext<'_, 'arena, A>) {}
+    fn walk_trait(&mut self, _: &'ast Trait<'arena>, _: &mut LintContext<'_, 'arena, A>) {}
+    fn walk_enum(&mut self, _: &'ast Enum<'arena>, _: &mut LintContext<'_, 'arena, A>) {}
+    fn walk_function(&mut self, _: &'ast Function<'arena>, _: &mut LintContext<'_, 'arena, A>) {}
+    fn walk_closure(&mut self, _: &'ast Closure<'arena>, _: &mut LintContext<'_, 'arena, A>) {}
+    fn walk_arrow_function(&mut self, _: &'ast ArrowFunction<'arena>, _: &mut LintContext<'_, 'arena, A>) {}
+    fn walk_anonymous_class(&mut self, _: &'ast AnonymousClass<'arena>, _: &mut LintContext<'_, 'arena, A>) {}
 }
 
 impl StatementCollector<'_> {
-    fn is_allowed_expression<'arena>(
+    fn is_allowed_expression<'arena, A>(
         &self,
         expr_stmt: &ExpressionStatement<'arena>,
-        ctx: &LintContext<'_, 'arena>,
-    ) -> bool {
+        ctx: &LintContext<'_, 'arena, A>,
+    ) -> bool
+    where
+        A: Arena,
+    {
         let Expression::Call(Call::Function(function_call)) = &expr_stmt.expression else {
             return false;
         };

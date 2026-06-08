@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -86,7 +87,10 @@ impl LintRule for NoRedundantBinaryStringPrefixRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let prefix_span = match node {
             Node::LiteralString(literal) if (literal.raw.starts_with(b"b") || literal.raw.starts_with(b"B")) => {
                 let span = literal.span();

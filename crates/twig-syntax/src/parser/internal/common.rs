@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::ast::Identifier;
@@ -8,7 +9,10 @@ use crate::parser::stream::is_keyword_usable_as_name;
 use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Convert a token into a [`Keyword`].
     #[inline]
     pub(crate) fn keyword_from(&self, token: &TwigToken<'arena>) -> Keyword<'arena> {

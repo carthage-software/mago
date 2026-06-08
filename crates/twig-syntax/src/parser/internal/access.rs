@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_span::Span;
 
 use crate::ast::Call;
@@ -15,7 +16,10 @@ use crate::parser::stream::is_keyword_usable_as_name;
 use crate::parser::stream::looks_like_identifier;
 use crate::token::TwigTokenKind;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse `object . attribute` or `object ?. attribute`. If the
     /// attribute is immediately followed by `(`, the result is a
     /// [`MethodCall`]; otherwise a [`GetAttribute`]. An `object.(expr)`

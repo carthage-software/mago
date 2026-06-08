@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::assertion::Assertion;
@@ -29,12 +30,15 @@ use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_property_access_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyAccess<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_property_access(
             context,
             block_context,
@@ -49,12 +53,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyAccess<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafePropertyAccess<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_property_access(
             context,
             block_context,
@@ -69,8 +76,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafePropertyAccess<'arena> {
 }
 
 #[inline]
-fn analyze_property_access<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_property_access<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     span: Span,
@@ -78,7 +85,10 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
     arrow_span: Span,
     property_selector: &'ast ClassLikeMemberSelector<'arena>,
     is_null_safe: bool,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let property_access_id = get_property_access_expression_id(
         object,
         property_selector,
@@ -213,13 +223,16 @@ fn analyze_property_access<'ctx, 'ast, 'arena>(
 ///
 /// When property access is memoized, we still need to track the symbol reference
 /// so that unused property detection works correctly.
-fn add_memoized_property_reference<'ctx, 'ast, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn add_memoized_property_reference<'ctx, 'ast, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     object: &'ast Expression<'arena>,
     property_selector: &'ast ClassLikeMemberSelector<'arena>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let property_name = match property_selector {
         ClassLikeMemberSelector::Identifier(ident) => concat_word!(b"$", ident.value),
         _ => return Ok(()),

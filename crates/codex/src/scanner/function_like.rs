@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use mago_allocator::Arena;
 use mago_docblock::tag::TypeString;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
@@ -54,14 +54,17 @@ use crate::ttype::template::GenericTemplate;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn scan_method<'arena>(
+pub fn scan_method<'arena, A>(
     functionlike_id: (Word, Word),
     method: &'arena Method<'arena>,
     class_like_metadata: &ClassLikeMetadata,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
     type_resolution_context: Option<TypeResolutionContext>,
-) -> Option<FunctionLikeMetadata> {
+) -> Option<FunctionLikeMetadata>
+where
+    A: Arena,
+{
     let span = method.span();
 
     let mut flags = MetadataFlags::origin_flags(context.file.file_type);
@@ -148,15 +151,18 @@ pub fn scan_method<'arena>(
 }
 
 #[inline]
-pub fn scan_function<'arena>(
+pub fn scan_function<'arena, A>(
     functionlike_id: (Word, Word),
     function: &'arena Function<'arena>,
     classname: Option<Word>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
     constants: Option<&WordMap<ConstantMetadata>>,
-) -> Option<FunctionLikeMetadata> {
+) -> Option<FunctionLikeMetadata>
+where
+    A: Arena,
+{
     let verdict = evaluate_version_attributes(&function.attribute_lists, context, context.php_version);
 
     let mut flags = MetadataFlags::origin_flags(context.file.file_type);
@@ -214,14 +220,17 @@ pub fn scan_function<'arena>(
 }
 
 #[inline]
-pub fn scan_closure<'arena>(
+pub fn scan_closure<'arena, A>(
     functionlike_id: (Word, Word),
     closure: &'arena Closure<'arena>,
     classname: Option<Word>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
-) -> FunctionLikeMetadata {
+) -> FunctionLikeMetadata
+where
+    A: Arena,
+{
     let span = closure.span();
 
     let mut flags = MetadataFlags::origin_flags(context.file.file_type);
@@ -271,14 +280,17 @@ pub fn scan_closure<'arena>(
 }
 
 #[inline]
-pub fn scan_arrow_function<'arena>(
+pub fn scan_arrow_function<'arena, A>(
     functionlike_id: (Word, Word),
     arrow_function: &'arena ArrowFunction<'arena>,
     classname: Option<Word>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
     type_resolution_context: TypeResolutionContext,
-) -> FunctionLikeMetadata {
+) -> FunctionLikeMetadata
+where
+    A: Arena,
+{
     let span = arrow_function.span();
 
     let mut flags = MetadataFlags::origin_flags(context.file.file_type);
@@ -326,14 +338,16 @@ pub fn scan_arrow_function<'arena>(
     metadata
 }
 
-fn scan_function_like_docblock(
+fn scan_function_like_docblock<A>(
     span: Span,
     functionlike_id: (Word, Word),
     metadata: &mut FunctionLikeMetadata,
     classname: Option<Word>,
-    context: &Context<'_, '_>,
+    context: &Context<'_, '_, A>,
     scope: &mut NamespaceScope,
-) {
+) where
+    A: Arena,
+{
     let docblock = match FunctionLikeDocblockComment::create(context, span, scope) {
         Ok(Some(docblock)) => docblock,
         Ok(None) => {
@@ -752,14 +766,17 @@ fn scan_function_like_docblock(
     }
 }
 
-fn parse_assertion_string(
-    arena: &Bump,
+fn parse_assertion_string<A>(
+    arena: &A,
     mut type_string: TypeString,
     classname: Option<Word>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
     function_like_metadata: &mut FunctionLikeMetadata,
-) -> Vec<Assertion> {
+) -> Vec<Assertion>
+where
+    A: Arena,
+{
     let mut assertions = Vec::new();
     if type_string.value.eq_ignore_ascii_case(b"truthy") || type_string.value.eq_ignore_ascii_case(b"!falsy") {
         assertions.push(Assertion::Truthy);

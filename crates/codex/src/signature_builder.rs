@@ -41,7 +41,7 @@ pub fn build_file_signature<'arena>(
     program: &'arena Program<'arena>,
     resolved_names: &'arena ResolvedNames<'arena>,
 ) -> FileSignature {
-    let mut builder = SignatureBuilder::new(file, resolved_names, &program.trivia.nodes);
+    let mut builder = SignatureBuilder::new(file, resolved_names, program.trivia.nodes);
     builder.walk_program(program, &mut ());
 
     let hash = program.fingerprint(resolved_names, &builder.fingerprint_options);

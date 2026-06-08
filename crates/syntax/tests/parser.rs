@@ -3,7 +3,7 @@
 mod runner {
     use std::borrow::Cow;
 
-    use bumpalo::Bump;
+    use mago_allocator::LocalArena;
 
     use mago_database::file::File;
 
@@ -11,7 +11,7 @@ mod runner {
     use mago_syntax::parser::parse_file;
 
     pub fn smoke_test(name: &'static str, code: &'static str) {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let file = File::ephemeral(Cow::Borrowed(name.as_bytes()), Cow::Borrowed(code.as_bytes()));
         let program = parse_file(&arena, &file);
         if !program.errors.is_empty() {
@@ -20,7 +20,7 @@ mod runner {
     }
 
     pub fn parse_error_test(name: &'static str, code: &'static str) {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let file = File::ephemeral(Cow::Borrowed(name.as_bytes()), Cow::Borrowed(code.as_bytes()));
         let program = parse_file(&arena, &file);
         if program.errors.is_empty() {
@@ -222,7 +222,7 @@ mod runner {
         }
 
         let code = format!("<?php {expression};");
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let file = File::ephemeral(Cow::Borrowed(name.as_bytes()), Cow::Owned(code.into_bytes()));
 
         let program = parse_file(&arena, &file);

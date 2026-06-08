@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -24,13 +25,16 @@ use crate::context::Context;
 use crate::invocation::Invocation;
 
 /// Resolves a type resulting from an invocation.
-pub fn resolve_invocation_type<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+pub fn resolve_invocation_type<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
     invocation_type: TUnion,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut template_result = Cow::Borrowed(template_result);
 
     'populate_templates: {
@@ -97,13 +101,16 @@ pub fn resolve_invocation_type<'ctx, 'arena>(
     resolve_union(context, invocation, &template_result, parameters, invocation_type)
 }
 
-fn resolve_union<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn resolve_union<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
     union_to_resolve: TUnion,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut resulting_union = union_to_resolve;
     let mut resulting_atomics = Vec::with_capacity(resulting_union.types.len());
     for atomic_to_resolve in resulting_union.types.into_owned() {
@@ -188,13 +195,16 @@ fn resolve_union<'ctx, 'arena>(
     resulting_union
 }
 
-fn resolve_atomic<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn resolve_atomic<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
     atomic_to_resolve: TAtomic,
-) -> Vec<TAtomic> {
+) -> Vec<TAtomic>
+where
+    A: Arena,
+{
     if let TAtomic::Variable(variable) = atomic_to_resolve {
         if variable.as_bytes().eq_ignore_ascii_case(b"$this")
             && let Some(method_context) = invocation.target.get_method_context()

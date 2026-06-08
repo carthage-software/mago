@@ -21,7 +21,7 @@ foldhash = { workspace = true }
 memchr = { workspace = true }
 serde = { workspace = true }
 unicode-width = { workspace = true }
-bumpalo = { workspace = true }
+mago-allocator = { workspace = true }
 schemars = { workspace = true }
 
 [dev-dependencies]

@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -9,12 +10,14 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 
 /// Checks if using an experimental class-like from a non-experimental context and reports a warning.
-pub fn check_experimental_class_like(
-    context: &mut Context<'_, '_>,
+pub fn check_experimental_class_like<A>(
+    context: &mut Context<'_, '_, A>,
     block_context: &BlockContext<'_>,
     class_name: Word,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_experimental {
         return;
     }
@@ -46,12 +49,14 @@ pub fn check_experimental_class_like(
 /// Checks if calling an experimental function from a non-experimental context and reports a warning.
 ///
 /// Accepts pre-resolved metadata to avoid redundant lookups.
-pub fn check_experimental_function_with_metadata(
-    context: &mut Context<'_, '_>,
+pub fn check_experimental_function_with_metadata<A>(
+    context: &mut Context<'_, '_, A>,
     block_context: &BlockContext<'_>,
     metadata: &FunctionLikeMetadata,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_experimental {
         return;
     }
@@ -80,13 +85,15 @@ pub fn check_experimental_function_with_metadata(
 /// Checks if using an experimental constant from a non-experimental context and reports a warning.
 ///
 /// Accepts pre-resolved flags to avoid redundant lookups.
-pub fn check_experimental_constant(
-    context: &mut Context<'_, '_>,
+pub fn check_experimental_constant<A>(
+    context: &mut Context<'_, '_, A>,
     block_context: &BlockContext<'_>,
     flags: &mago_codex::metadata::flags::MetadataFlags,
     constant_name: &[u8],
     span: Span,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_experimental {
         return;
     }

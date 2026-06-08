@@ -1,5 +1,5 @@
-use bumpalo::vec;
-
+use mago_allocator::Arena;
+use mago_allocator::vec_in;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::ArgumentList;
@@ -105,23 +105,26 @@ impl HasSpan for CallLikeNode<'_> {
     }
 }
 
-pub(super) fn print_call_like_node<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_call_like_node<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     node: CallLikeNode<'arena>,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     // format the callee-like expression
     let mut parts = match node {
         CallLikeNode::Call(c) => match c {
-            Call::Function(c) => vec![in f.arena; c.function.format(f)],
-            Call::StaticMethod(c) => vec![in f.arena; c.class.format(f), Document::String(b"::"), c.method.format(f)],
+            Call::Function(c) => vec_in![f.arena; c.function.format(f)],
+            Call::StaticMethod(c) => vec_in![f.arena; c.class.format(f), Document::String(b"::"), c.method.format(f)],
             _ => {
                 return print_access_call_node(f, c);
             }
         },
-        CallLikeNode::Instantiation(i) => vec![in f.arena; i.new.format(f), Document::space(), i.class.format(f)],
-        CallLikeNode::Attribute(a) => vec![in f.arena; a.name.format(f)],
-        CallLikeNode::DieConstruct(d) => vec![in f.arena; d.die.format(f)],
-        CallLikeNode::ExitConstruct(e) => vec![in f.arena; e.exit.format(f)],
+        CallLikeNode::Instantiation(i) => vec_in![f.arena; i.new.format(f), Document::space(), i.class.format(f)],
+        CallLikeNode::Attribute(a) => vec_in![f.arena; a.name.format(f)],
+        CallLikeNode::DieConstruct(d) => vec_in![f.arena; d.die.format(f)],
+        CallLikeNode::ExitConstruct(e) => vec_in![f.arena; e.exit.format(f)],
     };
 
     parts.push(print_call_arguments(f, node));
@@ -129,7 +132,13 @@ pub(super) fn print_call_like_node<'arena>(
     Document::Group(Group::new(parts))
 }
 
-fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'arena Call<'arena>) -> Document<'arena> {
+fn print_access_call_node<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    node: &'arena Call<'arena>,
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let (base, operator, operator_str, selector) = match node {
         Call::Method(method_call) => (&method_call.object, method_call.arrow, b"->" as &[u8], &method_call.method),
         Call::NullSafeMethod(null_safe_method_call) => (
@@ -148,11 +157,9 @@ fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'ar
             && misc::has_new_line_in_range(f.source_text, base_span.end.offset, operator.start.offset));
 
     if should_break {
-        Document::Group(Group::new(vec![
-            in f.arena;
+        Document::Group(Group::new(vec_in![f.arena;
             base.format(f),
-            Document::Indent(vec![
-                in f.arena;
+            Document::Indent(vec_in![f.arena;
                 Document::Line(Line::hard()),
                 format_access_operator(f, operator, operator_str),
                 selector.format(f),
@@ -160,8 +167,7 @@ fn print_access_call_node<'arena>(f: &mut FormatterState<'_, 'arena>, node: &'ar
             ]),
         ]))
     } else {
-        Document::Group(Group::new(vec![
-            in f.arena;
+        Document::Group(Group::new(vec_in![f.arena;
             base.format(f),
             format_access_operator(f, operator, operator_str),
             selector.format(f),

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 
 use mago_database::file::File;
 use mago_names::resolver::NameResolver;
@@ -9,7 +9,7 @@ use mago_semantics::SemanticsChecker;
 use mago_syntax::parser::parse_file;
 
 fn collect_codes(source: &str) -> Vec<String> {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let file = File::ephemeral(Cow::Borrowed(b"test.php"), Cow::Owned(source.as_bytes().to_vec()));
     let program = parse_file(&arena, &file);
     assert!(program.errors.is_empty(), "test source did not parse: {:?}", program.errors);

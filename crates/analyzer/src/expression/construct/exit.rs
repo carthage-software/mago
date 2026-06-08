@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::get_int_or_string;
 use mago_codex::ttype::get_never;
 use mago_syntax::ast::DieConstruct;
@@ -13,12 +14,15 @@ use crate::context::scope::control_action::ControlAction;
 use crate::error::AnalysisError;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ExitConstruct<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_construct_inputs(
             context,
             block_context,
@@ -42,12 +46,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ExitConstruct<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for DieConstruct<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_construct_inputs(
             context,
             block_context,

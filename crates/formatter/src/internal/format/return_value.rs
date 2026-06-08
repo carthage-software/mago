@@ -1,5 +1,5 @@
-use bumpalo::vec;
-
+use mago_allocator::Arena;
+use mago_allocator::vec_in;
 use mago_span::HasSpan;
 use mago_syntax::ast::Expression;
 
@@ -19,10 +19,13 @@ use crate::internal::utils::get_left_side;
 use crate::internal::utils::has_naked_left_side;
 use crate::internal::utils::unwrap_parenthesized;
 
-pub fn format_return_value<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub fn format_return_value<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     value: &'arena Expression<'arena>,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let value = unwrap_parenthesized(value);
 
     if return_argument_has_leading_comment(f, value) {
@@ -31,12 +34,11 @@ pub fn format_return_value<'arena>(
         let value_doc = value.format(f);
         f.is_wrapped_in_parens = was_inside_parens;
 
-        return Document::Array(vec![
-            in f.arena;
-            (Document::String(b"(")),
-            (Document::Indent(vec![in f.arena; Document::Line(Line::hard()), value_doc])),
-            (Document::Line(Line::hard())),
-            (Document::String(b")")),
+        return Document::Array(vec_in![f.arena;
+            Document::String(b"("),
+            Document::Indent(vec_in![f.arena; Document::Line(Line::hard()), value_doc]),
+            Document::Line(Line::hard()),
+            Document::String(b")"),
         ]);
     }
 
@@ -49,12 +51,11 @@ pub fn format_return_value<'arena>(
         let group_id = f.next_id();
 
         return Document::Group(
-            Group::new(vec![
-                in f.arena;
+            Group::new(vec_in![f.arena;
                 Document::IfBreak(IfBreak::then(f.arena, Document::String(b"("))),
                 Document::IndentIfBreak(IndentIfBreak::new(
                     group_id,
-                    vec![in f.arena; Document::Line(Line::soft()), value_doc],
+                    vec_in![f.arena; Document::Line(Line::soft()), value_doc],
                 )),
                 Document::Line(Line::soft()),
                 Document::IfBreak(IfBreak::then(f.arena, Document::String(b")"))),
@@ -66,10 +67,13 @@ pub fn format_return_value<'arena>(
     value.format(f)
 }
 
-fn return_argument_has_leading_comment<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+fn return_argument_has_leading_comment<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     argument: &'arena Expression<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if f.has_leading_own_line_comment(argument.span())
         || f.has_comment_with_filter(argument.span(), CommentFlags::LEADING, |comment| {
             has_new_line_in_range(f.source_text, comment.start, comment.end)
@@ -92,7 +96,10 @@ fn return_argument_has_leading_comment<'arena>(
     false
 }
 
-fn should_wrap_return_value<'arena>(f: &mut FormatterState<'_, 'arena>, value: &'arena Expression<'arena>) -> bool {
+fn should_wrap_return_value<'arena, A>(f: &mut FormatterState<'_, 'arena, A>, value: &'arena Expression<'arena>) -> bool
+where
+    A: Arena,
+{
     match value {
         Expression::Binary(binary) => {
             if is_simple_expression_or_binary(f, binary.lhs) && is_expandable_expression(binary.rhs, true) {
@@ -118,10 +125,13 @@ fn should_wrap_return_value<'arena>(f: &mut FormatterState<'_, 'arena>, value: &
     }
 }
 
-fn is_simple_expression_or_binary<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+fn is_simple_expression_or_binary<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     expr: &'arena Expression<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     match expr {
         Expression::Binary(binary) => {
             should_inline_simple_expression(f, binary.lhs) && should_inline_simple_expression(f, binary.rhs)
@@ -130,10 +140,13 @@ fn is_simple_expression_or_binary<'arena>(
     }
 }
 
-fn should_inline_simple_expression<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+fn should_inline_simple_expression<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     expr: &'arena Expression<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if is_simple_expression(expr) {
         return true;
     }

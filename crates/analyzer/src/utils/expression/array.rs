@@ -1,5 +1,6 @@
 //! TODO(azjezz): this whole file needs a re-write. it is a mess (ref #1569)
 
+use mago_allocator::Arena;
 use std::borrow::Cow;
 
 use mago_word::Word;
@@ -89,8 +90,8 @@ impl<'ast, 'arena> From<&'ast ArrayAppend<'arena>> for ArrayTarget<'ast, 'arena>
     }
 }
 
-pub(crate) fn get_array_target_type_given_index<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub(crate) fn get_array_target_type_given_index<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     access_span: Span,
     access_array_span: Span,
@@ -101,7 +102,10 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
     extended_var_id: Option<Word>,
     assign_value_type: Option<&TUnion>,
     is_array_like_nullsafe: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut has_valid_expected_index = false;
 
     let access_index_span = match access_index_span {
@@ -566,8 +570,8 @@ pub(crate) fn get_array_target_type_given_index<'ctx>(
     }
 }
 
-pub(crate) fn handle_array_access_on_list<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub(crate) fn handle_array_access_on_list<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     span: Option<Span>,
     list: &TAtomic,
@@ -575,7 +579,10 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
     in_assignment: bool,
     has_valid_expected_index: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let expected_key_type = if in_assignment {
         get_arraykey()
     } else if context.settings.strict_list_index_checks {
@@ -809,8 +816,8 @@ pub(crate) fn handle_array_access_on_list<'ctx>(
     get_mixed()
 }
 
-pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub(crate) fn handle_array_access_on_keyed_array<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     span: Span,
     keyed_array: &TAtomic,
@@ -823,7 +830,10 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
     array_like_type: &TUnion,
     key_in_other_variant: &mut bool,
     reported_undefined_key: &mut bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let TAtomic::Array(TArray::Keyed(keyed_array)) = keyed_array else {
         return get_never();
     };
@@ -1281,19 +1291,25 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx>(
     }
 }
 
-pub(crate) fn handle_array_access_on_named_object(
-    context: &mut Context<'_, '_>,
+pub(crate) fn handle_array_access_on_named_object<A>(
+    context: &mut Context<'_, '_, A>,
     span: Span,
     named_object: &TAtomic,
     index_type: &TUnion,
     has_valid_expected_index: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
     assign_value_type: Option<&TUnion>,
-) -> TUnion {
-    fn get_array_access_classes<'ctx>(
-        context: &mut Context<'ctx, '_>,
+) -> TUnion
+where
+    A: Arena,
+{
+    fn get_array_access_classes<'ctx, A>(
+        context: &mut Context<'ctx, '_, A>,
         atomic: &TAtomic,
-    ) -> Option<(Vec<&'ctx ClassLikeMetadata>, TUnion, TUnion)> {
+    ) -> Option<(Vec<&'ctx ClassLikeMetadata>, TUnion, TUnion)>
+    where
+        A: Arena,
+    {
         let mut parameters = vec![];
         let metadata = 'metadata: {
             let TAtomic::Object(TObject::Named(named_object)) = atomic else {
@@ -1451,13 +1467,16 @@ pub(crate) fn handle_array_access_on_named_object(
     resulting_value_type
 }
 
-pub(crate) fn handle_array_access_on_string(
-    context: &Context<'_, '_>,
+pub(crate) fn handle_array_access_on_string<A>(
+    context: &Context<'_, '_, A>,
     string: TAtomic,
     index_type: &TUnion,
     has_valid_expected_index: &mut bool,
     expected_index_types: &mut Vec<TUnion>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut non_empty = false;
 
     let valid_index_type = if let TAtomic::Scalar(TScalar::String(scalar_string)) = string {
@@ -1498,12 +1517,15 @@ pub(crate) fn handle_array_access_on_string(
     result
 }
 
-pub(crate) fn handle_array_access_on_mixed<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub(crate) fn handle_array_access_on_mixed<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     span: Span,
     mixed: &TAtomic,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if !block_context.flags.inside_isset() {
         if block_context.flags.inside_assignment() {
             if matches!(mixed, TAtomic::Never) {

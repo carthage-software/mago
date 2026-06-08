@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use mago_allocator::Arena;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
@@ -58,12 +59,15 @@ pub mod variable;
 pub mod r#yield;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         if context.plugin_registry.has_expression_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);
             let expression_hook_result = context.plugin_registry.before_expression(self, &mut hook_context)?;
@@ -263,12 +267,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Parenthesized<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         self.expression.analyze(context, block_context, artifacts)?;
         if let Some(u) = artifacts.get_expression_type(&self.expression) {
             artifacts.set_expression_type(&self, u.clone());
@@ -278,12 +285,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Parenthesized<'arena> {
     }
 }
 
-pub fn find_expression_logic_issues<'ctx, 'arena>(
+pub fn find_expression_logic_issues<'ctx, 'arena, A>(
     expression: &Expression<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
-) {
+) where
+    A: Arena,
+{
     let mut if_block_context = block_context.clone();
     let mut cond_referenced_var_ids = if_block_context.conditionally_referenced_variable_ids.clone();
 

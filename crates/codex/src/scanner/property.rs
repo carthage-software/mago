@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -31,15 +31,18 @@ use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
 #[inline]
-pub fn scan_promoted_property<'arena>(
+pub fn scan_promoted_property<'arena, A>(
     parameter: &'arena FunctionLikeParameter<'arena>,
     parameter_metadata: &mut FunctionLikeParameterMetadata,
     class_like_metadata: &mut ClassLikeMetadata,
     classname: Word,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &NamespaceScope,
-) -> PropertyMetadata {
+) -> PropertyMetadata
+where
+    A: Arena,
+{
     debug_assert!(parameter.is_promoted_property(), "Parameter is not a promoted property");
 
     let name = parameter_metadata.get_name();
@@ -150,14 +153,17 @@ pub fn scan_promoted_property<'arena>(
 }
 
 #[inline]
-pub fn scan_properties<'arena>(
+pub fn scan_properties<'arena, A>(
     property: &'arena Property<'arena>,
     class_like_metadata: &mut ClassLikeMetadata,
     classname: Word,
     type_context: &TypeResolutionContext,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &NamespaceScope,
-) -> Vec<PropertyMetadata> {
+) -> Vec<PropertyMetadata>
+where
+    A: Arena,
+{
     let docblock = match PropertyDocblockComment::create(context, property) {
         Ok(docblock) => docblock,
         Err(parse_error) => {
@@ -334,12 +340,15 @@ pub fn scan_properties<'arena>(
     }
 }
 
-fn scan_property_hook<'arena>(
+fn scan_property_hook<'arena, A>(
     hook: &'arena PropertyHook<'arena>,
     property_metadata: &PropertyMetadata,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &NamespaceScope,
-) -> PropertyHookMetadata {
+) -> PropertyHookMetadata
+where
+    A: Arena,
+{
     let name = word(hook.name.value);
     let is_get = hook.name.value == b"get";
     let is_set = hook.name.value == b"set";
@@ -456,11 +465,14 @@ fn scan_property_hook<'arena>(
         .with_issues(issues)
 }
 
-fn scan_hook_parameter<'arena>(
+fn scan_hook_parameter<'arena, A>(
     param: &'arena FunctionLikeParameter<'arena>,
     property_metadata: &PropertyMetadata,
-    context: &mut Context<'_, 'arena>,
-) -> FunctionLikeParameterMetadata {
+    context: &mut Context<'_, 'arena, A>,
+) -> FunctionLikeParameterMetadata
+where
+    A: Arena,
+{
     let name = VariableIdentifier(word(param.variable.name));
     let name_span = param.variable.span;
 
@@ -493,12 +505,15 @@ fn create_implicit_value_parameter(property_metadata: &PropertyMetadata, span: S
 }
 
 #[inline]
-pub fn scan_property_item<'arena>(
+pub fn scan_property_item<'arena, A>(
     property_item: &'arena PropertyItem<'arena>,
     classname: Word,
-    context: &Context<'_, 'arena>,
+    context: &Context<'_, 'arena, A>,
     scope: &NamespaceScope,
-) -> (VariableIdentifier, Span, bool, Option<TypeMetadata>) {
+) -> (VariableIdentifier, Span, bool, Option<TypeMetadata>)
+where
+    A: Arena,
+{
     match property_item {
         PropertyItem::Abstract(property_abstract_item) => {
             let name = VariableIdentifier(word(property_abstract_item.variable.name));
@@ -523,15 +538,17 @@ pub fn scan_property_item<'arena>(
     }
 }
 
-fn update_property_metadata_from_docblock(
-    arena: &Bump,
+fn update_property_metadata_from_docblock<A>(
+    arena: &A,
     property_metadata: &mut PropertyMetadata,
     docblock: &PropertyDocblockComment,
     classname: Word,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
     class_like_metadata: &mut ClassLikeMetadata,
-) {
+) where
+    A: Arena,
+{
     if docblock.is_internal {
         property_metadata.flags |= MetadataFlags::INTERNAL;
     }

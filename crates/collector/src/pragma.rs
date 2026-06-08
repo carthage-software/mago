@@ -1,6 +1,4 @@
-use bumpalo::Bump;
-use bumpalo::collections::CollectIn;
-use bumpalo::collections::Vec;
+use mago_allocator::prelude::*;
 
 use mago_database::file::File;
 use mago_span::Span;
@@ -12,7 +10,10 @@ use mago_syntax::comments::comment_lines;
 /// Pragma codes, categories, and descriptions are tool-config strings that are ASCII in practice.
 /// A non-UTF-8 byte means the pragma is malformed and can't match any rule name anyway, so
 /// callers skip the whole pragma when this returns `None`.
-fn alloc_utf8<'arena>(arena: &'arena Bump, bytes: &[u8]) -> Option<&'arena str> {
+fn alloc_utf8<'arena, A>(arena: &'arena A, bytes: &[u8]) -> Option<&'arena str>
+where
+    A: Arena,
+{
     std::str::from_utf8(bytes).ok().map(|s| arena.alloc_str(s) as &str)
 }
 
@@ -145,12 +146,15 @@ impl<'arena> Pragma<'arena> {
     ///
     /// A vector of `Pragma` structs, each containing a parsed pragma and its precise location.
     #[inline]
-    pub fn extract(
-        arena: &'arena Bump,
+    pub fn extract<A>(
+        arena: &'arena A,
         file: &File,
         trivias: &[Trivia<'arena>],
         categories: &'static [&'static str],
-    ) -> Vec<'arena, Pragma<'arena>> {
+    ) -> Vec<'arena, Pragma<'arena>, A>
+    where
+        A: Arena,
+    {
         trivias
             .iter()
             .filter(|trivia| trivia.kind.is_comment())
@@ -160,13 +164,16 @@ impl<'arena> Pragma<'arena> {
 }
 
 /// Parses all pragmas within a single trivia (comment) node.
-fn parse_pragmas_in_trivia<'arena>(
-    arena: &'arena Bump,
+fn parse_pragmas_in_trivia<'arena, A>(
+    arena: &'arena A,
     file: &File,
     trivia: &Trivia<'arena>,
     categories: &'static [&'static str],
-) -> Vec<'arena, Pragma<'arena>> {
-    let mut pragmas: Vec<'arena, Pragma<'arena>> = Vec::new_in(arena);
+) -> Vec<'arena, Pragma<'arena>, A>
+where
+    A: Arena,
+{
+    let mut pragmas: Vec<'arena, Pragma<'arena>, A> = Vec::new_in(arena);
     let base_offset = trivia.span.start;
 
     for (line_offset_in_trivia, line) in comment_lines(trivia) {

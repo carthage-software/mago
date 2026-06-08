@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use mago_allocator::Arena;
 use mago_word::WordSet;
 
 use mago_algebra::clause::Clause;
@@ -24,12 +25,15 @@ use crate::reconciler::reconcile_keyed_types;
 use crate::statement::r#loop;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let mut loop_block_context = block_context.clone();
         loop_block_context.break_types.push(BreakContext::Loop);
         loop_block_context.flags.set_inside_loop(true);

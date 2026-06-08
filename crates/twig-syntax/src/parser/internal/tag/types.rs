@@ -3,8 +3,12 @@ use crate::ast::Types;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigToken;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_types(
         &mut self,
         open_tag_tok: TwigToken<'arena>,

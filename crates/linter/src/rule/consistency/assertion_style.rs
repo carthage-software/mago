@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use std::str::FromStr;
 
@@ -117,7 +118,10 @@ impl LintRule for AssertionStyleRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::Method(method) = node else {
             return;
         };

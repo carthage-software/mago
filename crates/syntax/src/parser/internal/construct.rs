@@ -18,8 +18,12 @@ use crate::ast::ast::RequireOnceConstruct;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::Precedence;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_construct(&mut self) -> Result<Expression<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 

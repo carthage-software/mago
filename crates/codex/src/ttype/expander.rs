@@ -1048,12 +1048,11 @@ fn expand_alias(alias: &TAlias, codebase: &CodebaseMetadata, options: &TypeExpan
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use mago_allocator::LocalArena;
 
     use std::borrow::Cow;
     use std::collections::HashSet;
     use std::sync::Arc;
-
-    use bumpalo::Bump;
 
     use mago_database::Database;
     use mago_database::DatabaseReader;
@@ -1106,7 +1105,7 @@ mod tests {
         let database = Database::single(file, config);
 
         let mut codebase = CodebaseMetadata::new();
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         for file in database.files() {
             let program = parse_file(&arena, &file);
             assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);

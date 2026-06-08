@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -19,7 +20,10 @@ use crate::parser::stream::looks_like_identifier;
 use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse an expression with the lowest (zero) minimum precedence.
     #[inline]
     pub(crate) fn parse_expression(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
@@ -257,10 +261,13 @@ fn can_call(expression: &Expression<'_>) -> bool {
     )
 }
 
-fn classify_binary_operator<'arena>(
-    parser: &Parser<'_, 'arena>,
+fn classify_binary_operator<'arena, A>(
+    parser: &Parser<'_, 'arena, A>,
     token: &TwigToken<'arena>,
-) -> Option<(BinaryOperator<'arena>, u32, bool)> {
+) -> Option<(BinaryOperator<'arena>, u32, bool)>
+where
+    A: Arena,
+{
     let span = parser.stream.span_of(token);
     let keyword = || parser.keyword_from(token);
     match token.kind {

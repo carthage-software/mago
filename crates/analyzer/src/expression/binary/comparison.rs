@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::ttype::TType;
@@ -45,12 +46,15 @@ use mago_bytes::BytesDisplay;
 /// 5. Reports errors for invalid comparisons (e.g., involving `mixed`).
 /// 6. Reports hints for redundant comparisons where the outcome is statically known.
 /// 7. Establishes data flow from operands to the expression node.
-pub fn analyze_comparison_operation<'ctx, 'arena>(
+pub fn analyze_comparison_operation<'ctx, 'arena, A>(
     binary: &Binary<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let was_inside_general_use = block_context.flags.inside_general_use();
     block_context.flags.set_inside_general_use(true);
     binary.lhs.analyze(context, block_context, artifacts)?;
@@ -445,13 +449,15 @@ fn involves_external_reference(expr: &Expression<'_>, block_context: &BlockConte
 }
 
 /// Checks a single operand of a comparison operation for problematic types.
-fn check_comparison_operand<'ast, 'arena>(
-    context: &mut Context<'_, 'arena>,
+fn check_comparison_operand<'ast, 'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     operand: &'ast Expression<'arena>,
     operand_type: &TUnion,
     side: &'static str,
     operator: &'ast BinaryOperator<'arena>,
-) {
+) where
+    A: Arena,
+{
     if operator.is_identity() {
         return;
     }
@@ -516,13 +522,15 @@ fn check_comparison_operand<'ast, 'arena>(
 }
 
 /// Helper to report redundant comparison issues.
-fn report_redundant_comparison<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_redundant_comparison<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     artifacts: &AnalysisArtifacts,
     binary: &Binary<'arena>,
     comparison_description: &str,
     result_value_str: &str,
-) {
+) where
+    A: Arena,
+{
     let operator_span = binary.operator.span();
     if operator_span.is_zero() {
         // this is a synthetic node, do not report it.

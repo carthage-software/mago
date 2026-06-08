@@ -5,6 +5,7 @@ use crate::ast::Statement;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigToken;
+use mago_allocator::prelude::*;
 
 pub mod apply;
 pub mod autoescape;
@@ -30,7 +31,10 @@ pub mod r#use;
 pub mod verbatim;
 pub mod with;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Dispatch a `{% keyword ...` tag to the matching per-tag parser.
     pub(crate) fn parse_tag(
         &mut self,

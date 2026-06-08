@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::Span;
 
@@ -11,7 +12,10 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_classlike_member(&mut self) -> Result<ClassLikeMember<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
         Ok(match token.kind {
@@ -23,22 +27,19 @@ impl<'arena> Parser<'_, 'arena> {
             k if k.is_modifier() => {
                 let modifiers = self.parse_modifier_sequence()?;
 
-                self.parse_classlike_member_with_attributes_and_modifiers(Sequence::empty(self.arena), modifiers)?
+                self.parse_classlike_member_with_attributes_and_modifiers(Sequence::empty(), modifiers)?
             }
-            T!["const"] => ClassLikeMember::Constant(self.parse_class_like_constant_with_attributes_and_modifiers(
-                Sequence::empty(self.arena),
-                Sequence::empty(self.arena),
-            )?),
-            T!["function"] => ClassLikeMember::Method(self.parse_method_with_attributes_and_modifiers(
-                Sequence::empty(self.arena),
-                Sequence::empty(self.arena),
-            )?),
-            T!["case"] => ClassLikeMember::EnumCase(self.parse_enum_case_with_attributes(Sequence::empty(self.arena))?),
+            T!["const"] => ClassLikeMember::Constant(
+                self.parse_class_like_constant_with_attributes_and_modifiers(Sequence::empty(), Sequence::empty())?,
+            ),
+            T!["function"] => ClassLikeMember::Method(
+                self.parse_method_with_attributes_and_modifiers(Sequence::empty(), Sequence::empty())?,
+            ),
+            T!["case"] => ClassLikeMember::EnumCase(self.parse_enum_case_with_attributes(Sequence::empty())?),
             T!["use"] => ClassLikeMember::TraitUse(self.parse_trait_use()?),
-            _ => ClassLikeMember::Property(self.parse_property_with_attributes_and_modifiers(
-                Sequence::empty(self.arena),
-                Sequence::empty(self.arena),
-            )?),
+            _ => ClassLikeMember::Property(
+                self.parse_property_with_attributes_and_modifiers(Sequence::empty(), Sequence::empty())?,
+            ),
         })
     }
 
@@ -55,13 +56,13 @@ impl<'arena> Parser<'_, 'arena> {
             }
             T!["case"] => ClassLikeMember::EnumCase(self.parse_enum_case_with_attributes(attributes)?),
             T!["const"] => ClassLikeMember::Constant(
-                self.parse_class_like_constant_with_attributes_and_modifiers(attributes, Sequence::empty(self.arena))?,
+                self.parse_class_like_constant_with_attributes_and_modifiers(attributes, Sequence::empty())?,
             ),
-            T!["function"] => ClassLikeMember::Method(
-                self.parse_method_with_attributes_and_modifiers(attributes, Sequence::empty(self.arena))?,
-            ),
+            T!["function"] => {
+                ClassLikeMember::Method(self.parse_method_with_attributes_and_modifiers(attributes, Sequence::empty())?)
+            }
             _ => ClassLikeMember::Property(
-                self.parse_property_with_attributes_and_modifiers(attributes, Sequence::empty(self.arena))?,
+                self.parse_property_with_attributes_and_modifiers(attributes, Sequence::empty())?,
             ),
         })
     }

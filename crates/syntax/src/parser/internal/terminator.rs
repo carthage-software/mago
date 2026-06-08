@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::T;
@@ -7,7 +8,10 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TokenKind;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_optional_terminator(&mut self) -> Result<Option<Terminator<'arena>>, ParseError> {
         let next = self.stream.lookahead(0)?;
         Ok(match next.map(|t| t.kind) {

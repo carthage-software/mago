@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
@@ -24,12 +25,15 @@ use crate::expression::unary::cast_type_to_string;
 use crate::utils::expression::get_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let mut non_empty = false;
         let mut all_literals = true;
         let mut resulting_strings: Option<Vec<String>> = Some(vec![String::new()]);

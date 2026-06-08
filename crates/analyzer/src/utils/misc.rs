@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use foldhash::HashMap;
@@ -15,13 +16,15 @@ use crate::code::IssueCode;
 
 /// Checks for two types of logical issues between a set of existing assertions (`formula_1`)
 /// and a new set of assertions (`formula_2`) from a conditional expression.
-pub fn check_for_paradox(
-    collector: &mut Collector<'_, '_>,
+pub fn check_for_paradox<A>(
+    collector: &mut Collector<'_, '_, A>,
     formula_1: &[Rc<Clause>],
     formula_2: &[Clause],
     span: Span,
     algebra_thresholds: &AlgebraThresholds,
-) {
+) where
+    A: Arena,
+{
     let formula_1_hashes: HashMap<u32, Span> = formula_1.iter().map(|c| (c.hash, c.condition_span)).collect();
     let mut formula_2_hashes: HashMap<u32, Span> = HashMap::default();
 
@@ -71,12 +74,14 @@ pub fn check_for_paradox(
     }
 }
 
-fn report_redundant_condition(
-    collector: &mut Collector<'_, '_>,
+fn report_redundant_condition<A>(
+    collector: &mut Collector<'_, '_, A>,
     redundant_clause: &Clause,
     redundant_span: Span,
     original_span: Span,
-) {
+) where
+    A: Arena,
+{
     let clause_string = redundant_clause.to_string();
     let (kind, title) = if clause_string == "isset" {
         (IssueCode::RedundantIssetCheck, "Redundant `isset` check")
@@ -100,13 +105,15 @@ fn report_redundant_condition(
     );
 }
 
-fn report_paradoxical_condition(
-    collector: &mut Collector<'_, '_>,
+fn report_paradoxical_condition<A>(
+    collector: &mut Collector<'_, '_, A>,
     original_clause: &Clause,
     negated_conflicting_clause: &Clause,
     paradox_span: Span,
     algebra_thresholds: &AlgebraThresholds,
-) {
+) where
+    A: Arena,
+{
     let Some(conflicting_clause) = negate_formula(vec![negated_conflicting_clause.clone()], algebra_thresholds) else {
         return;
     };

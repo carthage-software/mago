@@ -348,7 +348,7 @@ pub fn format(code: String, php_version: &str) -> Result<String, JsValue> {
     let version = parse_php_version(php_version);
     let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Owned(code.into_bytes()));
 
-    let arena = bumpalo::Bump::new();
+    let arena = mago_allocator::LocalArena::new();
     let program = parse_file(&arena, &file);
     if let Some(e) = program.errors.first() {
         return Err(JsValue::from_str(&format!("Parse error: {e}")));

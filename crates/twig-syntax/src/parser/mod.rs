@@ -7,8 +7,7 @@
 //! [`Parser::parse`] contains whatever statements were successfully parsed,
 //! plus a list of errors for the parts that did not.
 
-use bumpalo::Bump;
-use bumpalo::collections::Vec as BVec;
+use mago_allocator::prelude::*;
 
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -49,20 +48,26 @@ pub struct State {
 #[derive(Debug)]
 #[allow(dead_code)]
 #[allow(clippy::field_scoped_visibility_modifiers)]
-pub struct Parser<'input, 'arena> {
-    pub(crate) arena: &'arena Bump,
+pub struct Parser<'input, 'arena, A>
+where
+    A: Arena,
+{
+    pub(crate) arena: &'arena A,
     pub(crate) settings: ParserSettings,
     pub(crate) state: State,
-    pub(crate) stream: TokenStream<'arena>,
-    pub(crate) errors: BVec<'arena, ParseError<'arena>>,
+    pub(crate) stream: TokenStream<'arena, A>,
+    pub(crate) errors: Vec<'arena, ParseError<'arena>, A>,
     _input: std::marker::PhantomData<&'input ()>,
 }
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Build a parser for `content`, which must already live in the arena.
     #[inline]
     #[must_use]
-    pub fn new(arena: &'arena Bump, file_id: FileId, content: &'arena [u8], settings: ParserSettings) -> Self {
+    pub fn new(arena: &'arena A, file_id: FileId, content: &'arena [u8], settings: ParserSettings) -> Self {
         let input = Input::new(file_id, content);
         let lexer = TwigLexer::new(input, settings.lexer);
         let stream = TokenStream::new(arena, lexer);
@@ -71,7 +76,7 @@ impl<'arena> Parser<'_, 'arena> {
             settings,
             state: State::default(),
             stream,
-            errors: BVec::new_in(arena),
+            errors: Vec::new_in(arena),
             _input: std::marker::PhantomData,
         }
     }
@@ -85,7 +90,7 @@ impl<'arena> Parser<'_, 'arena> {
     #[inline]
     #[must_use]
     pub fn from_lexer(
-        arena: &'arena Bump,
+        arena: &'arena A,
         _source_text: &'arena [u8],
         lexer: TwigLexer<'arena>,
         settings: ParserSettings,
@@ -96,14 +101,17 @@ impl<'arena> Parser<'_, 'arena> {
             settings,
             state: State::default(),
             stream,
-            errors: BVec::new_in(arena),
+            errors: Vec::new_in(arena),
             _input: std::marker::PhantomData,
         }
     }
 
     /// Consume the parser and produce an arena-allocated [`Template`].
     #[must_use]
-    pub fn parse(mut self, source_text: &'arena [u8], file_id: FileId) -> &'arena Template<'arena> {
+    pub fn parse(mut self, source_text: &'arena [u8], file_id: FileId) -> &'arena Template<'arena>
+    where
+        A: Arena,
+    {
         let statements = match self.parse_statements(&internal::NoTerminator) {
             Ok(sequence) => sequence,
             Err(error) => {
@@ -114,7 +122,7 @@ impl<'arena> Parser<'_, 'arena> {
                         break;
                     }
                 }
-                Sequence::new(BVec::new_in(self.arena))
+                Sequence::empty()
             }
         };
 
@@ -124,7 +132,7 @@ impl<'arena> Parser<'_, 'arena> {
 
         let trivia = self.stream.get_trivia();
 
-        self.arena.alloc(Template { file_id, source_text, trivia, statements, errors: self.errors })
+        self.arena.alloc(Template { file_id, source_text, trivia, statements, errors: self.errors.leak() })
     }
 
     #[inline]
@@ -136,35 +144,47 @@ impl<'arena> Parser<'_, 'arena> {
 
 /// Parse a Twig template file into an AST, with default settings.
 #[inline]
-pub fn parse_file<'arena>(arena: &'arena Bump, file: &File) -> &'arena Template<'arena> {
+pub fn parse_file<'arena, A>(arena: &'arena A, file: &File) -> &'arena Template<'arena>
+where
+    A: Arena,
+{
     parse_file_content(arena, file.file_id(), file.contents.as_ref())
 }
 
 /// Parse a Twig template file into an AST with the supplied settings.
 #[inline]
-pub fn parse_file_with_settings<'arena>(
-    arena: &'arena Bump,
+pub fn parse_file_with_settings<'arena, A>(
+    arena: &'arena A,
     file: &File,
     settings: ParserSettings,
-) -> &'arena Template<'arena> {
+) -> &'arena Template<'arena>
+where
+    A: Arena,
+{
     parse_file_content_with_settings(arena, file.file_id(), file.contents.as_ref(), settings)
 }
 
 /// Parse Twig source into an AST, associating every produced [`Span`] with
 /// the supplied [`FileId`].  Uses default parser settings.
-pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content: &[u8]) -> &'arena Template<'arena> {
+pub fn parse_file_content<'arena, A>(arena: &'arena A, file_id: FileId, content: &[u8]) -> &'arena Template<'arena>
+where
+    A: Arena,
+{
     parse_file_content_with_settings(arena, file_id, content, ParserSettings::default())
 }
 
 /// Parse Twig source into an AST with the supplied [`FileId`] and
 /// [`ParserSettings`].  The `content` is copied into the arena so that the
 /// resulting [`Template`] owns its `source_text` slice.
-pub fn parse_file_content_with_settings<'arena>(
-    arena: &'arena Bump,
+pub fn parse_file_content_with_settings<'arena, A>(
+    arena: &'arena A,
     file_id: FileId,
     content: &[u8],
     settings: ParserSettings,
-) -> &'arena Template<'arena> {
+) -> &'arena Template<'arena>
+where
+    A: Arena,
+{
     let source_text = arena.alloc_slice_copy(content);
     Parser::new(arena, file_id, source_text, settings).parse(source_text, file_id)
 }

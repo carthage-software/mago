@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -102,7 +103,10 @@ impl LintRule for NoArrayAccumulationInLoopRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let loop_span = node.span();
 
         let mut collector = AccumulationCollector { findings: Vec::new() };
@@ -177,8 +181,11 @@ struct AccumulationCollector {
     findings: Vec<Finding>,
 }
 
-impl<'ctx, 'arena> MutWalker<'_, 'arena, LintContext<'ctx, 'arena>> for AccumulationCollector {
-    fn walk_in_assignment(&mut self, assignment: &Assignment<'arena>, ctx: &mut LintContext<'ctx, 'arena>) {
+impl<'ctx, 'arena, A> MutWalker<'_, 'arena, LintContext<'ctx, 'arena, A>> for AccumulationCollector
+where
+    A: Arena,
+{
+    fn walk_in_assignment(&mut self, assignment: &Assignment<'arena>, ctx: &mut LintContext<'ctx, 'arena, A>) {
         if let Expression::Call(Call::Function(call)) = assignment.rhs {
             if let Some(name) = function_call_matches_any(ctx, call, MERGE_FUNCTIONS) {
                 self.findings.push(Finding::Merge { function_name: name, span: call.span() });
@@ -200,16 +207,16 @@ impl<'ctx, 'arena> MutWalker<'_, 'arena, LintContext<'ctx, 'arena>> for Accumula
     }
 
     // Don't descend into nested loops, they'll be checked separately as their own targets.
-    fn walk_for(&mut self, _: &For<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_foreach(&mut self, _: &Foreach<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_while(&mut self, _: &While<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_do_while(&mut self, _: &DoWhile<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
+    fn walk_for(&mut self, _: &For<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_foreach(&mut self, _: &Foreach<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_while(&mut self, _: &While<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_do_while(&mut self, _: &DoWhile<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
 
     // Don't descend into nested function scopes.
-    fn walk_function(&mut self, _: &Function<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_closure(&mut self, _: &Closure<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_arrow_function(&mut self, _: &ArrowFunction<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_method(&mut self, _: &Method<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
+    fn walk_function(&mut self, _: &Function<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_closure(&mut self, _: &Closure<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_arrow_function(&mut self, _: &ArrowFunction<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_method(&mut self, _: &Method<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
 }
 
 #[cfg(test)]

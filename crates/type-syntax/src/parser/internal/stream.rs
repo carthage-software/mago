@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 
-use bumpalo::Bump;
-use bumpalo::collections::Vec as BVec;
+use mago_allocator::prelude::*;
 
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
@@ -19,8 +18,11 @@ use crate::token::TypeTokenKind;
 /// capabilities and automatically skipping trivia tokens (whitespace, comments).
 #[derive(Debug)]
 #[allow(clippy::field_scoped_visibility_modifiers)]
-pub struct TypeTokenStream<'arena> {
-    pub(crate) arena: &'arena Bump,
+pub struct TypeTokenStream<'arena, A>
+where
+    A: Arena,
+{
+    pub(crate) arena: &'arena A,
     pub(crate) lexer: TypeLexer<'arena>,
     file_id: FileId,
     buffer: LookaheadBuf<TypeToken<'arena>, 64>,
@@ -32,10 +34,13 @@ pub struct TypeTokenStream<'arena> {
 /// pathologically nested types.
 pub(crate) const MAX_RECURSION_DEPTH: u16 = 512;
 
-impl<'arena> TypeTokenStream<'arena> {
+impl<'arena, A> TypeTokenStream<'arena, A>
+where
+    A: Arena,
+{
     /// Creates a new `TypeTokenStream` wrapping the given `TypeLexer`.
     #[inline]
-    pub fn new(arena: &'arena Bump, lexer: TypeLexer<'arena>) -> TypeTokenStream<'arena> {
+    pub fn new(arena: &'arena A, lexer: TypeLexer<'arena>) -> TypeTokenStream<'arena, A> {
         let position = lexer.current_position();
         let file_id = lexer.file_id();
         TypeTokenStream { arena, lexer, file_id, buffer: LookaheadBuf::new(), position, depth: 0 }
@@ -105,8 +110,8 @@ impl<'arena> TypeTokenStream<'arena> {
     /// A fresh arena-backed [`BVec`].
     #[inline]
     #[must_use]
-    pub fn new_bvec<T>(&self) -> BVec<'arena, T> {
-        BVec::new_in(self.arena)
+    pub fn new_bvec<T>(&self) -> Vec<'arena, T, A> {
+        Vec::new_in(self.arena)
     }
 
     /// Returns the current position of the stream within the source file.
@@ -307,7 +312,10 @@ impl<'arena> TypeTokenStream<'arena> {
     }
 }
 
-impl HasFileId for TypeTokenStream<'_> {
+impl<A> HasFileId for TypeTokenStream<'_, A>
+where
+    A: Arena,
+{
     #[inline]
     fn file_id(&self) -> FileId {
         self.file_id

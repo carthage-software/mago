@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
@@ -9,14 +10,17 @@ use crate::context::block::BlockContext;
 use crate::invocation::Invocation;
 use crate::invocation::resolver::resolve_invocation_type;
 
-pub fn fetch_invocation_return_type<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn fetch_invocation_return_type<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     // Try to get a custom return type from plugins
     if let Some(identifier) = invocation.target.get_function_like_identifier()
         && let Some(result) = context.plugin_registry.get_function_like_return_type(

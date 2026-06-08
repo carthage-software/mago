@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_syntax::ast::Access;
 
 use crate::analyzable::Analyzable;
@@ -11,12 +12,15 @@ pub mod property_access;
 pub mod static_property_access;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Access<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         match self {
             Access::Property(access) => access.analyze(context, block_context, artifacts),
             Access::NullSafeProperty(access) => access.analyze(context, block_context, artifacts),

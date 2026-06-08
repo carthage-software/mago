@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -106,7 +107,10 @@ impl LintRule for PreparedSqlRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::MethodCall(method_call) = node else {
             return;
         };
@@ -174,7 +178,10 @@ fn is_wpdb_prepare_call(expr: &Expression) -> bool {
     }
 }
 
-fn contains_unsafe_variables(ctx: &LintContext, expr: &Expression) -> bool {
+fn contains_unsafe_variables<A>(ctx: &LintContext<'_, '_, A>, expr: &Expression) -> bool
+where
+    A: Arena,
+{
     match expr {
         Expression::Literal(_) => false,
         Expression::CompositeString(composite_string) => {

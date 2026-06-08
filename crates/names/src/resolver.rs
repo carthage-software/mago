@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use mago_allocator::prelude::*;
 use mago_syntax::ast::Program;
 use mago_syntax::walker::MutWalker;
 
@@ -12,13 +12,19 @@ use crate::internal::walker::NameWalker;
 /// It requires an arena to store resolved names.
 #[derive(Debug, Clone)]
 #[repr(transparent)]
-pub struct NameResolver<'arena> {
-    arena: &'arena Bump,
+pub struct NameResolver<'arena, A>
+where
+    A: Arena,
+{
+    arena: &'arena A,
 }
 
-impl<'arena> NameResolver<'arena> {
+impl<'arena, A> NameResolver<'arena, A>
+where
+    A: Arena,
+{
     /// Creates a new `NameResolver` instance.
-    pub fn new(arena: &'arena Bump) -> Self {
+    pub fn new(arena: &'arena A) -> Self {
         NameResolver { arena }
     }
 

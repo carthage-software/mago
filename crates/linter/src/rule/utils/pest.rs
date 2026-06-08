@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Access;
@@ -13,10 +14,13 @@ use crate::context::LintContext;
 use crate::rule::utils::call::function_call_matches;
 
 /// Checks if the given function call is `expect($arg)` and returns the argument expression.
-pub fn get_expect_argument<'arena>(
-    ctx: &LintContext<'_, 'arena>,
+pub fn get_expect_argument<'arena, A>(
+    ctx: &LintContext<'_, 'arena, A>,
     call: &'arena FunctionCall<'arena>,
-) -> Option<&'arena Expression<'arena>> {
+) -> Option<&'arena Expression<'arena>>
+where
+    A: Arena,
+{
     if !function_call_matches(ctx, call, "expect") {
         return None;
     }

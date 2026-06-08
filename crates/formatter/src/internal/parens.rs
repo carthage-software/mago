@@ -1,5 +1,5 @@
-use bumpalo::vec;
-
+use mago_allocator::Arena;
+use mago_allocator::vec_in;
 use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
 use mago_syntax::ast::Access;
@@ -23,24 +23,25 @@ use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::utils::unwrap_parenthesized;
 
-impl<'arena> FormatterState<'_, 'arena> {
+impl<'arena, A> FormatterState<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn add_parens(
         &mut self,
-        document: Document<'arena>,
+        document: Document<'arena, A>,
         node: Node<'arena, 'arena>,
         has_leading_comments: bool,
-    ) -> Document<'arena> {
+    ) -> Document<'arena, A> {
         if has_leading_comments || self.should_indent(node) {
             let group_id = self.next_id();
 
             Document::Group(
-                Group::new(vec![
-                    in self.arena;
+                Group::new(vec_in![self.arena;
                     Document::String(b"("),
                     Document::IndentIfBreak(IndentIfBreak::new(
                         group_id,
-                        vec![
-                            in self.arena;
+                        vec_in![self.arena;
                             if self.settings.space_within_grouping_parenthesis {
                                 Document::Line(Line::default())
                             } else {
@@ -59,8 +60,7 @@ impl<'arena> FormatterState<'_, 'arena> {
                 .with_id(group_id),
             )
         } else {
-            Document::Group(Group::new(vec![
-                in self.arena;
+            Document::Group(Group::new(vec_in![self.arena;
                 Document::String(b"("),
                 if self.settings.space_within_grouping_parenthesis { Document::space() } else { Document::empty() },
                 document,

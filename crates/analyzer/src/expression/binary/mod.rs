@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
@@ -30,12 +31,15 @@ mod null_coalesce;
 mod spaceship;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Binary<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         match &self.operator {
             BinaryOperator::Addition(_)
             | BinaryOperator::Subtraction(_)
@@ -104,12 +108,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Binary<'arena> {
     }
 }
 
-fn compute_instanceof_type(
+fn compute_instanceof_type<A>(
     binary: &Binary<'_>,
-    context: &Context<'_, '_>,
+    context: &Context<'_, '_, A>,
     block_context: &BlockContext<'_>,
     artifacts: &AnalysisArtifacts,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let Some(lhs_type) = artifacts.get_rc_expression_type(binary.lhs) else {
         return get_bool();
     };

@@ -2,32 +2,43 @@
 
 use std::slice::Iter;
 
-use bumpalo::Bump;
-use bumpalo::collections::Vec as BVec;
-use bumpalo::collections::vec::IntoIter;
 use serde::Serialize;
+
+use mago_allocator::prelude::*;
 
 use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-/// A sequence of AST nodes allocated in a [`bumpalo::Bump`].
+/// A sequence of AST nodes allocated in an arena.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct Sequence<'arena, T> {
-    pub nodes: BVec<'arena, T>,
+    pub nodes: &'arena [T],
 }
 
 impl<'arena, T> Sequence<'arena, T> {
+    /// Freezes an arena-allocated vector into a sequence.
     #[inline]
     #[must_use]
-    pub const fn new(inner: BVec<'arena, T>) -> Self {
-        Self { nodes: inner }
+    pub fn new<A>(nodes: Vec<'arena, T, A>) -> Self
+    where
+        A: Arena,
+    {
+        Self { nodes: nodes.leak() }
+    }
+
+    /// Wraps an existing arena slice as a sequence.
+    #[inline]
+    #[must_use]
+    pub const fn from_slice(nodes: &'arena [T]) -> Self {
+        Self { nodes }
     }
 
     #[inline]
-    pub fn empty(arena: &'arena Bump) -> Self {
-        Self { nodes: BVec::new_in(arena) }
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self { nodes: &[] }
     }
 
     #[inline]
@@ -68,7 +79,7 @@ impl<'arena, T> Sequence<'arena, T> {
     #[inline]
     #[must_use]
     pub fn as_slice(&self) -> &[T] {
-        self.nodes.as_slice()
+        self.nodes
     }
 }
 
@@ -114,11 +125,11 @@ impl<T, Tok> std::ops::Index<usize> for TokenSeparatedSequence<'_, T, Tok> {
 }
 
 impl<'arena, T> IntoIterator for Sequence<'arena, T> {
-    type Item = T;
-    type IntoIter = IntoIter<'arena, Self::Item>;
+    type Item = &'arena T;
+    type IntoIter = Iter<'arena, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.nodes.into_iter()
+        self.nodes.iter()
     }
 }
 
@@ -143,20 +154,32 @@ impl<'seq, T> IntoIterator for &'seq Sequence<'_, T> {
 /// [`Position`]: mago_span::Position
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct TokenSeparatedSequence<'arena, T, Tok> {
-    pub nodes: BVec<'arena, T>,
-    pub tokens: BVec<'arena, Tok>,
+    pub nodes: &'arena [T],
+    pub tokens: &'arena [Tok],
 }
 
 impl<'arena, T, Tok> TokenSeparatedSequence<'arena, T, Tok> {
+    /// Freezes arena-allocated node and token vectors into a separated sequence.
     #[inline]
     #[must_use]
-    pub const fn new(nodes: BVec<'arena, T>, tokens: BVec<'arena, Tok>) -> Self {
+    pub fn new<A>(nodes: Vec<'arena, T, A>, tokens: Vec<'arena, Tok, A>) -> Self
+    where
+        A: Arena,
+    {
+        Self { nodes: nodes.leak(), tokens: tokens.leak() }
+    }
+
+    /// Wraps existing arena slices as a separated sequence.
+    #[inline]
+    #[must_use]
+    pub const fn from_slices(nodes: &'arena [T], tokens: &'arena [Tok]) -> Self {
         Self { nodes, tokens }
     }
 
     #[inline]
-    pub fn empty(arena: &'arena Bump) -> Self {
-        Self { nodes: BVec::new_in(arena), tokens: BVec::new_in(arena) }
+    #[must_use]
+    pub const fn empty() -> Self {
+        Self { nodes: &[], tokens: &[] }
     }
 
     #[inline]
@@ -197,7 +220,7 @@ impl<'arena, T, Tok> TokenSeparatedSequence<'arena, T, Tok> {
     #[inline]
     #[must_use]
     pub fn as_slice(&self) -> &[T] {
-        self.nodes.as_slice()
+        self.nodes
     }
 
     /// Iterate yielding `(index, node, optional trailing token)` tuples.
@@ -231,11 +254,11 @@ where
 }
 
 impl<'arena, T, Tok> IntoIterator for TokenSeparatedSequence<'arena, T, Tok> {
-    type Item = T;
-    type IntoIter = IntoIter<'arena, Self::Item>;
+    type Item = &'arena T;
+    type IntoIter = Iter<'arena, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.nodes.into_iter()
+        self.nodes.iter()
     }
 }
 

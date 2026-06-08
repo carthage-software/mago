@@ -11,8 +11,12 @@ use crate::ast::ast::VariadicPlaceholderArgument;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TokenKind;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_optional_argument_list(&mut self) -> Result<Option<ArgumentList<'arena>>, ParseError> {
         if let Some(T!["("]) = self.stream.peek_kind(0)? { Ok(Some(self.parse_argument_list()?)) } else { Ok(None) }
     }

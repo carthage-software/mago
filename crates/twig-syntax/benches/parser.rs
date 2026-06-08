@@ -2,11 +2,11 @@
 
 use std::hint::black_box;
 
-use bumpalo::Bump;
 use criterion::Criterion;
 use criterion::Throughput;
 use criterion::criterion_group;
 use criterion::criterion_main;
+use mago_allocator::LocalArena;
 
 use mago_database::file::FileId;
 use mago_syntax_core::input::Input;
@@ -68,7 +68,7 @@ fn bench_parser(c: &mut Criterion) {
     for &(name, src) in FIXTURES {
         group.throughput(Throughput::Bytes(src.len() as u64));
         group.bench_function(name, |b| {
-            let mut arena = Bump::new();
+            let mut arena = LocalArena::new();
             b.iter(|| {
                 arena.reset();
                 let tpl = parse_file_content(&arena, FileId::zero(), black_box(src.as_bytes()));

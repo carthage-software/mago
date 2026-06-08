@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::fmt::Write as _;
 use std::rc::Rc;
 
@@ -25,12 +26,15 @@ use crate::error::AnalysisError;
 use crate::expression::assignment;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Variable<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         match self {
             Variable::Direct(var) => var.analyze(context, block_context, artifacts),
             Variable::Indirect(var) => var.analyze(context, block_context, artifacts),
@@ -40,12 +44,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Variable<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for DirectVariable<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let resulting_type = read_variable(context, block_context, artifacts, self.name, self.span());
 
         artifacts.set_rc_expression_type(self, resulting_type);
@@ -55,12 +62,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DirectVariable<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for IndirectVariable<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         self.expression.analyze(context, block_context, artifacts)?;
 
         let resulting_type = match artifacts.get_expression_type(&self.expression) {
@@ -84,12 +94,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IndirectVariable<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for NestedVariable<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         self.variable.analyze(context, block_context, artifacts)?;
 
         let resulting_type = match artifacts.get_expression_type(&self.variable) {
@@ -112,13 +125,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NestedVariable<'arena> {
     }
 }
 
-fn read_variable<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn read_variable<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     variable_name_bytes: &[u8],
     variable_span: Span,
-) -> Rc<TUnion> {
+) -> Rc<TUnion>
+where
+    A: Arena,
+{
     let variable_atom = word(variable_name_bytes);
     let variable_name = BytesDisplay(variable_name_bytes);
     block_context.add_conditionally_referenced_variable_atom(variable_name_bytes, variable_atom);

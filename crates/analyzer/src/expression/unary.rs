@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::collections::BTreeMap;
 use std::ops::Add;
 use std::ops::Sub;
@@ -65,12 +66,15 @@ use crate::utils::php_emulation::str_increment_bytes;
 use crate::utils::php_emulation::str_is_numeric_bytes;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let is_negation = matches!(self.operator, UnaryPrefixOperator::Not(_));
         let is_variable_reference = matches!(self.operator, UnaryPrefixOperator::Reference(_))
             && matches!(self.operand, Expression::Variable(Variable::Direct(_)));
@@ -427,12 +431,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPostfix<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let was_in_general_use = block_context.flags.inside_general_use();
         block_context.flags.set_inside_general_use(true);
         self.operand.analyze(context, block_context, artifacts)?;
@@ -472,13 +479,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPostfix<'arena> {
 /// An `TUnion` representing the type of the operand *after* the increment operation.
 ///
 /// Returns `mixed|any` if the operand's type cannot be determined or if a fatal error occurs.
-fn increment_operand<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn increment_operand<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     operand: &Expression<'arena>,
     operation_span: Span,
-) -> Result<Rc<TUnion>, AnalysisError> {
+) -> Result<Rc<TUnion>, AnalysisError>
+where
+    A: Arena,
+{
     let Some(operand_type) = artifacts.get_expression_type(operand) else {
         return Ok(Rc::new(get_mixed()));
     };
@@ -724,13 +734,16 @@ fn increment_operand<'ctx, 'arena>(
 /// # Returns
 ///
 /// An `TUnion` representing the type of the operand *after* the decrement operation.
-fn decrement_operand<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn decrement_operand<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     operand: &Expression<'arena>,
     operation_span: Span,
-) -> Result<Rc<TUnion>, AnalysisError> {
+) -> Result<Rc<TUnion>, AnalysisError>
+where
+    A: Arena,
+{
     // Changed return to Result for consistency
     let Some(operand_type) = artifacts.get_expression_type(operand) else {
         return Ok(Rc::new(get_mixed()));
@@ -961,12 +974,14 @@ fn decrement_operand<'ctx, 'arena>(
     Ok(resulting_type_union)
 }
 
-fn report_redundant_type_cast<'ast, 'arena>(
+fn report_redundant_type_cast<'ast, 'arena, A>(
     cast_operator: &'ast UnaryPrefixOperator,
     expression: &'ast UnaryPrefix<'arena>,
     known_type: &TUnion,
-    context: &mut Context<'_, 'arena>,
-) {
+    context: &mut Context<'_, 'arena, A>,
+) where
+    A: Arena,
+{
     context.collector.propose_with_code(
         IssueCode::RedundantCast,
         Issue::help(format!(
@@ -987,11 +1002,14 @@ fn report_redundant_type_cast<'ast, 'arena>(
     );
 }
 
-fn cast_type_to_array<'arena>(
+fn cast_type_to_array<'arena, A>(
     operand_type: &TUnion,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     cast_expression: &UnaryPrefix<'arena>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if operand_type.is_never() {
         context.collector.report_with_code(
             IssueCode::InvalidTypeCast,
@@ -1120,11 +1138,14 @@ fn cast_type_to_array<'arena>(
     TUnion::from_vec(combine(resulting_array_atomics, context.codebase, context.settings.combiner_options()))
 }
 
-fn cast_type_to_bool<'arena>(
+fn cast_type_to_bool<'arena, A>(
     operand_type: &TUnion,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     cast_expression: &UnaryPrefix<'arena>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if operand_type.is_never() {
         return get_never();
     }
@@ -1172,11 +1193,14 @@ fn cast_type_to_bool<'arena>(
     get_bool()
 }
 
-fn cast_type_to_float<'arena>(
+fn cast_type_to_float<'arena, A>(
     operand_type: &TUnion,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     cast_expression: &UnaryPrefix<'arena>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if operand_type.is_never() {
         return get_never();
     }
@@ -1329,7 +1353,10 @@ fn cast_type_to_float<'arena>(
     TUnion::from_vec(combine(resulting_float_atomics, context.codebase, context.settings.combiner_options()))
 }
 
-fn cast_type_to_int(operand_type: &TUnion, context: &Context<'_, '_>) -> TUnion {
+fn cast_type_to_int<A>(operand_type: &TUnion, context: &Context<'_, '_, A>) -> TUnion
+where
+    A: Arena,
+{
     let mut possibilities = vec![];
     for t in operand_type.types.as_ref() {
         let possible = match t {
@@ -1409,11 +1436,14 @@ fn cast_type_to_int(operand_type: &TUnion, context: &Context<'_, '_>) -> TUnion 
     TUnion::from_vec(combine(possibilities, context.codebase, context.settings.combiner_options()))
 }
 
-fn cast_type_to_object<'arena>(
+fn cast_type_to_object<'arena, A>(
     operand_type: &TUnion,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     cast_expression: &UnaryPrefix<'arena>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut possibilities = vec![];
     for t in operand_type.types.as_ref() {
         match t {
@@ -1476,14 +1506,17 @@ fn cast_type_to_object<'arena>(
     TUnion::from_vec(combine(possibilities, context.codebase, context.settings.combiner_options()))
 }
 
-pub fn cast_type_to_string<'ctx>(
+pub fn cast_type_to_string<'ctx, A>(
     operand_type: &TUnion,
     operand_expression_id: Option<&[u8]>,
-    context: &mut Context<'ctx, '_>,
+    context: &mut Context<'ctx, '_, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     expression_span: Span,
-) -> Result<TUnion, AnalysisError> {
+) -> Result<TUnion, AnalysisError>
+where
+    A: Arena,
+{
     let (has_array, has_non_array) = operand_type
         .types
         .iter()
@@ -1766,14 +1799,17 @@ pub fn cast_type_to_string<'ctx>(
     Ok(TUnion::from_vec(combine(possibilities, context.codebase, context.settings.combiner_options())))
 }
 
-fn find_to_string_in_intersections<'ctx>(
+fn find_to_string_in_intersections<'ctx, A>(
     atomic: &TAtomic,
     operand_expression_id: Option<&[u8]>,
-    context: &mut Context<'ctx, '_>,
+    context: &mut Context<'ctx, '_, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     expression_span: Span,
-) -> Option<Result<TUnion, AnalysisError>> {
+) -> Option<Result<TUnion, AnalysisError>>
+where
+    A: Arena,
+{
     let intersection_types = atomic.get_intersection_types()?;
     let to_string_id = word(b"__toString");
 

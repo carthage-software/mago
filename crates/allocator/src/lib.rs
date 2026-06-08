@@ -52,6 +52,35 @@ pub use iter::FromIteratorIn;
 #[cfg(feature = "rayon")]
 pub use iter::ParallelCollectIn;
 
+/// Builds an arena-allocated [`Vec`](vec::Vec), analogous to [`std::vec!`].
+///
+/// The first argument is the arena (or any `&allocator`); the elements follow a
+/// `;`:
+///
+/// ```
+/// use mago_allocator::prelude::*;
+///
+/// let arena = LocalArena::new();
+/// let evens = vec_in![&arena; 0, 2, 4];
+/// assert_eq!(evens.as_slice(), &[0, 2, 4]);
+/// ```
+#[macro_export]
+macro_rules! vec_in {
+    ($arena:expr $(,)?) => {{
+        $crate::vec::Vec::new_in($arena)
+    }};
+    ($arena:expr; $element:expr; $count:expr) => {{
+        let mut vector = $crate::vec::Vec::new_in($arena);
+        vector.resize($count, $element);
+        vector
+    }};
+    ($arena:expr; $($element:expr),* $(,)?) => {{
+        let mut vector = $crate::vec::Vec::new_in($arena);
+        $( vector.push($element); )*
+        vector
+    }};
+}
+
 /// Formats its arguments into an arena, returning `&mut str`.
 ///
 /// The macro form of [`Arena::alloc_fmt`], reading like [`format!`] but with no

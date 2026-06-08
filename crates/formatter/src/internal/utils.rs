@@ -1,5 +1,6 @@
-use bumpalo::collections::CollectIn;
-use bumpalo::collections::Vec;
+use mago_allocator::Arena;
+use mago_allocator::CollectIn;
+use mago_allocator::vec::Vec;
 use mago_syntax::ast::Argument;
 use mago_syntax::ast::ArgumentList;
 use mago_syntax::ast::ClassConstantAccess;
@@ -84,7 +85,10 @@ pub fn get_left_side<'arena>(expression: &'arena Expression<'arena>) -> Option<&
 }
 
 #[inline]
-pub fn is_at_call_like_expression(f: &FormatterState<'_, '_>) -> bool {
+pub fn is_at_call_like_expression<A>(f: &FormatterState<'_, '_, A>) -> bool
+where
+    A: Arena,
+{
     let Some(grant_parent) = f.grandparent_node() else {
         return false;
     };
@@ -111,7 +115,10 @@ pub fn unwrap_parenthesized<'ast, 'arena>(mut expression: &'ast Expression<'aren
 }
 
 #[inline]
-pub fn is_at_callee(f: &FormatterState<'_, '_>) -> bool {
+pub fn is_at_callee<A>(f: &FormatterState<'_, '_, A>) -> bool
+where
+    A: Arena,
+{
     let Node::Expression(expression) = f.parent_node() else {
         return false;
     };
@@ -133,8 +140,11 @@ pub fn is_at_callee(f: &FormatterState<'_, '_>) -> bool {
 }
 
 #[inline]
-pub fn will_break<'arena>(document: &'arena Document<'arena>) -> bool {
-    let check_array = |array: &Vec<'arena, Document<'arena>>| array.iter().rev().any(|doc| will_break(doc));
+pub fn will_break<'arena, A>(document: &'arena Document<'arena, A>) -> bool
+where
+    A: Arena,
+{
+    let check_array = |array: &Vec<'arena, Document<'arena, A>, A>| array.iter().rev().any(|doc| will_break(doc));
 
     match document {
         Document::BreakParent => true,
@@ -184,12 +194,15 @@ fn split_any_newline(text: &[u8]) -> impl Iterator<Item = &[u8]> {
 }
 
 #[inline]
-pub fn replace_end_of_line<'arena>(
-    f: &FormatterState<'_, 'arena>,
-    document: Document<'arena>,
+pub fn replace_end_of_line<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
+    document: Document<'arena, A>,
     replacement: Separator,
     halted_compilation: bool,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let Document::String(text) = document else {
         return document;
     };
@@ -201,17 +214,20 @@ pub fn replace_end_of_line<'arena>(
 
     Document::Array(Document::join(
         f.arena,
-        split_any_newline(text).map(Document::String).collect_in::<Vec<_>>(f.arena),
+        split_any_newline(text).map(Document::String).collect_in::<Vec<'arena, _, A>>(f.arena),
         replacement,
     ))
 }
 
 #[inline]
-pub fn could_expand_value<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub fn could_expand_value<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     value: &'arena Expression<'arena>,
     nested_args: bool,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     match value {
         Expression::Array(expr) => {
             // If empty, we can't expand it.

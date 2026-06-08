@@ -1,10 +1,10 @@
 use std::hint::black_box;
 
-use bumpalo::Bump;
 use criterion::Criterion;
 use criterion::Throughput;
 use criterion::criterion_group;
 use criterion::criterion_main;
+use mago_allocator::LocalArena;
 use mago_database::file::FileId;
 use mago_span::Position;
 use mago_span::Span;
@@ -46,7 +46,7 @@ fn benchmark_type_parser(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(content.len() as u64));
         group.bench_function(name, |b| {
             b.iter(|| {
-                let arena = Bump::new();
+                let arena = LocalArena::new();
                 let mut success_count = 0usize;
                 for line in content.lines() {
                     let line = line.trim();
@@ -75,7 +75,7 @@ fn benchmark_single_complex_type(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(complex_type.len() as u64));
     group.bench_function("nested_array_shape", |b| {
         b.iter(|| {
-            let arena = Bump::new();
+            let arena = LocalArena::new();
             let span = Span::new(file_id, Position::new(0), Position::new(complex_type.len() as u32));
             let ok = parse_str(&arena, span, black_box(complex_type.as_bytes())).is_ok();
             black_box(ok)
@@ -87,7 +87,7 @@ fn benchmark_single_complex_type(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(closure_type.len() as u64));
     group.bench_function("complex_closure", |b| {
         b.iter(|| {
-            let arena = Bump::new();
+            let arena = LocalArena::new();
             let span = Span::new(file_id, Position::new(0), Position::new(closure_type.len() as u32));
             let ok = parse_str(&arena, span, black_box(closure_type.as_bytes())).is_ok();
             black_box(ok)

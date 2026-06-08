@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_syntax::ast::Construct;
 
 use crate::analyzable::Analyzable;
@@ -14,12 +15,15 @@ mod isset;
 mod print;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Construct<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         match self {
             Construct::Isset(isset_construct) => isset_construct.analyze(context, block_context, artifacts),
             Construct::Include(construct) => construct.analyze(context, block_context, artifacts),

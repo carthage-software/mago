@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::ast::CallableTypeParameter;
@@ -13,9 +14,12 @@ use crate::token::TypePrecedence;
 use crate::token::TypeTokenKind;
 
 #[inline]
-pub fn parse_callable_type_specifications<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
-) -> Result<CallableTypeSpecification<'arena>, ParseError> {
+pub fn parse_callable_type_specifications<'arena, A>(
+    stream: &mut TypeTokenStream<'arena, A>,
+) -> Result<CallableTypeSpecification<'arena>, ParseError>
+where
+    A: Arena,
+{
     Ok(CallableTypeSpecification {
         parameters: CallableTypeParameters {
             left_parenthesis: stream.eat_span(TypeTokenKind::LeftParenthesis)?,
@@ -69,9 +73,12 @@ pub fn parse_callable_type_specifications<'arena>(
 }
 
 #[inline]
-pub fn parse_optional_callable_type_specifications<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
-) -> Result<Option<CallableTypeSpecification<'arena>>, ParseError> {
+pub fn parse_optional_callable_type_specifications<'arena, A>(
+    stream: &mut TypeTokenStream<'arena, A>,
+) -> Result<Option<CallableTypeSpecification<'arena>>, ParseError>
+where
+    A: Arena,
+{
     if stream.is_at(TypeTokenKind::LeftParenthesis)? {
         let specifications = parse_callable_type_specifications(stream)?;
         Ok(Some(specifications))

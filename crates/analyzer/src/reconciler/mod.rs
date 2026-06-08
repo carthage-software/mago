@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -58,8 +59,8 @@ pub mod simple_negated_assertion_reconciler;
 mod macros;
 
 #[allow(clippy::similar_names)]
-pub fn reconcile_keyed_types<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn reconcile_keyed_types<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     new_types: &IndexMap<Word, AssertionSet>,
     mut active_new_types: IndexMap<Word, HashSet<usize>>,
     block_context: &mut BlockContext<'ctx>,
@@ -68,7 +69,9 @@ pub fn reconcile_keyed_types<'ctx>(
     span: &Span,
     can_report_issues: bool,
     negated: bool,
-) {
+) where
+    A: Arena,
+{
     if new_types.is_empty() {
         return;
     }
@@ -578,13 +581,15 @@ fn adjust_array_type_remove_key(
 /// When `$input->myProp` is narrowed (e.g., via `is_string()`), this function
 /// checks each object variant to see if its declared property type is compatible
 /// with the narrowed type, and removes incompatible variants.
-fn adjust_object_property_type(
+fn adjust_object_property_type<A>(
     mut key_parts: Vec<Vec<u8>>,
     block_context: &mut BlockContext<'_>,
     changed_var_ids: &mut WordSet,
     result_type: &TUnion,
-    context: &Context<'_, '_>,
-) {
+    context: &Context<'_, '_, A>,
+) where
+    A: Arena,
+{
     let Some(property_name) = key_parts.pop() else {
         return;
     };
@@ -932,8 +937,8 @@ pub fn break_up_path_into_parts(path: &[u8]) -> Vec<Vec<u8>> {
 
 #[allow(clippy::multiple_unsafe_ops_per_block)]
 #[allow(clippy::semicolon_inside_block)]
-fn get_value_for_key(
-    context: &Context<'_, '_>,
+fn get_value_for_key<A>(
+    context: &Context<'_, '_, A>,
     key: Word,
     block_context: &mut BlockContext<'_>,
     new_assertions: &IndexMap<Word, AssertionSet>,
@@ -943,7 +948,10 @@ fn get_value_for_key(
     has_empty: bool,
     inside_loop: bool,
     has_object_array_access: &mut bool,
-) -> Option<TUnion> {
+) -> Option<TUnion>
+where
+    A: Arena,
+{
     let key_str = key.as_bytes();
     let mut key_parts = break_up_path_into_parts(key_str);
     if key_parts.is_empty() {
@@ -1222,7 +1230,10 @@ fn get_value_for_key(
     block_context.locals.get(&base_key_atom).map(|t| (**t).clone())
 }
 
-fn get_property_type(context: &Context<'_, '_>, classlike_name: Word, property_name_str: &[u8]) -> Option<TUnion> {
+fn get_property_type<A>(context: &Context<'_, '_, A>, classlike_name: Word, property_name_str: &[u8]) -> Option<TUnion>
+where
+    A: Arena,
+{
     // Add `$` prefix
     let property_name = concat_word!(b"$", property_name_str);
 
@@ -1250,15 +1261,17 @@ fn get_property_type(context: &Context<'_, '_>, classlike_name: Word, property_n
     Some(property_type)
 }
 
-pub(crate) fn trigger_issue_for_impossible(
-    context: &mut Context<'_, '_>,
+pub(crate) fn trigger_issue_for_impossible<A>(
+    context: &mut Context<'_, '_, A>,
     old_var_type_string: Word,
     key: &[u8],
     assertion: &Assertion,
     redundant: bool,
     negated: bool,
     span: &Span,
-) {
+) where
+    A: Arena,
+{
     let mut assertion_atom = assertion.to_atom();
     let mut not_operator = assertion_atom.as_bytes().starts_with(b"!");
 
@@ -1297,14 +1310,16 @@ pub(crate) fn trigger_issue_for_impossible(
     }
 }
 
-fn report_impossible_issue(
-    context: &mut Context<'_, '_>,
+fn report_impossible_issue<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     assertion_atom: Word,
     key: &[u8],
     span: &Span,
     old_var_type_string: Word,
-) {
+) where
+    A: Arena,
+{
     let key = BytesDisplay(key);
     let subject_desc = if old_var_type_string.is_empty() || old_var_type_string.len() > 50 {
         format!("`{key}`")
@@ -1376,14 +1391,16 @@ fn report_impossible_issue(
     );
 }
 
-fn report_redundant_issue(
-    context: &mut Context<'_, '_>,
+fn report_redundant_issue<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     assertion_atom: Word,
     key: &[u8],
     span: &Span,
     old_var_type_string: Word,
-) {
+) where
+    A: Arena,
+{
     let key = BytesDisplay(key);
     let subject_desc = if old_var_type_string.is_empty() || old_var_type_string.len() > 50 {
         format!("`{key}`")

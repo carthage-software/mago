@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::sync::Arc;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -43,12 +44,15 @@ pub mod pipe;
 pub mod static_method_call;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Call<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         match self {
             Call::Function(call) => call.analyze(context, block_context, artifacts),
             Call::Method(call) => call.analyze(context, block_context, artifacts),
@@ -58,8 +62,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Call<'arena> {
     }
 }
 
-fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_invocation_targets<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     mut template_result: TemplateResult,
@@ -72,7 +76,10 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
     should_add_null: bool,
     object_has_nullsafe_null: bool,
     all_targets_non_nullable_return: bool,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let method_name_for_assertions: Option<Word> = invocation_targets.iter().find_map(|target| {
         if let InvocationTarget::FunctionLike {
             identifier: FunctionLikeIdentifier::Method(_, _),
@@ -231,13 +238,16 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena>(
 /// When inside a conditional like `if ($obj->isValid())` where `isValid` has method call
 /// assertions like `@phpstan-assert-if-true Statement $this->first()`, this function
 /// narrows the return type of `first()` from `Statement|null` to `Statement`.
-fn apply_method_call_assertions<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn apply_method_call_assertions<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     this_variable: Option<&[u8]>,
     method_name: Option<Word>,
     mut return_type: TUnion,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let Some(this_var) = this_variable else {
         return return_type;
     };
@@ -274,24 +284,30 @@ fn apply_method_call_assertions<'ctx>(
     return_type
 }
 
-fn get_function_like_target<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn get_function_like_target<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
     inferred_return_type: Option<Arc<TUnion>>,
-) -> Option<InvocationTarget<'ctx>> {
+) -> Option<InvocationTarget<'ctx>>
+where
+    A: Arena,
+{
     get_function_like_target_inner(context, function_like, alternative, span, inferred_return_type, false)
 }
 
-pub(super) fn get_function_like_target_with_skip<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub(super) fn get_function_like_target_with_skip<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
     inferred_return_type: Option<Arc<TUnion>>,
     skip_error_on_not_found: bool,
-) -> Option<InvocationTarget<'ctx>> {
+) -> Option<InvocationTarget<'ctx>>
+where
+    A: Arena,
+{
     get_function_like_target_inner(
         context,
         function_like,
@@ -302,14 +318,17 @@ pub(super) fn get_function_like_target_with_skip<'ctx>(
     )
 }
 
-fn get_function_like_target_inner<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn get_function_like_target_inner<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     function_like: FunctionLikeIdentifier,
     alternative: Option<FunctionLikeIdentifier>,
     span: Span,
     inferred_return_type: Option<Arc<TUnion>>,
     skip_error_on_not_found: bool,
-) -> Option<InvocationTarget<'ctx>> {
+) -> Option<InvocationTarget<'ctx>>
+where
+    A: Arena,
+{
     let mut identifier = function_like;
     let original_class_for_method_context =
         if let FunctionLikeIdentifier::Method(class_name, _) = function_like { Some(class_name) } else { None };
@@ -423,13 +442,16 @@ fn get_function_like_target_inner<'ctx>(
     Some(InvocationTarget::FunctionLike { identifier, metadata, inferred_return_type, method_context, span })
 }
 
-fn inspect_arguments<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn inspect_arguments<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     target: &InvocationTarget<'ctx>,
     invocation_arguments: &InvocationArgumentsSource<'_, 'arena>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     match invocation_arguments {
         InvocationArgumentsSource::ArgumentList(argument_list) => {
             argument_list.analyze(context, block_context, artifacts)?;
@@ -482,13 +504,16 @@ fn inspect_arguments<'ctx, 'arena>(
     Ok(())
 }
 
-fn confirm_argument_type<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn confirm_argument_type<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     target: &InvocationTarget<'ctx>,
     invocation_arguments: &InvocationArgumentsSource<'_, 'arena>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     match invocation_arguments {
         InvocationArgumentsSource::ArgumentList(argument_list) => {
             argument_list.analyze(context, block_context, artifacts)?;

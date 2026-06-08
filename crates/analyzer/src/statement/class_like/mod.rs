@@ -3,6 +3,7 @@ use foldhash::HashSet;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use mago_allocator::Arena;
 
 use mago_bytes::BytesDisplay;
 use mago_codex::context::ScopeContext;
@@ -74,14 +75,16 @@ pub mod property;
 pub mod unused_members;
 
 /// Reports a duplicate definition issue for class-like types.
-fn report_duplicate_definition(
-    context: &mut Context<'_, '_>,
+fn report_duplicate_definition<A>(
+    context: &mut Context<'_, '_, A>,
     title: &str,
     kind: &str,
     name: &[u8],
     duplicate_span: Span,
     original_span: Span,
-) {
+) where
+    A: Arena,
+{
     let name = BytesDisplay(name);
     context.collector.report_with_code(
         IssueCode::DuplicateDefinition,
@@ -245,10 +248,12 @@ fn type_contains_template_param(type_union: &TUnion, param_name: Word, defining_
 /// - A method parameter type
 /// - A method return type
 /// - An `@extends`, `@implements`, or `@use` annotation
-fn check_unused_template_parameters<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn check_unused_template_parameters<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.find_unused_definitions {
         return;
     }
@@ -352,12 +357,15 @@ fn check_unused_template_parameters<'ctx>(
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_attributes(
             context,
             block_context,
@@ -491,12 +499,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_attributes(
             context,
             block_context,
@@ -575,12 +586,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_attributes(
             context,
             block_context,
@@ -659,12 +673,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_attributes(
             context,
             block_context,
@@ -734,12 +751,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
     }
 }
 
-fn check_duplicate_enum_case_values<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn check_duplicate_enum_case_values<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     artifacts: &AnalysisArtifacts,
     enum_name: &[u8],
     r#enum: &Enum<'arena>,
-) {
+) where
+    A: Arena,
+{
     let enum_name = BytesDisplay(enum_name);
     let mut seen: Vec<(Word, &[u8], Span)> = Vec::new();
 
@@ -798,8 +817,8 @@ fn check_duplicate_enum_case_values<'arena>(
     }
 }
 
-pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     artifacts: &mut AnalysisArtifacts,
     name_span: Option<Span>,
     declaration_span: Span,
@@ -807,7 +826,10 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
     implements_ast: Option<&'ast Implements<'arena>>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     members: &'ast [ClassLikeMember<'arena>],
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     if context.settings.diff && context.codebase.safe_symbols.contains(&class_like_metadata.name) {
         return Ok(());
     }
@@ -1127,11 +1149,13 @@ pub(crate) fn analyze_class_like<'ctx, 'ast, 'arena>(
 }
 
 #[allow(clippy::unwrap_used)]
-fn check_class_like_extends<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_class_like_extends<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     extends_ast: Option<&Extends<'arena>>,
-) {
+) where
+    A: Arena,
+{
     // This check only applies to classes and interfaces, which can use `extends`.
     if !class_like_metadata.kind.is_class() && !class_like_metadata.kind.is_interface() {
         return;
@@ -1317,12 +1341,14 @@ fn check_class_like_extends<'ctx, 'arena>(
 }
 
 #[allow(clippy::unwrap_used)]
-fn check_class_like_implements<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_class_like_implements<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     implements_ast: Option<&Implements<'arena>>,
     checked_signatures: &mut HashSet<(Word, Word)>,
-) {
+) where
+    A: Arena,
+{
     // This check only applies to classes and enums, which can use `implements`.
     if !class_like_metadata.kind.is_class() && !class_like_metadata.kind.is_enum() {
         // A separate check in the semantic analyzer will catch `implements` on an invalid type like a trait or interface.
@@ -1435,11 +1461,13 @@ fn check_class_like_implements<'ctx, 'arena>(
 }
 
 #[allow(clippy::unwrap_used)]
-fn check_class_like_use<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_class_like_use<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     trait_use: &TraitUse<'arena>,
-) {
+) where
+    A: Arena,
+{
     let using_kind_str = class_like_metadata.kind.as_str();
     let using_kind_capitalized =
         format!("{}{}", using_kind_str.chars().next().unwrap().to_uppercase(), &using_kind_str[1..]);
@@ -1597,13 +1625,15 @@ impl HasSpan for InheritanceKind {
     }
 }
 
-fn check_template_parameters<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn check_template_parameters<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     parent_metadata: &'ctx ClassLikeMetadata,
     actual_parameters_count: usize,
     inheritance: InheritanceKind,
-) {
+) where
+    A: Arena,
+{
     let expected_parameters_count = parent_metadata.template_types.len();
     let min_required_parameters_count =
         parent_metadata.template_types.values().take_while(|t| t.default.is_none()).count();
@@ -1885,10 +1915,12 @@ fn should_skip_enum_builtin_interface(class_like_metadata: &ClassLikeMetadata, i
     class_like_metadata.kind.is_enum() && (interface_fqcn == b"backedenum" || interface_fqcn == b"unitenum")
 }
 
-fn check_template_variance_positions<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn check_template_variance_positions<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
-) {
+) where
+    A: Arena,
+{
     use mago_codex::ttype::template::variance::Variance;
 
     if class_like_metadata.template_variance.is_empty() {
@@ -1989,7 +2021,12 @@ fn check_template_variance_positions<'ctx>(
 /// inherits a method whose return positions merge (by intersection) to an
 /// uninhabited type, so no class could ever implement it. A class that declares
 /// the method itself is left to the per-path override checks.
-fn check_uninhabitable_diamonds<'ctx>(context: &mut Context<'ctx, '_>, class_like_metadata: &'ctx ClassLikeMetadata) {
+fn check_uninhabitable_diamonds<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+) where
+    A: Arena,
+{
     if class_like_metadata.template_extended_parameter_paths.is_empty() {
         return;
     }
@@ -2055,11 +2092,13 @@ fn check_uninhabitable_diamonds<'ctx>(context: &mut Context<'ctx, '_>, class_lik
     }
 }
 
-fn check_abstract_method_signatures<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn check_abstract_method_signatures<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     checked_signatures: &mut HashSet<(Word, Word)>,
-) {
+) where
+    A: Arena,
+{
     for (method_name_atom, overridden_method_ids) in &class_like_metadata.overridden_method_ids {
         let method_name_str = method_name_atom.as_ref();
 
@@ -2163,11 +2202,13 @@ fn check_abstract_method_signatures<'ctx>(
     }
 }
 
-fn check_trait_method_conflicts<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_trait_method_conflicts<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     members: &'ast [ClassLikeMember<'arena>],
-) {
+) where
+    A: Arena,
+{
     let mut trait_uses: Vec<(&'ast TraitUse<'arena>, Vec<Word>)> = Vec::new();
 
     for member in members {
@@ -2306,11 +2347,13 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena>(
     }
 }
 
-fn check_trait_property_conflicts<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_trait_property_conflicts<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     members: &'ast [ClassLikeMember<'arena>],
-) {
+) where
+    A: Arena,
+{
     let mut trait_uses: Vec<(&'ast TraitUse<'arena>, Vec<Word>)> = Vec::new();
 
     for member in members {
@@ -2571,8 +2614,8 @@ fn check_property_compatibility(prop1: &PropertyMetadata, prop2: &PropertyMetada
     Ok(())
 }
 
-fn report_trait_property_conflict(
-    context: &mut Context,
+fn report_trait_property_conflict<A>(
+    context: &mut Context<'_, '_, A>,
     class_name: Word,
     property_name: Word,
     trait1_name: Word,
@@ -2580,7 +2623,9 @@ fn report_trait_property_conflict(
     conflict_span: Span,
     prop1: &PropertyMetadata,
     prop2: &PropertyMetadata,
-) {
+) where
+    A: Arena,
+{
     let conflict = match check_property_compatibility(prop1, prop2) {
         Ok(()) => {
             PropertyConflict::Type(None, None) // Dummy value
@@ -2719,12 +2764,14 @@ fn apply_template_substitution_to_method(
     substituted_method
 }
 
-fn check_interface_method_signatures<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn check_interface_method_signatures<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     interface_metadata: &'ctx ClassLikeMetadata,
     checked_signatures: &mut HashSet<(Word, Word)>,
-) {
+) where
+    A: Arena,
+{
     let interface_fqcn_str: &[u8] = interface_metadata.name.as_ref();
     if should_skip_enum_builtin_interface(class_like_metadata, interface_fqcn_str) {
         return;
@@ -2798,15 +2845,17 @@ fn check_interface_method_signatures<'ctx>(
     }
 }
 
-fn report_signature_compatibility_issue<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn report_signature_compatibility_issue<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     child_class: &'ctx ClassLikeMetadata,
     parent_class: &'ctx ClassLikeMetadata,
     method_name: Word,
     parent_method: &FunctionLikeMetadata,
     incompatibility: SignatureCompatibilityIssue,
     primary_span: Span,
-) {
+) where
+    A: Arena,
+{
     let child_name = child_class.original_name;
     let parent_name = parent_class.original_name;
     let child_class_span = child_class.name_span.unwrap_or(child_class.span);
@@ -2978,7 +3027,12 @@ fn report_signature_compatibility_issue<'ctx>(
 }
 
 #[allow(clippy::similar_names)]
-fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like_metadata: &'ctx ClassLikeMetadata) {
+fn check_class_like_properties<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+) where
+    A: Arena,
+{
     if class_like_metadata.kind.is_enum() {
         return;
     }
@@ -3450,11 +3504,13 @@ fn check_class_like_properties<'ctx>(context: &mut Context<'ctx, '_>, class_like
     }
 }
 
-fn check_class_like_constants<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_class_like_constants<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     members: &[ClassLikeMember<'arena>],
-) {
+) where
+    A: Arena,
+{
     for member in members {
         let ClassLikeMember::Constant(constant) = member else {
             continue;
@@ -3721,11 +3777,13 @@ fn check_class_like_constants<'ctx, 'arena>(
 ///
 /// In PHP, a readonly class can only use traits where all properties are declared readonly.
 /// Using a trait with non-readonly properties in a readonly class causes a fatal error.
-fn check_readonly_class_trait_properties<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_readonly_class_trait_properties<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     members: &[ClassLikeMember<'arena>],
-) {
+) where
+    A: Arena,
+{
     if !class_like_metadata.flags.is_readonly() {
         return;
     }

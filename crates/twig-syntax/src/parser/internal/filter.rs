@@ -2,8 +2,12 @@ use crate::ast::Expression;
 use crate::ast::Filter;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse a filter suffix: `operand | name ( args? )`.  The leading
     /// `|` must already have been consumed by the caller.
     pub(crate) fn parse_filter(

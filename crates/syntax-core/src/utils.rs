@@ -1,5 +1,4 @@
-use bumpalo::Bump;
-use bumpalo::collections::Vec;
+use mago_allocator::prelude::*;
 
 use crate::input::Input;
 use crate::number_separator;
@@ -14,12 +13,15 @@ use crate::number_separator;
 ///
 /// Panics if internal assumptions about character parsing are violated (e.g., invalid hex or octal digits
 /// after validation). This should not occur with valid PHP strings.
-pub fn parse_literal_string_in<'arena>(
-    arena: &'arena Bump,
+pub fn parse_literal_string_in<'arena, A>(
+    arena: &'arena A,
     s: &'arena [u8],
     quote_char: Option<u8>,
     has_quote: bool,
-) -> Option<&'arena [u8]> {
+) -> Option<&'arena [u8]>
+where
+    A: Arena,
+{
     if s.is_empty() {
         return Some(b"");
     }
@@ -143,7 +145,7 @@ pub fn parse_literal_string_in<'arena>(
         i += consumed;
     }
 
-    Some(result.into_bump_slice())
+    Some(result.leak())
 }
 
 /// Parses a PHP literal float, handling underscore separators.

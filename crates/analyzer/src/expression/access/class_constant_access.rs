@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -14,12 +15,15 @@ use crate::error::AnalysisError;
 use crate::resolver::class_constant::resolve_class_constants;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassConstantAccess<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let resolution = resolve_class_constants(context, block_context, artifacts, self.class, &self.constant, false)?;
 
         let mut resulting_type = if resolution.has_ambiguous_path { Some(get_mixed()) } else { None };

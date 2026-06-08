@@ -1,7 +1,7 @@
-use bumpalo::Bump;
-use bumpalo::collections::Vec;
-use bumpalo::vec;
 use foldhash::HashMap;
+use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
+use mago_allocator::vec_in;
 
 use crate::document::Align;
 use crate::document::BreakMode;
@@ -25,29 +25,35 @@ use crate::settings::FormatSettings;
 mod command;
 
 #[derive(Debug)]
-pub struct Printer<'arena> {
-    arena: &'arena Bump,
+pub struct Printer<'arena, A>
+where
+    A: Arena,
+{
+    arena: &'arena A,
     settings: FormatSettings,
-    out: Vec<'arena, u8>,
+    out: Vec<'arena, u8, A>,
     position: usize,
-    commands: Vec<'arena, Command<'arena>>,
-    line_suffix: Vec<'arena, Command<'arena>>,
+    commands: Vec<'arena, Command<'arena, A>, A>,
+    line_suffix: Vec<'arena, Command<'arena, A>, A>,
     group_mode_map: HashMap<GroupIdentifier, Mode>,
     new_line: &'static str,
     can_trim: bool,
 }
 
-impl<'arena> Printer<'arena> {
+impl<'arena, A> Printer<'arena, A>
+where
+    A: Arena,
+{
     pub fn new(
-        arena: &'arena Bump,
-        document: Document<'arena>,
+        arena: &'arena A,
+        document: Document<'arena, A>,
         capacity_hint: usize,
         settings: FormatSettings,
     ) -> Self {
         // Preallocate for performance because the output will very likely
         // be the same size as the original text.
         let out = Vec::with_capacity_in(capacity_hint, arena);
-        let cmds = vec![in arena; Command::new(Indentation::root(), Mode::Break, document)];
+        let cmds = vec_in![arena; Command::new(Indentation::root(), Mode::Break, document)];
 
         Self {
             arena,
@@ -55,7 +61,7 @@ impl<'arena> Printer<'arena> {
             out,
             position: 0,
             commands: cmds,
-            line_suffix: vec![in arena],
+            line_suffix: vec_in![arena],
             group_mode_map: HashMap::default(),
             new_line: settings.end_of_line.as_str(),
             can_trim: true,
@@ -65,7 +71,7 @@ impl<'arena> Printer<'arena> {
     pub fn build(mut self) -> &'arena [u8] {
         self.print_doc_to_string();
 
-        self.out.into_bump_slice()
+        self.out.leak()
     }
 
     /// Turn Doc into a string
@@ -129,7 +135,12 @@ impl<'arena> Printer<'arena> {
         self.position += 1;
     }
 
-    fn handle_array(&mut self, indentation: &Indentation<'arena>, mode: Mode, docs: Vec<Document<'arena>>) {
+    fn handle_array(
+        &mut self,
+        indentation: &Indentation<'arena, A>,
+        mode: Mode,
+        docs: Vec<'arena, Document<'arena, A>, A>,
+    ) {
         self.commands.extend(docs.into_iter().rev().map(|doc| Command::new(indentation.clone(), mode, doc)));
     }
 
@@ -163,21 +174,26 @@ impl<'arena> Printer<'arena> {
         }
     }
 
-    fn handle_indent(&mut self, indentation: &Indentation<'arena>, mode: Mode, docs: Vec<Document<'arena>>) {
-        let new_indentation = Indentation::Combined(vec![in self.arena; Indentation::Indent, indentation.clone()]);
+    fn handle_indent(
+        &mut self,
+        indentation: &Indentation<'arena, A>,
+        mode: Mode,
+        docs: Vec<'arena, Document<'arena, A>, A>,
+    ) {
+        let new_indentation = Indentation::Combined(vec_in![self.arena; Indentation::Indent, indentation.clone()]);
         self.commands.extend(docs.into_iter().rev().map(|doc| Command::new(new_indentation.clone(), mode, doc)));
     }
 
-    fn handle_align(&mut self, align: Align<'arena>, mode: Mode) {
+    fn handle_align(&mut self, align: Align<'arena, A>, mode: Mode) {
         let new_indent = Indentation::Alignment(align.alignment);
         self.commands.extend(align.contents.into_iter().rev().map(|doc| Command::new(new_indent.clone(), mode, doc)));
     }
 
     fn handle_group(
         &mut self,
-        indentation: &Indentation<'arena>,
+        indentation: &Indentation<'arena, A>,
         mode: Mode,
-        doc: Document<'arena>,
+        doc: Document<'arena, A>,
         mut should_remeasure: bool,
     ) -> bool {
         #[allow(clippy::unreachable)]
@@ -242,7 +258,12 @@ impl<'arena> Printer<'arena> {
         should_remeasure
     }
 
-    fn handle_indent_if_break(&mut self, indentation: &Indentation<'arena>, mode: Mode, doc: IndentIfBreak<'arena>) {
+    fn handle_indent_if_break(
+        &mut self,
+        indentation: &Indentation<'arena, A>,
+        mode: Mode,
+        doc: IndentIfBreak<'arena, A>,
+    ) {
         let IndentIfBreak { contents, group_id } = doc;
         let group_mode = self.group_mode_map.get(&group_id).copied().unwrap_or(mode);
 
@@ -254,7 +275,7 @@ impl<'arena> Printer<'arena> {
             Mode::Break => {
                 self.commands.extend(contents.into_iter().rev().map(|doc| {
                     Command::new(
-                        Indentation::Combined(vec![in self.arena; Indentation::Indent, indentation.clone()]),
+                        Indentation::Combined(vec_in![self.arena; Indentation::Indent, indentation.clone()]),
                         mode,
                         doc,
                     )
@@ -266,9 +287,9 @@ impl<'arena> Printer<'arena> {
     fn handle_line(
         &mut self,
         line: Line,
-        indentation: &Indentation<'arena>,
+        indentation: &Indentation<'arena, A>,
         mode: Mode,
-        doc: Document<'arena>,
+        doc: Document<'arena, A>,
         mut should_remeasure: bool,
     ) -> bool {
         if mode.is_flat() {
@@ -311,16 +332,16 @@ impl<'arena> Printer<'arena> {
 
     fn handle_line_suffix(
         &mut self,
-        indentation: Indentation<'arena>,
+        indentation: Indentation<'arena, A>,
         mode: Mode,
-        docs: Vec<'arena, Document<'arena>>,
+        docs: Vec<'arena, Document<'arena, A>, A>,
     ) {
         self.line_suffix.push(Command { indentation, mode, document: Document::Array(docs) });
     }
 
     fn handle_line_suffix_boundary(
         &mut self,
-        indentation: Indentation<'arena>,
+        indentation: Indentation<'arena, A>,
         mode: Mode,
         mut should_remeasure: bool,
     ) -> bool {
@@ -334,7 +355,7 @@ impl<'arena> Printer<'arena> {
         should_remeasure
     }
 
-    fn handle_if_break(&mut self, if_break: IfBreak<'arena>, indentation: Indentation<'arena>, mode: Mode) {
+    fn handle_if_break(&mut self, if_break: IfBreak<'arena, A>, indentation: Indentation<'arena, A>, mode: Mode) {
         let IfBreak { break_contents, flat_content, group_id } = if_break;
         let group_mode = group_id.map_or(Some(mode), |id| self.group_mode_map.get(&id).copied()).unwrap_or(mode);
 
@@ -352,7 +373,7 @@ impl<'arena> Printer<'arena> {
         }
     }
 
-    fn handle_fill(&mut self, indentation: Indentation<'arena>, mode: Mode, mut fill: Fill<'arena>) {
+    fn handle_fill(&mut self, indentation: Indentation<'arena, A>, mode: Mode, mut fill: Fill<'arena, A>) {
         let remaining_width = self.remaining_width();
         let original_parts_len = fill.parts().len();
         let (content, whitespace) = fill.drain_out_pair();
@@ -397,7 +418,7 @@ impl<'arena> Printer<'arena> {
             return;
         };
 
-        let mut docs = vec![in self.arena; ];
+        let mut docs = vec_in![self.arena; ];
         let content = content_flat_cmd.document;
         docs.push(content);
         docs.push(whitespace_flat_cmd.document);
@@ -425,14 +446,13 @@ impl<'arena> Printer<'arena> {
         let content_flat_cmd = Command::new(indentation, Mode::Flat, content);
 
         if first_and_second_content_fits {
-            self.commands.extend(vec![in self.arena; remaining_cmd, whitespace_flat_cmd, content_flat_cmd]);
+            self.commands.extend(vec_in![self.arena; remaining_cmd, whitespace_flat_cmd, content_flat_cmd]);
         } else if content_fits {
             self.commands.extend(
-                vec![in self.arena; remaining_cmd, whitespace_flat_cmd.with_mode(Mode::Break), content_flat_cmd],
+                vec_in![self.arena; remaining_cmd, whitespace_flat_cmd.with_mode(Mode::Break), content_flat_cmd],
             );
         } else {
-            self.commands.extend(vec![
-                in self.arena;
+            self.commands.extend(vec_in![self.arena;
                 remaining_cmd,
                 whitespace_flat_cmd.with_mode(Mode::Break),
                 content_flat_cmd.with_mode(Mode::Break),
@@ -440,7 +460,7 @@ impl<'arena> Printer<'arena> {
         }
     }
 
-    fn add_indentation(&mut self, indentation: &Indentation<'arena>) -> usize {
+    fn add_indentation(&mut self, indentation: &Indentation<'arena, A>) -> usize {
         let value = indentation.get_value_in(self.arena, self.settings.use_tabs, self.settings.tab_width);
         self.out.extend(value);
 
@@ -459,11 +479,11 @@ impl<'arena> Printer<'arena> {
         self.group_mode_map.insert(id, mode);
     }
 
-    fn fits(&self, next: &Command<'arena>, width: isize) -> bool {
+    fn fits(&self, next: &Command<'arena, A>, width: isize) -> bool {
         let mut remaining_width = width;
         let mut has_line_suffix = false;
         // Use a Vec as a stack. Pre-allocating avoids reallocation churn.
-        let mut stack: Vec<(Mode, &Document<'arena>)> = Vec::with_capacity_in(128, self.arena);
+        let mut stack: Vec<'arena, (Mode, &Document<'arena, A>), A> = Vec::with_capacity_in(128, self.arena);
         let mut cmds = self.commands.iter().rev();
 
         stack.push((next.mode, &next.document));
@@ -559,8 +579,8 @@ impl<'arena> Printer<'arena> {
         true
     }
 
-    fn propagate_breaks(doc: &Document<'_>) -> bool {
-        let check_array = |arr: &Vec<'_, Document<'_>>| arr.iter().rev().any(|doc| Self::propagate_breaks(doc));
+    fn propagate_breaks(doc: &Document<'_, A>) -> bool {
+        let check_array = |arr: &Vec<'_, Document<'_, A>, A>| arr.iter().rev().any(|doc| Self::propagate_breaks(doc));
 
         match doc {
             Document::BreakParent => true,

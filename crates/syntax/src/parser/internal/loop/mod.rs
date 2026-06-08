@@ -3,13 +3,17 @@ use crate::ast::ast::Break;
 use crate::ast::ast::Continue;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
 pub mod do_while;
 pub mod r#for;
 pub mod foreach;
 pub mod r#while;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_continue(&mut self) -> Result<Continue<'arena>, ParseError> {
         Ok(Continue {
             r#continue: self.expect_keyword(T!["continue"])?,

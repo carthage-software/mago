@@ -31,7 +31,7 @@ tracing = { workspace = true }
 regex = { workspace = true }
 itertools = { workspace = true }
 indexmap = { workspace = true }
-bumpalo = { workspace = true }
+mago-allocator = { workspace = true }
 diffy = { workspace = true }
 memchr = { workspace = true }
 

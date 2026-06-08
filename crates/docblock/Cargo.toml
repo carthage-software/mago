@@ -16,7 +16,7 @@ workspace = true
 mago-syntax = { workspace = true }
 mago-span = { workspace = true }
 serde = { workspace = true }
-bumpalo = { workspace = true }
+mago-allocator = { workspace = true }
 memchr = { workspace = true }
 
 [dev-dependencies]

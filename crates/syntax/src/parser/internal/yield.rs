@@ -9,8 +9,12 @@ use crate::ast::ast::YieldValue;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::Precedence;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_yield(&mut self) -> Result<Yield<'arena>, ParseError> {
         let r#yield = self.expect_keyword(T!["yield"])?;
         let Some(next) = self.stream.lookahead(0)? else {

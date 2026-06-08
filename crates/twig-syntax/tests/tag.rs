@@ -5,7 +5,9 @@
     clippy::needless_raw_string_hashes,
     clippy::wildcard_in_or_patterns,
     clippy::match_wildcard_for_single_variants,
-    clippy::unnecessary_semicolon
+    clippy::unnecessary_semicolon,
+    clippy::indexing_slicing,
+    clippy::missing_asserts_for_indexing
 )]
 
 //! Focused tests for every Twig tag the parser recognises.
@@ -16,7 +18,7 @@ mod common;
 use crate::common::parse;
 use crate::common::parse_ok;
 use crate::common::parses;
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 use mago_twig_syntax::ast::Expression;
 use mago_twig_syntax::ast::GuardKind;
 use mago_twig_syntax::ast::Statement;
@@ -29,7 +31,7 @@ fn tag_if_basic() {
 
 #[test]
 fn tag_if_elseif_else() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% if a %}A{% elseif b %}B{% else %}C{% endif %}");
     let Statement::If(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.branches.len(), 2, "two branches: if + elseif");
@@ -48,7 +50,7 @@ fn tag_if_with_complex_condition() {
 
 #[test]
 fn tag_for_basic() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% for x in list %}{{ x }}{% endfor %}");
     let Statement::For(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.targets.len(), 1);
@@ -59,7 +61,7 @@ fn tag_for_basic() {
 
 #[test]
 fn tag_for_key_value() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% for k, v in items %}{{ k }}={{ v }}{% endfor %}");
     let Statement::For(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.targets.len(), 2);
@@ -69,7 +71,7 @@ fn tag_for_key_value() {
 
 #[test]
 fn tag_for_with_else() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% for x in list %}{{ x }}{% else %}empty{% endfor %}");
     let Statement::For(n) = &tpl.statements.nodes[0] else { panic!() };
     assert!(n.else_branch.is_some());
@@ -77,7 +79,7 @@ fn tag_for_with_else() {
 
 #[test]
 fn tag_for_with_filter_condition() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% for x in list if x > 0 %}{{ x }}{% endfor %}");
     let Statement::For(n) = &tpl.statements.nodes[0] else { panic!() };
     assert!(n.if_clause.is_some());
@@ -85,7 +87,7 @@ fn tag_for_with_filter_condition() {
 
 #[test]
 fn tag_set_single() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% set a = 1 %}");
     let Statement::Set(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.names.len(), 1);
@@ -98,7 +100,7 @@ fn tag_set_single() {
 
 #[test]
 fn tag_set_multiple() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% set a, b = 1, 2 %}");
     let Statement::Set(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.names.len(), 2);
@@ -110,7 +112,7 @@ fn tag_set_multiple() {
 
 #[test]
 fn tag_set_capture_body() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% set x %}captured{% endset %}");
     let Statement::Set(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.names.len(), 1);
@@ -123,7 +125,7 @@ fn tag_set_capture_body() {
 
 #[test]
 fn tag_block_short_form() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% block title 'hi' %}");
     let Statement::Block(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.name.value, b"title".as_slice());
@@ -132,7 +134,7 @@ fn tag_block_short_form() {
 
 #[test]
 fn tag_block_body_form() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% block main %}body{% endblock %}");
     let Statement::Block(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.name.value, b"main".as_slice());
@@ -141,7 +143,7 @@ fn tag_block_body_form() {
 
 #[test]
 fn tag_block_closing_name_must_match() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     parse_ok(&arena, "{% block main %}body{% endblock main %}");
 }
 
@@ -152,7 +154,7 @@ fn tag_block_mismatched_closing_name_rejected() {
 
 #[test]
 fn tag_nested_blocks() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% block outer %}{% block inner %}hi{% endblock %}{% endblock %}");
     let Statement::Block(outer) = &tpl.statements.nodes[0] else { panic!() };
     let mago_twig_syntax::ast::BlockBody::Long(long) = &outer.body else { panic!() };
@@ -161,7 +163,7 @@ fn tag_nested_blocks() {
 
 #[test]
 fn tag_extends() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% extends 'base.twig' %}");
     let Statement::Extends(_) = &tpl.statements.nodes[0] else { panic!() };
 }
@@ -178,7 +180,7 @@ fn tag_block_can_call_parent() {
 
 #[test]
 fn tag_include_basic() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% include 'x.twig' %}");
     let Statement::Include(n) = &tpl.statements.nodes[0] else { panic!() };
     assert!(n.with_clause.is_none());
@@ -188,7 +190,7 @@ fn tag_include_basic() {
 
 #[test]
 fn tag_include_with_vars() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% include 'x.twig' with vars %}");
     let Statement::Include(n) = &tpl.statements.nodes[0] else { panic!() };
     assert!(n.with_clause.is_some());
@@ -196,7 +198,7 @@ fn tag_include_with_vars() {
 
 #[test]
 fn tag_include_with_vars_only() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% include 'x.twig' with vars only %}");
     let Statement::Include(n) = &tpl.statements.nodes[0] else { panic!() };
     assert!(n.only_keyword.is_some());
@@ -204,7 +206,7 @@ fn tag_include_with_vars_only() {
 
 #[test]
 fn tag_include_ignore_missing() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% include 'x.twig' ignore missing %}");
     let Statement::Include(n) = &tpl.statements.nodes[0] else { panic!() };
     assert!(n.ignore_missing.is_some());
@@ -212,7 +214,7 @@ fn tag_include_ignore_missing() {
 
 #[test]
 fn tag_include_ignore_missing_with_vars() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% include 'x.twig' ignore missing with vars %}");
     let Statement::Include(n) = &tpl.statements.nodes[0] else { panic!() };
     assert!(n.ignore_missing.is_some());
@@ -226,7 +228,7 @@ fn tag_include_inline_hash_vars() {
 
 #[test]
 fn tag_embed_basic() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% embed 'x.twig' %}{% block b %}y{% endblock %}{% endembed %}");
     let Statement::Embed(_) = &tpl.statements.nodes[0] else { panic!() };
 }
@@ -248,7 +250,7 @@ fn tag_macro_no_args() {
 
 #[test]
 fn tag_macro_with_args() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% macro foo(a, b) %}{{ a }}{{ b }}{% endmacro %}");
     let Statement::Macro(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.name.value, b"foo".as_slice());
@@ -257,7 +259,7 @@ fn tag_macro_with_args() {
 
 #[test]
 fn tag_macro_default_args() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% macro foo(a, b = 1) %}{{ a + b }}{% endmacro %}");
     let Statement::Macro(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.arguments.len(), 2);
@@ -272,7 +274,7 @@ fn tag_macro_endmacro_with_name() {
 
 #[test]
 fn tag_import() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% import 'macros.twig' as m %}");
     let Statement::Import(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.alias.value, b"m".as_slice());
@@ -280,7 +282,7 @@ fn tag_import() {
 
 #[test]
 fn tag_from() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% from 'macros.twig' import foo, bar as baz %}");
     let Statement::From(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.names.len(), 2);
@@ -299,7 +301,7 @@ fn tag_use_simple() {
 
 #[test]
 fn tag_use_with_aliases() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% use 'base.twig' with header as base_header, footer as base_footer %}");
     let Statement::Use(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.aliases.len(), 2);
@@ -307,7 +309,7 @@ fn tag_use_with_aliases() {
 
 #[test]
 fn tag_apply_single_filter() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% apply upper %}hi{% endapply %}");
     let Statement::Apply(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.filters.len(), 1);
@@ -316,7 +318,7 @@ fn tag_apply_single_filter() {
 
 #[test]
 fn tag_apply_filter_chain() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% apply lower|title %}HELLO{% endapply %}");
     let Statement::Apply(n) = &tpl.statements.nodes[0] else { panic!() };
     let names: Vec<&[u8]> = n.filters.iter().map(|f| f.name.value).collect();
@@ -328,7 +330,7 @@ fn tag_apply_filter_chain() {
 
 #[test]
 fn tag_apply_filter_with_args() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, r#"{% apply replace({'a': 'b'})|upper %}x{% endapply %}"#);
     let Statement::Apply(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.filters.len(), 2);
@@ -340,7 +342,7 @@ fn tag_apply_filter_with_args() {
 
 #[test]
 fn tag_apply_body_keeps_nested_nodes() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% apply upper %}{{ x }}{% endapply %}");
     let Statement::Apply(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.body.len(), 1);
@@ -395,7 +397,7 @@ fn tag_flush() {
 
 #[test]
 fn tag_guard_function() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% guard function constant %}ok{% endguard %}");
     let Statement::Guard(g) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(g.kind, GuardKind::Function);
@@ -404,7 +406,7 @@ fn tag_guard_function() {
 
 #[test]
 fn tag_guard_filter() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% guard filter upper %}ok{% endguard %}");
     let Statement::Guard(g) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(g.kind, GuardKind::Filter);
@@ -413,7 +415,7 @@ fn tag_guard_filter() {
 
 #[test]
 fn tag_guard_test() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% guard test defined %}ok{% endguard %}");
     let Statement::Guard(g) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(g.kind, GuardKind::Test);
@@ -422,7 +424,7 @@ fn tag_guard_test() {
 
 #[test]
 fn tag_guard_with_else() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% guard filter foobar %}A{% else %}B{% endguard %}");
     let Statement::Guard(g) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(g.kind, GuardKind::Filter);
@@ -431,7 +433,7 @@ fn tag_guard_with_else() {
 
 #[test]
 fn tag_guard_test_compound_divisible_by() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% guard test divisible by %}yes{% endguard %}");
     let Statement::Guard(g) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(g.kind, GuardKind::Test);
@@ -475,7 +477,7 @@ fn tag_types() {
 
 #[test]
 fn tag_verbatim_preserves_body_raw() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% verbatim %}{{ not_parsed }}{% endverbatim %}");
     let Statement::Verbatim(v) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(v.body, b"{{ not_parsed }}".as_slice());
@@ -483,7 +485,7 @@ fn tag_verbatim_preserves_body_raw() {
 
 #[test]
 fn tag_raw_alias_parses() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% raw %}{{ nope }}{% endraw %}");
     let Statement::Verbatim(v) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(v.body, b"{{ nope }}".as_slice());
@@ -496,7 +498,7 @@ fn tag_verbatim_empty_body() {
 
 #[test]
 fn comment_surfaces_as_trivia() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{# hi #}");
     assert!(tpl.statements.is_empty(), "comments must not appear as statements");
     let c = tpl.trivia.iter().find(|t| t.kind == TriviaKind::Comment).expect("comment trivia");
@@ -505,7 +507,7 @@ fn comment_surfaces_as_trivia() {
 
 #[test]
 fn comment_value_preserves_markers() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{# hello world #}");
     let c = tpl.trivia.iter().find(|t| t.kind == TriviaKind::Comment).expect("comment trivia");
     assert_eq!(c.value, b"{# hello world #}".as_slice());
@@ -513,7 +515,7 @@ fn comment_value_preserves_markers() {
 
 #[test]
 fn empty_comment_is_trivia() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{##}");
     assert!(tpl.statements.is_empty());
     let c = tpl.trivia.iter().find(|t| t.kind == TriviaKind::Comment).expect("comment trivia");
@@ -522,7 +524,7 @@ fn empty_comment_is_trivia() {
 
 #[test]
 fn tag_unknown_is_opaque_node() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% nosuchtag foo bar %}");
     let Statement::Unknown(u) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(u.name.value, b"nosuchtag".as_slice());
@@ -565,7 +567,7 @@ fn tag_block_endif_mismatch_is_rejected() {
 
 #[test]
 fn combined_extends_block_block() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse(&arena, "{% extends 'base.twig' %}{% block a %}x{% endblock %}{% block b %}y{% endblock %}");
     assert!(!tpl.has_errors());
     assert!(matches!(&tpl.statements.nodes[0], Statement::Extends(_)));

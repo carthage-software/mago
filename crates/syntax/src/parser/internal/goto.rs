@@ -3,8 +3,12 @@ use crate::ast::ast::Goto;
 use crate::ast::ast::Label;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_goto(&mut self) -> Result<Goto<'arena>, ParseError> {
         Ok(Goto {
             goto: self.expect_keyword(T!["goto"])?,

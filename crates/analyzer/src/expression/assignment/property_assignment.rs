@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::ttype::TType;
@@ -28,14 +29,17 @@ use crate::utils::expression::get_property_access_expression_id;
 use crate::utils::get_type_diff;
 
 #[inline]
-pub fn analyze<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn analyze<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     property_access: &PropertyAccess<'arena>,
     assigned_value_type: &TUnion,
     assigned_value_span: Option<Span>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let property_access_id = get_property_access_expression_id(
         property_access.object,
         &property_access.property,

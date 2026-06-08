@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -85,7 +86,10 @@ impl LintRule for NoClosingTagRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::Program(program) = node else {
             return;
         };
@@ -95,7 +99,10 @@ impl LintRule for NoClosingTagRule {
 }
 
 impl NoClosingTagRule {
-    fn check_statements(&self, sequence: &Sequence<Statement>, ctx: &mut LintContext) {
+    fn check_statements<A>(&self, sequence: &Sequence<Statement>, ctx: &mut LintContext<'_, '_, A>)
+    where
+        A: Arena,
+    {
         let Some(last_statement) = sequence.last() else {
             return;
         };

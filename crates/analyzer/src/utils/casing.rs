@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -14,7 +15,10 @@ use crate::code::IssueCode;
 use crate::context::Context;
 
 /// Checks if the used class-like name matches the canonical casing and reports if not.
-pub fn check_class_like_casing(context: &mut Context<'_, '_>, used_name: Word, span: Span) {
+pub fn check_class_like_casing<A>(context: &mut Context<'_, '_, A>, used_name: Word, span: Span)
+where
+    A: Arena,
+{
     if !context.settings.check_name_casing {
         return;
     }
@@ -42,12 +46,14 @@ pub fn check_class_like_casing(context: &mut Context<'_, '_>, used_name: Word, s
 }
 
 /// Checks if the used function name matches the canonical casing and reports if not.
-pub fn check_function_casing_with_metadata(
-    context: &mut Context<'_, '_>,
+pub fn check_function_casing_with_metadata<A>(
+    context: &mut Context<'_, '_, A>,
     metadata: &FunctionLikeMetadata,
     used_name: Word,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_name_casing {
         return;
     }
@@ -78,7 +84,10 @@ pub fn check_function_casing_with_metadata(
 }
 
 /// Checks if the used function name matches the canonical casing and reports if not.
-fn check_function_casing(context: &mut Context<'_, '_>, used_name: Word, span: Span) {
+fn check_function_casing<A>(context: &mut Context<'_, '_, A>, used_name: Word, span: Span)
+where
+    A: Arena,
+{
     if !context.settings.check_name_casing {
         return;
     }
@@ -91,7 +100,10 @@ fn check_function_casing(context: &mut Context<'_, '_>, used_name: Word, span: S
 }
 
 /// Checks casing of all names imported via `use` statements.
-pub fn check_use_statement_casing(context: &mut Context<'_, '_>, r#use: &Use<'_>) {
+pub fn check_use_statement_casing<A>(context: &mut Context<'_, '_, A>, r#use: &Use<'_>)
+where
+    A: Arena,
+{
     match &r#use.items {
         UseItems::Sequence(sequence) => {
             for item in sequence.items.iter() {
@@ -128,7 +140,10 @@ pub fn check_use_statement_casing(context: &mut Context<'_, '_>, r#use: &Use<'_>
     }
 }
 
-fn check_typed_use_casing(context: &mut Context<'_, '_>, fqn: Word, span: Span, use_type: &UseType<'_>) {
+fn check_typed_use_casing<A>(context: &mut Context<'_, '_, A>, fqn: Word, span: Span, use_type: &UseType<'_>)
+where
+    A: Arena,
+{
     match use_type {
         UseType::Function(_) => check_function_casing(context, fqn, span),
         UseType::Const(_) => {} // Constants are case-sensitive

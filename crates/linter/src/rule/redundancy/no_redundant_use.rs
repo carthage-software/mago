@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -102,7 +103,10 @@ impl LintRule for NoRedundantUseRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::Program(program) = node else { return };
 
         let mut check_inline_mentions = false;
@@ -261,6 +265,7 @@ impl LintRule for NoRedundantUseRule {
 
 mod utils {
     use foldhash::HashSet;
+    use mago_allocator::Arena;
     use mago_database::file::FileId;
     use mago_span::Span;
     use mago_syntax::walker::MutWalker;
@@ -320,7 +325,7 @@ mod utils {
             match &use_stmt.items {
                 UseItems::Sequence(s) => {
                     let import_type = ImportType::ClassOrNamespace;
-                    for item in &s.items.nodes {
+                    for item in s.items.nodes {
                         declarations.push(UseDeclaration {
                             parent_stmt: stmt,
                             item,
@@ -332,7 +337,7 @@ mod utils {
                 }
                 UseItems::TypedSequence(s) => {
                     let import_type = if s.r#type.is_function() { ImportType::Function } else { ImportType::Constant };
-                    for item in &s.items.nodes {
+                    for item in s.items.nodes {
                         declarations.push(UseDeclaration {
                             parent_stmt: stmt,
                             item,
@@ -344,7 +349,7 @@ mod utils {
                 }
                 UseItems::MixedList(list) => {
                     let prefix = trim_start_byte(list.namespace.value(), b'\\');
-                    for i in &list.items.nodes {
+                    for i in list.items.nodes {
                         let import_type = match i.r#type.as_ref() {
                             Some(t) if t.is_function() => ImportType::Function,
                             Some(t) if t.is_const() => ImportType::Constant,
@@ -364,7 +369,7 @@ mod utils {
                     let prefix = trim_start_byte(list.namespace.value(), b'\\');
                     let import_type =
                         if list.r#type.is_function() { ImportType::Function } else { ImportType::Constant };
-                    for item in &list.items.nodes {
+                    for item in list.items.nodes {
                         let fqn = concat_word!(prefix, b"\\", item.name.value());
                         declarations.push(UseDeclaration { parent_stmt: stmt, item, import_type, fqn, namespace });
                     }
@@ -478,7 +483,10 @@ mod utils {
         walker.contents
     }
 
-    pub(super) fn build_used_fqn_set(ctx: &LintContext<'_, '_>, declarations: &[UseDeclaration<'_>]) -> WordSet {
+    pub(super) fn build_used_fqn_set<A>(ctx: &LintContext<'_, '_, A>, declarations: &[UseDeclaration<'_>]) -> WordSet
+    where
+        A: Arena,
+    {
         let import_starts: HashSet<u32> = declarations.iter().map(|d| d.item.name.span().start.offset).collect();
 
         ctx.resolved_names

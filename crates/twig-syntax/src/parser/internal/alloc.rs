@@ -1,12 +1,15 @@
-use bumpalo::collections::Vec as BVec;
+use mago_allocator::prelude::*;
 
 use crate::parser::Parser;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// A fresh arena-backed vector.
     #[inline]
-    pub(crate) fn new_vec<T>(&self) -> BVec<'arena, T> {
-        BVec::new_in(self.arena)
+    pub(crate) fn new_vec<T>(&self) -> Vec<'arena, T, A> {
+        Vec::new_in(self.arena)
     }
 
     /// Arena-allocate a value and return an `&'arena T` reference.

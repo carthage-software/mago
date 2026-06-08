@@ -1,8 +1,6 @@
-use bumpalo::Bump;
-use bumpalo::collections::CollectIn;
-use bumpalo::collections::Vec;
 use foldhash::HashMap;
 use foldhash::HashSet;
+use mago_allocator::prelude::*;
 
 use mago_database::file::File;
 use mago_reporting::Annotation;
@@ -52,22 +50,25 @@ fn check_non_pragma_line(line: &[u8]) -> bool {
 /// - Filtering issues based on configuration or suppression pragmas (`@mago-ignore`, `@mago-expect`).
 /// - Reporting unused or unfulfilled pragmas.
 #[derive(Debug)]
-pub struct Collector<'ctx, 'arena> {
+pub struct Collector<'ctx, 'arena, A>
+where
+    A: Arena,
+{
     /// The arena used for allocation of issues and pragmas.
-    arena: &'arena Bump,
+    arena: &'arena A,
     /// The source file from which this collector was created.
     file: &'ctx File,
     /// All pragmas that have not yet been applied to a node.
-    pragmas: Vec<'arena, Pragma<'arena>>,
+    pragmas: Vec<'arena, Pragma<'arena>, A>,
     /// The collection of issues that have been reported and not suppressed.
     issues: IssueCollection,
     /// A stack of issue collections for recording issues speculatively.
-    recordings: Vec<'arena, IssueCollection>,
+    recordings: Vec<'arena, IssueCollection, A>,
     /// A list of issue codes that should be silently ignored.
-    disabled_codes: Vec<'arena, &'static str>,
+    disabled_codes: Vec<'arena, &'static str, A>,
     /// An optional list of issue codes that are currently active (e.g., from `--only` flag).
     /// If set, unfulfilled pragmas for codes not in this list will not be reported.
-    active_codes: Option<Vec<'arena, &'arena str>>,
+    active_codes: Option<Vec<'arena, &'arena str, A>>,
     /// A map of legacy issue codes to their new, canonical counterparts.
     aliases: HashMap<&'static str, &'static str>,
     /// An optional URL template for generating links to issue documentation.
@@ -77,7 +78,10 @@ pub struct Collector<'ctx, 'arena> {
     skip_unfulfilled_expect: bool,
 }
 
-impl<'ctx, 'arena> Collector<'ctx, 'arena> {
+impl<'ctx, 'arena, A> Collector<'ctx, 'arena, A>
+where
+    A: Arena,
+{
     /// Creates a new `Collector` from a slice of trivia.
     ///
     /// This is the primary constructor. It pre-parses the given trivia to find pragmas
@@ -92,7 +96,7 @@ impl<'ctx, 'arena> Collector<'ctx, 'arena> {
     /// - `categories`: The categories of pragmas to extract (e.g., "lint", "analysis").
     #[inline]
     pub fn new<'ast>(
-        arena: &'arena Bump,
+        arena: &'arena A,
         file: &'ctx File,
         program: &'ast Program<'arena>,
         categories: &'static [&'static str],

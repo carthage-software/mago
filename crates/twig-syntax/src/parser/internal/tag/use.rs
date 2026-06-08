@@ -6,8 +6,12 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_use(
         &mut self,
         open_tag_tok: TwigToken<'arena>,
@@ -37,7 +41,7 @@ impl<'arena> Parser<'_, 'arena> {
             }
             (Some(with_keyword), TokenSeparatedSequence::new(alias_nodes, alias_commas))
         } else {
-            (None, TokenSeparatedSequence::empty(self.arena))
+            (None, TokenSeparatedSequence::empty())
         };
 
         let close_tag = self.stream.expect_block_end()?;

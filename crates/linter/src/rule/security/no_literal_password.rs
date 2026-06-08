@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use mago_span::Span;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -97,7 +98,10 @@ impl LintRule for NoLiteralPasswordRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         match node {
             Node::Assignment(assignment) => {
                 let Some(password) = get_password(assignment.lhs) else {
@@ -167,12 +171,14 @@ impl LintRule for NoLiteralPasswordRule {
 }
 
 #[inline]
-fn check<'arena>(
+fn check<'arena, A>(
     name: Span,
     value: &Expression<'arena>,
-    ctx: &mut LintContext<'_, 'arena>,
+    ctx: &mut LintContext<'_, 'arena, A>,
     rule: &NoLiteralPasswordRule,
-) {
+) where
+    A: Arena,
+{
     let is_literal_password = match value {
         Expression::Literal(Literal::String(literal_string)) => literal_string.raw.len() > 2,
         Expression::Literal(Literal::Integer(_)) => true,

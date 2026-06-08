@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::context::ScopeContext;
 use mago_word::ascii_lowercase_word;
 use mago_word::concat_word;
@@ -23,12 +24,15 @@ use crate::statement::function_like::unused_parameter;
 use crate::utils::missing_type_hints;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_attributes(context, block_context, artifacts, self.attribute_lists.as_slice(), AttributeTarget::Method);
 
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {

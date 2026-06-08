@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::sync::Arc;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -161,7 +162,10 @@ impl<'ctx> InvocationTarget<'ctx> {
     ///
     /// Returns the name of a function/method if statically known,
     /// or "Closure" or "callable" for dynamic callables.
-    pub fn guess_name(&self, context: &Context<'_, '_>) -> String {
+    pub fn guess_name<A>(&self, context: &Context<'_, '_, A>) -> String
+    where
+        A: Arena,
+    {
         self.get_function_like_identifier()
             .map(|identifier| crate::utils::names::display_function_like_identifier(context, identifier))
             .unwrap_or_else(

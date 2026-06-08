@@ -6,8 +6,8 @@ use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-use bumpalo::Bump;
 use foldhash::HashSet;
+use mago_allocator::LocalArena;
 use mago_php_version::PHPVersion;
 use rayon::prelude::*;
 
@@ -184,7 +184,7 @@ where
     /// - `symbol_references`: The final symbol references
     pub fn run<F>(self, map_function: F) -> Result<R, OrchestratorError>
     where
-        F: Fn(T, &Bump, Arc<File>, Arc<CodebaseMetadata>) -> Result<I, OrchestratorError> + Send + Sync + 'static,
+        F: Fn(T, &LocalArena, Arc<File>, Arc<CodebaseMetadata>) -> Result<I, OrchestratorError> + Send + Sync + 'static,
     {
         #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
@@ -225,7 +225,7 @@ where
             compile_parallel_duration,
             source_files
                 .into_par_iter()
-                .map_init(Bump::new, |arena, file| -> Result<CodebaseMetadata, OrchestratorError> {
+                .map_init(LocalArena::new, |arena, file| -> Result<CodebaseMetadata, OrchestratorError> {
                     let program = parse_file_with_settings(arena, &file, parser_settings);
                     if program.has_errors() {
                         tracing::warn!(
@@ -313,7 +313,7 @@ where
             analyze_parallel_duration,
             host_files
                 .into_par_iter()
-                .map_init(Bump::new, |arena, file| {
+                .map_init(LocalArena::new, |arena, file| {
                     let context = self.shared_context.clone();
                     let codebase = Arc::clone(&final_codebase);
 
@@ -404,7 +404,7 @@ where
     /// Executes the pipeline with a given map function on all `Host` files.
     pub fn run<F>(&self, map_function: F) -> Result<R, OrchestratorError>
     where
-        F: Fn(T, &Bump, Arc<File>) -> Result<I, OrchestratorError> + Send + Sync,
+        F: Fn(T, &LocalArena, Arc<File>) -> Result<I, OrchestratorError> + Send + Sync,
     {
         #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
@@ -447,7 +447,7 @@ where
             map_duration,
             host_files
                 .into_par_iter()
-                .map_init(Bump::new, |arena, file| {
+                .map_init(LocalArena::new, |arena, file| {
                     let context = self.shared_context.clone();
 
                     #[cfg(not(target_arch = "wasm32"))]
@@ -514,7 +514,7 @@ where
     /// * `map_function` - The function to apply to each file
     pub fn run_on_files<F, Iter>(&self, file_ids: Iter, map_function: F) -> Result<R, OrchestratorError>
     where
-        F: Fn(T, &Bump, Arc<File>) -> Result<I, OrchestratorError> + Send + Sync,
+        F: Fn(T, &LocalArena, Arc<File>) -> Result<I, OrchestratorError> + Send + Sync,
         Iter: IntoIterator<Item = FileId>,
     {
         #[cfg(not(target_arch = "wasm32"))]
@@ -554,7 +554,7 @@ where
             map_duration,
             files
                 .into_par_iter()
-                .map_init(Bump::new, |arena, file| {
+                .map_init(LocalArena::new, |arena, file| {
                     let context = self.shared_context.clone();
 
                     #[cfg(not(target_arch = "wasm32"))]

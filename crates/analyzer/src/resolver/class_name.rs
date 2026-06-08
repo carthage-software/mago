@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_word::Word;
 use mago_word::ascii_lowercase_word;
 use mago_word::word;
@@ -211,13 +212,16 @@ impl ResolvedClassname {
 ///
 /// It reports errors for syntactically invalid uses (e.g., `self` outside a class)
 /// or when an expression's type is fundamentally incompatible with being a class name.
-pub fn resolve_classnames_from_expression<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn resolve_classnames_from_expression<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class_expression: &Expression<'arena>,
     class_is_analyzed: bool,
-) -> Result<Vec<ResolvedClassname>, AnalysisError> {
+) -> Result<Vec<ResolvedClassname>, AnalysisError>
+where
+    A: Arena,
+{
     let mut possible_types = vec![];
     match class_expression.unparenthesized() {
         Expression::Identifier(name_node) => {
@@ -513,7 +517,13 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
     get_class_name_from_atomic_impl(codebase, atomic, None)
 }
 
-fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLikeMetadata) -> Vec<ResolvedClassname> {
+fn get_intersections_from_metadata<A>(
+    context: &Context<'_, '_, A>,
+    metadata: &ClassLikeMetadata,
+) -> Vec<ResolvedClassname>
+where
+    A: Arena,
+{
     if metadata.kind.is_enum() {
         return vec![];
     }
@@ -548,7 +558,10 @@ fn get_intersections_from_metadata(context: &Context<'_, '_>, metadata: &ClassLi
     intersections
 }
 
-pub fn report_non_existent_class_like(context: &mut Context, span: Span, classname: Word) {
+pub fn report_non_existent_class_like<A>(context: &mut Context<'_, '_, A>, span: Span, classname: Word)
+where
+    A: Arena,
+{
     let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
         IssueCode::NonExistentClassLike,

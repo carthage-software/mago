@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 
 use foldhash::HashMap;
@@ -96,15 +97,18 @@ fn adjust_offset_for_variadic(target: &InvocationTarget<'_>, argument_offset: us
 }
 
 /// Analyzes and verifies arguments passed to a function, method, or callable.
-pub fn analyze_invocation<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn analyze_invocation<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     calling_class_like: Option<(Word, Option<&TAtomic>)>,
     template_result: &mut TemplateResult,
     parameter_types: &mut WordMap<TUnion>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     if !context.settings.allow_side_effects_in_conditions
         && block_context.flags.inside_conditional()
         && !invocation.target.is_pure_or_mutation_free()
@@ -921,14 +925,17 @@ pub fn analyze_invocation<'ctx, 'arena>(
 }
 
 /// Gets the effective parameter type, expanding class-relative types based on call context.
-fn get_parameter_type<'ctx>(
-    context: &Context<'ctx, '_>,
+fn get_parameter_type<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
     invocation_target_parameter: Option<InvocationTargetParameter<'_>>,
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
     method_class_type: Option<&StaticClassType>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let Some(invocation_target_parameter) = invocation_target_parameter else {
         return get_mixed();
     };
@@ -968,8 +975,8 @@ fn get_parameter_type<'ctx>(
 }
 
 /// Validates individual elements within unpacked arrays against their corresponding parameters.
-fn validate_unpacked_argument_elements<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     argument_value_type: &TUnion,
     argument_expression: &Expression<'arena>,
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
@@ -981,7 +988,9 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
     starting_parameter_position: usize,
     target_kind_str: &str,
     target_name_str: &str,
-) {
+) where
+    A: Arena,
+{
     use mago_codex::ttype::atomic::array::TArray;
     use mago_codex::ttype::template::inferred_type_replacer;
 
@@ -1116,8 +1125,8 @@ fn validate_unpacked_argument_elements<'ctx, 'arena>(
     }
 }
 
-fn validate_keyed_array_elements<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn validate_keyed_array_elements<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     keyed_array: &mago_codex::ttype::atomic::array::keyed::TKeyedArray,
     argument_expression: &Expression<'arena>,
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
@@ -1128,7 +1137,9 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
     template_result: &TemplateResult,
     target_kind_str: &str,
     target_name_str: &str,
-) {
+) where
+    A: Arena,
+{
     use mago_codex::ttype::atomic::array::key::ArrayKey;
     use mago_codex::ttype::template::inferred_type_replacer;
     use mago_word::concat_word;
@@ -1257,11 +1268,14 @@ fn validate_keyed_array_elements<'ctx, 'arena>(
 ///
 /// Returns `Some(ClosureBindScope)` if this is a Closure::bind/bindTo call with extractable scope,
 /// `None` otherwise.
-fn detect_closure_bind_scope<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn detect_closure_bind_scope<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     invocation: &Invocation<'ctx, '_, 'arena>,
     analyzed_argument_types: &HashMap<usize, (TUnion, mago_span::Span)>,
-) -> Option<ClosureBindScope> {
+) -> Option<ClosureBindScope>
+where
+    A: Arena,
+{
     let identifier = invocation.target.get_function_like_identifier()?;
 
     let FunctionLikeIdentifier::Method(class_id, method_id) = identifier else {
@@ -1296,7 +1310,10 @@ fn detect_closure_bind_scope<'ctx, 'arena>(
 
 /// Extracts a class name from a scope argument (typically the 3rd argument to Closure::bind).
 /// This handles cases like `Foo::class`, `'Foo'`, or a class instance type.
-fn extract_class_name_from_scope_arg(context: &Context<'_, '_>, scope_type: &TUnion) -> Option<Word> {
+fn extract_class_name_from_scope_arg<A>(context: &Context<'_, '_, A>, scope_type: &TUnion) -> Option<Word>
+where
+    A: Arena,
+{
     for atomic in scope_type.types.as_ref() {
         match atomic {
             TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Literal { value })) => {

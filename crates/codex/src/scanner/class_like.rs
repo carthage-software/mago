@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_word::Word;
 use std::collections::BTreeMap;
 
@@ -81,12 +82,15 @@ use crate::visibility::Visibility;
 type ClassLikeRegistration = Option<(Word, TemplateConstraintList, WordSet, WordMap<(Word, Word)>)>;
 
 #[inline]
-pub fn register_anonymous_class<'arena>(
+pub fn register_anonymous_class<'arena, A>(
     codebase: &mut CodebaseMetadata,
     class: &'arena AnonymousClass<'arena>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
-) -> ClassLikeRegistration {
+) -> ClassLikeRegistration
+where
+    A: Arena,
+{
     let span = class.span();
     let name = get_anonymous_class_name(context.file, span);
 
@@ -126,12 +130,15 @@ pub fn register_anonymous_class<'arena>(
 }
 
 #[inline]
-pub fn register_class<'arena>(
+pub fn register_class<'arena, A>(
     codebase: &mut CodebaseMetadata,
     class: &'arena Class<'arena>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
-) -> ClassLikeRegistration {
+) -> ClassLikeRegistration
+where
+    A: Arena,
+{
     let class_like_metadata = scan_class_like(
         codebase,
         word(context.resolved_names.get(&class.name)),
@@ -168,12 +175,15 @@ pub fn register_class<'arena>(
 }
 
 #[inline]
-pub fn register_interface<'arena>(
+pub fn register_interface<'arena, A>(
     codebase: &mut CodebaseMetadata,
     interface: &'arena Interface<'arena>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
-) -> ClassLikeRegistration {
+) -> ClassLikeRegistration
+where
+    A: Arena,
+{
     let class_like_metadata = scan_class_like(
         codebase,
         word(context.resolved_names.get(&interface.name)),
@@ -210,12 +220,15 @@ pub fn register_interface<'arena>(
 }
 
 #[inline]
-pub fn register_trait<'arena>(
+pub fn register_trait<'arena, A>(
     codebase: &mut CodebaseMetadata,
     r#trait: &'arena Trait<'arena>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
-) -> ClassLikeRegistration {
+) -> ClassLikeRegistration
+where
+    A: Arena,
+{
     let class_like_metadata = scan_class_like(
         codebase,
         word(context.resolved_names.get(&r#trait.name)),
@@ -252,12 +265,15 @@ pub fn register_trait<'arena>(
 }
 
 #[inline]
-pub fn register_enum<'arena>(
+pub fn register_enum<'arena, A>(
     codebase: &mut CodebaseMetadata,
     r#enum: &'arena Enum<'arena>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
-) -> ClassLikeRegistration {
+) -> ClassLikeRegistration
+where
+    A: Arena,
+{
     let class_like_metadata = scan_class_like(
         codebase,
         word(context.resolved_names.get(&r#enum.name)),
@@ -295,7 +311,7 @@ pub fn register_enum<'arena>(
 
 #[inline]
 #[allow(clippy::too_many_arguments)]
-fn scan_class_like<'arena>(
+fn scan_class_like<'arena, A>(
     codebase: &mut CodebaseMetadata,
     name: Word,
     kind: SymbolKind,
@@ -307,9 +323,12 @@ fn scan_class_like<'arena>(
     extends: Option<&'arena Extends<'arena>>,
     implements: Option<&'arena Implements<'arena>>,
     enum_type: Option<&'arena EnumBackingTypeHint<'arena>>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
-) -> Option<ClassLikeMetadata> {
+) -> Option<ClassLikeMetadata>
+where
+    A: Arena,
+{
     let original_name = name;
     let name = ascii_lowercase_word(original_name.as_bytes());
 

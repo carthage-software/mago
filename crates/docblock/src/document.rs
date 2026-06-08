@@ -1,4 +1,3 @@
-use bumpalo::collections::Vec;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -7,7 +6,7 @@ use mago_span::Span;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Document<'arena> {
     pub span: Span,
-    pub elements: Vec<'arena, Element<'arena>>,
+    pub elements: &'arena [Element<'arena>],
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
@@ -21,13 +20,13 @@ pub enum Element<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Text<'arena> {
     pub span: Span,
-    pub segments: Vec<'arena, TextSegment<'arena>>,
+    pub segments: &'arena [TextSegment<'arena>],
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct Code<'arena> {
     pub span: Span,
-    pub directives: Vec<'arena, &'arena [u8]>,
+    pub directives: &'arena [&'arena [u8]],
     pub content: &'arena [u8],
 }
 

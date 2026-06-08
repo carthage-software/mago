@@ -3,8 +3,12 @@ use crate::ast::ast::Inline;
 use crate::ast::ast::InlineKind;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_inline(&mut self) -> Result<Inline<'arena>, ParseError> {
         let token = self.expect_one_of_keyword(T![InlineText, InlineShebang])?;
 

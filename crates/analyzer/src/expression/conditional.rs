@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -38,25 +39,31 @@ use crate::utils::expression::is_derived_access_path;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Conditional<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_conditional(context, block_context, artifacts, self.condition, self.then, self.r#else, self.span())
     }
 }
 
-pub(super) fn analyze_conditional<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(super) fn analyze_conditional<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     condition: &'ast Expression<'arena>,
     then: Option<&'ast Expression<'arena>>,
     r#else: &'ast Expression<'arena>,
     span: Span,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let mut if_scope = IfScope::new();
     let (if_conditional_scope, applied_block_context) =
         conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, condition, false)?;

@@ -58,8 +58,8 @@ use std::sync::Arc;
 use mago_reporting::baseline::BaselineChangeEntry;
 use serde::Serialize;
 
-use bumpalo::Bump;
 use clap::ColorChoice;
+use mago_allocator::LocalArena;
 use mago_database::file::FileId;
 use mago_syntax::parser::parse_file_content_with_settings;
 use mago_syntax::settings::ParserSettings;
@@ -564,7 +564,7 @@ impl IssueProcessor {
 
         let results: Vec<(bool, usize, usize, usize)> = batches_by_file
             .into_par_iter()
-            .map_init(Bump::new, |arena, (file_id, batches)| {
+            .map_init(LocalArena::new, |arena, (file_id, batches)| {
                 let file = read_database.get_ref(&file_id)?;
                 let mut editor = TextEditor::with_safety(&file.contents, safety_threshold);
 
@@ -1033,6 +1033,6 @@ impl BaselineIssueProcessor {
 /// # Returns
 ///
 /// * `true` if the code is syntactically valid, `false` otherwise.
-fn check_php_code(arena: &Bump, file_id: FileId, code: &[u8], parser_settings: ParserSettings) -> bool {
+fn check_php_code(arena: &LocalArena, file_id: FileId, code: &[u8], parser_settings: ParserSettings) -> bool {
     !parse_file_content_with_settings(arena, file_id, code, parser_settings).has_errors()
 }

@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_php_version::PHPVersion;
 use mago_syntax::ast::ArgumentList;
 use mago_syntax::ast::AttributeList;
@@ -50,11 +51,14 @@ impl VersionVerdict {
 /// against `version`. Returns [`VersionVerdict::always`] (the cheap default)
 /// when no `Mago\*` attributes are present, so callers pay nothing on the
 /// overwhelmingly common no-attribute path.
-pub fn evaluate_version_attributes<'arena>(
+pub fn evaluate_version_attributes<'arena, A>(
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
-    context: &Context<'_, 'arena>,
+    context: &Context<'_, 'arena, A>,
     version: PHPVersion,
-) -> VersionVerdict {
+) -> VersionVerdict
+where
+    A: Arena,
+{
     if attribute_lists.is_empty() {
         return VersionVerdict::always();
     }

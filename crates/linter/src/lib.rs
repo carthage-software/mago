@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use bumpalo::Bump;
+use mago_allocator::prelude::*;
 use mago_collector::Collector;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
@@ -40,13 +40,19 @@ pub mod settings;
 const COLLECTOR_CATEGORIES: &[&str] = &["lint", "linter"];
 
 #[derive(Debug, Clone)]
-pub struct Linter<'arena> {
-    arena: &'arena Bump,
+pub struct Linter<'arena, A>
+where
+    A: Arena,
+{
+    arena: &'arena A,
     registry: Arc<RuleRegistry>,
     php_version: PHPVersion,
 }
 
-impl<'arena> Linter<'arena> {
+impl<'arena, A> Linter<'arena, A>
+where
+    A: Arena,
+{
     /// Creates a new Linter instance.
     ///
     /// # Arguments
@@ -56,7 +62,7 @@ impl<'arena> Linter<'arena> {
     /// * `only` - If `Some`, only the rules with the specified codes will be loaded.
     ///   If `None`, all rules enabled by the settings will be loaded.
     /// * `include_disabled` - If `true`, includes rules that are disabled in the settings.
-    pub fn new(arena: &'arena Bump, settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Self {
+    pub fn new(arena: &'arena A, settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Self {
         Self {
             arena,
             php_version: settings.php_version,
@@ -71,7 +77,7 @@ impl<'arena> Linter<'arena> {
     /// * `arena` - The bump allocator to use for memory management.
     /// * `registry` - The rule registry to use for linting.
     /// * `php_version` - The PHP version to use for linting.
-    pub fn from_registry(arena: &'arena Bump, registry: Arc<RuleRegistry>, php_version: PHPVersion) -> Self {
+    pub fn from_registry(arena: &'arena A, registry: Arc<RuleRegistry>, php_version: PHPVersion) -> Self {
         Self { arena, registry, php_version }
     }
 
@@ -129,7 +135,13 @@ fn is_constant_expression_context(kind: NodeKind) -> bool {
     )
 }
 
-fn walk<'ctx, 'arena>(root: Node<'ctx, 'arena>, ctx: &mut LintContext<'ctx, 'arena>, excluded_rules: &HashSet<usize>) {
+fn walk<'ctx, 'arena, A>(
+    root: Node<'ctx, 'arena>,
+    ctx: &mut LintContext<'ctx, 'arena, A>,
+    excluded_rules: &HashSet<usize>,
+) where
+    A: Arena,
+{
     enum Op<'ctx, 'arena> {
         Enter(Node<'ctx, 'arena>),
         Exit { in_scope: bool, in_constant_expression: bool },

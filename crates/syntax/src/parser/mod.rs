@@ -1,5 +1,4 @@
-use bumpalo::Bump;
-use bumpalo::collections::Vec;
+use mago_allocator::prelude::*;
 
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -33,14 +32,21 @@ pub struct State {
 /// The parser holds an arena reference, the token stream, and parsing state.
 #[derive(Debug)]
 #[allow(clippy::field_scoped_visibility_modifiers)]
-pub struct Parser<'input, 'arena> {
-    pub(crate) arena: &'arena Bump,
+pub struct Parser<'input, 'arena, A>
+where
+    'input: 'arena,
+    A: Arena,
+{
+    pub(crate) arena: &'arena A,
     pub(crate) state: State,
-    pub(crate) stream: TokenStream<'input, 'arena>,
-    pub(crate) errors: Vec<'arena, ParseError>,
+    pub(crate) stream: TokenStream<'input, 'arena, A>,
+    pub(crate) errors: Vec<'arena, ParseError, A>,
 }
 
-impl<'input, 'arena> Parser<'input, 'arena> {
+impl<'input, 'arena, A> Parser<'input, 'arena, A>
+where
+    A: Arena,
+{
     /// Creates a new parser for the given content.
     ///
     /// # Parameters
@@ -54,7 +60,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     ///
     /// A new `Parser` instance.
     #[inline]
-    pub fn new(arena: &'arena Bump, file_id: FileId, content: &'input [u8], settings: ParserSettings) -> Self {
+    pub fn new(arena: &'arena A, file_id: FileId, content: &'input [u8], settings: ParserSettings) -> Self {
         let input = Input::new(file_id, content);
         let lexer = Lexer::new(input, settings.lexer);
         let stream = TokenStream::new(arena, lexer);
@@ -73,7 +79,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
     /// # Returns
     ///
     /// A new `Parser` instance.
-    pub fn for_file(arena: &'arena Bump, file: &'input File, settings: ParserSettings) -> Self {
+    pub fn for_file(arena: &'arena A, file: &'input File, settings: ParserSettings) -> Self {
         Self::new(arena, file.file_id(), file.contents.as_ref(), settings)
     }
 
@@ -119,7 +125,7 @@ impl<'input, 'arena> Parser<'input, 'arena> {
             source_text,
             statements: Sequence::new(statements),
             trivia: self.stream.get_trivia(),
-            errors: self.errors,
+            errors: self.errors.leak(),
         })
     }
 }
@@ -135,7 +141,10 @@ impl<'input, 'arena> Parser<'input, 'arena> {
 ///
 /// The parsed `Program` AST.
 #[inline]
-pub fn parse_file<'arena>(arena: &'arena Bump, file: &File) -> &'arena Program<'arena> {
+pub fn parse_file<'arena, A>(arena: &'arena A, file: &File) -> &'arena Program<'arena>
+where
+    A: Arena,
+{
     parse_file_content(arena, file.file_id(), file.contents.as_ref())
 }
 
@@ -151,11 +160,14 @@ pub fn parse_file<'arena>(arena: &'arena Bump, file: &File) -> &'arena Program<'
 ///
 /// The parsed `Program` AST.
 #[inline]
-pub fn parse_file_with_settings<'arena>(
-    arena: &'arena Bump,
+pub fn parse_file_with_settings<'arena, A>(
+    arena: &'arena A,
     file: &File,
     settings: ParserSettings,
-) -> &'arena Program<'arena> {
+) -> &'arena Program<'arena>
+where
+    A: Arena,
+{
     parse_file_content_with_settings(arena, file.file_id(), file.contents.as_ref(), settings)
 }
 
@@ -170,7 +182,10 @@ pub fn parse_file_with_settings<'arena>(
 /// # Returns
 ///
 /// The parsed `Program` AST.
-pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content: &[u8]) -> &'arena Program<'arena> {
+pub fn parse_file_content<'arena, A>(arena: &'arena A, file_id: FileId, content: &[u8]) -> &'arena Program<'arena>
+where
+    A: Arena,
+{
     let source_text = arena.alloc_slice_copy(content);
     Parser::new(arena, file_id, source_text, ParserSettings::default()).parse(source_text, file_id)
 }
@@ -187,12 +202,15 @@ pub fn parse_file_content<'arena>(arena: &'arena Bump, file_id: FileId, content:
 /// # Returns
 ///
 /// The parsed `Program` AST.
-pub fn parse_file_content_with_settings<'arena>(
-    arena: &'arena Bump,
+pub fn parse_file_content_with_settings<'arena, A>(
+    arena: &'arena A,
     file_id: FileId,
     content: &[u8],
     settings: ParserSettings,
-) -> &'arena Program<'arena> {
+) -> &'arena Program<'arena>
+where
+    A: Arena,
+{
     let source_text = arena.alloc_slice_copy(content);
     Parser::new(arena, file_id, source_text, settings).parse(source_text, file_id)
 }

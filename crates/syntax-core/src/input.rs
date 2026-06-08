@@ -1,6 +1,7 @@
-use bumpalo::Bump;
 use memchr::memchr;
 use memchr::memmem::find;
+
+use mago_allocator::prelude::*;
 
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -96,7 +97,10 @@ impl<'src> Input<'src> {
     /// # Returns
     ///
     /// A new `Input` instance initialized with the file's ID and contents.
-    pub fn from_file_in(arena: &'src Bump, file: &File) -> Self {
+    pub fn from_file_in<A>(arena: &'src A, file: &File) -> Self
+    where
+        A: Arena,
+    {
         Self::new(file.id, arena.alloc_slice_clone(file.contents.as_ref()))
     }
 

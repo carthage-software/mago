@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use indexmap::IndexMap;
@@ -61,12 +62,15 @@ mod property_assignment;
 mod static_property_assignment;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Assignment<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_assignment(
             context,
             block_context,
@@ -80,8 +84,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Assignment<'arena> {
     }
 }
 
-pub fn analyze_assignment<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn analyze_assignment<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     assignment_span: Option<Span>,
@@ -89,7 +93,10 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
     mut assignment_operator: Option<&AssignmentOperator>,
     source_expression: Option<&'ast Expression<'arena>>,
     source_type: Option<TUnion>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     if let Some(AssignmentOperator::Assign(_)) = assignment_operator {
         assignment_operator = None;
     }
@@ -284,8 +291,8 @@ pub fn analyze_assignment<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
-pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     target_expression: &'ast Expression<'arena>,
@@ -293,7 +300,10 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
     source_expression: Option<&'ast Expression<'arena>>,
     mut source_type: Rc<TUnion>,
     destructuring: bool,
-) -> Result<bool, AnalysisError> {
+) -> Result<bool, AnalysisError>
+where
+    A: Arena,
+{
     if let Some(source_expression) = source_expression {
         if source_expression.is_reference() != source_type.by_reference() {
             Rc::make_mut(&mut source_type).set_by_reference(source_expression.is_reference());
@@ -366,12 +376,14 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena>(
     Ok(true)
 }
 
-fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn analyze_reference_assignment<'ctx, 'ast, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     target_expression: &'ast Expression<'arena>,
     source_expression: &'ast Expression<'arena>,
-) {
+) where
+    A: Arena,
+{
     let Expression::UnaryPrefix(UnaryPrefix {
         operator: UnaryPrefixOperator::Reference(_),
         operand: referenced_expression,
@@ -415,8 +427,8 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena>(
     }
 }
 
-pub fn analyze_assignment_to_variable<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     variable_span: Span,
@@ -424,7 +436,9 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
     mut assigned_type: Rc<TUnion>,
     variable_id: Word,
     destructuring: bool,
-) {
+) where
+    A: Arena,
+{
     if let Some(constraint) = block_context.by_reference_constraints.get(&variable_id) {
         if let Some(constraint_type) = constraint.constraint_type.as_ref()
             && !union_comparator::is_contained_by(
@@ -636,15 +650,18 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena>(
     block_context.variables_possibly_in_scope.insert(variable_id);
 }
 
-fn analyze_destructuring<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_destructuring<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     target_span: Span, // the span of the destructuring target ( list or array )
     source_expression: Option<&'ast Expression<'arena>>, // the expression being destructured
     array_type: &TUnion, // the type of the array being destructured
     target_elements: &'ast [ArrayElement<'arena>], // the elements being destructured
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let mut non_array = false;
 
     let can_be_destructured = array_type
@@ -882,12 +899,14 @@ fn analyze_destructuring<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
-fn check_list_destructure_keys<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn check_list_destructure_keys<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     target_span: Span,
     source_expression: Option<&Expression<'arena>>,
     array_type: &TUnion,
-) {
+) where
+    A: Arena,
+{
     let mut has_string_signal = false;
     let mut has_negative_signal = false;
 
@@ -992,12 +1011,15 @@ fn check_list_destructure_keys<'arena>(
     }
 }
 
-fn analyze_assignment_target<'ctx, 'arena>(
+fn analyze_assignment_target<'ctx, 'arena, A>(
     expression: &Expression<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     match expression {
         Expression::Variable(Variable::Nested(nested)) => {
             nested.variable.analyze(context, block_context, artifacts)?;
@@ -1040,14 +1062,16 @@ fn analyze_assignment_target<'ctx, 'arena>(
     Ok(())
 }
 
-fn handle_assignment_with_boolean_logic<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn handle_assignment_with_boolean_logic<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
     variable_expression_id: Span,
     source_expression: &Expression<'arena>,
     variable_id: Word,
-) {
+) where
+    A: Arena,
+{
     let Some(right_clauses) = get_formula(
         source_expression.span(),
         source_expression.span(),

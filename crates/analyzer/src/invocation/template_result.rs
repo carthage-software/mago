@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 
 use foldhash::fast::RandomState;
@@ -46,11 +47,13 @@ use crate::utils::template::get_template_types_for_class_member;
 ///
 /// This function assumes that the `TemplateResult` is initially empty and will be populated with
 /// template types and bounds derived from the invocation's target metadata.
-pub fn populate_template_result_from_invocation<'ctx, 'arena>(
-    context: &Context<'ctx, 'arena>,
+pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &mut TemplateResult,
-) {
+) where
+    A: Arena,
+{
     let InvocationTarget::FunctionLike { metadata, method_context, .. } = &invocation.target else {
         return;
     };
@@ -222,10 +225,13 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena>(
 /// # Returns
 ///
 /// An `IndexMap` mapping class template parameter names to a vector of (Defining Entity, Resolved Type).
-pub(super) fn get_class_template_parameters_from_result(
+pub(super) fn get_class_template_parameters_from_result<A>(
     template_result: &TemplateResult,
-    context: &Context<'_, '_>,
-) -> IndexMap<Word, Vec<GenericTemplate>, RandomState> {
+    context: &Context<'_, '_, A>,
+) -> IndexMap<Word, Vec<GenericTemplate>, RandomState>
+where
+    A: Arena,
+{
     let mut class_generic_parameters: IndexMap<Word, Vec<GenericTemplate>, RandomState> =
         IndexMap::with_hasher(RandomState::default());
 
@@ -257,15 +263,17 @@ pub(super) fn get_class_template_parameters_from_result(
 /// **Note:** If `template_result.template_types` already contains entries (perhaps from
 /// analyzing generic class types), this function currently does *not* merge or overwrite them.
 /// It only initializes the map if it's empty.
-pub(super) fn refine_template_result_for_function_like<'ctx>(
+pub(super) fn refine_template_result_for_function_like<'ctx, A>(
     template_result: &mut TemplateResult,
-    context: &Context<'ctx, '_>,
+    context: &Context<'ctx, '_, A>,
     method_target_context: Option<&MethodTargetContext<'ctx>>,
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     function_like_metadata: &'ctx FunctionLikeMetadata,
     class_template_parameters: &IndexMap<Word, Vec<GenericTemplate>, RandomState>,
-) {
+) where
+    A: Arena,
+{
     if !template_result.template_types.is_empty() {
         return;
     }
@@ -312,7 +320,13 @@ pub(super) fn refine_template_result_for_function_like<'ctx>(
 /// * `context` - The analysis context, providing access to the codebase metadata.
 /// * `template_result` - The result containing the bounds to check (will be mutated if bounds are added).
 /// * `span` - The span (location) to associate with any reported errors (e.g., the call site).
-pub(super) fn check_template_result(context: &mut Context<'_, '_>, template_result: &mut TemplateResult, span: Span) {
+pub(super) fn check_template_result<A>(
+    context: &mut Context<'_, '_, A>,
+    template_result: &mut TemplateResult,
+    span: Span,
+) where
+    A: Arena,
+{
     if template_result.lower_bounds.is_empty() {
         return;
     }

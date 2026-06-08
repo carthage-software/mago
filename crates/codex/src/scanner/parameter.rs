@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::FunctionLikeParameter;
@@ -18,23 +19,29 @@ use crate::scanner::version_claim::TypeOverride;
 use crate::scanner::version_claim::evaluate_version_attributes;
 
 #[inline]
-pub fn scan_function_like_parameter<'arena>(
+pub fn scan_function_like_parameter<'arena, A>(
     parameter: &'arena FunctionLikeParameter<'arena>,
     classname: Option<Word>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &NamespaceScope,
-) -> Option<FunctionLikeParameterMetadata> {
+) -> Option<FunctionLikeParameterMetadata>
+where
+    A: Arena,
+{
     scan_function_like_parameter_with_constants(parameter, classname, context, scope, None)
 }
 
 #[inline]
-pub fn scan_function_like_parameter_with_constants<'arena>(
+pub fn scan_function_like_parameter_with_constants<'arena, A>(
     parameter: &'arena FunctionLikeParameter<'arena>,
     classname: Option<Word>,
-    context: &mut Context<'_, 'arena>,
+    context: &mut Context<'_, 'arena, A>,
     scope: &NamespaceScope,
     constants: Option<&WordMap<ConstantMetadata>>,
-) -> Option<FunctionLikeParameterMetadata> {
+) -> Option<FunctionLikeParameterMetadata>
+where
+    A: Arena,
+{
     let verdict = evaluate_version_attributes(&parameter.attribute_lists, context, context.php_version);
     if !verdict.is_available(context.php_version) {
         return None;

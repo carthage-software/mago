@@ -1,6 +1,7 @@
 use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
+use mago_allocator::Arena;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::class_like::TemplateTypes;
@@ -49,14 +50,17 @@ pub type TemplateLowerBounds = HashMap<Word, HashMap<GenericParent, TUnion>>;
 /// An `IndexMap` where keys are template parameter names (`str`) and values are
 /// `HashMap`s mapping the defining entity (`GenericParent` - class or function) to the
 /// fully resolved and expanded `TUnion` for that template parameter in this specific context.
-pub fn get_template_types_for_class_member(
-    context: &Context<'_, '_>,
+pub fn get_template_types_for_class_member<A>(
+    context: &Context<'_, '_, A>,
     declaring_class_meta: Option<&ClassLikeMetadata>,
     appearing_class_name: Option<Word>,
     calling_class_meta: Option<&ClassLikeMetadata>,
     existing_template_types: &TemplateTypes,
     class_template_parameters: &IndexMap<Word, Vec<GenericTemplate>, RandomState>,
-) -> TemplateLowerBounds {
+) -> TemplateLowerBounds
+where
+    A: Arena,
+{
     let codebase = context.codebase;
 
     // Convert existing_template_types to internal Vec-based format for accumulation

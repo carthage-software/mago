@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_php_version::PHPVersion;
 use mago_reporting::Annotation;
@@ -10,11 +11,13 @@ use mago_word::ascii_lowercase_word;
 use crate::code::IssueCode;
 use crate::context::Context;
 
-pub fn check_override_attribute<'ctx, 'arena>(
+pub fn check_override_attribute<'ctx, 'arena, A>(
     metadata: &'ctx ClassLikeMetadata,
     members: &[ClassLikeMember<'arena>],
-    context: &mut Context<'ctx, 'arena>,
-) {
+    context: &mut Context<'ctx, 'arena, A>,
+) where
+    A: Arena,
+{
     if context.settings.version < PHPVersion::PHP83 {
         // Override attribute not supported before PHP 8.3
         return;

@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -32,14 +33,17 @@ use crate::reconciler::simple_assertion_reconciler::get_acceptable_type;
 use crate::reconciler::simple_assertion_reconciler::intersect_null;
 use crate::reconciler::trigger_issue_for_impossible;
 
-pub(crate) fn reconcile(
-    context: &mut Context<'_, '_>,
+pub(crate) fn reconcile<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     span: Option<&Span>,
     negated: bool,
-) -> Option<TUnion> {
+) -> Option<TUnion>
+where
+    A: Arena,
+{
     let assertion_type = assertion.get_type();
 
     if let Some(assertion_type) = assertion_type {
@@ -287,15 +291,18 @@ pub(crate) fn reconcile(
     }
 }
 
-fn subtract_object(
-    context: &mut Context<'_, '_>,
+fn subtract_object<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -395,15 +402,18 @@ fn subtract_object(
     )
 }
 
-fn subtract_list_array(
-    context: &mut Context<'_, '_>,
+fn subtract_list_array<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -474,15 +484,18 @@ fn subtract_list_array(
     )
 }
 
-fn subtract_keyed_array(
-    context: &mut Context<'_, '_>,
+fn subtract_keyed_array<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -529,15 +542,18 @@ fn subtract_keyed_array(
     )
 }
 
-fn subtract_string(
-    context: &mut Context<'_, '_>,
+fn subtract_string<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -611,15 +627,18 @@ fn subtract_string(
     )
 }
 
-fn subtract_numeric(
-    context: &mut Context<'_, '_>,
+fn subtract_numeric<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -706,8 +725,8 @@ fn subtract_numeric(
     )
 }
 
-fn subtract_int(
-    context: &mut Context<'_, '_>,
+fn subtract_int<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
@@ -715,7 +734,10 @@ fn subtract_int(
     span: Option<&Span>,
     is_equality: bool,
     integer_to_subtract: &TInteger,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -793,15 +815,18 @@ fn subtract_int(
     )
 }
 
-fn subtract_float(
-    context: &mut Context<'_, '_>,
+fn subtract_float<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -858,15 +883,18 @@ fn subtract_float(
     )
 }
 
-fn subtract_arraykey(
-    context: &mut Context<'_, '_>,
+fn subtract_arraykey<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -922,15 +950,18 @@ fn subtract_arraykey(
     new_existing_var_type
 }
 
-fn subtract_bool(
-    context: &mut Context<'_, '_>,
+fn subtract_bool<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -986,14 +1017,17 @@ fn subtract_bool(
     new_existing_var_type
 }
 
-pub(crate) fn subtract_null(
-    context: &mut Context<'_, '_>,
+pub(crate) fn subtract_null<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut did_remove_type = false;
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
@@ -1044,15 +1078,18 @@ pub(crate) fn subtract_null(
     )
 }
 
-pub(crate) fn subtract_resource(
-    context: &mut Context<'_, '_>,
+pub(crate) fn subtract_resource<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     resource_to_subtract: TResource,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut did_remove_type = false;
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
@@ -1104,15 +1141,18 @@ pub(crate) fn subtract_resource(
     )
 }
 
-fn subtract_false(
-    context: &mut Context<'_, '_>,
+fn subtract_false<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -1171,15 +1211,18 @@ fn subtract_false(
     new_existing_var_type
 }
 
-fn subtract_true(
-    context: &mut Context<'_, '_>,
+fn subtract_true<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -1239,14 +1282,17 @@ fn subtract_true(
     new_existing_var_type
 }
 
-fn reconcile_falsy_or_empty(
-    context: &mut Context<'_, '_>,
+fn reconcile_falsy_or_empty<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
@@ -1326,12 +1372,15 @@ fn reconcile_falsy_or_empty(
     )
 }
 
-fn reconcile_not_isset(
-    _context: &mut Context<'_, '_>,
+fn reconcile_not_isset<A>(
+    _context: &mut Context<'_, '_, A>,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     // When !isset is true, the value is definitely not set (either null or undefined)
     // For array accesses, this means the key doesn't exist or the value is null
     // In both cases, the resulting type should be null
@@ -1354,14 +1403,17 @@ fn reconcile_not_isset(
     get_undefined_null()
 }
 
-fn reconcile_empty_countable(
-    context: &mut Context<'_, '_>,
+fn reconcile_empty_countable<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
@@ -1406,15 +1458,18 @@ fn reconcile_empty_countable(
     )
 }
 
-fn reconcile_not_exactly_countable(
-    context: &mut Context<'_, '_>,
+fn reconcile_not_exactly_countable<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     count: usize,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
@@ -1456,15 +1511,18 @@ fn reconcile_not_exactly_countable(
     )
 }
 
-fn reconcile_not_in_array(
-    context: &mut Context<'_, '_>,
+fn reconcile_not_in_array<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     typed_value: &TUnion,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let intersection = intersect_union_types(typed_value, existing_var_type, context.codebase);
 
     if intersection.is_some() {
@@ -1480,15 +1538,18 @@ fn reconcile_not_in_array(
     get_mixed()
 }
 
-fn reconcile_no_array_key(
-    context: &mut Context<'_, '_>,
+fn reconcile_no_array_key<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     span: Option<&Span>,
     key_name: &ArrayKey,
     negated: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut did_remove_type = existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];

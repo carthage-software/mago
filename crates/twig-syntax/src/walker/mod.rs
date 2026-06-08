@@ -417,7 +417,7 @@ generate_ast_walker! {
 
     'arena Deprecated as deprecated => {
         walker.walk_expression(&deprecated.message, context);
-        for option in &deprecated.options {
+        for option in deprecated.options {
             walker.walk_deprecated_option(option, context);
         }
     }
@@ -469,7 +469,7 @@ generate_ast_walker! {
     'arena StringLiteral as string_literal => {}
 
     'arena InterpolatedString as interpolated_string => {
-        for part in &interpolated_string.parts {
+        for part in interpolated_string.parts {
             walker.walk_string_part(part, context);
         }
     }

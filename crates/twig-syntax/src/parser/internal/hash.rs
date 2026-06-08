@@ -8,8 +8,12 @@ use crate::ast::StringLiteral;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse a hash map literal: `{ a: 1, 'b': 2, ...rest }`.
     pub(crate) fn parse_hash_map(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
         let result = self.parse_comma_separated_sequence(

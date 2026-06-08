@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -192,23 +193,29 @@ pub fn get_platform_constant_type(name: &[u8]) -> Option<TUnion> {
 }
 
 #[inline]
-pub(super) fn infer<'arena>(
-    context: &Context<'_, 'arena>,
+pub(super) fn infer<'arena, A>(
+    context: &Context<'_, 'arena, A>,
     scope: &NamespaceScope,
     expression: &'arena Expression<'arena>,
     enclosing_class: Option<Word>,
-) -> Option<TUnion> {
+) -> Option<TUnion>
+where
+    A: Arena,
+{
     infer_with_constants(context, scope, expression, enclosing_class, None)
 }
 
 #[inline]
-pub(super) fn infer_with_constants<'arena>(
-    context: &Context<'_, 'arena>,
+pub(super) fn infer_with_constants<'arena, A>(
+    context: &Context<'_, 'arena, A>,
     scope: &NamespaceScope,
     expression: &'arena Expression<'arena>,
     enclosing_class: Option<Word>,
     constants: Option<&WordMap<ConstantMetadata>>,
-) -> Option<TUnion> {
+) -> Option<TUnion>
+where
+    A: Arena,
+{
     match expression {
         Expression::MagicConstant(magic_constant) => Some(match magic_constant {
             MagicConstant::Line(_) => {

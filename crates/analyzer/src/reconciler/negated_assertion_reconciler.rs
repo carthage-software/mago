@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::sync::Arc;
 
@@ -32,15 +33,18 @@ use crate::reconciler::assertion_reconciler::intersect_atomic_with_atomic;
 use crate::reconciler::simple_negated_assertion_reconciler;
 use crate::reconciler::trigger_issue_for_impossible;
 
-pub(crate) fn reconcile(
-    context: &mut Context<'_, '_>,
+pub(crate) fn reconcile<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let is_equality = assertion.has_equality();
     if is_equality && assertion.has_literal_value() {
         if existing_var_type.is_mixed() {
@@ -117,12 +121,14 @@ pub(crate) fn reconcile(
     existing_var_type
 }
 
-fn subtract_complex_type(
-    context: &mut Context<'_, '_>,
+fn subtract_complex_type<A>(
+    context: &mut Context<'_, '_, A>,
     assertion_type: &TAtomic,
     existing_var_type: &mut TUnion,
     can_be_disjunct: &mut bool,
-) {
+) where
+    A: Arena,
+{
     let mut acceptable_types = vec![];
 
     let existing_atomic_types = existing_var_type.types.to_mut().drain(..).collect::<Vec<_>>();
@@ -278,13 +284,15 @@ fn subtract_complex_type(
     existing_var_type.types = Cow::Owned(acceptable_types);
 }
 
-fn handle_negated_class(
-    context: &mut Context<'_, '_>,
+fn handle_negated_class<A>(
+    context: &mut Context<'_, '_, A>,
     child_classlikes: &WordSet,
     existing_atomic: &TAtomic,
     assertion_classlike_name: Word,
     acceptable_types: &mut Vec<TAtomic>,
-) {
+) where
+    A: Arena,
+{
     for child_classlike in child_classlikes {
         if *child_classlike != assertion_classlike_name {
             let alternate_class =
@@ -308,15 +316,18 @@ fn handle_negated_class(
     }
 }
 
-fn handle_literal_negated_equality(
-    context: &mut Context<'_, '_>,
+fn handle_literal_negated_equality<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let Some(assertion_type) = assertion.get_type() else {
         return get_never();
     };

@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_syntax::ast::ClassLikeMemberSelector;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Variable;
@@ -5,7 +6,10 @@ use mago_syntax::ast::Variable;
 use crate::context::LintContext;
 use crate::scope::ClassLikeScope;
 
-pub fn is_within_controller(context: &LintContext<'_, '_>) -> bool {
+pub fn is_within_controller<A>(context: &LintContext<'_, '_, A>) -> bool
+where
+    A: Arena,
+{
     let Some(ClassLikeScope::Class(classname)) = context.scope.get_class_like_scope() else {
         return false;
     };

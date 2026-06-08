@@ -1,7 +1,7 @@
-use bumpalo::collections::Vec;
-use bumpalo::vec;
+use mago_allocator::vec::Vec;
+use mago_allocator::vec_in;
 
-use bumpalo::Bump;
+use mago_allocator::Arena;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -38,9 +38,12 @@ use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
 
 #[derive(Debug)]
-pub(super) struct MemberAccessChain<'arena> {
+pub(super) struct MemberAccessChain<'arena, A>
+where
+    A: Arena,
+{
     pub base: &'arena Expression<'arena>,
-    pub accesses: Vec<'arena, MemberAccess<'arena>>,
+    pub accesses: Vec<'arena, MemberAccess<'arena>, A>,
 }
 
 #[derive(Debug)]
@@ -110,9 +113,12 @@ impl<'arena> MemberAccess<'arena> {
     }
 }
 
-impl<'arena> MemberAccessChain<'arena> {
+impl<'arena, A> MemberAccessChain<'arena, A>
+where
+    A: Arena,
+{
     #[inline]
-    fn get_eligibility_score(&self, f: &FormatterState<'_, 'arena>) -> usize {
+    fn get_eligibility_score(&self, f: &FormatterState<'_, 'arena, A>) -> usize {
         let mut score: i32 = 0;
         let mut account_for_simple_calls = true;
         let mut always_account_for_simple_calls = false;
@@ -205,7 +211,7 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     #[inline]
-    pub fn is_eligible_for_chaining(&self, f: &FormatterState<'_, 'arena>) -> bool {
+    pub fn is_eligible_for_chaining(&self, f: &FormatterState<'_, 'arena, A>) -> bool {
         if self.has_comments_in_chain(f) {
             return true;
         }
@@ -279,7 +285,7 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     #[inline]
-    fn is_first_link_already_broken(&self, f: &FormatterState) -> bool {
+    fn is_first_link_already_broken(&self, f: &FormatterState<'_, '_, A>) -> bool {
         let Some(first_access) = self.accesses.first() else {
             return false;
         };
@@ -296,7 +302,7 @@ impl<'arena> MemberAccessChain<'arena> {
         matches!(self.accesses.first(), Some(MemberAccess::MethodCall(_) | MemberAccess::NullSafeMethodCall(_)))
     }
 
-    fn exceeds_print_width(&self, f: &FormatterState) -> bool {
+    fn exceeds_print_width(&self, f: &FormatterState<'_, '_, A>) -> bool {
         let Some(width) = self.get_flat_width() else {
             return false;
         };
@@ -305,7 +311,7 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     #[inline]
-    fn has_break_after_first_access(&self, f: &FormatterState) -> bool {
+    fn has_break_after_first_access(&self, f: &FormatterState<'_, '_, A>) -> bool {
         for (i, access) in self.accesses.iter().enumerate() {
             if i == 0 {
                 continue;
@@ -330,7 +336,7 @@ impl<'arena> MemberAccessChain<'arena> {
         false
     }
 
-    fn has_line_break_before_statement_terminator(&self, f: &FormatterState) -> bool {
+    fn has_line_break_before_statement_terminator(&self, f: &FormatterState<'_, '_, A>) -> bool {
         let Some(last_access) = self.accesses.last() else {
             return false;
         };
@@ -366,7 +372,7 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     #[inline]
-    fn is_already_broken(&self, f: &FormatterState) -> bool {
+    fn is_already_broken(&self, f: &FormatterState<'_, '_, A>) -> bool {
         let mut accesses_len = self.accesses.len();
         if should_inline_first_access(f, self) {
             accesses_len -= 1; // First access is inline, so we don't count it for broken links
@@ -418,7 +424,7 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     #[inline]
-    fn has_comments_in_chain(&self, f: &FormatterState) -> bool {
+    fn has_comments_in_chain(&self, f: &FormatterState<'_, '_, A>) -> bool {
         // Check if there are comments after the base expression
         if let Some(first_access) = self.accesses.first() {
             let base_end = self.base.span().end;
@@ -481,7 +487,7 @@ impl<'arena> MemberAccessChain<'arena> {
     }
 
     #[inline]
-    fn must_break(&self, f: &FormatterState) -> bool {
+    fn must_break(&self, f: &FormatterState<'_, '_, A>) -> bool {
         if f.settings.preserve_breaking_member_access_chain && self.has_line_break_before_statement_terminator(f) {
             return true;
         }
@@ -672,13 +678,16 @@ fn get_flat_expression_width(expression: &Expression<'_>) -> Option<usize> {
     }
 }
 
-pub(super) fn collect_member_access_chain<'arena>(
-    arena: &'arena Bump,
+pub(super) fn collect_member_access_chain<'arena, A>(
+    arena: &'arena A,
     expr: &'arena Expression<'arena>,
-) -> Option<MemberAccessChain<'arena>> {
+) -> Option<MemberAccessChain<'arena, A>>
+where
+    A: Arena,
+{
     let expr = unwrap_parenthesized(expr);
 
-    let mut member_access: Vec<'arena, MemberAccess<'arena>> = Vec::new_in(arena);
+    let mut member_access: Vec<'arena, MemberAccess<'arena>, A> = Vec::new_in(arena);
     let mut current_expr = expr;
 
     loop {
@@ -725,10 +734,13 @@ pub(super) fn collect_member_access_chain<'arena>(
     }
 }
 
-pub(super) fn print_member_access_chain<'arena>(
-    member_access_chain: &MemberAccessChain<'arena>,
-    f: &mut FormatterState<'_, 'arena>,
-) -> Document<'arena> {
+pub(super) fn print_member_access_chain<'arena, A>(
+    member_access_chain: &MemberAccessChain<'arena, A>,
+    f: &mut FormatterState<'_, 'arena, A>,
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     enum ChainBaseFrame {
         None,
         BaseHandlesParens,
@@ -774,9 +786,9 @@ pub(super) fn print_member_access_chain<'arena>(
     };
 
     let mut parts = if chain_owns_parens {
-        vec![in f.arena; Document::String(b"("), base_document, Document::String(b")")]
+        vec_in![f.arena; Document::String(b"("), base_document, Document::String(b")")]
     } else {
-        vec![in f.arena; base_document]
+        vec_in![f.arena; base_document]
     };
 
     let mut accesses_iter = member_access_chain.accesses.iter().enumerate().peekable();
@@ -797,7 +809,7 @@ pub(super) fn print_member_access_chain<'arena>(
         parts.push(selector.format(f));
         last_element_end = selector.span().end;
         if let Some(argument_list) = chain_link.get_arguments_list() {
-            let mut formatted_argument_list = vec![in f.arena; print_argument_list(f, argument_list, false, true)];
+            let mut formatted_argument_list = vec_in![f.arena; print_argument_list(f, argument_list, false, true)];
             if let Some(comments) = f.print_trailing_comments(argument_list.span()) {
                 formatted_argument_list.push(comments);
             }
@@ -821,12 +833,12 @@ pub(super) fn print_member_access_chain<'arena>(
 
         let mut contents = if must_have_new_line {
             if must_break {
-                vec![in f.arena; Document::Line(Line::hard())]
+                vec_in![f.arena; Document::Line(Line::hard())]
             } else {
-                vec![in f.arena; Document::Line(Line::soft())]
+                vec_in![f.arena; Document::Line(Line::soft())]
             }
         } else {
-            vec![in f.arena;] // No newline if in fluent chain and last was property
+            vec_in![f.arena;] // No newline if in fluent chain and last was property
         };
 
         contents.push(format_access_operator(f, chain_link.get_operator_span(), chain_link.get_operator_as_bytes()));
@@ -834,7 +846,7 @@ pub(super) fn print_member_access_chain<'arena>(
         last_element_end = selector.span().end;
         contents.push(selector.format(f));
         if let Some(argument_list) = chain_link.get_arguments_list() {
-            let mut formatted_argument_list = vec![in f.arena; print_argument_list(f, argument_list, false, true)];
+            let mut formatted_argument_list = vec_in![f.arena; print_argument_list(f, argument_list, false, true)];
             if let Some(comments) = f.print_trailing_comments(argument_list.span()) {
                 formatted_argument_list.push(comments);
             }
@@ -868,7 +880,13 @@ pub(super) fn print_member_access_chain<'arena>(
     Document::Group(Group::new(parts).with_id(group_id))
 }
 
-fn inline_prefix_len<'arena>(f: &FormatterState<'_, 'arena>, member_access_chain: &MemberAccessChain<'arena>) -> usize {
+fn inline_prefix_len<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
+    member_access_chain: &MemberAccessChain<'arena, A>,
+) -> usize
+where
+    A: Arena,
+{
     if !should_inline_first_access(f, member_access_chain) {
         return 0;
     }
@@ -887,10 +905,13 @@ fn inline_prefix_len<'arena>(f: &FormatterState<'_, 'arena>, member_access_chain
     1
 }
 
-fn preserve_breaks_first_method<'arena>(
-    f: &FormatterState<'_, 'arena>,
-    member_access_chain: &MemberAccessChain<'arena>,
-) -> bool {
+fn preserve_breaks_first_method<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
+    member_access_chain: &MemberAccessChain<'arena, A>,
+) -> bool
+where
+    A: Arena,
+{
     f.settings.preserve_breaking_member_access_chain
         && !f.settings.preserve_breaking_member_access_chain_first_method_on_same_line
         && (member_access_chain.is_first_link_already_broken(f)
@@ -898,10 +919,13 @@ fn preserve_breaks_first_method<'arena>(
             || member_access_chain.exceeds_print_width(f))
 }
 
-fn should_inline_first_access<'arena>(
-    f: &FormatterState<'_, 'arena>,
-    member_access_chain: &MemberAccessChain<'arena>,
-) -> bool {
+fn should_inline_first_access<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
+    member_access_chain: &MemberAccessChain<'arena, A>,
+) -> bool
+where
+    A: Arena,
+{
     if let Some(first_access) = member_access_chain.accesses.first() {
         let base_end = member_access_chain.base.span().end;
         let first_op_start = first_access.get_operator_span().start;
@@ -968,7 +992,10 @@ fn should_inline_first_access<'arena>(
     false
 }
 
-fn base_needs_parens<'arena>(f: &FormatterState<'_, 'arena>, base: &'arena Expression<'arena>) -> bool {
+fn base_needs_parens<'arena, A>(f: &FormatterState<'_, 'arena, A>, base: &'arena Expression<'arena>) -> bool
+where
+    A: Arena,
+{
     if let Expression::Parenthesized(parenthesized) = base {
         return base_needs_parens(f, parenthesized.expression);
     }
@@ -976,11 +1003,14 @@ fn base_needs_parens<'arena>(f: &FormatterState<'_, 'arena>, base: &'arena Expre
     f.callee_expression_need_parenthesis(base, false)
 }
 
-pub(super) fn format_access_operator<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn format_access_operator<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     span: Span,
     operator: &'arena [u8],
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let leading = f.print_leading_comments(span);
     let doc = Document::String(operator);
 

@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -90,7 +91,10 @@ impl LintRule for NoUnescapedOutputRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         match node {
             Node::Echo(echo) => {
                 // Check each expression in the echo statement
@@ -129,7 +133,10 @@ impl LintRule for NoUnescapedOutputRule {
 }
 
 impl NoUnescapedOutputRule {
-    fn report_unescaped_output(&self, ctx: &mut LintContext<'_, '_>, span: mago_span::Span, context: &str) {
+    fn report_unescaped_output<A>(&self, ctx: &mut LintContext<'_, '_, A>, span: mago_span::Span, context: &str)
+    where
+        A: Arena,
+    {
         let issue = Issue::new(self.cfg.level(), "All output should be escaped to prevent XSS vulnerabilities")
             .with_code(self.meta.code)
             .with_annotation(Annotation::primary(span).with_message(format!("Unescaped output in {context}")))
@@ -141,7 +148,10 @@ impl NoUnescapedOutputRule {
 }
 
 /// Check if an expression needs escaping before output (with context)
-fn needs_escaping_with_context(expr: &Expression, ctx: Option<&LintContext>) -> bool {
+fn needs_escaping_with_context<A>(expr: &Expression, ctx: Option<&LintContext<'_, '_, A>>) -> bool
+where
+    A: Arena,
+{
     match expr {
         // Literal strings and numbers are generally safe
         Expression::Literal(Literal::String(_)) => false,
@@ -182,7 +192,10 @@ fn needs_escaping_with_context(expr: &Expression, ctx: Option<&LintContext>) -> 
 }
 
 /// Check if a function call is a `WordPress` escaping function
-fn is_escaping_function_call(ctx: &LintContext, function_call: &FunctionCall) -> bool {
+fn is_escaping_function_call<A>(ctx: &LintContext<'_, '_, A>, function_call: &FunctionCall) -> bool
+where
+    A: Arena,
+{
     let escaping_functions = [
         "esc_html",
         "esc_attr",

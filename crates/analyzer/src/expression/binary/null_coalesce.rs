@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::rc::Rc;
 
@@ -44,12 +45,15 @@ use crate::utils::misc::unwrap_expression;
 ///   non-null parts of the LHS and the type of the RHS.
 /// - If the LHS type is unknown (`mixed`), the result type is `mixed`.
 #[allow(clippy::unwrap_used)]
-pub fn analyze_null_coalesce_operation<'ctx, 'arena>(
+pub fn analyze_null_coalesce_operation<'ctx, 'arena, A>(
     binary: &Binary<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let was_inside_isset = block_context.flags.inside_isset();
     block_context.flags.set_inside_isset(matches!(
         binary.lhs,

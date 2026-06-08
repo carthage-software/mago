@@ -11,7 +11,8 @@
 #[path = "common/mod.rs"]
 mod common;
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
+use mago_allocator::prelude::*;
 use mago_twig_syntax::ast::BinaryOperator;
 use mago_twig_syntax::ast::Expression;
 use mago_twig_syntax::ast::Statement;
@@ -21,7 +22,7 @@ use crate::common::parse_and_roundtrip;
 use crate::common::parse_ok;
 use crate::common::parses;
 
-fn print_expr<'a>(arena: &'a Bump, src: &'a str) -> &'a Expression<'a> {
+fn print_expr<'a>(arena: &'a LocalArena, src: &'a str) -> &'a Expression<'a> {
     let tpl = parse_ok(arena, src);
     let first = tpl.statements.first().expect("at least one statement");
     match first {
@@ -30,7 +31,7 @@ fn print_expr<'a>(arena: &'a Bump, src: &'a str) -> &'a Expression<'a> {
     }
 }
 
-fn binary_operator_name<'a>(arena: &'a Bump, src: &'a str) -> String {
+fn binary_operator_name<'a>(arena: &'a LocalArena, src: &'a str) -> String {
     let e = print_expr(arena, src);
     match e {
         Expression::Binary(b) => b.operator.to_string(),
@@ -38,7 +39,7 @@ fn binary_operator_name<'a>(arena: &'a Bump, src: &'a str) -> String {
     }
 }
 
-fn unary_operator_name<'a>(arena: &'a Bump, src: &'a str) -> String {
+fn unary_operator_name<'a>(arena: &'a LocalArena, src: &'a str) -> String {
     let e = print_expr(arena, src);
     match e {
         Expression::Unary(u) => u.operator.to_string(),
@@ -101,7 +102,7 @@ fn literal_name() {
 
 #[test]
 fn adjacent_strings_are_concatenated() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let e = print_expr(&arena, r#"{{ 'a' 'b' }}"#);
     match e {
         Expression::Binary(b) => assert!(matches!(b.operator, BinaryOperator::StringConcat(_))),
@@ -131,19 +132,19 @@ fn interpolated_string_nested() {
 
 #[test]
 fn unary_neg() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     assert_eq!(unary_operator_name(&arena, "{{ -a }}"), "MinusSign");
 }
 
 #[test]
 fn unary_pos() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     assert_eq!(unary_operator_name(&arena, "{{ +a }}"), "PlusSign");
 }
 
 #[test]
 fn unary_not() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let e = print_expr(&arena, "{{ not a }}");
     match e {
         Expression::Unary(u) => assert!(matches!(u.operator, UnaryOperator::Not(_))),
@@ -164,68 +165,68 @@ fn unary_double_not() {
 
 #[test]
 fn binary_add() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ 1 + 2 }}"), "Addition");
 }
 
 #[test]
 fn binary_sub() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ 1 - 2 }}"), "Subtraction");
 }
 
 #[test]
 fn binary_mul() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ 1 * 2 }}"), "Multiplication");
 }
 
 #[test]
 fn binary_div() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ 1 / 2 }}"), "Division");
 }
 
 #[test]
 fn binary_floor_div() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ 1 // 2 }}"), "FloorDivision");
 }
 
 #[test]
 fn binary_mod() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ 1 % 2 }}"), "Modulo");
 }
 
 #[test]
 fn binary_pow() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ 1 ** 2 }}"), "Exponentiation");
 }
 
 #[test]
 fn binary_concat() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ 'a' ~ 'b' }}"), "StringConcat");
 }
 
 #[test]
 fn binary_range() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ 1..10 }}"), "Range");
 }
 
 #[test]
 fn binary_eq_neq() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ a == b }}"), "Equal");
     assert_eq!(binary_operator_name(&a, "{{ a != b }}"), "NotEqual");
 }
 
 #[test]
 fn binary_comparisons() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ a < b }}"), "LessThan");
     assert_eq!(binary_operator_name(&a, "{{ a > b }}"), "GreaterThan");
     assert_eq!(binary_operator_name(&a, "{{ a <= b }}"), "LessThanOrEqual");
@@ -237,7 +238,7 @@ fn binary_comparisons() {
 
 #[test]
 fn binary_logical_and_or_xor() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ a and b }}"), "And");
     assert_eq!(binary_operator_name(&a, "{{ a or b }}"), "Or");
     assert_eq!(binary_operator_name(&a, "{{ a xor b }}"), "Xor");
@@ -245,7 +246,7 @@ fn binary_logical_and_or_xor() {
 
 #[test]
 fn binary_bitwise() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ a b-and b }}"), "BitwiseAnd");
     assert_eq!(binary_operator_name(&a, "{{ a b-or b }}"), "BitwiseOr");
     assert_eq!(binary_operator_name(&a, "{{ a b-xor b }}"), "BitwiseXor");
@@ -253,40 +254,40 @@ fn binary_bitwise() {
 
 #[test]
 fn binary_null_coalesce() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ a ?? b }}"), "NullCoalesce");
 }
 
 #[test]
 fn binary_in_not_in() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ a in xs }}"), "In");
     assert_eq!(binary_operator_name(&a, "{{ a not in xs }}"), "NotIn");
 }
 
 #[test]
 fn binary_matches() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, r#"{{ 'x' matches '/x/' }}"#), "Matches");
 }
 
 #[test]
 fn binary_starts_ends_with() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ 'foo' starts with 'f' }}"), "StartsWith");
     assert_eq!(binary_operator_name(&a, "{{ 'foo' ends with 'o' }}"), "EndsWith");
 }
 
 #[test]
 fn binary_has_some_every() {
-    let a = Bump::new();
+    let a = LocalArena::new();
     assert_eq!(binary_operator_name(&a, "{{ xs has some [1, 2] }}"), "HasSome");
     assert_eq!(binary_operator_name(&a, "{{ xs has every [1, 2] }}"), "HasEvery");
 }
 
 #[test]
 fn precedence_mul_binds_tighter_than_add() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let e = print_expr(&arena, "{{ 1 + 2 * 3 }}");
     match e {
         Expression::Binary(b) => {
@@ -302,7 +303,7 @@ fn precedence_mul_binds_tighter_than_add() {
 
 #[test]
 fn precedence_parens_override() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let e = print_expr(&arena, "{{ (1 + 2) * 3 }}");
     match e {
         Expression::Binary(b) => {
@@ -315,7 +316,7 @@ fn precedence_parens_override() {
 
 #[test]
 fn precedence_pow_is_right_associative() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let e = print_expr(&arena, "{{ a ** b ** c }}");
     match e {
         Expression::Binary(b) => {
@@ -334,7 +335,7 @@ fn precedence_pow_is_right_associative() {
 
 #[test]
 fn precedence_subtraction_is_left_associative() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let e = print_expr(&arena, "{{ a - b - c }}");
     match e {
         Expression::Binary(b) => {
@@ -353,7 +354,7 @@ fn precedence_subtraction_is_left_associative() {
 
 #[test]
 fn precedence_and_binds_tighter_than_or() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let e = print_expr(&arena, "{{ a or b and c }}");
     match e {
         Expression::Binary(b) => {
@@ -369,7 +370,7 @@ fn precedence_and_binds_tighter_than_or() {
 
 #[test]
 fn precedence_not_binds_tighter_than_eq() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let e = print_expr(&arena, "{{ not a == b }}");
     match e {
         Expression::Binary(b) => {
@@ -382,7 +383,7 @@ fn precedence_not_binds_tighter_than_eq() {
 
 #[test]
 fn precedence_null_coalesce_is_right_associative() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let e = print_expr(&arena, "{{ a ?? b ?? c }}");
     match e {
         Expression::Binary(b) => {
@@ -403,7 +404,7 @@ fn precedence_nested_conditional() {
 
 #[test]
 fn precedence_is_not_null() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let e = print_expr(&arena, "{{ a is not null }}");
     match e {
         Expression::Test(t) => {
@@ -426,7 +427,7 @@ fn precedence_concat_with_arithmetic() {
 
 #[test]
 fn conditional_full() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ a ? b : c }}") {
         Expression::Conditional(c) => {
             assert!(c.then.is_some());
@@ -437,7 +438,7 @@ fn conditional_full() {
 
 #[test]
 fn conditional_with_elvis() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ a ?: b }}") {
         Expression::Conditional(c) => {
             assert!(c.then.is_none());
@@ -448,7 +449,7 @@ fn conditional_with_elvis() {
 
 #[test]
 fn group_expression() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ (a) }}") {
         Expression::Parenthesized(_) => {}
         other => panic!("{other:?}"),
@@ -462,7 +463,7 @@ fn rejects_empty_parens() {
 
 #[test]
 fn attribute_single() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ a.b }}") {
         Expression::GetAttribute(_) => {}
         other => panic!("{other:?}"),
@@ -476,7 +477,7 @@ fn attribute_nested_chain() {
 
 #[test]
 fn attribute_null_safe() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ a?.b }}") {
         Expression::GetAttribute(g) => assert!(g.null_safe),
         other => panic!("{other:?}"),
@@ -485,7 +486,7 @@ fn attribute_null_safe() {
 
 #[test]
 fn method_call_no_args() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ a.b() }}") {
         Expression::MethodCall(m) => assert_eq!(m.method.value, b"b".as_slice()),
         other => panic!("{other:?}"),
@@ -494,7 +495,7 @@ fn method_call_no_args() {
 
 #[test]
 fn method_call_with_args() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ a.b(1, 2) }}") {
         Expression::MethodCall(m) => {
             assert_eq!(m.method.value, b"b".as_slice());
@@ -511,7 +512,7 @@ fn chained_method_calls() {
 
 #[test]
 fn get_item_string_key() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, r#"{{ a["key"] }}"#) {
         Expression::GetItem(_) => {}
         other => panic!("{other:?}"),
@@ -550,7 +551,7 @@ fn slice_to_end() {
 
 #[test]
 fn array_empty() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ [] }}") {
         Expression::Array(a) => assert_eq!(a.elements.len(), 0),
         other => panic!("{other:?}"),
@@ -564,7 +565,7 @@ fn array_single_element() {
 
 #[test]
 fn array_multiple() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ [1, 2, 3] }}") {
         Expression::Array(a) => assert_eq!(a.elements.len(), 3),
         other => panic!("{other:?}"),
@@ -583,7 +584,7 @@ fn array_with_spread() {
 
 #[test]
 fn hash_empty() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ {} }}") {
         Expression::HashMap(h) => assert_eq!(h.entries.len(), 0),
         other => panic!("{other:?}"),
@@ -622,7 +623,7 @@ fn hash_number_key() {
 
 #[test]
 fn filter_without_args() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ x|upper }}") {
         Expression::Filter(f) => {
             assert_eq!(f.name.value, b"upper".as_slice());
@@ -634,7 +635,7 @@ fn filter_without_args() {
 
 #[test]
 fn filter_with_positional_arg() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, r#"{{ x|default("fallback") }}"#) {
         Expression::Filter(f) => {
             assert_eq!(f.name.value, b"default".as_slice());
@@ -651,7 +652,7 @@ fn filter_with_hash_arg() {
 
 #[test]
 fn filter_chained() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ x|upper|title }}") {
         Expression::Filter(outer) => {
             assert_eq!(outer.name.value, b"title".as_slice());
@@ -671,7 +672,7 @@ fn filter_with_named_arg() {
 
 #[test]
 fn test_is_null() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ x is null }}") {
         Expression::Test(t) => {
             assert!(t.not_keyword.is_none());
@@ -683,7 +684,7 @@ fn test_is_null() {
 
 #[test]
 fn test_is_not_null() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ x is not null }}") {
         Expression::Test(t) => {
             assert!(t.not_keyword.is_some());
@@ -725,7 +726,7 @@ fn test_is_same_as() {
 
 #[test]
 fn test_is_not_odd() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ x is not odd }}") {
         Expression::Test(t) => {
             assert!(t.not_keyword.is_some());
@@ -737,7 +738,7 @@ fn test_is_not_odd() {
 
 #[test]
 fn arrow_single_param_no_parens() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ v => v * 2 }}") {
         Expression::ArrowFunction(a) => {
             assert_eq!(a.parameters.len(), 1);
@@ -749,7 +750,7 @@ fn arrow_single_param_no_parens() {
 
 #[test]
 fn arrow_multi_param_in_parens() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     match print_expr(&arena, "{{ (a, b) => a + b }}") {
         Expression::ArrowFunction(a) => {
             assert_eq!(a.parameters.len(), 2);

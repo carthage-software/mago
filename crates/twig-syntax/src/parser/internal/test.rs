@@ -4,8 +4,12 @@ use crate::ast::TestArguments;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse a test expression suffix: `operand is [not] name [second_word] [arguments]`.
     /// The leading `is` token must already have been consumed.
     pub(crate) fn parse_test(

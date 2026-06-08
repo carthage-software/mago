@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -78,15 +79,18 @@ impl HasSpan for FunctionLikeBody<'_, '_> {
     }
 }
 
-pub fn analyze_function_like<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn analyze_function_like<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     parent_artifacts: &mut AnalysisArtifacts,
     block_context: &mut BlockContext<'ctx>,
     function_like_metadata: &'ctx FunctionLikeMetadata,
     parameter_list: &'ast FunctionLikeParameterList<'arena>,
     body: FunctionLikeBody<'ast, 'arena>,
     inferred_parameter_types: Option<HashMap<usize, TUnion>>,
-) -> Result<AnalysisArtifacts, AnalysisError> {
+) -> Result<AnalysisArtifacts, AnalysisError>
+where
+    A: Arena,
+{
     let mut previous_type_resolution_context = std::mem::replace(
         &mut context.type_resolution_context,
         function_like_metadata.type_resolution_context.clone().unwrap_or_default(),
@@ -256,14 +260,17 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena>(
     Ok(artifacts)
 }
 
-fn add_parameter_types_to_context<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn add_parameter_types_to_context<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &'ctx FunctionLikeMetadata,
     parameter_list: &FunctionLikeParameterList<'arena>,
     mut inferred_parameter_types: Option<HashMap<usize, TUnion>>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let is_overriding_method = function_like_metadata.kind.is_method()
         && block_context.scope.get_class_like_name().is_some_and(|class_name| {
             context.codebase.method_is_overriding(class_name.as_bytes(), function_like_metadata.name.as_bytes())
@@ -517,13 +524,16 @@ fn is_unresolved_template_with_mixed_bound(union: &TUnion) -> bool {
     }
 }
 
-fn expand_type_metadata<'ctx>(
-    context: &Context<'ctx, '_>,
+fn expand_type_metadata<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &FunctionLikeMetadata,
     type_metadata: &TypeMetadata,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     add_symbol_references(
         &type_metadata.type_union,
         block_context.scope.get_function_like_identifier().as_ref(),
@@ -560,12 +570,15 @@ fn expand_type_metadata<'ctx>(
     signature_union
 }
 
-pub(super) fn add_properties_to_context<'ctx>(
-    context: &Context<'ctx, '_>,
+pub(super) fn add_properties_to_context<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
     block_context: &mut BlockContext<'ctx>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     function_like_metadata: Option<&'ctx FunctionLikeMetadata>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let Some(calling_class) = block_context.scope.get_class_like_name() else {
         return Ok(());
     };
@@ -651,11 +664,14 @@ pub(super) fn add_properties_to_context<'ctx>(
 /// - Class template parameters (preserves generics)
 /// - Required interfaces and parent classes (intersection types)
 /// - Method-level where constraints (when `function_like_metadata` is provided)
-pub fn get_this_type(
-    context: &Context<'_, '_>,
+pub fn get_this_type<A>(
+    context: &Context<'_, '_, A>,
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: Option<&FunctionLikeMetadata>,
-) -> TObject {
+) -> TObject
+where
+    A: Arena,
+{
     if class_like_metadata.kind.is_enum() {
         return TObject::Enum(TEnum { name: class_like_metadata.original_name, case: None });
     }
@@ -783,12 +799,14 @@ fn add_symbol_references(
 
 /// Flags declared return types that are strictly wider than the union of every
 /// value the body actually returns.
-fn check_return_type_width<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn check_return_type_width<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &'ctx FunctionLikeMetadata,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.find_overly_wide_return_types {
         return;
     }
@@ -912,12 +930,14 @@ fn check_return_type_width<'ctx>(
     context.collector.report_with_code(IssueCode::OverlyWideReturnType, issue);
 }
 
-fn check_thrown_types<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn check_thrown_types<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &'ctx FunctionLikeMetadata,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_throws {
         // If the setting is disabled, we skip the check.
         return;
@@ -1004,7 +1024,10 @@ fn check_thrown_types<'ctx>(
 /// Returns `true` if the exception is:
 /// - In `unchecked_exception_classes` (exact match only)
 /// - In `unchecked_exceptions` or is a subclass of any exception in that set (hierarchy-aware)
-fn is_exception_unchecked(context: &Context<'_, '_>, exception_name: Word) -> bool {
+fn is_exception_unchecked<A>(context: &Context<'_, '_, A>, exception_name: Word) -> bool
+where
+    A: Arena,
+{
     // Check exact match in unchecked_exception_classes
     if context
         .settings
@@ -1072,13 +1095,15 @@ fn type_contains_function_template_param(
 /// A template parameter is considered "used" if it appears in:
 /// - A parameter type
 /// - The return type
-pub fn check_unused_function_template_parameters<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn check_unused_function_template_parameters<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     function_like_metadata: &'ctx FunctionLikeMetadata,
     name_span: Span,
     kind_str: &str,
     display_name: Word,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.find_unused_definitions {
         return;
     }
@@ -1146,13 +1171,15 @@ pub fn check_unused_function_template_parameters<'ctx>(
 }
 
 /// Verifies that a parameter's default value is assignable to the parameter's declared type.
-fn check_parameter_default_value<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn check_parameter_default_value<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     parameter_metadata: &'ctx FunctionLikeParameterMetadata,
     declared_type: &TUnion,
     default_expression: &Expression<'arena>,
     artifacts: &AnalysisArtifacts,
-) {
+) where
+    A: Arena,
+{
     if declared_type.is_mixed() || declared_type.has_template_types() || declared_type.is_generic_parameter() {
         return;
     }
@@ -1208,7 +1235,10 @@ fn check_parameter_default_value<'ctx, 'arena>(
 ///
 /// This function scans the type union for unresolved `TReference::Symbol` entries,
 /// which indicate types that were not found during the population phase.
-pub fn report_undefined_type_references(context: &mut Context<'_, '_>, type_metadata: &TypeMetadata) {
+pub fn report_undefined_type_references<A>(context: &mut Context<'_, '_, A>, type_metadata: &TypeMetadata)
+where
+    A: Arena,
+{
     if type_metadata.inferred {
         return;
     }
