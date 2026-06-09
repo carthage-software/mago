@@ -7,7 +7,7 @@ declare(strict_types=1);
  */
 function test_consistent_warn_expected(array $o): void
 {
-    /** @mago-expect analysis:possibly-undefined-string-array-index,possibly-undefined-string-array-index */
+    /** @mago-expect analysis:possibly-undefined-string-array-index */
     if ($o['x_1'] || $o['x_2']) {
         /** @mago-expect analysis:possibly-undefined-string-array-index */
         if ($o['x_1']) {

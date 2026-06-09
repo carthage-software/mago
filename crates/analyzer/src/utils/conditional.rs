@@ -85,9 +85,21 @@ where
 
     let was_inside_conditional = externally_applied_context.flags.inside_conditional();
 
+    // When the second pass below runs it re-covers everything this pass touches, so record and
+    // discard this pass's diagnostics to avoid reporting them twice; its type/data-flow effects
+    // are kept regardless.
+    let must_reanalyze_full_condition =
+        internally_applied_if_cond_expr != condition || externally_applied_if_cond_expr != condition;
+
     externally_applied_context.flags.set_inside_conditional(true);
     let tmp_if_body_context = std::mem::take(&mut externally_applied_context.if_body_context);
+    if must_reanalyze_full_condition {
+        context.collector.start_recording();
+    }
     externally_applied_if_cond_expr.analyze(context, &mut externally_applied_context, artifacts)?;
+    if must_reanalyze_full_condition {
+        context.collector.finish_recording();
+    }
     externally_applied_context.if_body_context = tmp_if_body_context;
 
     let first_cond_assigned_var_ids = externally_applied_context.assigned_variable_ids.clone();
@@ -108,7 +120,7 @@ where
     let post_if_context = externally_applied_context.clone();
     let mut conditionally_referenced_variable_ids;
     let assigned_in_conditional_variable_ids;
-    if internally_applied_if_cond_expr != condition || externally_applied_if_cond_expr != condition {
+    if must_reanalyze_full_condition {
         if_conditional_context.assigned_variable_ids = WordMap::default();
         if_conditional_context.conditionally_referenced_variable_ids.clear();
 

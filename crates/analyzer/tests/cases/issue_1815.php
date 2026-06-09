@@ -3,7 +3,7 @@
 /**
  * @param array<int|string, array{float, string}> $cache
  *
- * @mago-expect analysis:possibly-invalid-operand(2)
+ * @mago-expect analysis:possibly-invalid-operand
  */
 function cache_put(array &$cache, int $max, int|string $key, string $val): void
 {
