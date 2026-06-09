@@ -40,6 +40,7 @@ use crate::internal::format::Format;
 use crate::internal::format::alignment::AlignmentWidths;
 use crate::internal::format::alignment::detect_statement_ref_alignment_runs;
 use crate::internal::format::alignment::get_statement_alignment;
+use crate::internal::format::alignment::has_comment_between;
 use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::misc::has_new_line_in_range;
 
@@ -423,6 +424,23 @@ where
             DeclareBody::ColonDelimited(_) => true,
         },
         Statement::OpeningTag(_) => {
+            // Opt-in: collapse `<?php` and an immediately following `declare`
+            // statement onto a single line (`<?php declare(strict_types=1);`),
+            // regardless of how the source laid them out. This takes precedence
+            // over `opening_tag_on_own_line` and `empty_line_after_opening_tag`.
+            //
+            // Only collapse when nothing but whitespace separates the two: a
+            // trailing comment on the opening tag, or any comment sitting
+            // between the tag and the `declare`, must keep them apart so the
+            // option never rewrites comment placement.
+            if f.settings.combine_opening_tag_and_declare
+                && let Some(next @ Statement::Declare(_)) = stmts.get(i + 1).copied()
+                && !f.has_comment(stmt.span(), CommentFlags::TRAILING)
+                && !has_comment_between(f, stmt.span(), next.span())
+            {
+                return (false, true);
+            }
+
             if f.settings.opening_tag_on_own_line && !is_inline_php_template(stmts) {
                 return (true, false);
             }
