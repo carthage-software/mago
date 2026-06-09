@@ -25,22 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.4"
-          coverage: none
-          tools: composer
-        env:
-          COMPOSER_ALLOW_SUPERUSER: 1
-
-      - name: Install Composer dependencies
-        run: composer install --prefer-dist --no-progress
+        uses: actions/checkout@v6
 
       - name: Set up Mago
-        uses: nhedger/setup-mago@v1
+        uses: nhedger/setup-mago@v2
 
       - name: Check formatting
         run: mago format --check
@@ -80,7 +68,7 @@ jobs:
       image: ghcr.io/carthage-software/mago:1
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Check formatting
         run: mago fmt --check
