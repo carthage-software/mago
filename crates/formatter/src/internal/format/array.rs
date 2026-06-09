@@ -417,11 +417,14 @@ where
     }
 }
 
+type DelimitedArrayElements<'arena, A> =
+    (Document<'arena, A>, Vec<'arena, Document<'arena, A>, A>, Document<'arena, A>);
+
 #[inline]
 fn extract_array_elements<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     contents: &[Document<'arena, A>],
-) -> Option<(Document<'arena, A>, Vec<'arena, Document<'arena, A>, A>, Document<'arena, A>)>
+) -> Option<DelimitedArrayElements<'arena, A>>
 where
     A: Arena,
 {

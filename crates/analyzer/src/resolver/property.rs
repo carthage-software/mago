@@ -1173,7 +1173,7 @@ fn type_has_property_assertion(intersection_types: Option<&[TAtomic]>, property_
 /// When the mixin type is a generic parameter (e.g., `@mixin T`), tries to resolve it
 /// using the outer_object's type_parameters.
 fn find_property_in_mixins<A>(
-    context: &mut Context<'_, '_, A>,
+    context: &Context<'_, '_, A>,
     class_metadata: &ClassLikeMetadata,
     outer_object: &TObject,
     mixins: &[TUnion],
@@ -1248,7 +1248,7 @@ where
 
 /// Searches for a property in a single mixin class.
 fn find_property_in_single_mixin<A>(
-    context: &mut Context<'_, '_, A>,
+    context: &Context<'_, '_, A>,
     mixin_class_name: Word,
     prop_name: Word,
 ) -> Option<ResolvedProperty>
@@ -1281,7 +1281,7 @@ where
 /// Searches for a property in intersection types of a named object.
 /// For example, if the type is `Foo&Baz`, this will look for the property on `Baz`.
 fn find_property_in_intersection_types<A>(
-    context: &mut Context<'_, '_, A>,
+    context: &Context<'_, '_, A>,
     named_object: &TNamedObject,
     prop_name: Word,
 ) -> Option<ResolvedProperty>
