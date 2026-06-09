@@ -82,6 +82,7 @@ publish:
     # Note: the order of publishing is important, as some crates depend on others.
     cargo publish -p mago-bytes
     cargo publish -p mago-word
+    cargo publish -p mago-allocator
     cargo publish -p mago-casing
     cargo publish -p mago-php-version
     cargo publish -p mago-text-edit
