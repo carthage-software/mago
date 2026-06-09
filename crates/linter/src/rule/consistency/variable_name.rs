@@ -184,8 +184,8 @@ impl VariableNameRule {
                     ))
                     .with_help(format!(
                         "Consider renaming it to `${}` or `${}` to adhere to the naming convention.",
-                        to_camel_case(clean_name),
-                        to_snake_case(clean_name)
+                        String::from_utf8_lossy(&to_camel_case(clean_name)),
+                        String::from_utf8_lossy(&to_snake_case(clean_name))
                     )),
                 );
             }
@@ -203,7 +203,7 @@ impl VariableNameRule {
                     .with_note(format!("The variable name `{name}` does not follow camel naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
-                        to_camel_case(clean_name)
+                        String::from_utf8_lossy(&to_camel_case(clean_name))
                     )),
             );
         } else if !self.cfg.camel && !is_snake_case(clean_name) {
@@ -216,7 +216,7 @@ impl VariableNameRule {
                     .with_note(format!("The variable name `{name}` does not follow snake naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
-                        to_snake_case(clean_name)
+                        String::from_utf8_lossy(&to_snake_case(clean_name))
                     )),
             );
         }

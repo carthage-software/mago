@@ -653,6 +653,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::missing_asserts_for_indexing)]
     fn test_annotation_parsing() {
         let arena = LocalArena::new();
         let phpdoc = br#"/**

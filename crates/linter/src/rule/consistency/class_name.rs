@@ -108,14 +108,14 @@ impl LintRule for ClassNameRule {
                 .with_note(format!("The class name `{name}` does not follow class naming convention."))
                 .with_help(format!(
                     "Consider renaming it to `{}` to adhere to the naming convention.",
-                    to_class_case(name)
+                    String::from_utf8_lossy(&to_class_case(name))
                 ));
 
             issues.push(issue);
         }
 
         if class.modifiers.contains_abstract() && self.cfg.psr && !name_bytes.starts_with(b"Abstract") {
-            let suggested_name = format!("Abstract{}", to_class_case(name));
+            let suggested_name = format!("Abstract{}", String::from_utf8_lossy(&to_class_case(name)));
 
             issues.push(
                 Issue::new(

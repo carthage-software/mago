@@ -115,7 +115,7 @@ impl LintRule for InterfaceNameRule {
                     .with_note(format!("The interface name `{name}` does not follow class naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `{}` to adhere to the naming convention.",
-                        mago_casing::to_class_case(name)
+                        String::from_utf8_lossy(&mago_casing::to_class_case(name))
                     )),
             );
         }

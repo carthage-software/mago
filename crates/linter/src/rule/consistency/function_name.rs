@@ -121,8 +121,8 @@ impl LintRule for FunctionNameRule {
                     ))
                     .with_help(format!(
                         "Consider renaming it to `{}` or `{}` to adhere to the naming convention.",
-                        to_camel_case(name),
-                        to_snake_case(name)
+                        String::from_utf8_lossy(&to_camel_case(name)),
+                        String::from_utf8_lossy(&to_snake_case(name))
                     )),
                 );
             }
@@ -142,7 +142,7 @@ impl LintRule for FunctionNameRule {
                         .with_note(format!("The function name `{name}` does not follow camel naming convention."))
                         .with_help(format!(
                             "Consider renaming it to `{}` to adhere to the naming convention.",
-                            to_camel_case(name)
+                            String::from_utf8_lossy(&to_camel_case(name))
                         )),
                 );
             }
@@ -161,7 +161,7 @@ impl LintRule for FunctionNameRule {
                     .with_note(format!("The function name `{name}` does not follow snake naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `{}` to adhere to the naming convention.",
-                        to_snake_case(name)
+                        String::from_utf8_lossy(&to_snake_case(name))
                     )),
             );
         }

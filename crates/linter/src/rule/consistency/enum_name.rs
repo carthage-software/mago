@@ -112,7 +112,7 @@ impl LintRule for EnumNameRule {
                     .with_note(format!("The enum name `{name}` does not follow class naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `{}` to adhere to the naming convention.",
-                        to_class_case(name)
+                        String::from_utf8_lossy(&to_class_case(name))
                     )),
             );
         }

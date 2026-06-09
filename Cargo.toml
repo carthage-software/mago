@@ -195,7 +195,6 @@ hashbrown = "0.17.1"
 serde_norway = "0.9.42"
 toml = "1.0.3"
 regex = "1.11.0"
-cruet = "0.15.0"
 indicatif = { version = "0.18.0" }
 paste = "1.0.15"
 criterion = { package = "codspeed-criterion-compat", version = "4.5.0" }

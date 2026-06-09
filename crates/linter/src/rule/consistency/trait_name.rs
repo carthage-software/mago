@@ -114,7 +114,7 @@ impl LintRule for TraitNameRule {
                     .with_note(format!("The trait name `{name}` does not follow class naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `{}` to adhere to the naming convention.",
-                        mago_casing::to_class_case(name)
+                        String::from_utf8_lossy(&mago_casing::to_class_case(name))
                     )),
             );
         }

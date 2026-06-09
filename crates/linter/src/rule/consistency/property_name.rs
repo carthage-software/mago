@@ -169,8 +169,8 @@ impl PropertyNameRule {
                     ))
                     .with_help(format!(
                         "Consider renaming it to `${}` or `${}` to adhere to the naming convention.",
-                        to_camel_case(name_without_dollar),
-                        to_snake_case(name_without_dollar)
+                        String::from_utf8_lossy(&to_camel_case(name_without_dollar)),
+                        String::from_utf8_lossy(&to_snake_case(name_without_dollar))
                     )),
                 );
             }
@@ -188,7 +188,7 @@ impl PropertyNameRule {
                     .with_note(format!("The property name `{name}` does not follow camel naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
-                        to_camel_case(name_without_dollar)
+                        String::from_utf8_lossy(&to_camel_case(name_without_dollar))
                     )),
             );
         } else if !self.cfg.camel && !is_snake_case(name_without_dollar) {
@@ -201,7 +201,7 @@ impl PropertyNameRule {
                     .with_note(format!("The property name `{name}` does not follow snake naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
-                        to_snake_case(name_without_dollar)
+                        String::from_utf8_lossy(&to_snake_case(name_without_dollar))
                     )),
             );
         }

@@ -117,7 +117,7 @@ impl LintRule for ConstantNameRule {
                                 ))
                                 .with_help(format!(
                                     "Consider renaming it to `{}` to adhere to the naming convention.",
-                                    to_constant_case(name)
+                                    String::from_utf8_lossy(&to_constant_case(name))
                                 )),
                         );
                     }
@@ -140,7 +140,7 @@ impl LintRule for ConstantNameRule {
                                 ))
                                 .with_help(format!(
                                     "Consider renaming it to `{}` to adhere to the naming convention.",
-                                    to_constant_case(name)
+                                    String::from_utf8_lossy(&to_constant_case(name))
                                 )),
                         );
                     }
