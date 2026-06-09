@@ -232,7 +232,6 @@ dhat = "0.3"
 rust-embed = { version = "8.7.2", features = ["interpolate-folder-path", "include-exclude"] }
 bincode = { version = "2.0.1", features = ["serde"] }
 libc = "0.2.175"
-shell-words = "1.1.0"
 ryu = "1.0"
 itoa = "1.0"
 notify = "8.2"
