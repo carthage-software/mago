@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_database::file::FileId;
 use mago_span::HasSpan;
 use mago_span::Position;
@@ -7,14 +5,16 @@ use mago_span::Span;
 
 use crate::token::TypeTokenKind;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum SyntaxError {
     UnexpectedToken(FileId, u8, Position),
     UnrecognizedToken(FileId, u8, Position),
     UnexpectedEndOfFile(FileId, Position),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ParseError {
     SyntaxError(SyntaxError),
     UnexpectedEndOfFile(FileId, Vec<TypeTokenKind>, Position),

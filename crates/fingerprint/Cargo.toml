@@ -16,6 +16,10 @@ mago-span = { workspace = true }
 foldhash = { workspace = true }
 memchr = { workspace = true }
 
+[features]
+default = []
+serde = []
+
 [dev-dependencies]
 mago-database = { workspace = true }
 mago-allocator = { workspace = true }

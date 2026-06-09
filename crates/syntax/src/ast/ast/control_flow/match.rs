@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -10,7 +9,8 @@ use crate::ast::sequence::TokenSeparatedSequence;
 use crate::ast::sequence::TokenSeparatedSequenceExt;
 
 /// Represents a PHP match expression.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Match<'arena> {
     pub r#match: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -22,15 +22,17 @@ pub struct Match<'arena> {
 }
 
 /// Represents a single arm within a match expression.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum MatchArm<'arena> {
     Expression(MatchExpressionArm<'arena>),
     Default(MatchDefaultArm<'arena>),
 }
 
 /// Represents a single arm within a match statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MatchExpressionArm<'arena> {
     pub conditions: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
     pub arrow: Span,
@@ -38,7 +40,8 @@ pub struct MatchExpressionArm<'arena> {
 }
 
 /// Represents the default arm within a match statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MatchDefaultArm<'arena> {
     pub default: Keyword<'arena>,
     pub comma: Option<Span>,

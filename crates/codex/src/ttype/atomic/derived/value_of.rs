@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use mago_word::Word;
 use mago_word::concat_word;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
@@ -15,7 +13,8 @@ use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::get_array_parameters;
 use crate::ttype::union::TUnion;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TValueOf(Arc<TUnion>);
 
 impl TValueOf {

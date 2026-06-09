@@ -1,11 +1,9 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 /// Represents the safety of applying a specific edit.
 ///
 /// Ordered from most safe to least safe.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 #[derive(Default)]
 #[non_exhaustive]
 pub enum Safety {
@@ -22,7 +20,8 @@ pub enum Safety {
 }
 
 /// Represents a range in the source text identified by byte offsets.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TextRange {
     pub start: u32,
     pub end: u32,
@@ -114,7 +113,8 @@ where
 ///
 /// This struct holds the data for a modification but does not execute it.
 /// It always refers to the byte offsets in the **ORIGINAL** source code.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TextEdit {
     /// The range in the original text to be replaced.
     pub range: TextRange,
@@ -163,7 +163,8 @@ impl TextEdit {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub enum ApplyResult {
     /// The edits were successfully applied.

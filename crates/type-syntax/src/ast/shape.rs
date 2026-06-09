@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -10,8 +9,9 @@ use crate::ast::generics::GenericParameters;
 use crate::ast::identifier::Identifier;
 use crate::ast::keyword::Keyword;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum ShapeTypeKind {
     Array,
     NonEmptyArray,
@@ -20,7 +20,8 @@ pub enum ShapeTypeKind {
     NonEmptyList,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ShapeType<'arena> {
     pub kind: ShapeTypeKind,
     pub keyword: Keyword<'arena>,
@@ -30,7 +31,8 @@ pub struct ShapeType<'arena> {
     pub right_brace: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ShapeKey<'arena> {
     String {
         value: &'arena [u8],
@@ -48,21 +50,24 @@ pub enum ShapeKey<'arena> {
     },
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ShapeFieldKey<'arena> {
     pub key: ShapeKey<'arena>,
     pub question_mark: Option<Span>,
     pub colon: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ShapeField<'arena> {
     pub key: Option<ShapeFieldKey<'arena>>,
     pub value: &'arena Type<'arena>,
     pub comma: Option<Span>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ShapeAdditionalFields<'arena> {
     pub ellipsis: Span,
     pub parameters: Option<GenericParameters<'arena>>,

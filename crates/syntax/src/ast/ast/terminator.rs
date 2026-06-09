@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -10,8 +9,9 @@ use crate::ast::ast::tag::OpeningTag;
 /// A statement terminator.
 ///
 /// A PHP statement can be terminated with a semicolon `;` or a closing tag `?>`.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Terminator<'arena> {
     /// A semicolon.
     Semicolon(Span),

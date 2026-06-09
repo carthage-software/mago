@@ -1,11 +1,10 @@
-use serde::Deserialize;
-use serde::Serialize;
 use strum::Display;
 
 /// Categorizes the type of PHP name being referenced, primarily for alias
 /// resolution and determining naming rules (like case sensitivity).
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum NameKind {

@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -9,8 +8,9 @@ use crate::ast::ast::expression::Expression;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Construct<'arena> {
     Isset(IssetConstruct<'arena>),
     Empty(EmptyConstruct<'arena>),
@@ -24,7 +24,8 @@ pub enum Construct<'arena> {
     Die(DieConstruct<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IssetConstruct<'arena> {
     pub isset: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -32,7 +33,8 @@ pub struct IssetConstruct<'arena> {
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct EmptyConstruct<'arena> {
     pub empty: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -40,7 +42,8 @@ pub struct EmptyConstruct<'arena> {
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct EvalConstruct<'arena> {
     pub eval: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -48,43 +51,50 @@ pub struct EvalConstruct<'arena> {
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IncludeConstruct<'arena> {
     pub include: Keyword<'arena>,
     pub value: &'arena Expression<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IncludeOnceConstruct<'arena> {
     pub include_once: Keyword<'arena>,
     pub value: &'arena Expression<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RequireConstruct<'arena> {
     pub require: Keyword<'arena>,
     pub value: &'arena Expression<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RequireOnceConstruct<'arena> {
     pub require_once: Keyword<'arena>,
     pub value: &'arena Expression<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PrintConstruct<'arena> {
     pub print: Keyword<'arena>,
     pub value: &'arena Expression<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ExitConstruct<'arena> {
     pub exit: Keyword<'arena>,
     pub arguments: Option<ArgumentList<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct DieConstruct<'arena> {
     pub die: Keyword<'arena>,
     pub arguments: Option<ArgumentList<'arena>>,

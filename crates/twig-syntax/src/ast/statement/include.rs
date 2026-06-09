@@ -1,12 +1,11 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::Keyword;
 use crate::ast::expression::Expression;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IgnoreMissingClause<'arena> {
     pub ignore_keyword: Keyword<'arena>,
     pub missing_keyword: Keyword<'arena>,
@@ -18,7 +17,8 @@ impl HasSpan for IgnoreMissingClause<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct WithExpressionClause<'arena> {
     pub with_keyword: Keyword<'arena>,
     pub variables: Expression<'arena>,
@@ -30,7 +30,8 @@ impl HasSpan for WithExpressionClause<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Include<'arena> {
     pub open_tag: Span,
     pub keyword: Keyword<'arena>,

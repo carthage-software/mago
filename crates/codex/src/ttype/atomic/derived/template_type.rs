@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 
@@ -20,7 +17,8 @@ use crate::ttype::get_specialized_template_type;
 use crate::ttype::union::TUnion;
 
 /// The `template-type<Object, ClassName, TemplateName>` utility type.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TTemplateType {
     object: Arc<TUnion>,
     class_name: Arc<TUnion>,

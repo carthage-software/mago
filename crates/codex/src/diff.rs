@@ -1,7 +1,5 @@
 use foldhash::HashMap;
 use foldhash::HashSet;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_database::file::FileId;
 
@@ -31,7 +29,8 @@ pub type DeletionRange = (usize, usize);
 /// (signature, body, modifiers, attributes) produces a different hash, triggering re-analysis.
 ///
 /// Provides a comprehensive API for modification and querying following established conventions.
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CodebaseDiff {
     /// Set of `(Symbol, Member)` pairs whose fingerprint hash is UNCHANGED.
     /// These symbols can be safely skipped during re-analysis.

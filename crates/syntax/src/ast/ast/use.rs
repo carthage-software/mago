@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_database::file::FileId;
@@ -13,15 +12,17 @@ use crate::ast::ast::terminator::Terminator;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::ast::sequence::TokenSeparatedSequenceExt;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Use<'arena> {
     pub r#use: Keyword<'arena>,
     pub items: UseItems<'arena>,
     pub terminator: Terminator<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum UseItems<'arena> {
     Sequence(UseItemSequence<'arena>),
     TypedSequence(TypedUseItemSequence<'arena>),
@@ -29,27 +30,31 @@ pub enum UseItems<'arena> {
     MixedList(MixedUseItemList<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum UseType<'arena> {
     Function(Keyword<'arena>),
     Const(Keyword<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct UseItemSequence<'arena> {
     pub file_id: FileId,
     pub start: Position,
     pub items: TokenSeparatedSequence<'arena, UseItem<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TypedUseItemSequence<'arena> {
     pub r#type: UseType<'arena>,
     pub items: TokenSeparatedSequence<'arena, UseItem<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TypedUseItemList<'arena> {
     pub r#type: UseType<'arena>,
     pub namespace: Identifier<'arena>,
@@ -59,7 +64,8 @@ pub struct TypedUseItemList<'arena> {
     pub right_brace: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MixedUseItemList<'arena> {
     pub namespace: Identifier<'arena>,
     pub namespace_separator: Span,
@@ -68,19 +74,22 @@ pub struct MixedUseItemList<'arena> {
     pub right_brace: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MaybeTypedUseItem<'arena> {
     pub r#type: Option<UseType<'arena>>,
     pub item: UseItem<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct UseItem<'arena> {
     pub name: Identifier<'arena>,
     pub alias: Option<UseItemAlias<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct UseItemAlias<'arena> {
     pub r#as: Keyword<'arena>,
     pub identifier: LocalIdentifier<'arena>,

@@ -1,7 +1,5 @@
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -14,7 +12,8 @@ use crate::metadata::version_constraint::VersionConstraint;
 use crate::ttype::atomic::TAtomic;
 use crate::visibility::Visibility;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct ClassLikeConstantMetadata {
     pub attributes: Vec<AttributeMetadata>,

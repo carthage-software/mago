@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -26,7 +24,8 @@ use crate::ast::ast::terminator::Terminator;
 ///
 /// ?>
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Goto<'arena> {
     pub goto: Keyword<'arena>,
     pub label: LocalIdentifier<'arena>,
@@ -42,7 +41,8 @@ pub struct Goto<'arena> {
 ///
 /// foo:
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Label<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub colon: Span,

@@ -11,8 +11,6 @@ use mago_syntax::ast::Expression;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -32,8 +30,9 @@ pub struct TaintedDataToSinkRule {
     cfg: TaintedDataToSinkConfig,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, Eq, PartialEq, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct TaintedDataToSinkConfig {
     pub level: Level,
     pub known_sink_functions: HashSet<String>,

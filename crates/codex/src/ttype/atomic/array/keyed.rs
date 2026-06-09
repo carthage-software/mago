@@ -1,9 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
@@ -17,7 +14,8 @@ use crate::ttype::union::TUnion;
 ///
 /// Corresponds to `array<TKey, TValue>` or `array{'key': TVal, 1: TVal2 ...}` shape.
 #[allow(clippy::derived_hash_with_manual_eq)]
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, Eq, Hash, PartialOrd, Ord, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TKeyedArray {
     /// Specific types known for certain keys (`ArrayKey`). The bool indicates if the element is optional.
     pub known_items: Option<BTreeMap<ArrayKey, (bool, TUnion)>>,

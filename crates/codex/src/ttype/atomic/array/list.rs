@@ -1,9 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
@@ -16,7 +13,8 @@ use crate::ttype::union::TUnion;
 /// Metadata for a PHP array analyzed as a list (vector-like).
 /// Corresponds to `list<TValue>` or `array{T0, T1, ...}` list-shape.
 #[allow(clippy::derived_hash_with_manual_eq)]
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TList {
     /// The general type of elements in the list (`TValue` in `list<TValue>`).
     pub element_type: Arc<TUnion>,

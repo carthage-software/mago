@@ -1,20 +1,20 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::keyword::Keyword;
 use crate::ast::literal::LiteralIntType;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum IntOrKeyword<'arena> {
     NegativeInt { minus: Span, int: LiteralIntType<'arena> },
     Int(LiteralIntType<'arena>),
     Keyword(Keyword<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IntRangeType<'arena> {
     pub keyword: Keyword<'arena>,
     pub less_than: Span,

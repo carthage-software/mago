@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::word;
 
@@ -8,7 +5,8 @@ use crate::ttype::TType;
 
 /// Represents PHP's boolean type system, including the general `bool` type
 /// and the literal `true` and `false` types.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(transparent)]
 pub struct TBool {
     pub value: Option<bool>,

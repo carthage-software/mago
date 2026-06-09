@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax_core::ast::Sequence;
@@ -7,13 +5,15 @@ use mago_syntax_core::ast::Sequence;
 use crate::ast::Keyword;
 use crate::ast::ShapeField;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ObjectType<'arena> {
     pub keyword: Keyword<'arena>,
     pub properties: Option<ObjectProperties<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ObjectProperties<'arena> {
     pub left_brace: Span,
     pub fields: Sequence<'arena, ShapeField<'arena>>,

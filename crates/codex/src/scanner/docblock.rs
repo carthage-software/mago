@@ -26,7 +26,6 @@ use mago_docblock::tag::parse_where_tag;
 use mago_docblock::tag::split_tag_content;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
-use serde::Serialize;
 
 use mago_docblock::document::Element;
 use mago_docblock::document::Tag;
@@ -38,7 +37,8 @@ use mago_span::Span;
 
 use crate::scanner::Context;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ClassLikeDocblockComment {
     pub span: Span,
     pub is_deprecated: bool,
@@ -65,7 +65,8 @@ pub struct ClassLikeDocblockComment {
     pub mixins: Vec<TypeString>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FunctionLikeDocblockComment {
     pub span: Span,
     pub is_deprecated: bool,
@@ -92,7 +93,8 @@ pub struct FunctionLikeDocblockComment {
     pub unchecked: bool,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PropertyDocblockComment {
     pub span: Span,
     pub type_string: Option<TypeString>,
@@ -102,7 +104,8 @@ pub struct PropertyDocblockComment {
     pub is_readonly: bool,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConstantDocblockComment {
     pub span: Span,
     pub type_string: Option<TypeString>,
@@ -112,7 +115,8 @@ pub struct ConstantDocblockComment {
     pub is_final: bool,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[allow(clippy::struct_field_names)]
 pub struct TraitUseDocblockComment {
     pub template_extends: Vec<TypeString>,
@@ -120,7 +124,8 @@ pub struct TraitUseDocblockComment {
     pub template_use: Vec<TypeString>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PropertyHookDocblockComment {
     pub span: Span,
     pub param_type_string: Option<ParameterTag>,

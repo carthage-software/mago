@@ -1,18 +1,18 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::identifier::Identifier;
 use crate::ast::keyword::Keyword;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum AliasName<'arena> {
     Identifier(Identifier<'arena>),
     Keyword(Keyword<'arena>),
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct AliasReferenceType<'arena> {
     pub exclamation: Span,
     pub class: Identifier<'arena>,

@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -7,8 +6,9 @@ use mago_span::Span;
 use crate::ast::Keyword;
 use crate::ast::expression::Expression;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum BinaryOperator<'arena> {
     Addition(Span),
     Subtraction(Span),
@@ -108,7 +108,8 @@ impl HasSpan for BinaryOperator<'_> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Binary<'arena> {
     pub lhs: &'arena Expression<'arena>,
     pub operator: BinaryOperator<'arena>,

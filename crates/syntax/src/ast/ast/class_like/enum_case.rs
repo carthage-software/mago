@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -11,7 +10,8 @@ use crate::ast::ast::keyword::Keyword;
 use crate::ast::ast::terminator::Terminator;
 use crate::ast::sequence::Sequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct EnumCase<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub case: Keyword<'arena>,
@@ -19,19 +19,22 @@ pub struct EnumCase<'arena> {
     pub terminator: Terminator<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum EnumCaseItem<'arena> {
     Unit(EnumCaseUnitItem<'arena>),
     Backed(EnumCaseBackedItem<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct EnumCaseUnitItem<'arena> {
     pub name: LocalIdentifier<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct EnumCaseBackedItem<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub equals: Span,

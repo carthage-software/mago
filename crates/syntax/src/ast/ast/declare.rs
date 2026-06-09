@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -21,7 +20,8 @@ use crate::ast::sequence::TokenSeparatedSequence;
 ///
 /// declare(strict_types=1);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Declare<'arena> {
     pub declare: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -33,7 +33,8 @@ pub struct Declare<'arena> {
 /// Represents a single name-value pair within a declare statement.
 ///
 /// Example: `strict_types=1`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct DeclareItem<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub equal: Span,
@@ -41,8 +42,9 @@ pub struct DeclareItem<'arena> {
 }
 
 /// Represents the body of a declare statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum DeclareBody<'arena> {
     Statement(&'arena Statement<'arena>),
     ColonDelimited(DeclareColonDelimitedBody<'arena>),
@@ -58,7 +60,8 @@ pub enum DeclareBody<'arena> {
 ///   echo "Goodbye, world!";
 /// enddeclare;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct DeclareColonDelimitedBody<'arena> {
     pub colon: Span,
     pub statements: Sequence<'arena, Statement<'arena>>,

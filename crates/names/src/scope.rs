@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 
 use foldhash::HashMap;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_syntax::ast::Use;
 use mago_syntax::ast::UseItems;
@@ -49,7 +47,8 @@ pub(crate) fn concat_with_sep(parts: &[&[u8]], sep: u8) -> Vec<u8> {
 ///
 /// Aliases are stored case-insensitively (keys in the maps are lowercase)
 /// but resolve to the original case-sensitive FQN.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NamespaceScope {
     /// The fully qualified name of the current namespace context (e.g., "App\\Http\\Controllers").
     /// `None` indicates the global namespace.

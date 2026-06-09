@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -12,38 +11,44 @@ use crate::ast::ast::terminator::Terminator;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TraitUse<'arena> {
     pub r#use: Keyword<'arena>,
     pub trait_names: TokenSeparatedSequence<'arena, Identifier<'arena>>,
     pub specification: TraitUseSpecification<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum TraitUseSpecification<'arena> {
     Abstract(TraitUseAbstractSpecification<'arena>),
     Concrete(TraitUseConcreteSpecification<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TraitUseAbstractSpecification<'arena>(pub Terminator<'arena>);
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TraitUseConcreteSpecification<'arena> {
     pub left_brace: Span,
     pub adaptations: Sequence<'arena, TraitUseAdaptation<'arena>>,
     pub right_brace: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum TraitUseAdaptation<'arena> {
     Precedence(TraitUsePrecedenceAdaptation<'arena>),
     Alias(TraitUseAliasAdaptation<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TraitUsePrecedenceAdaptation<'arena> {
     pub method_reference: TraitUseAbsoluteMethodReference<'arena>,
     pub insteadof: Keyword<'arena>,
@@ -51,7 +56,8 @@ pub struct TraitUsePrecedenceAdaptation<'arena> {
     pub terminator: Terminator<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TraitUseAliasAdaptation<'arena> {
     pub method_reference: TraitUseMethodReference<'arena>,
     pub r#as: Keyword<'arena>,
@@ -60,14 +66,16 @@ pub struct TraitUseAliasAdaptation<'arena> {
     pub terminator: Terminator<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum TraitUseMethodReference<'arena> {
     Identifier(LocalIdentifier<'arena>),
     Absolute(TraitUseAbsoluteMethodReference<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TraitUseAbsoluteMethodReference<'arena> {
     pub trait_name: Identifier<'arena>,
     pub double_colon: Span,

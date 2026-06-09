@@ -2,10 +2,11 @@ use std::fmt;
 use std::str::FromStr;
 
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
+#[cfg(feature = "serde")]
 use serde::Serializer;
+#[cfg(feature = "serde")]
 use serde::de;
+#[cfg(feature = "serde")]
 use serde::de::Deserializer;
 
 use mago_syntax_core::part_of_identifier;
@@ -160,7 +161,8 @@ impl fmt::Display for Path {
     }
 }
 
-impl<'de> Deserialize<'de> for NamespacePath {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for NamespacePath {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -169,7 +171,8 @@ impl<'de> Deserialize<'de> for NamespacePath {
     }
 }
 
-impl<'de> Deserialize<'de> for SymbolSelector {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for SymbolSelector {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -178,7 +181,8 @@ impl<'de> Deserialize<'de> for SymbolSelector {
     }
 }
 
-impl<'de> Deserialize<'de> for Path {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Path {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -187,7 +191,8 @@ impl<'de> Deserialize<'de> for Path {
     }
 }
 
-impl Serialize for NamespacePath {
+#[cfg(feature = "serde")]
+impl serde::Serialize for NamespacePath {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -196,7 +201,8 @@ impl Serialize for NamespacePath {
     }
 }
 
-impl Serialize for SymbolSelector {
+#[cfg(feature = "serde")]
+impl serde::Serialize for SymbolSelector {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -205,7 +211,8 @@ impl Serialize for SymbolSelector {
     }
 }
 
-impl Serialize for Path {
+#[cfg(feature = "serde")]
+impl serde::Serialize for Path {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

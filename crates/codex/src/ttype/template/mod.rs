@@ -1,8 +1,6 @@
 use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_span::Span;
 use mago_word::Word;
@@ -19,7 +17,8 @@ pub mod variance;
 ///
 /// This struct pairs a `GenericParent` (identifying where the template is defined)
 /// with a `TUnion` (the constraint type for the template parameter).
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GenericTemplate {
     /// The entity (class or function) where this template parameter is defined.
     pub defining_entity: GenericParent,

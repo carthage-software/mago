@@ -2,37 +2,48 @@ use std::fmt;
 
 use foldhash::HashMap;
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
+#[cfg(feature = "serde")]
 use serde::de;
+#[cfg(feature = "serde")]
 use serde::de::Deserializer;
+#[cfg(feature = "serde")]
 use serde::de::MapAccess;
+#[cfg(feature = "serde")]
 use serde::de::Visitor;
+#[cfg(feature = "serde")]
 use serde::ser::SerializeStruct;
+#[cfg(feature = "serde")]
 use serde::ser::Serializer;
+
+#[cfg(feature = "serde")]
+use serde::Deserialize;
 
 use crate::path::NamespacePath;
 use crate::path::Path;
+#[cfg(feature = "serde")]
 use crate::path::is_valid_identifier_part;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct Settings {
     pub mode: GuardMode,
     pub perimeter: PerimeterSettings,
     pub structural: StructuralSettings,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct PerimeterSettings {
     pub layers: HashMap<String, Vec<Path>>,
     pub layering: Vec<NamespacePath>,
     pub rules: Vec<PerimeterRule>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
 pub struct PerimeterRule {
     pub namespace: NamespacePath,
     pub permit: Vec<PermittedDependency>,
@@ -46,8 +57,9 @@ pub enum PermittedDependency {
 }
 
 /// Represents the specific types of symbols allowed from a path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 pub enum PermittedDependencyKind {
     ClassLike,
     Function,
@@ -55,16 +67,18 @@ pub enum PermittedDependencyKind {
     Attribute,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct StructuralSettings {
     /// A list of structural rules to enforce across the codebase.
     pub rules: Vec<StructuralRule>,
 }
 
 /// Represents a single structural enforcement rule from `[[guard.structural.rules]]`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct StructuralRule {
     /// The namespace pattern this rule applies to.
     pub on: String,
@@ -94,8 +108,9 @@ pub struct StructuralRule {
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 pub enum StructuralSymbolKind {
     ClassLike,
     Class,
@@ -107,8 +122,9 @@ pub enum StructuralSymbolKind {
 }
 
 /// Represents a logical constraint for `implement`, `extend`, or `use_traits`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, JsonSchema)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 #[schemars(untagged)]
 pub enum StructuralInheritanceConstraint {
     /// An OR of ANDs, e.g., `[["A", "B"], ["C"]]`
@@ -155,7 +171,8 @@ impl StructuralSymbolKind {
     }
 }
 
-impl<'de> Deserialize<'de> for PermittedDependency {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for PermittedDependency {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -181,7 +198,7 @@ impl<'de> Deserialize<'de> for PermittedDependency {
             where
                 M: MapAccess<'de>,
             {
-                #[derive(Deserialize)]
+                #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
                 struct DetailedHelper {
                     path: Path,
                     kinds: Vec<PermittedDependencyKind>,
@@ -197,14 +214,15 @@ impl<'de> Deserialize<'de> for PermittedDependency {
     }
 }
 
-impl<'de> Deserialize<'de> for StructuralInheritanceConstraint {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for StructuralInheritanceConstraint {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         // Helper enum to let serde handle the shape detection (string vs array vs array of arrays).
-        #[derive(Deserialize)]
-        #[serde(untagged)]
+        #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+        #[cfg_attr(feature = "serde", serde(untagged))]
         enum Untagged {
             AnyOfAllOf(Vec<Vec<String>>),
             AllOf(Vec<String>),
@@ -245,7 +263,8 @@ impl<'de> Deserialize<'de> for StructuralInheritanceConstraint {
     }
 }
 
-impl Serialize for PermittedDependency {
+#[cfg(feature = "serde")]
+impl serde::Serialize for PermittedDependency {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -361,8 +380,9 @@ impl Settings {
 }
 
 /// Specifies which guard modes to run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 pub enum GuardMode {
     /// Run both structural and perimeter guards (default)
     #[default]
@@ -420,7 +440,7 @@ mod tests {
         assert_eq!(none.to_string(), "<nothing>");
     }
 
-    #[derive(Deserialize)]
+    #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
     struct Wrapper {
         constraint: StructuralInheritanceConstraint,
     }

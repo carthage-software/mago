@@ -1,17 +1,17 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::LiteralIntOrFloatType;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NegatedType<'arena> {
     pub minus: Span,
     pub number: LiteralIntOrFloatType<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PositedType<'arena> {
     pub plus: Span,
     pub number: LiteralIntOrFloatType<'arena>,

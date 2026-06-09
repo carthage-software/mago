@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -22,7 +21,8 @@ use crate::ast::sequence::TokenSeparatedSequence;
 ///   echo $i;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct For<'arena> {
     pub r#for: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -36,8 +36,9 @@ pub struct For<'arena> {
 }
 
 /// Represents the body of a for statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum ForBody<'arena> {
     Statement(&'arena Statement<'arena>),
     ColonDelimited(ForColonDelimitedBody<'arena>),
@@ -54,7 +55,8 @@ pub enum ForBody<'arena> {
 ///   echo $i;
 /// endfor;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ForColonDelimitedBody<'arena> {
     pub colon: Span,
     pub statements: Sequence<'arena, Statement<'arena>>,

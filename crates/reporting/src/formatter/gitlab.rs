@@ -1,7 +1,5 @@
 use std::io::Write;
 
-use serde::Serialize;
-
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::HasFileId;
@@ -13,7 +11,7 @@ use crate::formatter::Formatter;
 use crate::formatter::FormatterConfig;
 use crate::formatter::utils::long_message;
 
-#[derive(Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 struct CodeQualityIssue<'issue> {
     description: String,
     check_name: &'issue str,
@@ -22,19 +20,19 @@ struct CodeQualityIssue<'issue> {
     location: Location,
 }
 
-#[derive(Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 struct Location {
     path: String,
     positions: Positions,
 }
 
-#[derive(Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 struct Positions {
     begin: Position,
     end: Position,
 }
 
-#[derive(Serialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 struct Position {
     line: u32,
     column: u32,

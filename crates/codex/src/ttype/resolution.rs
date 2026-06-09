@@ -1,8 +1,6 @@
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::ttype::template::GenericTemplate;
 use crate::ttype::union::TUnion;
@@ -12,7 +10,8 @@ use crate::ttype::union::TUnion;
 /// This context typically includes the definitions of template parameters available in the current scope
 /// (e.g., from class or function `@template` tags) and any concrete types that these templates
 /// have been resolved to (e.g., when a generic class is instantiated or a generic method is called).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypeResolutionContext {
     /// Definitions of template types available in this context, including their constraints.
     template_definitions: WordMap<Vec<GenericTemplate>>,

@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 
@@ -12,7 +9,8 @@ use crate::ttype::atomic::TAtomic;
 ///
 /// This type is created when the analyzer encounters a conditional like
 /// `if (property_exists($obj, 'foo'))` and narrows the type within that block.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TObjectHasProperty {
     /// The name of the property that is known to exist.
     pub property: Word,

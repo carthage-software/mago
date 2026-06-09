@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -15,8 +14,9 @@ use crate::ast::ast::expression::Expression;
 /// ${foo}
 /// $$foo
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Variable<'arena> {
     Direct(DirectVariable<'arena>),
     Indirect(IndirectVariable<'arena>),
@@ -32,7 +32,8 @@ pub enum Variable<'arena> {
 /// ```php
 /// $foo
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct DirectVariable<'arena> {
     pub span: Span,
     pub name: &'arena [u8],
@@ -49,7 +50,8 @@ pub struct DirectVariable<'arena> {
 /// ```php
 /// ${foo}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IndirectVariable<'arena> {
     pub dollar_left_brace: Span,
     pub expression: &'arena Expression<'arena>,
@@ -67,7 +69,8 @@ pub struct IndirectVariable<'arena> {
 /// $${foo}
 /// $$$foo
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NestedVariable<'arena> {
     pub dollar: Span,
     pub variable: &'arena Variable<'arena>,

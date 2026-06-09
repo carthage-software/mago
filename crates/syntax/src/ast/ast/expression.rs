@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_php_version::PHPVersion;
@@ -47,15 +46,17 @@ use crate::ast::ast::variable::Variable;
 use crate::ast::ast::r#yield::Yield;
 use crate::ast::node::NodeKind;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Parenthesized<'arena> {
     pub left_parenthesis: Span,
     pub expression: &'arena Expression<'arena>,
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 #[non_exhaustive]
 pub enum Expression<'arena> {
     Binary(Binary<'arena>),

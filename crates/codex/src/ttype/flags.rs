@@ -1,11 +1,9 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 /// Flags representing various properties of a type union.
 ///
 /// This replaces 9 individual boolean fields with a compact 16-bit representation,
 /// reducing memory usage from 9 bytes to 2 bytes per TUnion instance.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UnionFlags(u16);
 
 impl UnionFlags {

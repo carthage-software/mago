@@ -1,38 +1,41 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::Type;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ParenthesizedType<'arena> {
     pub left_parenthesis: Span,
     pub inner: &'arena Type<'arena>,
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct UnionType<'arena> {
     pub left: &'arena Type<'arena>,
     pub pipe: Span,
     pub right: &'arena Type<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IntersectionType<'arena> {
     pub left: &'arena Type<'arena>,
     pub ampersand: Span,
     pub right: &'arena Type<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NullableType<'arena> {
     pub question_mark: Span,
     pub inner: &'arena Type<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TrailingPipeType<'arena> {
     pub inner: &'arena Type<'arena>,
     pub pipe: Span,

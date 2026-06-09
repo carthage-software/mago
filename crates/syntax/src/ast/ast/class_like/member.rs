@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -14,8 +13,9 @@ use crate::ast::ast::expression::Expression;
 use crate::ast::ast::identifier::LocalIdentifier;
 use crate::ast::ast::variable::Variable;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum ClassLikeMember<'arena> {
     TraitUse(TraitUse<'arena>),
     Constant(ClassLikeConstant<'arena>),
@@ -24,8 +24,9 @@ pub enum ClassLikeMember<'arena> {
     Method(Method<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum ClassLikeMemberSelector<'arena> {
     Identifier(LocalIdentifier<'arena>),
     Variable(Variable<'arena>),
@@ -33,15 +34,17 @@ pub enum ClassLikeMemberSelector<'arena> {
     Missing(Span),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum ClassLikeConstantSelector<'arena> {
     Identifier(LocalIdentifier<'arena>),
     Expression(ClassLikeMemberExpressionSelector<'arena>),
     Missing(Span),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ClassLikeMemberExpressionSelector<'arena> {
     pub left_brace: Span,
     pub expression: &'arena Expression<'arena>,

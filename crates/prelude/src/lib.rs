@@ -19,16 +19,17 @@
 //!     - The main application uses `include_bytes!` to embed the `prelude.bin` file.
 //!     - It calls `Prelude::decode()` on the bytes to instantly reconstruct the prelude in memory.
 
+#[cfg(feature = "serde")]
 use bincode::config::standard;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
 
+#[cfg(feature = "serde")]
 use crate::error::PreludeError;
 
+#[cfg(feature = "serde")]
 pub mod error;
 
 #[cfg(feature = "build")]
@@ -38,7 +39,8 @@ pub mod build;
 ///
 /// This struct holds all the necessary, fully-analyzed data for PHP's core library,
 /// allowing for instant startup without needing to parse and analyze stubs at runtime.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Prelude {
     /// The database of all built-in PHP files.
     pub database: Database<'static>,
@@ -58,6 +60,7 @@ impl Prelude {
     ///
     /// Returns a [`PreludeError`] if deserialization fails due to corrupted or
     /// incompatible binary data.
+    #[cfg(feature = "serde")]
     pub fn decode(bytes: &[u8]) -> Result<Self, PreludeError> {
         let (prelude, _) = bincode::serde::decode_from_slice(bytes, standard())?;
 

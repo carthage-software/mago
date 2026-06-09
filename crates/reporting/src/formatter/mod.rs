@@ -13,10 +13,13 @@ pub mod code_count;
 pub mod count;
 pub mod emacs;
 pub mod github;
+#[cfg(feature = "serde")]
 pub mod gitlab;
+#[cfg(feature = "serde")]
 pub mod json;
 pub mod medium;
 pub mod rich;
+#[cfg(feature = "serde")]
 pub mod sarif;
 pub mod short;
 pub mod utils;
@@ -78,8 +81,10 @@ pub enum ReportingFormat {
     /// GitHub Actions format.
     Github,
     /// GitLab Code Quality format.
+    #[cfg(feature = "serde")]
     Gitlab,
     /// JSON format.
+    #[cfg(feature = "serde")]
     Json,
     /// Issue count by severity.
     Count,
@@ -90,6 +95,7 @@ pub enum ReportingFormat {
     /// Emacs compilation mode format.
     Emacs,
     /// SARIF format (Static Analysis Results Interchange Format).
+    #[cfg(feature = "serde")]
     Sarif,
 }
 
@@ -108,13 +114,16 @@ pub(crate) fn dispatch_format(
         ReportingFormat::Medium => medium::MediumFormatter.format(writer, issues, database, config),
         ReportingFormat::Short => short::ShortFormatter.format(writer, issues, database, config),
         ReportingFormat::Ariadne => ariadne::AriadneFormatter.format(writer, issues, database, config),
+        #[cfg(feature = "serde")]
         ReportingFormat::Json => json::JsonFormatter.format(writer, issues, database, config),
         ReportingFormat::Github => github::GithubFormatter.format(writer, issues, database, config),
+        #[cfg(feature = "serde")]
         ReportingFormat::Gitlab => gitlab::GitlabFormatter.format(writer, issues, database, config),
         ReportingFormat::Checkstyle => checkstyle::CheckstyleFormatter.format(writer, issues, database, config),
         ReportingFormat::Emacs => emacs::EmacsFormatter.format(writer, issues, database, config),
         ReportingFormat::Count => count::CountFormatter.format(writer, issues, database, config),
         ReportingFormat::CodeCount => code_count::CodeCountFormatter.format(writer, issues, database, config),
+        #[cfg(feature = "serde")]
         ReportingFormat::Sarif => sarif::SarifFormatter.format(writer, issues, database, config),
     }
 }

@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -13,7 +11,8 @@ use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 
 /// Represents a parameter list in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FunctionLikeParameterList<'arena> {
     pub left_parenthesis: Span,
     pub parameters: TokenSeparatedSequence<'arena, FunctionLikeParameter<'arena>>,
@@ -23,7 +22,8 @@ pub struct FunctionLikeParameterList<'arena> {
 /// Represents a function-like parameter in PHP.
 ///
 /// Example: `int $foo`, `string &$bar`, `bool ...$baz`, `mixed $qux = null`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FunctionLikeParameter<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub modifiers: Sequence<'arena, Modifier<'arena>>,
@@ -36,7 +36,8 @@ pub struct FunctionLikeParameter<'arena> {
 }
 
 /// Represents the default value of a function-like parameter.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FunctionLikeParameterDefaultValue<'arena> {
     pub equals: Span,
     pub value: &'arena Expression<'arena>,

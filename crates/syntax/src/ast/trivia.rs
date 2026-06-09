@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -7,8 +6,9 @@ use mago_span::Span;
 use crate::ast::Sequence;
 
 /// Represents the kind of trivia.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum TriviaKind {
     WhiteSpace,
     SingleLineComment,
@@ -21,7 +21,8 @@ pub enum TriviaKind {
 ///
 /// A trivia is a piece of information that is not part of the syntax tree,
 /// such as comments and white spaces.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Trivia<'arena> {
     pub kind: TriviaKind,
     pub span: Span,

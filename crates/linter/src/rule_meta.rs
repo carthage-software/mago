@@ -1,9 +1,8 @@
-use serde::Serialize;
-
 use crate::category::Category;
 use crate::requirements::RuleRequirements;
 
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, PartialOrd, Serialize)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RuleMeta {
     pub name: &'static str,
     pub code: &'static str,
@@ -14,9 +13,10 @@ pub struct RuleMeta {
     pub requirements: RuleRequirements,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct RuleEntry {
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub meta: &'static RuleMeta,
     pub level: mago_reporting::Level,
 }

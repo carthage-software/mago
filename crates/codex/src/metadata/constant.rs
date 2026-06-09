@@ -1,7 +1,5 @@
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -18,7 +16,8 @@ use crate::ttype::union::TUnion;
 ///
 /// Represents a single constant declaration item, potentially within a grouped declaration,
 /// like `MAX_RETRIES = 3` in `const MAX_RETRIES = 3;` or `B = 2` in `const A = 1, B = 2;`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct ConstantMetadata {
     pub attributes: Vec<AttributeMetadata>,

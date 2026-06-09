@@ -17,4 +17,10 @@ mago-allocator = { workspace = true }
 mago-database = { workspace = true }
 mago-span = { workspace = true }
 memchr = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = []
+serde = [
+    "dep:serde",
+]

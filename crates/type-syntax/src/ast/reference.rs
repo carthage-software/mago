@@ -1,18 +1,18 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::generics::GenericParameters;
 use crate::ast::identifier::Identifier;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ReferenceType<'arena> {
     pub identifier: Identifier<'arena>,
     pub parameters: Option<GenericParameters<'arena>>,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum MemberReferenceSelector<'arena> {
     Wildcard(Span),
     Identifier(Identifier<'arena>),
@@ -20,19 +20,22 @@ pub enum MemberReferenceSelector<'arena> {
     EndsWith(Span, Identifier<'arena>),
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MemberReferenceType<'arena> {
     pub class: Identifier<'arena>,
     pub double_colon: Span,
     pub member: MemberReferenceSelector<'arena>,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct GlobalWildcardType<'arena> {
     pub selector: GlobalWildcardSelector<'arena>,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum GlobalWildcardSelector<'arena> {
     StartsWith(Identifier<'arena>, Span),
     EndsWith(Span, Identifier<'arena>),

@@ -2,8 +2,6 @@ use std::collections::BTreeMap;
 
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -27,7 +25,8 @@ use crate::visibility::Visibility;
 /// Contains metadata specific to methods defined within classes, interfaces, enums, or traits.
 ///
 /// This complements the more general `FunctionLikeMetadata`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct MethodMetadata {
     /// Marks whether this method is declared as `final`, preventing further overriding.
@@ -54,7 +53,8 @@ pub struct MethodMetadata {
 }
 
 /// Distinguishes between different kinds of callable constructs in PHP.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FunctionLikeKind {
     /// Represents a standard function declared in the global scope or a namespace (`function foo() {}`).
     Function,
@@ -66,7 +66,8 @@ pub enum FunctionLikeKind {
     ArrowFunction,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FunctionLikeMetadata {
     /// The kind of function-like structure this metadata represents.
     pub kind: FunctionLikeKind,

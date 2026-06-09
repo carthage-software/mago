@@ -15,9 +15,16 @@ workspace = true
 [dependencies]
 mago-syntax = { workspace = true }
 mago-span = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
 mago-allocator = { workspace = true }
 memchr = { workspace = true }
+
+[features]
+default = []
+serde = [
+    "dep:serde",
+    "mago-span/serde",
+]
 
 [dev-dependencies]
 mago-database = { workspace = true }

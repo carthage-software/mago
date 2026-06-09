@@ -1,10 +1,6 @@
 use std::str::FromStr;
 
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Deserializer;
-use serde::Serialize;
-use serde::Serializer;
 
 use crate::error::ParsingError;
 use crate::feature::Feature;
@@ -47,7 +43,8 @@ pub struct PHPVersion(u32);
 /// assert!(range.includes(PHPVersion::new(7, 2, 0))); // true
 /// assert!(!range.includes(PHPVersion::new(8, 0, 0))); // false
 /// ```
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, PartialOrd, Deserialize, Serialize, Default, Hash, JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, PartialOrd, Default, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct PHPVersionRange {
     pub min: Option<PHPVersion>,
     pub max: Option<PHPVersion>,
@@ -455,21 +452,23 @@ impl std::fmt::Display for PHPVersion {
     }
 }
 
-impl Serialize for PHPVersion {
+#[cfg(feature = "serde")]
+impl serde::Serialize for PHPVersion {
     #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
         serializer.serialize_str(&self.to_string())
     }
 }
 
-impl<'de> Deserialize<'de> for PHPVersion {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for PHPVersion {
     #[inline]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
 
@@ -608,6 +607,7 @@ mod tests {
         assert!(v_8_2_0.is_deprecated(Feature::DynamicProperties));
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_serde_serialize() {
         let v_7_4_0 = PHPVersion::new(7, 4, 0);
@@ -615,6 +615,7 @@ mod tests {
         assert_eq!(json, "\"7.4.0\"");
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_serde_deserialize() {
         let json = "\"7.4.0\"";
@@ -630,6 +631,7 @@ mod tests {
         assert_eq!(v.patch(), 0);
     }
 
+    #[cfg(feature = "serde")]
     #[test]
     fn test_serde_round_trip() {
         let original = PHPVersion::new(8, 1, 5);

@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 
@@ -9,7 +6,8 @@ use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::union::TUnion;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TReferenceMemberSelector {
     /// A wildcard member selector, e.g., `Foo::*`.
     Wildcard,
@@ -41,7 +39,8 @@ impl TReferenceMemberSelector {
 /// for `mixed`), so the global-reference form only expresses prefix or suffix
 /// matches. Bare identifiers in type positions remain class-like references —
 /// PHPDoc does not treat them as constant references.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TGlobalReferenceSelector {
     /// A global constant whose name starts with a given prefix, e.g. `FILTER_FLAG_*`.
     StartsWith(Word),
@@ -65,7 +64,8 @@ impl TGlobalReferenceSelector {
 ///
 /// These require context (e.g., symbol tables, codebase analysis) to be resolved
 /// into a concrete type (`TObject`, `TEnum`, constant type, etc.).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TReference {
     /// A reference to a symbol name (class, interface, trait, enum, ..etc).
     /// Example: `Foo`, `Bar<int>`, `T`.

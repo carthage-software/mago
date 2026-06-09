@@ -4,8 +4,6 @@ use std::collections::HashSet;
 
 use indoc::indoc;
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_database::file::HasFileId;
 use mago_reporting::Annotation;
@@ -41,8 +39,9 @@ pub struct NoRedundantUseRule {
     cfg: NoRedundantUseConfig,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct NoRedundantUseConfig {
     pub level: Level,
 }

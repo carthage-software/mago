@@ -185,7 +185,7 @@ foldhash = "0.2"
 serde_json = { version = "1.0.138" }
 serde = { version = "1.0", features = ["derive"] }
 strum = { version = "0.28", features = ["derive"] }
-ordered-float = { version = "5.0", default-features = false, features = ["serde"] }
+ordered-float = { version = "5.0", default-features = false }
 pretty_assertions = { version = "1.4.1" }
 codespan-reporting = { version = "0.13.1", features = ["serde", "serialization"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
@@ -250,21 +250,21 @@ temp-env = "0.3.6"
 mago-allocator = { workspace = true }
 mago-word = { workspace = true }
 mago-bytes = { workspace = true }
-mago-syntax = { workspace = true }
+mago-syntax = { workspace = true, features = ["serde"] }
 mago-syntax-core = { workspace = true }
 mago-reporting = { workspace = true }
 mago-database = { workspace = true }
-mago-linter = { workspace = true }
+mago-linter = { workspace = true, features = ["serde"] }
 mago-names = { workspace = true }
-mago-formatter = { workspace = true }
+mago-formatter = { workspace = true, features = ["serde"] }
 mago-text-edit = { workspace = true }
 mago-php-version = { workspace = true }
 mago-composer = { workspace = true }
-mago-prelude = { workspace = true }
+mago-prelude = { workspace = true, features = ["serde"] }
 mago-analyzer = { workspace = true }
 mago-algebra = { workspace = true }
 mago-codex = { workspace = true }
-mago-guard = { workspace = true }
+mago-guard = { workspace = true, features = ["serde"] }
 mago-orchestrator = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }

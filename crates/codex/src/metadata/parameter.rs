@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -13,7 +10,8 @@ use crate::misc::VariableIdentifier;
 ///
 /// This captures details like the parameter's name, type hint, attributes, default value,
 /// pass-by-reference status, variadic nature, and other PHP features like property promotion.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct FunctionLikeParameterMetadata {
     /// Attributes attached to the parameter declaration.

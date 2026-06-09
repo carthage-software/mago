@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 
@@ -13,7 +10,8 @@ use crate::ttype::atomic::TAtomic;
 use crate::ttype::union::TUnion;
 
 /// Represents a generic type parameter (`@template T of Bound`), potentially with intersection constraints.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TGenericParameter {
     /// The name of the template parameter (e.g., `T` in `@template T`).
     pub parameter_name: Word,

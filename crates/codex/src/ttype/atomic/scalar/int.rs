@@ -13,9 +13,6 @@ use std::ops::Shl;
 use std::ops::Shr;
 use std::ops::Sub;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::i64_word;
@@ -27,7 +24,8 @@ use crate::ttype::atomic::scalar::TScalar;
 
 /// Represents an integer type in a static analysis context, which can be either a
 /// specific known value or a range of possible values.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub enum TInteger {
     /// A specific, known integer value (e.g., `5`, `-100`).

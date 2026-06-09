@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -8,21 +7,24 @@ use crate::ast::ast::argument::PartialArgumentList;
 use crate::ast::ast::class_like::member::ClassLikeMemberSelector;
 use crate::ast::ast::expression::Expression;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum PartialApplication<'arena> {
     Function(FunctionPartialApplication<'arena>),
     Method(MethodPartialApplication<'arena>),
     StaticMethod(StaticMethodPartialApplication<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FunctionPartialApplication<'arena> {
     pub function: &'arena Expression<'arena>,
     pub argument_list: PartialArgumentList<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MethodPartialApplication<'arena> {
     pub object: &'arena Expression<'arena>,
     pub arrow: Span,
@@ -30,7 +32,8 @@ pub struct MethodPartialApplication<'arena> {
     pub argument_list: PartialArgumentList<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct StaticMethodPartialApplication<'arena> {
     pub class: &'arena Expression<'arena>,
     pub double_colon: Span,

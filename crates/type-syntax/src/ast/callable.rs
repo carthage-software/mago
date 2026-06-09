@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -9,8 +8,9 @@ use crate::ast::Type;
 use crate::ast::VariableType;
 use crate::ast::keyword::Keyword;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum CallableTypeKind {
     Callable,
     PureCallable,
@@ -18,27 +18,31 @@ pub enum CallableTypeKind {
     PureClosure,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CallableType<'arena> {
     pub kind: CallableTypeKind,
     pub keyword: Keyword<'arena>,
     pub specification: Option<CallableTypeSpecification<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CallableTypeSpecification<'arena> {
     pub parameters: CallableTypeParameters<'arena>,
     pub return_type: Option<CallableTypeReturnType<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CallableTypeParameters<'arena> {
     pub left_parenthesis: Span,
     pub entries: Sequence<'arena, CallableTypeParameter<'arena>>,
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CallableTypeParameter<'arena> {
     pub parameter_type: Option<Type<'arena>>,
     pub ampersand: Option<Span>,
@@ -48,7 +52,8 @@ pub struct CallableTypeParameter<'arena> {
     pub comma: Option<Span>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct CallableTypeReturnType<'arena> {
     pub colon: Span,
     pub return_type: &'arena Type<'arena>,

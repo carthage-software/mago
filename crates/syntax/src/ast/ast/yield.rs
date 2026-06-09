@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -20,8 +19,9 @@ use crate::ast::ast::keyword::Keyword;
 ///     yield from [4, 5];
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Yield<'arena> {
     Value(YieldValue<'arena>),
     Pair(YieldPair<'arena>),
@@ -39,7 +39,8 @@ pub enum Yield<'arena> {
 ///    yield 1;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct YieldValue<'arena> {
     pub r#yield: Keyword<'arena>,
     pub value: Option<&'arena Expression<'arena>>,
@@ -56,7 +57,8 @@ pub struct YieldValue<'arena> {
 ///   yield 2 => 3;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct YieldPair<'arena> {
     pub r#yield: Keyword<'arena>,
     pub key: &'arena Expression<'arena>,
@@ -75,7 +77,8 @@ pub struct YieldPair<'arena> {
 ///  yield from [4, 5];
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct YieldFrom<'arena> {
     pub r#yield: Keyword<'arena>,
     pub from: Keyword<'arena>,

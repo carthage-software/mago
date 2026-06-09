@@ -2,8 +2,6 @@ use std::str::FromStr;
 
 use crate::presets::FormatterPreset;
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 
 /// Macro to generate both `FormatSettings` and `RawFormatSettings` from a single definition.
 ///
@@ -26,12 +24,13 @@ macro_rules! generate_formatter_settings {
         ///
         /// New fields are added with default values to ensure backward compatibility,
         /// unless a breaking change is explicitly intended for PER-CS compliance updates.
-        #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
-        #[serde(rename_all = "kebab-case", deny_unknown_fields)]
+        #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, JsonSchema)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        #[cfg_attr(feature = "serde", serde(rename_all = "kebab-case", deny_unknown_fields))]
         pub struct FormatSettings {
             $(
                 $(#[$field_meta])*
-                #[serde(default = $default)]
+                #[cfg_attr(feature = "serde", serde(default = $default))]
                 pub $field: $type,
             )*
         }
@@ -40,8 +39,9 @@ macro_rules! generate_formatter_settings {
         ///
         /// Used during deserialization to track which fields were explicitly set by the user.
         /// This allows us to distinguish between "user set a value" and "serde applied a default".
-        #[derive(Debug, Clone, Default, Deserialize)]
-        #[serde(rename_all = "kebab-case")]
+        #[derive(Debug, Clone, Default)]
+        #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+        #[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
         pub struct RawFormatSettings {
             $(
                 $(#[$field_meta])*
@@ -1209,32 +1209,34 @@ impl Default for FormatSettings {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 pub enum SortOrder {
     #[default]
-    #[serde(alias = "as-is", alias = "none", alias = "keep")]
+    #[cfg_attr(feature = "serde", serde(alias = "as-is", alias = "none", alias = "keep"))]
     Preserve,
-    #[serde(alias = "alpha-ascending", alias = "ascending")]
+    #[cfg_attr(feature = "serde", serde(alias = "alpha-ascending", alias = "ascending"))]
     AlphanumericAscending,
-    #[serde(alias = "alpha-descending", alias = "descending")]
+    #[cfg_attr(feature = "serde", serde(alias = "alpha-descending", alias = "descending"))]
     AlphanumericDescending,
     LengthAscending,
     LengthDescending,
 }
 
 /// Specifies the style of line endings.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
 pub enum EndOfLine {
     #[default]
-    #[serde(alias = "Auto")]
+    #[cfg_attr(feature = "serde", serde(alias = "Auto"))]
     Auto,
-    #[serde(alias = "Lf")]
+    #[cfg_attr(feature = "serde", serde(alias = "Lf"))]
     Lf,
-    #[serde(alias = "Crlf")]
+    #[cfg_attr(feature = "serde", serde(alias = "Crlf"))]
     Crlf,
-    #[serde(alias = "Cr")]
+    #[cfg_attr(feature = "serde", serde(alias = "Cr"))]
     Cr,
 }
 
@@ -1245,24 +1247,26 @@ pub enum EndOfLine {
 ///   on the same line when the signature breaks across multiple lines
 /// - `AlwaysNextLine`: Opening brace always on the next line, regardless of
 ///   whether the signature breaks
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum BraceStyle {
-    #[serde(alias = "SameLine", alias = "same-line")]
+    #[cfg_attr(feature = "serde", serde(alias = "SameLine", alias = "same-line"))]
     SameLine,
-    #[serde(alias = "NextLine", alias = "next-line")]
+    #[cfg_attr(feature = "serde", serde(alias = "NextLine", alias = "next-line"))]
     NextLine,
-    #[serde(alias = "AlwaysNextLine", alias = "always-next-line")]
+    #[cfg_attr(feature = "serde", serde(alias = "AlwaysNextLine", alias = "always-next-line"))]
     AlwaysNextLine,
 }
 
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum MethodChainBreakingStyle {
-    #[serde(alias = "SameLine", alias = "same-line")]
+    #[cfg_attr(feature = "serde", serde(alias = "SameLine", alias = "same-line"))]
     SameLine,
     #[default]
-    #[serde(alias = "NextLine", alias = "next-line")]
+    #[cfg_attr(feature = "serde", serde(alias = "NextLine", alias = "next-line"))]
     NextLine,
 }
 
@@ -1330,15 +1334,16 @@ impl FromStr for EndOfLine {
 }
 
 /// Specifies null type hint style.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 pub enum NullTypeHint {
-    #[serde(alias = "NullPipe", alias = "pipe", alias = "long", alias = "|")]
+    #[cfg_attr(feature = "serde", serde(alias = "NullPipe", alias = "pipe", alias = "long", alias = "|"))]
     NullPipe,
-    #[serde(alias = "NullPipeLast", alias = "pipe_last", alias = "long_last")]
+    #[cfg_attr(feature = "serde", serde(alias = "NullPipeLast", alias = "pipe_last", alias = "long_last"))]
     NullPipeLast,
     #[default]
-    #[serde(alias = "Question", alias = "short", alias = "?")]
+    #[cfg_attr(feature = "serde", serde(alias = "Question", alias = "short", alias = "?"))]
     Question,
 }
 
@@ -1370,7 +1375,7 @@ fn default_true() -> bool {
     true
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "serde"))]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;

@@ -1,7 +1,4 @@
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 
 use mago_database::GlobSettings;
 use mago_php_version::PHPVersion;
@@ -193,8 +190,9 @@ use crate::rule::ValidatedSanitizedInputConfig;
 use crate::rule::VariableNameConfig;
 use crate::rule::YodaConditionsConfig;
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct Settings {
     pub php_version: PHPVersion,
     pub integrations: IntegrationSet,
@@ -203,21 +201,26 @@ pub struct Settings {
     pub glob: GlobSettings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(default, deny_unknown_fields, bound = "C: Serialize + DeserializeOwned")]
+#[derive(Debug, Clone, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(default, deny_unknown_fields, bound = "C: serde::Serialize + serde::de::DeserializeOwned")
+)]
 #[schemars(bound = "C: JsonSchema")]
 pub struct RuleSettings<C: Config> {
     pub enabled: bool,
 
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Vec::is_empty"))]
     pub exclude: Vec<String>,
 
-    #[serde(flatten)]
+    #[cfg_attr(feature = "serde", serde(flatten))]
     pub config: C,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, Default, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct RulesSettings {
     pub ambiguous_constant_access: RuleSettings<AmbiguousConstantAccessConfig>,
     pub ambiguous_function_call: RuleSettings<AmbiguousFunctionCallConfig>,

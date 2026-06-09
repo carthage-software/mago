@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -12,7 +10,8 @@ use crate::ast::ast::variable::DirectVariable;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Closure<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub r#static: Option<Keyword<'arena>>,
@@ -24,7 +23,8 @@ pub struct Closure<'arena> {
     pub body: Block<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ClosureUseClause<'arena> {
     pub r#use: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -32,7 +32,8 @@ pub struct ClosureUseClause<'arena> {
     pub right_parenthesis: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ClosureUseClauseVariable<'arena> {
     pub ampersand: Option<Span>,
     pub variable: DirectVariable<'arena>,

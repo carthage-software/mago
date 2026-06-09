@@ -1,9 +1,6 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::ascii_lowercase_word;
 use mago_word::concat_word;
@@ -21,7 +18,8 @@ use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::union::TUnion;
 
 /// Specifies the kind of class-like structure a string refers to.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TClassLikeStringKind {
     /// The string refers to a class name (`class-string`).
     Class,
@@ -37,7 +35,8 @@ pub enum TClassLikeStringKind {
 /// often constrained by a type (`T` in `*-string<T>`).
 ///
 /// Examples: `class-string`, `interface-string<MyInterface>`, `enum-string<MyEnum>`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TClassLikeString {
     Any {
         kind: TClassLikeStringKind,

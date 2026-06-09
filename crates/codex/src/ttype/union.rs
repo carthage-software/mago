@@ -3,9 +3,6 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::empty_word;
@@ -39,7 +36,8 @@ use crate::ttype::get_arraykey;
 use crate::ttype::get_int;
 use crate::ttype::get_mixed;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TUnion {
     pub types: Cow<'static, [TAtomic]>,
     pub flags: UnionFlags,

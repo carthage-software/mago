@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -10,7 +8,8 @@ use crate::ast::sequence::TokenSeparatedSequence;
 /// Represents a list of attributes.
 ///
 /// Example: `#[Foo, Bar(1)]` in `#[Foo, Bar(1)] class Foo {}`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct AttributeList<'arena> {
     pub hash_left_bracket: Span,
     pub attributes: TokenSeparatedSequence<'arena, Attribute<'arena>>,
@@ -20,7 +19,8 @@ pub struct AttributeList<'arena> {
 /// Represents a single attribute.
 ///
 /// Example: `Foo` in `#[Foo]`, `Bar(1)` in `#[Bar(1)]`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Attribute<'arena> {
     pub name: Identifier<'arena>,
     pub argument_list: Option<ArgumentList<'arena>>,

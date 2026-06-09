@@ -1,5 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
 use strum::Display;
 
 use mago_database::file::FileId;
@@ -14,7 +12,8 @@ use mago_span::Span;
 /// For example, in `Closure(): int|string`:
 /// - With `Lowest` precedence: parses as `Union(Closure(): int, string)` (correct PHPStan/Psalm behavior)
 /// - Callable return types use `Callable` precedence, which stops before `|`, `&`, and `is`
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TypePrecedence {
     /// Lowest precedence - parses everything including unions, intersections, conditionals
     Lowest,
@@ -30,7 +29,8 @@ pub enum TypePrecedence {
     Callable,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TypeTokenKind {
     Int,
     Integer,
@@ -139,7 +139,8 @@ pub enum TypeTokenKind {
     Asterisk,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypeToken<'arena> {
     pub kind: TypeTokenKind,
     pub start: Position,

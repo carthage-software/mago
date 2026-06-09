@@ -1,7 +1,5 @@
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_span::Span;
 use mago_word::WordMap;
@@ -17,7 +15,8 @@ use crate::visibility::Visibility;
 ///
 /// This includes information about its name, location, visibility (potentially asymmetric),
 /// type hints, default values, and various modifiers (`static`, `readonly`, `abstract`, etc.).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct PropertyMetadata {
     /// The identifier (name) of the property, including the leading '$'.

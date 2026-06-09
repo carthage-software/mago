@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -10,13 +9,15 @@ use crate::ast::ast::expression::Expression;
 use crate::ast::ast::identifier::Identifier;
 use crate::ast::ast::variable::Variable;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConstantAccess<'arena> {
     pub name: Identifier<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Access<'arena> {
     Property(PropertyAccess<'arena>),
     NullSafeProperty(NullSafePropertyAccess<'arena>),
@@ -24,28 +25,32 @@ pub enum Access<'arena> {
     ClassConstant(ClassConstantAccess<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PropertyAccess<'arena> {
     pub object: &'arena Expression<'arena>,
     pub arrow: Span,
     pub property: ClassLikeMemberSelector<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NullSafePropertyAccess<'arena> {
     pub object: &'arena Expression<'arena>,
     pub question_mark_arrow: Span,
     pub property: ClassLikeMemberSelector<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct StaticPropertyAccess<'arena> {
     pub class: &'arena Expression<'arena>,
     pub double_colon: Span,
     pub property: Variable<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ClassConstantAccess<'arena> {
     pub class: &'arena Expression<'arena>,
     pub double_colon: Span,

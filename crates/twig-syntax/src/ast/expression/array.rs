@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -7,7 +6,8 @@ use mago_span::Span;
 use crate::ast::TokenSeparatedSequence;
 use crate::ast::expression::Expression;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Array<'arena> {
     pub left_bracket: Span,
     pub elements: TokenSeparatedSequence<'arena, ArrayElement<'arena>>,
@@ -16,20 +16,23 @@ pub struct Array<'arena> {
 
 /// An element inside an array literal: plain values, variadic (spread)
 /// elements, and missing holes used by destructuring (`[, second]`).
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum ArrayElement<'arena> {
     Value(ValueArrayElement<'arena>),
     Variadic(VariadicArrayElement<'arena>),
     Missing(MissingArrayElement),
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ValueArrayElement<'arena> {
     pub value: &'arena Expression<'arena>,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct VariadicArrayElement<'arena> {
     pub ellipsis: Span,
     pub value: &'arena Expression<'arena>,
@@ -38,12 +41,14 @@ pub struct VariadicArrayElement<'arena> {
 /// A missing array element - produced for destructuring patterns like
 /// `[, second]` where the first slot is skipped. The `comma` span points
 /// at the comma that *follows* the empty slot.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MissingArrayElement {
     pub comma: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct HashMapEntry<'arena> {
     /// `Some(span)` only for spread entries (`...expr`).
     pub ellipsis: Option<Span>,
@@ -54,7 +59,8 @@ pub struct HashMapEntry<'arena> {
     pub value: Expression<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct HashMap<'arena> {
     pub left_brace: Span,
     pub entries: TokenSeparatedSequence<'arena, HashMapEntry<'arena>>,

@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -7,7 +5,8 @@ use crate::ast::generics::GenericParameters;
 use crate::ast::keyword::Keyword;
 
 /// The `template-type<Object, ClassName, TemplateName>` utility type.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TemplateTypeType<'arena> {
     pub keyword: Keyword<'arena>,
     pub parameters: GenericParameters<'arena>,

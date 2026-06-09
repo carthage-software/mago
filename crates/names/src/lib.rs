@@ -2,7 +2,6 @@ use std::collections::HashSet;
 
 use foldhash::HashMap;
 use mago_span::Span;
-use serde::Serialize;
 
 use mago_span::HasPosition;
 use mago_span::Position;
@@ -19,7 +18,8 @@ mod internal;
 /// `(end offset, resolved fully qualified name, was-imported flag)`. Storing the end
 /// offset alongside the start lets callers answer "what name is at this cursor offset?"
 /// without re-scanning the source for identifier boundaries.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ResolvedNames<'arena> {
     /// Internal map: start offset -> (end offset, (resolved FQN, imported flag)).
     ///

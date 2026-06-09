@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -17,8 +16,9 @@ use crate::ast::ast::keyword::Keyword;
 /// ```php
 /// int
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Hint<'arena> {
     Identifier(Identifier<'arena>),
     Parenthesized(ParenthesizedHint<'arena>),
@@ -55,7 +55,8 @@ pub enum Hint<'arena> {
 ///    return 'hello';
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ParenthesizedHint<'arena> {
     pub left_parenthesis: Span,
     pub hint: &'arena Hint<'arena>,
@@ -71,7 +72,8 @@ pub struct ParenthesizedHint<'arena> {
 /// ```php
 /// int|string
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct UnionHint<'arena> {
     pub left: &'arena Hint<'arena>,
     pub pipe: Span,
@@ -87,7 +89,8 @@ pub struct UnionHint<'arena> {
 /// ```php
 /// ArrayAccess&Countable
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IntersectionHint<'arena> {
     pub left: &'arena Hint<'arena>,
     pub ampersand: Span,
@@ -103,7 +106,8 @@ pub struct IntersectionHint<'arena> {
 /// ```php
 /// ?string
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NullableHint<'arena> {
     pub question_mark: Span,
     pub hint: &'arena Hint<'arena>,

@@ -3,8 +3,6 @@ use mago_allocator::Arena;
 use mago_syntax::ast::Hint;
 use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
@@ -31,8 +29,9 @@ pub struct ExplicitNullableParamRule {
     cfg: ExplicitNullableParamConfig,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct ExplicitNullableParamConfig {
     pub level: Level,
 }

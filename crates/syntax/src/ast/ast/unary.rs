@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -8,8 +7,9 @@ use crate::ast::ast::expression::Expression;
 use crate::token::GetPrecedence;
 use crate::token::Precedence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum UnaryPrefixOperator<'arena> {
     ErrorControl(Span),              // `@$expr`
     Reference(Span),                 // `&$expr`
@@ -34,20 +34,23 @@ pub enum UnaryPrefixOperator<'arena> {
     Negation(Span),                  // `-$expr`
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum UnaryPostfixOperator {
     PostIncrement(Span), // `$expr++`
     PostDecrement(Span), // `$expr--`
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct UnaryPrefix<'arena> {
     pub operator: UnaryPrefixOperator<'arena>,
     pub operand: &'arena Expression<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct UnaryPostfix<'arena> {
     pub operand: &'arena Expression<'arena>,
     pub operator: UnaryPostfixOperator,

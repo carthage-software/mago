@@ -21,8 +21,6 @@ use std::collections::BTreeMap;
 use foldhash::HashMap;
 use foldhash::HashSet;
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
@@ -43,8 +41,9 @@ fn baseline_annotation(issue: &Issue) -> Option<&Annotation> {
 }
 
 /// The variant of baseline format to use.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum BaselineVariant {
     /// Strict baseline with exact line matching.
     ///
@@ -62,7 +61,8 @@ pub enum BaselineVariant {
 /// Represents a single issue in the strict baseline format.
 ///
 /// This is a simplified representation of an issue for storage in the baseline file.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StrictBaselineIssue {
     pub code: String,
     pub start_line: u32,
@@ -70,7 +70,8 @@ pub struct StrictBaselineIssue {
 }
 
 /// Represents a collection of issues for a specific file path in the strict baseline.
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StrictBaselineEntry {
     pub issues: Vec<StrictBaselineIssue>,
 }
@@ -79,11 +80,12 @@ pub struct StrictBaselineEntry {
 ///
 /// File paths are stored in a normalized format (using forward slashes)
 /// to ensure cross-platform compatibility.
-#[derive(Serialize, Deserialize, Debug, Default, JsonSchema)]
+#[derive(Debug, Default, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StrictBaseline {
     /// The baseline variant marker. When present, indicates this is a strict baseline.
     /// When absent (for backward compatibility), the baseline is assumed to be strict.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
     pub variant: Option<BaselineVariant>,
     /// The entries organized by file path.
     pub entries: BTreeMap<Cow<'static, str>, StrictBaselineEntry>,
@@ -92,7 +94,8 @@ pub struct StrictBaseline {
 /// Represents a single issue entry in the loose baseline format.
 ///
 /// Issues are grouped by (file, code, message) tuple with a count.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LooseBaselineIssue {
     /// The normalized file path where the issues occur.
     pub file: String,
@@ -105,7 +108,8 @@ pub struct LooseBaselineIssue {
 }
 
 /// The loose baseline structure with count-based issue tracking.
-#[derive(Serialize, Deserialize, Debug, Default, JsonSchema)]
+#[derive(Debug, Default, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LooseBaseline {
     /// The baseline variant marker.
     pub variant: BaselineVariant,
@@ -114,8 +118,9 @@ pub struct LooseBaseline {
 }
 
 /// A baseline that can be either strict or loose.
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
-#[serde(untagged)]
+#[derive(Debug, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum Baseline {
     /// Strict baseline with exact line matching.
     Strict(StrictBaseline),
@@ -124,7 +129,8 @@ pub enum Baseline {
 }
 
 /// A specific issue that appeared or disappeared during a baseline comparison.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct BaselineChangeEntry {
     pub file: String,
     pub code: String,

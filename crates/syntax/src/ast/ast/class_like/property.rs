@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -18,8 +17,9 @@ use crate::ast::ast::variable::DirectVariable;
 use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Property<'arena> {
     Plain(PlainProperty<'arena>),
     Hooked(HookedProperty<'arena>),
@@ -37,7 +37,8 @@ pub enum Property<'arena> {
 ///    protected $bar = 42;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PlainProperty<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub modifiers: Sequence<'arena, Modifier<'arena>>,
@@ -67,7 +68,8 @@ pub struct PlainProperty<'arena> {
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct HookedProperty<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub modifiers: Sequence<'arena, Modifier<'arena>>,
@@ -78,8 +80,9 @@ pub struct HookedProperty<'arena> {
 }
 
 /// Represents a property item in a class-like property declaration in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum PropertyItem<'arena> {
     Abstract(PropertyAbstractItem<'arena>),
     Concrete(PropertyConcreteItem<'arena>),
@@ -96,7 +99,8 @@ pub enum PropertyItem<'arena> {
 ///    public $foo;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PropertyAbstractItem<'arena> {
     pub variable: DirectVariable<'arena>,
 }
@@ -112,7 +116,8 @@ pub struct PropertyAbstractItem<'arena> {
 ///   public $foo = 42;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PropertyConcreteItem<'arena> {
     pub variable: DirectVariable<'arena>,
     pub equals: Span,
@@ -137,7 +142,8 @@ pub struct PropertyConcreteItem<'arena> {
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PropertyHookList<'arena> {
     pub left_brace: Span,
     pub hooks: Sequence<'arena, PropertyHook<'arena>>,
@@ -159,7 +165,8 @@ pub struct PropertyHookList<'arena> {
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PropertyHook<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub modifiers: Sequence<'arena, Modifier<'arena>>,
@@ -170,29 +177,33 @@ pub struct PropertyHook<'arena> {
 }
 
 /// Represents the body of a property hook in a class-like property declaration in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum PropertyHookBody<'arena> {
     Abstract(PropertyHookAbstractBody),
     Concrete(PropertyHookConcreteBody<'arena>),
 }
 
 /// Represents an abstract body of a property hook in a class-like property declaration in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PropertyHookAbstractBody {
     pub semicolon: Span,
 }
 
 /// Represents a concrete body of a property hook in a class-like property declaration in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum PropertyHookConcreteBody<'arena> {
     Block(Block<'arena>),
     Expression(PropertyHookConcreteExpressionBody<'arena>),
 }
 
 /// Represents an expression body of a property hook in a class-like property declaration in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PropertyHookConcreteExpressionBody<'arena> {
     pub arrow: Span,
     pub expression: &'arena Expression<'arena>,

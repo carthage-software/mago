@@ -1,8 +1,5 @@
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::word;
 
@@ -24,7 +21,8 @@ pub mod with_properties;
 
 /// Represents a PHP object type, distinguishing between the generic `object`
 /// and instances of specific named classes/interfaces/traits (which may include intersections).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TObject {
     /// Represents the generic `object` type, accepting any object instance.
     Any,

@@ -1,10 +1,8 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_syntax::ast::Modifier;
 
 /// Represents the visibility level of class members (properties, methods, constants) in PHP.
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Default, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, Default, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum Visibility {
     /// Represents `public` visibility. Accessible from anywhere.

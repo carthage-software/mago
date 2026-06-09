@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 
 use crate::ttype::TType;
@@ -21,7 +18,8 @@ pub mod list;
 
 /// Represents the type of a PHP array, distinguishing between list-like and keyed/associative usage.
 #[allow(clippy::derived_hash_with_manual_eq)]
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TArray {
     /// Represents an array used as a list (sequential, zero-based integer keys). `list<T>`.
     List(TList),

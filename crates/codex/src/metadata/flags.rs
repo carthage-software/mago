@@ -1,8 +1,7 @@
 use mago_database::file::FileType;
-use serde::Deserialize;
-use serde::Serialize;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MetadataFlags(u64);
 
 impl MetadataFlags {

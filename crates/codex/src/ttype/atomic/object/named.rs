@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
@@ -14,7 +11,8 @@ use crate::ttype::union::TUnion;
 ///
 /// This structure holds the name, any concrete type parameters for generics,
 /// flags (`$this`, internal state), and potential intersection types (`&OtherType`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TNamedObject {
     /// The fully qualified class name (FQCN) of the primary type (e.g., `A` in `A&B<T>&S`).
     pub name: Word,

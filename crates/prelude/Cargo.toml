@@ -13,8 +13,8 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-serde = { workspace = true }
-bincode = { workspace = true }
+serde = { workspace = true, optional = true }
+bincode = { workspace = true, optional = true }
 mago-codex = { workspace = true }
 mago-database = { workspace = true }
 
@@ -25,7 +25,13 @@ mago-names = { workspace = true, optional = true }
 mago-php-version = { workspace = true, optional = true }
 
 [features]
-build = ["mago-allocator", "rust-embed", "mago-syntax", "mago-names", "mago-php-version"]
+default = []
+serde = [
+    "dep:serde",
+    "dep:bincode",
+    "mago-codex/serde",
+]
+build = ["serde", "mago-allocator", "rust-embed", "mago-syntax", "mago-names", "mago-php-version"]
 
 [dev-dependencies]
 criterion = { workspace = true }

@@ -4,8 +4,6 @@ use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::i64_word;
 use mago_word::word;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::scalar::TScalar;
@@ -24,7 +22,8 @@ use crate::ttype::union::TUnion;
 /// PHP automatically casts other scalar types (float, bool, null) and resources to int or string
 /// when used as array keys. Objects used as keys usually result in errors or use `spl_object_hash`.
 /// This enum focuses on the valid resulting key types after potential casting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ArrayKey {
     /// An integer array key.
     Integer(i64),

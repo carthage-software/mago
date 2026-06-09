@@ -20,8 +20,6 @@ use foldhash::HashMap;
 use foldhash::HashMapExt;
 use regex::Regex;
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 use strum::Display;
 use strum::VariantNames;
 
@@ -32,6 +30,7 @@ use mago_span::Span;
 use mago_text_edit::TextEdit;
 
 mod formatter;
+#[cfg(feature = "serde")]
 mod internal;
 
 pub mod baseline;
@@ -62,8 +61,9 @@ pub use output::ReportingTarget;
 ///
 /// The `pattern` field is a [bare Rust regex](https://docs.rs/regex/) — use
 /// `(?i)` for case-insensitive matching. No surrounding delimiters.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(untagged))]
 pub enum IgnoreEntry {
     /// Ignore a code everywhere: `"code1"`
     Code(String),
@@ -71,7 +71,7 @@ pub enum IgnoreEntry {
     /// `{ code = "code2", in = ["tests/", "src/**/*.php"] }`
     Scoped {
         code: String,
-        #[serde(rename = "in", deserialize_with = "one_or_many")]
+        #[cfg_attr(feature = "serde", serde(rename = "in", deserialize_with = "one_or_many"))]
         paths: Vec<String>,
     },
     /// Ignore by regex against issue text, with optional code and path scoping:
@@ -85,31 +85,41 @@ pub enum IgnoreEntry {
         pattern: String,
         /// Optional code to narrow the match. When set, only issues with this
         /// code are tested against the pattern.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
         code: Option<String>,
         /// Optional paths/globs to narrow the match.
-        #[serde(rename = "in", default, skip_serializing_if = "Option::is_none", deserialize_with = "opt_one_or_many")]
+        #[cfg_attr(
+            feature = "serde",
+            serde(
+                rename = "in",
+                default,
+                skip_serializing_if = "Option::is_none",
+                deserialize_with = "opt_one_or_many"
+            )
+        )]
         paths: Option<Vec<String>>,
     },
 }
 
+#[cfg(feature = "serde")]
 fn one_or_many<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
+    #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+    #[cfg_attr(feature = "serde", serde(untagged))]
     enum OneOrMany {
         One(String),
         Many(Vec<String>),
     }
 
-    match OneOrMany::deserialize(deserializer)? {
+    match <OneOrMany as serde::Deserialize>::deserialize(deserializer)? {
         OneOrMany::One(s) => Ok(vec![s]),
         OneOrMany::Many(v) => Ok(v),
     }
 }
 
+#[cfg(feature = "serde")]
 fn opt_one_or_many<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -136,7 +146,8 @@ enum CompiledIgnoreEntry {
 }
 
 /// Represents the kind of annotation associated with an issue.
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum AnnotationKind {
     /// A primary annotation, typically highlighting the main source of the issue.
     Primary,
@@ -145,7 +156,8 @@ pub enum AnnotationKind {
 }
 
 /// An annotation associated with an issue, providing additional context or highlighting specific code spans.
-#[derive(Debug, PartialEq, Eq, Ord, Clone, Hash, PartialOrd, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Ord, Clone, Hash, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Annotation {
     /// An optional message associated with the annotation.
     pub message: Option<String>,
@@ -156,22 +168,21 @@ pub struct Annotation {
 }
 
 /// Represents the severity level of an issue.
-#[derive(
-    Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize, Display, VariantNames, JsonSchema,
-)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Display, VariantNames, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[strum(serialize_all = "lowercase")]
 pub enum Level {
     /// A note, providing additional information or context.
-    #[serde(alias = "note")]
+    #[cfg_attr(feature = "serde", serde(alias = "note"))]
     Note,
     /// A help message, suggesting possible solutions or further actions.
-    #[serde(alias = "help")]
+    #[cfg_attr(feature = "serde", serde(alias = "help"))]
     Help,
     /// A warning, indicating a potential problem that may need attention.
-    #[serde(alias = "warning", alias = "warn")]
+    #[cfg_attr(feature = "serde", serde(alias = "warning", alias = "warn"))]
     Warning,
     /// An error, indicating a problem that prevents the code from functioning correctly.
-    #[serde(alias = "error", alias = "err")]
+    #[cfg_attr(feature = "serde", serde(alias = "error", alias = "err"))]
     Error,
 }
 
@@ -193,7 +204,8 @@ type IssueEdits = Vec<TextEdit>;
 type IssueEditBatches = Vec<(Option<String>, IssueEdits)>;
 
 /// Represents an issue identified in the code.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Issue {
     /// The severity level of the issue.
     pub level: Level,
@@ -214,7 +226,8 @@ pub struct Issue {
 }
 
 /// A collection of issues.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IssueCollection {
     issues: Vec<Issue>,
 }

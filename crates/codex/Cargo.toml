@@ -15,6 +15,14 @@ workspace = true
 [features]
 default = []
 property-tests = []
+serde = [
+    "dep:serde",
+    "mago-reporting/serde",
+    "mago-docblock/serde",
+    "mago-word/serde",
+    "mago-type-syntax/serde",
+    "mago-php-version/serde",
+]
 
 [dependencies]
 mago-reporting = { workspace = true }
@@ -29,7 +37,7 @@ mago-database = { workspace = true }
 mago-fingerprint = { workspace = true }
 mago-php-version = { workspace = true }
 foldhash = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
 tracing = { workspace = true }
 strum = { workspace = true }
 indexmap = { workspace = true }

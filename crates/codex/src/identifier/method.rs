@@ -1,11 +1,9 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 
 /// Represents a unique identifier for a method within a class-like structure.
 /// Combines the fully qualified class name (FQCN) and the method name.
-#[derive(Clone, Debug, PartialEq, Eq, Copy, Serialize, Deserialize, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Copy, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MethodIdentifier {
     /// The fully qualified name of the class, interface, trait, or enum containing the method.
     class_name: Word,

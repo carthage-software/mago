@@ -1,13 +1,11 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 
 use crate::ttype::TType;
 
 /// Represents metadata specific to a PHP enum type (`enum`).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TEnum {
     /// The fully qualified name (FQCN) of the enum.
     pub name: Word,

@@ -1,7 +1,5 @@
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
-use serde::Deserialize;
-use serde::Serialize;
 
 /// Tracks the PHP version intervals in which a symbol is available, derived
 /// from `Mago\AvailableSince` / `Mago\AvailableUntil` attributes during
@@ -11,7 +9,8 @@ use serde::Serialize;
 /// availability ranges (for example "available 8.1–8.3, removed in 8.4,
 /// brought back in 8.5"). An empty range list means "always available";
 /// otherwise a version is allowed when *some* range contains it.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VersionConstraint {
     /// Disjoint availability intervals in source order. Empty = unconstrained.
     pub ranges: Vec<PHPVersionRange>,

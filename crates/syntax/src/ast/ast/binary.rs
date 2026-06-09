@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -10,8 +9,9 @@ use crate::token::GetPrecedence;
 use crate::token::Precedence;
 
 /// Represents a PHP binary operator.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum BinaryOperator<'arena> {
     Addition(Span),              // `+`
     Subtraction(Span),           // `-`
@@ -47,7 +47,8 @@ pub enum BinaryOperator<'arena> {
 /// Represents a PHP binary operation.
 ///
 /// A binary operation is an operation that takes two operands, a left-hand side and a right-hand side.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Binary<'arena> {
     pub lhs: &'arena Expression<'arena>,
     pub operator: BinaryOperator<'arena>,

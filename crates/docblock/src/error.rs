@@ -1,10 +1,8 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ParseError {
     InvalidTrivia(Span),
     UnclosedInlineTag(Span),

@@ -1,12 +1,11 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::ArgumentList;
 use crate::ast::expression::Expression;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Call<'arena> {
     pub callee: &'arena Expression<'arena>,
     pub argument_list: ArgumentList<'arena>,

@@ -7,8 +7,6 @@ use std::fmt;
 use std::str::FromStr;
 
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::settings::BraceStyle;
 use crate::settings::EndOfLine;
@@ -18,8 +16,9 @@ use crate::settings::NullTypeHint;
 use crate::settings::SortOrder;
 
 /// Available formatter presets.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case", try_from = "String")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case", try_from = "String"))]
 pub enum FormatterPreset {
     /// Default preset (PER-CS compatible).
     #[default]

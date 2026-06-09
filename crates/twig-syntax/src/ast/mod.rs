@@ -27,8 +27,6 @@ pub mod sequence;
 pub mod statement;
 pub mod trivia;
 
-use serde::Serialize;
-
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
@@ -43,7 +41,8 @@ use crate::error::ParseError;
 /// by the lexer, so that `(statements, trivia)` can be re-serialised back to
 /// the original bytes (though consumers must interleave the two by span -
 /// trivia are not embedded in the statement tree).
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Template<'arena> {
     pub file_id: FileId,
     pub source_text: &'arena [u8],

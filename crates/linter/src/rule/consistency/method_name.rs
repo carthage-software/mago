@@ -1,8 +1,6 @@
 use indoc::indoc;
 use mago_allocator::Arena;
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_casing::is_camel_case;
 use mago_casing::is_snake_case;
@@ -29,8 +27,9 @@ pub struct MethodNameRule {
     cfg: MethodNameConfig,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct MethodNameConfig {
     pub level: Level,
     /// When `true`, method names must be in camelCase. When `false`, they must be in snake_case.

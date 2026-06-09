@@ -1,9 +1,8 @@
-use serde::Deserialize;
-use serde::Serialize;
 use strum::Display;
 use strum::EnumString;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Display, Debug, PartialOrd, Ord, Serialize, Deserialize, EnumString)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Display, Debug, PartialOrd, Ord, EnumString)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[strum(serialize_all = "kebab-case")]
 pub(crate) enum ScanningIssueKind {
     MalformedDocblockComment,

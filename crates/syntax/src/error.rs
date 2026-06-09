@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_reporting::Annotation;
@@ -14,7 +12,8 @@ use crate::token::TokenKind;
 const SYNTAX_ERROR_CODE: &str = "syntax";
 const PARSE_ERROR_CODE: &str = "parse";
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum SyntaxError {
     UnexpectedToken(FileId, u8, Position),
     UnrecognizedToken(FileId, u8, Position),
@@ -22,7 +21,8 @@ pub enum SyntaxError {
 }
 
 /// The token kinds a parser expected at the point an error was raised.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum Expected {
     Exactly(TokenKind),
     OneOf(&'static [TokenKind]),
@@ -38,7 +38,8 @@ impl Expected {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ParseError {
     SyntaxError(SyntaxError),
     UnexpectedEndOfFile(Expected, FileId, Position),

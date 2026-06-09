@@ -4,8 +4,6 @@ use std::sync::Arc;
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::metadata::CodebaseMetadata;
 use crate::symbol::SymbolKind;
@@ -23,7 +21,8 @@ use crate::ttype::get_non_empty_string;
 use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TPropertiesOf {
     pub visibility: Option<Visibility>,
     pub target_type: Arc<TUnion>,

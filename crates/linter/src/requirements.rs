@@ -1,5 +1,6 @@
-use serde::Serialize;
+#[cfg(feature = "serde")]
 use serde::Serializer;
+#[cfg(feature = "serde")]
 use serde::ser::SerializeStruct;
 
 use mago_php_version::PHPVersion;
@@ -114,7 +115,8 @@ impl RuleRequirements {
     }
 }
 
-impl Serialize for RuleRequirements {
+#[cfg(feature = "serde")]
+impl serde::Serialize for RuleRequirements {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

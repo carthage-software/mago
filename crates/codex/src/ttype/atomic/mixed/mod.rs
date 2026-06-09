@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::word;
 
@@ -10,7 +7,8 @@ use crate::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 pub mod truthiness;
 
 /// Represents the `mixed` type, potentially with constraints applied.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TMixed {
     is_isset_from_loop: bool,
     is_non_null: bool,

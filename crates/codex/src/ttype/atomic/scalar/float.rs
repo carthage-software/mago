@@ -1,6 +1,4 @@
 use ordered_float::OrderedFloat;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_word::Word;
 use mago_word::concat_word;
@@ -11,7 +9,8 @@ use crate::ttype::TType;
 
 /// Represents PHP float types: general `float`, an unspecified literal `literal-float`,
 /// or a specific literal like `12.3`.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TFloat {
     /// General `float` type.
     Float,

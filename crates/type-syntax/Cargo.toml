@@ -17,9 +17,18 @@ mago-allocator = { workspace = true }
 mago-database = { workspace = true }
 mago-span = { workspace = true }
 mago-syntax-core = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
 strum = { workspace = true }
-ordered-float = { workspace = true, features = ["serde", "rand"] }
+ordered-float = { workspace = true, features = ["rand"] }
+
+[features]
+default = []
+serde = [
+    "dep:serde",
+    "ordered-float/serde",
+    "mago-span/serde",
+    "mago-syntax-core/serde",
+]
 
 [dev-dependencies]
 criterion = { workspace = true }

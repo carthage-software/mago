@@ -21,3 +21,7 @@ mago-syntax = { workspace = true }
 foldhash = { workspace = true }
 mago-allocator = { workspace = true }
 memchr = { workspace = true }
+
+[features]
+default = []
+serde = []

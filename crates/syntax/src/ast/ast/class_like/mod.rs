@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -31,7 +29,8 @@ pub mod trait_use;
 ///
 /// interface Foo {}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Interface<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub interface: Keyword<'arena>,
@@ -56,7 +55,8 @@ pub struct Interface<'arena> {
 ///     ) {}
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Class<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub modifiers: Sequence<'arena, Modifier<'arena>>,
@@ -83,7 +83,8 @@ pub struct Class<'arena> {
 ///   ) {}
 /// };
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct AnonymousClass<'arena> {
     pub new: Keyword<'arena>,
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
@@ -110,7 +111,8 @@ pub struct AnonymousClass<'arena> {
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Trait<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub r#trait: Keyword<'arena>,
@@ -134,7 +136,8 @@ pub struct Trait<'arena> {
 ///   case Left;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Enum<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub r#enum: Keyword<'arena>,
@@ -165,7 +168,8 @@ pub struct Enum<'arena> {
 ///   case XLarge = 3;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct EnumBackingTypeHint<'arena> {
     pub colon: Span,
     pub hint: Hint<'arena>,

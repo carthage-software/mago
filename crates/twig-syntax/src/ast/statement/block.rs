@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -10,7 +9,8 @@ use crate::ast::Sequence;
 use crate::ast::expression::Expression;
 use crate::ast::statement::Statement;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct BlockShort<'arena> {
     pub expression: Expression<'arena>,
     pub close_tag: Span,
@@ -22,7 +22,8 @@ impl HasSpan for BlockShort<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct BlockLong<'arena> {
     pub close_tag: Span,
     pub body: Sequence<'arena, Statement<'arena>>,
@@ -38,8 +39,9 @@ impl HasSpan for BlockLong<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum BlockBody<'arena> {
     Short(BlockShort<'arena>),
     Long(BlockLong<'arena>),
@@ -54,7 +56,8 @@ impl HasSpan for BlockBody<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Block<'arena> {
     pub open_tag: Span,
     pub keyword: Keyword<'arena>,

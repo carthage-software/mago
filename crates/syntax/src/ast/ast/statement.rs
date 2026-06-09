@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -45,15 +44,17 @@ use super::IfBody;
 use super::NamespaceBody;
 use super::WhileBody;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ExpressionStatement<'arena> {
     pub expression: &'arena Expression<'arena>,
     pub terminator: Terminator<'arena>,
 }
 
 /// Represents a PHP statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 #[non_exhaustive]
 pub enum Statement<'arena> {
     OpeningTag(OpeningTag<'arena>),

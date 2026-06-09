@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -7,7 +5,8 @@ use crate::ast::ast::expression::Expression;
 use crate::ast::ast::keyword::Keyword;
 use crate::ast::sequence::TokenSeparatedSequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ArrayAccess<'arena> {
     pub array: &'arena Expression<'arena>,
     pub left_bracket: Span,
@@ -15,7 +14,8 @@ pub struct ArrayAccess<'arena> {
     pub right_bracket: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ArrayAppend<'arena> {
     pub array: &'arena Expression<'arena>,
     pub left_bracket: Span,
@@ -31,7 +31,8 @@ pub struct ArrayAppend<'arena> {
 ///
 /// list($a, 'b' => $c, /* missing */, ...$rest) = $arr;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct List<'arena> {
     pub list: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -48,7 +49,8 @@ pub struct List<'arena> {
 ///
 /// $arr = ['apple', 'banana', 3 => 'orange'];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Array<'arena> {
     pub left_bracket: Span,
     pub elements: TokenSeparatedSequence<'arena, ArrayElement<'arena>>,
@@ -64,7 +66,8 @@ pub struct Array<'arena> {
 ///
 /// $arr = array('apple', 'banana', 3 => 'orange');
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LegacyArray<'arena> {
     pub array: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -73,8 +76,9 @@ pub struct LegacyArray<'arena> {
 }
 
 /// Represents an array element.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum ArrayElement<'arena> {
     KeyValue(KeyValueArrayElement<'arena>),
     Value(ValueArrayElement<'arena>),
@@ -93,7 +97,8 @@ pub enum ArrayElement<'arena> {
 ///   1 => 'orange',
 /// ];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct KeyValueArrayElement<'arena> {
     pub key: &'arena Expression<'arena>,
     pub double_arrow: Span,
@@ -111,7 +116,8 @@ pub struct KeyValueArrayElement<'arena> {
 ///   'orange',
 /// ];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ValueArrayElement<'arena> {
     pub value: &'arena Expression<'arena>,
 }
@@ -127,7 +133,8 @@ pub struct ValueArrayElement<'arena> {
 ///   ...$other,
 /// ];
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct VariadicArrayElement<'arena> {
     pub ellipsis: Span,
     pub value: &'arena Expression<'arena>,
@@ -145,7 +152,8 @@ pub struct VariadicArrayElement<'arena> {
 ///   ,
 ///   'third',
 /// ];
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MissingArrayElement {
     pub comma: Span,
 }

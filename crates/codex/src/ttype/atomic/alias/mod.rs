@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 
@@ -16,7 +13,8 @@ use crate::ttype::union::TUnion;
 /// - Proper reference tracking for go-to-definition
 /// - Type ID preservation showing the alias name
 /// - Analysis-time expansion with full codebase context
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TAlias {
     /// The FQCN of the class where the alias is defined or imported
     class_name: Word,

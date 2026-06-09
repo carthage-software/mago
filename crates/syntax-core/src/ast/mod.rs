@@ -2,8 +2,6 @@
 
 use std::slice::Iter;
 
-use serde::Serialize;
-
 use mago_allocator::prelude::*;
 
 use mago_span::HasPosition;
@@ -11,7 +9,8 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 /// A sequence of AST nodes allocated in an arena.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(transparent)]
 pub struct Sequence<'arena, T> {
     pub nodes: &'arena [T],
@@ -152,7 +151,8 @@ impl<'seq, T> IntoIterator for &'seq Sequence<'_, T> {
 /// start so the impl is trivial.
 ///
 /// [`Position`]: mago_span::Position
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TokenSeparatedSequence<'arena, T, Tok> {
     pub nodes: &'arena [T],
     pub tokens: &'arena [Tok],

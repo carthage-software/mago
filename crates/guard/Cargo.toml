@@ -24,9 +24,15 @@ mago-syntax-core = { workspace = true }
 mago-database = { workspace = true }
 mago-codex = { workspace = true }
 foldhash = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
 mago-allocator = { workspace = true }
 schemars = { workspace = true }
+
+[features]
+default = []
+serde = [
+    "dep:serde",
+]
 
 [dev-dependencies]
 mago-syntax = { workspace = true }

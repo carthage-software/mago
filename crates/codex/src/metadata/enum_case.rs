@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_word::Word;
@@ -15,7 +12,8 @@ use crate::ttype::atomic::TAtomic;
 /// Represents enum cases in both "pure" enums (e.g., `case Pending;` in `enum Status`)
 /// and "backed" enums (e.g., `case Ok = 200;` in `enum HttpStatus: int`),
 /// including associated attributes, values, and source locations.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct EnumCaseMetadata {
     pub attributes: Vec<AttributeMetadata>,

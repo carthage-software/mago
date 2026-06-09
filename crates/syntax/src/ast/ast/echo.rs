@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -16,7 +14,8 @@ use crate::ast::sequence::TokenSeparatedSequence;
 /// <?= "Hello, World!" ?>
 /// <?= $a, $b, $c;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct EchoTag<'arena> {
     pub tag: Span,
     pub values: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
@@ -33,7 +32,8 @@ pub struct EchoTag<'arena> {
 /// echo "Hello, World!";
 /// echo $a, $b, $c;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Echo<'arena> {
     pub echo: Keyword<'arena>,
     pub values: TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,

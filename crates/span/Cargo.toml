@@ -14,4 +14,11 @@ workspace = true
 
 [dependencies]
 mago-database = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = []
+serde = [
+    "dep:serde",
+    "mago-database/serde",
+]

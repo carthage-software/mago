@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -17,7 +15,8 @@ use crate::ast::sequence::TokenSeparatedSequenceExt;
 ///
 /// final class Foo implements Bar, Baz {}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Implements<'arena> {
     pub implements: Keyword<'arena>,
     pub types: TokenSeparatedSequence<'arena, Identifier<'arena>>,
@@ -38,7 +37,8 @@ pub struct Implements<'arena> {
 ///
 /// class Foo extends Bar {}
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Extends<'arena> {
     pub extends: Keyword<'arena>,
     pub types: TokenSeparatedSequence<'arena, Identifier<'arena>>,

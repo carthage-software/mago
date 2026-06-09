@@ -1,36 +1,39 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::generics::GenericParameters;
 use crate::ast::keyword::Keyword;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ArrayType<'arena> {
     pub keyword: Keyword<'arena>,
     pub parameters: Option<GenericParameters<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NonEmptyArrayType<'arena> {
     pub keyword: Keyword<'arena>,
     pub parameters: Option<GenericParameters<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct AssociativeArrayType<'arena> {
     pub keyword: Keyword<'arena>,
     pub parameters: Option<GenericParameters<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ListType<'arena> {
     pub keyword: Keyword<'arena>,
     pub parameters: Option<GenericParameters<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NonEmptyListType<'arena> {
     pub keyword: Keyword<'arena>,
     pub parameters: Option<GenericParameters<'arena>>,

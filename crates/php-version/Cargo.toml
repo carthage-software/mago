@@ -13,8 +13,12 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
 schemars = { workspace = true }
+
+[features]
+default = []
+serde = ["dep:serde"]
 
 [dev-dependencies]
 serde_json = { workspace = true }

@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -9,7 +7,8 @@ use crate::ast::ast::type_hint::Hint;
 use crate::ast::ast::variable::DirectVariable;
 use crate::ast::sequence::Sequence;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Try<'arena> {
     pub r#try: Keyword<'arena>,
     pub block: Block<'arena>,
@@ -17,7 +16,8 @@ pub struct Try<'arena> {
     pub finally_clause: Option<TryFinallyClause<'arena>>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TryCatchClause<'arena> {
     pub r#catch: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -27,7 +27,8 @@ pub struct TryCatchClause<'arena> {
     pub block: Block<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TryFinallyClause<'arena> {
     pub r#finally: Keyword<'arena>,
     pub block: Block<'arena>,

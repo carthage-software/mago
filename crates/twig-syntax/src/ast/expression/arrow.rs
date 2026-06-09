@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -7,7 +5,8 @@ use crate::ast::Identifier;
 use crate::ast::TokenSeparatedSequence;
 use crate::ast::expression::Expression;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ArrowFunction<'arena> {
     pub left_parenthesis: Option<Span>,
     pub parameters: TokenSeparatedSequence<'arena, Identifier<'arena>>,

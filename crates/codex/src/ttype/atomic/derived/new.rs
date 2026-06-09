@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
@@ -27,7 +24,8 @@ fn class_name_of_constraint(constraint: &TAtomic) -> Option<Word> {
 }
 
 /// The `new<X>` utility type.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TNew(Arc<TUnion>);
 
 impl TNew {

@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -8,7 +6,8 @@ use crate::ast::Keyword;
 use crate::ast::TokenSeparatedSequence;
 use crate::ast::expression::Expression;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ImportedMacro<'arena> {
     pub from: Identifier<'arena>,
     pub as_keyword: Option<Keyword<'arena>>,
@@ -22,7 +21,8 @@ impl HasSpan for ImportedMacro<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct From<'arena> {
     pub open_tag: Span,
     pub keyword: Keyword<'arena>,

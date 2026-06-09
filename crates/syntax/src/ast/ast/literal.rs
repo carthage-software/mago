@@ -1,5 +1,4 @@
 use ordered_float::OrderedFloat;
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -7,8 +6,9 @@ use mago_span::Span;
 
 use crate::ast::ast::keyword::Keyword;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Literal<'arena> {
     String(LiteralString<'arena>),
     Integer(LiteralInteger<'arena>),
@@ -18,14 +18,16 @@ pub enum Literal<'arena> {
     Null(Keyword<'arena>),
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum LiteralStringKind {
     SingleQuoted,
     DoubleQuoted,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LiteralString<'arena> {
     pub kind: LiteralStringKind,
     pub span: Span,
@@ -33,14 +35,16 @@ pub struct LiteralString<'arena> {
     pub value: Option<&'arena [u8]>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LiteralInteger<'arena> {
     pub span: Span,
     pub raw: &'arena [u8],
     pub value: Option<u64>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LiteralFloat<'arena> {
     pub span: Span,
     pub raw: &'arena [u8],

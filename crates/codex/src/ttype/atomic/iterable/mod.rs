@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
@@ -13,7 +10,8 @@ use crate::ttype::atomic::TAtomic;
 use crate::ttype::get_mixed;
 use crate::ttype::union::TUnion;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TIterable {
     /// The key type of the iterable (e.g., `K` in `iterable<K, V>`).
     pub key_type: Arc<TUnion>,

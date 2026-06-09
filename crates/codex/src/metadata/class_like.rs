@@ -2,8 +2,6 @@ use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 use mago_php_version::PHPVersion;
 use mago_php_version::PHPVersionRange;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -37,7 +35,8 @@ pub type TemplateTypes = IndexMap<Word, GenericTemplate, RandomState>;
 ///
 /// Aggregates information about inheritance, traits, generics, methods, properties, constants,
 /// attributes, docblock tags, analysis flags, and more.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct ClassLikeMetadata {
     pub name: Word,

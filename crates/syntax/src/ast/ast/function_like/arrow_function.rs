@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -19,7 +17,8 @@ use crate::ast::sequence::Sequence;
 ///
 /// $fn = fn($x) => $x * 2;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ArrowFunction<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub r#static: Option<Keyword<'arena>>,

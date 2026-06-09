@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use mago_word::Word;
 use mago_word::concat_word;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -15,7 +13,8 @@ use crate::ttype::union::TUnion;
 /// Represents an indexed access type `T[K]`.
 ///
 /// This type resolves to the type of elements in `T` at index `K`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TIndexAccess {
     target_type: Arc<TUnion>,
     index_type: Arc<TUnion>,

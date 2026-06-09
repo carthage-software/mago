@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -7,8 +6,9 @@ use mago_span::Span;
 use crate::ast::generics::SingleGenericParameter;
 use crate::ast::keyword::Keyword;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum PropertiesOfFilter {
     All,
     Public,
@@ -16,7 +16,8 @@ pub enum PropertiesOfFilter {
     Private,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PropertiesOfType<'arena> {
     pub filter: PropertiesOfFilter,
     pub keyword: Keyword<'arena>,

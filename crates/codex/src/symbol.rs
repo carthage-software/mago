@@ -1,7 +1,5 @@
 use mago_word::WordSet;
 use mago_word::word;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_word::Word;
 use mago_word::WordMap;
@@ -16,7 +14,8 @@ use mago_word::WordMap;
 pub type SymbolIdentifier = (Word, Word);
 
 /// Represents the different kinds of top-level class-like structures in PHP.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SymbolKind {
     Class,
     Enum,
@@ -68,7 +67,8 @@ impl SymbolKind {
 
 /// Stores a map of all known class-like symbol names (FQCNs) to their corresponding `SymbolKind`.
 /// Provides basic methods for adding symbols and querying.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Symbols {
     all: WordMap<SymbolKind>,
     namespaces: WordSet,

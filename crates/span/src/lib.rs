@@ -9,14 +9,12 @@ use std::ops::Bound;
 use std::ops::Range;
 use std::ops::RangeBounds;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 
 /// Represents a specific byte offset within a single source file.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(transparent)]
 pub struct Position {
     pub offset: u32,
@@ -26,7 +24,8 @@ pub struct Position {
 ///
 /// A `Span` is defined by a `start` and `end` [`Position`], marking the beginning
 /// (inclusive) and end (exclusive) of a source code segment.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Span {
     /// The unique identifier of the file this span belongs to.
     pub file_id: FileId,

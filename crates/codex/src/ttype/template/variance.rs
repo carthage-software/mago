@@ -1,7 +1,5 @@
-use serde::Deserialize;
-use serde::Serialize;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Variance {
     Invariant,
     Covariant,

@@ -1,13 +1,12 @@
 use std::fmt;
 
-use serde::Serialize;
-
 use mago_database::file::FileId;
 use mago_span::HasSpan;
 use mago_span::Position;
 use mago_span::Span;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum SyntaxError {
     /// A lexer-level unexpected character while inside a tag/expression.
     UnexpectedCharacter(FileId, u8, Position),
@@ -41,7 +40,8 @@ impl SyntaxError {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum ParseError<'arena> {
     SyntaxError(SyntaxError),
     /// Generic "unexpected token" with a human-readable expectation string.

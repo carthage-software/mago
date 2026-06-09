@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_database::file::FileId;
@@ -6,8 +5,9 @@ use mago_span::Position;
 use mago_span::Span;
 
 /// Associativity classification for infix operators.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Associativity {
     NonAssociative,
     Left,
@@ -16,8 +16,9 @@ pub enum Associativity {
 
 /// Precedence levels for Twig expression operators, ordered from lowest to
 /// highest binding.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Precedence {
     Lowest,
     Elvis,
@@ -143,8 +144,9 @@ pub trait GetPrecedence {
     fn precedence(&self) -> Precedence;
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum TwigTokenKind {
     RawText,
     VerbatimText,
@@ -268,7 +270,8 @@ impl TwigTokenKind {
 ///
 /// Stores `{ kind, start, value }`. The end position and full [`Span`] are
 /// derived on demand from `start` and `value.len()`.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TwigToken<'input> {
     pub kind: TwigTokenKind,
     pub start: Position,

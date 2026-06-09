@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -11,7 +10,8 @@ use crate::ast::TokenSeparatedSequence;
 use crate::ast::expression::Expression;
 use crate::ast::statement::Statement;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SetInline<'arena> {
     pub equal: Span,
     pub values: TokenSeparatedSequence<'arena, Expression<'arena>>,
@@ -24,7 +24,8 @@ impl HasSpan for SetInline<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SetCapture<'arena> {
     pub close_tag: Span,
     pub body: Sequence<'arena, Statement<'arena>>,
@@ -39,8 +40,9 @@ impl HasSpan for SetCapture<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum SetBody<'arena> {
     Inline(SetInline<'arena>),
     Capture(SetCapture<'arena>),
@@ -55,7 +57,8 @@ impl HasSpan for SetBody<'_> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Set<'arena> {
     pub open_tag: Span,
     pub keyword: Keyword<'arena>,

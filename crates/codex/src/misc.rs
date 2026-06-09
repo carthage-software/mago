@@ -1,20 +1,19 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_span::Span;
 use mago_word::Word;
 use mago_word::concat_word;
 
 /// Represents a PHP variable identifier (e.g., `$foo`, `$this`).
 /// Wraps a `Word` which holds the interned name (including '$').
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VariableIdentifier(
     /// The atom for the variable name (e.g., "$foo").
     pub Word,
 );
 
 /// Identifies the target of an expression, distinguishing simple variables from property accesses.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExpressionIdentifier {
     /// A simple variable identifier.
     ///
@@ -29,7 +28,8 @@ pub enum ExpressionIdentifier {
 }
 
 /// Identifies the scope where a generic template parameter (`@template`) is defined.
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize, PartialOrd, Ord, Debug)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum GenericParent {
     /// The template is defined on a class, interface, trait, or enum.
     /// * `Word` - The fully qualified name (FQCN) of the class-like structure.

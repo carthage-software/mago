@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
@@ -8,7 +5,8 @@ use mago_word::word;
 use crate::ttype::TType;
 use crate::utils::str_is_numeric;
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TStringCasing {
     Unspecified,
     Lowercase,
@@ -16,7 +14,8 @@ pub enum TStringCasing {
 }
 
 /// Represents the state of a string known to originate from a literal.
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TStringLiteral {
     /// The string originates from a literal, but its specific value isn't tracked here.
     Unspecified,
@@ -25,7 +24,8 @@ pub enum TStringLiteral {
 }
 
 /// Represents a PHP string type, tracking literal origin and guaranteed properties.
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TString {
     /// Describes the literal nature, if known. `None` means not known to be literal (general string).
     pub literal: Option<TStringLiteral>,

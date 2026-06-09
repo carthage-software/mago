@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -7,8 +6,9 @@ use mago_span::Span;
 /// Represents an identifier.
 ///
 /// An identifier can be a local, qualified, or fully qualified identifier.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Identifier<'arena> {
     Local(LocalIdentifier<'arena>),
     Qualified(QualifiedIdentifier<'arena>),
@@ -18,7 +18,8 @@ pub enum Identifier<'arena> {
 /// Represents a local, unqualified identifier.
 ///
 /// Example: `foo`, `Bar`, `BAZ`
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LocalIdentifier<'arena> {
     pub span: Span,
     pub value: &'arena [u8],
@@ -27,7 +28,8 @@ pub struct LocalIdentifier<'arena> {
 /// Represents a qualified identifier.
 ///
 /// Example: `Foo\bar`, `Bar\Baz`, `Baz\QUX`
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct QualifiedIdentifier<'arena> {
     pub span: Span,
     pub value: &'arena [u8],
@@ -36,7 +38,8 @@ pub struct QualifiedIdentifier<'arena> {
 /// Represents a fully qualified identifier.
 ///
 /// Example: `\Foo\bar`, `\Bar\Baz`, `\Baz\QUX`
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FullyQualifiedIdentifier<'arena> {
     pub span: Span,
     pub value: &'arena [u8],

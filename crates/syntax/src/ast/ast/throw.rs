@@ -1,12 +1,11 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ast::ast::expression::Expression;
 use crate::ast::ast::keyword::Keyword;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Throw<'arena> {
     pub throw: Keyword<'arena>,
     pub exception: &'arena Expression<'arena>,

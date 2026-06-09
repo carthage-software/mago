@@ -1,8 +1,6 @@
 use indoc::indoc;
 use mago_allocator::Arena;
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -36,8 +34,9 @@ pub struct PreferEarlyContinueRule {
     cfg: PreferEarlyContinueConfig,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
-#[serde(default)]
+#[derive(Debug, Clone, Copy, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
 pub struct PreferEarlyContinueConfig {
     pub level: Level,
     pub max_allowed_statements: usize,

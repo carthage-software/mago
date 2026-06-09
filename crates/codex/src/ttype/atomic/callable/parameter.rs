@@ -1,12 +1,10 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use crate::ttype::union::TUnion;
 
 /// Represents metadata for a single parameter within a `callable` type signature.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TCallableParameter {
     /// The type hint for the parameter, if specified within the callable signature.
     /// `None` if no specific type is given (equivalent to `mixed`).

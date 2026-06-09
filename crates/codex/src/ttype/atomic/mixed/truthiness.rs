@@ -1,8 +1,6 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 /// Describes the known truthiness of a `Mixed` type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(u8)]
 pub enum TMixedTruthiness {
     /// The value could be truthy or falsy.

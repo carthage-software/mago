@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -11,8 +10,9 @@ use crate::ast::Sequence;
 /// Trivia are tokens that carry no syntactic meaning for the parse tree
 /// proper but are retained so that the template source can be recovered
 /// from the AST.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum TriviaKind {
     /// Whitespace inside `{% %}` / `{{ }}` / `{# #}` blocks that does not
     /// appear in the significant token stream.
@@ -25,7 +25,8 @@ pub enum TriviaKind {
 }
 
 /// A piece of trivia retained on the template root.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Trivia<'arena> {
     pub kind: TriviaKind,
     pub span: Span,

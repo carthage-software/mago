@@ -2,8 +2,6 @@ use indoc::indoc;
 use mago_allocator::Arena;
 use mago_span::Span;
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_casing::is_camel_case;
 use mago_casing::is_snake_case;
@@ -34,8 +32,9 @@ pub struct VariableNameRule {
     cfg: VariableNameConfig,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct VariableNameConfig {
     pub level: Level,
     pub camel: bool,

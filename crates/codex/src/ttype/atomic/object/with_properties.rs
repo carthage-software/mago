@@ -1,8 +1,5 @@
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::word;
 
@@ -16,7 +13,8 @@ use crate::ttype::union::TUnion;
 /// and an optional `bar` property of type `string`.
 ///
 /// The `sealed` flag indicates whether the object is sealed (no additional properties will exist beyond those known).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TObjectWithProperties {
     /// Specific types known for certain keys (`Word`). The bool indicates if the element is optional.
     pub known_properties: BTreeMap<Word, (bool, TUnion)>,

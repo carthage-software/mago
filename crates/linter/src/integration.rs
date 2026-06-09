@@ -1,12 +1,12 @@
 use schemars::JsonSchema;
-use serde::Deserialize;
-use serde::Serialize;
 
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize, JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[schemars(with = "Vec<Integration>")]
 pub struct IntegrationSet(u32);
 
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Serialize, JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[schemars(with = "String")]
 #[repr(u8)]
 pub enum Integration {
@@ -140,7 +140,8 @@ impl std::str::FromStr for Integration {
     }
 }
 
-impl<'de> Deserialize<'de> for Integration {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Integration {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,

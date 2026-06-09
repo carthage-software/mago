@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_span::Span;
 
 use crate::ttype::union::TUnion;
@@ -10,7 +7,8 @@ use crate::ttype::union::TUnion;
 /// This struct combines the core type information (`TUnion`) with contextual details
 /// about *how* and *where* this type information was determined or declared in the source code
 /// or related documentation.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 pub struct TypeMetadata {
     /// The specific location (span) in the source code or documentation

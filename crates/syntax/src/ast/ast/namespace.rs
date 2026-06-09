@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -23,7 +22,8 @@ use crate::ast::sequence::Sequence;
 ///    // ...
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Namespace<'arena> {
     pub namespace: Keyword<'arena>,
     pub name: Option<Identifier<'arena>>,
@@ -31,8 +31,9 @@ pub struct Namespace<'arena> {
 }
 
 /// Represents the body of a PHP `namespace` declaration.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum NamespaceBody<'arena> {
     Implicit(NamespaceImplicitBody<'arena>),
     BraceDelimited(Block<'arena>),
@@ -49,7 +50,8 @@ pub enum NamespaceBody<'arena> {
 ///
 /// // ...
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NamespaceImplicitBody<'arena> {
     pub terminator: Terminator<'arena>,
     pub statements: Sequence<'arena, Statement<'arena>>,

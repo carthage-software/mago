@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -21,7 +20,8 @@ use crate::ast::sequence::Sequence;
 ///    echo $value;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Foreach<'arena> {
     pub foreach: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -33,8 +33,9 @@ pub struct Foreach<'arena> {
 }
 
 /// Represents the target of a foreach statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum ForeachTarget<'arena> {
     Value(ForeachValueTarget<'arena>),
     KeyValue(ForeachKeyValueTarget<'arena>),
@@ -51,7 +52,8 @@ pub enum ForeachTarget<'arena> {
 ///   echo $value;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ForeachValueTarget<'arena> {
     pub value: &'arena Expression<'arena>,
 }
@@ -67,7 +69,8 @@ pub struct ForeachValueTarget<'arena> {
 ///   echo $key . ' => ' . $value . PHP_EOL;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ForeachKeyValueTarget<'arena> {
     pub key: &'arena Expression<'arena>,
     pub double_arrow: Span,
@@ -75,8 +78,9 @@ pub struct ForeachKeyValueTarget<'arena> {
 }
 
 /// Represents the body of a foreach statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum ForeachBody<'arena> {
     /// The body is a statement.
     Statement(&'arena Statement<'arena>),
@@ -95,7 +99,8 @@ pub enum ForeachBody<'arena> {
 ///   echo $value;
 /// endforeach;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ForeachColonDelimitedBody<'arena> {
     pub colon: Span,
     pub statements: Sequence<'arena, Statement<'arena>>,

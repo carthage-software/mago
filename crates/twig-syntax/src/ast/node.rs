@@ -1,6 +1,5 @@
 //! Universal walker enum over every Twig AST node.
 
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -75,8 +74,9 @@ use crate::ast::VariadicArrayElement;
 use crate::ast::Verbatim;
 use crate::ast::With;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum NodeKind {
@@ -151,8 +151,9 @@ pub enum NodeKind {
     MissingArrayElement,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 #[non_exhaustive]
 pub enum Node<'ast, 'arena> {
     Template(&'ast Template<'arena>),

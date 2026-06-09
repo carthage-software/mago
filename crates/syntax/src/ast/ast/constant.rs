@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -14,7 +12,8 @@ use crate::ast::sequence::TokenSeparatedSequence;
 /// Represents a constant statement in PHP.
 ///
 /// Example: `const FOO = 1;` or `const BAR = 2, QUX = 3, BAZ = 4;`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Constant<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub r#const: Keyword<'arena>,
@@ -23,7 +22,8 @@ pub struct Constant<'arena> {
 }
 
 /// Represents a single name-value pair within a constant statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ConstantItem<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub equals: Span,

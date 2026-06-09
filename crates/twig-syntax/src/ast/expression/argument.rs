@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -10,7 +9,8 @@ use crate::ast::expression::Expression;
 
 /// A parenthesised argument list attached to a call, method call, filter,
 /// or test.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ArgumentList<'arena> {
     pub left_parenthesis: Span,
     pub arguments: TokenSeparatedSequence<'arena, Argument<'arena>>,
@@ -18,8 +18,9 @@ pub struct ArgumentList<'arena> {
 }
 
 /// A single argument in a call or filter/test argument list.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Argument<'arena> {
     Positional(PositionalArgument<'arena>),
     Named(NamedArgument<'arena>),
@@ -27,7 +28,8 @@ pub enum Argument<'arena> {
 
 /// A positional argument. `...x` (spread) is represented as a positional
 /// argument with `ellipsis = Some(span)`.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PositionalArgument<'arena> {
     pub ellipsis: Option<Span>,
     pub value: &'arena Expression<'arena>,
@@ -35,15 +37,17 @@ pub struct PositionalArgument<'arena> {
 
 /// The separator between a named argument's name and its value. Twig
 /// accepts both `name = value` and `name: value`.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum NamedArgumentSeparator {
     Equal(Span),
     Colon(Span),
 }
 
 /// A named argument: `name = value` or `name: value`.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NamedArgument<'arena> {
     pub name: Identifier<'arena>,
     pub separator: NamedArgumentSeparator,

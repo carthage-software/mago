@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::word;
 
@@ -12,7 +9,8 @@ use crate::ttype::union::TUnion;
 ///
 /// This type expands to a union of all possible bitmask combinations.
 /// For example, `int-mask<1, 2, 4>` expands to `0|1|2|3|4|5|6|7`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TIntMask {
     values: Vec<TUnion>,
 }

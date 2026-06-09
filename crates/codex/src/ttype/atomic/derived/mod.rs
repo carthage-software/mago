@@ -1,6 +1,4 @@
 use mago_word::Word;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
@@ -31,7 +29,8 @@ pub mod value_of;
 /// - `value-of<T>`: Extracts the values of an array-like or enum type
 /// - `properties-of<T>`: Extracts object properties, optionally filtered by visibility
 /// - `T[K]`: Indexed access type that resolves to the type at index K of type T
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TDerived {
     /// Represents `key-of<T>` utility type
     KeyOf(TKeyOf),

@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::word;
 
@@ -24,7 +21,8 @@ pub mod string;
 ///
 /// This includes general types (int, float, string, bool), literal types,
 /// union types (num, array-key), and the top type (scalar).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TScalar {
     /// Represents the top type `scalar`, encompassing all other scalar variants.
     Generic,

@@ -71,8 +71,6 @@ use foldhash::HashMap;
 use foldhash::HashMapExt;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::change::Change;
 use crate::change::ChangeLog;
@@ -98,7 +96,8 @@ pub mod watcher;
 mod operation;
 
 /// Configuration for database loading and watching.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DatabaseConfiguration<'config> {
     pub workspace: Cow<'config, Path>,
     /// Paths or glob patterns for source files.
@@ -117,7 +116,8 @@ pub struct DatabaseConfiguration<'config> {
 /// Settings for glob pattern matching behavior.
 ///
 /// All defaults match the `globset` crate defaults for backwards compatibility.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlobSettings {
     /// Match patterns case-insensitively.
     ///
@@ -212,7 +212,8 @@ impl<'config> DatabaseConfiguration<'config> {
 }
 
 /// Mutable database for managing project files with add/update/delete operations.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct Database<'config> {
     files: HashMap<Cow<'static, [u8]>, Arc<File>>,

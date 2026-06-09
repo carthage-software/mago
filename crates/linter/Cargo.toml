@@ -27,13 +27,22 @@ mago-php-version = { workspace = true }
 mago-collector = { workspace = true }
 foldhash = { workspace = true }
 memchr = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
 regex = { workspace = true }
 indoc = { workspace = true }
 mago-allocator = { workspace = true }
 tracing = { workspace = true }
 schemars = { workspace = true }
+
+[features]
+default = []
+serde = [
+    "dep:serde",
+    "dep:serde_json",
+    "mago-reporting/serde",
+    "mago-php-version/serde",
+]
 
 [dev-dependencies]
 mago-syntax = { workspace = true }

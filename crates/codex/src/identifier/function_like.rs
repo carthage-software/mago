@@ -1,6 +1,4 @@
 use mago_database::file::File;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_span::Span;
 use mago_word::Word;
@@ -11,7 +9,8 @@ use crate::identifier::method::MethodIdentifier;
 ///
 /// This distinguishes between globally/namespaced defined functions, methods within
 /// class-like structures, and closures identified by their synthetic name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FunctionLikeIdentifier {
     /// A globally or namespaced defined function.
     /// * `Word` - The fully qualified name (FQN) of the function.

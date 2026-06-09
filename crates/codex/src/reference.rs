@@ -2,8 +2,6 @@ use foldhash::HashMap;
 use foldhash::HashSet;
 use mago_word::ascii_lowercase_word;
 use mago_word::empty_word;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_word::Word;
 use mago_word::WordSet;
@@ -16,7 +14,8 @@ use crate::symbol::SymbolIdentifier;
 
 /// Represents the source of a reference, distinguishing between top-level symbols
 /// and members within a class-like structure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ReferenceSource {
     /// A reference from a top-level symbol (function, class, enum, trait, interface, constant).
     /// The bool indicates if the reference occurs within a signature context (true) or body (false).
@@ -31,7 +30,8 @@ pub enum ReferenceSource {
 
 /// Holds sets of symbols and members identified as invalid during analysis,
 /// often due to changes detected in `CodebaseDiff`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::struct_field_names)]
 pub struct InvalidSymbols {
     /// Set of (Symbol, Member) pairs whose *signatures* are considered invalid.
@@ -50,7 +50,8 @@ pub struct InvalidSymbols {
 ///
 /// This is primarily used for dependency analysis, understanding code structure,
 /// and potentially for tasks like dead code detection or impact analysis.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::struct_field_names)]
 pub struct SymbolReferences {
     /// Maps a referencing symbol/member `(RefSymbol, RefMember)` to a set of referenced symbols/members `(Symbol, Member)`

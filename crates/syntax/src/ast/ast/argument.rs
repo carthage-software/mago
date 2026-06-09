@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_allocator::prelude::*;
@@ -13,7 +12,8 @@ use crate::ast::sequence::TokenSeparatedSequence;
 /// Represents a list of arguments.
 ///
 /// Example: `($bar, 42)` in `foo($bar, 42)`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct ArgumentList<'arena> {
     pub left_parenthesis: Span,
     pub arguments: TokenSeparatedSequence<'arena, Argument<'arena>>,
@@ -25,7 +25,8 @@ pub struct ArgumentList<'arena> {
 /// Example: `(1, ?, 3, ...)` in `foo(1, ?, 3, ...)`
 ///
 /// Reference: <https://wiki.php.net/rfc/partial_function_application_v2>
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PartialArgumentList<'arena> {
     pub left_parenthesis: Span,
     pub arguments: TokenSeparatedSequence<'arena, PartialArgument<'arena>>,
@@ -33,16 +34,18 @@ pub struct PartialArgumentList<'arena> {
 }
 
 /// Represents an argument.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Argument<'arena> {
     Positional(PositionalArgument<'arena>),
     Named(NamedArgument<'arena>),
 }
 
 /// Represents an argument or placeholder in a partial function application.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum PartialArgument<'arena> {
     Positional(PositionalArgument<'arena>),
     Named(NamedArgument<'arena>),
@@ -54,7 +57,8 @@ pub enum PartialArgument<'arena> {
 /// Represents a positional argument.
 ///
 /// Example: `$foo` in `foo($foo)`, `...$bar` in `foo(...$bar)`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PositionalArgument<'arena> {
     pub ellipsis: Option<Span>,
     pub value: &'arena Expression<'arena>,
@@ -63,7 +67,8 @@ pub struct PositionalArgument<'arena> {
 /// Represents a named argument.
 ///
 /// Example: `foo: 42` in `foo(foo: 42)`, `bar: ...$bar` in `foo(bar: ...$bar)`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NamedArgument<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub colon: Span,
@@ -75,7 +80,8 @@ pub struct NamedArgument<'arena> {
 /// Example: `foo: ?` in `foo(foo: ?, bar: 2)`
 ///
 /// Reference: <https://wiki.php.net/rfc/partial_function_application_v2>
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NamedPlaceholderArgument<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub colon: Span,
@@ -87,7 +93,8 @@ pub struct NamedPlaceholderArgument<'arena> {
 /// Example: `?` in `foo(1, ?, 3)`
 ///
 /// Reference: <https://wiki.php.net/rfc/partial_function_application_v2>
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct PlaceholderArgument {
     pub span: Span,
 }
@@ -97,7 +104,8 @@ pub struct PlaceholderArgument {
 /// Example: `...` in `foo(1, 2, ...)`
 ///
 /// Reference: <https://wiki.php.net/rfc/partial_function_application_v2>
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct VariadicPlaceholderArgument {
     pub span: Span,
 }

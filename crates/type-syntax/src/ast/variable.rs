@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_database::file::FileId;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -7,7 +5,8 @@ use mago_span::Span;
 use crate::token::TypeToken;
 use crate::token::TypeTokenKind;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct VariableType<'arena> {
     pub span: Span,
     pub value: &'arena [u8],

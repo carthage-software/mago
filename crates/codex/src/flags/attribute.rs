@@ -1,9 +1,7 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 /// Represents the flags defined in a PHP `#[Attribute]` declaration,
 /// specifying the targets where the attribute can be applied and whether it's repeatable.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(transparent)]
 pub struct AttributeFlags(u8);
 

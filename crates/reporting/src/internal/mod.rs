@@ -1,9 +1,6 @@
 use std::borrow::Cow;
 use std::path::PathBuf;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::error::DatabaseError;
@@ -19,24 +16,27 @@ use crate::IssueCollection;
 use crate::Level;
 
 /// Expanded representation of a file id.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExpandedFileId {
     pub name: Cow<'static, str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub path: Option<PathBuf>,
     pub size: u32,
     pub file_type: FileType,
 }
 
 /// Expanded representation of a position within a file.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExpandedPosition {
     pub offset: u32,
     pub line: u32,
 }
 
 /// Expanded representation of a span, including start and end positions.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExpandedSpan {
     pub file_id: ExpandedFileId,
     pub start: ExpandedPosition,
@@ -44,35 +44,38 @@ pub struct ExpandedSpan {
 }
 
 /// Expanded annotation, enriched with resolved spans.
-#[derive(Debug, PartialEq, Eq, Ord, Clone, Hash, PartialOrd, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Ord, Clone, Hash, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct ExpandedAnnotation {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub message: Option<String>,
     pub kind: AnnotationKind,
     pub span: ExpandedSpan,
 }
 
 /// Expanded issue, containing detailed information for display or external reporting.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExpandedIssue {
     pub level: Level,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub code: Option<String>,
     pub message: String,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
     pub notes: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub help: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
     pub link: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
     pub annotations: Vec<ExpandedAnnotation>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
     pub edits: Vec<(ExpandedFileId, Vec<TextEdit>)>,
 }
 
 /// A collection of expanded issues.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ExpandedIssueCollection {
     issues: Vec<ExpandedIssue>,
 }

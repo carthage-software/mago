@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -21,7 +19,8 @@ use crate::ast::ast::terminator::Terminator;
 ///   $i++;
 /// } while ($i < 10);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct DoWhile<'arena> {
     pub r#do: Keyword<'arena>,
     pub statement: &'arena Statement<'arena>,

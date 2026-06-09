@@ -1,7 +1,5 @@
-use serde::Deserialize;
-use serde::Serialize;
-
-#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Ord, Copy, Clone, Hash, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 #[repr(u8)]
 pub enum Category {
     Clarity,

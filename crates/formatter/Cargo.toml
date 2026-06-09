@@ -19,10 +19,16 @@ mago-span = { workspace = true }
 mago-php-version = { workspace = true }
 foldhash = { workspace = true }
 memchr = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
 unicode-width = { workspace = true }
 mago-allocator = { workspace = true }
 schemars = { workspace = true }
+
+[features]
+default = []
+serde = [
+    "dep:serde",
+]
 
 [dev-dependencies]
 indoc = { workspace = true }

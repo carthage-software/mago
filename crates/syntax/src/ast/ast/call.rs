@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -8,8 +7,9 @@ use crate::ast::ast::argument::ArgumentList;
 use crate::ast::ast::class_like::member::ClassLikeMemberSelector;
 use crate::ast::ast::expression::Expression;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Call<'arena> {
     Function(FunctionCall<'arena>),
     Method(MethodCall<'arena>),
@@ -17,13 +17,15 @@ pub enum Call<'arena> {
     StaticMethod(StaticMethodCall<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct FunctionCall<'arena> {
     pub function: &'arena Expression<'arena>,
     pub argument_list: ArgumentList<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MethodCall<'arena> {
     pub object: &'arena Expression<'arena>,
     pub arrow: Span,
@@ -31,7 +33,8 @@ pub struct MethodCall<'arena> {
     pub argument_list: ArgumentList<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct NullSafeMethodCall<'arena> {
     pub object: &'arena Expression<'arena>,
     pub question_mark_arrow: Span,
@@ -39,7 +42,8 @@ pub struct NullSafeMethodCall<'arena> {
     pub argument_list: ArgumentList<'arena>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct StaticMethodCall<'arena> {
     pub class: &'arena Expression<'arena>,
     pub double_colon: Span,

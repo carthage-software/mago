@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -11,7 +10,8 @@ use crate::ast::ast::terminator::Terminator;
 use crate::ast::sequence::Sequence;
 
 /// Represents a `switch` statement in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Switch<'arena> {
     pub switch: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -21,15 +21,17 @@ pub struct Switch<'arena> {
 }
 
 /// Represents the body of a switch statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum SwitchBody<'arena> {
     BraceDelimited(SwitchBraceDelimitedBody<'arena>),
     ColonDelimited(SwitchColonDelimitedBody<'arena>),
 }
 
 /// Represents a brace-delimited body of a switch statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SwitchBraceDelimitedBody<'arena> {
     pub left_brace: Span,
     pub optional_terminator: Option<Terminator<'arena>>,
@@ -38,7 +40,8 @@ pub struct SwitchBraceDelimitedBody<'arena> {
 }
 
 /// Represents a colon-delimited body of a switch statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SwitchColonDelimitedBody<'arena> {
     pub colon: Span,
     pub optional_terminator: Option<Terminator<'arena>>,
@@ -48,8 +51,9 @@ pub struct SwitchColonDelimitedBody<'arena> {
 }
 
 /// Represents a single case within a switch statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum SwitchCase<'arena> {
     Expression(SwitchExpressionCase<'arena>),
     Default(SwitchDefaultCase<'arena>),
@@ -58,7 +62,8 @@ pub enum SwitchCase<'arena> {
 /// Represents a single case within a switch statement.
 ///
 /// Example: `case 1: echo "One";`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SwitchExpressionCase<'arena> {
     pub case: Keyword<'arena>,
     pub expression: &'arena Expression<'arena>,
@@ -69,7 +74,8 @@ pub struct SwitchExpressionCase<'arena> {
 /// Represents the default case within a switch statement.
 ///
 /// Example: `default: echo "Default";`
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SwitchDefaultCase<'arena> {
     pub default: Keyword<'arena>,
     pub separator: SwitchCaseSeparator,
@@ -77,8 +83,9 @@ pub struct SwitchDefaultCase<'arena> {
 }
 
 /// Represents the separator between a case and its statements.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum SwitchCaseSeparator {
     Colon(Span),
     SemiColon(Span),

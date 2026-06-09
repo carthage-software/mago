@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
@@ -21,7 +18,8 @@ pub mod parameter;
 /// This includes parameter types and flags, return type, and purity information,
 /// often derived from `@param callable(ParamType...): ReturnType` docblock tags
 /// or inferred from usage.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TCallableSignature {
     /// `true` if the callable is known to be pure (no side effects), often from `@psalm-pure`.
     pub is_pure: bool,
@@ -37,7 +35,8 @@ pub struct TCallableSignature {
 
 /// Represents a callable entity, which can either be a fully defined signature
 /// or an alias pointing to another function, method, or known closure.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TCallable {
     /// A concrete callable signature with defined parameters and return type.
     /// Example: Represents `callable(string): int`.

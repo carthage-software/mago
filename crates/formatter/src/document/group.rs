@@ -3,9 +3,8 @@ use core::fmt::Formatter;
 use core::fmt::Result;
 use core::ops::AddAssign;
 
-use serde::Serialize;
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct GroupIdentifier(pub usize);
 
 #[derive(Debug)]

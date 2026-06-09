@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -24,7 +23,8 @@ use crate::ast::sequence::Sequence;
 ///    }
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Method<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub modifiers: Sequence<'arena, Modifier<'arena>>,
@@ -37,8 +37,9 @@ pub struct Method<'arena> {
 }
 
 /// Represents the body of a method statement in PHP.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum MethodBody<'arena> {
     Abstract(MethodAbstractBody),
     Concrete(Block<'arena>),
@@ -56,7 +57,8 @@ pub enum MethodBody<'arena> {
 /// }
 ///
 /// ```
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MethodAbstractBody {
     pub semicolon: Span,
 }

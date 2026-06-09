@@ -1,10 +1,10 @@
 use mago_span::HasSpan;
 use mago_span::Span;
-use serde::Serialize;
 
 use mago_type_syntax::error::ParseError;
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum TypeError {
     ParseError(ParseError),
     UnsupportedType(String, Span),

@@ -16,8 +16,14 @@ workspace = true
 mago-span = { workspace = true }
 mago-syntax = { workspace = true }
 mago-word = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, optional = true }
 strum = { workspace = true }
 foldhash = { workspace = true }
 mago-allocator = { workspace = true }
 memchr = { workspace = true }
+
+[features]
+default = []
+serde = [
+    "dep:serde",
+]

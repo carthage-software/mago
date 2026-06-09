@@ -32,7 +32,7 @@ mago-analyzer = { workspace = true }
 mago-formatter = { workspace = true }
 mago-orchestrator = { workspace = true }
 mago-syntax = { workspace = true }
-mago-prelude = { workspace = true }
+mago-prelude = { workspace = true, features = ["serde"] }
 wasm-bindgen = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 serde = { workspace = true }

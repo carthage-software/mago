@@ -3,8 +3,6 @@ use std::collections::hash_map::Entry;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
-use serde::Deserialize;
-use serde::Serialize;
 
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -75,7 +73,8 @@ pub struct CodebaseEntryKeys {
 /// This acts as the central repository for metadata gathered during static analysis,
 /// including details about classes, interfaces, traits, enums, functions, constants,
 /// their members, inheritance, dependencies, and associated types.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct CodebaseMetadata {

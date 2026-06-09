@@ -1,8 +1,5 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 use mago_word::concat_word;
 
@@ -17,7 +14,8 @@ use crate::ttype::union::TUnion;
 ///
 /// For example, if `Foo` has constants `READ = 1`, `WRITE = 2`, `EXECUTE = 4`,
 /// then `int-mask-of<Foo::*>` expands to `0|1|2|3|4|5|6|7`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TIntMaskOf(Arc<TUnion>);
 
 impl TIntMaskOf {

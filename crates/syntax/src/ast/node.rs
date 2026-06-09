@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -230,8 +229,9 @@ use crate::ast::ast::YieldFrom;
 use crate::ast::ast::YieldPair;
 use crate::ast::ast::YieldValue;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum NodeKind {
@@ -464,8 +464,9 @@ pub enum NodeKind {
     ClassLikeConstantMissingSelector,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 #[repr(u8)]
 #[non_exhaustive]
 pub enum Node<'ast, 'arena> {

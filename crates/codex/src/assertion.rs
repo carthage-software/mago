@@ -9,8 +9,6 @@ use mago_word::concat_word;
 use mago_word::i64_word;
 use mago_word::usize_word;
 use mago_word::word;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
@@ -20,7 +18,8 @@ use crate::ttype::template::TemplateResult;
 use crate::ttype::template::inferred_type_replacer;
 use crate::ttype::union::TUnion;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Assertion {
     Any,
     IsType(TAtomic),

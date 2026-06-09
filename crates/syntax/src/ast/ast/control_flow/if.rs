@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -23,7 +22,8 @@ use crate::ast::sequence::Sequence;
 ///   echo "a and b are false";
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct If<'arena> {
     pub r#if: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -35,15 +35,17 @@ pub struct If<'arena> {
 /// Represents the body of an `if` statement.
 ///
 /// This can be either a statement body or a colon-delimited body.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum IfBody<'arena> {
     Statement(IfStatementBody<'arena>),
     ColonDelimited(IfColonDelimitedBody<'arena>),
 }
 
 /// Represents the body of an `if` statement when it is a statement body.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IfStatementBody<'arena> {
     pub statement: &'arena Statement<'arena>,
     pub else_if_clauses: Sequence<'arena, IfStatementBodyElseIfClause<'arena>>,
@@ -51,7 +53,8 @@ pub struct IfStatementBody<'arena> {
 }
 
 /// Represents an `elseif` clause in a statement body of an `if` statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IfStatementBodyElseIfClause<'arena> {
     pub elseif: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -61,14 +64,16 @@ pub struct IfStatementBodyElseIfClause<'arena> {
 }
 
 /// Represents an `else` clause in a statement body of an `if` statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IfStatementBodyElseClause<'arena> {
     pub r#else: Keyword<'arena>,
     pub statement: &'arena Statement<'arena>,
 }
 
 /// Represents a colon-delimited body of an `if` statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IfColonDelimitedBody<'arena> {
     pub colon: Span,
     pub statements: Sequence<'arena, Statement<'arena>>,
@@ -79,7 +84,8 @@ pub struct IfColonDelimitedBody<'arena> {
 }
 
 /// Represents an `elseif` clause in a colon-delimited body of an `if` statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IfColonDelimitedBodyElseIfClause<'arena> {
     pub elseif: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -90,7 +96,8 @@ pub struct IfColonDelimitedBodyElseIfClause<'arena> {
 }
 
 /// Represents an `else` clause in a colon-delimited body of an `if` statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IfColonDelimitedBodyElseClause<'arena> {
     pub r#else: Keyword<'arena>,
     pub colon: Span,

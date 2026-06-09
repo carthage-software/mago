@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -7,7 +5,8 @@ use crate::ast::ArgumentList;
 use crate::ast::Identifier;
 use crate::ast::expression::Expression;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct GetAttribute<'arena> {
     pub object: &'arena Expression<'arena>,
     pub dot: Span,
@@ -15,7 +14,8 @@ pub struct GetAttribute<'arena> {
     pub attribute: &'arena Expression<'arena>,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct GetItem<'arena> {
     pub object: &'arena Expression<'arena>,
     pub left_bracket: Span,
@@ -25,7 +25,8 @@ pub struct GetItem<'arena> {
 
 /// `a[start:length]` slice access. `start` and `length` are both optional -
 /// `a[:3]`, `a[1:]`, and `a[:]` are all valid Twig.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Slice<'arena> {
     pub object: &'arena Expression<'arena>,
     pub left_bracket: Span,
@@ -35,7 +36,8 @@ pub struct Slice<'arena> {
     pub right_bracket: Span,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MethodCall<'arena> {
     pub object: &'arena Expression<'arena>,
     pub dot: Span,

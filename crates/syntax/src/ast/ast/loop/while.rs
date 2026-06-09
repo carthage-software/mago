@@ -1,4 +1,3 @@
-use serde::Serialize;
 use strum::Display;
 
 use mago_span::HasSpan;
@@ -23,7 +22,8 @@ use crate::ast::sequence::Sequence;
 ///   $i++;
 /// }
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct While<'arena> {
     pub r#while: Keyword<'arena>,
     pub left_parenthesis: Span,
@@ -33,8 +33,9 @@ pub struct While<'arena> {
 }
 
 /// Represents the body of a while statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord, Display)]
-#[serde(tag = "type", content = "value")]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum WhileBody<'arena> {
     Statement(&'arena Statement<'arena>),
     ColonDelimited(WhileColonDelimitedBody<'arena>),
@@ -53,7 +54,8 @@ pub enum WhileBody<'arena> {
 ///   $i++;
 /// endwhile;
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct WhileColonDelimitedBody<'arena> {
     pub colon: Span,
     pub statements: Sequence<'arena, Statement<'arena>>,

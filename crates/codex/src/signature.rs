@@ -1,6 +1,3 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use mago_word::Word;
 
 /// Represents a signature node for a definition (function, class, method, constant, etc.).
@@ -8,7 +5,8 @@ use mago_word::Word;
 /// This structure forms a hierarchical tree where top-level symbols (classes, functions)
 /// can have children (methods, properties within classes).
 ///
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DefSignatureNode {
     /// The name of the symbol (e.g., "Foo" for class Foo, "bar" for method bar)
     pub name: Word,
@@ -110,7 +108,8 @@ impl DefSignatureNode {
 /// This contains all top-level definitions (classes, interfaces, traits, enums,
 /// functions, constants) in the file as a flat vector. Nested definitions
 /// (methods, properties) are stored within the `children` of their parent nodes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FileSignature {
     pub hash: u64,
     pub ast_nodes: Vec<DefSignatureNode>,
