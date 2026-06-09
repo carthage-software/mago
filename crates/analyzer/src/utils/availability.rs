@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::class_like_constant::ClassLikeConstantMetadata;
 use mago_codex::metadata::constant::ConstantMetadata;
@@ -21,12 +22,14 @@ use crate::context::Context;
 ///
 /// `display_name` is rendered verbatim into the message — pass the user's
 /// original casing (e.g. `Foo::bar`) rather than the lowercased lookup key.
-pub fn check_class_like_availability(
-    context: &mut Context<'_, '_>,
+pub fn check_class_like_availability<A>(
+    context: &mut Context<'_, '_, A>,
     metadata: &ClassLikeMetadata,
     display_name: &dyn std::fmt::Display,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     let version = context.settings.version;
     if metadata.is_available_in_version(version) {
         return;
@@ -50,12 +53,14 @@ pub fn check_class_like_availability(
     );
 }
 
-pub fn check_function_availability(
-    context: &mut Context<'_, '_>,
+pub fn check_function_availability<A>(
+    context: &mut Context<'_, '_, A>,
     metadata: &FunctionLikeMetadata,
     display_name: &dyn std::fmt::Display,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     let version = context.settings.version;
     if metadata.is_available_in_version(version) {
         return;
@@ -72,12 +77,14 @@ pub fn check_function_availability(
     );
 }
 
-pub fn check_method_availability(
-    context: &mut Context<'_, '_>,
+pub fn check_method_availability<A>(
+    context: &mut Context<'_, '_, A>,
     metadata: &FunctionLikeMetadata,
     display_name: &dyn std::fmt::Display,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     let version = context.settings.version;
     if metadata.is_available_in_version(version) {
         return;
@@ -94,12 +101,14 @@ pub fn check_method_availability(
     );
 }
 
-pub fn check_property_availability(
-    context: &mut Context<'_, '_>,
+pub fn check_property_availability<A>(
+    context: &mut Context<'_, '_, A>,
     metadata: &PropertyMetadata,
     display_name: &dyn std::fmt::Display,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     let version = context.settings.version;
     if metadata.is_available_in_version(version) {
         return;
@@ -116,12 +125,14 @@ pub fn check_property_availability(
     );
 }
 
-pub fn check_constant_availability(
-    context: &mut Context<'_, '_>,
+pub fn check_constant_availability<A>(
+    context: &mut Context<'_, '_, A>,
     metadata: &ConstantMetadata,
     display_name: &dyn std::fmt::Display,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     let version = context.settings.version;
     if metadata.is_available_in_version(version) {
         return;
@@ -138,12 +149,14 @@ pub fn check_constant_availability(
     );
 }
 
-pub fn check_class_constant_availability(
-    context: &mut Context<'_, '_>,
+pub fn check_class_constant_availability<A>(
+    context: &mut Context<'_, '_, A>,
     metadata: &ClassLikeConstantMetadata,
     display_name: &dyn std::fmt::Display,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     let version = context.settings.version;
     if metadata.is_available_in_version(version) {
         return;
@@ -160,12 +173,14 @@ pub fn check_class_constant_availability(
     );
 }
 
-pub fn check_enum_case_availability(
-    context: &mut Context<'_, '_>,
+pub fn check_enum_case_availability<A>(
+    context: &mut Context<'_, '_, A>,
     metadata: &EnumCaseMetadata,
     display_name: &dyn std::fmt::Display,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     let version = context.settings.version;
     if metadata.is_available_in_version(version) {
         return;
@@ -183,15 +198,17 @@ pub fn check_enum_case_availability(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn report_unavailable(
-    context: &mut Context<'_, '_>,
+fn report_unavailable<A>(
+    context: &mut Context<'_, '_, A>,
     code: IssueCode,
     kind: &str,
     display_name: &dyn std::fmt::Display,
     constraint: &VersionConstraint,
     configured: PHPVersion,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     let configured_str = format_version(configured);
 
     let availability = describe_availability(constraint);

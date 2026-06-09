@@ -3,8 +3,12 @@ use crate::ast::ast::Modifier;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_modifier_sequence(&mut self) -> Result<Sequence<'arena, Modifier<'arena>>, ParseError> {
         let mut modifiers = self.new_vec();
         while let Some(modifier) = self.parse_optional_modifier()? {

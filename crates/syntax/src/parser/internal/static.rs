@@ -6,8 +6,12 @@ use crate::ast::ast::StaticItem;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_static(&mut self) -> Result<Static<'arena>, ParseError> {
         let r#static = self.expect_keyword(T!["static"])?;
         let items = {

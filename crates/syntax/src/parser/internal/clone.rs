@@ -15,8 +15,12 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::Precedence;
 use crate::token::TokenKind;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parses a `clone` expression, handling the syntactic ambiguity introduced in PHP 8.5.
     ///
     /// PHP 8.5 allows `clone` to be used like a function (e.g., `clone($foo, $bar)`). This

@@ -1,4 +1,3 @@
-use bumpalo::collections::Vec as BVec;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -41,7 +40,7 @@ pub enum StringPart<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, PartialOrd, Ord)]
 pub struct InterpolatedString<'arena> {
     pub open_quote: Span,
-    pub parts: BVec<'arena, StringPart<'arena>>,
+    pub parts: &'arena [StringPart<'arena>],
     pub close_quote: Span,
 }
 

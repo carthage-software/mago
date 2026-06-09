@@ -6,11 +6,15 @@ use crate::ast::WithExpressionClause;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigToken;
+use mago_allocator::prelude::*;
 
 pub(super) type IncludeTail<'arena> =
     (Option<IgnoreMissingClause<'arena>>, Option<WithExpressionClause<'arena>>, Option<Keyword<'arena>>);
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_include(
         &mut self,
         open_tag_tok: TwigToken<'arena>,

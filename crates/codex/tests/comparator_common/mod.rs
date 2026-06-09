@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 use mago_word::Word;
 use mago_word::WordSet;
 use mago_word::word;
@@ -54,7 +54,7 @@ pub fn codebase_from_php(code: &'static str) -> CodebaseMetadata {
     let database = Database::single(file, config);
 
     let mut codebase = CodebaseMetadata::new();
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     for file in database.files() {
         let program = parse_file(&arena, &file);
         assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);

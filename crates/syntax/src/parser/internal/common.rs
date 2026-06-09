@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::ast::ast::Keyword;
@@ -5,7 +6,10 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TokenKind;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Expects and consumes a keyword token.
     #[inline]
     pub(crate) fn expect_keyword(&mut self, kind: TokenKind) -> Result<Keyword<'arena>, ParseError> {

@@ -6,8 +6,12 @@ use crate::ast::StringPart;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse an interpolated double-quoted string, producing a sequence of
     /// literal chunks and `#{ ... }` interpolations.
     pub(crate) fn parse_interpolated_string(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
@@ -43,7 +47,11 @@ impl<'arena> Parser<'_, 'arena> {
                 TwigTokenKind::DoubleQuoteEnd => {
                     let end_tok = self.stream.consume()?;
                     let close_quote = self.stream.span_of(&end_tok);
-                    return Ok(Expression::InterpolatedString(InterpolatedString { open_quote, parts, close_quote }));
+                    return Ok(Expression::InterpolatedString(InterpolatedString {
+                        open_quote,
+                        parts: parts.leak(),
+                        close_quote,
+                    }));
                 }
                 _ => {
                     return Err(ParseError::UnexpectedToken(

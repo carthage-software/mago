@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::rc::Rc;
@@ -32,12 +33,15 @@ use crate::error::AnalysisError;
 use crate::statement::analyze_statements;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let mut catch_actions = vec![];
         let mut all_catches_leave = !self.catch_clauses.is_empty();
 
@@ -399,10 +403,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
     }
 }
 
-fn get_caught_classes<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'arena>) -> WordSet {
+fn get_caught_classes<'arena, A>(context: &mut Context<'_, 'arena, A>, hint: &Hint<'arena>) -> WordSet
+where
+    A: Arena,
+{
     let mut caught_identifiers: WordMap<Span> = WordMap::default();
 
-    fn walk<'arena>(context: &mut Context<'_, 'arena>, hint: &Hint<'arena>, caught: &mut WordMap<Span>) {
+    fn walk<'arena, A>(context: &mut Context<'_, 'arena, A>, hint: &Hint<'arena>, caught: &mut WordMap<Span>)
+    where
+        A: Arena,
+    {
         match hint {
             Hint::Identifier(identifier) => {
                 let name_bytes = context.resolved_names.get(identifier);

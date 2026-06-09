@@ -3,13 +3,13 @@
 mod runner {
     use std::borrow::Cow;
 
-    use bumpalo::Bump;
+    use mago_allocator::LocalArena;
 
     use mago_database::file::File;
     use mago_syntax::parser::parse_file;
 
     pub fn parse_file_test(name: &'static str, code: &'static str, expected_errors: usize) {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let file = File::ephemeral(Cow::Borrowed(name.as_bytes()), Cow::Borrowed(code.as_bytes()));
         let program = parse_file(&arena, &file);
         let actual = program.errors.len();

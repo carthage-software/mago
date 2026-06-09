@@ -1,4 +1,5 @@
 use foldhash::HashMap;
+use mago_allocator::Arena;
 
 use mago_codex::flags::attribute::AttributeFlags;
 
@@ -43,13 +44,15 @@ impl AttributeTarget {
     }
 }
 
-pub fn analyze_attributes<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn analyze_attributes<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     _block_context: &mut BlockContext<'ctx>,
     _artifacts: &mut AnalysisArtifacts,
     attribute_lists: &[AttributeList<'arena>],
     target: AttributeTarget,
-) {
+) where
+    A: Arena,
+{
     let attributes = attribute_lists.iter().flat_map(|list| list.attributes.iter()).collect::<Vec<_>>();
 
     let mut used_attributes = HashMap::default();
@@ -185,13 +188,15 @@ pub fn analyze_attributes<'ctx, 'arena>(
     }
 }
 
-fn report_invalid_target<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn report_invalid_target<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     metadata: &'ctx ClassLikeMetadata,
     attribute: &Attribute<'arena>,
     target: AttributeTarget,
     flags: AttributeFlags,
-) {
+) where
+    A: Arena,
+{
     let attribute_name = metadata.original_name;
     let attribute_name_bytes = attribute_name.as_bytes();
     let short_attribute_name = match memchr::memrchr(b'\\', attribute_name_bytes) {

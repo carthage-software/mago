@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_word::concat_word;
@@ -60,12 +61,15 @@ fn collect_concat_operands<'ast, 'arena>(binary: &'ast Binary<'arena>) -> Vec<&'
 /// 2. Analyze each leaf operand (non-concat expressions don't cause deep recursion)
 /// 3. Validate and compute the result type by folding left-to-right
 #[inline(never)]
-pub fn analyze_string_concat_operation<'ctx, 'arena>(
+pub fn analyze_string_concat_operation<'ctx, 'arena, A>(
     binary: &Binary<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let operands = collect_concat_operands(binary);
 
     for operand in &operands {
@@ -92,12 +96,14 @@ pub fn analyze_string_concat_operation<'ctx, 'arena>(
 }
 
 #[inline]
-fn analyze_string_concat_operand<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn analyze_string_concat_operand<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     artifacts: &AnalysisArtifacts,
     operand: &Expression<'arena>,
     side: &'static str,
-) {
+) where
+    A: Arena,
+{
     let Some(operand_type) = artifacts.get_expression_type(operand) else {
         return;
     };

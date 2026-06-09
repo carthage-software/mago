@@ -1,10 +1,10 @@
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 use mago_database::file::File;
 use mago_fingerprint::FingerprintOptions;
 use mago_fingerprint::Fingerprintable;
 
 fn get_fingerprint(code: &'static [u8]) -> u64 {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let file = File::ephemeral(b"test.php".into(), code.into());
     let program = mago_syntax::parser::parse_file(&arena, &file);
     assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);

@@ -1,6 +1,7 @@
-use bumpalo::collections::CollectIn;
-use bumpalo::collections::Vec;
-use bumpalo::vec;
+use mago_allocator::Arena;
+use mago_allocator::CollectIn;
+use mago_allocator::vec::Vec;
+use mago_allocator::vec_in;
 
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -39,15 +40,18 @@ pub enum ArrayLike<'arena> {
 
 impl<'arena> ArrayLike<'arena> {
     #[inline]
-    fn elements(&self) -> Vec<'arena, &'arena ArrayElement<'arena>> {
-        let (elements_sequence, arena) = match self {
-            Self::Array(array) => (&array.elements, array.elements.nodes.bump()),
-            Self::LegacyArray(array) => (&array.elements, array.elements.nodes.bump()),
-            Self::List(list) => (&list.elements, list.elements.nodes.bump()),
+    fn elements<A>(&self, arena: &'arena A) -> Vec<'arena, &'arena ArrayElement<'arena>, A>
+    where
+        A: Arena,
+    {
+        let elements_sequence = match self {
+            Self::Array(array) => &array.elements,
+            Self::LegacyArray(array) => &array.elements,
+            Self::List(list) => &list.elements,
         };
 
-        let mut elements: Vec<'arena, &'arena ArrayElement<'arena>> =
-            elements_sequence.iter().collect_in::<Vec<_>>(arena);
+        let mut elements: Vec<'arena, &'arena ArrayElement<'arena>, A> =
+            elements_sequence.iter().collect_in::<Vec<'arena, _, A>>(arena);
 
         while let Some(ArrayElement::Missing(_)) = elements.last() {
             elements.pop();
@@ -84,7 +88,10 @@ impl<'arena> ArrayLike<'arena> {
         if matches!(self, Self::List(_) | Self::LegacyArray(_)) { b")" } else { b"]" }
     }
 
-    fn prefix(&self, f: &mut FormatterState<'_, 'arena>) -> Option<Document<'arena>> {
+    fn prefix<A>(&self, f: &mut FormatterState<'_, 'arena, A>) -> Option<Document<'arena, A>>
+    where
+        A: Arena,
+    {
         match self {
             Self::List(list) => Some(list.list.format(f)),
             Self::LegacyArray(array) => Some(array.array.format(f)),
@@ -103,13 +110,16 @@ impl HasSpan for ArrayLike<'_> {
     }
 }
 
-pub(super) fn print_array_like<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_array_like<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     array_like: ArrayLike<'arena>,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let group_id = f.next_id();
     let left_delimiter = {
-        let mut left_delimiter_content = vec![in f.arena;];
+        let mut left_delimiter_content = vec_in![f.arena;];
         if let Some(prefix) = array_like.prefix(f) {
             left_delimiter_content.push(prefix);
         }
@@ -122,8 +132,8 @@ pub(super) fn print_array_like<'arena>(
         Document::Array(left_delimiter_content)
     };
 
-    let get_right_delimiter = |f: &mut FormatterState<'_, 'arena>, array_like: &ArrayLike<'arena>| {
-        let mut right_delimiter_content = vec![in f.arena;];
+    let get_right_delimiter = |f: &mut FormatterState<'_, 'arena, A>, array_like: &ArrayLike<'arena>| {
+        let mut right_delimiter_content = vec_in![f.arena;];
         right_delimiter_content.push(Document::String(array_like.get_right_delimiter()));
         if let Some(s) = f.print_trailing_comments(array_like.get_right_delimiter_span()) {
             right_delimiter_content.push(s);
@@ -132,8 +142,8 @@ pub(super) fn print_array_like<'arena>(
         Document::Array(right_delimiter_content)
     };
 
-    let mut parts = vec![in f.arena;left_delimiter];
-    let elements = array_like.elements();
+    let mut parts = vec_in![f.arena;left_delimiter];
+    let elements = array_like.elements(f.arena);
 
     if elements.is_empty() {
         if let Some(dangling_comments) = f.print_dangling_comments(array_like.span(), true) {
@@ -166,7 +176,7 @@ pub(super) fn print_array_like<'arena>(
 
     parts.push(Document::Indent({
         let len = elements.len();
-        let mut indent_parts = vec![in f.arena;];
+        let mut indent_parts = vec_in![f.arena;];
         indent_parts.push(Document::Line(Line::soft()));
 
         if let Some(widths) = column_widths {
@@ -244,12 +254,15 @@ pub(super) fn print_array_like<'arena>(
 }
 
 #[inline]
-fn has_floating_comments<'arena>(f: &mut FormatterState<'_, 'arena>, array_like: &ArrayLike<'arena>) -> bool {
+fn has_floating_comments<'arena, A>(f: &mut FormatterState<'_, 'arena, A>, array_like: &ArrayLike<'arena>) -> bool
+where
+    A: Arena,
+{
     let has_comments = |prev: &ArrayElement, next: &ArrayElement| {
         f.has_inner_comment(Span::new(prev.span().file_id, prev.end_position(), next.start_position()))
     };
 
-    for element in array_like.elements().windows(2) {
+    for element in array_like.elements(f.arena).windows(2) {
         let [prev, next] = element else { continue };
         if has_comments(prev, next) {
             return true;
@@ -260,11 +273,14 @@ fn has_floating_comments<'arena>(f: &mut FormatterState<'_, 'arena>, array_like:
 }
 
 #[inline]
-fn inline_single_element<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+fn inline_single_element<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     array_like: &ArrayLike<'arena>,
-) -> Option<Document<'arena>> {
-    let elements = array_like.elements();
+) -> Option<Document<'arena, A>>
+where
+    A: Arena,
+{
+    let elements = array_like.elements(f.arena);
     if elements.len() != 1 {
         return None; // Only inline single-element arrays
     }
@@ -287,8 +303,7 @@ fn inline_single_element<'arena>(
 
             let key = element.key.format(f);
             let value = element.value.format(f);
-            Some(Document::Group(Group::new(vec![
-                in f.arena;
+            Some(Document::Group(Group::new(vec_in![f.arena;
                 key,
                 Document::space(),
                 Document::String(b"=>"),
@@ -362,11 +377,14 @@ fn has_nested_array_like_value(expression: &Expression<'_>) -> bool {
 }
 
 #[inline]
-fn format_row_with_alignment<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
-    document: Document<'arena>,
+fn format_row_with_alignment<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    document: Document<'arena, A>,
     column_widths: &[usize],
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     match document {
         Document::Array(mut elements) => {
             let Some(last_element) = elements.pop() else {
@@ -386,7 +404,7 @@ fn format_row_with_alignment<'arena>(
             if let Some((opening_delimiter, elements, closing_delimiter)) = extract_array_elements(f, &group.contents) {
                 let formatted_elements = format_elements_with_alignment(f, elements, column_widths);
 
-                Document::Group(Group::new(vec![in f.arena;
+                Document::Group(Group::new(vec_in![f.arena;
                     opening_delimiter,
                     Document::Array(formatted_elements),
                     closing_delimiter,
@@ -399,14 +417,20 @@ fn format_row_with_alignment<'arena>(
     }
 }
 
+type DelimitedArrayElements<'arena, A> =
+    (Document<'arena, A>, Vec<'arena, Document<'arena, A>, A>, Document<'arena, A>);
+
 #[inline]
-fn extract_array_elements<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
-    contents: &[Document<'arena>],
-) -> Option<(Document<'arena>, Vec<'arena, Document<'arena>>, Document<'arena>)> {
+fn extract_array_elements<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    contents: &[Document<'arena, A>],
+) -> Option<DelimitedArrayElements<'arena, A>>
+where
+    A: Arena,
+{
     let mut opening_delimiter = None;
     let mut closing_delimiter = None;
-    let mut elements = vec![in f.arena];
+    let mut elements = vec_in![f.arena];
     let mut in_elements = false;
 
     for doc in contents {
@@ -463,12 +487,15 @@ fn extract_array_elements<'arena>(
     }
 }
 
-fn format_elements_with_alignment<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
-    elements: Vec<Document<'arena>>,
+fn format_elements_with_alignment<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    elements: Vec<'arena, Document<'arena, A>, A>,
     column_widths: &[usize],
-) -> Vec<'arena, Document<'arena>> {
-    let mut formatted_elements = vec![in f.arena;];
+) -> Vec<'arena, Document<'arena, A>, A>
+where
+    A: Arena,
+{
+    let mut formatted_elements = vec_in![f.arena;];
 
     let len = elements.len();
     for (i, element) in elements.into_iter().enumerate() {
@@ -479,19 +506,18 @@ fn format_elements_with_alignment<'arena>(
 
             if padding > 0 {
                 // Create a padded document
-                Document::Array(vec![
-                    in f.arena;
+                Document::Array(vec_in![f.arena;
                     element,
                     Document::String(b","),
                     Document::String({
                         let mut spaces = Vec::with_capacity_in(padding + 1, f.arena);
                         spaces.resize(padding + 1, b' ');
-                        spaces.into_bump_slice()
+                        spaces.leak()
                     })
                 ])
             } else {
                 // No padding needed
-                Document::Array(vec![in f.arena;element, Document::String(b","), Document::space()])
+                Document::Array(vec_in![f.arena;element, Document::String(b","), Document::space()])
             }
         } else {
             // Last element, no padding
@@ -504,17 +530,20 @@ fn format_elements_with_alignment<'arena>(
     formatted_elements
 }
 
-fn is_table_style<'arena>(f: &mut FormatterState<'_, 'arena>, array_like: &ArrayLike<'arena>) -> bool {
+fn is_table_style<'arena, A>(f: &mut FormatterState<'_, 'arena, A>, array_like: &ArrayLike<'arena>) -> bool
+where
+    A: Arena,
+{
     // Arbitrary limit to prevent excessive column width
     const WIGGLE_ROOM: usize = 20;
 
-    let elements = array_like.elements();
+    let elements = array_like.elements(f.arena);
     if elements.len() < 2 {
         return false; // Need at least two rows for table style to make sense
     }
 
     let mut row_size = 0;
-    let mut sizes = vec![in f.arena;];
+    let mut sizes = vec_in![f.arena;];
     let mut maximum_width = 0;
 
     // Check if all elements are nested arrays with consistent row sizes
@@ -577,12 +606,15 @@ fn is_table_style<'arena>(f: &mut FormatterState<'_, 'arena>, array_like: &Array
     (sizes.iter().filter(|size| **size == row_size).count() as f64) / (sizes.len() as f64) >= 0.6
 }
 
-fn calculate_column_widths<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+fn calculate_column_widths<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     array_like: &ArrayLike<'arena>,
-) -> Option<Vec<'arena, usize>> {
+) -> Option<Vec<'arena, usize, A>>
+where
+    A: Arena,
+{
     let mut row_size = 0;
-    let elements = array_like.elements();
+    let elements = array_like.elements(f.arena);
 
     // First pass: determine consistent row size and initialize column widths
     for element in &elements {
@@ -602,7 +634,7 @@ fn calculate_column_widths<'arena>(
         }
     }
 
-    let mut column_maximum_widths = vec![in f.arena; 0; row_size];
+    let mut column_maximum_widths = vec_in![f.arena; 0; row_size];
 
     // Second pass: calculate maximum width for each column
     for element in elements {
@@ -627,10 +659,13 @@ fn calculate_column_widths<'arena>(
 }
 
 /// Detect alignment runs in array elements for key-value pairs.
-fn detect_array_element_alignment_runs<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn detect_array_element_alignment_runs<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     elements: &[&'arena ArrayElement<'arena>],
-) -> std::vec::Vec<AlignmentRun> {
+) -> std::vec::Vec<AlignmentRun>
+where
+    A: Arena,
+{
     if !f.settings.align_assignment_like || elements.is_empty() {
         return std::vec::Vec::new();
     }

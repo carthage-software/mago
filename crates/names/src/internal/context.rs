@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use mago_allocator::prelude::*;
 
 use mago_syntax::ast::Use;
 
@@ -13,18 +13,24 @@ use crate::scope::NamespaceScope;
 ///
 /// It serves as a bridge between the AST walker and the `NamespaceScope`.
 #[derive(Debug)]
-pub struct NameResolutionContext<'arena> {
-    arena: &'arena Bump,
+pub struct NameResolutionContext<'arena, A>
+where
+    A: Arena,
+{
+    arena: &'arena A,
     scope: NamespaceScope,
 }
 
-impl<'arena> NameResolutionContext<'arena> {
+impl<'arena, A> NameResolutionContext<'arena, A>
+where
+    A: Arena,
+{
     /// Creates a new `NameResolutionContext`, initialized to the global namespace scope.
     ///
     /// # Arguments
     ///
-    /// * `arena` - A reference to the arena (`Bump`) used for memory allocation.
-    pub fn new(arena: &'arena Bump) -> Self {
+    /// * `arena` - A reference to the arena used for memory allocation.
+    pub fn new(arena: &'arena A) -> Self {
         NameResolutionContext {
             arena,
             // Start in the global scope by default.

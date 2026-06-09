@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_span::HasSpan;
 
 use crate::ast::ArrowFunction;
@@ -9,7 +10,10 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse a `(` group - which may be a parenthesised expression, an
     /// arrow function's parameter list, or an empty-parameter arrow.
     /// Handles: `()`, `( expr )`, `( name ) => body`, `(a, b) => body`,

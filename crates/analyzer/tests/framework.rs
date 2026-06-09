@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 
 use foldhash::HashSet;
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::plugin::PluginRegistry;
@@ -103,7 +103,7 @@ fn run_test_case_inner(config: TestCase) {
     let file_id = database.add(file);
     let source_file = database.get_ref(&file_id).expect("File just added should exist");
 
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let program = parse_file(&arena, source_file);
     assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
 

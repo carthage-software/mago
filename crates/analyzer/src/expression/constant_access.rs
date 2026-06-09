@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::scanner::inference::get_literal_constant_type;
 use mago_codex::scanner::inference::get_platform_constant_type;
 use mago_codex::ttype::expander;
@@ -18,12 +19,15 @@ use crate::error::AnalysisError;
 use mago_bytes::BytesDisplay;
 
 impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let name_bytes = context.resolved_names.get(self);
         let name = BytesDisplay(name_bytes);
         let unqualified_name = self.name.value();

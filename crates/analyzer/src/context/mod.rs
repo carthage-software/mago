@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use mago_allocator::Arena;
 use mago_word::Word;
 
 use mago_codex::metadata::CodebaseMetadata;
@@ -34,8 +34,11 @@ pub mod utils;
 #[derive(Debug)]
 #[allow(clippy::field_scoped_visibility_modifiers)]
 #[allow(clippy::struct_field_names)]
-pub struct Context<'ctx, 'arena> {
-    pub(super) arena: &'arena Bump,
+pub struct Context<'ctx, 'arena, A>
+where
+    A: Arena,
+{
+    pub(super) arena: &'arena A,
     pub(super) codebase: &'ctx CodebaseMetadata,
     pub(super) source_file: &'ctx File,
     pub(super) resolved_names: &'ctx ResolvedNames<'arena>,
@@ -43,21 +46,24 @@ pub struct Context<'ctx, 'arena> {
     pub(super) comments: &'arena [Trivia<'arena>],
     pub(super) settings: &'ctx Settings,
     pub(super) scope: NamespaceScope,
-    pub(super) collector: Collector<'ctx, 'arena>,
+    pub(super) collector: Collector<'ctx, 'arena, A>,
     pub(super) statement_span: Span,
     pub(super) plugin_registry: &'ctx PluginRegistry,
 }
 
-impl<'ctx, 'arena> Context<'ctx, 'arena> {
+impl<'ctx, 'arena, A> Context<'ctx, 'arena, A>
+where
+    A: Arena,
+{
     pub fn new(
-        arena: &'arena Bump,
+        arena: &'arena A,
         codebase: &'ctx CodebaseMetadata,
         source: &'ctx File,
         resolved_names: &'ctx ResolvedNames<'arena>,
         settings: &'ctx Settings,
         statement_span: Span,
         comments: &'arena [Trivia<'arena>],
-        collector: Collector<'ctx, 'arena>,
+        collector: Collector<'ctx, 'arena, A>,
         plugin_registry: &'ctx PluginRegistry,
     ) -> Self {
         Self {
@@ -125,12 +131,12 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
     pub fn get_assertion_context_from_block(
         &self,
         block_context: &BlockContext<'ctx>,
-    ) -> AssertionContext<'ctx, 'arena> {
+    ) -> AssertionContext<'ctx, 'arena, A> {
         self.get_assertion_context(block_context.scope.get_class_like_name())
     }
 
     #[inline]
-    pub fn get_assertion_context(&self, this_class_name: Option<Word>) -> AssertionContext<'ctx, 'arena> {
+    pub fn get_assertion_context(&self, this_class_name: Option<Word>) -> AssertionContext<'ctx, 'arena, A> {
         AssertionContext {
             arena: self.arena,
             resolved_names: self.resolved_names,
@@ -144,7 +150,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
         let mut elements = vec![];
         for trivia in PrecedingDocblocks::new(self.comments, self.statement_span.start.offset) {
             match mago_docblock::parse_trivia(self.arena, trivia) {
-                Ok(document) => elements.extend(document.elements),
+                Ok(document) => elements.extend(document.elements.iter().cloned()),
                 Err(error) => {
                     let error_span = error.span();
 
@@ -176,7 +182,7 @@ impl<'ctx, 'arena> Context<'ctx, 'arena> {
         elements
     }
 
-    pub fn record<T>(&mut self, callback: impl FnOnce(&mut Context<'ctx, 'arena>) -> T) -> (T, IssueCollection) {
+    pub fn record<T>(&mut self, callback: impl FnOnce(&mut Context<'ctx, 'arena, A>) -> T) -> (T, IssueCollection) {
         self.collector.start_recording();
         let result = callback(self);
         let issues = self.collector.finish_recording().unwrap_or_default();

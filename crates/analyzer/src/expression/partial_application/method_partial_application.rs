@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -27,12 +28,15 @@ use crate::resolver::method::resolve_method_targets;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena> {
     #[allow(clippy::expect_used)]
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let method_resolution =
             resolve_method_targets(context, block_context, artifacts, self.object, &self.method, false, self.span())?;
 

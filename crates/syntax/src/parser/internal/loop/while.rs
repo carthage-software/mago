@@ -5,8 +5,12 @@ use crate::ast::ast::WhileColonDelimitedBody;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_while(&mut self) -> Result<While<'arena>, ParseError> {
         Ok(While {
             r#while: self.expect_keyword(T!["while"])?,

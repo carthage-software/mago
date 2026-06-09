@@ -18,7 +18,7 @@ memchr = { workspace = true }
 
 [dev-dependencies]
 mago-database = { workspace = true }
-bumpalo = { workspace = true }
+mago-allocator = { workspace = true }
 pretty_assertions = { workspace = true }
 indoc = { workspace = true }
 

@@ -2,8 +2,12 @@ use crate::T;
 use crate::ast::ast::MagicConstant;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_magic_constant(&mut self) -> Result<MagicConstant<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 

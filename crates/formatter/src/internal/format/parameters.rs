@@ -1,5 +1,6 @@
-use bumpalo::collections::Vec;
-use bumpalo::vec;
+use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
+use mago_allocator::vec_in;
 
 use mago_span::HasSpan;
 use mago_syntax::ast::FunctionLikeParameter;
@@ -19,12 +20,15 @@ use crate::internal::format::Format;
 use crate::internal::format::misc;
 use crate::internal::utils::string_width;
 
-pub(super) fn print_function_like_parameters<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_function_like_parameters<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     if parameter_list.parameters.is_empty() {
-        let mut contents = vec![in f.arena; Document::String(b"(")];
+        let mut contents = vec_in![f.arena; Document::String(b"(")];
         if let Some(comments) = f.print_inner_comment(parameter_list.span(), true) {
             contents.push(comments);
         }
@@ -53,7 +57,7 @@ pub(super) fn print_function_like_parameters<'arena>(
     };
 
     let left_parenthesis = {
-        let mut contents = vec![in f.arena; Document::String(b"(")];
+        let mut contents = vec_in![f.arena; Document::String(b"(")];
 
         if !should_break
             && parameter_list.parameters.len() == 1
@@ -80,9 +84,9 @@ pub(super) fn print_function_like_parameters<'arena>(
         Document::Array(contents)
     };
 
-    let mut parts = vec![in f.arena; left_parenthesis];
+    let mut parts = vec_in![f.arena; left_parenthesis];
 
-    let mut printed = vec![in f.arena; ];
+    let mut printed = vec_in![f.arena; ];
     let len = parameter_list.parameters.len();
     let previous_variable_padding = f.parameter_state.variable_padding;
     for (i, parameter) in parameter_list.parameters.iter().enumerate() {
@@ -117,7 +121,7 @@ pub(super) fn print_function_like_parameters<'arena>(
     }
 
     if !parameter_list.parameters.is_empty() {
-        let mut contents = vec![in f.arena; Document::Line(Line::soft())];
+        let mut contents = vec_in![f.arena; Document::Line(Line::soft())];
         contents.extend(printed);
         parts.push(Document::Indent(contents));
 
@@ -147,18 +151,24 @@ pub(super) fn print_function_like_parameters<'arena>(
     }))
 }
 
-pub(super) fn force_break_parameters<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub(super) fn force_break_parameters<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     f.settings.break_promoted_properties_list
         && parameter_list.parameters.iter().any(FunctionLikeParameter::is_promoted_property)
 }
 
-pub(super) fn preserve_break_parameters<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub(super) fn preserve_break_parameters<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     f.settings.preserve_breaking_parameter_list
         && !parameter_list.parameters.is_empty()
         && misc::has_new_line_in_range(
@@ -168,10 +178,13 @@ pub(super) fn preserve_break_parameters<'arena>(
         )
 }
 
-pub(super) fn should_hug_the_only_parameter<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub(super) fn should_hug_the_only_parameter<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if parameter_list.parameters.len() != 1 {
         return false;
     }
@@ -200,10 +213,13 @@ pub(super) fn should_hug_the_only_parameter<'arena>(
     true
 }
 
-fn should_align_parameters<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn should_align_parameters<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     f.settings.align_parameters
         && parameter_list.parameters.len() >= 2
         && (force_break_parameters(f, parameter_list)
@@ -216,10 +232,13 @@ fn should_align_parameters<'arena>(
             .all(|(index, parameter)| can_align_parameter(f, parameter_list, index, parameter))
 }
 
-fn parameter_list_exceeds_print_width<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn parameter_list_exceeds_print_width<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let start = parameter_list.left_parenthesis.start.offset;
     let end = parameter_list.right_parenthesis.end.offset;
 
@@ -238,7 +257,7 @@ fn parameter_list_exceeds_print_width<'arena>(
         }
     }
 
-    let flattened: &[u8] = flattened.into_bump_slice();
+    let flattened: &[u8] = flattened.leak();
 
     string_width(flattened.trim_ascii()) > f.settings.print_width
 }
@@ -276,12 +295,15 @@ fn get_parameter_prefix_width<'arena>(parameter: &'arena FunctionLikeParameter<'
     width
 }
 
-fn can_align_parameter<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn can_align_parameter<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     parameter_list: &'arena FunctionLikeParameterList<'arena>,
     index: usize,
     parameter: &'arena FunctionLikeParameter<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let gap_start = if index == 0 {
         parameter_list.left_parenthesis.end.offset
     } else {
@@ -292,7 +314,10 @@ fn can_align_parameter<'arena>(
         && !has_comment_trivia_in_range(f, parameter.start_offset(), parameter.variable.start_offset())
 }
 
-fn has_comment_trivia_in_range(f: &FormatterState<'_, '_>, start: u32, end: u32) -> bool {
+fn has_comment_trivia_in_range<A>(f: &FormatterState<'_, '_, A>, start: u32, end: u32) -> bool
+where
+    A: Arena,
+{
     if start >= end {
         return false;
     }

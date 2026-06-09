@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 
-use bumpalo::Bump;
-use bumpalo::collections::CollectIn;
-use bumpalo::collections::Vec;
+use mago_allocator::prelude::*;
 
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
@@ -21,17 +19,24 @@ use crate::token::Token;
 use crate::token::TokenKind;
 
 #[derive(Debug)]
-pub struct TokenStream<'input, 'arena> {
-    arena: &'arena Bump,
+pub struct TokenStream<'input, 'arena, A>
+where
+    'input: 'arena,
+    A: Arena,
+{
+    arena: &'arena A,
     lexer: Lexer<'input>,
     buffer: LookaheadBuf<Token<'input>, 16>,
-    trivia: Vec<'arena, Token<'input>>,
+    trivia: Vec<'arena, Token<'input>, A>,
     position: Position,
     file_id: FileId,
 }
 
-impl<'input, 'arena> TokenStream<'input, 'arena> {
-    pub fn new(arena: &'arena Bump, lexer: Lexer<'input>) -> TokenStream<'input, 'arena> {
+impl<'input, 'arena, A> TokenStream<'input, 'arena, A>
+where
+    A: Arena,
+{
+    pub fn new(arena: &'arena A, lexer: Lexer<'input>) -> TokenStream<'input, 'arena, A> {
         let position = lexer.current_position();
         let file_id_cached = lexer.file_id();
 
@@ -306,7 +311,10 @@ impl<'input, 'arena> TokenStream<'input, 'arena> {
     }
 }
 
-impl HasFileId for TokenStream<'_, '_> {
+impl<A> HasFileId for TokenStream<'_, '_, A>
+where
+    A: Arena,
+{
     #[inline]
     fn file_id(&self) -> FileId {
         self.file_id

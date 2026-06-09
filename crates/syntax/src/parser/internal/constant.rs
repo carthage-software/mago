@@ -6,8 +6,12 @@ use crate::ast::ast::ConstantItem;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_constant_with_attributes(
         &mut self,
         attribute_lists: Sequence<'arena, AttributeList<'arena>>,

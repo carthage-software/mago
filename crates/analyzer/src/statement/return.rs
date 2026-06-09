@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -38,12 +39,15 @@ use crate::utils::get_type_diff;
 use crate::utils::names::display_function_like_identifier;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let inferred_return_type = if let Some(return_value) = self.value.as_ref() {
             block_context.flags.set_inside_return(true);
             return_value.analyze(context, block_context, artifacts)?;
@@ -102,14 +106,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
     }
 }
 
-pub fn handle_return_value<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn handle_return_value<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     return_value: Option<&Expression>,
     mut inferred_return_type: Rc<TUnion>,
     return_span: Span,
-) {
+) where
+    A: Arena,
+{
     if inferred_return_type.is_void() {
         inferred_return_type = Rc::new(get_null());
     }
@@ -535,15 +541,17 @@ pub fn handle_return_value<'ctx>(
     }
 }
 
-fn handle_property_hook_return<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn handle_property_hook_return<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     return_value: Option<&Expression>,
     mut inferred_return_type: Rc<TUnion>,
     property_name: Word,
     hook_metadata: &PropertyHookMetadata,
     expansion_options: &TypeExpansionOptions,
-) {
+) where
+    A: Arena,
+{
     if !hook_metadata.is_get() {
         return;
     }
@@ -655,12 +663,14 @@ fn handle_property_hook_return<'ctx>(
 }
 
 /// Check for uninitialized properties when returning early from a constructor.
-fn check_constructor_early_return<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn check_constructor_early_return<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     return_span: Span,
     class_name: Word,
-) {
+) where
+    A: Arena,
+{
     let Some(class_like_metadata) = context.codebase.get_class_like(class_name.as_bytes()) else {
         return;
     };
@@ -762,7 +772,10 @@ fn property_requires_constructor_initialization(
     true
 }
 
-fn get_generator_return_type(context: &Context, return_type: &TUnion) -> Option<(TUnion, bool)> {
+fn get_generator_return_type<A>(context: &Context<'_, '_, A>, return_type: &TUnion) -> Option<(TUnion, bool)>
+where
+    A: Arena,
+{
     let mut generator_return = None;
     let mut could_be_array_or_traversable = false;
     for atomic in return_type.types.iter() {

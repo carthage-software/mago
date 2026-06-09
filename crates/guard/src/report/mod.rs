@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use mago_allocator::Arena;
 
 use mago_collector::Collector;
 use mago_database::file::File;
@@ -29,7 +29,10 @@ impl FortressReport {
         self.boundary_breaches.is_empty() && self.structural_flaws.is_empty()
     }
 
-    pub fn report_into_issues(self, arena: &Bump, source_file: &File, program: &Program) -> IssueCollection {
+    pub fn report_into_issues<A>(self, arena: &A, source_file: &File, program: &Program) -> IssueCollection
+    where
+        A: Arena,
+    {
         let mut collector = Collector::new(arena, source_file, program, COLLECTOR_CATEGORIES);
         for boundary_breach in self.boundary_breaches {
             collector.report_with_code(boundary_breach.vector.error_code(), boundary_breach.into());

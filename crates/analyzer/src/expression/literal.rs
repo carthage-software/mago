@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::get_empty_string;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_int_or_float;
@@ -18,12 +19,15 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Literal<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        _context: &mut Context<'ctx, 'arena>,
+        _context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         if let Literal::String(literal_string) = self
             && let Some(value) = literal_string.value
             && let Some(separator_idx) = memchr::memmem::find(value, b"::")

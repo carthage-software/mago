@@ -10,7 +10,7 @@
 //!   the root so consumers can recover the exact source by interleaving
 //!   statements and trivia by span.
 //!
-//! All nodes are arena-allocated in a [`bumpalo::Bump`]; string fragments
+//! All nodes are arena-allocated in a [`arena`]; string fragments
 //! borrow directly from the source template wherever possible.
 
 pub use crate::ast::expression::*;
@@ -27,7 +27,6 @@ pub mod sequence;
 pub mod statement;
 pub mod trivia;
 
-use bumpalo::collections::Vec as BVec;
 use serde::Serialize;
 
 use mago_database::file::FileId;
@@ -50,7 +49,7 @@ pub struct Template<'arena> {
     pub source_text: &'arena [u8],
     pub trivia: Sequence<'arena, Trivia<'arena>>,
     pub statements: Sequence<'arena, Statement<'arena>>,
-    pub errors: BVec<'arena, ParseError<'arena>>,
+    pub errors: &'arena [ParseError<'arena>],
 }
 
 impl Template<'_> {

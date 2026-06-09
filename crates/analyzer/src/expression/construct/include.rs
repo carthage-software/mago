@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_string;
 use mago_span::HasSpan;
@@ -17,12 +18,15 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for IncludeConstruct<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_include(
             context,
             block_context,
@@ -37,12 +41,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IncludeConstruct<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for IncludeOnceConstruct<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_include(
             context,
             block_context,
@@ -57,12 +64,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IncludeOnceConstruct<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for RequireConstruct<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_include(
             context,
             block_context,
@@ -77,12 +87,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for RequireConstruct<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for RequireOnceConstruct<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_include(
             context,
             block_context,
@@ -96,8 +109,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for RequireOnceConstruct<'arena> {
     }
 }
 
-fn analyze_include<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_include<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     construct_span: Span,
@@ -105,7 +118,10 @@ fn analyze_include<'ctx, 'arena>(
     included_file: &Expression<'arena>,
     is_include: bool,
     is_once: bool,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let was_inside_call = block_context.flags.inside_call();
     block_context.flags.set_inside_call(true);
     included_file.analyze(context, block_context, artifacts)?;

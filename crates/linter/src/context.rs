@@ -1,5 +1,4 @@
-use bumpalo::Bump;
-use bumpalo::collections::Vec;
+use mago_allocator::prelude::*;
 
 use mago_collector::Collector;
 use mago_database::file::File;
@@ -17,27 +16,33 @@ use crate::scope::ScopeStack;
 
 #[derive(Debug)]
 #[allow(clippy::partial_pub_fields)]
-pub struct LintContext<'ctx, 'arena> {
+pub struct LintContext<'ctx, 'arena, A>
+where
+    A: Arena,
+{
     pub php_version: PHPVersion,
-    pub arena: &'arena Bump,
+    pub arena: &'arena A,
     pub registry: &'ctx RuleRegistry,
     pub source_file: &'ctx File,
     pub resolved_names: &'ctx ResolvedNames<'arena>,
-    pub collector: Collector<'ctx, 'arena>,
-    pub scope: ScopeStack<'arena>,
+    pub collector: Collector<'ctx, 'arena, A>,
+    pub scope: ScopeStack<'arena, A>,
     pub constant_expression_depth: usize,
     imports: ImportTracker,
-    ancestors: Vec<'arena, Node<'ctx, 'arena>>,
+    ancestors: Vec<'arena, Node<'ctx, 'arena>, A>,
 }
 
-impl<'ctx, 'arena> LintContext<'ctx, 'arena> {
+impl<'ctx, 'arena, A> LintContext<'ctx, 'arena, A>
+where
+    A: Arena,
+{
     pub fn new(
         php_version: PHPVersion,
-        arena: &'arena Bump,
+        arena: &'arena A,
         registry: &'ctx RuleRegistry,
         source_file: &'ctx File,
         resolved_names: &'ctx ResolvedNames<'arena>,
-        collector: Collector<'ctx, 'arena>,
+        collector: Collector<'ctx, 'arena, A>,
     ) -> Self {
         Self {
             php_version,

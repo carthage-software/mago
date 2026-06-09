@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 
 use mago_codex::ttype::TType;
@@ -33,8 +34,8 @@ pub enum ConstructInput<'ast, 'arena> {
 /// on the `ConstructInput` enum. It dispatches to the type verifier for each
 /// provided value and correctly sets the `is_argument` flag to ensure error
 /// messages use the appropriate terminology ("argument" vs. "value").
-pub fn analyze_construct_inputs<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn analyze_construct_inputs<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     construct_kind: &'static str,
@@ -44,7 +45,10 @@ pub fn analyze_construct_inputs<'ctx, 'arena>(
     is_variadic: bool,
     has_default: bool,
     has_side_effects: bool,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     if has_side_effects && block_context.scope.is_pure() {
         context.collector.report_with_code(
             IssueCode::ImpureConstruct,
@@ -172,8 +176,8 @@ pub fn analyze_construct_inputs<'ctx, 'arena>(
 /// * `construct_kind` - A string name of the construct (e.g., "echo", "exit").
 /// * `construct_keyword` - The span of the construct's keyword for highlighting.
 /// * `is_argument` - Controls terminology in errors. `true` uses "argument", `false` uses "value".
-fn verify_construct_input_type<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn verify_construct_input_type<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     input_type: &TUnion,
     parameter_type: &TUnion,
     argument_offset: usize,
@@ -181,7 +185,9 @@ fn verify_construct_input_type<'arena>(
     construct_kind: &'static str,
     construct_keyword: &Span,
     is_argument: bool,
-) {
+) where
+    A: Arena,
+{
     if input_type.is_never() {
         return report_never_input(
             context,
@@ -311,7 +317,10 @@ fn get_ordinal(index: usize) -> Cow<'static, str> {
     }
 }
 
-fn report_missing_input(context: &mut Context<'_, '_>, kind: &str, keyword: &Span, is_argument: bool) {
+fn report_missing_input<A>(context: &mut Context<'_, '_, A>, kind: &str, keyword: &Span, is_argument: bool)
+where
+    A: Arena,
+{
     let term = if is_argument { "argument" } else { "value" };
     context.collector.report_with_code(
         IssueCode::TooFewArguments,
@@ -320,14 +329,16 @@ fn report_missing_input(context: &mut Context<'_, '_>, kind: &str, keyword: &Spa
     );
 }
 
-fn report_too_many_inputs(
-    context: &mut Context<'_, '_>,
+fn report_too_many_inputs<A>(
+    context: &mut Context<'_, '_, A>,
     kind: &str,
     keyword: &Span,
     input_span: Span,
     index: usize,
     is_argument: bool,
-) {
+) where
+    A: Arena,
+{
     let term = if is_argument { "argument" } else { "value" };
     let position = get_ordinal(index);
     context.collector.report_with_code(
@@ -338,14 +349,16 @@ fn report_too_many_inputs(
     );
 }
 
-fn report_never_input<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_never_input<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
     keyword: &Span,
     is_argument: bool,
-) {
+) where
+    A: Arena,
+{
     let term = if is_argument { "argument" } else { "value" };
     let position = get_ordinal(offset);
     context.collector.report_with_code(
@@ -357,15 +370,17 @@ fn report_never_input<'arena>(
     );
 }
 
-fn report_null_input<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_null_input<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
     param_type: Word,
     keyword: &Span,
     is_argument: bool,
-) {
+) where
+    A: Arena,
+{
     let term = if is_argument { "argument" } else { "value" };
     let position = get_ordinal(offset);
     context.collector.report_with_code(
@@ -379,8 +394,8 @@ fn report_null_input<'arena>(
     );
 }
 
-fn report_possibly_null_input<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_possibly_null_input<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
@@ -388,7 +403,9 @@ fn report_possibly_null_input<'arena>(
     param_type: Word,
     keyword: &Span,
     is_argument: bool,
-) {
+) where
+    A: Arena,
+{
     let term = if is_argument { "argument" } else { "value" };
     let position = get_ordinal(offset);
     context.collector.report_with_code(
@@ -403,15 +420,17 @@ fn report_possibly_null_input<'arena>(
     );
 }
 
-fn report_false_input<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_false_input<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
     param_type: Word,
     keyword: &Span,
     is_argument: bool,
-) {
+) where
+    A: Arena,
+{
     let term = if is_argument { "argument" } else { "value" };
     let position = get_ordinal(offset);
 
@@ -426,8 +445,8 @@ fn report_false_input<'arena>(
     );
 }
 
-fn report_possibly_false_input<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_possibly_false_input<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
@@ -435,7 +454,9 @@ fn report_possibly_false_input<'arena>(
     param_type: Word,
     keyword: &Span,
     is_argument: bool,
-) {
+) where
+    A: Arena,
+{
     let term = if is_argument { "argument" } else { "value" };
     let position = get_ordinal(offset);
 
@@ -451,8 +472,8 @@ fn report_possibly_false_input<'arena>(
     );
 }
 
-fn report_mixed_input<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_mixed_input<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     kind: &str,
     expr: &Expression<'arena>,
     offset: usize,
@@ -460,7 +481,9 @@ fn report_mixed_input<'arena>(
     param_type: Word,
     keyword: &Span,
     is_argument: bool,
-) {
+) where
+    A: Arena,
+{
     let term = if is_argument { "argument" } else { "value" };
     let position = get_ordinal(offset);
 
@@ -474,8 +497,8 @@ fn report_mixed_input<'arena>(
     );
 }
 
-fn report_less_specific_input<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_less_specific_input<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     comparison: &ComparisonResult,
     kind: &str,
     expr: &Expression<'arena>,
@@ -484,7 +507,9 @@ fn report_less_specific_input<'arena>(
     param_type: Word,
     keyword: &Span,
     is_argument: bool,
-) {
+) where
+    A: Arena,
+{
     let term = if is_argument { "argument" } else { "value" };
     let position = get_ordinal(offset);
     let (code, reason) = if comparison.type_coerced_from_nested_mixed.unwrap_or(false) {
@@ -504,8 +529,8 @@ fn report_less_specific_input<'arena>(
     );
 }
 
-fn report_invalid_or_possibly_invalid_input<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_invalid_or_possibly_invalid_input<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     in_type: &TUnion,
     param_type: &TUnion,
     kind: &str,
@@ -515,7 +540,9 @@ fn report_invalid_or_possibly_invalid_input<'arena>(
     param_type_str: Word,
     keyword: &Span,
     is_argument: bool,
-) {
+) where
+    A: Arena,
+{
     let term = if is_argument { "argument" } else { "value" };
     let position = get_ordinal(offset);
 

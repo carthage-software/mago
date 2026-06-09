@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeKind;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
@@ -24,10 +25,12 @@ use mago_bytes::BytesDisplay;
 /// A constant should only be reported as missing a type hint if:
 /// 1. It has no type hint
 /// 2. Typed class constants are supported in the target PHP version
-pub fn check_constant_type_hint<'arena>(
-    context: &mut Context<'_, 'arena>,
+pub fn check_constant_type_hint<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     class_like_constant: &ClassLikeConstant<'arena>,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_missing_type_hints
         || !context.settings.version.is_supported(Feature::TypedClassLikeConstants)
     {
@@ -61,11 +64,13 @@ pub fn check_constant_type_hint<'arena>(
 /// 2. It is not prefixed with `$_` (ignored by convention)
 /// 3. It would be safe to add a type hint (i.e., no parent class/trait has the same property without a type hint)
 /// 4. Typed properties are supported in the target PHP version
-pub fn check_property_type_hint<'arena>(
-    context: &mut Context<'_, 'arena>,
+pub fn check_property_type_hint<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     class_like_metadata: &ClassLikeMetadata,
     property: &Property<'arena>,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_missing_type_hints || !context.settings.version.is_supported(Feature::TypedProperties) {
         return;
     }
@@ -130,12 +135,14 @@ pub fn check_property_type_hint<'arena>(
 /// 3. The method is not overriding a parent method (where adding a type hint might cause issues)
 /// 4. If it's a closure/arrow function parameter, the corresponding ignore setting is not enabled
 /// 5. Typed parameters are supported in the target PHP version
-pub fn check_parameter_type_hint<'arena>(
-    context: &mut Context<'_, 'arena>,
+pub fn check_parameter_type_hint<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     class_like_metadata: Option<&ClassLikeMetadata>,
     function_like_metadata: &FunctionLikeMetadata,
     parameter: &FunctionLikeParameter<'arena>,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_missing_type_hints || context.settings.version < PHPVersion::PHP70 {
         return;
     }
@@ -186,14 +193,16 @@ pub fn check_parameter_type_hint<'arena>(
 /// 3. If it's a method, it's not overriding a parent method
 /// 4. If it's a closure/arrow function, the corresponding ignore setting is not enabled
 /// 5. Return type hints are supported in the target PHP version
-pub fn check_return_type_hint<'arena>(
-    context: &mut Context<'_, 'arena>,
+pub fn check_return_type_hint<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     class_like_metadata: Option<&ClassLikeMetadata>,
     function_like_metadata: &FunctionLikeMetadata,
     function_name: &[u8],
     return_type_hint: Option<&FunctionLikeReturnTypeHint<'arena>>,
     span: Span,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_missing_type_hints || context.settings.version < PHPVersion::PHP70 {
         return;
     }
@@ -242,12 +251,14 @@ pub fn check_return_type_hint<'arena>(
 
 /// Check if a return type hint uses a bare `array` or `iterable` without a more specific
 /// docblock annotation.
-pub fn check_imprecise_return_type_hint<'arena>(
-    context: &mut Context<'_, 'arena>,
+pub fn check_imprecise_return_type_hint<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     function_like_metadata: &FunctionLikeMetadata,
     function_name: &[u8],
     return_type_hint: Option<&FunctionLikeReturnTypeHint<'arena>>,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_missing_type_hints {
         return;
     }
@@ -280,12 +291,14 @@ pub fn check_imprecise_return_type_hint<'arena>(
 
 /// Check if a parameter type hint uses a bare `array` or `iterable` without a more specific
 /// docblock annotation.
-pub fn check_imprecise_parameter_type_hint<'arena>(
-    context: &mut Context<'_, 'arena>,
+pub fn check_imprecise_parameter_type_hint<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     function_like_metadata: &FunctionLikeMetadata,
     parameter: &FunctionLikeParameter<'arena>,
     parameter_index: usize,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_missing_type_hints {
         return;
     }
@@ -321,11 +334,13 @@ pub fn check_imprecise_parameter_type_hint<'arena>(
 
 /// Check if a property type hint uses a bare `array` or `iterable` without a more specific
 /// docblock annotation.
-pub fn check_imprecise_property_type_hint<'arena>(
-    context: &mut Context<'_, 'arena>,
+pub fn check_imprecise_property_type_hint<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     property: &Property<'arena>,
     property_metadata: Option<&PropertyMetadata>,
-) {
+) where
+    A: Arena,
+{
     if !context.settings.check_missing_type_hints {
         return;
     }
@@ -405,7 +420,10 @@ fn collect_imprecise_hints_inner(hint: &Hint<'_>, results: &mut Vec<(&'static st
     }
 }
 
-fn report_imprecise_type(context: &mut Context<'_, '_>, type_name: &str, span: Span, location: &str) {
+fn report_imprecise_type<A>(context: &mut Context<'_, '_, A>, type_name: &str, span: Span, location: &str)
+where
+    A: Arena,
+{
     // `iterable` can have any key type (not just array-key), since iterators support arbitrary keys.
     let equivalent = if type_name == "iterable" { "iterable<mixed, mixed>" } else { "array<array-key, mixed>" };
 
@@ -424,11 +442,14 @@ fn report_imprecise_type(context: &mut Context<'_, '_>, type_name: &str, span: S
 ///
 /// It's safe to add a property type hint if no parent class or trait declares the same property
 /// without a type hint (because adding a type hint would create a compile error in PHP).
-fn is_safe_to_add_property_type_hint(
-    context: &Context,
+fn is_safe_to_add_property_type_hint<A>(
+    context: &Context<'_, '_, A>,
     class_like_metadata: &ClassLikeMetadata,
     property_name: &[u8],
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let property_word = mago_word::word(property_name);
 
     // Check all parent classes
@@ -457,11 +478,14 @@ fn is_safe_to_add_property_type_hint(
 ///
 /// It's safe to add a parameter type hint if the method is not overriding a parent method
 /// that has no type hints on the corresponding parameter.
-fn is_safe_to_add_parameter_type_hint(
-    context: &Context,
+fn is_safe_to_add_parameter_type_hint<A>(
+    context: &Context<'_, '_, A>,
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: &FunctionLikeMetadata,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     // If it's not a method, it's always safe
     if !matches!(function_like_metadata.kind, FunctionLikeKind::Method) {
         return true;
@@ -484,11 +508,14 @@ fn is_safe_to_add_parameter_type_hint(
 ///
 /// It's safe to add a return type hint if the method is not overriding a parent method
 /// that has no return type hint.
-fn is_safe_to_add_return_type_hint(
-    context: &Context,
+fn is_safe_to_add_return_type_hint<A>(
+    context: &Context<'_, '_, A>,
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: &FunctionLikeMetadata,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     // If it's not a method, it's always safe
     if !matches!(function_like_metadata.kind, FunctionLikeKind::Method) {
         return true;

@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use mago_allocator::prelude::*;
 
 use mago_span::Span;
 use mago_syntax::ast::Trivia;
@@ -19,7 +19,10 @@ pub mod tag;
 ///
 /// Returns a [`ParseError`] if the trivia is not a docblock comment or parsing fails.
 #[inline]
-pub fn parse_trivia<'arena>(arena: &'arena Bump, trivia: &Trivia<'arena>) -> Result<Document<'arena>, ParseError> {
+pub fn parse_trivia<'arena, A>(arena: &'arena A, trivia: &Trivia<'arena>) -> Result<Document<'arena>, ParseError>
+where
+    A: Arena,
+{
     if TriviaKind::DocBlockComment != trivia.kind {
         return Err(ParseError::InvalidTrivia(trivia.span));
     }
@@ -33,11 +36,14 @@ pub fn parse_trivia<'arena>(arena: &'arena Bump, trivia: &Trivia<'arena>) -> Res
 ///
 /// Returns a [`ParseError`] if tokenization or parsing fails.
 #[inline]
-pub fn parse_phpdoc_with_span<'arena>(
-    arena: &'arena Bump,
+pub fn parse_phpdoc_with_span<'arena, A>(
+    arena: &'arena A,
     content: &'arena [u8],
     span: Span,
-) -> Result<Document<'arena>, ParseError> {
+) -> Result<Document<'arena>, ParseError>
+where
+    A: Arena,
+{
     let tokens = internal::lexer::tokenize(content, span)?;
 
     internal::parser::parse_document(span, tokens.as_slice(), arena)
@@ -57,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_parse_all_elements() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = br#"/**
             * This is a simple description.
             *
@@ -172,7 +178,7 @@ mod tests {
         };
 
         let content = code.content;
-        assert_eq!(code.directives.as_slice(), &[b"php" as &[u8]]);
+        assert_eq!(code.directives, &[b"php" as &[u8]]);
         assert_eq!(content, b"echo \"Hello, World!\";" as &[u8]);
         assert_eq!(
             &phpdoc[code.span.start_offset() as usize..code.span.end_offset() as usize],
@@ -235,7 +241,7 @@ mod tests {
     #[test]
     fn test_unclosed_inline_tag() {
         // Test case for ParseError::UnclosedInlineTag
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/** This is a doc block with an unclosed inline tag {@see Class */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
@@ -256,7 +262,7 @@ mod tests {
     #[test]
     fn test_unclosed_inline_code() {
         // Test case for ParseError::UnclosedInlineCode
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/** This is a doc block with unclosed inline code `code sample */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
@@ -276,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_unclosed_code_block() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/**
             * This is a doc block with unclosed code block
             * ```
@@ -301,7 +307,7 @@ mod tests {
     #[test]
     fn test_invalid_tag_name() {
         // Test case for ParseError::InvalidTagName — use a character not valid in identifiers
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/** @invalid!tag Description */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
@@ -315,7 +321,7 @@ mod tests {
 
     #[test]
     fn test_underscore_tag_name_is_valid() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/** @some_tag Description */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
@@ -328,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_malformed_code_block() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/**
             * ```
             * Some code here
@@ -356,7 +362,7 @@ mod tests {
     #[test]
     fn test_invalid_comment() {
         // Test case for ParseError::InvalidComment
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/* Not a valid doc block */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
@@ -375,7 +381,7 @@ mod tests {
     #[test]
     fn test_inconsistent_indentation() {
         // Test case for ParseError::InconsistentIndentation
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/**
     * This is a doc block
       * With inconsistent indentation
@@ -410,7 +416,7 @@ mod tests {
 
     #[test]
     fn test_missing_asterisk() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/**
      This line is missing an asterisk
      * This line is fine
@@ -446,7 +452,7 @@ mod tests {
 
     #[test]
     fn test_missing_whitespace_after_asterisk() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/**
      *This line is missing a space after asterisk
      */";
@@ -480,7 +486,7 @@ mod tests {
 
     #[test]
     fn test_missing_whitespace_after_opening_asterisk() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/**This is a doc block without space after /** */";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
@@ -512,7 +518,7 @@ mod tests {
 
     #[test]
     fn test_missing_whitespace_before_closing_asterisk() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/** This is a doc block without space before */*/";
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
@@ -544,7 +550,7 @@ mod tests {
 
     #[test]
     fn test_utf8_characters() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = r#"/**
     * هذا نص باللغة العربية.
     * 这是一段中文。
@@ -648,7 +654,7 @@ mod tests {
 
     #[test]
     fn test_annotation_parsing() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = br#"/**
          * @Event("Symfony\Component\Workflow\Event\CompletedEvent")
          * @AnotherAnnotation({
@@ -682,7 +688,7 @@ mod tests {
 
     #[test]
     fn test_long_description_with_missing_asterisk() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/** @var string[] this is a really long description
             that spans multiple lines, and demonstrates how the parser handles
             docblocks with multiple descriptions, and missing astricks*/";
@@ -710,7 +716,7 @@ mod tests {
 
     #[test]
     fn test_code_indent_using_non_ascii_chars() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = "/**
         *    └─ comment 2
         *       └─ comment 4
@@ -737,7 +743,7 @@ mod tests {
 
     #[test]
     fn test_issue_456() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = "/**
              * \u{3000}(イベント日数をもとに計算)\u{3000}
              * @return\u{3000}int
@@ -796,7 +802,7 @@ mod tests {
 
     #[test]
     fn test_issue_808() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
 
         let phpdoc = "/** @param\u{3000}string $foo 中文描述 */".as_bytes();
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
@@ -842,7 +848,7 @@ mod tests {
         // is_indented_line returns true (starts with ASCII space)
         // indent_len = 3 (2 ASCII spaces + 1 full-width space char)
         // But byte offset should be 2 + 3 = 5
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         // Format: " * " (asterisk + space) + "  " (2 ASCII spaces) + "\u{3000}" (full-width) + "code"
         let phpdoc = "/**\n *   \u{3000}code\n */".as_bytes();
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
@@ -861,7 +867,7 @@ mod tests {
     #[test]
     fn test_indented_code_with_mixed_multibyte_whitespace() {
         // Multiple lines with mixed ASCII and full-width whitespace
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = "/**\n *  \u{3000}first line\n *  \u{3000}second line\n */".as_bytes();
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
 
@@ -879,7 +885,7 @@ mod tests {
     #[test]
     fn test_indented_code_with_tab_and_fullwidth_space() {
         // Tab + full-width space: is_indented_line checks for '\t' as well
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         // After "* " there is a tab followed by full-width space
         let phpdoc = "/**\n * \t\u{3000}code\n */".as_bytes();
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
@@ -901,7 +907,7 @@ mod tests {
         // Error: byte index 3 is not a char boundary; it is inside '\u{3000}' (bytes 1..4) of ` 　 メールクリックがない`
         // After lexer processing: " " + "\u{3000}" + " " + Japanese text
         // This triggers parse_indented_code because line starts with ASCII space
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         // Format: " * " + " " (1 ASCII space) + "\u{3000}" (full-width) + " " (1 ASCII space) + text
         let phpdoc = "/**\n *  \u{3000} メールクリックがない\n */".as_bytes();
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(phpdoc.len() as u32));
@@ -919,7 +925,7 @@ mod tests {
 
     #[test]
     fn test_multiline_inline_tag() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/**
             * This method gets a count of the Foo.
             * {@internal Developers should note that it silently
@@ -947,7 +953,7 @@ mod tests {
 
     #[test]
     fn test_multiline_inline_tag_with_nested() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = b"/**
             * {@internal Developers should note that it silently
             *            adds one extra Foo (see {@link http://example.com}).}
@@ -970,7 +976,7 @@ mod tests {
 
     #[test]
     fn test_single_line_inline_tag_still_works() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = br#"/**
             * See {@see \Some\Class} for details.
             */"#;
@@ -990,7 +996,7 @@ mod tests {
 
     #[test]
     fn test_multiline_inline_tag_chinese() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = "/**
             * 获取用户数量的方法。
             * {@internal 开发者请注意，此方法会静默地
@@ -1016,7 +1022,7 @@ mod tests {
 
     #[test]
     fn test_multiline_inline_tag_japanese() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = r#"/**
             * ユーザー数を取得するメソッド。
             * {@see \App\Service\UserCounter このクラスは
@@ -1038,7 +1044,7 @@ mod tests {
 
     #[test]
     fn test_multiline_inline_tag_arabic() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = "/**
             * طريقة للحصول على عدد المستخدمين.
             * {@internal يجب على المطورين ملاحظة أن هذه الطريقة
@@ -1064,7 +1070,7 @@ mod tests {
 
     #[test]
     fn test_multiline_inline_tag_mixed_scripts() {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let phpdoc = "/**
             * Documentation with mixed scripts.
             * {@internal 注意: This method は静かに adds один

@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_true;
@@ -15,12 +16,15 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for IssetConstruct<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let mut all_definitely_set = true;
         let mut any_definitely_unset = false;
         for value in &self.values {

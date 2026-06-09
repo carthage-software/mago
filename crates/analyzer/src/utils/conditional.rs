@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -26,14 +27,17 @@ use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::reconciler::reconcile_keyed_types;
 
-pub(crate) fn analyze<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn analyze<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     mut outer_context: BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     if_scope: &mut IfScope,
     condition: &Expression<'arena>,
     check_for_paradoxes: bool,
-) -> Result<(IfConditionalScope<'ctx>, BlockContext<'ctx>), AnalysisError> {
+) -> Result<(IfConditionalScope<'ctx>, BlockContext<'ctx>), AnalysisError>
+where
+    A: Arena,
+{
     let mut entry_clauses = vec![];
 
     let old_outer_context = outer_context.clone();
@@ -256,9 +260,10 @@ fn get_definitely_evaluated_expression_inside_if<'ast, 'arena>(
     condition
 }
 
-pub fn handle_paradoxical_condition<T>(context: &mut Context<'_, '_>, expression: &T, expression_type: &TUnion)
+pub fn handle_paradoxical_condition<T, A>(context: &mut Context<'_, '_, A>, expression: &T, expression_type: &TUnion)
 where
     T: HasSpan,
+    A: Arena,
 {
     let type_id = expression_type.get_id();
 

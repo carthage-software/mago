@@ -1,5 +1,6 @@
-use bumpalo::collections::Vec;
-use bumpalo::vec;
+use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
+use mago_allocator::vec_in;
 
 use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
@@ -37,10 +38,13 @@ use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
 use crate::internal::utils::will_break;
 
-pub(super) fn print_call_arguments<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_call_arguments<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     expression: CallLikeNode<'arena>,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let Some(argument_list) = expression.arguments() else {
         return if (expression.is_instantiation()
             && (f.settings.parentheses_in_new_expression || instantiation_needs_inline_new_parens(f, expression)))
@@ -61,8 +65,7 @@ pub(super) fn print_call_arguments<'arena>(
             || (expression.is_attribute() && !f.settings.parentheses_in_attribute))
     {
         return if let Some(inner_comments) = f.print_inner_comment(argument_list.span(), true) {
-            Document::Array(vec![
-                in f.arena;
+            Document::Array(vec_in![f.arena;
                 Document::String(b"("),
                 inner_comments,
                 Document::String(b")"),
@@ -75,10 +78,13 @@ pub(super) fn print_call_arguments<'arena>(
     print_argument_list(f, argument_list, expression.is_attribute(), !expression.is_phpunit_assertion_call())
 }
 
-fn instantiation_needs_inline_new_parens<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn instantiation_needs_inline_new_parens<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     expression: CallLikeNode<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if !expression.is_instantiation() {
         return false;
     }
@@ -116,16 +122,18 @@ fn instantiation_needs_inline_new_parens<'arena>(
     false
 }
 
-pub(super) fn print_argument_list<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_argument_list<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     argument_list: &'arena ArgumentList<'arena>,
     for_attribute: bool,
     can_expand_first_or_last: bool,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let mut force_break = false;
     let left_parenthesis = {
-        let mut contents = vec![
-            in f.arena;
+        let mut contents = vec_in![f.arena;
             Document::String(b"(")
         ];
 
@@ -171,10 +179,10 @@ pub(super) fn print_argument_list<'arena>(
         let argument_doc = argument.format(f);
         let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
 
-        return Document::Array(vec![in f.arena; left_parenthesis, argument_doc, right_parenthesis]);
+        return Document::Array(vec_in![f.arena; left_parenthesis, argument_doc, right_parenthesis]);
     }
 
-    let mut contents = vec![in f.arena; clone_in_arena(f.arena, &left_parenthesis)];
+    let mut contents = vec_in![f.arena; clone_in_arena(f.arena, &left_parenthesis)];
 
     // First, run all the decision functions with unformatted arguments
     let should_break_all = force_break || should_break_all_arguments(f, argument_list, for_attribute);
@@ -191,7 +199,7 @@ pub(super) fn print_argument_list<'arena>(
     };
 
     let arguments_count = argument_list.arguments.len();
-    let mut formatted_arguments: Vec<'arena, Document<'arena>> = Vec::with_capacity_in(arguments_count, f.arena);
+    let mut formatted_arguments: Vec<'arena, Document<'arena, A>, A> = Vec::with_capacity_in(arguments_count, f.arena);
     let previous_named_argument_padding = f.argument_state.named_argument_padding;
     for (i, arg) in argument_list.arguments.iter().enumerate() {
         f.argument_state.named_argument_padding = match (named_argument_width, arg) {
@@ -236,8 +244,8 @@ pub(super) fn print_argument_list<'arena>(
         return Document::Array(contents);
     }
 
-    let get_printed_arguments = |f: &mut FormatterState<'_, 'arena>, should_break: bool, skip_index: isize| {
-        let mut printed_arguments = vec![in f.arena];
+    let get_printed_arguments = |f: &mut FormatterState<'_, 'arena, A>, should_break: bool, skip_index: isize| {
+        let mut printed_arguments = vec_in![f.arena];
         let mut length = arguments_count;
         let (arguments_start, arguments_end) = match skip_index {
             _ if skip_index > 0 => {
@@ -253,7 +261,7 @@ pub(super) fn print_argument_list<'arena>(
 
         for (i, arg_idx) in (arguments_start..arguments_end).enumerate() {
             let element = &argument_list.arguments.as_slice()[arg_idx];
-            let mut argument = vec![in f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
+            let mut argument = vec_in![f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
             if i < (length - 1) {
                 argument.push(Document::String(b","));
 
@@ -273,11 +281,10 @@ pub(super) fn print_argument_list<'arena>(
         printed_arguments
     };
 
-    let all_arguments_broken_out = |f: &mut FormatterState<'_, 'arena>| {
-        let mut parts = vec![in f.arena];
+    let all_arguments_broken_out = |f: &mut FormatterState<'_, 'arena, A>| {
+        let mut parts = vec_in![f.arena];
         parts.push(clone_in_arena(f.arena, &left_parenthesis));
-        parts.push(Document::Indent(vec![
-            in f.arena;
+        parts.push(Document::Indent(vec_in![f.arena;
             Document::Line(Line::hard()),
             Document::Group(Group::new(get_printed_arguments(f, true, 0))),
             if f.settings.trailing_comma { Document::String(b",") } else { Document::empty() },
@@ -301,13 +308,11 @@ pub(super) fn print_argument_list<'arena>(
         return Document::IfBreak(IfBreak::new(
             f.arena,
             Document::Group(
-                Group::new(vec![
-                    in f.arena;
+                Group::new(vec_in![f.arena;
                     clone_in_arena(f.arena, &left_parenthesis),
-                    Document::IndentIfBreak(IndentIfBreak::new(group_id, vec![
-                        in f.arena;
+                    Document::IndentIfBreak(IndentIfBreak::new(group_id, vec_in![f.arena;
                         Document::Line(Line::soft()),
-                        Document::Group(Group::new(vec![in f.arena; clone_in_arena(f.arena, &single_argument)])),
+                        Document::Group(Group::new(vec_in![f.arena; clone_in_arena(f.arena, &single_argument)])),
                     ])),
                     if f.settings.trailing_comma {
                         Document::IfBreak(IfBreak::new(f.arena, Document::String(b","), Document::empty()))
@@ -318,13 +323,12 @@ pub(super) fn print_argument_list<'arena>(
                 ])
                 .with_id(group_id),
             ),
-            Document::Group(Group::new(vec![in f.arena; left_parenthesis, single_argument, right_parenthesis])),
+            Document::Group(Group::new(vec_in![f.arena; left_parenthesis, single_argument, right_parenthesis])),
         ));
     }
 
     if should_inline {
-        return Document::Group(Group::new(vec![
-            in f.arena;
+        return Document::Group(Group::new(vec_in![f.arena;
             left_parenthesis,
             Document::Group(Group::new(Document::join(f.arena, formatted_arguments, Separator::CommaSpace))),
             print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(false)),
@@ -343,39 +347,33 @@ pub(super) fn print_argument_list<'arena>(
         let last_argument = clone_in_arena(f.arena, last_argument);
 
         if will_break(&first_argument) {
-            return Document::Group(Group::new(vec![
-                in f.arena;
+            return Document::Group(Group::new(vec_in![f.arena;
                 Document::Group(Group::conditional(
-                    vec![
-                        in f.arena;
+                    vec_in![f.arena;
                         clone_in_arena(f.arena, &left_parenthesis),
-                        Document::Group(Group::new(vec![in f.arena; first_argument]).with_break_mode(BreakMode::Force)),
+                        Document::Group(Group::new(vec_in![f.arena; first_argument]).with_break_mode(BreakMode::Force)),
                         Document::String(b", "),
                         last_argument,
                         print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                     ],
-                    vec![in f.arena; all_arguments_broken_out(f)],
+                    vec_in![f.arena; all_arguments_broken_out(f)],
                 )),
             ]));
         }
 
-        return Document::Group(Group::new(vec![
-            in f.arena;
+        return Document::Group(Group::new(vec_in![f.arena;
             Document::Group(Group::conditional(
-                vec![
-                    in f.arena;
+                vec_in![f.arena;
                     clone_in_arena(f.arena, &left_parenthesis),
                     clone_in_arena(f.arena, &first_argument),
                     Document::String(b", "),
                     clone_in_arena(f.arena, &last_argument),
                     print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                 ],
-                vec![
-                    in f.arena;
-                    Document::Array(vec![
-                        in f.arena;
+                vec_in![f.arena;
+                    Document::Array(vec_in![f.arena;
                         clone_in_arena(f.arena, &left_parenthesis),
-                        Document::Group(Group::new(vec![in f.arena; first_argument]).with_break_mode(BreakMode::Force)),
+                        Document::Group(Group::new(vec_in![f.arena; first_argument]).with_break_mode(BreakMode::Force)),
                         Document::String(b", "),
                         last_argument,
                         print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
@@ -400,18 +398,15 @@ pub(super) fn print_argument_list<'arena>(
         #[allow(clippy::unwrap_used)]
         let last_argument = clone_in_arena(f.arena, formatted_arguments.last().unwrap());
 
-        return Document::Group(Group::new(vec![
-            in f.arena;
+        return Document::Group(Group::new(vec_in![f.arena;
             Document::Group(Group::conditional(
-                vec![
-                    in f.arena;
+                vec_in![f.arena;
                     clone_in_arena(f.arena, &left_parenthesis),
                     Document::Array(first_arguments),
-                    Document::Group(Group::new(vec![in f.arena; last_argument]).with_break_mode(BreakMode::Force)),
+                    Document::Group(Group::new(vec_in![f.arena; last_argument]).with_break_mode(BreakMode::Force)),
                     print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None),
                 ],
-                vec![
-                    in f.arena;
+                vec_in![f.arena;
                     all_arguments_broken_out(f),
                 ],
             )),
@@ -431,12 +426,15 @@ pub(super) fn print_argument_list<'arena>(
     Document::Group(Group::new(contents).with_id(group_id))
 }
 
-fn should_align_named_arguments(
-    f: &FormatterState<'_, '_>,
+fn should_align_named_arguments<A>(
+    f: &FormatterState<'_, '_, A>,
     argument_list: &ArgumentList<'_>,
     should_break_all: bool,
     should_inline: bool,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if !f.settings.align_named_arguments || should_inline || argument_list.arguments.len() < 2 {
         return false;
     }
@@ -465,13 +463,16 @@ fn get_max_named_argument_width(argument_list: &ArgumentList<'_>) -> usize {
         .unwrap_or(0)
 }
 
-fn print_right_parenthesis<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
-    dangling_comments: Option<&Document<'arena>>,
-    right_parenthesis: &Document<'arena>,
+fn print_right_parenthesis<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    dangling_comments: Option<&Document<'arena, A>>,
+    right_parenthesis: &Document<'arena, A>,
     breaking: Option<bool>,
-) -> Document<'arena> {
-    let mut contents = vec![in f.arena];
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    let mut contents = vec_in![f.arena];
 
     if let Some(dangling) = dangling_comments {
         contents.push(clone_in_arena(f.arena, dangling));
@@ -493,24 +494,30 @@ fn print_right_parenthesis<'arena>(
 }
 
 #[inline]
-fn argument_has_surrounding_comments(f: &FormatterState, argument: &Argument) -> bool {
+fn argument_has_surrounding_comments<A>(f: &FormatterState<'_, '_, A>, argument: &Argument) -> bool
+where
+    A: Arena,
+{
     f.has_comment(argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
         || f.has_comment(argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
 }
 
-pub(super) fn print_partial_argument_list<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_partial_argument_list<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     argument_list: &'arena PartialArgumentList<'arena>,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     if argument_list.is_first_class_callable() {
         return Document::String(b"(...)");
     }
 
     let left_parenthesis = Document::String(b"(");
-    let mut contents = vec![in f.arena; left_parenthesis];
+    let mut contents = vec_in![f.arena; left_parenthesis];
 
     let arguments_count = argument_list.arguments.len();
-    let mut formatted_arguments: Vec<'arena, Document<'arena>> = Vec::with_capacity_in(arguments_count, f.arena);
+    let mut formatted_arguments: Vec<'arena, Document<'arena, A>, A> = Vec::with_capacity_in(arguments_count, f.arena);
     for arg in &argument_list.arguments {
         formatted_arguments.push(arg.format(f));
     }
@@ -524,12 +531,12 @@ pub(super) fn print_partial_argument_list<'arena>(
         return Document::Array(contents);
     }
 
-    let get_printed_arguments = |f: &mut FormatterState<'_, 'arena>, should_break: bool| {
-        let mut printed_arguments = vec![in f.arena];
+    let get_printed_arguments = |f: &mut FormatterState<'_, 'arena, A>, should_break: bool| {
+        let mut printed_arguments = vec_in![f.arena];
 
         for (i, arg_idx) in (0..arguments_count).enumerate() {
             let element = &argument_list.arguments.as_slice()[arg_idx];
-            let mut argument = vec![in f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
+            let mut argument = vec_in![f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
             if i < (arguments_count - 1) {
                 argument.push(Document::String(b","));
 
@@ -558,7 +565,10 @@ pub(super) fn print_partial_argument_list<'arena>(
 
 /// Checks if an expression is a concatenation chain (3+ operands) that exceeds print width.
 /// This is used to determine if the parent call should break.
-pub fn is_breaking_binary(f: &FormatterState, expr: &Expression) -> bool {
+pub fn is_breaking_binary<A>(f: &FormatterState<'_, '_, A>, expr: &Expression) -> bool
+where
+    A: Arena,
+{
     let threshold = f.settings.print_width + f.settings.tab_width;
 
     let mut estimated_total_width = 0;
@@ -571,7 +581,14 @@ pub fn is_breaking_binary(f: &FormatterState, expr: &Expression) -> bool {
 }
 
 #[inline]
-pub fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentList, for_attributes: bool) -> bool {
+pub fn should_break_all_arguments<A>(
+    f: &FormatterState<'_, '_, A>,
+    argument_list: &ArgumentList,
+    for_attributes: bool,
+) -> bool
+where
+    A: Arena,
+{
     if f.settings.always_break_named_arguments_list
         && (!for_attributes || f.settings.always_break_attribute_named_argument_lists)
         && argument_list.arguments.len() >= 2
@@ -608,10 +625,13 @@ pub fn should_break_all_arguments(f: &FormatterState, argument_list: &ArgumentLi
 }
 
 #[inline]
-fn is_single_late_breaking_argument<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn is_single_late_breaking_argument<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     argument_list: &'arena ArgumentList<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let arguments = argument_list.arguments.as_slice();
     if arguments.len() != 1 {
         return false;
@@ -643,10 +663,13 @@ fn is_single_late_breaking_argument<'arena>(
 /// value any shorter, so the standard break-on-overflow path produces a
 /// pure-noise diff. Gated by `inline_single_breaking_value_argument`.
 #[inline]
-fn should_inline_single_value_argument<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn should_inline_single_value_argument<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     argument_list: &'arena ArgumentList<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let arguments = argument_list.arguments.as_slice();
     if arguments.len() != 1 {
         return false;
@@ -665,10 +688,13 @@ fn should_inline_single_value_argument<'arena>(
 }
 
 #[inline]
-fn should_inline_breaking_arguments<'arena>(
-    f: &FormatterState<'_, 'arena>,
+fn should_inline_breaking_arguments<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     argument_list: &'arena ArgumentList<'arena>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let arguments = argument_list.arguments.as_slice();
 
     match arguments.len() {
@@ -750,11 +776,14 @@ fn is_call_with_wrapping_arrow_function<'arena>(expr: &'arena Expression<'arena>
 }
 
 /// * Reference <https://github.com/prettier/prettier/blob/3.3.3/src/language-js/print/call-arguments.js#L247-L272>
-pub fn should_expand_first_arg<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub fn should_expand_first_arg<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     argument_list: &'arena ArgumentList<'arena>,
     nested_args: bool,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if argument_list.arguments.len() != 2 {
         return false;
     }
@@ -775,11 +804,14 @@ pub fn should_expand_first_arg<'arena>(
 }
 
 /// * Reference <https://github.com/prettier/prettier/blob/52829385bcc4d785e58ae2602c0b098a643523c9/src/language-js/print/call-arguments.js#L234-L258>
-pub fn should_expand_last_arg<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub fn should_expand_last_arg<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     argument_list: &'arena ArgumentList<'arena>,
     nested_args: bool,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let Some(last_argument) = argument_list.arguments.last() else { return false };
     if f.has_comment(last_argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING) {
         return false;

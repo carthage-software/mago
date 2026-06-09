@@ -1,4 +1,5 @@
 use core::hint::unreachable_unchecked;
+use mago_allocator::prelude::*;
 
 use crate::ast::Argument;
 use crate::ast::ArgumentList;
@@ -9,7 +10,10 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse an optional `(arg, ...)` list - returns `None` when the next
     /// token is not `(`.
     pub(crate) fn parse_optional_argument_list(&mut self) -> Result<Option<ArgumentList<'arena>>, ParseError<'arena>> {

@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -27,12 +28,15 @@ use crate::error::AnalysisError;
 use crate::utils::get_type_diff;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Yield<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         match self {
             Yield::Value(yield_value) => yield_value.analyze(context, block_context, artifacts),
             Yield::Pair(yield_pair) => yield_pair.analyze(context, block_context, artifacts),
@@ -42,12 +46,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Yield<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldValue<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let key_type = get_non_negative_int();
         let value_type = if let Some(value) = self.value.as_ref() {
             let was_inside_call = block_context.flags.inside_call();
@@ -133,12 +140,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldValue<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldPair<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let key_type = {
             let was_inside_call = block_context.flags.inside_call();
             block_context.flags.set_inside_call(true);
@@ -230,12 +240,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldPair<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let was_inside_call = block_context.flags.inside_call();
         block_context.flags.set_inside_call(true);
         self.iterator.analyze(context, block_context, artifacts)?;
@@ -384,11 +397,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
     }
 }
 
-fn get_current_generator_parameters<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn get_current_generator_parameters<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     yield_span: Span,
-) -> Option<(TUnion, TUnion, TUnion, TUnion)> {
+) -> Option<(TUnion, TUnion, TUnion, TUnion)>
+where
+    A: Arena,
+{
     let Some(function) = block_context.scope.get_function_like() else {
         context.collector.report_with_code(
             IssueCode::YieldOutsideFunction,

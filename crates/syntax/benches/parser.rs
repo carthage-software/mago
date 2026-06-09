@@ -2,11 +2,11 @@
 
 use std::hint::black_box;
 
-use bumpalo::Bump;
 use criterion::Criterion;
 use criterion::Throughput;
 use criterion::criterion_group;
 use criterion::criterion_main;
+use mago_allocator::LocalArena;
 use mago_database::file::FileId;
 use mago_syntax::lexer::Lexer;
 use mago_syntax::parser::parse_file_content;
@@ -31,7 +31,7 @@ fn benchmark_mago_parser(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(SMALL_PHP.len() as u64));
     group.bench_function("small", |b| {
         b.iter(|| {
-            let arena = Bump::new();
+            let arena = LocalArena::new();
             let file_id = FileId::new(b"bench.php");
             let result = parse_file_content(&arena, file_id, black_box(SMALL_PHP.as_bytes()));
             let _ = black_box(result.errors.len());
@@ -41,7 +41,7 @@ fn benchmark_mago_parser(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(MEDIUM_PHP.len() as u64));
     group.bench_function("medium", |b| {
         b.iter(|| {
-            let arena = Bump::new();
+            let arena = LocalArena::new();
             let file_id = FileId::new(b"bench.php");
             let result = parse_file_content(&arena, file_id, black_box(MEDIUM_PHP.as_bytes()));
             let _ = black_box(result.errors.len());
@@ -51,7 +51,7 @@ fn benchmark_mago_parser(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(LARGE_PHP.len() as u64));
     group.bench_function("large", |b| {
         b.iter(|| {
-            let arena = Bump::new();
+            let arena = LocalArena::new();
             let file_id = FileId::new(b"bench.php");
             let result = parse_file_content(&arena, file_id, black_box(LARGE_PHP.as_bytes()));
             let _ = black_box(result.errors.len());

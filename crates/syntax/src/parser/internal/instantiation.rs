@@ -3,8 +3,12 @@ use crate::ast::ast::Instantiation;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::Precedence;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_instantiation(&mut self) -> Result<Instantiation<'arena>, ParseError> {
         Ok(Instantiation {
             new: self.expect_keyword(T!["new"])?,

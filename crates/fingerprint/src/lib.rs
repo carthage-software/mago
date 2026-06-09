@@ -197,8 +197,8 @@ impl<'opts> FingerprintOptions<'opts> {
 
 #[cfg(test)]
 mod tests {
-    use bumpalo::Bump;
     use indoc::indoc;
+    use mago_allocator::LocalArena;
     use mago_database::file::File;
     use mago_names::resolver::NameResolver;
     use mago_syntax::parser::parse_file;
@@ -208,7 +208,7 @@ mod tests {
     use super::*;
 
     pub(crate) fn fingerprint_code(code: &'static str) -> u64 {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Borrowed(code.as_bytes()));
         let program = parse_file(&arena, &file);
         assert!(!program.has_errors(), "Failed to parse code, errors: {:?}", program.errors);

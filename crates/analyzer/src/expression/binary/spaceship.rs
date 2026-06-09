@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::ttype::TType;
@@ -31,12 +32,15 @@ use crate::expression::binary::utils::is_always_less_than;
 /// reports warnings for potentially problematic comparisons (e.g., array with int),
 /// and errors for invalid comparisons (e.g., involving `mixed`).
 /// Data flow is established from both operands.
-pub fn analyze_spaceship_operation<'ctx, 'arena>(
+pub fn analyze_spaceship_operation<'ctx, 'arena, A>(
     binary: &Binary<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     binary.lhs.analyze(context, block_context, artifacts)?;
     binary.rhs.analyze(context, block_context, artifacts)?;
 
@@ -146,12 +150,14 @@ pub fn analyze_spaceship_operation<'ctx, 'arena>(
     Ok(())
 }
 
-fn check_spaceship_operand<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn check_spaceship_operand<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     operand: &Expression<'arena>,
     operand_type: &TUnion,
     side: &'static str,
-) {
+) where
+    A: Arena,
+{
     if operand_type.is_null() {
         context.collector.report_with_code(
              IssueCode::NullOperand,

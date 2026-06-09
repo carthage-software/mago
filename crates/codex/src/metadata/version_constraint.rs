@@ -117,7 +117,7 @@ impl VersionConstraint {
                 return true;
             }
 
-            // Bump past this range. There's no `+1` notion on PHPVersion, so
+            // LocalArena past this range. There's no `+1` notion on PHPVersion, so
             // re-cast through the packed id; every range we'd be looking for
             // next must start strictly after `r_max`.
             next_required = PHPVersion::from_version_id(r_max.to_version_id().saturating_add(1));
@@ -129,6 +129,7 @@ impl VersionConstraint {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     fn v(major: u32, minor: u32, patch: u32) -> PHPVersion {

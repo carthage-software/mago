@@ -12,8 +12,12 @@ use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_trait_use(&mut self) -> Result<TraitUse<'arena>, ParseError> {
         Ok(TraitUse {
             r#use: self.expect_keyword(T!["use"])?,

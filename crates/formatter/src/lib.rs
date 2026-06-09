@@ -12,7 +12,7 @@
 
 use std::borrow::Cow;
 
-use bumpalo::Bump;
+use mago_allocator::Arena;
 
 use mago_database::file::File;
 use mago_php_version::PHPVersion;
@@ -44,22 +44,28 @@ const FORMAT_IGNORE_MARKERS: [&[u8]; 2] = [b"@mago-format-ignore", b"@mago-forma
 /// string representation. It is configured with a specific PHP version, formatting
 /// settings, and a string interner.
 #[derive(Debug)]
-pub struct Formatter<'arena> {
-    arena: &'arena Bump,
+pub struct Formatter<'arena, A>
+where
+    A: Arena,
+{
+    arena: &'arena A,
     php_version: PHPVersion,
     settings: FormatSettings,
     parser_settings: ParserSettings,
 }
 
-impl<'arena> Formatter<'arena> {
+impl<'arena, A> Formatter<'arena, A>
+where
+    A: Arena,
+{
     /// Creates a new `Formatter` with the specified configuration.
     ///
     /// # Arguments
     ///
-    /// * `arena` - A reference to a `Bump` arena for memory allocation.
+    /// * `arena` - A reference to an arena for memory allocation.
     /// * `php_version` - The target PHP version for formatting.
     /// * `settings` - The formatting settings to use.
-    pub fn new(arena: &'arena Bump, php_version: PHPVersion, settings: FormatSettings) -> Self {
+    pub fn new(arena: &'arena A, php_version: PHPVersion, settings: FormatSettings) -> Self {
         Self { arena, php_version, settings, parser_settings: ParserSettings::default() }
     }
 
@@ -125,7 +131,7 @@ impl<'arena> Formatter<'arena> {
     /// This is a separate step from printing, allowing for potential inspection or
     /// manipulation of the layout before rendering.
     #[must_use]
-    pub fn build(&self, file: &File, program: &'arena Program<'arena>) -> Document<'arena> {
+    pub fn build(&self, file: &File, program: &'arena Program<'arena>) -> Document<'arena, A> {
         // Check for format-ignore directive in comments
         if has_format_ignore_comment(program) {
             return Document::String(program.source_text);
@@ -148,7 +154,7 @@ impl<'arena> Formatter<'arena> {
     /// # Returns
     ///
     /// A formatted string representation of the document.
-    pub fn print(&self, document: Document<'arena>, capacity_hint: Option<usize>) -> &'arena [u8] {
+    pub fn print(&self, document: Document<'arena, A>, capacity_hint: Option<usize>) -> &'arena [u8] {
         Printer::new(self.arena, document, capacity_hint.unwrap_or(0), self.settings).build()
     }
 }

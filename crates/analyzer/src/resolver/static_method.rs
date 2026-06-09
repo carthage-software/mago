@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::sync::Arc;
 
 use mago_word::Word;
@@ -48,14 +49,17 @@ use crate::visibility::check_method_visibility;
 /// 2. Resolving the `method` selector to get potential method names.
 /// 3. Finding matching methods and validating them against static access rules.
 /// 4. Reporting issues like calling a non-static method, or calling a method on an interface.
-pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn resolve_static_method_targets<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class_expr: &'ast Expression<'arena>,
     method_selector: &'ast ClassLikeMemberSelector<'arena>,
     access_span: Span,
-) -> Result<MethodResolutionResult, AnalysisError> {
+) -> Result<MethodResolutionResult, AnalysisError>
+where
+    A: Arena,
+{
     let mut result = MethodResolutionResult::default();
 
     let class_resolutions = resolve_classnames_from_expression(context, block_context, artifacts, class_expr, false)?;
@@ -118,8 +122,8 @@ pub fn resolve_static_method_targets<'ctx, 'ast, 'arena>(
     Ok(result)
 }
 
-fn resolve_method_from_classname<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn resolve_method_from_classname<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
     method_name: Word,
@@ -129,7 +133,10 @@ fn resolve_method_from_classname<'ctx, 'arena>(
     result: &mut MethodResolutionResult,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
-) -> Vec<ResolvedMethod> {
+) -> Vec<ResolvedMethod>
+where
+    A: Arena,
+{
     let mut resolve_method_from_class_id =
         |fq_class_id: Word,
          is_relative: bool,
@@ -335,8 +342,8 @@ fn resolve_method_from_classname<'ctx, 'arena>(
     resolved_methods
 }
 
-fn resolve_method_from_metadata<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn resolve_method_from_metadata<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     current_class_metadata: Option<&'ctx ClassLikeMetadata>,
     method_name: Word,
@@ -348,7 +355,10 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     access_span: Span,
     class_span: Span,
     has_magic_static_call: bool,
-) -> Option<ResolvedMethod> {
+) -> Option<ResolvedMethod>
+where
+    A: Arena,
+{
     let method_id = MethodIdentifier::new(defining_class_metadata.original_name, method_name);
     let declaring_method_id = context.codebase.get_declaring_method_identifier(&method_id);
     let (declaring_method_id, function_like) = match context.codebase.get_method_by_id(&declaring_method_id) {
@@ -442,11 +452,14 @@ fn resolve_method_from_metadata<'ctx, 'arena>(
     })
 }
 
-fn get_metadata_object<'ctx>(
-    context: &Context<'ctx, '_>,
+fn get_metadata_object<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     current_class_metadata: &'ctx ClassLikeMetadata,
-) -> TObject {
+) -> TObject
+where
+    A: Arena,
+{
     if class_like_metadata.kind.is_enum() {
         return TObject::Enum(TEnum { name: class_like_metadata.original_name, case: None });
     }
@@ -534,7 +547,10 @@ fn get_metadata_object<'ctx>(
     })
 }
 
-fn report_non_static_access(context: &mut Context, method_id: &MethodIdentifier, span: Span) {
+fn report_non_static_access<A>(context: &mut Context<'_, '_, A>, method_id: &MethodIdentifier, span: Span)
+where
+    A: Arena,
+{
     let class_lower = method_id.get_class_name();
     let method_lower = method_id.get_method_name();
     let class_name = display_class_like_name(context, class_lower);
@@ -548,7 +564,10 @@ fn report_non_static_access(context: &mut Context, method_id: &MethodIdentifier,
     );
 }
 
-fn report_static_call_on_interface(context: &mut Context, name: Word, span: Span, from_class_string: bool) {
+fn report_static_call_on_interface<A>(context: &mut Context<'_, '_, A>, name: Word, span: Span, from_class_string: bool)
+where
+    A: Arena,
+{
     let name = display_class_like_name(context, name);
     if from_class_string {
         context.collector.report_with_code(
@@ -576,7 +595,10 @@ fn report_static_call_on_interface(context: &mut Context, name: Word, span: Span
     }
 }
 
-fn report_deprecated_static_access_on_trait(context: &mut Context, name: Word, span: Span) {
+fn report_deprecated_static_access_on_trait<A>(context: &mut Context<'_, '_, A>, name: Word, span: Span)
+where
+    A: Arena,
+{
     let name = display_class_like_name(context, name);
     context.collector.report_with_code(
         IssueCode::DeprecatedFeature,
@@ -588,14 +610,16 @@ fn report_deprecated_static_access_on_trait(context: &mut Context, name: Word, s
 
 /// Reports a warning when a static method is found in a mixin but the target class lacks __callStatic.
 /// This is a warning because a subclass might implement __callStatic.
-fn report_possibly_non_existent_mixin_static_method(
-    context: &mut Context,
+fn report_possibly_non_existent_mixin_static_method<A>(
+    context: &mut Context<'_, '_, A>,
     class_span: Span,
     selector_span: Span,
     classname: Word,
     method_name: Word,
     mixin_classname: Word,
-) {
+) where
+    A: Arena,
+{
     let mixin_classname = display_class_like_name(context, mixin_classname);
     let method_name = display_method_name(context, classname, method_name);
     let classname = display_class_like_name(context, classname);
@@ -624,14 +648,16 @@ fn report_possibly_non_existent_mixin_static_method(
 
 /// Reports an error when a static method is found in a mixin but the target final class lacks __callStatic.
 /// This is an error because no subclass can exist to implement __callStatic.
-fn report_non_existent_mixin_static_method(
-    context: &mut Context,
+fn report_non_existent_mixin_static_method<A>(
+    context: &mut Context<'_, '_, A>,
     class_span: Span,
     selector_span: Span,
     classname: Word,
     method_name: Word,
     mixin_classname: Word,
-) {
+) where
+    A: Arena,
+{
     let mixin_classname = display_class_like_name(context, mixin_classname);
     let method_name = display_method_name(context, classname, method_name);
     let classname = display_class_like_name(context, classname);
@@ -661,14 +687,17 @@ fn report_non_existent_mixin_static_method(
 /// Note: For static method calls, we cannot resolve generic mixin types (e.g., `@mixin T`)
 /// to concrete types because static calls don't have an instance with type parameters.
 /// In such cases, we fall back to using the constraint type.
-fn find_static_method_in_mixins<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn find_static_method_in_mixins<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     mixins: &[TUnion],
     method_name: Word,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
-) -> Option<ResolvedMethod> {
+) -> Option<ResolvedMethod>
+where
+    A: Arena,
+{
     for mixin_type in mixins {
         for mixin_atomic in mixin_type.types.as_ref() {
             match mixin_atomic {
@@ -727,14 +756,17 @@ fn find_static_method_in_mixins<'ctx, 'arena>(
 }
 
 /// Searches for a static method in a single mixin class.
-fn find_static_method_in_single_mixin<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn find_static_method_in_single_mixin<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     mixin_class_name: Word,
     method_name: Word,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
-) -> Option<ResolvedMethod> {
+) -> Option<ResolvedMethod>
+where
+    A: Arena,
+{
     let mixin_metadata = context.codebase.get_class_like(mixin_class_name.as_bytes())?;
 
     let method_id = MethodIdentifier::new(mixin_metadata.original_name, method_name);

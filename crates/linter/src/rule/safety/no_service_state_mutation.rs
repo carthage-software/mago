@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -172,7 +173,10 @@ impl LintRule for NoServiceStateMutationRule {
         Self { meta: Self::meta(), cfg: settings.config.clone() }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let members = match node {
             Node::Class(class) => {
                 let is_reset_class = class.implements.as_ref().is_some_and(|implements| {
@@ -246,14 +250,17 @@ struct MutationCollector {
     findings: Vec<Span>,
 }
 
-impl<'ctx, 'arena> MutWalker<'_, 'arena, LintContext<'ctx, 'arena>> for MutationCollector {
-    fn walk_in_assignment(&mut self, assignment: &Assignment<'arena>, _ctx: &mut LintContext<'ctx, 'arena>) {
+impl<'ctx, 'arena, A> MutWalker<'_, 'arena, LintContext<'ctx, 'arena, A>> for MutationCollector
+where
+    A: Arena,
+{
+    fn walk_in_assignment(&mut self, assignment: &Assignment<'arena>, _ctx: &mut LintContext<'ctx, 'arena, A>) {
         if let Some(span) = is_property_mutation(assignment.lhs) {
             self.findings.push(span);
         }
     }
 
-    fn walk_in_unary_prefix(&mut self, prefix: &UnaryPrefix<'arena>, _ctx: &mut LintContext<'ctx, 'arena>) {
+    fn walk_in_unary_prefix(&mut self, prefix: &UnaryPrefix<'arena>, _ctx: &mut LintContext<'ctx, 'arena, A>) {
         if prefix.operator.is_increment_or_decrement()
             && let Some(span) = is_property_mutation(prefix.operand)
         {
@@ -261,13 +268,13 @@ impl<'ctx, 'arena> MutWalker<'_, 'arena, LintContext<'ctx, 'arena>> for Mutation
         }
     }
 
-    fn walk_in_unary_postfix(&mut self, postfix: &UnaryPostfix<'arena>, _ctx: &mut LintContext<'ctx, 'arena>) {
+    fn walk_in_unary_postfix(&mut self, postfix: &UnaryPostfix<'arena>, _ctx: &mut LintContext<'ctx, 'arena, A>) {
         if let Some(span) = is_property_mutation(postfix.operand) {
             self.findings.push(span);
         }
     }
 
-    fn walk_in_unset(&mut self, unset: &Unset<'arena>, _ctx: &mut LintContext<'ctx, 'arena>) {
+    fn walk_in_unset(&mut self, unset: &Unset<'arena>, _ctx: &mut LintContext<'ctx, 'arena, A>) {
         for value in unset.values.iter() {
             if let Some(span) = is_property_mutation(value) {
                 self.findings.push(span);
@@ -276,13 +283,13 @@ impl<'ctx, 'arena> MutWalker<'_, 'arena, LintContext<'ctx, 'arena>> for Mutation
     }
 
     // Don't descend into nested classes/functions — they have their own scope.
-    fn walk_anonymous_class(&mut self, _: &AnonymousClass<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_closure(&mut self, _: &Closure<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_arrow_function(&mut self, _: &ArrowFunction<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_class(&mut self, _: &Class<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_trait(&mut self, _: &Trait<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_interface(&mut self, _: &Interface<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
-    fn walk_enum(&mut self, _: &Enum<'arena>, _: &mut LintContext<'ctx, 'arena>) {}
+    fn walk_anonymous_class(&mut self, _: &AnonymousClass<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_closure(&mut self, _: &Closure<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_arrow_function(&mut self, _: &ArrowFunction<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_class(&mut self, _: &Class<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_trait(&mut self, _: &Trait<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_interface(&mut self, _: &Interface<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
+    fn walk_enum(&mut self, _: &Enum<'arena>, _: &mut LintContext<'ctx, 'arena, A>) {}
 }
 
 #[cfg(test)]

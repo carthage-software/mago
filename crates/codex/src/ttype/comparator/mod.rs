@@ -53,10 +53,11 @@ impl ComparisonResult {
 
 #[cfg(test)]
 mod tests {
+
+    use mago_allocator::LocalArena;
     use std::borrow::Cow;
     use std::collections::HashSet;
 
-    use bumpalo::Bump;
     use mago_database::Database;
     use mago_database::DatabaseReader;
     use mago_database::file::File;
@@ -83,7 +84,7 @@ mod tests {
         let database = Database::single(file, config);
 
         let mut codebase = CodebaseMetadata::new();
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         for file in database.files() {
             let program = parse_file(&arena, &file);
             assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);

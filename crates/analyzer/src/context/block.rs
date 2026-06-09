@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -336,12 +337,15 @@ impl<'ctx> BlockContext<'ctx> {
         (included_clauses, rejected_clauses)
     }
 
-    pub(crate) fn filter_clauses<'arena>(
-        context: &mut Context<'ctx, 'arena>,
+    pub(crate) fn filter_clauses<'arena, A>(
+        context: &mut Context<'ctx, 'arena, A>,
         remove_var_id: Word,
         clauses: Vec<Rc<Clause>>,
         new_type: Option<&TUnion>,
-    ) -> Vec<Rc<Clause>> {
+    ) -> Vec<Rc<Clause>>
+    where
+        A: Arena,
+    {
         let mut clauses_to_keep = Vec::new();
         let mut other_clauses = Vec::new();
 
@@ -404,24 +408,28 @@ impl<'ctx> BlockContext<'ctx> {
         clauses_to_keep
     }
 
-    pub(crate) fn remove_variable_from_conflicting_clauses<'arena>(
+    pub(crate) fn remove_variable_from_conflicting_clauses<'arena, A>(
         &mut self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         remove_var_id: Word,
         new_type: Option<&TUnion>,
-    ) {
+    ) where
+        A: Arena,
+    {
         self.clauses = BlockContext::filter_clauses(context, remove_var_id, self.clauses.clone(), new_type);
 
         self.parent_conflicting_clause_variables.insert(remove_var_id);
     }
 
-    pub(crate) fn remove_descendants<'arena>(
+    pub(crate) fn remove_descendants<'arena, A>(
         &mut self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         remove_var_id: Word,
         existing_type: &TUnion,
         new_type: Option<&TUnion>,
-    ) {
+    ) where
+        A: Arena,
+    {
         self.remove_variable_from_conflicting_clauses(
             context,
             remove_var_id,
@@ -478,12 +486,14 @@ impl<'ctx> BlockContext<'ctx> {
         }
     }
 
-    pub(crate) fn remove_variable<'arena>(
+    pub(crate) fn remove_variable<'arena, A>(
         &mut self,
         var_name: &[u8],
         remove_descendants: bool,
-        context: &mut Context<'ctx, 'arena>,
-    ) {
+        context: &mut Context<'ctx, 'arena, A>,
+    ) where
+        A: Arena,
+    {
         let var_atom = word(var_name);
         if let Some(existing_type) = self.locals.remove(&var_atom)
             && remove_descendants
@@ -553,15 +563,17 @@ impl<'ctx> BlockContext<'ctx> {
         self.conditionally_referenced_variable_ids.remove(&remove_var_atom);
     }
 
-    pub fn update(
+    pub fn update<A>(
         &mut self,
-        context: &mut Context<'ctx, '_>,
+        context: &mut Context<'ctx, '_, A>,
         start_block_context: &Self,
         end_block_context: &mut Self,
         has_leaving_statements: bool,
         vars_to_update: &WordSet,
         updated_vars: &mut WordSet,
-    ) {
+    ) where
+        A: Arena,
+    {
         if vars_to_update.is_empty() {
             return;
         }
@@ -639,12 +651,15 @@ impl std::fmt::Display for ReferenceConstraintSource {
     }
 }
 
-fn substitute_types(
-    context: &mut Context<'_, '_>,
+fn substitute_types<A>(
+    context: &mut Context<'_, '_, A>,
     existing_type: TUnion,
     old_type: TUnion,
     new_type: Option<&TUnion>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_type.is_mixed() || existing_type.is_never() {
         return existing_type;
     }
@@ -674,7 +689,14 @@ fn substitute_types(
 /// # Returns
 ///
 /// A new `TUnion` representing `existing_type - type_to_remove`.
-pub fn subtract_union_types(context: &mut Context<'_, '_>, existing_type: TUnion, type_to_remove: TUnion) -> TUnion {
+pub fn subtract_union_types<A>(
+    context: &mut Context<'_, '_, A>,
+    existing_type: TUnion,
+    type_to_remove: TUnion,
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_type == type_to_remove {
         return get_never();
     }

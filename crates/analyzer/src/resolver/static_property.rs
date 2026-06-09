@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
@@ -25,13 +26,16 @@ use crate::resolver::property::ResolvedProperty;
 use crate::visibility::check_property_read_visibility;
 
 /// Resolves all possible static properties from a class expression and a member selector.
-pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn resolve_static_properties<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class_expression: &'ast Expression<'arena>,
     property_variable: &'ast Variable<'arena>,
-) -> Result<PropertyResolutionResult, AnalysisError> {
+) -> Result<PropertyResolutionResult, AnalysisError>
+where
+    A: Arena,
+{
     let mut result = PropertyResolutionResult::default();
 
     let classnames = resolve_classnames_from_expression(context, block_context, artifacts, class_expression, false)?;
@@ -123,15 +127,18 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena>(
 }
 
 /// Finds a static property in a class, gets its type, and handles template localization.
-fn find_static_property_in_class<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn find_static_property_in_class<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     class_id: Word,
     property_name: Word,
     variable: &'ast Variable<'arena>,
     class_expr: &'ast Expression<'arena>,
     result: &mut PropertyResolutionResult,
-) -> Option<ResolvedProperty> {
+) -> Option<ResolvedProperty>
+where
+    A: Arena,
+{
     let Some(class_metadata) = context.codebase.get_class_like(class_id.as_bytes()) else {
         // Error reporting for non-existent class is handled by `resolve_classnames_from_expression`.
         result.has_invalid_path = true;
@@ -254,13 +261,15 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena>(
     })
 }
 
-fn report_non_existent_property(
-    context: &mut Context<'_, '_>,
+fn report_non_existent_property<A>(
+    context: &mut Context<'_, '_, A>,
     classname: Word,
     property_name: Word,
     selector_span: Span,
     class_like_name_span: Span,
-) {
+) where
+    A: Arena,
+{
     let class_kind_str = context.codebase.get_class_like(classname.as_bytes()).map_or("class", |m| m.kind.as_str());
 
     context.collector.report_with_code(

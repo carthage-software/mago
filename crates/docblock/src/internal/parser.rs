@@ -1,5 +1,4 @@
-use bumpalo::Bump;
-use bumpalo::collections::Vec;
+use mago_allocator::prelude::*;
 
 use mago_span::Span;
 
@@ -13,11 +12,14 @@ use crate::error::ParseError;
 
 use super::token::Token;
 
-pub fn parse_document<'arena>(
+pub fn parse_document<'arena, A>(
     span: Span,
     tokens: &[Token<'arena>],
-    arena: &'arena Bump,
-) -> Result<Document<'arena>, ParseError> {
+    arena: &'arena A,
+) -> Result<Document<'arena>, ParseError>
+where
+    A: Arena,
+{
     let mut elements = Vec::new_in(arena);
     let mut i = 0;
 
@@ -49,18 +51,21 @@ pub fn parse_document<'arena>(
         }
     }
 
-    Ok(Document { span, elements })
+    Ok(Document { span, elements: elements.leak() })
 }
 
 fn is_indented_line(content: &[u8]) -> bool {
     content.starts_with(b" ") || content.starts_with(b"\t")
 }
 
-fn parse_tag<'arena>(
+fn parse_tag<'arena, A>(
     tokens: &[Token<'arena>],
     start_index: usize,
-    arena: &'arena Bump,
-) -> Result<(Tag<'arena>, usize), ParseError> {
+    arena: &'arena A,
+) -> Result<(Tag<'arena>, usize), ParseError>
+where
+    A: Arena,
+{
     let mut i = start_index;
     let Token::Line { content, span } = &tokens[i] else {
         return Err(ParseError::ExpectedLine(tokens[i].span()));
@@ -164,11 +169,14 @@ fn parse_tag<'arena>(
     Ok((tag, i))
 }
 
-fn parse_code_block<'arena>(
+fn parse_code_block<'arena, A>(
     tokens: &[Token<'arena>],
     start_index: usize,
-    arena: &'arena Bump,
-) -> Result<(Code<'arena>, usize), ParseError> {
+    arena: &'arena A,
+) -> Result<(Code<'arena>, usize), ParseError>
+where
+    A: Arena,
+{
     let mut i = start_index;
     let Token::Line { content, span } = &tokens[i] else {
         return Err(ParseError::ExpectedLine(tokens[i].span()));
@@ -214,14 +222,17 @@ fn parse_code_block<'arena>(
         return Err(ParseError::UnclosedCodeBlock(code_span));
     }
 
-    Ok((Code { span: code_span, directives, content: arena.alloc_slice_copy(&code_content) }, i))
+    Ok((Code { span: code_span, directives: directives.leak(), content: arena.alloc_slice_copy(&code_content) }, i))
 }
 
-fn parse_indented_code<'arena>(
+fn parse_indented_code<'arena, A>(
     tokens: &[Token<'arena>],
     start_index: usize,
-    arena: &'arena Bump,
-) -> Result<(Code<'arena>, usize), ParseError> {
+    arena: &'arena A,
+) -> Result<(Code<'arena>, usize), ParseError>
+where
+    A: Arena,
+{
     let mut i = start_index;
     let Token::Line { content, span } = &tokens[i] else {
         return Err(ParseError::ExpectedLine(tokens[i].span()));
@@ -262,18 +273,21 @@ fn parse_indented_code<'arena>(
     Ok((
         Code {
             span: Span::new(span.file_id, span.start, end_span.end),
-            directives: Vec::new_in(arena),
+            directives: &[],
             content: arena.alloc_slice_copy(&code_content),
         },
         i,
     ))
 }
 
-fn parse_text<'arena>(
+fn parse_text<'arena, A>(
     tokens: &[Token<'arena>],
     start_index: usize,
-    arena: &'arena Bump,
-) -> Result<(Text<'arena>, usize), ParseError> {
+    arena: &'arena A,
+) -> Result<(Text<'arena>, usize), ParseError>
+where
+    A: Arena,
+{
     let mut i = start_index;
     let mut text_content: std::vec::Vec<u8> = std::vec::Vec::new();
     let start_span = tokens[start_index].span();
@@ -327,16 +341,19 @@ fn parse_text<'arena>(
     let text_span = Span::new(start_span.file_id, start_span.start, end_span.end);
     let segments = parse_text_segments(arena.alloc_slice_copy(&text_content), text_span, arena)?;
 
-    let text = Text { span: text_span, segments };
+    let text = Text { span: text_span, segments: segments.leak() };
 
     Ok((text, i))
 }
 
-fn parse_text_segments<'arena>(
+fn parse_text_segments<'arena, A>(
     text_content: &'arena [u8],
     base_span: Span,
-    arena: &'arena Bump,
-) -> Result<Vec<'arena, TextSegment<'arena>>, ParseError> {
+    arena: &'arena A,
+) -> Result<Vec<'arena, TextSegment<'arena>, A>, ParseError>
+where
+    A: Arena,
+{
     let mut segments = Vec::new_in(arena);
     let mut i = 0usize;
     let len = text_content.len();
@@ -374,7 +391,7 @@ fn parse_text_segments<'arena>(
                     let code_content = &text_content[code_start_pos..code_end];
                     let code_span = base_span.subspan(i as u32, code_end as u32 + backtick_count as u32);
 
-                    let code = Code { span: code_span, directives: Vec::new_in(arena), content: code_content };
+                    let code = Code { span: code_span, directives: &[], content: code_content };
 
                     segments.push(TextSegment::InlineCode(code));
                     i = code_end + backtick_count;

@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use mago_span::Span;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -106,7 +107,10 @@ impl LintRule for PropertyNameRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         match node {
             Node::PropertyItem(property_item) => {
                 self.check_property_item(ctx, property_item);
@@ -120,17 +124,22 @@ impl LintRule for PropertyNameRule {
 }
 
 impl PropertyNameRule {
-    fn check_property_item<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, property_item: &PropertyItem<'arena>) {
+    fn check_property_item<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, property_item: &PropertyItem<'arena>)
+    where
+        A: Arena,
+    {
         let variable = property_item.variable();
 
         self.check_property_name(ctx, variable.name, variable.span());
     }
 
-    fn check_promoted_property<'arena>(
+    fn check_promoted_property<'arena, A>(
         &self,
-        ctx: &mut LintContext<'_, 'arena>,
+        ctx: &mut LintContext<'_, 'arena, A>,
         parameter: &FunctionLikeParameter<'arena>,
-    ) {
+    ) where
+        A: Arena,
+    {
         if !parameter.is_promoted_property() {
             return;
         }
@@ -138,7 +147,10 @@ impl PropertyNameRule {
         self.check_property_name(ctx, parameter.variable.name, parameter.variable.span());
     }
 
-    fn check_property_name(&self, ctx: &mut LintContext<'_, '_>, name_bytes: &[u8], span: Span) {
+    fn check_property_name<A>(&self, ctx: &mut LintContext<'_, '_, A>, name_bytes: &[u8], span: Span)
+    where
+        A: Arena,
+    {
         let Some(name) = std::str::from_utf8(name_bytes).ok() else { return };
         let name_without_dollar = name.strip_prefix('$').unwrap_or(name);
 

@@ -1,0 +1,32 @@
+[package]
+name = "mago-allocator"
+description = "Arena allocation for Mago: a unified `Arena` trait over thread-local and thread-safe bump allocators."
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+blink-alloc = { workspace = true, features = ["sync"] }
+allocator-api2 = { workspace = true }
+hashbrown = { workspace = true }
+rayon = { workspace = true, optional = true }
+
+[features]
+default = []
+rayon = ["dep:rayon"]
+serde = ["allocator-api2/serde", "hashbrown/serde"]
+
+[dev-dependencies]
+rayon = { workspace = true }
+serde_json = { workspace = true }
+
+[[example]]
+name = "compile"
+required-features = ["rayon"]

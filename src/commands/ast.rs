@@ -46,10 +46,10 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use bumpalo::Bump;
 use clap::ColorChoice;
 use clap::Parser;
 use colored::Colorize;
+use mago_allocator::LocalArena;
 use mago_syntax::parser::parse_file_with_settings;
 use serde_json::json;
 use termtree::Tree;
@@ -133,7 +133,7 @@ pub struct AstCommand {
 impl AstCommand {
     /// Executes the AST inspection command.
     pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let file = File::read(&configuration.source.workspace, &self.file, FileType::Host)?;
 
         if self.tokens {
@@ -251,7 +251,7 @@ fn print_ast_json(program: &Program) -> Result<(), Error> {
 }
 
 /// Prints the list of resolved symbol names from the AST.
-fn print_names<'arena>(arena: &'arena Bump, program: &Program<'arena>) -> Result<(), Error> {
+fn print_names<'arena>(arena: &'arena LocalArena, program: &Program<'arena>) -> Result<(), Error> {
     let resolver = NameResolver::new(arena);
     let names = resolver.resolve(program);
 

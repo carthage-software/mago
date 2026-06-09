@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -48,13 +49,16 @@ use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_index_id;
 
-pub(crate) fn analyze<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn analyze<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     array_target: ArrayTarget<'_, 'arena>,
     assign_value_type: &TUnion,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let mut array_target_expressions = vec![array_target];
     while let Some(next_target) = array_target_expressions.last().and_then(|expr| match expr.get_array() {
         Expression::ArrayAccess(aa) => Some(ArrayTarget::Access(aa)),
@@ -210,13 +214,16 @@ pub(crate) fn analyze<'ctx, 'arena>(
     Ok(())
 }
 
-pub(crate) fn update_type_with_key_values(
-    context: &Context<'_, '_>,
+pub(crate) fn update_type_with_key_values<A>(
+    context: &Context<'_, '_, A>,
     mut new_type: TUnion,
     current_type: &TUnion,
     key_values: &Vec<TAtomic>,
     key_type: Option<&Rc<TUnion>>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut has_matching_item = false;
 
     new_type.types = new_type
@@ -231,14 +238,17 @@ pub(crate) fn update_type_with_key_values(
     new_type
 }
 
-fn update_atomic_given_key(
-    context: &Context<'_, '_>,
+fn update_atomic_given_key<A>(
+    context: &Context<'_, '_, A>,
     mut atomic_type: TAtomic,
     key_values: &Vec<TAtomic>,
     key_type: Option<&Rc<TUnion>>,
     has_matching_item: &mut bool,
     current_type: &TUnion,
-) -> TAtomic {
+) -> TAtomic
+where
+    A: Arena,
+{
     if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = &atomic_type
         && constraint.types.len() == 1
     {
@@ -415,14 +425,17 @@ fn update_atomic_given_key(
     atomic_type
 }
 
-fn update_array_assignment_child_type<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn update_array_assignment_child_type<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     key_type: Option<&Rc<TUnion>>,
     value_type: &TUnion,
     mut root_type: TUnion,
     target_span: mago_span::Span,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut collection_types = Vec::new();
     let mut extended_shape = false;
 
@@ -622,8 +635,8 @@ fn update_array_assignment_child_type<'ctx>(
     result
 }
 
-pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     mut array_target_expressions: Vec<ArrayTarget<'ast, 'arena>>,
@@ -631,7 +644,10 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena>(
     root_var_id: Option<Word>,
     root_type: &mut TUnion,
     last_array_expr_type: &mut TUnion,
-) -> Result<Option<&'ast Expression<'arena>>, AnalysisError> {
+) -> Result<Option<&'ast Expression<'arena>>, AnalysisError>
+where
+    A: Arena,
+{
     let mut var_id_additions: Vec<String> = Vec::new();
     let mut last_array_expression_index = None;
     let mut extended_var_id: Option<Word> = None;
@@ -846,7 +862,10 @@ fn get_index_literal_types(expression_index_type: &TUnion) -> Vec<TAtomic> {
     valid_offset_types
 }
 
-fn report_array_append_overflow(context: &mut Context<'_, '_>, target_span: mago_span::Span, possibly: bool) {
+fn report_array_append_overflow<A>(context: &mut Context<'_, '_, A>, target_span: mago_span::Span, possibly: bool)
+where
+    A: Arena,
+{
     let issue = if possibly {
         Issue::warning("Appending to this array may fail at runtime: it can already hold an entry at `PHP_INT_MAX`.")
             .with_annotation(

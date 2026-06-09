@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::get_nullable_scalar;
 use mago_syntax::ast::Echo;
 use mago_syntax::ast::EchoTag;
@@ -11,12 +12,15 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Echo<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_construct_inputs(
             context,
             block_context,
@@ -35,12 +39,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Echo<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for EchoTag<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_construct_inputs(
             context,
             block_context,

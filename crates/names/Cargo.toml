@@ -19,5 +19,5 @@ mago-word = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
 foldhash = { workspace = true }
-bumpalo = { workspace = true }
+mago-allocator = { workspace = true }
 memchr = { workspace = true }

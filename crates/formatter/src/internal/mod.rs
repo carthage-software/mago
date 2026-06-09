@@ -1,6 +1,6 @@
-use bumpalo::Bump;
-use bumpalo::collections::CollectIn;
-use bumpalo::collections::Vec as BumpVec;
+use mago_allocator::Arena;
+use mago_allocator::CollectIn;
+use mago_allocator::vec::Vec as BumpVec;
 
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -66,11 +66,14 @@ pub struct IgnoreNextMarker {
 }
 
 /// Scans comments to build a list of ignore regions and ignore-next markers.
-fn build_ignore_markers<'arena>(
-    arena: &'arena Bump,
+fn build_ignore_markers<'arena, A>(
+    arena: &'arena A,
     comments: &[Trivia<'arena>],
     source_len: u32,
-) -> (&'arena [IgnoreRegion], &'arena [IgnoreNextMarker]) {
+) -> (&'arena [IgnoreRegion], &'arena [IgnoreNextMarker])
+where
+    A: Arena,
+{
     let mut regions = BumpVec::new_in(arena);
     let mut next_markers = BumpVec::new_in(arena);
     let mut current_start: Option<u32> = None;
@@ -99,17 +102,20 @@ fn build_ignore_markers<'arena>(
         regions.push(IgnoreRegion { start, end: source_len });
     }
 
-    (regions.into_bump_slice(), next_markers.into_bump_slice())
+    (regions.leak(), next_markers.leak())
 }
 
 #[derive(Debug)]
-pub struct FormatterState<'ctx, 'arena> {
-    arena: &'arena Bump,
+pub struct FormatterState<'ctx, 'arena, A>
+where
+    A: Arena,
+{
+    arena: &'arena A,
     source_text: &'arena [u8],
     file: &'ctx File,
     php_version: PHPVersion,
     settings: FormatSettings,
-    stack: BumpVec<'arena, Node<'arena, 'arena>>,
+    stack: BumpVec<'arena, Node<'arena, 'arena>, A>,
     all_comments: &'arena [Trivia<'arena>],
     next_comment_index: usize,
     placed_comments: Comments,
@@ -130,9 +136,12 @@ pub struct FormatterState<'ctx, 'arena> {
     member_access_chain_group_id: Option<GroupIdentifier>,
 }
 
-impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
+impl<'ctx, 'arena, A> FormatterState<'ctx, 'arena, A>
+where
+    A: Arena,
+{
     pub fn new(
-        arena: &'arena Bump,
+        arena: &'arena A,
         program: &'arena Program<'arena>,
         file: &'ctx File,
         php_version: PHPVersion,
@@ -143,8 +152,8 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
             .iter()
             .filter(|t| t.kind.is_comment())
             .copied()
-            .collect_in::<BumpVec<_>>(arena)
-            .into_bump_slice();
+            .collect_in::<BumpVec<'arena, _, A>>(arena)
+            .leak();
 
         let (ignore_regions, ignore_next_markers) =
             build_ignore_markers(arena, all_comments, program.source_text.len() as u32);
@@ -482,7 +491,7 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     }
 
     #[inline]
-    fn split_lines(&self, slice: &'arena [u8]) -> BumpVec<'arena, &'arena [u8]> {
+    fn split_lines(&self, slice: &'arena [u8]) -> BumpVec<'arena, &'arena [u8], A> {
         let mut lines = BumpVec::new_in(self.arena);
         let mut remaining = slice;
 
@@ -578,7 +587,10 @@ impl<'ctx, 'arena> FormatterState<'ctx, 'arena> {
     }
 }
 
-impl HasFileId for FormatterState<'_, '_> {
+impl<A> HasFileId for FormatterState<'_, '_, A>
+where
+    A: Arena,
+{
     fn file_id(&self) -> FileId {
         self.file.id
     }

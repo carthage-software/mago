@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -32,12 +33,15 @@ use crate::invocation::InvocationTargetParameter;
 use crate::invocation::analyzer::analyze_invocation;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let callables: Vec<TCallable> =
             resolve_function_callable_types(context, block_context, artifacts, self.function)?
                 .into_iter()
@@ -142,12 +146,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
     }
 }
 
-fn resolve_function_callable_types<'ctx, 'arena, 'artifacts>(
-    context: &mut Context<'ctx, 'arena>,
+fn resolve_function_callable_types<'ctx, 'arena, 'artifacts, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &'artifacts mut AnalysisArtifacts,
     expression: &Expression<'arena>,
-) -> Result<Vec<Cow<'artifacts, TCallable>>, AnalysisError> {
+) -> Result<Vec<Cow<'artifacts, TCallable>>, AnalysisError>
+where
+    A: Arena,
+{
     if let Expression::Identifier(function_name) = expression {
         let name = word(context.resolved_names.get(function_name));
         let unqualified_name = word(function_name.value());

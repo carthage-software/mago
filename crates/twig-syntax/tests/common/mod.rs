@@ -16,7 +16,7 @@
 
 #![allow(dead_code)]
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 
 use mago_database::file::FileId;
 use mago_syntax_core::input::Input;
@@ -30,7 +30,7 @@ use mago_twig_syntax::token::TwigToken;
 use mago_twig_syntax::token::TwigTokenKind;
 
 /// Parse `source` under [`FileId::zero`] with default settings.
-pub fn parse<'arena>(arena: &'arena Bump, source: &'arena str) -> &'arena Template<'arena> {
+pub fn parse<'arena>(arena: &'arena LocalArena, source: &'arena str) -> &'arena Template<'arena> {
     parse_file_content(arena, FileId::zero(), source.as_bytes())
 }
 
@@ -59,7 +59,7 @@ pub fn roundtrip_tokens(source: &str) -> Result<String, SyntaxError> {
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
-pub fn parse_ok<'a>(arena: &'a Bump, src: &'a str) -> &'a Template<'a> {
+pub fn parse_ok<'a>(arena: &'a LocalArena, src: &'a str) -> &'a Template<'a> {
     let tpl = parse(arena, src);
     if tpl.has_errors() {
         let joined: Vec<String> = tpl.errors.iter().map(|e| e.to_string()).collect();
@@ -70,7 +70,7 @@ pub fn parse_ok<'a>(arena: &'a Bump, src: &'a str) -> &'a Template<'a> {
 }
 
 pub fn parses(src: &str) {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse(&arena, src);
     if tpl.has_errors() {
         let joined: Vec<String> = tpl.errors.iter().map(|e| e.to_string()).collect();
@@ -79,7 +79,7 @@ pub fn parses(src: &str) {
 }
 
 pub fn rejects(src: &str) {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse(&arena, src);
     if !tpl.has_errors() {
         panic!("expected {src:?} to be rejected");
@@ -90,7 +90,7 @@ pub fn rejects_with<F>(src: &str, matcher: F)
 where
     F: Fn(&ParseError) -> bool,
 {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse(&arena, src);
     if !tpl.has_errors() {
         panic!("expected {src:?} to be rejected");

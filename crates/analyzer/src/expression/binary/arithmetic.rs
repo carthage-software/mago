@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -33,12 +34,15 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
 #[inline]
-pub fn analyze_arithmetic_operation<'ctx, 'arena>(
+pub fn analyze_arithmetic_operation<'ctx, 'arena, A>(
     binary: &Binary<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let was_inside_general_use = block_context.flags.inside_general_use();
     block_context.flags.set_inside_general_use(true);
     binary.lhs.analyze(context, block_context, artifacts)?;
@@ -509,7 +513,10 @@ pub fn analyze_arithmetic_operation<'ctx, 'arena>(
 }
 
 #[inline]
-fn is_arithmetic_compatible_generic(context: &Context<'_, '_>, union: &TUnion, other_union: &TUnion) -> bool {
+fn is_arithmetic_compatible_generic<A>(context: &Context<'_, '_, A>, union: &TUnion, other_union: &TUnion) -> bool
+where
+    A: Arena,
+{
     if !union.is_single() {
         return false;
     }
@@ -750,7 +757,10 @@ fn calculate_int_arithmetic(op: &BinaryOperator<'_>, left: TInteger, right: TInt
 }
 
 /// Compose two array shapes under PHP's `+` operator.
-fn compose_array_plus(left: &TArray, right: &TArray, context: &Context<'_, '_>) -> Vec<TAtomic> {
+fn compose_array_plus<A>(left: &TArray, right: &TArray, context: &Context<'_, '_, A>) -> Vec<TAtomic>
+where
+    A: Arena,
+{
     if let (TArray::Keyed(left_keyed), TArray::Keyed(right_keyed)) = (left, right) {
         let composed = compose_keyed_plus(left_keyed, right_keyed);
         return vec![TAtomic::Array(TArray::Keyed(composed))];

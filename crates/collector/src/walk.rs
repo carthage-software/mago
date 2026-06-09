@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::ClassLikeMember;
@@ -14,7 +15,10 @@ use crate::Collector;
 /// This function initializes and runs the `ScopeAttachmentWalker` over the entire program.
 /// The walker traverses the AST to identify the precise AST node (e.g., a function or class)
 /// that each pragma applies to.
-pub fn attach_pragma_scopes<'arena>(collector: &mut Collector<'_, 'arena>, program: &Program<'arena>) {
+pub fn attach_pragma_scopes<'arena, A>(collector: &mut Collector<'_, 'arena, A>, program: &Program<'arena>)
+where
+    A: Arena,
+{
     ScopeAttachmentWalker.walk_program(program, collector);
 }
 
@@ -30,7 +34,10 @@ impl ScopeAttachmentWalker {
     /// A pragma is considered applicable to a node if it immediately precedes
     /// the node's span with only whitespace in between. This method iterates through all
     /// unscoped pragmas and updates the first one that meets this criterion.
-    fn assign_scope_for_node(&self, node_span: &Span, collector: &mut Collector<'_, '_>) {
+    fn assign_scope_for_node<A>(&self, node_span: &Span, collector: &mut Collector<'_, '_, A>)
+    where
+        A: Arena,
+    {
         for pragma in &mut collector.pragmas {
             // Skip pragmas that already have a scope.
             if pragma.scope_span.is_some() {
@@ -53,9 +60,12 @@ impl ScopeAttachmentWalker {
     }
 }
 
-impl<'arena> Walker<'_, 'arena, Collector<'_, 'arena>> for ScopeAttachmentWalker {
+impl<'arena, A> Walker<'_, 'arena, Collector<'_, 'arena, A>> for ScopeAttachmentWalker
+where
+    A: Arena,
+{
     /// Visits a statement and attaches scopes for any applicable pragmas.
-    fn walk_statement(&self, statement: &Statement<'arena>, collector: &mut Collector<'_, 'arena>) {
+    fn walk_statement(&self, statement: &Statement<'arena>, collector: &mut Collector<'_, 'arena, A>) {
         let span = statement.span();
 
         if statement.is_declaration() {
@@ -68,7 +78,7 @@ impl<'arena> Walker<'_, 'arena, Collector<'_, 'arena>> for ScopeAttachmentWalker
     }
 
     /// Visits a class-like member and attaches scopes for any applicable pragmas.
-    fn walk_class_like_member(&self, member: &ClassLikeMember<'arena>, collector: &mut Collector<'_, 'arena>) {
+    fn walk_class_like_member(&self, member: &ClassLikeMember<'arena>, collector: &mut Collector<'_, 'arena, A>) {
         let span = member.span();
 
         self.assign_scope_for_node(&span, collector);

@@ -1,7 +1,7 @@
 use foldhash::HashMap;
 use foldhash::HashMapExt;
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 use mago_database::ReadDatabase;
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -54,7 +54,7 @@ impl FormatService {
     ///
     /// Returns [`OrchestratorError`] if the formatter fails outside of recoverable parse errors.
     pub fn format_file(self, file: &File) -> Result<FileFormatStatus, OrchestratorError> {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
 
         self.format_file_in(file, &arena)
     }
@@ -64,7 +64,7 @@ impl FormatService {
     /// # Errors
     ///
     /// Returns [`OrchestratorError`] if the formatter fails outside of recoverable parse errors.
-    pub fn format_file_in(self, file: &File, arena: &Bump) -> Result<FileFormatStatus, OrchestratorError> {
+    pub fn format_file_in(self, file: &File, arena: &LocalArena) -> Result<FileFormatStatus, OrchestratorError> {
         let formatter =
             Formatter::new(arena, self.php_version, self.settings).with_parser_settings(self.parser_settings);
 

@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::T;
@@ -14,7 +15,10 @@ use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_switch(&mut self) -> Result<Switch<'arena>, ParseError> {
         Ok(Switch {
             switch: self.expect_keyword(T!["switch"])?,

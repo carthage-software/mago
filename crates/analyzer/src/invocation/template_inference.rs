@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -93,14 +94,16 @@ fn expand_template_constraint<'ty>(
     Cow::Owned(expanded)
 }
 
-fn infer_templates_from_input_and_container_types(
-    context: &Context<'_, '_>,
+fn infer_templates_from_input_and_container_types<A>(
+    context: &Context<'_, '_, A>,
     container_type: &TUnion,
     input_type: &TUnion,
     template_result: &mut TemplateResult,
     options: InferenceOptions,
     violations: &mut Vec<TemplateInferenceViolation>,
-) {
+) where
+    A: Arena,
+{
     // Capture the top-level flag for this frame's insertion decisions, then
     // shadow `options` so every recursive call descends as "nested". A
     // top-level object specialization (e.g. `Column<T>` matched against
@@ -1017,14 +1020,16 @@ fn infer_templates_from_input_and_container_types(
     }
 }
 
-pub fn infer_templates_for_method_call<'ctx>(
-    context: &Context<'ctx, '_>,
+pub fn infer_templates_for_method_call<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
     object_type: &TNamedObject,
     method_target_context: &MethodTargetContext<'ctx>,
     method_metadata: &'ctx MethodMetadata,
     declaring_class_like_metadata: &'ctx ClassLikeMetadata,
     template_result: &mut TemplateResult,
-) {
+) where
+    A: Arena,
+{
     if declaring_class_like_metadata.name != method_target_context.class_like_metadata.name {
         for (template_name, _) in &declaring_class_like_metadata.template_types {
             let template_type = get_specialized_template_type(
@@ -1098,15 +1103,17 @@ pub fn infer_templates_for_method_call<'ctx>(
 /// * `argument_span`: The source code location of the argument, for error reporting.
 /// * `is_callable_argument`: A flag indicating if the argument is a callable, which
 ///   can influence inference strategy.
-pub fn infer_parameter_templates_from_argument(
-    context: &mut Context<'_, '_>,
+pub fn infer_parameter_templates_from_argument<A>(
+    context: &mut Context<'_, '_, A>,
     parameter_type: &TUnion,
     argument_type: &TUnion,
     template_result: &mut TemplateResult,
     argument_offset: usize,
     argument_span: Span,
     is_callable_argument: bool,
-) {
+) where
+    A: Arena,
+{
     let mut violations = vec![];
     infer_templates_from_input_and_container_types(
         context,
@@ -1157,12 +1164,14 @@ pub fn infer_parameter_templates_from_argument(
 /// * `parameter_type`: The declared type of the parameter (the "container").
 /// * `default_type`: The type of the parameter's default value (the "input").
 /// * `template_result`: The map where inferred template types are stored.
-pub fn infer_parameter_templates_from_default(
-    context: &Context<'_, '_>,
+pub fn infer_parameter_templates_from_default<A>(
+    context: &Context<'_, '_, A>,
     parameter_type: &TUnion,
     default_type: &TUnion,
     template_result: &mut TemplateResult,
-) {
+) where
+    A: Arena,
+{
     infer_templates_from_input_and_container_types(
         context,
         parameter_type,

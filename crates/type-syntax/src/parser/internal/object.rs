@@ -8,9 +8,13 @@ use crate::parser::internal::array_like::parse_shape_field_key;
 use crate::parser::internal::parse_type;
 use crate::parser::internal::stream::TypeTokenStream;
 use crate::token::TypeTokenKind;
+use mago_allocator::prelude::*;
 
 #[inline]
-pub fn parse_object_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Type<'arena>, ParseError> {
+pub fn parse_object_type<'arena, A>(stream: &mut TypeTokenStream<'arena, A>) -> Result<Type<'arena>, ParseError>
+where
+    A: Arena,
+{
     let keyword = stream.eat_keyword(TypeTokenKind::Object)?;
     if !stream.is_at(TypeTokenKind::LeftBrace)? {
         return Ok(Type::Object(ObjectType { keyword, properties: None }));

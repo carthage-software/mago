@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
@@ -88,7 +89,10 @@ impl LintRule for NoAliasFunctionRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::FunctionCall(function_call) = node else {
             return;
         };

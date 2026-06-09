@@ -6,8 +6,12 @@ use crate::ast::sequence::Sequence;
 use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_for(&mut self) -> Result<For<'arena>, ParseError> {
         Ok(For {
             r#for: self.expect_keyword(T!["for"])?,

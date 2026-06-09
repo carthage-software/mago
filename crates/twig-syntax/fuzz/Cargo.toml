@@ -15,7 +15,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-bumpalo = { version = "3", features = ["collections"] }
+mago-allocator = { path = "../../allocator" }
 
 mago-twig-syntax = { path = ".." }
 mago-syntax-core = { path = "../../syntax-core" }

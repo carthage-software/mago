@@ -1,4 +1,3 @@
-use bumpalo::collections::Vec as BVec;
 use serde::Serialize;
 
 use mago_span::HasSpan;
@@ -26,7 +25,7 @@ pub struct Deprecated<'arena> {
     pub open_tag: Span,
     pub keyword: Keyword<'arena>,
     pub message: Expression<'arena>,
-    pub options: BVec<'arena, DeprecatedOption<'arena>>,
+    pub options: &'arena [DeprecatedOption<'arena>],
     pub close_tag: Span,
 }
 

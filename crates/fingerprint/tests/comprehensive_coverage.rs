@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 use mago_database::file::File;
 use mago_fingerprint::FingerprintOptions;
 use mago_fingerprint::Fingerprintable;
@@ -8,7 +8,7 @@ use mago_syntax::parser::parse_file;
 const COMPREHENSIVE_PHP: &[u8] = include_bytes!("fixtures/comprehensive.php");
 
 fn fingerprint_code(code: &'static [u8]) -> u64 {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let file = File::ephemeral(b"test.php".into(), code.into());
     let program = parse_file(&arena, &file);
     assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);
@@ -19,7 +19,7 @@ fn fingerprint_code(code: &'static [u8]) -> u64 {
 
 #[test]
 fn test_comprehensive_file_parses() {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let file = File::ephemeral(b"comprehensive.php".into(), COMPREHENSIVE_PHP.into());
     let program = parse_file(&arena, &file);
     assert!(!program.has_errors(), "Parse should succeed without errors: {:?}", program.errors);
@@ -263,7 +263,7 @@ fn test_use_statement_skipped() {
 #[test]
 fn test_use_statement_change_detected_when_enabled() {
     fn fingerprint_with_use(code: &'static [u8]) -> u64 {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let file = File::ephemeral(b"test.php".into(), code.into());
         let program = parse_file(&arena, &file);
         assert!(!program.has_errors(), "Parse failed: {:?}", program.errors);

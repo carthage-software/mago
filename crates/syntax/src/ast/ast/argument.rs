@@ -1,7 +1,7 @@
-use bumpalo::Bump;
-use bumpalo::collections::Vec;
 use serde::Serialize;
 use strum::Display;
+
+use mago_allocator::prelude::*;
 
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -122,14 +122,17 @@ impl<'arena> PartialArgumentList<'arena> {
     }
 
     #[inline]
-    pub(crate) fn into_argument_list(self, arena: &'arena Bump) -> ArgumentList<'arena> {
+    pub(crate) fn into_argument_list<A>(self, arena: &'arena A) -> ArgumentList<'arena>
+    where
+        A: Arena,
+    {
         debug_assert!(!self.has_placeholders(), "Cannot convert PartialArgumentList with placeholders to ArgumentList");
 
         let mut arguments = Vec::new_in(arena);
         for arg in self.arguments.nodes {
             match arg {
-                PartialArgument::Positional(p) => arguments.push(Argument::Positional(p)),
-                PartialArgument::Named(n) => arguments.push(Argument::Named(n)),
+                PartialArgument::Positional(p) => arguments.push(Argument::Positional(p.clone())),
+                PartialArgument::Named(n) => arguments.push(Argument::Named(n.clone())),
                 PartialArgument::Placeholder(_)
                 | PartialArgument::NamedPlaceholder(_)
                 | PartialArgument::VariadicPlaceholder(_) => {}
@@ -138,7 +141,7 @@ impl<'arena> PartialArgumentList<'arena> {
 
         ArgumentList {
             left_parenthesis: self.left_parenthesis,
-            arguments: TokenSeparatedSequence::new(arguments, self.arguments.tokens),
+            arguments: TokenSeparatedSequence::from_slices(arguments.leak(), self.arguments.tokens),
             right_parenthesis: self.right_parenthesis,
         }
     }

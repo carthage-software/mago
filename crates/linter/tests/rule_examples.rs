@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 
 use mago_database::file::File;
 use mago_linter::Linter;
@@ -44,7 +44,7 @@ fn test_all_rule_examples() {
 
 /// Test a code snippet and verify it produces (or doesn't produce) issues
 fn test_code_snippet(rule_code: &str, code: &str, should_have_issues: bool) -> Result<(), String> {
-    let arena = Bump::new();
+    let arena = LocalArena::new();
 
     let file = File::ephemeral(Cow::Owned(b"test.php".to_vec()), Cow::Owned(code.as_bytes().to_vec()));
 

@@ -1,8 +1,9 @@
+use mago_allocator::Arena;
+use mago_allocator::vec_in;
 use std::cmp::Ordering;
 
-use bumpalo::collections::CollectIn;
-use bumpalo::collections::Vec;
-use bumpalo::vec;
+use mago_allocator::CollectIn;
+use mago_allocator::vec::Vec;
 
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -47,13 +48,16 @@ struct SortedMember<'arena> {
     comment_index: usize,
 }
 
-pub fn print_class_like_body<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub fn print_class_like_body<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     left_brace: &'arena Span,
     class_like_members: &'arena Sequence<'arena, ClassLikeMember<'arena>>,
     right_brace: &'arena Span,
     anonymous_class_signature_id: Option<GroupIdentifier>,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let is_body_empty = block_is_empty(f, left_brace, right_brace);
     let should_inline = is_body_empty
         && if anonymous_class_signature_id.is_some() {
@@ -64,7 +68,7 @@ pub fn print_class_like_body<'arena>(
 
     let length = class_like_members.len();
     let class_like_members = {
-        let mut contents = vec![in f.arena;];
+        let mut contents = vec_in![f.arena;];
         contents.push(Document::String(b"{"));
         if let Some(c) = f.print_trailing_comments(*left_brace) {
             contents.push(c);
@@ -73,7 +77,7 @@ pub fn print_class_like_body<'arena>(
         if length != 0 {
             let mut last_member_kind = None;
             let mut last_has_line_after = false;
-            let mut members = vec![in f.arena; Document::Line(Line::hard())];
+            let mut members = vec_in![f.arena; Document::Line(Line::hard())];
 
             // If enabled, add an empty line directly after the opening brace.
             // This forces a blank line between the `{` and the first member
@@ -87,7 +91,7 @@ pub fn print_class_like_body<'arena>(
                 (sort_class_members(f.arena, f, class_like_members), true)
             } else {
                 // When not sorting, wrap members without comment tracking
-                let wrapped: Vec<'arena, SortedMember<'arena>> = class_like_members
+                let wrapped: Vec<'arena, SortedMember<'arena>, A> = class_like_members
                     .iter()
                     .map(|member| SortedMember { member, comment_index: 0 })
                     .collect_in(f.arena);
@@ -245,27 +249,26 @@ pub fn print_class_like_body<'arena>(
         Document::Group(Group::new(contents))
     };
 
-    Document::Group(Group::new(vec![
-        in f.arena;
+    Document::Group(Group::new(vec_in![f.arena;
         if should_inline {
             Document::space()
         } else {
             match anonymous_class_signature_id {
                 Some(signature_id) => match f.settings.closure_brace_style {
                     BraceStyle::SameLine => Document::space(),
-                    BraceStyle::AlwaysNextLine => Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
+                    BraceStyle::AlwaysNextLine => Document::Array(vec_in![f.arena; Document::Line(Line::hard()), Document::BreakParent]),
                     BraceStyle::NextLine => Document::IfBreak(
                         IfBreak::new(
                             f.arena,
                             Document::space(),
-                            Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
+                            Document::Array(vec_in![f.arena; Document::Line(Line::hard()), Document::BreakParent]),
                         )
                         .with_id(signature_id),
                     ),
                 },
                 None => match f.settings.classlike_brace_style {
                     BraceStyle::SameLine => Document::space(),
-                    BraceStyle::NextLine | BraceStyle::AlwaysNextLine => Document::Array(vec![in f.arena; Document::Line(Line::hard()), Document::BreakParent]),
+                    BraceStyle::NextLine | BraceStyle::AlwaysNextLine => Document::Array(vec_in![f.arena; Document::Line(Line::hard()), Document::BreakParent]),
                 },
             }
         },
@@ -274,11 +277,14 @@ pub fn print_class_like_body<'arena>(
 }
 
 #[inline]
-fn should_add_empty_line_before(
-    f: &mut FormatterState<'_, '_>,
+fn should_add_empty_line_before<A>(
+    f: &mut FormatterState<'_, '_, A>,
     class_like_member_kind: ClassLikeMemberKind,
     last_class_like_member_kind: Option<ClassLikeMemberKind>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if let Some(last_member_kind) = last_class_like_member_kind
         && last_member_kind != class_like_member_kind
         && f.settings.separate_class_like_members
@@ -290,10 +296,13 @@ fn should_add_empty_line_before(
 }
 
 #[inline]
-const fn should_add_empty_line_after(
-    f: &mut FormatterState<'_, '_>,
+const fn should_add_empty_line_after<A>(
+    f: &mut FormatterState<'_, '_, A>,
     class_like_member_kind: ClassLikeMemberKind,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     match class_like_member_kind {
         ClassLikeMemberKind::TraitUse => f.settings.empty_line_after_trait_use,
         ClassLikeMemberKind::Constant => f.settings.empty_line_after_class_like_constant,
@@ -308,12 +317,15 @@ const fn should_add_empty_line_after(
 ///
 /// Returns sorted members paired with their original comment indices, ensuring that
 /// leading comments (including doc comments) move with their associated methods.
-fn sort_class_members<'arena>(
-    arena: &'arena bumpalo::Bump,
-    f: &FormatterState<'_, 'arena>,
+fn sort_class_members<'arena, A>(
+    arena: &'arena A,
+    f: &FormatterState<'_, 'arena, A>,
     members: &'arena Sequence<'arena, ClassLikeMember<'arena>>,
-) -> Vec<'arena, SortedMember<'arena>> {
-    let mut members_with_indices: Vec<'arena, SortedMember<'arena>> = Vec::new_in(arena);
+) -> Vec<'arena, SortedMember<'arena>, A>
+where
+    A: Arena,
+{
+    let mut members_with_indices: Vec<'arena, SortedMember<'arena>, A> = Vec::new_in(arena);
 
     let all_comments = f.all_comments();
     let mut current_comment_index = f.get_next_comment_index();

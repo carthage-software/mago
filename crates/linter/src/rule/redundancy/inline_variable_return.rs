@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use mago_syntax::ast::UnaryPrefix;
 use mago_syntax::ast::UnaryPrefixOperator;
 use schemars::JsonSchema;
@@ -129,7 +130,10 @@ impl LintRule for InlineVariableReturnRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         if ctx.scope.get_function_like_scope().is_some_and(|function_like| function_like.is_by_ref()) {
             return;
         }

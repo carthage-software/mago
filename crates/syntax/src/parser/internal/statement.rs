@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::Span;
 
@@ -11,7 +12,10 @@ use crate::error::ParseError;
 use crate::parser::MAX_RECURSION_DEPTH;
 use crate::parser::Parser;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         self.state.recursion_depth += 1;
         if self.state.recursion_depth > MAX_RECURSION_DEPTH {
@@ -95,11 +99,11 @@ impl<'arena> Parser<'_, 'arena> {
                     }
                 }
             }
-            T!["interface"] => Statement::Interface(self.parse_interface_with_attributes(Sequence::empty(self.arena))?),
-            T!["trait"] => Statement::Trait(self.parse_trait_with_attributes(Sequence::empty(self.arena))?),
-            T!["enum"] => Statement::Enum(self.parse_enum_with_attributes(Sequence::empty(self.arena))?),
-            T!["class"] => Statement::Class(self.parse_class_with_attributes(Sequence::empty(self.arena))?),
-            T!["function"] => self.parse_closure_or_function(Sequence::empty(self.arena))?,
+            T!["interface"] => Statement::Interface(self.parse_interface_with_attributes(Sequence::empty())?),
+            T!["trait"] => Statement::Trait(self.parse_trait_with_attributes(Sequence::empty())?),
+            T!["enum"] => Statement::Enum(self.parse_enum_with_attributes(Sequence::empty())?),
+            T!["class"] => Statement::Class(self.parse_class_with_attributes(Sequence::empty())?),
+            T!["function"] => self.parse_closure_or_function(Sequence::empty())?,
             T!["global"] => Statement::Global(self.parse_global()?),
             T!["static"] if matches!(self.stream.peek_kind(1)?, Some(T!["$variable"])) => {
                 Statement::Static(self.parse_static()?)
@@ -110,11 +114,11 @@ impl<'arena> Parser<'_, 'arena> {
                     Some(T!["::" | "(" | "->" | "?->" | "[" | "fn" | "function"])
                 ) =>
             {
-                Statement::Class(self.parse_class_with_attributes(Sequence::empty(self.arena))?)
+                Statement::Class(self.parse_class_with_attributes(Sequence::empty())?)
             }
             T!["__halt_compiler"] => Statement::HaltCompiler(self.parse_halt_compiler()?),
             T![";"] => Statement::Noop(self.stream.consume_span()?),
-            T!["const"] => Statement::Constant(self.parse_constant_with_attributes(Sequence::empty(self.arena))?),
+            T!["const"] => Statement::Constant(self.parse_constant_with_attributes(Sequence::empty())?),
             T!["if"] => Statement::If(self.parse_if()?),
             T!["switch"] => Statement::Switch(self.parse_switch()?),
             T!["foreach"] => Statement::Foreach(self.parse_foreach()?),

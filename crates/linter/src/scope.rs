@@ -1,5 +1,4 @@
-use bumpalo::Bump;
-use bumpalo::collections::Vec;
+use mago_allocator::prelude::*;
 
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -52,8 +51,11 @@ pub enum Scope<'arena> {
 /// it pushes a new `Scope` onto this stack. When it exits that node, it pops the
 /// scope off. This allows rules to query the current context at any point.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ScopeStack<'arena> {
-    stack: Vec<'arena, Scope<'arena>>,
+pub struct ScopeStack<'arena, A>
+where
+    A: Arena,
+{
+    stack: Vec<'arena, Scope<'arena>, A>,
 }
 
 impl FunctionLikeScope<'_> {
@@ -72,7 +74,10 @@ impl<'arena> Scope<'arena> {
     /// Creates a `Scope` from an AST `Node` if that node defines a new scope.
     ///
     /// Returns `None` if the node does not define a scope.
-    pub fn for_node<'ast>(ctx: &LintContext<'_, 'arena>, node: Node<'ast, 'arena>) -> Option<Self> {
+    pub fn for_node<'ast, A>(ctx: &LintContext<'_, 'arena, A>, node: Node<'ast, 'arena>) -> Option<Self>
+    where
+        A: Arena,
+    {
         Some(match node {
             Node::Namespace(namespace) => {
                 let namespace_name = namespace
@@ -129,10 +134,13 @@ impl<'arena> Scope<'arena> {
     }
 }
 
-impl<'arena> ScopeStack<'arena> {
+impl<'arena, A> ScopeStack<'arena, A>
+where
+    A: Arena,
+{
     /// Creates a new, empty scope stack.
     #[must_use]
-    pub fn new_in(arena: &'arena Bump) -> Self {
+    pub fn new_in(arena: &'arena A) -> Self {
         Self { stack: Vec::with_capacity_in(4, arena) }
     }
 

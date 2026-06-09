@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -91,7 +92,10 @@ impl LintRule for NoSprintfConcatRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::Binary(binary) = node else {
             return;
         };
@@ -128,7 +132,10 @@ impl LintRule for NoSprintfConcatRule {
     }
 }
 
-fn is_sprintf_call<'arena>(expression: &Expression<'arena>, context: &LintContext<'_, 'arena>) -> bool {
+fn is_sprintf_call<'arena, A>(expression: &Expression<'arena>, context: &LintContext<'_, 'arena, A>) -> bool
+where
+    A: Arena,
+{
     let Expression::Call(Call::Function(call)) = expression else {
         return false;
     };

@@ -5,11 +5,15 @@ use crate::error::ParseError;
 use crate::parser::internal::parse_type;
 use crate::parser::internal::stream::TypeTokenStream;
 use crate::token::TypeTokenKind;
+use mago_allocator::prelude::*;
 
 #[inline]
-pub fn parse_single_generic_parameter<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
-) -> Result<SingleGenericParameter<'arena>, ParseError> {
+pub fn parse_single_generic_parameter<'arena, A>(
+    stream: &mut TypeTokenStream<'arena, A>,
+) -> Result<SingleGenericParameter<'arena>, ParseError>
+where
+    A: Arena,
+{
     let less_than = stream.eat_span(TypeTokenKind::LessThan)?;
     let inner = parse_type(stream)?;
     let entry = stream.alloc(GenericParameterEntry { inner, comma: None });
@@ -18,9 +22,12 @@ pub fn parse_single_generic_parameter<'arena>(
 }
 
 #[inline]
-pub fn parse_generic_parameters<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
-) -> Result<GenericParameters<'arena>, ParseError> {
+pub fn parse_generic_parameters<'arena, A>(
+    stream: &mut TypeTokenStream<'arena, A>,
+) -> Result<GenericParameters<'arena>, ParseError>
+where
+    A: Arena,
+{
     let less_than = stream.eat_span(TypeTokenKind::LessThan)?;
     let mut entries = stream.new_bvec::<GenericParameterEntry<'arena>>();
 
@@ -47,9 +54,12 @@ pub fn parse_generic_parameters<'arena>(
 }
 
 #[inline]
-pub fn parse_single_generic_parameter_or_none<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
-) -> Result<Option<SingleGenericParameter<'arena>>, ParseError> {
+pub fn parse_single_generic_parameter_or_none<'arena, A>(
+    stream: &mut TypeTokenStream<'arena, A>,
+) -> Result<Option<SingleGenericParameter<'arena>>, ParseError>
+where
+    A: Arena,
+{
     if stream.is_at(TypeTokenKind::LessThan)? {
         let single_generic_parameter = parse_single_generic_parameter(stream)?;
         Ok(Some(single_generic_parameter))
@@ -59,9 +69,12 @@ pub fn parse_single_generic_parameter_or_none<'arena>(
 }
 
 #[inline]
-pub fn parse_generic_parameters_or_none<'arena>(
-    stream: &mut TypeTokenStream<'arena>,
-) -> Result<Option<GenericParameters<'arena>>, ParseError> {
+pub fn parse_generic_parameters_or_none<'arena, A>(
+    stream: &mut TypeTokenStream<'arena, A>,
+) -> Result<Option<GenericParameters<'arena>>, ParseError>
+where
+    A: Arena,
+{
     if stream.is_at(TypeTokenKind::LessThan)? {
         let generic_parameters = parse_generic_parameters(stream)?;
         Ok(Some(generic_parameters))

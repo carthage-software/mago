@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use mago_allocator::Arena;
 use mago_docblock::error::ParseError;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
@@ -23,12 +23,15 @@ use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::resolution::TypeResolutionContext;
 
 #[inline]
-pub fn scan_constant<'arena>(
+pub fn scan_constant<'arena, A>(
     constant: &'arena Constant<'arena>,
-    context: &Context<'_, 'arena>,
+    context: &Context<'_, 'arena, A>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
-) -> Vec<ConstantMetadata> {
+) -> Vec<ConstantMetadata>
+where
+    A: Arena,
+{
     let verdict = evaluate_version_attributes(&constant.attribute_lists, context, context.php_version);
 
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
@@ -59,12 +62,15 @@ pub fn scan_constant<'arena>(
 }
 
 #[inline]
-pub fn scan_defined_constant<'arena>(
+pub fn scan_defined_constant<'arena, A>(
     define: &'arena FunctionCall<'arena>,
-    context: &Context<'_, 'arena>,
+    context: &Context<'_, 'arena, A>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
-) -> Option<ConstantMetadata> {
+) -> Option<ConstantMetadata>
+where
+    A: Arena,
+{
     let Expression::Identifier(identifier) = define.function else {
         return None;
     };
@@ -96,14 +102,16 @@ pub fn scan_defined_constant<'arena>(
 }
 
 #[inline]
-fn process_constant_docblock(
-    arena: &Bump,
+fn process_constant_docblock<A>(
+    arena: &A,
     metadata: &mut ConstantMetadata,
     docblock: &Result<Option<ConstantDocblockComment>, ParseError>,
     classname: Option<Word>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
-) {
+) where
+    A: Arena,
+{
     let docblock = match docblock {
         Ok(docblock) => match docblock {
             Some(docblock) => docblock,

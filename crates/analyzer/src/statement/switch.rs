@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use foldhash::HashMap;
@@ -52,19 +53,25 @@ use crate::utils::misc::check_for_paradox;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Switch<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         SwitchAnalyzer::new(context, block_context, artifacts).analyze(self)
     }
 }
 
 #[derive(Debug)]
-struct SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
-    context: &'anlyz mut Context<'ctx, 'arena>,
+struct SwitchAnalyzer<'anlyz, 'ctx, 'arena, A>
+where
+    A: Arena,
+{
+    context: &'anlyz mut Context<'ctx, 'arena, A>,
     block_context: &'anlyz mut BlockContext<'ctx>,
     artifacts: &'anlyz mut AnalysisArtifacts,
     new_locals: Option<WordMap<Rc<TUnion>>>,
@@ -81,11 +88,14 @@ struct SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
     has_default_case: bool,
 }
 
-impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
+impl<'anlyz, 'ctx, 'arena, A> SwitchAnalyzer<'anlyz, 'ctx, 'arena, A>
+where
+    A: Arena,
+{
     const SYNTHETIC_SWITCH_VAR_PREFIX: &'static str = "$-tmp-switch-";
 
     pub fn new(
-        context: &'anlyz mut Context<'ctx, 'arena>,
+        context: &'anlyz mut Context<'ctx, 'arena, A>,
         block_context: &'anlyz mut BlockContext<'ctx>,
         artifacts: &'anlyz mut AnalysisArtifacts,
     ) -> Self {
@@ -108,7 +118,10 @@ impl<'anlyz, 'ctx, 'arena> SwitchAnalyzer<'anlyz, 'ctx, 'arena> {
         }
     }
 
-    pub fn analyze(mut self, switch: &Switch<'arena>) -> Result<(), AnalysisError> {
+    pub fn analyze(mut self, switch: &Switch<'arena>) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let was_inside_conditional = self.block_context.flags.inside_conditional();
         self.block_context.flags.set_inside_conditional(true);
         switch.expression.analyze(self.context, self.block_context, self.artifacts)?;

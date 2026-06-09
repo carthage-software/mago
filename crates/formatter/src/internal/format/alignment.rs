@@ -4,6 +4,7 @@
 //! constructs such as variable assignments, class properties, constants, and
 //! array key-value pairs.
 
+use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::ClassLikeConstant;
@@ -74,7 +75,10 @@ impl AlignmentRun {
 }
 
 /// Check if there's a blank line between two spans.
-pub fn has_blank_line_between(f: &FormatterState<'_, '_>, prev_span: Span, next_span: Span) -> bool {
+pub fn has_blank_line_between<A>(f: &FormatterState<'_, '_, A>, prev_span: Span, next_span: Span) -> bool
+where
+    A: Arena,
+{
     let source = f.source_text;
     let start = prev_span.end_offset() as usize;
     let end = next_span.start_offset() as usize;
@@ -90,7 +94,10 @@ pub fn has_blank_line_between(f: &FormatterState<'_, '_>, prev_span: Span, next_
 }
 
 /// Check if there's a comment between two spans.
-pub fn has_comment_between(f: &FormatterState<'_, '_>, prev_span: Span, next_span: Span) -> bool {
+pub fn has_comment_between<A>(f: &FormatterState<'_, '_, A>, prev_span: Span, next_span: Span) -> bool
+where
+    A: Arena,
+{
     f.all_comments.iter().any(|comment| {
         let comment_span = comment.span;
         comment_span.start_offset() >= prev_span.end_offset() && comment_span.end_offset() <= next_span.start_offset()
@@ -168,10 +175,13 @@ fn calculate_modifier_signature(modifiers: &Sequence<'_, Modifier<'_>>) -> u32 {
 ///
 /// Returns a list of runs where consecutive members of the same type can be aligned.
 /// Different member types (properties vs constants) break alignment runs.
-pub fn detect_class_member_alignment_runs<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub fn detect_class_member_alignment_runs<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     members: &'arena [ClassLikeMember<'arena>],
-) -> Vec<AlignmentRun> {
+) -> Vec<AlignmentRun>
+where
+    A: Arena,
+{
     if !f.settings.align_assignment_like || members.is_empty() {
         return Vec::new();
     }
@@ -329,10 +339,13 @@ pub fn get_statement_alignment(runs: &[AlignmentRun], index: usize) -> Option<Al
 ///
 /// This is a variant of `detect_statement_alignment_runs` that works with
 /// `&[&Statement]` instead of `&[Statement]`.
-pub fn detect_statement_ref_alignment_runs<'arena>(
-    f: &FormatterState<'_, 'arena>,
+pub fn detect_statement_ref_alignment_runs<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
     statements: &[&'arena Statement<'arena>],
-) -> Vec<AlignmentRun> {
+) -> Vec<AlignmentRun>
+where
+    A: Arena,
+{
     if !f.settings.align_assignment_like || statements.is_empty() {
         return Vec::new();
     }
@@ -420,11 +433,14 @@ pub fn detect_statement_ref_alignment_runs<'arena>(
 }
 
 /// Calculate alignment widths for a slice of statement references.
-fn calculate_statement_ref_widths(
-    f: &FormatterState<'_, '_>,
+fn calculate_statement_ref_widths<A>(
+    f: &FormatterState<'_, '_, A>,
     statements: &[&Statement<'_>],
     kind: AlignableKind,
-) -> AlignmentWidths {
+) -> AlignmentWidths
+where
+    A: Arena,
+{
     let mut max_name_width = 0usize;
 
     for stmt in statements {
@@ -454,7 +470,10 @@ fn calculate_statement_ref_widths(
 }
 
 /// Check whether a statement should be the last item in its alignment run.
-fn statement_breaks_alignment_run_after(f: &FormatterState<'_, '_>, stmt: &Statement<'_>) -> bool {
+fn statement_breaks_alignment_run_after<A>(f: &FormatterState<'_, '_, A>, stmt: &Statement<'_>) -> bool
+where
+    A: Arena,
+{
     match stmt {
         Statement::Expression(expr_stmt) => {
             let Expression::Assignment(assign) = &expr_stmt.expression else {

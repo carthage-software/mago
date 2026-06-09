@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::ttype::add_optional_union_type;
@@ -18,12 +19,15 @@ use crate::resolver::static_property::resolve_static_properties;
 use crate::utils::expression::get_static_property_access_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let property_access_id = get_static_property_access_expression_id(
             self.class,
             &self.property,
@@ -89,13 +93,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
 }
 
 /// Adds symbol reference for a memoized static property access.
-fn add_memoized_static_property_reference<'ctx, 'ast, 'arena>(
-    context: &Context<'ctx, 'arena>,
+fn add_memoized_static_property_reference<'ctx, 'ast, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class: &'ast Expression<'arena>,
     property: &'ast Variable<'arena>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let property_name = match property {
         Variable::Direct(var) => word(var.name),
         _ => return Ok(()),

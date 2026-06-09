@@ -1,5 +1,5 @@
-use bumpalo::vec;
-
+use mago_allocator::Arena;
+use mago_allocator::vec_in;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::AttributeList;
@@ -131,8 +131,11 @@ impl<'arena> FunctionLikeParts<'arena> {
         }
     }
 
-    fn format_attributes(&self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
-        let mut attributes = vec![in f.arena];
+    fn format_attributes<A>(&self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A>
+    where
+        A: Arena,
+    {
+        let mut attributes = vec_in![f.arena];
         for attribute_list in self.attribute_lists {
             attributes.push(attribute_list.format(f));
             attributes.push(Document::Line(Line::hard()));
@@ -146,7 +149,10 @@ impl<'arena> FunctionLikeParts<'arena> {
         Document::Group(Group::new(attributes))
     }
 
-    fn should_use_inlined_braces(&self, f: &FormatterState<'_, 'arena>, settings: FunctionLikeSettings) -> bool {
+    fn should_use_inlined_braces<A>(&self, f: &FormatterState<'_, 'arena, A>, settings: FunctionLikeSettings) -> bool
+    where
+        A: Arena,
+    {
         match &self.body {
             FunctionLikeBody::Abstract(_) => false,
             FunctionLikeBody::Block(block) => {
@@ -155,12 +161,15 @@ impl<'arena> FunctionLikeParts<'arena> {
         }
     }
 
-    fn format_signature(
+    fn format_signature<A>(
         &self,
-        f: &mut FormatterState<'_, 'arena>,
+        f: &mut FormatterState<'_, 'arena, A>,
         space_before_params: bool,
-    ) -> (Document<'arena>, GroupIdentifier) {
-        let mut signature = vec![in f.arena];
+    ) -> (Document<'arena, A>, GroupIdentifier)
+    where
+        A: Arena,
+    {
+        let mut signature = vec_in![f.arena];
 
         // Add modifiers (for methods)
         if let Some(modifiers) = self.modifiers {
@@ -201,8 +210,7 @@ impl<'arena> FunctionLikeParts<'arena> {
         let signature_id = f.next_id();
         // Add parameter list directly - don't wrap in another group
         signature.push(Document::Group(
-            Group::new(vec![
-                in f.arena;
+            Group::new(vec_in![f.arena;
                 self.parameter_list.format(f)
             ])
             .with_id(signature_id),
@@ -222,14 +230,17 @@ impl<'arena> FunctionLikeParts<'arena> {
         (Document::Group(Group::new(signature)), signature_id)
     }
 
-    fn format_brace_spacing(
+    fn format_brace_spacing<A>(
         &self,
-        f: &mut FormatterState<'_, 'arena>,
+        f: &mut FormatterState<'_, 'arena, A>,
         settings: FunctionLikeSettings,
         signature_id: GroupIdentifier,
         parameter_list_will_break: Option<bool>,
         inlined_braces: bool,
-    ) -> Document<'arena> {
+    ) -> Document<'arena, A>
+    where
+        A: Arena,
+    {
         match settings.brace_style {
             BraceStyle::SameLine => Document::space(),
             BraceStyle::AlwaysNextLine => {
@@ -255,14 +266,17 @@ impl<'arena> FunctionLikeParts<'arena> {
         }
     }
 
-    fn format_body(
+    fn format_body<A>(
         &self,
-        f: &mut FormatterState<'_, 'arena>,
+        f: &mut FormatterState<'_, 'arena, A>,
         settings: FunctionLikeSettings,
         signature_id: GroupIdentifier,
         parameter_list_will_break: Option<bool>,
-        dangling_comments: Option<Document<'arena>>,
-    ) -> Document<'arena> {
+        dangling_comments: Option<Document<'arena, A>>,
+    ) -> Document<'arena, A>
+    where
+        A: Arena,
+    {
         match self.body {
             FunctionLikeBody::Abstract(span) => format_token(f, span, b";"),
             FunctionLikeBody::Block(block) => {
@@ -273,15 +287,13 @@ impl<'arena> FunctionLikeParts<'arena> {
                 if let Some(comments) = dangling_comments {
                     let block_doc = block.format(f);
 
-                    Document::Group(Group::new(vec![
-                        in f.arena;
+                    Document::Group(Group::new(vec_in![f.arena;
                         spacing,
                         comments,
                         block_doc,
                     ]))
                 } else {
-                    Document::Group(Group::new(vec![
-                        in f.arena;
+                    Document::Group(Group::new(vec_in![f.arena;
                         spacing,
                         block.format(f),
                     ]))
@@ -290,7 +302,14 @@ impl<'arena> FunctionLikeParts<'arena> {
         }
     }
 
-    pub fn format(&self, f: &mut FormatterState<'_, 'arena>, settings: FunctionLikeSettings) -> Document<'arena> {
+    pub fn format<A>(
+        &self,
+        f: &mut FormatterState<'_, 'arena, A>,
+        settings: FunctionLikeSettings,
+    ) -> Document<'arena, A>
+    where
+        A: Arena,
+    {
         let attributes = self.format_attributes(f);
         let leading_comment_span = self.get_leading_comment_span();
         let leading_comments = f.print_leading_comments(leading_comment_span);
@@ -317,8 +336,7 @@ impl<'arena> FunctionLikeParts<'arena> {
 
         let body = self.format_body(f, settings, signature_id, parameter_list_will_break, dangling_comments);
 
-        Document::Group(Group::new(vec![
-            in f.arena;
+        Document::Group(Group::new(vec_in![f.arena;
             attributes,
             leading_comments.unwrap_or_else(Document::empty),
             signature,
@@ -327,8 +345,11 @@ impl<'arena> FunctionLikeParts<'arena> {
     }
 }
 
-impl<'arena> Format<'arena> for Function<'arena> {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+impl<'arena, A> Format<'arena, A> for Function<'arena>
+where
+    A: Arena,
+{
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, Function, {
             let parts = FunctionLikeParts::for_function(self);
             let settings = FunctionLikeSettings {
@@ -342,8 +363,11 @@ impl<'arena> Format<'arena> for Function<'arena> {
     }
 }
 
-impl<'arena> Format<'arena> for Closure<'arena> {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+impl<'arena, A> Format<'arena, A> for Closure<'arena>
+where
+    A: Arena,
+{
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, Closure, {
             let parts = FunctionLikeParts::for_closure(self);
 
@@ -359,11 +383,14 @@ impl<'arena> Format<'arena> for Closure<'arena> {
     }
 }
 
-impl<'arena> Format<'arena> for ClosureUseClauseVariable<'arena> {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+impl<'arena, A> Format<'arena, A> for ClosureUseClauseVariable<'arena>
+where
+    A: Arena,
+{
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, ClosureUseClauseVariable, {
             if self.ampersand.is_some() {
-                Document::Group(Group::new(vec![in f.arena; Document::String(b"&"), self.variable.format(f)]))
+                Document::Group(Group::new(vec_in![f.arena; Document::String(b"&"), self.variable.format(f)]))
             } else {
                 self.variable.format(f)
             }
@@ -371,17 +398,20 @@ impl<'arena> Format<'arena> for ClosureUseClauseVariable<'arena> {
     }
 }
 
-impl<'arena> Format<'arena> for ClosureUseClause<'arena> {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+impl<'arena, A> Format<'arena, A> for ClosureUseClause<'arena>
+where
+    A: Arena,
+{
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, ClosureUseClause, {
-            let mut contents = vec![in f.arena; self.r#use.format(f)];
+            let mut contents = vec_in![f.arena; self.r#use.format(f)];
             if f.settings.space_before_closure_use_clause_parenthesis {
                 contents.push(Document::space());
             }
 
             contents.push(Document::String(b"("));
 
-            let mut variables = vec![in f.arena];
+            let mut variables = vec_in![f.arena];
             for variable in &self.variables {
                 variables.push(variable.format(f));
             }
@@ -407,8 +437,11 @@ impl<'arena> Format<'arena> for ClosureUseClause<'arena> {
     }
 }
 
-impl<'arena> Format<'arena> for Method<'arena> {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+impl<'arena, A> Format<'arena, A> for Method<'arena>
+where
+    A: Arena,
+{
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, Method, {
             let parts = FunctionLikeParts::for_method(self);
 
@@ -428,8 +461,11 @@ impl<'arena> Format<'arena> for Method<'arena> {
     }
 }
 
-impl<'arena> Format<'arena> for MethodBody<'arena> {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+impl<'arena, A> Format<'arena, A> for MethodBody<'arena>
+where
+    A: Arena,
+{
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, MethodBody, {
             match self {
                 MethodBody::Abstract(b) => b.format(f),
@@ -439,8 +475,11 @@ impl<'arena> Format<'arena> for MethodBody<'arena> {
     }
 }
 
-impl<'arena> Format<'arena> for MethodAbstractBody {
-    fn format(&'arena self, f: &mut FormatterState<'_, 'arena>) -> Document<'arena> {
+impl<'arena, A> Format<'arena, A> for MethodAbstractBody
+where
+    A: Arena,
+{
+    fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, MethodAbstractBody, { Document::String(b";") })
     }
 }

@@ -38,8 +38,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
-use bumpalo::Bump;
 use foldhash::HashSet;
+use mago_allocator::LocalArena;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_codex::metadata::CodebaseMetadata;
@@ -452,7 +452,7 @@ impl<'cfg> Orchestrator<'cfg> {
     ///
     /// Returns [`OrchestratorError`] when formatting cannot complete (file IO, syntax errors that
     /// prevent emission, etc.).
-    pub fn format_file_in(&self, file: &File, arena: &Bump) -> Result<FileFormatStatus, OrchestratorError> {
+    pub fn format_file_in(&self, file: &File, arena: &LocalArena) -> Result<FileFormatStatus, OrchestratorError> {
         let service = self.get_format_service(ReadDatabase::empty());
 
         service.format_file_in(file, arena)

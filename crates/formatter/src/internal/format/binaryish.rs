@@ -1,5 +1,6 @@
-use bumpalo::collections::Vec;
-use bumpalo::vec;
+use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
+use mago_allocator::vec_in;
 
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -105,12 +106,15 @@ impl<'arena> BinaryishOperator<'arena> {
     }
 }
 
-pub(super) fn print_binaryish_expression<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_binaryish_expression<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     left: &'arena Expression<'arena>,
     operator: BinaryishOperator<'arena>,
     right: &'arena Expression<'arena>,
-) -> Document<'arena> {
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
     let original_right = right;
     let left = unwrap_parenthesized(left);
     let right = unwrap_parenthesized(right);
@@ -147,11 +151,9 @@ pub(super) fn print_binaryish_expression<'arena>(
         let group_id = f.next_id();
 
         return Document::Group(
-            Group::new(vec![
-                in f.arena;
+            Group::new(vec_in![f.arena;
                 left.format(f),
-                Document::IndentIfBreak(IndentIfBreak::new(group_id, vec![
-                    in f.arena;
+                Document::IndentIfBreak(IndentIfBreak::new(group_id, vec_in![f.arena;
                     Document::Line(if has_space_around { Line::default() } else { Line::soft() }),
                     format_token(f, operator.span(), operator.as_bytes()),
                     Document::String(if has_space_around { b" " } else { b"" }),
@@ -191,9 +193,8 @@ pub(super) fn print_binaryish_expression<'arena>(
     }
 
     if is_at_callee(f) || matches!(f.grandparent_node(), Some(Node::UnaryPrefix(_) | Node::UnaryPostfix(_))) {
-        return Document::Group(Group::new(vec![
-            in f.arena;
-            Document::Indent(vec![in f.arena; Document::Line(Line::soft()), Document::Array(parts)]),
+        return Document::Group(Group::new(vec_in![f.arena;
+            Document::Indent(vec_in![f.arena; Document::Line(Line::soft()), Document::Array(parts)]),
             Document::Line(Line::soft()),
         ]));
     }
@@ -302,14 +303,17 @@ pub(super) fn print_binaryish_expression<'arena>(
     Document::Group(Group::new(head_parts).with_id(group_id))
 }
 
-fn print_binaryish_expression_parts<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+fn print_binaryish_expression_parts<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     left: &'arena Expression<'arena>,
     operator: BinaryishOperator<'arena>,
     right: &'arena Expression<'arena>,
     is_inside_parenthesis: bool,
     is_nested: bool,
-) -> Vec<'arena, Document<'arena>> {
+) -> Vec<'arena, Document<'arena, A>, A>
+where
+    A: Arena,
+{
     let left = unwrap_parenthesized(left);
     let original_right = right;
     let right = unwrap_parenthesized(right);
@@ -356,7 +360,7 @@ fn print_binaryish_expression_parts<'arena>(
                 }
                 result
             } else {
-                vec![in f.arena; left.format(f)]
+                vec_in![f.arena; left.format(f)]
             }
         }
         Expression::Conditional(conditional @ Conditional { then: None, .. }) => {
@@ -376,10 +380,10 @@ fn print_binaryish_expression_parts<'arena>(
                 }
                 result
             } else {
-                vec![in f.arena; left.format(f)]
+                vec_in![f.arena; left.format(f)]
             }
         }
-        _ => vec![in f.arena; left.format(f)],
+        _ => vec_in![f.arena; left.format(f)],
     };
 
     if let Some(trailing) = f.take_placed_trailing(left.span()) {
@@ -402,7 +406,7 @@ fn print_binaryish_expression_parts<'arena>(
 
     let force_break = f.must_break_condition && line_before_operator && operator.is_logical();
 
-    let mut right_document = vec![in f.arena];
+    let mut right_document = vec_in![f.arena];
 
     right_document.push(
         if force_break || operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
@@ -427,7 +431,7 @@ fn print_binaryish_expression_parts<'arena>(
     });
 
     right_document.push(if should_inline_this_level && !rhs_is_parenthesized_lassoc_subchain {
-        Document::Group(Group::new(vec![in f.arena; right.format(f)]))
+        Document::Group(Group::new(vec_in![f.arena; right.format(f)]))
     } else {
         right.format(f)
     });
@@ -458,7 +462,10 @@ fn print_binaryish_expression_parts<'arena>(
     parts
 }
 
-pub(super) fn should_inline_binary_expression(f: &FormatterState, expression: &Expression) -> bool {
+pub(super) fn should_inline_binary_expression<A>(f: &FormatterState<'_, '_, A>, expression: &Expression) -> bool
+where
+    A: Arena,
+{
     match unwrap_parenthesized(expression) {
         Expression::Binary(operation) => {
             if operation.lhs.is_binary() || operation.rhs.is_binary() {
@@ -521,11 +528,14 @@ fn should_flatten<'arena>(operator: &BinaryishOperator<'arena>, parent_op: &Bina
     operator.is_same_as(parent_op)
 }
 
-fn should_inline_binary_rhs_expression(
-    f: &FormatterState<'_, '_>,
+fn should_inline_binary_rhs_expression<A>(
+    f: &FormatterState<'_, '_, A>,
     rhs: &Expression<'_>,
     operator: &BinaryishOperator<'_>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     if f.is_in_inlined_binary_chain {
         return true;
     }
@@ -550,7 +560,10 @@ fn should_inline_binary_rhs_expression(
     }
 }
 
-fn has_placed_leading_comment_in_leftmost(f: &FormatterState, expr: &Expression) -> bool {
+fn has_placed_leading_comment_in_leftmost<A>(f: &FormatterState<'_, '_, A>, expr: &Expression) -> bool
+where
+    A: Arena,
+{
     let expr = unwrap_parenthesized(expr);
 
     if f.has_placed_leading_own_line_comment(expr.span()) {
@@ -566,7 +579,10 @@ fn has_placed_leading_comment_in_leftmost(f: &FormatterState, expr: &Expression)
     }
 }
 
-fn has_own_line_comment_in_left_chain(f: &FormatterState, expr: &Expression) -> bool {
+fn has_own_line_comment_in_left_chain<A>(f: &FormatterState<'_, '_, A>, expr: &Expression) -> bool
+where
+    A: Arena,
+{
     let expr = unwrap_parenthesized(expr);
     match expr {
         Expression::Binary(binary) => {

@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -40,12 +41,15 @@ use crate::utils::expression::get_expression_id;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Match<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         MatchAnalyzer::new(self, context, block_context, artifacts).analyze()
     }
 }
@@ -57,26 +61,35 @@ enum ArmExecutionStatus {
     Conditional,
 }
 
-struct MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
+struct MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena, A>
+where
+    A: Arena,
+{
     stmt: &'ast Match<'arena>,
-    context: &'anlyz mut Context<'ctx, 'arena>,
+    context: &'anlyz mut Context<'ctx, 'arena, A>,
     block_context: &'anlyz mut BlockContext<'ctx>,
     artifacts: &'anlyz mut AnalysisArtifacts,
 }
 
-impl<'anlyz, 'ctx, 'ast, 'arena> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena> {
+impl<'anlyz, 'ctx, 'ast, 'arena, A> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena, A>
+where
+    A: Arena,
+{
     const SYNTHETIC_MATCH_VAR_PREFIX: &'static str = "$-tmp-match-";
 
     fn new(
         stmt: &'ast Match<'arena>,
-        context: &'anlyz mut Context<'ctx, 'arena>,
+        context: &'anlyz mut Context<'ctx, 'arena, A>,
         block_context: &'anlyz mut BlockContext<'ctx>,
         artifacts: &'anlyz mut AnalysisArtifacts,
     ) -> Self {
         Self { stmt, context, block_context, artifacts }
     }
 
-    fn analyze(&mut self) -> Result<(), AnalysisError> {
+    fn analyze(&mut self) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let was_inside_conditional = self.block_context.flags.inside_conditional();
         self.block_context.flags.set_inside_conditional(true);
         self.stmt.expression.analyze(self.context, self.block_context, self.artifacts)?;

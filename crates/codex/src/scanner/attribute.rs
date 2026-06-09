@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::ast::AttributeList;
@@ -11,10 +12,13 @@ use crate::scanner::Context;
 use crate::scanner::inference::infer;
 
 #[inline]
-pub fn scan_attribute_lists<'arena>(
+pub fn scan_attribute_lists<'arena, A>(
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
-    context: &Context<'_, 'arena>,
-) -> Vec<AttributeMetadata> {
+    context: &Context<'_, 'arena, A>,
+) -> Vec<AttributeMetadata>
+where
+    A: Arena,
+{
     let mut metadata = vec![];
 
     for attribute_list in attribute_lists {
@@ -30,13 +34,16 @@ pub fn scan_attribute_lists<'arena>(
 }
 
 #[inline]
-pub fn get_attribute_flags<'arena>(
+pub fn get_attribute_flags<'arena, A>(
     class_like_name: Word,
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
-    context: &Context<'_, 'arena>,
+    context: &Context<'_, 'arena, A>,
     scope: &NamespaceScope,
     classname: Option<Word>,
-) -> Option<AttributeFlags> {
+) -> Option<AttributeFlags>
+where
+    A: Arena,
+{
     if class_like_name.as_bytes().eq_ignore_ascii_case(b"Attribute") {
         return Some(AttributeFlags::TARGET_CLASS);
     }

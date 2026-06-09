@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::Span;
 
@@ -32,7 +33,10 @@ impl Terminator for BlockTerminator {
     }
 }
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse a sequence of top-level statements until `terminator` matches
     /// or EOF is reached.
     ///

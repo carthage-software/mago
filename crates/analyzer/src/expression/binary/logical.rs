@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use foldhash::HashSet;
@@ -38,12 +39,15 @@ use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
 #[inline]
-pub fn analyze_logical_and_operation<'ctx, 'arena>(
+pub fn analyze_logical_and_operation<'ctx, 'arena, A>(
     binary: &Binary<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let mut left_block_context = block_context.clone();
     let pre_referenced_var_ids = left_block_context.conditionally_referenced_variable_ids.clone();
     let pre_assigned_var_ids = left_block_context.assigned_variable_ids.clone();
@@ -267,12 +271,15 @@ pub fn analyze_logical_and_operation<'ctx, 'arena>(
 }
 
 #[inline]
-pub fn analyze_logical_or_operation<'ctx, 'arena>(
+pub fn analyze_logical_or_operation<'ctx, 'arena, A>(
     binary: &Binary<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let mut left_block_context;
     let mut left_referenced_var_ids;
     let left_assigned_var_ids;
@@ -588,12 +595,15 @@ pub fn analyze_logical_or_operation<'ctx, 'arena>(
 /// and `false` otherwise. The result type is always `bool`.
 /// This function analyzes both operands, checks for problematic types in a boolean context,
 /// determines if the result can be statically known, and sets up data flow.
-pub fn analyze_logical_xor_operation<'ctx, 'arena>(
+pub fn analyze_logical_xor_operation<'ctx, 'arena, A>(
     binary: &Binary<'arena>,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     binary.lhs.analyze(context, block_context, artifacts)?;
     binary.rhs.analyze(context, block_context, artifacts)?;
 
@@ -644,13 +654,15 @@ pub fn analyze_logical_xor_operation<'ctx, 'arena>(
 /// Checks a single operand of a logical operation (like AND, OR, XOR) for problematic types.
 /// Reports errors for `mixed` and warnings for types that PHP coerces to boolean
 /// (e.g., `null`, `array`, `resource`, `object`).
-fn check_logical_operand<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn check_logical_operand<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     operand: &Expression<'arena>,
     operand_type: &TUnion,
     side: &'static str,
     operator_name: &'static str,
-) {
+) where
+    A: Arena,
+{
     if operand_type.is_mixed() {
         context.collector.report_with_code(
             IssueCode::MixedOperand,
@@ -711,14 +723,16 @@ fn check_logical_operand<'arena>(
 ///   - `None`: No fix offered (just report the issue)
 ///   - `Some(false)`: Remove left operand, keep right operand
 ///   - `Some(true)`: Remove right operand, keep left operand
-fn report_redundant_logical_operation<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_redundant_logical_operation<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     binary: &Binary<'arena>,
     lhs_description: &str,
     rhs_description: &str,
     result_value_str: &str,
     side_to_remove: Option<bool>,
-) {
+) where
+    A: Arena,
+{
     let operator_span = binary.operator.span();
     if operator_span.is_zero() {
         // Do not report issues for synthetic nodes.

@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -96,7 +97,10 @@ impl LintRule for NoAssignInConditionRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let (condition, assignment) = match node {
             Node::If(r#if) => (&r#if.condition, get_assignment_from_expression(r#if.condition)),
             Node::While(r#while) => {

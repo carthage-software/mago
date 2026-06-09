@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_docblock::error::ParseError;
 use mago_docblock::tag::AssertionTag;
 use mago_docblock::tag::ImportTypeTag;
@@ -130,11 +131,14 @@ pub struct PropertyHookDocblockComment {
 }
 
 impl ClassLikeDocblockComment {
-    pub fn create(
-        context: &Context<'_, '_>,
+    pub fn create<A>(
+        context: &Context<'_, '_, A>,
         class_like: impl HasSpan,
         scope: &mut NamespaceScope,
-    ) -> Result<Option<ClassLikeDocblockComment>, ParseError> {
+    ) -> Result<Option<ClassLikeDocblockComment>, ParseError>
+    where
+        A: Arena,
+    {
         let Some(docblock) = context.get_docblock(class_like) else {
             return Ok(None);
         };
@@ -339,11 +343,14 @@ impl ClassLikeDocblockComment {
 }
 
 impl FunctionLikeDocblockComment {
-    pub fn create(
-        context: &Context<'_, '_>,
+    pub fn create<A>(
+        context: &Context<'_, '_, A>,
         function: impl HasSpan,
         scope: &mut NamespaceScope,
-    ) -> Result<Option<FunctionLikeDocblockComment>, ParseError> {
+    ) -> Result<Option<FunctionLikeDocblockComment>, ParseError>
+    where
+        A: Arena,
+    {
         let Some(docblock) = context.get_docblock(function) else {
             return Ok(None);
         };
@@ -552,10 +559,13 @@ impl FunctionLikeDocblockComment {
 }
 
 impl PropertyDocblockComment {
-    pub fn create(
-        context: &Context<'_, '_>,
+    pub fn create<A>(
+        context: &Context<'_, '_, A>,
         property: impl HasSpan,
-    ) -> Result<Option<PropertyDocblockComment>, ParseError> {
+    ) -> Result<Option<PropertyDocblockComment>, ParseError>
+    where
+        A: Arena,
+    {
         let Some(docblock) = context.get_docblock(property) else {
             return Ok(None);
         };
@@ -619,10 +629,13 @@ impl PropertyDocblockComment {
 }
 
 impl ConstantDocblockComment {
-    pub fn create(
-        context: &Context<'_, '_>,
+    pub fn create<A>(
+        context: &Context<'_, '_, A>,
         constant: impl HasSpan,
-    ) -> Result<Option<ConstantDocblockComment>, ParseError> {
+    ) -> Result<Option<ConstantDocblockComment>, ParseError>
+    where
+        A: Arena,
+    {
         let Some(docblock) = context.get_docblock(constant) else {
             return Ok(None);
         };
@@ -687,10 +700,13 @@ impl ConstantDocblockComment {
 }
 
 impl TraitUseDocblockComment {
-    pub fn create(
-        context: &Context<'_, '_>,
+    pub fn create<A>(
+        context: &Context<'_, '_, A>,
         trait_use: impl HasSpan,
-    ) -> Result<Option<TraitUseDocblockComment>, ParseError> {
+    ) -> Result<Option<TraitUseDocblockComment>, ParseError>
+    where
+        A: Arena,
+    {
         let Some(docblock) = context.get_docblock(trait_use) else {
             return Ok(None);
         };
@@ -740,10 +756,13 @@ impl TraitUseDocblockComment {
 }
 
 impl PropertyHookDocblockComment {
-    pub fn create(
-        context: &Context<'_, '_>,
+    pub fn create<A>(
+        context: &Context<'_, '_, A>,
         hook: impl HasSpan,
-    ) -> Result<Option<PropertyHookDocblockComment>, ParseError> {
+    ) -> Result<Option<PropertyHookDocblockComment>, ParseError>
+    where
+        A: Arena,
+    {
         let Some(docblock) = context.get_docblock(hook) else {
             return Ok(None);
         };

@@ -3,7 +3,7 @@
 mod runner {
     use std::borrow::Cow;
 
-    use bumpalo::Bump;
+    use mago_allocator::LocalArena;
     use mago_formatter::Formatter;
     use mago_formatter::settings::FormatSettings;
     use mago_php_version::PHPVersion;
@@ -24,7 +24,7 @@ mod runner {
     }
 
     pub fn run_format_test(name: &'static str, input_expression: &'static [u8], expected_expression: &'static [u8]) {
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let formatter = Formatter::new(
             &arena,
             PHPVersion::LATEST,

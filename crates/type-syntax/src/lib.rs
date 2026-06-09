@@ -2,7 +2,7 @@
 #![allow(clippy::pub_use)]
 #![allow(clippy::exhaustive_enums)]
 
-use bumpalo::Bump;
+use mago_allocator::Arena;
 
 use mago_span::Position;
 use mago_span::Span;
@@ -21,7 +21,7 @@ pub mod token;
 /// Parses a string representation of a PHPDoc type into an arena-allocated
 /// Abstract Syntax Tree.
 ///
-/// All AST nodes are allocated in the caller-supplied [`bumpalo::Bump`], so
+/// All AST nodes are allocated in the caller-supplied arena, so
 /// no per-node heap allocation happens during parsing. The resulting
 /// [`Type`] borrows from `input` (for textual slices) and from `arena`
 /// (for nested sub-trees) for the duration of `'arena`.
@@ -37,7 +37,10 @@ pub mod token;
 /// # Errors
 ///
 /// Returns a [`ParseError`] if any lexing or parsing error occurs.
-pub fn parse_str<'arena>(arena: &'arena Bump, span: Span, input: &'arena [u8]) -> Result<Type<'arena>, ParseError> {
+pub fn parse_str<'arena, A>(arena: &'arena A, span: Span, input: &'arena [u8]) -> Result<Type<'arena>, ParseError>
+where
+    A: Arena,
+{
     let input = Input::anchored_at(span.file_id, input, span.start);
     let lexer = TypeLexer::new(input);
     parser::construct(arena, lexer)
@@ -63,11 +66,14 @@ pub fn parse_str<'arena>(arena: &'arena Bump, span: Span, input: &'arena [u8]) -
 ///
 /// Returns a [`ParseError`] if the prefix does not start with a valid
 /// type.
-pub fn parse_prefix<'arena>(
-    arena: &'arena Bump,
+pub fn parse_prefix<'arena, A>(
+    arena: &'arena A,
     span: Span,
     input: &'arena [u8],
-) -> Result<(Type<'arena>, Position), ParseError> {
+) -> Result<(Type<'arena>, Position), ParseError>
+where
+    A: Arena,
+{
     let input_obj = Input::anchored_at(span.file_id, input, span.start);
     let lexer = TypeLexer::new(input_obj);
     parser::construct_prefix(arena, lexer)
@@ -76,7 +82,7 @@ pub fn parse_prefix<'arena>(
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
-    use bumpalo::Bump;
+    use mago_allocator::LocalArena;
 
     use mago_database::file::FileId;
     use mago_span::HasSpan;
@@ -93,7 +99,7 @@ mod tests {
     /// tests run once and exit, so the cost is bounded and the ergonomics
     /// match the pre-arena API.
     fn do_parse(input: &str) -> Result<Type<'static>, ParseError> {
-        let arena: &'static Bump = Box::leak(Box::new(Bump::new()));
+        let arena: &'static LocalArena = Box::leak(Box::new(LocalArena::new()));
         let owned: &'static [u8] = arena.alloc_slice_copy(input.as_bytes());
         let span = Span::new(FileId::zero(), Position::new(0), Position::new(owned.len() as u32));
         parse_str(arena, span, owned)

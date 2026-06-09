@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::context::ScopeContext;
@@ -39,12 +40,15 @@ use crate::statement::function_like::report_undefined_type_references;
 use crate::statement::r#return::handle_return_value;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Property<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         match self {
             Property::Plain(plain) => plain.analyze(context, block_context, artifacts),
             Property::Hooked(hooked) => hooked.analyze(context, block_context, artifacts),
@@ -53,12 +57,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Property<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PlainProperty<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_attributes(
             context,
             block_context,
@@ -76,12 +83,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PlainProperty<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyItem<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         if let PropertyItem::Concrete(property_concrete_item) = self {
             property_concrete_item.analyze(context, block_context, artifacts)?;
         }
@@ -91,12 +101,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyItem<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyConcreteItem<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         self.value.analyze(context, block_context, artifacts)?;
 
         if let Some(class_metadata) = block_context.scope.get_class_like()
@@ -161,12 +174,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyConcreteItem<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for HookedProperty<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_attributes(
             context,
             block_context,
@@ -186,23 +202,29 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for HookedProperty<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyHook<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_property_hook(self, word(""), context, block_context, artifacts)
     }
 }
 
-fn analyze_property_hook<'ctx, 'arena>(
+fn analyze_property_hook<'ctx, 'arena, A>(
     hook: &PropertyHook<'arena>,
     property_name: mago_word::Word,
-    context: &mut Context<'ctx, 'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
     parent_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     analyze_attributes(
         context,
         parent_block_context,

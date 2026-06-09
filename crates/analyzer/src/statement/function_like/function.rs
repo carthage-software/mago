@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::context::ScopeContext;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -22,12 +23,14 @@ use crate::statement::function_like::unused_parameter;
 use crate::utils::missing_type_hints;
 
 /// Reports a duplicate function definition issue.
-fn report_duplicate_function_definition(
-    context: &mut Context<'_, '_>,
+fn report_duplicate_function_definition<A>(
+    context: &mut Context<'_, '_, A>,
     name: &[u8],
     duplicate_span: Span,
     original_span: Span,
-) {
+) where
+    A: Arena,
+{
     let name = mago_bytes::BytesDisplay(name);
     context.collector.report_with_code(
         IssueCode::DuplicateDefinition,
@@ -43,12 +46,15 @@ fn report_duplicate_function_definition(
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_attributes(
             context,
             block_context,

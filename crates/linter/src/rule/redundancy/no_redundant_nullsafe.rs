@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -100,7 +101,10 @@ impl LintRule for NoRedundantNullsafeRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         match node {
             Node::Binary(Binary { lhs, operator: BinaryOperator::NullCoalesce(op), .. }) => {
                 let Expression::Access(Access::NullSafeProperty(null_safe)) = lhs else {

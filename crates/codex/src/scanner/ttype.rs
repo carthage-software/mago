@@ -1,4 +1,4 @@
-use bumpalo::Bump;
+use mago_allocator::Arena;
 use mago_docblock::tag::TypeString;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
@@ -42,11 +42,14 @@ use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 
 #[inline]
-pub fn get_type_metadata_from_hint<'arena>(
+pub fn get_type_metadata_from_hint<'arena, A>(
     hint: &'arena Hint<'arena>,
     classname: Option<Word>,
-    context: &mut Context<'_, 'arena>,
-) -> TypeMetadata {
+    context: &mut Context<'_, 'arena, A>,
+) -> TypeMetadata
+where
+    A: Arena,
+{
     let type_union = get_union_from_hint(hint, classname, context);
 
     let mut type_metadata = TypeMetadata::new(type_union, hint.span());
@@ -55,13 +58,16 @@ pub fn get_type_metadata_from_hint<'arena>(
 }
 
 #[inline]
-pub fn get_type_metadata_from_type_string(
-    arena: &Bump,
+pub fn get_type_metadata_from_type_string<A>(
+    arena: &A,
     ttype: &TypeString,
     classname: Option<Word>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
-) -> Result<TypeMetadata, TypeError> {
+) -> Result<TypeMetadata, TypeError>
+where
+    A: Arena,
+{
     builder::get_type_from_string(arena, &ttype.value, ttype.span, scope, type_context, classname).map(|type_union| {
         let mut type_metadata = TypeMetadata::new(type_union, ttype.span);
         type_metadata.from_docblock = true;
@@ -70,11 +76,14 @@ pub fn get_type_metadata_from_type_string(
 }
 
 #[inline]
-fn get_union_from_hint<'arena>(
+fn get_union_from_hint<'arena, A>(
     hint: &'arena Hint<'arena>,
     classname: Option<Word>,
-    context: &mut Context<'_, 'arena>,
-) -> TUnion {
+    context: &mut Context<'_, 'arena, A>,
+) -> TUnion
+where
+    A: Arena,
+{
     match hint {
         Hint::Parenthesized(parenthesized_hint) => get_union_from_hint(parenthesized_hint.hint, classname, context),
         Hint::Identifier(identifier) => get_union_from_identifier_hint(identifier, context),
@@ -179,10 +188,13 @@ fn get_union_from_hint<'arena>(
 }
 
 #[inline]
-fn get_union_from_identifier_hint<'arena>(
+fn get_union_from_identifier_hint<'arena, A>(
     identifier: &'arena Identifier<'arena>,
-    context: &Context<'_, 'arena>,
-) -> TUnion {
+    context: &Context<'_, 'arena, A>,
+) -> TUnion
+where
+    A: Arena,
+{
     let name = context.resolved_names.get(identifier);
 
     if name.eq_ignore_ascii_case(b"Generator") {

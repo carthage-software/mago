@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -90,7 +91,10 @@ impl LintRule for NoAssignInArgumentRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         match node {
             Node::ArgumentList(list) => {
                 for argument in list.arguments.iter() {
@@ -114,12 +118,14 @@ impl LintRule for NoAssignInArgumentRule {
 }
 
 impl NoAssignInArgumentRule {
-    fn check_expression_for_assignment<'arena>(
+    fn check_expression_for_assignment<'arena, A>(
         &self,
-        ctx: &mut LintContext<'_, 'arena>,
+        ctx: &mut LintContext<'_, 'arena, A>,
         expression: &Expression<'arena>,
         argument_list_span: Span,
-    ) {
+    ) where
+        A: Arena,
+    {
         if let Some(assignment) = get_assignment_from_expression(expression) {
             let mut issue = Issue::new(self.cfg.level(), "Avoid assignments in function call arguments.")
                     .with_code(self.meta.code)

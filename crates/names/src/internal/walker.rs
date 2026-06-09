@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_span::HasSpan;
 use mago_syntax::ast::Attribute;
 use mago_syntax::ast::Binary;
@@ -41,8 +42,15 @@ pub struct NameWalker<'arena> {
     pub resolved_names: ResolvedNames<'arena>,
 }
 
-impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for NameWalker<'arena> {
-    fn walk_in_namespace(&mut self, namespace: &'ast Namespace<'arena>, context: &mut NameResolutionContext<'arena>) {
+impl<'ast, 'arena, A> MutWalker<'ast, 'arena, NameResolutionContext<'arena, A>> for NameWalker<'arena>
+where
+    A: Arena,
+{
+    fn walk_in_namespace(
+        &mut self,
+        namespace: &'ast Namespace<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
+    ) {
         context.exit_namespace();
 
         if let Some(ns) = namespace.name.as_ref() {
@@ -52,7 +60,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         context.enter_namespace(namespace.name.as_ref().map(mago_syntax::ast::Identifier::value));
     }
 
-    fn walk_in_use(&mut self, r#use: &'ast Use<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_use(&mut self, r#use: &'ast Use<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         context.populate_from_use(r#use);
 
         match &r#use.items {
@@ -87,7 +95,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         }
     }
 
-    fn walk_in_constant(&mut self, constant: &'ast Constant<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_constant(&mut self, constant: &'ast Constant<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         for item in &constant.items {
             let name = context.qualify_name(item.name.value);
 
@@ -95,37 +103,41 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         }
     }
 
-    fn walk_in_function(&mut self, function: &'ast Function<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_function(&mut self, function: &'ast Function<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         let name = context.qualify_name(function.name.value);
 
         self.resolved_names.insert_at(function.name.span, name, false);
     }
 
-    fn walk_in_class(&mut self, class: &'ast Class<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_class(&mut self, class: &'ast Class<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         let classlike = context.qualify_name(class.name.value);
 
         self.resolved_names.insert_at(class.name.span, classlike, false);
     }
 
-    fn walk_in_interface(&mut self, interface: &'ast Interface<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_interface(
+        &mut self,
+        interface: &'ast Interface<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
+    ) {
         let classlike = context.qualify_name(interface.name.value);
 
         self.resolved_names.insert_at(interface.name.span, classlike, false);
     }
 
-    fn walk_in_trait(&mut self, r#trait: &'ast Trait<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_trait(&mut self, r#trait: &'ast Trait<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         let classlike = context.qualify_name(r#trait.name.value);
 
         self.resolved_names.insert_at(r#trait.name.span, classlike, false);
     }
 
-    fn walk_in_enum(&mut self, r#enum: &'ast Enum<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_enum(&mut self, r#enum: &'ast Enum<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         let classlike = context.qualify_name(r#enum.name.value);
 
         self.resolved_names.insert_at(r#enum.name.span, classlike, false);
     }
 
-    fn walk_in_trait_use(&mut self, trait_use: &'ast TraitUse<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_trait_use(&mut self, trait_use: &'ast TraitUse<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         for trait_name in &trait_use.trait_names {
             let (trait_classlike, imported) = context.resolve(NameKind::Default, trait_name.value());
 
@@ -133,7 +145,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         }
     }
 
-    fn walk_in_extends(&mut self, extends: &'ast Extends<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_extends(&mut self, extends: &'ast Extends<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         for parent in &extends.types {
             let (parent_classlike, imported) = context.resolve(NameKind::Default, parent.value());
 
@@ -144,7 +156,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
     fn walk_in_implements(
         &mut self,
         implements: &'ast Implements<'arena>,
-        context: &mut NameResolutionContext<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
     ) {
         for parent in &implements.types {
             let (parent_classlike, imported) = context.resolve(NameKind::Default, parent.value());
@@ -153,7 +165,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         }
     }
 
-    fn walk_in_hint(&mut self, hint: &'ast Hint<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_hint(&mut self, hint: &'ast Hint<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         if let Hint::Identifier(identifier) = hint {
             let (name, imported) = context.resolve(NameKind::Default, identifier.value());
 
@@ -161,7 +173,11 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         }
     }
 
-    fn walk_in_attribute(&mut self, attribute: &'ast Attribute<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_attribute(
+        &mut self,
+        attribute: &'ast Attribute<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
+    ) {
         let (name, imported) = context.resolve(NameKind::Default, attribute.name.value());
 
         self.resolved_names.insert_at(attribute.name.span(), name, imported);
@@ -170,7 +186,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
     fn walk_in_function_call(
         &mut self,
         function_call: &'ast FunctionCall<'arena>,
-        context: &mut NameResolutionContext<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
     ) {
         if let Expression::Identifier(identifier) = function_call.function {
             let (name, imported) = context.resolve(NameKind::Function, identifier.value());
@@ -182,7 +198,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
     fn walk_in_function_partial_application(
         &mut self,
         function_partial_application: &'ast FunctionPartialApplication<'arena>,
-        context: &mut NameResolutionContext<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
     ) {
         if let Expression::Identifier(identifier) = function_partial_application.function {
             let (name, imported) = context.resolve(NameKind::Function, identifier.value());
@@ -194,7 +210,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
     fn walk_in_instantiation(
         &mut self,
         instantiation: &'ast Instantiation<'arena>,
-        context: &mut NameResolutionContext<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
     ) {
         if let Expression::Identifier(identifier) = instantiation.class {
             let (name, imported) = context.resolve(NameKind::Default, identifier.value());
@@ -206,7 +222,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
     fn walk_in_static_method_call(
         &mut self,
         static_method_call: &'ast StaticMethodCall<'arena>,
-        context: &mut NameResolutionContext<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
     ) {
         if let Expression::Identifier(identifier) = static_method_call.class {
             let (name, imported) = context.resolve(NameKind::Default, identifier.value());
@@ -218,7 +234,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
     fn walk_in_static_method_partial_application(
         &mut self,
         static_method_partial_application: &'ast StaticMethodPartialApplication<'arena>,
-        context: &mut NameResolutionContext<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
     ) {
         if let Expression::Identifier(identifier) = static_method_partial_application.class {
             let (name, imported) = context.resolve(NameKind::Default, identifier.value());
@@ -230,7 +246,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
     fn walk_in_static_property_access(
         &mut self,
         static_property_access: &'ast StaticPropertyAccess<'arena>,
-        context: &mut NameResolutionContext<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
     ) {
         if let Expression::Identifier(identifier) = static_property_access.class {
             let (name, imported) = context.resolve(NameKind::Default, identifier.value());
@@ -242,7 +258,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
     fn walk_in_class_constant_access(
         &mut self,
         class_constant_access: &'ast ClassConstantAccess<'arena>,
-        context: &mut NameResolutionContext<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
     ) {
         if let Expression::Identifier(identifier) = class_constant_access.class {
             let (name, imported) = context.resolve(NameKind::Default, identifier.value());
@@ -251,7 +267,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         }
     }
 
-    fn walk_in_binary(&mut self, binary: &'ast Binary<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_in_binary(&mut self, binary: &'ast Binary<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         if let (BinaryOperator::Instanceof(_), Expression::Identifier(identifier)) = (binary.operator, binary.rhs) {
             let (name, imported) = context.resolve(NameKind::Default, identifier.value());
 
@@ -262,7 +278,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
     fn walk_in_constant_access(
         &mut self,
         constant_access: &'ast ConstantAccess<'arena>,
-        context: &mut NameResolutionContext<'arena>,
+        context: &mut NameResolutionContext<'arena, A>,
     ) {
         let identifier = &constant_access.name;
 
@@ -273,7 +289,7 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, NameResolutionContext<'arena>> for Na
         }
     }
 
-    fn walk_out_namespace(&mut self, _namespace: &Namespace<'arena>, context: &mut NameResolutionContext<'arena>) {
+    fn walk_out_namespace(&mut self, _namespace: &Namespace<'arena>, context: &mut NameResolutionContext<'arena, A>) {
         context.exit_namespace();
     }
 }

@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::ttype::TType;
@@ -42,12 +43,14 @@ use mago_bytes::BytesDisplay;
 /// * `block_context`: The current block context, which holds local variables and their types.
 /// * `artifacts`: The analysis artifacts, which may be used to store or retrieve additional information.
 /// * `override_existing`: A boolean indicating whether to override existing variable types in the block context.
-pub fn populate_docblock_variables<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn populate_docblock_variables<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     override_existing: bool,
-) {
+) where
+    A: Arena,
+{
     populate_docblock_variables_excluding(context, block_context, artifacts, override_existing, None);
 }
 
@@ -55,13 +58,15 @@ pub fn populate_docblock_variables<'ctx>(
 ///
 /// This is useful for assignment statements where we want to populate all @var annotations
 /// except the one for the assignment target (which is handled by the assignment analyzer).
-pub fn populate_docblock_variables_excluding<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn populate_docblock_variables_excluding<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     override_existing: bool,
     exclude_variable: Option<Word>,
-) {
+) where
+    A: Arena,
+{
     if PrecedingDocblocks::new(context.comments, context.statement_span.start.offset).next().is_none() {
         return;
     }
@@ -129,12 +134,15 @@ pub fn populate_docblock_variables_excluding<'ctx>(
 /// - `Option<String>`: The variable name if specified, or `None` if the tag is unnamed.
 /// - `TUnion`: The parsed type from the tag.
 /// - `Span`: The span of the tag in the source code.
-pub fn get_docblock_variables<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn get_docblock_variables<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     allow_tracing: bool,
-) -> Vec<(Option<mago_word::Word>, TUnion, Span)> {
+) -> Vec<(Option<mago_word::Word>, TUnion, Span)>
+where
+    A: Arena,
+{
     context.get_parsed_docblocks()
         .into_iter()
         // Filter out non-tag elements
@@ -264,13 +272,16 @@ pub fn get_docblock_variables<'ctx>(
 ///
 /// An `Option<TUnion>` containing the parsed type if a valid, matching `@var` tag
 /// was found and successfully parsed. Returns `None` otherwise.
-pub fn get_type_from_var_docblock<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn get_type_from_var_docblock<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     value_expression_variable_id: Option<&[u8]>,
     mut allow_unnamed: bool,
-) -> Option<(TUnion, Span)> {
+) -> Option<(TUnion, Span)>
+where
+    A: Arena,
+{
     allow_unnamed =
         allow_unnamed && !block_context.flags.inside_return() && !block_context.flags.inside_loop_expressions();
 
@@ -299,14 +310,16 @@ pub fn get_type_from_var_docblock<'ctx>(
 /// * `variable_type`: The type of the variable as a `TUnion`, parsed from the docblock.
 /// * `variable_type_span`: The span of the variable type in the source code, used for error reporting.
 /// * `override_existing`: A boolean indicating whether to override an existing variable type
-pub fn insert_variable_from_docblock<'ctx>(
-    context: &mut Context<'ctx, '_>,
+pub fn insert_variable_from_docblock<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &mut BlockContext<'ctx>,
     variable_name: mago_word::Word,
     variable_type: TUnion,
     variable_type_span: Span,
     override_existing: bool,
-) {
+) where
+    A: Arena,
+{
     if !override_existing && block_context.locals.contains_key(&variable_name) {
         return;
     }
@@ -383,15 +396,17 @@ pub fn insert_variable_from_docblock<'ctx>(
     block_context.locals.insert(variable_name, Rc::new(variable_type));
 }
 
-pub fn check_docblock_type_incompatibility(
-    context: &mut Context<'_, '_>,
+pub fn check_docblock_type_incompatibility<A>(
+    context: &mut Context<'_, '_, A>,
     value_expression_variable_id: Option<&[u8]>,
     value_expression_span: Span,
     inferred_type: &TUnion,
     docblock_type: &TUnion,
     dockblock_type_span: Span,
     source_expression: Option<&Expression>,
-) {
+) where
+    A: Arena,
+{
     let is_super = is_contained_by(
         context.codebase,
         docblock_type,

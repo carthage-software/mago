@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -66,12 +67,15 @@ use crate::utils::misc::unwrap_expression;
 /// ];
 /// ```
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Array<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_array_elements(context, block_context, artifacts, self.span(), self.elements.as_slice())
     }
 }
@@ -84,12 +88,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Array<'arena> {
 /// $array = array('key1' => 'value1', 'key2' => 'value2');
 /// ```
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for LegacyArray<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_array_elements(context, block_context, artifacts, self.span(), self.elements.as_slice())
     }
 }
@@ -108,13 +115,16 @@ struct ArrayCreationInfo {
     known_int_offset: bool,
 }
 
-fn analyze_array_elements<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_array_elements<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     expression_span: Span,
     elements: &[ArrayElement<'arena>],
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     if elements.is_empty() {
         artifacts.set_expression_type(&expression_span, get_empty_keyed_array());
 
@@ -500,12 +510,14 @@ fn get_numeric_key_from_string(key: &[u8]) -> Option<i64> {
     key_str.parse::<i64>().ok()
 }
 
-fn handle_variadic_array_element<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn handle_variadic_array_element<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     array_creation_info: &mut ArrayCreationInfo,
     variadic_array_element: &VariadicArrayElement<'arena>,
     variadic_array_element_type: &TUnion,
-) {
+) where
+    A: Arena,
+{
     let mut all_non_empty = true;
 
     for atomic_type in variadic_array_element_type.types.as_ref() {

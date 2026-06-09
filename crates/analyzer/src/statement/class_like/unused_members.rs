@@ -12,6 +12,7 @@
 //! since they all start with double underscore.
 
 use foldhash::HashSet;
+use mago_allocator::Arena;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::reference::SymbolReferences;
@@ -43,13 +44,16 @@ struct CheckableMember {
 ///
 /// Reports private members (and protected members in final classes) that are unused.
 /// Returns the set of unused member symbol IDs for use by other checks.
-pub fn check_unused_members_with_transitivity(
+pub fn check_unused_members_with_transitivity<A>(
     class_name: Word,
     class_span: Span,
     class_like_metadata: &ClassLikeMetadata,
     symbol_references: &SymbolReferences,
-    context: &mut Context<'_, '_>,
-) -> HashSet<SymbolIdentifier> {
+    context: &mut Context<'_, '_, A>,
+) -> HashSet<SymbolIdentifier>
+where
+    A: Arena,
+{
     if class_like_metadata.kind.is_trait() {
         return HashSet::default();
     }
@@ -242,14 +246,16 @@ fn all_references_from_unused(
 ///
 /// The `unused_members` set contains property symbols that were already reported
 /// as unused (via transitive analysis) and should be skipped.
-pub fn check_write_only_properties(
+pub fn check_write_only_properties<A>(
     class_name: Word,
     class_span: Span,
     class_like_metadata: &ClassLikeMetadata,
     symbol_references: &SymbolReferences,
     unused_members: &HashSet<SymbolIdentifier>,
-    context: &mut Context<'_, '_>,
-) {
+    context: &mut Context<'_, '_, A>,
+) where
+    A: Arena,
+{
     if class_like_metadata.kind.is_trait() {
         return;
     }
@@ -312,7 +318,14 @@ fn is_member_referenced(symbol_references: &SymbolReferences, symbol_id: &Symbol
 }
 
 /// Reports an unused property.
-fn report_unused_property(context: &mut Context<'_, '_>, class_span: Span, property_name: Word, property_span: Span) {
+fn report_unused_property<A>(
+    context: &mut Context<'_, '_, A>,
+    class_span: Span,
+    property_name: Word,
+    property_span: Span,
+) where
+    A: Arena,
+{
     let issue = Issue::help(format!("Property `{property_name}` is never used."))
         .with_code(IssueCode::UnusedProperty)
         .with_annotations([
@@ -330,12 +343,14 @@ fn report_unused_property(context: &mut Context<'_, '_>, class_span: Span, prope
 }
 
 /// Reports a write-only property.
-fn report_write_only_property(
-    context: &mut Context<'_, '_>,
+fn report_write_only_property<A>(
+    context: &mut Context<'_, '_, A>,
     class_span: Span,
     property_name: Word,
     property_span: Span,
-) {
+) where
+    A: Arena,
+{
     let issue = Issue::help(format!("Property `{property_name}` is written to but never read."))
         .with_code(IssueCode::WriteOnlyProperty)
         .with_annotations([
@@ -351,7 +366,10 @@ fn report_write_only_property(
 }
 
 /// Reports an unused method.
-fn report_unused_method(context: &mut Context<'_, '_>, class_span: Span, method_name: Word, method_span: Span) {
+fn report_unused_method<A>(context: &mut Context<'_, '_, A>, class_span: Span, method_name: Word, method_span: Span)
+where
+    A: Arena,
+{
     let issue = Issue::help(format!("Method `{method_name}()` is never used."))
         .with_code(IssueCode::UnusedMethod)
         .with_annotations([

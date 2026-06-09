@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -98,7 +99,10 @@ impl LintRule for NoAlternativeSyntaxRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         match node {
             Node::If(if_stmt) => {
                 if let IfBody::ColonDelimited(body) = &if_stmt.body {
@@ -136,7 +140,10 @@ impl LintRule for NoAlternativeSyntaxRule {
 }
 
 impl NoAlternativeSyntaxRule {
-    fn report(&self, ctx: &mut LintContext, keyword: &str, end_keyword_span: mago_span::Span) {
+    fn report<A>(&self, ctx: &mut LintContext<'_, '_, A>, keyword: &str, end_keyword_span: mago_span::Span)
+    where
+        A: Arena,
+    {
         let issue = Issue::new(self.cfg.level(), format!("Do not use alternative syntax `end{}`", keyword))
             .with_code(self.meta.code)
             .with_annotation(

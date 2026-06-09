@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use serde::de::DeserializeOwned;
 
 use mago_php_version::PHPVersion;
@@ -68,7 +69,9 @@ pub trait LintRule {
 
     fn build(settings: &RuleSettings<Self::Config>) -> Self;
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>);
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena;
 }
 
 macro_rules! define_rules {
@@ -150,7 +153,10 @@ macro_rules! define_rules {
             }
 
             #[inline]
-            pub fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>)  {
+            pub fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+            where
+                A: Arena,
+            {
                 match self {
                     $( AnyRule::$variant(r) => r.check(ctx, node), )*
                 }

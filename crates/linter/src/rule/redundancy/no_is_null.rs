@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -95,7 +96,10 @@ impl LintRule for NoIsNullRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::FunctionCall(function_call) = node else {
             return;
         };
@@ -156,10 +160,13 @@ struct SurroundingContext {
 /// Walk up from the `is_null(...)` call collecting consecutive `!` operators
 /// and the redundant parens between them, so the fix can consume the whole run
 /// in one edit and pick `===` vs `!==` from the parity.
-fn surrounding_context<'arena>(
-    ctx: &LintContext<'_, 'arena>,
+fn surrounding_context<'arena, A>(
+    ctx: &LintContext<'_, 'arena, A>,
     function_call: &'arena FunctionCall<'arena>,
-) -> SurroundingContext {
+) -> SurroundingContext
+where
+    A: Arena,
+{
     let mut span = function_call.span();
     let mut negated = false;
     let mut n = 0;

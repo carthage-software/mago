@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -42,7 +43,10 @@ use crate::token::GetPrecedence;
 use crate::token::Precedence;
 use crate::token::TokenKind;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_expression(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {
         self.parse_expression_with_precedence(Precedence::Lowest)
     }

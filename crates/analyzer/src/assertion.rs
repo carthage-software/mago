@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::cmp::Ordering;
 
 use mago_algebra::assertion_set::AssertionSet;
@@ -46,11 +47,14 @@ pub enum OtherValuePosition {
     Right,
 }
 
-pub fn scrape_assertions(
+pub fn scrape_assertions<A>(
     mut expression: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
-) -> Vec<WordMap<AssertionSet>> {
+    assertion_context: AssertionContext<'_, '_, A>,
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     expression = unwrap_expression(expression);
 
     let mut if_types = WordMap::default();
@@ -271,11 +275,14 @@ fn process_custom_assertions(expression_span: Span, artifacts: &AnalysisArtifact
     if_true_assertions
 }
 
-fn scrape_special_function_call_assertions(
-    assertion_context: AssertionContext<'_, '_>,
+fn scrape_special_function_call_assertions<A>(
+    assertion_context: AssertionContext<'_, '_, A>,
     artifacts: &AnalysisArtifacts,
     function_call: &FunctionCall,
-) -> WordMap<AssertionSet> {
+) -> WordMap<AssertionSet>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
 
     let Expression::Identifier(function_identifier) = function_call.function else {
@@ -542,13 +549,16 @@ fn scrape_special_function_call_assertions(
     if_types
 }
 
-pub(super) fn scrape_equality_assertions(
+pub(super) fn scrape_equality_assertions<A>(
     left: &Expression,
     is_identity: bool,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
-) -> Vec<WordMap<AssertionSet>> {
+    assertion_context: AssertionContext<'_, '_, A>,
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     if let Some(assertions) = scrape_class_constant_equality_assertions(
         left,
         right,
@@ -625,13 +635,16 @@ pub(super) fn scrape_equality_assertions(
     vec![]
 }
 
-fn scrape_inequality_assertions(
+fn scrape_inequality_assertions<A>(
     left: &Expression,
     operator: &BinaryOperator,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
-) -> Vec<WordMap<AssertionSet>> {
+    assertion_context: AssertionContext<'_, '_, A>,
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     if let Some(assertions) = scrape_class_constant_equality_assertions(
         left,
         right,
@@ -716,13 +729,16 @@ fn scrape_inequality_assertions(
 
 /// Scrapes assertions for comparisons like `$foo::class === Bar::class`.
 /// This is treated as equivalent to an `instanceof` check.
-fn scrape_class_constant_equality_assertions(
+fn scrape_class_constant_equality_assertions<A>(
     left: &Expression,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     negated: bool,
-) -> Option<Vec<WordMap<AssertionSet>>> {
+) -> Option<Vec<WordMap<AssertionSet>>>
+where
+    A: Arena,
+{
     let left_class_part = is_class_constant_access(left);
     let right_class_part = is_class_constant_access(right);
 
@@ -814,13 +830,16 @@ fn is_static_class_reference(expr: &Expression) -> bool {
     )
 }
 
-fn get_empty_array_equality_assertions(
+fn get_empty_array_equality_assertions<A>(
     left: &Expression,
     is_identity: bool,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     null_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
@@ -845,13 +864,16 @@ fn get_empty_array_equality_assertions(
     if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
-fn get_empty_array_inequality_assertions(
+fn get_empty_array_inequality_assertions<A>(
     left: &Expression,
     operator: &BinaryOperator,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     null_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
@@ -876,13 +898,16 @@ fn get_empty_array_inequality_assertions(
     if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
-fn get_enum_case_equality_assertions(
+fn get_enum_case_equality_assertions<A>(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     artifacts: &AnalysisArtifacts,
     enum_case_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let (variable_expression, Some(enum_case_type)) = (match enum_case_position {
         OtherValuePosition::Left => (right, artifacts.get_expression_type(left)),
         OtherValuePosition::Right => (left, artifacts.get_expression_type(right)),
@@ -906,13 +931,16 @@ fn get_enum_case_equality_assertions(
     vec![if_types]
 }
 
-fn get_enum_case_inequality_assertions(
+fn get_enum_case_inequality_assertions<A>(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     artifacts: &AnalysisArtifacts,
     enum_case_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let (variable_expression, Some(enum_case_type)) = (match enum_case_position {
         OtherValuePosition::Left => (right, artifacts.get_expression_type(left)),
         OtherValuePosition::Right => (left, artifacts.get_expression_type(right)),
@@ -936,12 +964,15 @@ fn get_enum_case_inequality_assertions(
     vec![if_types]
 }
 
-fn get_null_equality_assertions(
+fn get_null_equality_assertions<A>(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     null_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
@@ -978,12 +1009,15 @@ fn get_null_equality_assertions(
     vec![if_types]
 }
 
-fn get_null_inequality_assertions(
+fn get_null_inequality_assertions<A>(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     null_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,
@@ -1031,12 +1065,15 @@ fn get_null_inequality_assertions(
     if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
-fn get_false_inquality_assertions(
+fn get_false_inquality_assertions<A>(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     false_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
     let base_conditional = match false_position {
         OtherValuePosition::Left => right,
@@ -1057,12 +1094,15 @@ fn get_false_inquality_assertions(
     vec![if_types]
 }
 
-fn get_true_inquality_assertions(
+fn get_true_inquality_assertions<A>(
     left: &Expression,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     true_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
     let base_conditional = match true_position {
         OtherValuePosition::Left => right,
@@ -1083,13 +1123,16 @@ fn get_true_inquality_assertions(
     vec![if_types]
 }
 
-fn scrape_lesser_than_assertions(
+fn scrape_lesser_than_assertions<A>(
     left: &Expression,
     operator: &BinaryOperator,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
-) -> Vec<WordMap<AssertionSet>> {
+    assertion_context: AssertionContext<'_, '_, A>,
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
             let mut if_types = WordMap::default();
@@ -1272,13 +1315,16 @@ fn scrape_lesser_than_assertions(
     if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
-fn scrape_greater_than_assertions(
+fn scrape_greater_than_assertions<A>(
     left: &Expression,
     operator: &BinaryOperator,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
-) -> Vec<WordMap<AssertionSet>> {
+    assertion_context: AssertionContext<'_, '_, A>,
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
             let mut if_types = WordMap::default();
@@ -1470,12 +1516,15 @@ fn scrape_greater_than_assertions(
     if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
-fn scrape_instanceof_assertions(
+fn scrape_instanceof_assertions<A>(
     left: &Expression,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    context: AssertionContext<'_, '_>,
-) -> Vec<WordMap<AssertionSet>> {
+    context: AssertionContext<'_, '_, A>,
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
 
     let variable_id = get_expression_id(left, context.this_class_name, context.resolved_names, Some(context.codebase));
@@ -1566,12 +1615,15 @@ fn scrape_instanceof_assertions(
 /// If the expression is not a size comparison, or the other operand is not an
 /// integer literal, it returns `(None, None)`. The returned tuple will never
 /// contain a value for both the left and right sides.
-fn resolve_count_comparison(
+fn resolve_count_comparison<A>(
     left: &Expression,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
-) -> (Option<i64>, Option<i64>) {
+    assertion_context: AssertionContext<'_, '_, A>,
+) -> (Option<i64>, Option<i64>)
+where
+    A: Arena,
+{
     if is_count_or_size_of_call(left, assertion_context) {
         (None, get_expression_integer_value(artifacts, right).and_then(|integer| integer.get_literal_value()))
     } else if is_count_or_size_of_call(right, assertion_context) {
@@ -1615,24 +1667,33 @@ fn get_expression_array_key(artifacts: &AnalysisArtifacts, expression: &Expressi
     artifacts.get_expression_type(expression).and_then(mago_codex::ttype::union::TUnion::get_single_array_key)
 }
 
-fn is_count_or_size_of_call(expression: &Expression, assertion_context: AssertionContext<'_, '_>) -> bool {
+fn is_count_or_size_of_call<A>(expression: &Expression, assertion_context: AssertionContext<'_, '_, A>) -> bool
+where
+    A: Arena,
+{
     is_function_call_to_one_of(expression, assertion_context, &[b"count", b"sizeof", b"Psl\\Iter\\count"])
 }
 
-fn is_function_call_to(
+fn is_function_call_to<A>(
     expression: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     function_name: &[u8],
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     is_function_call_to_one_of(expression, assertion_context, &[function_name])
 }
 
 #[inline]
-fn is_function_call_to_one_of(
+fn is_function_call_to_one_of<A>(
     expression: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     functions: &[&[u8]],
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let Expression::Call(Call::Function(FunctionCall { function, argument_list })) = expression else {
         return false;
     };
@@ -1654,14 +1715,17 @@ fn is_function_call_to_one_of(
     functions.iter().any(|name| resolved_function_name.eq_ignore_ascii_case(name))
 }
 
-fn get_true_equality_assertions(
+fn get_true_equality_assertions<A>(
     left: &Expression,
     is_identity: bool,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     true_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
     let base_conditional = match true_position {
         OtherValuePosition::Left => right,
@@ -1689,12 +1753,15 @@ fn get_true_equality_assertions(
     }
 }
 
-pub fn has_typed_value_comparison(
+pub fn has_typed_value_comparison<A>(
     left: &Expression,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
-) -> Option<OtherValuePosition> {
+    assertion_context: AssertionContext<'_, '_, A>,
+) -> Option<OtherValuePosition>
+where
+    A: Arena,
+{
     let left_var_id = get_expression_id(
         left,
         assertion_context.this_class_name,
@@ -1740,13 +1807,16 @@ pub fn has_typed_value_comparison(
     None
 }
 
-fn get_false_equality_assertions(
+fn get_false_equality_assertions<A>(
     left: &Expression,
     is_identity: bool,
     right: &Expression,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     false_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
     let base_conditional = match false_position {
         OtherValuePosition::Left => right,
@@ -1773,14 +1843,17 @@ fn get_false_equality_assertions(
     vec![]
 }
 
-fn get_typed_value_equality_assertions(
+fn get_typed_value_equality_assertions<A>(
     left: &Expression,
     is_identity: bool,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     typed_value_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
 
     let var_name;
@@ -1863,14 +1936,17 @@ fn get_typed_value_equality_assertions(
     if if_types.is_empty() { vec![] } else { vec![if_types] }
 }
 
-fn get_typed_value_inequality_assertions(
+fn get_typed_value_inequality_assertions<A>(
     left: &Expression,
     operator: &BinaryOperator,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
-    assertion_context: AssertionContext<'_, '_>,
+    assertion_context: AssertionContext<'_, '_, A>,
     typed_value_position: OtherValuePosition,
-) -> Vec<WordMap<AssertionSet>> {
+) -> Vec<WordMap<AssertionSet>>
+where
+    A: Arena,
+{
     let mut if_types = WordMap::default();
 
     let var_name;
@@ -1947,10 +2023,13 @@ fn get_typed_value_inequality_assertions(
 }
 
 #[inline]
-fn get_first_argument_expression_id(
-    assertion_context: AssertionContext<'_, '_>,
+fn get_first_argument_expression_id<A>(
+    assertion_context: AssertionContext<'_, '_, A>,
     expression: &Expression,
-) -> Option<Word> {
+) -> Option<Word>
+where
+    A: Arena,
+{
     let Expression::Call(Call::Function(FunctionCall { argument_list, .. })) = expression else {
         return None;
     };

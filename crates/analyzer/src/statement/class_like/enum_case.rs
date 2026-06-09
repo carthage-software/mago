@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::TType;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -16,12 +17,15 @@ use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCase<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         analyze_attributes(
             context,
             block_context,
@@ -35,12 +39,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCase<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCaseItem<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         match self {
             EnumCaseItem::Unit(_) => Ok(()),
             EnumCaseItem::Backed(item) => item.analyze(context, block_context, artifacts),
@@ -49,12 +56,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCaseItem<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCaseBackedItem<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let Some(current_enum) = block_context.scope.get_class_like() else {
             return Err(AnalysisError::InternalError(
                 "Internal Error: Enum case must be analyzed within an enum scope.".to_string(),

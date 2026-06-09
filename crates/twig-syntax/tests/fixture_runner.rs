@@ -31,7 +31,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 
 use crate::common::parse;
 use crate::common::roundtrip_tokens;
@@ -260,7 +260,7 @@ fn fixtures_match_upstream_accept_reject() {
             expected_accept += 1;
         }
 
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let tpl = parse(&arena, &fx.template);
         let accepted = !tpl.has_errors();
         let relative = fx.path.strip_prefix(fixtures_dir()).unwrap_or(&fx.path).display().to_string();
@@ -335,7 +335,7 @@ fn excluded_fixtures_are_explicit_and_self_consistent() {
         "the set of explicitly-excluded fixtures changed; review and update this test",
     );
 
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let tpl = parse(&arena, "");
     assert!(!tpl.has_errors(), "empty template should parse without errors");
     assert!(tpl.statements.is_empty());
@@ -352,7 +352,7 @@ fn fixtures_roundtrip_for_accepted_templates() {
             continue;
         }
 
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         if parse(&arena, &fx.template).has_errors() {
             continue;
         }

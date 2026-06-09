@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_syntax::ast::Expression;
 use mago_syntax::ast::Literal;
@@ -11,12 +12,15 @@ use crate::error::AnalysisError;
 use crate::statement::r#loop;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for While<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let is_while_true = match self.condition {
             Expression::Literal(literal) => match literal {
                 Literal::True(_) => true,

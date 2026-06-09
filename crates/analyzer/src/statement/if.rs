@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -53,12 +54,15 @@ use crate::utils::misc::check_for_paradox;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let mut if_scope = IfScope::new();
 
         let needs_post_leaving_context = is_obvious_boolean_condition(self.condition) && {
@@ -431,8 +435,8 @@ const fn is_obvious_boolean_condition(condition: &Expression) -> bool {
     }
 }
 
-fn analyze_if_statement_block<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_if_statement_block<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     if_scope: &mut IfScope<'ctx>,
     if_conditional_scope: &IfConditionalScope<'ctx>,
     mut if_block_context: BlockContext<'ctx>,
@@ -440,7 +444,10 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     artifacts: &mut AnalysisArtifacts,
     pre_assignment_else_redefined_locals: &WordMap<Rc<TUnion>>,
     if_statement: &If<'arena>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let mut conditionally_referenced_variable_ids = if_block_context.conditionally_referenced_variable_ids.clone();
     let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
         if_block_context.clauses.iter().map(Rc::as_ref).cloned().collect_vec().as_slice(),
@@ -640,14 +647,17 @@ fn analyze_if_statement_block<'ctx, 'arena>(
     Ok(())
 }
 
-fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_else_if_clause<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     if_scope: &mut IfScope<'ctx>,
     else_block_context: &mut BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     else_if_clause: (&'ast Expression<'arena>, &'ast [Statement<'arena>]),
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let (if_conditional_scope, applied_else_block_context) =
         conditional::analyze(context, else_block_context.clone(), artifacts, if_scope, else_if_clause.0, true)?;
     *else_block_context = applied_else_block_context;
@@ -1000,15 +1010,18 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena>(
     Ok(())
 }
 
-fn analyze_else_statements<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_else_statements<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     if_scope: &mut IfScope<'ctx>,
     else_block_context: &mut BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     else_statements: Option<&[Statement<'arena>]>,
     if_span: Span,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     if else_statements.is_none() && if_scope.negated_clauses.is_empty() && else_block_context.clauses.is_empty() {
         if_scope.final_actions.insert(ControlAction::None);
         if_scope.assigned_variable_ids = None;
@@ -1227,14 +1240,17 @@ fn analyze_else_statements<'ctx, 'arena>(
     Ok(())
 }
 
-fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn add_conditionally_assigned_variables_to_context<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     artifacts: &mut AnalysisArtifacts,
     post_leaving_if_block_context: &mut BlockContext<'ctx>,
     post_if_block_context: &mut BlockContext<'ctx>,
     condition: &Expression<'arena>,
     assigned_in_conditional_variable_ids: &WordMap<u32>,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     if assigned_in_conditional_variable_ids.is_empty() {
         return Ok(());
     }
@@ -1271,8 +1287,8 @@ fn add_conditionally_assigned_variables_to_context<'ctx, 'arena>(
     Ok(())
 }
 
-fn update_if_scope<'ctx>(
-    context: &Context<'ctx, '_>,
+fn update_if_scope<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
     if_scope: &mut IfScope<'ctx>,
     if_block_context: &mut BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
@@ -1280,7 +1296,9 @@ fn update_if_scope<'ctx>(
     new_possibly_assigned_variable_ids: WordSet,
     newly_reconciled_variable_ids: &WordSet,
     update_new_variables: bool,
-) {
+) where
+    A: Arena,
+{
     // Handle definitely_initialized_properties with INTERSECTION semantics
     if outer_block_context.flags.collect_initializations() {
         let branch_initialized = std::mem::take(&mut if_block_context.definitely_initialized_properties);

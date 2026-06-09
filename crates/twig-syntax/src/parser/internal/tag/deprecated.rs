@@ -5,8 +5,12 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_deprecated(
         &mut self,
         open_tag_tok: TwigToken<'arena>,
@@ -39,6 +43,6 @@ impl<'arena> Parser<'_, 'arena> {
         }
         let close_tag = self.stream.expect_block_end()?;
 
-        Ok(Statement::Deprecated(Deprecated { open_tag, keyword, message, options, close_tag }))
+        Ok(Statement::Deprecated(Deprecated { open_tag, keyword, message, options: options.leak(), close_tag }))
     }
 }

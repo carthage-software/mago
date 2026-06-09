@@ -2,8 +2,12 @@ use crate::T;
 use crate::ast::ast::Unset;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_unset(&mut self) -> Result<Unset<'arena>, ParseError> {
         let unset = self.expect_keyword(T!["unset"])?;
         let result = self.parse_comma_separated_sequence(T!["("], T![")"], |p| p.parse_expression())?;

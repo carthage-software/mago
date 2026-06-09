@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::sync::Arc;
 
@@ -52,12 +53,15 @@ use crate::utils::template::get_generic_parameter_for_offset;
 use crate::visibility::check_method_visibility;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Instantiation<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let classnames = resolve_classnames_from_expression(context, block_context, artifacts, self.class, false)?;
         if classnames.is_empty() {
             return Ok(());
@@ -128,15 +132,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Instantiation<'arena> {
     }
 }
 
-fn analyze_class_instantiation<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_class_instantiation<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     classname: &ResolvedClassname,
     instantiation_span: Span,
     class_expression_span: Span,
     argument_list: Option<&ArgumentList<'arena>>,
-) -> Result<TUnion, AnalysisError> {
+) -> Result<TUnion, AnalysisError>
+where
+    A: Arena,
+{
     if classname.is_invalid() {
         argument_list.analyze(context, block_context, artifacts)?;
 
@@ -528,14 +535,17 @@ fn analyze_class_instantiation<'ctx, 'arena>(
 ///
 /// This function validates that the arguments passed to an anonymous class instantiation
 /// match the constructor signature, similar to how regular class instantiation is validated.
-pub fn analyze_anonymous_class_constructor<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn analyze_anonymous_class_constructor<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class_like_metadata: &'ctx mago_codex::metadata::class_like::ClassLikeMetadata,
     argument_list: Option<&mago_syntax::ast::ArgumentList<'arena>>,
     instantiation_span: Span,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     let classlike_name = class_like_metadata.name;
 
     let constructor_id = MethodIdentifier::new(classlike_name, word("__construct"));

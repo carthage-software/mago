@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -93,12 +94,15 @@ impl LintRule for NoHashEmojiRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::Program(program) = node else {
             return;
         };
 
-        for trivia in &program.trivia.nodes {
+        for trivia in program.trivia.nodes {
             let Trivia { kind: TriviaKind::HashComment, value: comment, .. } = trivia else {
                 continue;
             };

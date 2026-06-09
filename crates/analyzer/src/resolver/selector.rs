@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::union::TUnion;
@@ -70,12 +71,15 @@ impl SelectorKind {
 /// Resolves the selector part of a class member access (property or method).
 ///
 /// This handles selectors in expressions like `$object->member` or `$object->{$var}`.
-pub fn resolve_member_selector<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn resolve_member_selector<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     selector: &ClassLikeMemberSelector<'arena>,
-) -> Result<Vec<ResolvedSelector>, AnalysisError> {
+) -> Result<Vec<ResolvedSelector>, AnalysisError>
+where
+    A: Arena,
+{
     match selector {
         ClassLikeMemberSelector::Identifier(ident) => Ok(vec![ResolvedSelector::Identifier(word(ident.value))]),
         ClassLikeMemberSelector::Expression(expr) => {
@@ -105,12 +109,15 @@ pub fn resolve_member_selector<'ctx, 'arena>(
 /// Resolves the selector part of a class constant access.
 ///
 /// This handles selectors in expressions like `ClassName::CONSTANT` or `ClassName::{$var}`.
-pub fn resolve_constant_selector<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn resolve_constant_selector<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     selector: &ClassLikeConstantSelector<'arena>,
-) -> Result<Vec<ResolvedSelector>, AnalysisError> {
+) -> Result<Vec<ResolvedSelector>, AnalysisError>
+where
+    A: Arena,
+{
     match selector {
         ClassLikeConstantSelector::Identifier(ident) => Ok(vec![ResolvedSelector::Identifier(word(ident.value))]),
         ClassLikeConstantSelector::Expression(expr) => {
@@ -128,12 +135,15 @@ pub fn resolve_constant_selector<'ctx, 'arena>(
 }
 
 /// Analyzes the type of a selector expression to determine the resolved selector name(s).
-fn resolve_selector_from_type(
-    context: &mut Context,
+fn resolve_selector_from_type<A>(
+    context: &mut Context<'_, '_, A>,
     selector_type: Option<&TUnion>,
     selector_span: Span,
     kind: SelectorKind,
-) -> Vec<ResolvedSelector> {
+) -> Vec<ResolvedSelector>
+where
+    A: Arena,
+{
     let kind_str = kind.as_str();
 
     let Some(selector_type) = selector_type else {

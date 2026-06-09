@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_syntax::ast::ArgumentList;
 
 use crate::analyzable::Analyzable;
@@ -7,12 +8,15 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArgumentList<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let was_inside_call = block_context.flags.inside_call();
         let was_inside_general_use = block_context.flags.inside_general_use();
 

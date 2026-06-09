@@ -6,8 +6,8 @@ use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-use bumpalo::Bump;
 use foldhash::HashSet;
+use mago_allocator::LocalArena;
 
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
@@ -98,7 +98,7 @@ impl AnalysisService {
             return IssueCollection::default();
         };
 
-        let arena = Bump::new();
+        let arena = LocalArena::new();
 
         let program = parse_file_with_settings(&arena, file, self.parser_settings);
         let resolved_names = NameResolver::new(&arena).resolve(program);

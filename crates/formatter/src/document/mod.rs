@@ -1,26 +1,29 @@
+use mago_allocator::vec_in;
 use std::cell::RefCell;
 
-use bumpalo::Bump;
-use bumpalo::collections::Vec;
-use bumpalo::vec;
+use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
 
 use crate::document::group::GroupIdentifier;
 
 pub mod group;
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum Document<'arena> {
+pub enum Document<'arena, A>
+where
+    A: Arena,
+{
     String(&'arena [u8]),
-    Array(Vec<'arena, Document<'arena>>),
+    Array(Vec<'arena, Document<'arena, A>, A>),
     /// Increase the level of indentation.
-    Indent(Vec<'arena, Document<'arena>>),
-    IndentIfBreak(IndentIfBreak<'arena>),
+    Indent(Vec<'arena, Document<'arena, A>, A>),
+    IndentIfBreak(IndentIfBreak<'arena, A>),
     /// Mark a group of items which the printer should try to fit on one line.
     /// This is the basic command to tell the printer when to break.
     /// Groups are usually nested, and the printer will try to fit everything on one line,
     /// but if it doesn't fit it will break the outermost group first and try again.
     /// It will continue breaking groups until everything fits (or there are no more groups to break).
-    Group(Group<'arena>),
+    Group(Group<'arena, A>),
     /// Specify a line break.
     /// If an expression fits on one line, the line break will be replaced with a space.
     /// Line breaks always indent the next line with the current level of indentation.
@@ -28,17 +31,17 @@ pub enum Document<'arena> {
     /// This is used to implement trailing comments.
     /// It's not practical to constantly check where the line ends to avoid accidentally printing some code at the end of a comment.
     /// `lineSuffix` buffers docs passed to it and flushes them before any new line.
-    LineSuffix(Vec<'arena, Document<'arena>>),
+    LineSuffix(Vec<'arena, Document<'arena, A>, A>),
     LineSuffixBoundary,
     /// Print something if the current `group` or the current element of `fill` breaks and something else if it doesn't.
-    IfBreak(IfBreak<'arena>),
+    IfBreak(IfBreak<'arena, A>),
     /// This is an alternative type of group which behaves like text layout:
     /// it's going to add a break whenever the next element doesn't fit in the line anymore.
     /// The difference with `group` is that it's not going to break all the separators, just the ones that are at the end of lines.
-    Fill(Fill<'arena>),
+    Fill(Fill<'arena, A>),
     /// Include this anywhere to force all parent groups to break.
     BreakParent,
-    Align(Align<'arena>),
+    Align(Align<'arena, A>),
     /// Trim all newlines from the end of the document.
     Trim(Trim),
     /// Do not perform any trimming before printing the next document.
@@ -47,9 +50,12 @@ pub enum Document<'arena> {
 }
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub struct Align<'arena> {
+pub struct Align<'arena, A>
+where
+    A: Arena,
+{
     pub alignment: &'arena [u8],
-    pub contents: Vec<'arena, Document<'arena>>,
+    pub contents: Vec<'arena, Document<'arena, A>, A>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -87,28 +93,40 @@ pub enum BreakMode {
 }
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub struct Group<'arena> {
-    pub contents: Vec<'arena, Document<'arena>>,
+pub struct Group<'arena, A>
+where
+    A: Arena,
+{
+    pub contents: Vec<'arena, Document<'arena, A>, A>,
     pub break_mode: RefCell<BreakMode>,
-    pub expanded_states: Option<Vec<'arena, Document<'arena>>>,
+    pub expanded_states: Option<Vec<'arena, Document<'arena, A>, A>>,
     pub id: Option<GroupIdentifier>,
 }
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub struct IndentIfBreak<'arena> {
+pub struct IndentIfBreak<'arena, A>
+where
+    A: Arena,
+{
     pub group_id: GroupIdentifier,
-    pub contents: Vec<'arena, Document<'arena>>,
+    pub contents: Vec<'arena, Document<'arena, A>, A>,
 }
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub struct Fill<'arena> {
-    pub parts: Vec<'arena, Document<'arena>>,
+pub struct Fill<'arena, A>
+where
+    A: Arena,
+{
+    pub parts: Vec<'arena, Document<'arena, A>, A>,
 }
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone)]
-pub struct IfBreak<'arena> {
-    pub break_contents: &'arena Document<'arena>,
-    pub flat_content: &'arena Document<'arena>,
+pub struct IfBreak<'arena, A>
+where
+    A: Arena,
+{
+    pub break_contents: &'arena Document<'arena, A>,
+    pub flat_content: &'arena Document<'arena, A>,
     pub group_id: Option<GroupIdentifier>,
 }
 
@@ -160,16 +178,19 @@ impl Space {
     }
 }
 
-impl<'arena> Group<'arena> {
+impl<'arena, A> Group<'arena, A>
+where
+    A: Arena,
+{
     #[must_use]
-    pub fn new(contents: Vec<'arena, Document<'arena>>) -> Self {
+    pub fn new(contents: Vec<'arena, Document<'arena, A>, A>) -> Self {
         Self { contents, break_mode: RefCell::new(BreakMode::Auto), id: None, expanded_states: None }
     }
 
     #[must_use]
     pub fn conditional(
-        contents: Vec<'arena, Document<'arena>>,
-        expanded_states: Vec<'arena, Document<'arena>>,
+        contents: Vec<'arena, Document<'arena, A>, A>,
+        expanded_states: Vec<'arena, Document<'arena, A>, A>,
     ) -> Self {
         Self { contents, break_mode: RefCell::new(BreakMode::Auto), id: None, expanded_states: Some(expanded_states) }
     }
@@ -187,41 +208,50 @@ impl<'arena> Group<'arena> {
     }
 }
 
-impl<'arena> IndentIfBreak<'arena> {
+impl<'arena, A> IndentIfBreak<'arena, A>
+where
+    A: Arena,
+{
     #[must_use]
-    pub fn new(group_id: GroupIdentifier, contents: Vec<'arena, Document<'arena>>) -> Self {
+    pub fn new(group_id: GroupIdentifier, contents: Vec<'arena, Document<'arena, A>, A>) -> Self {
         Self { group_id, contents }
     }
 }
 
-impl<'arena> Fill<'arena> {
-    pub fn drain_out_pair(&mut self) -> (Option<Document<'arena>>, Option<Document<'arena>>) {
+impl<'arena, A> Fill<'arena, A>
+where
+    A: Arena,
+{
+    pub fn drain_out_pair(&mut self) -> (Option<Document<'arena, A>>, Option<Document<'arena, A>>) {
         let content = if self.parts.is_empty() { None } else { Some(self.parts.remove(0)) };
         let whitespace = if self.parts.is_empty() { None } else { Some(self.parts.remove(0)) };
 
         (content, whitespace)
     }
 
-    pub fn dequeue(&mut self) -> Option<Document<'arena>> {
+    pub fn dequeue(&mut self) -> Option<Document<'arena, A>> {
         if self.parts.is_empty() { None } else { Some(self.parts.remove(0)) }
     }
 
-    pub fn enqueue(&mut self, doc: Document<'arena>) {
+    pub fn enqueue(&mut self, doc: Document<'arena, A>) {
         self.parts.insert(0, doc);
     }
 
     #[must_use]
-    pub fn parts(&self) -> &[Document<'arena>] {
+    pub fn parts(&self) -> &[Document<'arena, A>] {
         &self.parts
     }
 }
 
-impl<'arena> IfBreak<'arena> {
-    pub fn new(arena: &'arena Bump, break_contents: Document<'arena>, flat_content: Document<'arena>) -> Self {
+impl<'arena, A> IfBreak<'arena, A>
+where
+    A: Arena,
+{
+    pub fn new(arena: &'arena A, break_contents: Document<'arena, A>, flat_content: Document<'arena, A>) -> Self {
         Self { break_contents: arena.alloc(break_contents), flat_content: arena.alloc(flat_content), group_id: None }
     }
 
-    pub fn then(arena: &'arena Bump, break_contents: Document<'arena>) -> Self {
+    pub fn then(arena: &'arena A, break_contents: Document<'arena, A>) -> Self {
         Self {
             break_contents: arena.alloc(break_contents),
             flat_content: arena.alloc(Document::empty()),
@@ -236,22 +266,25 @@ impl<'arena> IfBreak<'arena> {
     }
 }
 
-impl<'arena> Document<'arena> {
+impl<'arena, A> Document<'arena, A>
+where
+    A: Arena,
+{
     #[inline]
     #[must_use]
-    pub fn empty() -> Document<'arena> {
+    pub fn empty() -> Document<'arena, A> {
         Document::String(b"")
     }
 
     #[inline]
     #[must_use]
-    pub fn space() -> Document<'arena> {
+    pub fn space() -> Document<'arena, A> {
         Document::Space(Space { soft: false })
     }
 
     #[inline]
     #[must_use]
-    pub fn soft_space() -> Document<'arena> {
+    pub fn soft_space() -> Document<'arena, A> {
         Document::Space(Space { soft: true })
     }
 
@@ -261,7 +294,7 @@ impl<'arena> Document<'arena> {
 
     pub fn any<F>(&self, predicate: F) -> bool
     where
-        F: Fn(&Document<'arena>) -> bool,
+        F: Fn(&Document<'arena, A>) -> bool,
     {
         if predicate(self) {
             return true;
@@ -281,11 +314,11 @@ impl<'arena> Document<'arena> {
     }
 
     pub fn join(
-        arena: &'arena Bump,
-        documents: impl IntoIterator<Item = Document<'arena>>,
+        arena: &'arena A,
+        documents: impl IntoIterator<Item = Document<'arena, A>>,
         separator: Separator,
-    ) -> Vec<'arena, Document<'arena>> {
-        let mut parts = vec![in arena];
+    ) -> Vec<'arena, Document<'arena, A>, A> {
+        let mut parts = vec_in![arena];
         for (i, document) in documents.into_iter().enumerate() {
             if i != 0 {
                 parts.push(match separator {
@@ -294,13 +327,13 @@ impl<'arena> Document<'arena> {
                     Separator::HardLine => Document::Line(Line::hard()),
                     Separator::CommaSpace => Document::String(b", "),
                     Separator::LiteralLine => {
-                        Document::Array(vec![in arena; Document::Line(Line::literal()), Document::BreakParent])
+                        Document::Array(vec_in![arena; Document::Line(Line::literal()), Document::BreakParent])
                     }
                     Separator::CommaHardLine => {
-                        Document::Array(vec![in arena; Document::String(b","), Document::Line(Line::hard())])
+                        Document::Array(vec_in![arena; Document::String(b","), Document::Line(Line::hard())])
                     }
                     Separator::CommaLine => {
-                        Document::Array(vec![in arena; Document::String(b","), Document::Line(Line::default())])
+                        Document::Array(vec_in![arena; Document::String(b","), Document::Line(Line::default())])
                     }
                 });
             }
@@ -313,10 +346,13 @@ impl<'arena> Document<'arena> {
 }
 
 /// Recursively clones a `Vec` of `Document`s into the given arena.
-pub fn clone_vec_in_arena<'arena>(
-    arena: &'arena Bump,
-    source_vec: &Vec<'arena, Document<'arena>>,
-) -> Vec<'arena, Document<'arena>> {
+pub fn clone_vec_in_arena<'arena, A>(
+    arena: &'arena A,
+    source_vec: &Vec<'arena, Document<'arena, A>, A>,
+) -> Vec<'arena, Document<'arena, A>, A>
+where
+    A: Arena,
+{
     let mut new_vec = Vec::with_capacity_in(source_vec.len(), arena);
     new_vec.extend(source_vec.iter().map(|d| clone_in_arena(arena, d)));
     new_vec
@@ -324,10 +360,13 @@ pub fn clone_vec_in_arena<'arena>(
 
 /// Recursively creates a deep clone of a `Document` within the given arena.
 ///
-/// This function is necessary because `bumpalo::Box` does not implement `Clone`.
+/// This function is necessary because the arena `Box` does not implement `Clone`.
 /// It manually reconstructs the entire `Document` tree, allocating new `Vec`s and
 /// `Box`es in the provided `arena` to create a fully independent copy.
-pub fn clone_in_arena<'arena>(arena: &'arena Bump, document: &Document<'arena>) -> Document<'arena> {
+pub fn clone_in_arena<'arena, A>(arena: &'arena A, document: &Document<'arena, A>) -> Document<'arena, A>
+where
+    A: Arena,
+{
     match document {
         // Trivial `Copy` cases
         Document::String(s) => Document::String(s),
@@ -370,15 +409,21 @@ pub fn clone_in_arena<'arena>(arena: &'arena Bump, document: &Document<'arena>) 
 
 #[allow(dead_code, clippy::use_debug)]
 #[cfg(debug_assertions)]
-pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &Document<'arena>) -> String {
-    use bumpalo::collections::CollectIn;
+pub(crate) fn print_document_to_string<'arena, A>(arena: &'arena A, document: &Document<'arena, A>) -> String
+where
+    A: Arena,
+{
+    use mago_allocator::CollectIn;
 
-    fn write_documents_vec_to_buffer<'arena>(
+    fn write_documents_vec_to_buffer<'arena, A>(
         buffer: &mut String,
-        arena: &'arena Bump,
-        docs: &Vec<'arena, Document<'arena>>,
-    ) {
-        let mut printed = docs.iter().map(|d| print_document_to_string(arena, d)).collect_in::<Vec<_>>(arena);
+        arena: &'arena A,
+        docs: &Vec<'arena, Document<'arena, A>, A>,
+    ) where
+        A: Arena,
+    {
+        let mut printed =
+            docs.iter().map(|d| print_document_to_string(arena, d)).collect_in::<Vec<'arena, _, A>>(arena);
 
         let length = printed.len();
         if length != 1 {
@@ -423,7 +468,7 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
             buffer.push(')');
         }
         Document::Group(Group { contents, break_mode, expanded_states, id }) => {
-            let mut options = vec![in arena];
+            let mut options = vec_in![arena];
             match *break_mode.borrow() {
                 BreakMode::Auto => {}
                 BreakMode::Force => options.push("breakMode: force".to_string()),
@@ -437,7 +482,11 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
             let expanded_states_str = if let Some(states) = expanded_states {
                 format!(
                     "conditionalGroup([{}]",
-                    states.iter().map(|s| print_document_to_string(arena, s)).collect_in::<Vec<_>>(arena).join(", ")
+                    states
+                        .iter()
+                        .map(|s| print_document_to_string(arena, s))
+                        .collect_in::<Vec<'arena, _, A>>(arena)
+                        .join(", ")
                 )
             } else {
                 String::new()
@@ -477,7 +526,7 @@ pub(crate) fn print_document_to_string<'arena>(arena: &'arena Bump, document: &D
         }
         Document::LineSuffixBoundary => buffer.push_str("lineSuffixBoundary"),
         Document::IfBreak(IfBreak { break_contents, flat_content, group_id }) => {
-            let mut options = vec![in arena];
+            let mut options = vec_in![arena];
             if let Some(id) = group_id {
                 options.push(format!("groupId: {id}"));
             }

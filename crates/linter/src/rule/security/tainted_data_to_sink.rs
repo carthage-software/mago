@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::collections::HashSet;
 
 use indoc::indoc;
@@ -93,7 +94,10 @@ impl LintRule for TaintedDataToSinkRule {
         Self { meta: Self::meta(), cfg: settings.config.clone() }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         match node {
             Node::Echo(echo) => {
                 for value in &echo.values {
@@ -124,12 +128,14 @@ impl LintRule for TaintedDataToSinkRule {
 }
 
 impl TaintedDataToSinkRule {
-    fn check_tainted_data_to_sink<'arena>(
+    fn check_tainted_data_to_sink<'arena, A>(
         &self,
-        ctx: &mut LintContext<'_, 'arena>,
+        ctx: &mut LintContext<'_, 'arena, A>,
         used_in: Span,
         value: &Expression<'arena>,
-    ) {
+    ) where
+        A: Arena,
+    {
         if !is_user_input(value) {
             return;
         }

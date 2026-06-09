@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -119,7 +120,10 @@ impl LintRule for ExcessiveNestingRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::Program(program) = node else {
             return;
         };
@@ -147,7 +151,10 @@ struct NestingWalker {
 }
 
 impl NestingWalker {
-    fn check_depth(&self, block: &Block, ctx: &mut LintContext) -> bool {
+    fn check_depth<A>(&self, block: &Block, ctx: &mut LintContext<'_, '_, A>) -> bool
+    where
+        A: Arena,
+    {
         let threshold = self.effective_threshold;
         if self.level > threshold {
             let scope = if self.function_like { "function-like" } else { "global" };
@@ -175,7 +182,10 @@ impl NestingWalker {
         false
     }
 
-    fn enter_function_like_body<'arena>(&mut self, body: &Block<'arena>, ctx: &mut LintContext<'_, 'arena>) {
+    fn enter_function_like_body<'arena, A>(&mut self, body: &Block<'arena>, ctx: &mut LintContext<'_, 'arena, A>)
+    where
+        A: Arena,
+    {
         let Some(fn_threshold) = self.function_like_threshold else {
             return;
         };
@@ -196,8 +206,11 @@ impl NestingWalker {
     }
 }
 
-impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, LintContext<'ctx, 'arena>> for NestingWalker {
-    fn walk_block(&mut self, block: &'ast Block<'arena>, ctx: &mut LintContext<'ctx, 'arena>) {
+impl<'ctx, 'ast, 'arena, A> MutWalker<'ast, 'arena, LintContext<'ctx, 'arena, A>> for NestingWalker
+where
+    A: Arena,
+{
+    fn walk_block(&mut self, block: &'ast Block<'arena>, ctx: &mut LintContext<'ctx, 'arena, A>) {
         self.level += 1;
 
         if !self.check_depth(block, ctx) {
@@ -207,15 +220,15 @@ impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, LintContext<'ctx, 'arena>> for 
         self.level -= 1;
     }
 
-    fn walk_in_function(&mut self, function: &'ast Function<'arena>, ctx: &mut LintContext<'ctx, 'arena>) {
+    fn walk_in_function(&mut self, function: &'ast Function<'arena>, ctx: &mut LintContext<'ctx, 'arena, A>) {
         self.enter_function_like_body(&function.body, ctx);
     }
 
-    fn walk_in_closure(&mut self, closure: &'ast Closure<'arena>, ctx: &mut LintContext<'ctx, 'arena>) {
+    fn walk_in_closure(&mut self, closure: &'ast Closure<'arena>, ctx: &mut LintContext<'ctx, 'arena, A>) {
         self.enter_function_like_body(&closure.body, ctx);
     }
 
-    fn walk_in_method(&mut self, method: &'ast Method<'arena>, ctx: &mut LintContext<'ctx, 'arena>) {
+    fn walk_in_method(&mut self, method: &'ast Method<'arena>, ctx: &mut LintContext<'ctx, 'arena, A>) {
         if let MethodBody::Concrete(body) = &method.body {
             self.enter_function_like_body(body, ctx);
         }
@@ -224,7 +237,7 @@ impl<'ctx, 'ast, 'arena> MutWalker<'ast, 'arena, LintContext<'ctx, 'arena>> for 
     fn walk_in_property_hook_concrete_body(
         &mut self,
         body: &'ast PropertyHookConcreteBody<'arena>,
-        ctx: &mut LintContext<'ctx, 'arena>,
+        ctx: &mut LintContext<'ctx, 'arena, A>,
     ) {
         if let PropertyHookConcreteBody::Block(block) = body {
             self.enter_function_like_body(block, ctx);

@@ -2,7 +2,7 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::default_constructed_unit_structs)]
 
-use bumpalo::Bump;
+use mago_allocator::LocalArena;
 use std::borrow::Cow;
 use std::fs;
 
@@ -26,7 +26,7 @@ macro_rules! test_case {
             let expected = include_bytes!(concat!("cases/", stringify!($name), "/after.php"));
             let settings = include!(concat!("cases/", stringify!($name), "/settings.inc"));
 
-            let arena = Bump::new();
+            let arena = LocalArena::new();
             let formatter = Formatter::new(&arena, $version, settings);
 
             let formatted_code = formatter.format_code(Cow::Borrowed(b"code.php"), Cow::Borrowed(code)).unwrap();
@@ -519,7 +519,7 @@ fn preserves_non_utf8_identifiers() {
     // about.
     assert!(std::str::from_utf8(&src).is_err(), "test input must contain non-UTF-8 bytes");
 
-    let arena = Bump::new();
+    let arena = LocalArena::new();
     let formatter = Formatter::new(&arena, PHPVersion::PHP84, FormatSettings::default());
 
     let Ok(formatted_pass1) = formatter.format_code(Cow::Borrowed(b"non_utf8.php"), Cow::Owned(src.clone())) else {

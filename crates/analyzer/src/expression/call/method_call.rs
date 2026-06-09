@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use mago_word::Word;
 use mago_word::WordMap;
 
@@ -44,12 +45,15 @@ use crate::utils::expression::get_expression_id;
 use crate::visibility::check_method_visibility;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodCall<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         if context.plugin_registry.has_method_call_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);
             let result = context.plugin_registry.before_method_call(self, &mut hook_context)?;
@@ -93,12 +97,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodCall<'arena> {
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafeMethodCall<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         if context.plugin_registry.has_nullsafe_method_call_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);
             let result = context.plugin_registry.before_nullsafe_method_call(self, &mut hook_context)?;
@@ -173,8 +180,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafeMethodCall<'arena> {
 ///
 /// A `Result` containing the `TUnion` type of the method's return value. If the method
 /// is not visible, it returns the `never` type.
-pub fn analyze_implicit_method_call<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn analyze_implicit_method_call<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     object_type: &TObject,
@@ -184,7 +191,10 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
     method_metadata: &'ctx FunctionLikeMetadata,
     arguments_source: Option<InvocationArgumentsSource<'_, 'arena>>,
     span: Span,
-) -> Result<TUnion, AnalysisError> {
+) -> Result<TUnion, AnalysisError>
+where
+    A: Arena,
+{
     if !check_method_visibility(
         context,
         block_context,
@@ -245,8 +255,8 @@ pub fn analyze_implicit_method_call<'ctx, 'arena>(
 }
 
 #[allow(clippy::expect_used)]
-fn analyze_method_call<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_method_call<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     object: &'ast Expression<'arena>,
@@ -254,7 +264,10 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
     argument_list: &'ast ArgumentList<'arena>,
     is_null_safe: bool,
     span: Span,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     if block_context.flags.collect_initializations()
         && let ClassLikeMemberSelector::Identifier(method_ident) = selector
         && is_this_or_self_returning_chain(object, context, block_context)
@@ -354,15 +367,18 @@ fn analyze_method_call<'ctx, 'ast, 'arena>(
 /// declared return type of `__call` (e.g. `static`), since there is no concrete
 /// method to resolve against.
 #[allow(clippy::expect_used)]
-fn analyze_magic_call_return_type<'ctx, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn analyze_magic_call_return_type<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     magic_call_methods: Vec<ResolvedMethod>,
     template_result: TemplateResult,
     argument_list: &ArgumentList<'arena>,
     span: Span,
-) -> Result<(), AnalysisError> {
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
     argument_list.analyze(context, block_context, artifacts)?;
 
     let mut resulting_type: Option<TUnion> = None;
@@ -415,11 +431,14 @@ fn analyze_magic_call_return_type<'ctx, 'arena>(
 ///
 /// This enables tracking method calls in chains like `$this->foo()->bar()->baz()`
 /// where `foo()` and `bar()` return `self` or `static`.
-fn is_this_or_self_returning_chain<'ctx, 'arena>(
+fn is_this_or_self_returning_chain<'ctx, 'arena, A>(
     expr: &Expression<'arena>,
-    context: &Context<'ctx, 'arena>,
+    context: &Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     match expr {
         Expression::Variable(Variable::Direct(var)) if var.name == b"$this" => true,
         Expression::Call(Call::Method(method_call)) => {
@@ -460,7 +479,10 @@ fn is_this_or_self_returning_chain<'ctx, 'arena>(
 }
 
 /// Checks if a method returns `self`, `static`, or the same class type.
-fn method_returns_self_or_static(context: &Context<'_, '_>, class_name: Word, method_name: Word) -> bool {
+fn method_returns_self_or_static<A>(context: &Context<'_, '_, A>, class_name: Word, method_name: Word) -> bool
+where
+    A: Arena,
+{
     let method_id = MethodIdentifier::new(class_name, method_name);
     let Some(method_meta) = context.codebase.get_method_by_id(&method_id) else {
         return false;

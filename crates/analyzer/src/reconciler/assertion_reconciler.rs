@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -42,8 +43,8 @@ use crate::reconciler::negated_assertion_reconciler;
 use crate::reconciler::simple_assertion_reconciler;
 use crate::reconciler::trigger_issue_for_impossible;
 
-pub fn reconcile(
-    context: &mut Context<'_, '_>,
+pub fn reconcile<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: Option<&TUnion>,
     key: Option<&[u8]>,
@@ -51,7 +52,10 @@ pub fn reconcile(
     span: Option<&Span>,
     can_report_issues: bool,
     negated: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let codebase = context.codebase;
     let is_negation = assertion.is_negation();
 
@@ -129,11 +133,14 @@ pub fn reconcile(
     get_mixed()
 }
 
-pub(crate) fn refine_atomic_with_union(
-    context: &mut Context<'_, '_>,
+pub(crate) fn refine_atomic_with_union<A>(
+    context: &mut Context<'_, '_, A>,
     new_type: &TAtomic,
     existing_var_type: &TUnion,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if new_type.is_mixed() {
         return existing_var_type.clone();
     }
@@ -269,11 +276,14 @@ pub(crate) fn refine_atomic_with_union(
     get_never()
 }
 
-fn intersect_union_with_atomic(
-    context: &mut Context<'_, '_>,
+fn intersect_union_with_atomic<A>(
+    context: &mut Context<'_, '_, A>,
     existing_var_type: &TUnion,
     new_type: &TAtomic,
-) -> Option<TUnion> {
+) -> Option<TUnion>
+where
+    A: Arena,
+{
     let mut acceptable_types = Vec::new();
 
     for existing_atomic in existing_var_type.types.as_ref() {
@@ -294,11 +304,14 @@ fn intersect_union_with_atomic(
     None
 }
 
-pub(crate) fn intersect_atomic_with_atomic(
-    context: &mut Context<'_, '_>,
+pub(crate) fn intersect_atomic_with_atomic<A>(
+    context: &mut Context<'_, '_, A>,
     first_type: &TAtomic,
     second_type: &TAtomic,
-) -> Option<TAtomic> {
+) -> Option<TAtomic>
+where
+    A: Arena,
+{
     let mut atomic_comparison_results = ComparisonResult::new();
     if atomic_comparator::is_contained_by(
         context.codebase,
@@ -473,7 +486,14 @@ pub(crate) fn intersect_atomic_with_atomic(
     None
 }
 
-fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, second_list: &TList) -> Option<TAtomic> {
+fn intersect_list_arrays<A>(
+    context: &mut Context<'_, '_, A>,
+    first_list: &TList,
+    second_list: &TList,
+) -> Option<TAtomic>
+where
+    A: Arena,
+{
     let element_type = intersect_union_with_union(context, &first_list.element_type, &second_list.element_type);
 
     match (first_list.known_elements.as_ref(), second_list.known_elements.as_ref()) {
@@ -556,11 +576,14 @@ fn intersect_list_arrays(context: &mut Context<'_, '_>, first_list: &TList, seco
     }
 }
 
-fn intersect_keyed_arrays(
-    context: &mut Context<'_, '_>,
+fn intersect_keyed_arrays<A>(
+    context: &mut Context<'_, '_, A>,
     first_keyed_array: &TKeyedArray,
     second_keyed_array: &TKeyedArray,
-) -> Option<TAtomic> {
+) -> Option<TAtomic>
+where
+    A: Arena,
+{
     let parameters = match (&first_keyed_array.parameters, &second_keyed_array.parameters) {
         (Some(first_parameters), Some(second_parameters)) => {
             let key = intersect_union_with_union(context, &first_parameters.0, &second_parameters.0);
@@ -648,11 +671,14 @@ fn intersect_keyed_arrays(
     }
 }
 
-pub(crate) fn intersect_union_with_union(
-    context: &mut Context<'_, '_>,
+pub(crate) fn intersect_union_with_union<A>(
+    context: &mut Context<'_, '_, A>,
     type_1_param: &TUnion,
     type_2_param: &TUnion,
-) -> Option<TUnion> {
+) -> Option<TUnion>
+where
+    A: Arena,
+{
     match (type_1_param.is_single(), type_2_param.is_single()) {
         (true, true) => {
             intersect_atomic_with_atomic(context, type_1_param.get_single(), type_2_param.get_single()).map(wrap_atomic)
@@ -680,12 +706,15 @@ pub(crate) fn intersect_union_with_union(
     }
 }
 
-fn intersect_contained_atomic_with_another(
-    context: &mut Context<'_, '_>,
+fn intersect_contained_atomic_with_another<A>(
+    context: &mut Context<'_, '_, A>,
     super_atomic: &TAtomic,
     sub_atomic: &TAtomic,
     generic_coercion: bool,
-) -> Option<TAtomic> {
+) -> Option<TAtomic>
+where
+    A: Arena,
+{
     if let TAtomic::Object(TObject::Enum(TEnum { case: Some(_), .. })) = sub_atomic {
         return Some(sub_atomic.clone());
     }
@@ -776,8 +805,8 @@ fn get_missing_type(assertion: &Assertion, inside_loop: bool) -> TUnion {
     get_mixed()
 }
 
-fn handle_literal_equality(
-    context: &mut Context<'_, '_>,
+fn handle_literal_equality<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     assertion_type: &TAtomic,
     existing_var_type: &TUnion,
@@ -785,7 +814,10 @@ fn handle_literal_equality(
     old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     match assertion_type {
         TAtomic::Scalar(TScalar::Integer(TInteger::Literal(i))) => handle_literal_equality_with_int(
             context,
@@ -850,8 +882,8 @@ fn handle_literal_equality(
     }
 }
 
-fn handle_literal_equality_with_int(
-    context: &mut Context<'_, '_>,
+fn handle_literal_equality_with_int<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     assertion_integer: i64,
     existing_var_type: &TUnion,
@@ -859,7 +891,10 @@ fn handle_literal_equality_with_int(
     old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let literal_asserted_type = TAtomic::Scalar(TScalar::Integer(TInteger::Literal(assertion_integer)));
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 
@@ -958,8 +993,8 @@ fn handle_literal_equality_with_int(
     get_never()
 }
 
-fn handle_literal_equality_with_str(
-    context: &mut Context<'_, '_>,
+fn handle_literal_equality_with_str<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     assertion_str_val: &[u8],
     existing_var_type: &TUnion,
@@ -967,7 +1002,10 @@ fn handle_literal_equality_with_str(
     old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let literal_asserted_type = TAtomic::Scalar(TScalar::literal_string(word(assertion_str_val)));
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 
@@ -1060,8 +1098,8 @@ fn handle_literal_equality_with_str(
     get_never()
 }
 
-fn handle_literal_equality_with_class_string(
-    context: &mut Context<'_, '_>,
+fn handle_literal_equality_with_class_string<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     assertion_class_string_val: Word,
     existing_var_type: &TUnion,
@@ -1069,7 +1107,10 @@ fn handle_literal_equality_with_class_string(
     old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let asserted_atomic =
         TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(assertion_class_string_val)));
 
@@ -1159,8 +1200,8 @@ fn handle_literal_equality_with_class_string(
     get_never()
 }
 
-fn handle_literal_equality_with_float(
-    context: &mut Context<'_, '_>,
+fn handle_literal_equality_with_float<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     assertion_float_val: f64,
     existing_var_type: &TUnion,
@@ -1168,7 +1209,10 @@ fn handle_literal_equality_with_float(
     old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let literal_asserted_type = TAtomic::Scalar(TScalar::literal_float(assertion_float_val));
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 
@@ -1270,8 +1314,8 @@ fn handle_literal_equality_with_float(
     get_never()
 }
 
-fn handle_literal_equality_with_bool(
-    context: &mut Context<'_, '_>,
+fn handle_literal_equality_with_bool<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     assertion_bool_val: bool,
     existing_var_type: &TUnion,
@@ -1279,7 +1323,10 @@ fn handle_literal_equality_with_bool(
     old_var_type_atom: Word,
     span: Option<&Span>,
     negated: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let literal_asserted_type = TAtomic::Scalar(TScalar::Bool(TBool { value: Some(assertion_bool_val) }));
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 

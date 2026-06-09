@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use ordered_float::OrderedFloat;
 
@@ -15,7 +16,10 @@ use crate::ast::ast::LiteralStringKind;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_literal(&mut self) -> Result<Literal<'arena>, ParseError> {
         let token = self.stream.consume()?;
 

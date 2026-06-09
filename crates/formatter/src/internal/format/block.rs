@@ -1,5 +1,5 @@
-use bumpalo::vec;
-
+use mago_allocator::Arena;
+use mago_allocator::vec_in;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::ast::Node;
@@ -14,24 +14,25 @@ use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::statement;
 
-pub(super) fn print_block_of_nodes<'ast, 'arena, T>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_block_of_nodes<'ast, 'arena, T, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     left_brace: &Span,
     nodes: &'arena Sequence<'arena, T>,
     right_brace: &Span,
     inline_empty: bool,
-) -> Document<'arena>
+) -> Document<'arena, A>
 where
-    T: Format<'arena> + HasSpan,
+    T: Format<'arena, A> + HasSpan,
+    A: Arena,
 {
     let length = nodes.len();
-    let mut contents = vec![in f.arena; Document::String(b"{")];
+    let mut contents = vec_in![f.arena; Document::String(b"{")];
     if let Some(c) = f.print_trailing_comments(*left_brace) {
         contents.push(c);
     }
 
     if length != 0 {
-        let mut formatted = vec![in f.arena; Document::Line(Line::hard())];
+        let mut formatted = vec_in![f.arena; Document::Line(Line::hard())];
         for (i, item) in nodes.iter().enumerate() {
             formatted.push(item.format(f));
 
@@ -64,13 +65,16 @@ where
     Document::Group(Group::new(contents))
 }
 
-pub(super) fn print_block<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_block<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     left_brace: &'arena Span,
     stmts: &'arena Sequence<'arena, Statement<'arena>>,
     right_brace: &'arena Span,
-) -> Document<'arena> {
-    let mut contents = vec![in f.arena];
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    let mut contents = vec_in![f.arena];
     contents.push(Document::String(b"{"));
     if let Some(c) = f.print_trailing_comments(*left_brace) {
         contents.push(c);
@@ -156,16 +160,22 @@ pub(super) fn print_block<'arena>(
     Document::Group(Group::new(contents).with_break_mode(if should_break { BreakMode::Force } else { BreakMode::Auto }))
 }
 
-pub(super) fn print_block_body<'arena>(
-    f: &mut FormatterState<'_, 'arena>,
+pub(super) fn print_block_body<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
     stmts: &'arena Sequence<'arena, Statement<'arena>>,
-) -> Option<Document<'arena>> {
+) -> Option<Document<'arena, A>>
+where
+    A: Arena,
+{
     let has_body = stmts.iter().any(|stmt| !matches!(stmt, Statement::Noop(_)));
 
     if has_body { Some(Document::Array(statement::print_statement_sequence(f, stmts))) } else { None }
 }
 
-pub fn block_is_empty(f: &FormatterState<'_, '_>, left_brace: &Span, right_brace: &Span) -> bool {
+pub fn block_is_empty<A>(f: &FormatterState<'_, '_, A>, left_brace: &Span, right_brace: &Span) -> bool
+where
+    A: Arena,
+{
     let content = &f.source_text[left_brace.end.offset as usize..right_brace.start.offset as usize];
 
     for &c in content {

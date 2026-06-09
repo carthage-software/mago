@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::T;
@@ -15,7 +16,10 @@ use crate::ast::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_use(&mut self) -> Result<Use<'arena>, ParseError> {
         Ok(Use {
             r#use: self.expect_keyword(T!["use"])?,

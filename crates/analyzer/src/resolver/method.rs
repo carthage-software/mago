@@ -1,4 +1,5 @@
 use foldhash::HashSet;
+use mago_allocator::Arena;
 
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
@@ -99,15 +100,18 @@ pub struct MethodResolutionResult {
 /// 2. Resolving the `selector` to get potential method names.
 /// 3. Finding all matching methods on the object's possible types.
 /// 4. Reporting any issues found, such as "method not found" or "call on mixed".
-pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn resolve_method_targets<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     object: &'ast Expression<'arena>,
     selector: &'ast ClassLikeMemberSelector<'arena>,
     is_null_safe: bool,
     access_span: Span,
-) -> Result<MethodResolutionResult, AnalysisError> {
+) -> Result<MethodResolutionResult, AnalysisError>
+where
+    A: Arena,
+{
     let mut result = MethodResolutionResult::default();
 
     let was_inside_general_use = block_context.flags.inside_general_use();
@@ -292,8 +296,8 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena>(
     Ok(result)
 }
 
-pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn resolve_method_from_object<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     object: &'ast Expression<'arena>,
     selector: &'ast ClassLikeMemberSelector<'arena>,
@@ -302,7 +306,10 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
     access_span: Span,
     has_magic_call: bool,
     result: &mut MethodResolutionResult,
-) -> Vec<ResolvedMethod> {
+) -> Vec<ResolvedMethod>
+where
+    A: Arena,
+{
     let mut resolved_methods = vec![];
 
     let method_ids = get_method_ids_from_object(
@@ -358,8 +365,8 @@ pub fn resolve_method_from_object<'ctx, 'ast, 'arena>(
     resolved_methods
 }
 
-pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     object: &'ast Expression<'arena>,
     selector: &'ast ClassLikeMemberSelector<'arena>,
@@ -369,7 +376,10 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
     access_span: Span,
     has_magic_call: bool,
     result: &mut MethodResolutionResult,
-) -> Vec<(&'ctx ClassLikeMetadata, MethodIdentifier, TObject, Word, Option<MixinWithoutMagicMethod>)> {
+) -> Vec<(&'ctx ClassLikeMetadata, MethodIdentifier, TObject, Word, Option<MixinWithoutMagicMethod>)>
+where
+    A: Arena,
+{
     let mut ids = vec![];
 
     let Some(name) = object_type.get_name() else {
@@ -599,15 +609,18 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object>(
     ids
 }
 
-fn check_where_method_constraints(
-    context: &mut Context,
+fn check_where_method_constraints<A>(
+    context: &mut Context<'_, '_, A>,
     object_type: &TObject,
     object: &Expression,
     selector: &ClassLikeMemberSelector,
     class_like_metadata: &ClassLikeMetadata,
     function_like_metadata: &FunctionLikeMetadata,
     defining_class_id: Word,
-) -> bool {
+) -> bool
+where
+    A: Arena,
+{
     let Some(method_metadata) = function_like_metadata.method_metadata.as_ref() else {
         return true;
     };
@@ -676,7 +689,14 @@ fn check_where_method_constraints(
     true
 }
 
-fn report_call_on_non_object(context: &mut Context, atomic_type: &TAtomic, obj_span: Span, selector_span: Span) {
+fn report_call_on_non_object<A>(
+    context: &mut Context<'_, '_, A>,
+    atomic_type: &TAtomic,
+    obj_span: Span,
+    selector_span: Span,
+) where
+    A: Arena,
+{
     let type_str = atomic_type.get_id();
 
     context.collector.report_with_code(
@@ -689,7 +709,10 @@ fn report_call_on_non_object(context: &mut Context, atomic_type: &TAtomic, obj_s
     );
 }
 
-fn report_call_on_ambiguous_object(context: &mut Context, obj_span: Span, selector_span: Span) {
+fn report_call_on_ambiguous_object<A>(context: &mut Context<'_, '_, A>, obj_span: Span, selector_span: Span)
+where
+    A: Arena,
+{
     context.collector.report_with_code(
         IssueCode::AmbiguousObjectMethodAccess,
         Issue::warning("Cannot statically verify method call on a generic `object` type.")
@@ -701,13 +724,15 @@ fn report_call_on_ambiguous_object(context: &mut Context, obj_span: Span, select
     );
 }
 
-pub(super) fn report_non_existent_method(
-    context: &mut Context,
+pub(super) fn report_non_existent_method<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     method_name: Word,
-) {
+) where
+    A: Arena,
+{
     let classname = display_class_like_name(context, classname);
     let method_name = display_method_name(context, classname, method_name);
     context.collector.report_with_code(
@@ -721,13 +746,15 @@ pub(super) fn report_non_existent_method(
     );
 }
 
-pub(super) fn report_non_documented_method(
-    context: &mut Context,
+pub(super) fn report_non_documented_method<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     method_name: Word,
-) {
+) where
+    A: Arena,
+{
     let classname = display_class_like_name(context, classname);
     let method_name = display_method_name(context, classname, method_name);
     context.collector.report_with_code(
@@ -752,14 +779,16 @@ pub(super) fn report_non_documented_method(
 
 /// Reports a warning when a method is found in a mixin but the target class lacks __call.
 /// This is a warning because a subclass might implement __call.
-fn report_possibly_non_existent_mixin_method(
-    context: &mut Context,
+fn report_possibly_non_existent_mixin_method<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     method_name: Word,
     mixin_classname: Word,
-) {
+) where
+    A: Arena,
+{
     let mixin_classname = display_class_like_name(context, mixin_classname);
     let method_name = display_method_name(context, classname, method_name);
     let classname = display_class_like_name(context, classname);
@@ -788,14 +817,16 @@ fn report_possibly_non_existent_mixin_method(
 
 /// Reports an error when a method is found in a mixin but the target final class lacks __call.
 /// This is an error because no subclass can exist to implement __call.
-fn report_non_existent_mixin_method(
-    context: &mut Context,
+fn report_non_existent_mixin_method<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     method_name: Word,
     mixin_classname: Word,
-) {
+) where
+    A: Arena,
+{
     let mixin_classname = display_class_like_name(context, mixin_classname);
     let method_name = display_method_name(context, classname, method_name);
     let classname = display_class_like_name(context, classname);
@@ -819,14 +850,16 @@ fn report_non_existent_mixin_method(
     );
 }
 
-pub(super) fn report_possibly_missing_magic_call(
-    context: &mut Context,
+pub(super) fn report_possibly_missing_magic_call<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     method_name: Word,
     is_static: bool,
-) {
+) where
+    A: Arena,
+{
     let magic_method_name = if is_static { "__callStatic" } else { "__call" };
     let classname = display_class_like_name(context, classname);
     let method_name = display_method_name(context, classname, method_name);
@@ -852,14 +885,16 @@ pub(super) fn report_possibly_missing_magic_call(
     );
 }
 
-pub(super) fn report_magic_call_without_call_method(
-    context: &mut Context,
+pub(super) fn report_magic_call_without_call_method<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     method_name: Word,
     is_static: bool,
-) {
+) where
+    A: Arena,
+{
     let magic_method_name = if is_static { "__callStatic" } else { "__call" };
     let classname = display_class_like_name(context, classname);
     let method_name = display_method_name(context, classname, method_name);
@@ -885,14 +920,16 @@ pub(super) fn report_magic_call_without_call_method(
     );
 }
 
-pub(super) fn report_dynamic_static_method_call(
-    context: &mut Context,
+pub(super) fn report_dynamic_static_method_call<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     method_name: Word,
     has_magic_call: bool,
-) {
+) where
+    A: Arena,
+{
     let classname = display_class_like_name(context, classname);
     let method_name = display_method_name(context, classname, method_name);
     let mut issue =

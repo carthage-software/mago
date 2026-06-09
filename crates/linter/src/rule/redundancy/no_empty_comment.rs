@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_span::Span;
 use schemars::JsonSchema;
@@ -95,7 +96,10 @@ impl LintRule for NoEmptyCommentRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::Program(program) = node else {
             return;
         };

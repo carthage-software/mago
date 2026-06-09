@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -62,15 +63,18 @@ use crate::reconciler::simple_negated_assertion_reconciler::subtract_null;
 use crate::reconciler::trigger_issue_for_impossible;
 
 // This performs type intersections and more general reconciliations
-pub(crate) fn reconcile(
-    context: &mut Context<'_, '_>,
+pub(crate) fn reconcile<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     span: Option<&Span>,
     negated: bool,
     inside_loop: bool,
-) -> Option<TUnion> {
+) -> Option<TUnion>
+where
+    A: Arena,
+{
     if let Some(assertion_type) = assertion.get_type() {
         // `mixed is T` -> `T`, always
         if existing_var_type.is_mixed() {
@@ -340,14 +344,17 @@ pub(crate) fn reconcile(
     }
 }
 
-pub(crate) fn intersect_null(
-    context: &mut Context<'_, '_>,
+pub(crate) fn intersect_null<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return get_null();
     }
@@ -404,15 +411,18 @@ pub(crate) fn intersect_null(
     get_never()
 }
 
-pub(crate) fn intersect_resource(
-    context: &mut Context<'_, '_>,
+pub(crate) fn intersect_resource<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     resource_to_intersection: TResource,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return match resource_to_intersection.closed {
             None => get_resource(),
@@ -469,15 +479,18 @@ pub(crate) fn intersect_resource(
     get_never()
 }
 
-fn intersect_object(
-    context: &mut Context<'_, '_>,
+fn intersect_object<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return get_object();
     }
@@ -517,15 +530,18 @@ fn intersect_object(
     get_never()
 }
 
-fn intersect_iterable(
-    context: &mut Context<'_, '_>,
+fn intersect_iterable<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return get_mixed_iterable();
     }
@@ -584,8 +600,8 @@ fn intersect_iterable(
     get_never()
 }
 
-fn intersect_array_list(
-    context: &mut Context<'_, '_>,
+fn intersect_array_list<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
@@ -593,7 +609,10 @@ fn intersect_array_list(
     span: Option<&Span>,
     is_equality: bool,
     is_non_empty: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return wrap_atomic(if is_non_empty {
             TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_mixed()))))
@@ -709,15 +728,18 @@ fn intersect_array_list(
     get_never()
 }
 
-fn intersect_keyed_array(
-    context: &mut Context<'_, '_>,
+fn intersect_keyed_array<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let assertion_type = assertion.get_type();
 
     if existing_var_type.is_mixed() {
@@ -823,15 +845,18 @@ fn intersect_keyed_array(
     get_never()
 }
 
-fn intersect_arraykey(
-    context: &mut Context<'_, '_>,
+fn intersect_arraykey<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return get_arraykey();
     }
@@ -903,15 +928,18 @@ fn intersect_arraykey(
     get_never()
 }
 
-fn intersect_numeric(
-    context: &mut Context<'_, '_>,
+fn intersect_numeric<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     is_equality: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
 
@@ -980,8 +1008,8 @@ fn intersect_numeric(
     get_never()
 }
 
-fn intersect_string(
-    context: &mut Context<'_, '_>,
+fn intersect_string<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
@@ -993,7 +1021,10 @@ fn intersect_string(
     is_numeric: bool,
     is_callable: bool,
     casing: TStringCasing,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
 
@@ -1102,8 +1133,8 @@ fn intersect_string(
     get_never()
 }
 
-fn intersect_bool(
-    context: &mut Context<'_, '_>,
+fn intersect_bool<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
@@ -1111,7 +1142,10 @@ fn intersect_bool(
     span: Option<&Span>,
     is_equality: bool,
     boolean: TBool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     // Treat specific boolean values (true/false literals) as equality checks
     // even if the assertion is IsType rather than IsIdentical
     let is_equality = is_equality || !boolean.is_general();
@@ -1186,8 +1220,8 @@ fn intersect_bool(
     get_never()
 }
 
-fn intersect_float(
-    context: &mut Context<'_, '_>,
+fn intersect_float<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
@@ -1195,7 +1229,10 @@ fn intersect_float(
     span: Option<&Span>,
     is_equality: bool,
     float: &TFloat,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
 
@@ -1258,8 +1295,8 @@ fn intersect_float(
     get_never()
 }
 
-fn intersect_int(
-    context: &mut Context<'_, '_>,
+fn intersect_int<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
@@ -1267,7 +1304,10 @@ fn intersect_int(
     span: Option<&Span>,
     is_equality: bool,
     integer: &TInteger,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
 
@@ -1332,14 +1372,17 @@ fn intersect_int(
     get_never()
 }
 
-fn reconcile_truthy_or_non_empty(
-    context: &mut Context<'_, '_>,
+fn reconcile_truthy_or_non_empty<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut did_remove_type = existing_var_type.possibly_undefined() || existing_var_type.possibly_undefined_from_try();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
@@ -1413,15 +1456,18 @@ fn reconcile_truthy_or_non_empty(
     )
 }
 
-fn reconcile_isset(
-    context: &mut Context<'_, '_>,
+fn reconcile_isset<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     inside_loop: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut did_remove_type = existing_var_type.possibly_undefined() || existing_var_type.possibly_undefined_from_try();
 
     if existing_var_type.possibly_undefined() {
@@ -1473,15 +1519,18 @@ fn reconcile_isset(
     new_var_type
 }
 
-fn reconcile_non_empty_countable(
-    context: &mut Context<'_, '_>,
+fn reconcile_non_empty_countable<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     recursive_check: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut did_remove_type = false;
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
@@ -1542,8 +1591,8 @@ fn reconcile_non_empty_countable(
     new_var_type
 }
 
-fn reconcile_exactly_countable(
-    context: &mut Context<'_, '_>,
+fn reconcile_exactly_countable<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
@@ -1551,7 +1600,10 @@ fn reconcile_exactly_countable(
     span: Option<&Span>,
     recursive_check: bool,
     count: usize,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let old_var_type_atom = existing_var_type.get_id();
 
     let mut did_remove_type = false;
@@ -1614,8 +1666,8 @@ fn reconcile_exactly_countable(
     existing_var_type
 }
 
-fn reconcile_at_least_countable(
-    context: &mut Context<'_, '_>,
+fn reconcile_at_least_countable<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
@@ -1623,7 +1675,10 @@ fn reconcile_at_least_countable(
     span: Option<&Span>,
     recursive_check: bool,
     count: usize,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let old_var_type_atom = existing_var_type.get_id();
 
     let mut did_remove_type = false;
@@ -1687,14 +1742,17 @@ fn reconcile_at_least_countable(
     existing_var_type
 }
 
-fn reconcile_countable(
-    context: &mut Context<'_, '_>,
+fn reconcile_countable<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.has_mixed() || existing_var_type.has_template() {
         return TUnion::from_vec(vec![
             TAtomic::Object(TObject::Named(TNamedObject::new(word("Countable")))),
@@ -1756,15 +1814,18 @@ fn reconcile_countable(
 }
 
 #[inline]
-fn reconcile_less_than(
-    context: &mut Context<'_, '_>,
+fn reconcile_less_than<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     value: i64,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     reconcile_integer_comparison(
         context,
         assertion,
@@ -1779,15 +1840,18 @@ fn reconcile_less_than(
 }
 
 #[inline]
-fn reconcile_less_than_or_equal(
-    context: &mut Context<'_, '_>,
+fn reconcile_less_than_or_equal<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     value: i64,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     reconcile_integer_comparison(
         context,
         assertion,
@@ -1802,15 +1866,18 @@ fn reconcile_less_than_or_equal(
 }
 
 #[inline]
-fn reconcile_greater_than(
-    context: &mut Context<'_, '_>,
+fn reconcile_greater_than<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     value: i64,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     reconcile_integer_comparison(
         context,
         assertion,
@@ -1825,15 +1892,18 @@ fn reconcile_greater_than(
 }
 
 #[inline]
-fn reconcile_greater_than_or_equal(
-    context: &mut Context<'_, '_>,
+fn reconcile_greater_than_or_equal<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     value: i64,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     reconcile_integer_comparison(
         context,
         assertion,
@@ -1847,8 +1917,8 @@ fn reconcile_greater_than_or_equal(
     )
 }
 
-fn reconcile_integer_comparison(
-    context: &mut Context<'_, '_>,
+fn reconcile_integer_comparison<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
@@ -1857,7 +1927,10 @@ fn reconcile_integer_comparison(
     value: i64,
     is_less_than: bool,
     or_equal: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let old_var_type_atom = existing_var_type.get_id();
 
     let existing_var_types = existing_var_type.types.as_ref();
@@ -1931,15 +2004,18 @@ fn reconcile_integer_comparison(
     existing_var_type
 }
 
-fn reconcile_array_access(
-    context: &mut Context<'_, '_>,
+fn reconcile_array_access<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     allow_int_key: bool,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut new_var_type = existing_var_type.clone();
 
     if new_var_type.is_mixed() {
@@ -1978,15 +2054,18 @@ fn reconcile_array_access(
     new_var_type
 }
 
-fn reconcile_in_array(
-    context: &mut Context<'_, '_>,
+fn reconcile_in_array<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     negated: bool,
     span: Option<&Span>,
     typed_value: &TUnion,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let intersection = intersect_union_types(typed_value, existing_var_type, context.codebase);
 
     if let Some(intersection) = intersection {
@@ -2002,15 +2081,18 @@ fn reconcile_in_array(
     get_mixed()
 }
 
-fn reconcile_has_array_key(
-    context: &mut Context<'_, '_>,
+fn reconcile_has_array_key<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     key_name: &ArrayKey,
     negated: bool,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut did_remove_type = existing_var_type.possibly_undefined();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
@@ -2134,15 +2216,18 @@ fn reconcile_has_array_key(
     new_var_type
 }
 
-fn reconcile_has_nonnull_entry_for_key(
-    context: &mut Context<'_, '_>,
+fn reconcile_has_nonnull_entry_for_key<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     key_name: &ArrayKey,
     negated: bool,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut new_var_type = existing_var_type.clone();
 
     let existing_var_types = new_var_type.types.to_mut().drain(..).collect::<Vec<_>>();
@@ -2278,15 +2363,18 @@ fn reconcile_has_nonnull_entry_for_key(
 ///
 /// When `method_exists($obj, 'methodName')` returns true, we know the object has that method.
 /// This creates a `HasMethod` type that tracks the known method.
-fn reconcile_has_method(
-    context: &mut Context<'_, '_>,
+fn reconcile_has_method<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     method_name: Word,
     negated: bool,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return wrap_atomic(TAtomic::Object(TObject::new_has_method(method_name)));
     }
@@ -2374,15 +2462,18 @@ fn reconcile_has_method(
 ///
 /// When `property_exists($obj, 'propertyName')` returns true, we know the object has that property.
 /// This creates a `HasProperty` type that tracks the known property.
-fn reconcile_has_property(
-    context: &mut Context<'_, '_>,
+fn reconcile_has_property<A>(
+    context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
     key: Option<&[u8]>,
     property_name: Word,
     negated: bool,
     span: Option<&Span>,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if existing_var_type.is_mixed() {
         return wrap_atomic(TAtomic::Object(TObject::new_has_property(property_name)));
     }
@@ -2457,8 +2548,8 @@ fn reconcile_has_property(
     )
 }
 
-pub(crate) fn get_acceptable_type(
-    context: &mut Context<'_, '_>,
+pub(crate) fn get_acceptable_type<A>(
+    context: &mut Context<'_, '_, A>,
     acceptable_types: Vec<TAtomic>,
     did_remove_type: bool,
     key: Option<&[u8]>,
@@ -2468,7 +2559,10 @@ pub(crate) fn get_acceptable_type(
     negated: bool,
     trigger_issue: bool,
     mut new_var_type: TUnion,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     if trigger_issue
         && (acceptable_types.is_empty() || !did_remove_type)
         && let Some(key) = key

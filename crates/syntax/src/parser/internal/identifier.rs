@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::T;
@@ -8,7 +9,10 @@ use crate::ast::ast::QualifiedIdentifier;
 use crate::error::ParseError;
 use crate::parser::Parser;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_identifier(&mut self) -> Result<Identifier<'arena>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 

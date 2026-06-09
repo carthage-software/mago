@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::Position;
 use mago_span::Span;
@@ -41,7 +42,10 @@ const SHAPE_KEY_SCAN_LIMIT: usize = 48;
 /// from exceeding the stream buffer's lookahead capacity; hitting the
 /// cap conservatively returns `false` (treat the field as keyless).
 #[inline]
-pub fn scan_for_shape_field_key(stream: &mut TypeTokenStream<'_>) -> Result<bool, ParseError> {
+pub fn scan_for_shape_field_key<A>(stream: &mut TypeTokenStream<'_, A>) -> Result<bool, ParseError>
+where
+    A: Arena,
+{
     let mut depth_angle: u32 = 0;
 
     for i in 0..SHAPE_KEY_SCAN_LIMIT {
@@ -77,7 +81,10 @@ pub fn scan_for_shape_field_key(stream: &mut TypeTokenStream<'_>) -> Result<bool
 }
 
 #[inline]
-pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<Type<'arena>, ParseError> {
+pub fn parse_array_like_type<'arena, A>(stream: &mut TypeTokenStream<'arena, A>) -> Result<Type<'arena>, ParseError>
+where
+    A: Arena,
+{
     let next = stream.peek()?;
     let (keyword, kind) = match next.kind {
         TypeTokenKind::Array => {
@@ -192,7 +199,10 @@ pub fn parse_array_like_type<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
     }))
 }
 
-pub fn parse_shape_field_key<'arena>(stream: &mut TypeTokenStream<'arena>) -> Result<ShapeKey<'arena>, ParseError> {
+pub fn parse_shape_field_key<'arena, A>(stream: &mut TypeTokenStream<'arena, A>) -> Result<ShapeKey<'arena>, ParseError>
+where
+    A: Arena,
+{
     if stream.is_at(TypeTokenKind::LiteralString)? {
         let token = stream.consume()?;
         let value = &token.value[1..token.value.len() - 1];
@@ -286,7 +296,7 @@ pub fn parse_shape_field_key<'arena>(stream: &mut TypeTokenStream<'arena>) -> Re
         return Ok(ShapeKey::ClassLikeConstant { class_name, double_colon, constant_name, span });
     }
 
-    let mut key_parts = Vec::new();
+    let mut key_parts = std::vec::Vec::new();
     let mut start_offset = None;
     let mut end_offset = None;
 

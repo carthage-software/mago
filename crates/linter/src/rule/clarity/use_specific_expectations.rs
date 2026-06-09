@@ -1,4 +1,5 @@
 use indoc::indoc;
+use mago_allocator::Arena;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
@@ -182,7 +183,10 @@ impl LintRule for UseSpecificExpectationsRule {
         Self { meta: Self::meta(), cfg: settings.config }
     }
 
-    fn check<'arena>(&self, ctx: &mut LintContext<'_, 'arena>, node: Node<'_, 'arena>) {
+    fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
+    where
+        A: Arena,
+    {
         let Node::MethodCall(method_call) = node else {
             return;
         };
@@ -235,7 +239,10 @@ impl LintRule for UseSpecificExpectationsRule {
 }
 
 impl UseSpecificExpectationsRule {
-    fn report(&self, ctx: &mut LintContext<'_, '_>, method_call: &MethodCall<'_>, kind: IssueKind) {
+    fn report<A>(&self, ctx: &mut LintContext<'_, '_, A>, method_call: &MethodCall<'_>, kind: IssueKind)
+    where
+        A: Arena,
+    {
         let issue = Issue::new(self.cfg.level(), kind.message())
             .with_code(self.meta.code)
             .with_annotation(Annotation::primary(method_call.span()).with_message(kind.annotation()))

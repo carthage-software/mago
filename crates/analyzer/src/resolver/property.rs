@@ -1,5 +1,6 @@
 use foldhash::HashMap;
 use indexmap::IndexMap;
+use mago_allocator::Arena;
 
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -71,8 +72,8 @@ pub struct PropertyResolutionResult {
 }
 
 /// Resolves all possible instance properties from an object expression and a member selector.
-pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+pub fn resolve_instance_properties<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     object_expression: &'ast Expression<'arena>,
@@ -80,7 +81,10 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
     operator_span: Span,
     is_null_safe: bool,
     for_assignment: bool,
-) -> Result<PropertyResolutionResult, AnalysisError> {
+) -> Result<PropertyResolutionResult, AnalysisError>
+where
+    A: Arena,
+{
     let mut result = PropertyResolutionResult::default();
 
     let was_inside_general_use = block_context.flags.inside_general_use();
@@ -378,7 +382,14 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena>(
 /// For a general enum type like `Color $c`, returns a union of all case literals:
 /// - `name` returns `'Red'|'Green'|'Blue'`
 /// - `value` returns `'red'|'green'|'blue'`
-fn resolve_enum_builtin_property(context: &Context, enum_type: &TEnum, prop_name: Word) -> Option<ResolvedProperty> {
+fn resolve_enum_builtin_property<A>(
+    context: &Context<'_, '_, A>,
+    enum_type: &TEnum,
+    prop_name: Word,
+) -> Option<ResolvedProperty>
+where
+    A: Arena,
+{
     let prop_str = trim_start_byte(prop_name.as_bytes(), b'$');
     if prop_str != b"name" && prop_str != b"value" {
         return None;
@@ -437,8 +448,8 @@ fn is_backing_store_access(object_expr: &Expression, prop_name: Word, block_cont
 }
 
 /// Finds a property in a class, gets its type, and handles template localization.
-fn find_property_in_class<'ctx, 'ast, 'arena>(
-    context: &mut Context<'ctx, 'arena>,
+fn find_property_in_class<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     class_id: Word,
     prop_name: Word,
@@ -449,7 +460,10 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
     for_assignment: bool,
     result: &mut PropertyResolutionResult,
     has_magic_method: bool,
-) -> Option<ResolvedProperty> {
+) -> Option<ResolvedProperty>
+where
+    A: Arena,
+{
     let declaring_class_id =
         context.codebase.get_declaring_property_class(class_id.as_bytes(), prop_name.as_bytes()).unwrap_or(class_id);
 
@@ -693,13 +707,16 @@ fn find_property_in_class<'ctx, 'ast, 'arena>(
     })
 }
 
-pub fn localize_property_type(
-    context: &Context<'_, '_>,
+pub fn localize_property_type<A>(
+    context: &Context<'_, '_, A>,
     class_property_type: &TUnion,
     object_type_parameters: &[TUnion],
     property_class_metadata: &ClassLikeMetadata,
     property_declaring_class_metadata: &ClassLikeMetadata,
-) -> TUnion {
+) -> TUnion
+where
+    A: Arena,
+{
     let mut template_types = get_template_types_for_class_member(
         context,
         Some(property_declaring_class_metadata),
@@ -724,13 +741,15 @@ pub fn localize_property_type(
     )
 }
 
-fn update_template_types(
-    context: &Context<'_, '_>,
+fn update_template_types<A>(
+    context: &Context<'_, '_, A>,
     template_types: &mut HashMap<Word, HashMap<GenericParent, TUnion>>,
     property_class_metadata: &ClassLikeMetadata,
     lhs_type_params: &[TUnion],
     property_declaring_class_metadata: &ClassLikeMetadata,
-) {
+) where
+    A: Arena,
+{
     if !template_types.is_empty() && !property_class_metadata.template_types.is_empty() {
         for (param_offset, lhs_param_type) in lhs_type_params.iter().enumerate() {
             let mut i = -1;
@@ -791,14 +810,16 @@ fn update_template_types(
 }
 
 /// Reports an error for a property access on a `null` or `void` value.
-fn report_access_on_null<'ctx>(
-    context: &mut Context<'ctx, '_>,
+fn report_access_on_null<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     object_span: Span,
     operator_span: Span,
     is_always_null: bool,
     from_void: bool,
-) {
+) where
+    A: Arena,
+{
     match (from_void, is_always_null) {
         (true, true) => {
             context.collector.report_with_code(
@@ -867,12 +888,14 @@ fn report_access_on_null<'ctx>(
     }
 }
 
-fn report_redundant_nullsafe<'arena>(
-    context: &mut Context<'_, 'arena>,
+fn report_redundant_nullsafe<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
     operator_span: Span,
     object_expr: &Expression<'arena>,
     object_type: &TUnion,
-) {
+) where
+    A: Arena,
+{
     let object_type_str = object_type.get_id();
 
     context.collector.propose_with_code(
@@ -893,12 +916,14 @@ fn report_redundant_nullsafe<'arena>(
     );
 }
 
-fn report_access_on_non_object(
-    context: &mut Context,
+fn report_access_on_non_object<A>(
+    context: &mut Context<'_, '_, A>,
     atomic_type: &TAtomic,
     selector: &ClassLikeMemberSelector,
     object_span: Span,
-) {
+) where
+    A: Arena,
+{
     let type_str = atomic_type.get_id();
     context.collector.report_with_code(
         if atomic_type.is_mixed() { IssueCode::MixedPropertyAccess } else { IssueCode::InvalidPropertyAccess },
@@ -910,12 +935,14 @@ fn report_access_on_non_object(
     );
 }
 
-fn report_ambiguous_access(
-    context: &mut Context,
+fn report_ambiguous_access<A>(
+    context: &mut Context<'_, '_, A>,
     selector: &ClassLikeMemberSelector,
     object_span: Span,
     object_type: Word,
-) {
+) where
+    A: Arena,
+{
     context.collector.report_with_code(
         IssueCode::AmbiguousObjectPropertyAccess,
         Issue::warning(format!("Cannot statically verify property access on a generic `{object_type}` type."))
@@ -927,13 +954,15 @@ fn report_ambiguous_access(
     );
 }
 
-fn report_possibly_non_existent_property(
-    context: &mut Context,
+fn report_possibly_non_existent_property<A>(
+    context: &mut Context<'_, '_, A>,
     object_type: &TUnion,
     prop_name: Word,
     selector_span: Span,
     object_span: Span,
-) {
+) where
+    A: Arena,
+{
     context.collector.report_with_code(
         IssueCode::PossiblyNonExistentProperty,
         Issue::error(format!("Property `{prop_name}` might not exist on object `{}`.", object_type.get_id()))
@@ -950,14 +979,16 @@ fn report_possibly_non_existent_property(
     );
 }
 
-fn report_non_existent_property(
-    context: &mut Context,
+fn report_non_existent_property<A>(
+    context: &mut Context<'_, '_, A>,
     classname: Word,
     prop_name: Word,
     selector_span: Span,
     object_span: Span,
     is_sealed_object: bool, // `true` if we are accessing undefined prop on `object{foo: string}` type, not an actual class
-) {
+) where
+    A: Arena,
+{
     let class_kind_str = context.codebase.get_class_like(classname.as_bytes()).map_or("class", |m| m.kind.as_str());
     let classname = display_class_like_name(context, classname);
 
@@ -979,14 +1010,16 @@ fn report_non_existent_property(
     );
 }
 
-pub(super) fn report_non_documented_property(
-    context: &mut Context,
+pub(super) fn report_non_documented_property<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     property_name: Word,
     for_assignment: bool,
-) {
+) where
+    A: Arena,
+{
     if classname.as_bytes().eq_ignore_ascii_case(b"stdClass") {
         // Special case: we don't report undocumented properties on stdClass
         return;
@@ -1016,15 +1049,17 @@ pub(super) fn report_non_documented_property(
 
 /// Reports a warning when a property is found in a mixin but the target class lacks __get/__set.
 /// This is a warning because a subclass might implement __get/__set.
-fn report_possibly_non_existent_mixin_property(
-    context: &mut Context,
+fn report_possibly_non_existent_mixin_property<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     prop_name: Word,
     mixin_classname: Word,
     magic_method_name: &str,
-) {
+) where
+    A: Arena,
+{
     let mixin_classname = display_class_like_name(context, mixin_classname);
     let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
@@ -1050,15 +1085,17 @@ fn report_possibly_non_existent_mixin_property(
     );
 }
 
-fn report_non_existent_mixin_property(
-    context: &mut Context,
+fn report_non_existent_mixin_property<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     prop_name: Word,
     mixin_classname: Word,
     magic_method_name: &str,
-) {
+) where
+    A: Arena,
+{
     let mixin_classname = display_class_like_name(context, mixin_classname);
     let classname = display_class_like_name(context, classname);
     context.collector.report_with_code(
@@ -1081,14 +1118,16 @@ fn report_non_existent_mixin_property(
     );
 }
 
-pub(super) fn report_magic_property_without_get_set_method(
-    context: &mut Context,
+pub(super) fn report_magic_property_without_get_set_method<A>(
+    context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
     classname: Word,
     property_name: Word,
     for_assignment: bool,
-) {
+) where
+    A: Arena,
+{
     let magic_method_name = if for_assignment { "__set" } else { "__get" };
     let access_type = if for_assignment { "write to" } else { "read from" };
     let classname = display_class_like_name(context, classname);
@@ -1133,13 +1172,16 @@ fn type_has_property_assertion(intersection_types: Option<&[TAtomic]>, property_
 /// Returns Some(ResolvedProperty) if the property is found in a mixin, None otherwise.
 /// When the mixin type is a generic parameter (e.g., `@mixin T`), tries to resolve it
 /// using the outer_object's type_parameters.
-fn find_property_in_mixins(
-    context: &mut Context,
+fn find_property_in_mixins<A>(
+    context: &Context<'_, '_, A>,
     class_metadata: &ClassLikeMetadata,
     outer_object: &TObject,
     mixins: &[TUnion],
     prop_name: Word,
-) -> Option<ResolvedProperty> {
+) -> Option<ResolvedProperty>
+where
+    A: Arena,
+{
     for mixin_type in mixins {
         for mixin_atomic in mixin_type.types.as_ref() {
             match mixin_atomic {
@@ -1205,11 +1247,14 @@ fn find_property_in_mixins(
 }
 
 /// Searches for a property in a single mixin class.
-fn find_property_in_single_mixin(
-    context: &mut Context,
+fn find_property_in_single_mixin<A>(
+    context: &Context<'_, '_, A>,
     mixin_class_name: Word,
     prop_name: Word,
-) -> Option<ResolvedProperty> {
+) -> Option<ResolvedProperty>
+where
+    A: Arena,
+{
     let mixin_metadata = context.codebase.get_class_like(mixin_class_name.as_bytes())?;
     let property_metadata = mixin_metadata.properties.get(&prop_name)?;
 
@@ -1235,11 +1280,14 @@ fn find_property_in_single_mixin(
 
 /// Searches for a property in intersection types of a named object.
 /// For example, if the type is `Foo&Baz`, this will look for the property on `Baz`.
-fn find_property_in_intersection_types(
-    context: &mut Context,
+fn find_property_in_intersection_types<A>(
+    context: &Context<'_, '_, A>,
     named_object: &TNamedObject,
     prop_name: Word,
-) -> Option<ResolvedProperty> {
+) -> Option<ResolvedProperty>
+where
+    A: Arena,
+{
     let intersection_types = named_object.get_intersection_types()?;
 
     for atomic in intersection_types {

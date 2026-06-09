@@ -1,3 +1,4 @@
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -18,7 +19,10 @@ pub struct TokenSeparatedSequenceResult<'arena, T> {
     pub close: Span,
 }
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     /// Parse a comma-separated sequence.
     ///
     /// This method handles common patterns like:

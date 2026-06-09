@@ -7,8 +7,12 @@ use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;
 use crate::token::TwigToken;
 use crate::token::TwigTokenKind;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_guard(
         &mut self,
         open_tag_tok: TwigToken<'arena>,

@@ -1,3 +1,4 @@
+use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::ttype::get_mixed;
@@ -25,12 +26,15 @@ use crate::statement::r#loop;
 use crate::utils::expression::get_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
-    fn analyze<'ctx>(
+    fn analyze<'ctx, A>(
         &'ast self,
-        context: &mut Context<'ctx, 'arena>,
+        context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
         artifacts: &mut AnalysisArtifacts,
-    ) -> Result<(), AnalysisError> {
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
         let iterator = self.expression;
         let is_by_reference = match &self.target {
             ForeachTarget::Value(v) => v.value.is_reference(),

@@ -3,8 +3,12 @@ use crate::ast::ast::Block;
 use crate::ast::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use mago_allocator::prelude::*;
 
-impl<'arena> Parser<'_, 'arena> {
+impl<'arena, A> Parser<'_, 'arena, A>
+where
+    A: Arena,
+{
     pub(crate) fn parse_block(&mut self) -> Result<Block<'arena>, ParseError> {
         let left_brace = self.stream.eat_span(T!["{"])?;
         let mut statements = self.new_vec();
