@@ -4,8 +4,7 @@
 //! version and [`FormatSettings`]. Returns `None` when formatting changes
 //! nothing. Range formatting isn't supported; the formatter works whole-file.
 
-use bumpalo::Bump;
-
+use mago_allocator::LocalArena;
 use mago_database::DatabaseReader;
 use mago_database::file::FileId;
 use mago_formatter::Formatter;
@@ -18,7 +17,7 @@ impl Server {
     #[must_use]
     pub fn get_formatting(&self, file_id: FileId) -> Option<FormattedDocument> {
         let file = self.database().get(&file_id).ok()?;
-        let arena = Bump::new();
+        let arena = LocalArena::new();
         let formatter = Formatter::new(&arena, self.php_version, self.formatter);
 
         let output = formatter.format_file(&file).ok()?;

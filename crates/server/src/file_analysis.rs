@@ -1,14 +1,13 @@
 //! Per-file derived data computed in a single parse + name-resolve pass.
 //!
-//! Each [`FileAnalysis`] owns its own [`Bump`] arena. The arena keeps
+//! Each [`FileAnalysis`] owns its own [`SharedArena`]. The arena keeps
 //! the parse tree and [`ResolvedNames`] alive for the lifetime of the
 //! analysis, so capability handlers can use `mago_names`'s resolution
 //! map directly instead of going through an owned shadow copy.
 
 use std::sync::Arc;
 
-use bumpalo::Bump;
-
+use mago_allocator::SharedArena;
 use mago_database::file::File as MagoFile;
 use mago_linter::Linter;
 use mago_names::ResolvedNames;
@@ -17,21 +16,21 @@ use mago_names::scope::NamespaceScope;
 use mago_reporting::IssueCollection;
 use mago_semantics::SemanticsChecker;
 use mago_span::HasSpan;
-use mago_syntax::ast::Block;
-use mago_syntax::ast::Class;
-use mago_syntax::ast::Closure;
-use mago_syntax::ast::Enum;
-use mago_syntax::ast::Function;
-use mago_syntax::ast::If;
-use mago_syntax::ast::Interface;
-use mago_syntax::ast::Match;
-use mago_syntax::ast::Method;
-use mago_syntax::ast::Namespace;
-use mago_syntax::ast::Program;
-use mago_syntax::ast::Statement;
-use mago_syntax::ast::Switch;
-use mago_syntax::ast::Trait;
-use mago_syntax::ast::Try;
+use mago_syntax::cst::Block;
+use mago_syntax::cst::Class;
+use mago_syntax::cst::Closure;
+use mago_syntax::cst::Enum;
+use mago_syntax::cst::Function;
+use mago_syntax::cst::If;
+use mago_syntax::cst::Interface;
+use mago_syntax::cst::Match;
+use mago_syntax::cst::Method;
+use mago_syntax::cst::Namespace;
+use mago_syntax::cst::Program;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::Switch;
+use mago_syntax::cst::Trait;
+use mago_syntax::cst::Try;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::walker::Walker;
 use mago_syntax::walker::walk_program;
@@ -59,20 +58,13 @@ pub struct FileAnalysis {
     /// `[start, end)`. Owned (no arena borrow), so completion can resolve names
     /// exactly as the resolver did without re-parsing `use` statements.
     scopes: Vec<(u32, u32, NamespaceScope)>,
-    /// Boxed so the `Bump`'s address is stable across moves of
+    /// Boxed so the arena's address is stable across moves of
     /// `FileAnalysis`. Treated as frozen storage after construction:
     /// nothing reaches it, nothing allocates, nothing resets. When the
     /// analysis is dropped, the heap chunks are freed and the
     /// references in `resolved` are invalidated at the same instant.
-    _arena: Box<Bump>,
+    _arena: Box<SharedArena>,
 }
-
-// SAFETY: After construction the `Bump` is never accessed via a shared
-// reference: no `alloc` (which mutates allocator state through `&self`)
-// and no `reset` (which requires `&mut self`) is reachable. The `&str`
-// values in `resolved` point at immutable bytes in heap chunks the
-// `Bump` owns; reading immutable bytes from multiple threads is safe.
-unsafe impl Sync for FileAnalysis {}
 
 impl std::fmt::Debug for FileAnalysis {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -152,14 +144,14 @@ fn collect_scopes(program: &Program<'_>, file_size: u32) -> Vec<(u32, u32, Names
 /// file (otherwise semantic issues get reported twice).
 #[must_use]
 pub fn build(file: &MagoFile, linter_ctx: &LinterContext, with_semantics: bool) -> FileAnalysis {
-    let arena: Box<Bump> = Box::new(Bump::new());
+    let arena: Box<SharedArena> = Box::new(SharedArena::new());
 
     // SAFETY: `arena` is moved into the returned `FileAnalysis` at the
     // end of this function. Until then it stays at a stable heap address
     // (it's already boxed, and Box doesn't move its allocation on move).
     // Borrows derived from `arena_ref` end up stored in the same struct
     // as `arena` itself, so they're freed together.
-    let arena_ref: &'static Bump = unsafe { &*(arena.as_ref() as *const Bump) };
+    let arena_ref: &'static SharedArena = unsafe { &*(arena.as_ref() as *const SharedArena) };
 
     let program = parse_file_with_settings(arena_ref, file, linter_ctx.parser_settings);
     let resolved = NameResolver::new(arena_ref).resolve(program);
