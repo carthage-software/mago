@@ -586,7 +586,7 @@ where
         }
     }
 
-    let SortUses(sort_uses) = f.settings.sort_uses;
+    let sort_uses = *f.settings.sort_uses;
     let should_separate = f.settings.separate_use_types;
     let should_expand = f.settings.expand_use_groups;
 

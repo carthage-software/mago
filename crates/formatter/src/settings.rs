@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::str::FromStr;
 
 use crate::presets::FormatterPreset;
@@ -1245,6 +1246,15 @@ impl From<SortUsesWire> for SortUses {
             SortUsesWire::Bool(false) => SortUses(SortOrder::Preserve),
             SortUsesWire::Order(order) => SortUses(order),
         }
+    }
+}
+
+// Implement Deref so SortUses automatically coerces into SortOrder
+impl Deref for SortUses {
+    type Target = SortOrder;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
