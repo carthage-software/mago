@@ -3663,7 +3663,7 @@ function array_reverse(array $array, bool $preserve_keys = false): array {}
  * @template I
  *
  * @param array<K, V> $array
- * @param (callable(null|I, V): I) $callback
+ * @param (callable(I, V): I) $callback
  * @param null|I $initial
  *
  * @return I
