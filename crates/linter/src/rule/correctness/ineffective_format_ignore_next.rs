@@ -7,10 +7,10 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::ClassLikeMember;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::Statement;
+use mago_syntax::cst::ClassLikeMember;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
+use mago_syntax::cst::Statement;
 use mago_syntax::walker::MutWalker;
 
 use crate::category::Category;
@@ -154,7 +154,7 @@ struct IgnoreNextMarker {
 }
 
 /// Builds ignore-next markers from comments in the program.
-fn build_ignore_next_markers(program: &mago_syntax::ast::Program<'_>) -> Vec<IgnoreNextMarker> {
+fn build_ignore_next_markers(program: &mago_syntax::cst::Program<'_>) -> Vec<IgnoreNextMarker> {
     let mut markers = Vec::new();
 
     for trivia in program.trivia.iter() {

@@ -4,7 +4,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::T;
-use crate::ast::sequence::TokenSeparatedSequence;
+use crate::cst::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TokenKind;

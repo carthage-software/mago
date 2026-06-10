@@ -8,9 +8,9 @@ use mago_span::Position;
 use mago_span::Span;
 use mago_syntax_core::parser::LookaheadBuf;
 
-use crate::ast::sequence::Sequence;
-use crate::ast::trivia::Trivia;
-use crate::ast::trivia::TriviaKind;
+use crate::cst::sequence::Sequence;
+use crate::cst::trivia::Trivia;
+use crate::cst::trivia::TriviaKind;
 use crate::error::Expected;
 use crate::error::ParseError;
 use crate::error::SyntaxError;

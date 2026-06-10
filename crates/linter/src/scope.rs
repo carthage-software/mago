@@ -2,7 +2,7 @@ use mago_allocator::prelude::*;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Node;
+use mago_syntax::cst::Node;
 
 use crate::context::LintContext;
 
@@ -83,7 +83,7 @@ impl<'arena> Scope<'arena> {
                 let namespace_name = namespace
                     .name
                     .as_ref()
-                    .map(mago_syntax::ast::Identifier::value)
+                    .map(mago_syntax::cst::Identifier::value)
                     .map_or(&b""[..], |n| if let Some(n) = n.strip_prefix(b"\\") { n } else { n });
 
                 Scope::Namespace(namespace_name)

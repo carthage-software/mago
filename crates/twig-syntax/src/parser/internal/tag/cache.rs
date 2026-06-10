@@ -1,7 +1,7 @@
-use crate::ast::Cache;
-use crate::ast::CacheOption;
-use crate::ast::Keyword;
-use crate::ast::Statement;
+use crate::cst::Cache;
+use crate::cst::CacheOption;
+use crate::cst::Keyword;
+use crate::cst::Statement;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;

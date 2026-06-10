@@ -1,7 +1,7 @@
 use mago_allocator::Arena;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_string;
-use mago_syntax::ast::EvalConstruct;
+use mago_syntax::cst::EvalConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

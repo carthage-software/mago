@@ -3,8 +3,8 @@ use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::ClassLikeConstant;
-use mago_syntax::ast::ModifierSequenceExt;
+use mago_syntax::cst::ClassLikeConstant;
+use mago_syntax::cst::ModifierSequenceExt;
 use mago_word::Word;
 use mago_word::word;
 

@@ -7,18 +7,18 @@ use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
-use mago_syntax::ast::Class;
-use mago_syntax::ast::Enum;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Function;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::Interface;
-use mago_syntax::ast::MethodCall;
-use mago_syntax::ast::NullSafeMethodCall;
-use mago_syntax::ast::Program;
-use mago_syntax::ast::Statement;
-use mago_syntax::ast::StaticMethodCall;
-use mago_syntax::ast::Trait;
+use mago_syntax::cst::Class;
+use mago_syntax::cst::Enum;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Function;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Interface;
+use mago_syntax::cst::MethodCall;
+use mago_syntax::cst::NullSafeMethodCall;
+use mago_syntax::cst::Program;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::StaticMethodCall;
+use mago_syntax::cst::Trait;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
@@ -1333,7 +1333,7 @@ impl PluginRegistry {
         source_file: &'ctx File,
         block_context: &BlockContext<'ctx>,
         artifacts: &AnalysisArtifacts,
-        expression: &mago_syntax::ast::Expression<'_>,
+        expression: &mago_syntax::cst::Expression<'_>,
     ) -> WordSet {
         let mut exceptions = WordSet::default();
 

@@ -3,9 +3,9 @@ use mago_codex::ttype::TType;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::EnumCase;
-use mago_syntax::ast::EnumCaseBackedItem;
-use mago_syntax::ast::EnumCaseItem;
+use mago_syntax::cst::EnumCase;
+use mago_syntax::cst::EnumCaseBackedItem;
+use mago_syntax::cst::EnumCaseItem;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

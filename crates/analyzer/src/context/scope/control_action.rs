@@ -1,11 +1,11 @@
 use mago_span::HasSpan;
-use mago_syntax::ast::Construct;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::ForBody;
-use mago_syntax::ast::ForeachBody;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::Statement;
-use mago_syntax::ast::WhileBody;
+use mago_syntax::cst::Construct;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::ForBody;
+use mago_syntax::cst::ForeachBody;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::WhileBody;
 
 use crate::artifacts::AnalysisArtifacts;
 

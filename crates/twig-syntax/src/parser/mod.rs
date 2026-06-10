@@ -14,8 +14,8 @@ use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_syntax_core::input::Input;
 
-use crate::ast::Sequence;
-use crate::ast::Template;
+use crate::cst::Sequence;
+use crate::cst::Template;
 use crate::error::ParseError;
 use crate::lexer::TwigLexer;
 use crate::parser::stream::TokenStream;

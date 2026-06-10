@@ -13,8 +13,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Parenthesized;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Parenthesized;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

@@ -6,12 +6,12 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::ClassLikeMember;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::Program;
-use mago_syntax::ast::Statement;
 use mago_syntax::comments::docblock::get_docblock_for_node;
+use mago_syntax::cst::ClassLikeMember;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
+use mago_syntax::cst::Program;
+use mago_syntax::cst::Statement;
 
 use crate::category::Category;
 use crate::context::LintContext;

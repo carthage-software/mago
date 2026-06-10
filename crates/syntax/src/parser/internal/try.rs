@@ -1,8 +1,8 @@
 use crate::T;
-use crate::ast::ast::Try;
-use crate::ast::ast::TryCatchClause;
-use crate::ast::ast::TryFinallyClause;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::Try;
+use crate::cst::cst::TryCatchClause;
+use crate::cst::cst::TryFinallyClause;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use mago_allocator::prelude::*;

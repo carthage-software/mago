@@ -8,8 +8,8 @@ use mago_codex::ttype::expander::expand_union;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::ClassLikeConstant;
-use mago_syntax::ast::ClassLikeConstantItem;
+use mago_syntax::cst::ClassLikeConstant;
+use mago_syntax::cst::ClassLikeConstantItem;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;

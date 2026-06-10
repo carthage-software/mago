@@ -8,8 +8,8 @@ use mago_codex::ttype::template::TemplateResult;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionCall;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::FunctionCall;
 use mago_word::ascii_lowercase_word;
 use mago_word::word;
 

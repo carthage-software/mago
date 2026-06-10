@@ -6,10 +6,10 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;

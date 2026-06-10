@@ -20,7 +20,7 @@ use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_void;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
-use mago_syntax::ast::ArrowFunction;
+use mago_syntax::cst::ArrowFunction;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

@@ -8,7 +8,7 @@ use mago_codex::ttype::get_never;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
-use mago_syntax::ast::MethodPartialApplication;
+use mago_syntax::cst::MethodPartialApplication;
 use mago_word::WordMap;
 use mago_word::ascii_lowercase_word;
 

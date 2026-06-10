@@ -1,8 +1,8 @@
 use mago_allocator::Arena;
 use mago_span::HasSpan;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::While;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::While;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

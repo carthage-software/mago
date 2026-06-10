@@ -1,7 +1,7 @@
 use mago_allocator::Arena;
 use mago_codex::ttype::get_nullable_scalar;
-use mago_syntax::ast::Echo;
-use mago_syntax::ast::EchoTag;
+use mago_syntax::cst::Echo;
+use mago_syntax::cst::EchoTag;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

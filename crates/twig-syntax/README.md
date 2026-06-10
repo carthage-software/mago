@@ -80,7 +80,7 @@ inspection, [`ast::Node`] is a non-exhaustive enum covering every node kind.
 
 Dual-licensed under the same terms as the rest of the [Mago] workspace.
 
-[`Template`]: crate::ast::Template
+[`Template`]: crate::cst::Template
 [`ParseError`]: crate::error::ParseError
 [`MutWalker`]: crate::walker::MutWalker
 [`Walker`]: crate::walker::Walker

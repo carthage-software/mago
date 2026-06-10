@@ -3,11 +3,11 @@ use mago_database::file::HasFileId;
 use mago_span::Span;
 
 use crate::T;
-use crate::ast::ast::AttributeList;
-use crate::ast::ast::Expression;
-use crate::ast::ast::ExpressionStatement;
-use crate::ast::ast::Statement;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::AttributeList;
+use crate::cst::cst::Expression;
+use crate::cst::cst::ExpressionStatement;
+use crate::cst::cst::Statement;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::MAX_RECURSION_DEPTH;
 use crate::parser::Parser;

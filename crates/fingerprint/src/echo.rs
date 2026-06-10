@@ -1,6 +1,6 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Echo;
-use mago_syntax::ast::EchoTag;
+use mago_syntax::cst::Echo;
+use mago_syntax::cst::EchoTag;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

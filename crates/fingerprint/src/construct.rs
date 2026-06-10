@@ -1,15 +1,15 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Construct;
-use mago_syntax::ast::DieConstruct;
-use mago_syntax::ast::EmptyConstruct;
-use mago_syntax::ast::EvalConstruct;
-use mago_syntax::ast::ExitConstruct;
-use mago_syntax::ast::IncludeConstruct;
-use mago_syntax::ast::IncludeOnceConstruct;
-use mago_syntax::ast::IssetConstruct;
-use mago_syntax::ast::PrintConstruct;
-use mago_syntax::ast::RequireConstruct;
-use mago_syntax::ast::RequireOnceConstruct;
+use mago_syntax::cst::Construct;
+use mago_syntax::cst::DieConstruct;
+use mago_syntax::cst::EmptyConstruct;
+use mago_syntax::cst::EvalConstruct;
+use mago_syntax::cst::ExitConstruct;
+use mago_syntax::cst::IncludeConstruct;
+use mago_syntax::cst::IncludeOnceConstruct;
+use mago_syntax::cst::IssetConstruct;
+use mago_syntax::cst::PrintConstruct;
+use mago_syntax::cst::RequireConstruct;
+use mago_syntax::cst::RequireOnceConstruct;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

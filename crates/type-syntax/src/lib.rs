@@ -8,11 +8,11 @@ use mago_span::Position;
 use mago_span::Span;
 use mago_syntax_core::input::Input;
 
-use crate::ast::Type;
+use crate::cst::Type;
 use crate::error::ParseError;
 use crate::lexer::TypeLexer;
 
-pub mod ast;
+pub mod cst;
 pub mod error;
 pub mod lexer;
 pub mod parser;
@@ -89,7 +89,7 @@ mod tests {
     use mago_span::Position;
     use mago_span::Span;
 
-    use crate::ast::*;
+    use crate::cst::*;
 
     use super::*;
 

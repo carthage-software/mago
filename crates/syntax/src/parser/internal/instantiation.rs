@@ -1,5 +1,5 @@
 use crate::T;
-use crate::ast::ast::Instantiation;
+use crate::cst::cst::Instantiation;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::Precedence;

@@ -1,12 +1,12 @@
-use mago_syntax::ast::Class;
-use mago_syntax::ast::ClassLikeMember;
-use mago_syntax::ast::Constant;
-use mago_syntax::ast::Enum;
-use mago_syntax::ast::Function;
-use mago_syntax::ast::Interface;
-use mago_syntax::ast::ModifierSequenceExt;
-use mago_syntax::ast::Namespace;
-use mago_syntax::ast::Trait;
+use mago_syntax::cst::Class;
+use mago_syntax::cst::ClassLikeMember;
+use mago_syntax::cst::Constant;
+use mago_syntax::cst::Enum;
+use mago_syntax::cst::Function;
+use mago_syntax::cst::Interface;
+use mago_syntax::cst::ModifierSequenceExt;
+use mago_syntax::cst::Namespace;
+use mago_syntax::cst::Trait;
 use mago_syntax::walker::MutWalker;
 
 use crate::context::GuardContext;
@@ -89,7 +89,7 @@ fn fqn_to_owned(fqn: &[u8]) -> Vec<u8> {
 
 impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for StructuralGuardWalker {
     fn walk_in_namespace(&mut self, namespace: &'ast Namespace<'arena>, context: &mut GuardContext<'ctx, 'arena>) {
-        context.set_current_namespace(namespace.name.as_ref().map(mago_syntax::ast::Identifier::value));
+        context.set_current_namespace(namespace.name.as_ref().map(mago_syntax::cst::Identifier::value));
     }
 
     fn walk_out_namespace(&mut self, _namespace: &'ast Namespace<'arena>, context: &mut GuardContext<'ctx, 'arena>) {

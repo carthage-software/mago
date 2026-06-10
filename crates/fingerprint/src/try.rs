@@ -1,7 +1,7 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Try;
-use mago_syntax::ast::TryCatchClause;
-use mago_syntax::ast::TryFinallyClause;
+use mago_syntax::cst::Try;
+use mago_syntax::cst::TryCatchClause;
+use mago_syntax::cst::TryFinallyClause;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

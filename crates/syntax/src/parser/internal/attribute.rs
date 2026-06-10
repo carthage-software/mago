@@ -1,7 +1,7 @@
 use crate::T;
-use crate::ast::ast::Attribute;
-use crate::ast::ast::AttributeList;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::Attribute;
+use crate::cst::cst::AttributeList;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use mago_allocator::prelude::*;

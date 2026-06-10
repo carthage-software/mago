@@ -14,10 +14,10 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Yield;
-use mago_syntax::ast::YieldFrom;
-use mago_syntax::ast::YieldPair;
-use mago_syntax::ast::YieldValue;
+use mago_syntax::cst::Yield;
+use mago_syntax::cst::YieldFrom;
+use mago_syntax::cst::YieldPair;
+use mago_syntax::cst::YieldValue;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

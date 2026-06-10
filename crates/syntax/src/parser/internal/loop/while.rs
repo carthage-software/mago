@@ -1,8 +1,8 @@
 use crate::T;
-use crate::ast::ast::While;
-use crate::ast::ast::WhileBody;
-use crate::ast::ast::WhileColonDelimitedBody;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::While;
+use crate::cst::cst::WhileBody;
+use crate::cst::cst::WhileColonDelimitedBody;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use mago_allocator::prelude::*;

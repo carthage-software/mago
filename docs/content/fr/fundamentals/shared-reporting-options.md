@@ -1,12 +1,12 @@
 +++
 title = "Options de rapport et de correction"
-description = "Les drapeaux partagés par lint, analyze et ast pour signaler les problèmes, appliquer les corrections et gérer les baselines."
+description = "Les drapeaux partagés par lint, analyze et cst pour signaler les problèmes, appliquer les corrections et gérer les baselines."
 nav_order = 40
 nav_section = "Fondamentaux"
 +++
 # Options de rapport et de correction
 
-`mago lint`, `mago analyze` et `mago ast` partagent un ensemble de drapeaux pour la manière dont les problèmes sont signalés et les corrections appliquées. Cette page est la référence centrale pour ces drapeaux afin de ne pas les répéter sur chaque page de commande.
+`mago lint`, `mago analyze` et `mago cst` partagent un ensemble de drapeaux pour la manière dont les problèmes sont signalés et les corrections appliquées. Cette page est la référence centrale pour ces drapeaux afin de ne pas les répéter sur chaque page de commande.
 
 ## Correction automatique
 

@@ -1,5 +1,5 @@
-use crate::ast::Extends;
-use crate::ast::Statement;
+use crate::cst::Extends;
+use crate::cst::Statement;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigToken;

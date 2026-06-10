@@ -2,16 +2,16 @@ use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::T;
-use crate::ast::ast::Statement;
-use crate::ast::ast::Switch;
-use crate::ast::ast::SwitchBody;
-use crate::ast::ast::SwitchBraceDelimitedBody;
-use crate::ast::ast::SwitchCase;
-use crate::ast::ast::SwitchCaseSeparator;
-use crate::ast::ast::SwitchColonDelimitedBody;
-use crate::ast::ast::SwitchDefaultCase;
-use crate::ast::ast::SwitchExpressionCase;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::Statement;
+use crate::cst::cst::Switch;
+use crate::cst::cst::SwitchBody;
+use crate::cst::cst::SwitchBraceDelimitedBody;
+use crate::cst::cst::SwitchCase;
+use crate::cst::cst::SwitchCaseSeparator;
+use crate::cst::cst::SwitchColonDelimitedBody;
+use crate::cst::cst::SwitchDefaultCase;
+use crate::cst::cst::SwitchExpressionCase;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

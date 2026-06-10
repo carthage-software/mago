@@ -1,8 +1,8 @@
-use crate::ast::ElseBranch;
-use crate::ast::If;
-use crate::ast::IfBranch;
-use crate::ast::Sequence;
-use crate::ast::Statement;
+use crate::cst::ElseBranch;
+use crate::cst::If;
+use crate::cst::IfBranch;
+use crate::cst::Sequence;
+use crate::cst::Statement;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;

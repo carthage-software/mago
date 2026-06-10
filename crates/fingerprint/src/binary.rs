@@ -1,8 +1,8 @@
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Binary;
-use mago_syntax::ast::BinaryOperator;
+use mago_syntax::cst::Binary;
+use mago_syntax::cst::BinaryOperator;
 use std::hash::Hash;
 
 impl Fingerprintable for Binary<'_> {

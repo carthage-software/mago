@@ -10,8 +10,8 @@ use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::union::TUnion;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Literal;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Literal;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;

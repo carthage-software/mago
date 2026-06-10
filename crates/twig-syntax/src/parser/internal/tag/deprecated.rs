@@ -1,6 +1,6 @@
-use crate::ast::Deprecated;
-use crate::ast::DeprecatedOption;
-use crate::ast::Statement;
+use crate::cst::Deprecated;
+use crate::cst::DeprecatedOption;
+use crate::cst::Statement;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigToken;

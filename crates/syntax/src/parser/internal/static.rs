@@ -1,9 +1,9 @@
 use crate::T;
-use crate::ast::ast::Static;
-use crate::ast::ast::StaticAbstractItem;
-use crate::ast::ast::StaticConcreteItem;
-use crate::ast::ast::StaticItem;
-use crate::ast::sequence::TokenSeparatedSequence;
+use crate::cst::cst::Static;
+use crate::cst::cst::StaticAbstractItem;
+use crate::cst::cst::StaticConcreteItem;
+use crate::cst::cst::StaticItem;
+use crate::cst::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use mago_allocator::prelude::*;

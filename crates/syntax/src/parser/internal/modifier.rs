@@ -1,6 +1,6 @@
 use crate::T;
-use crate::ast::ast::Modifier;
-use crate::ast::sequence::Sequence;
+use crate::cst::cst::Modifier;
+use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use mago_allocator::prelude::*;

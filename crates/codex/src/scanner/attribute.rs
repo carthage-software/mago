@@ -1,8 +1,8 @@
 use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
-use mago_syntax::ast::AttributeList;
-use mago_syntax::ast::Sequence;
+use mago_syntax::cst::AttributeList;
+use mago_syntax::cst::Sequence;
 use mago_word::Word;
 use mago_word::word;
 

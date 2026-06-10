@@ -1,5 +1,5 @@
-use crate::ast::Statement;
-use crate::ast::With;
+use crate::cst::Statement;
+use crate::cst::With;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;

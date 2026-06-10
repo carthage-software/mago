@@ -4,7 +4,7 @@ use mago_php_version::PHPVersion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::ClassLikeMember;
+use mago_syntax::cst::ClassLikeMember;
 use mago_text_edit::TextEdit;
 use mago_word::ascii_lowercase_word;
 

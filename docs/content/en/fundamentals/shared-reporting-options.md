@@ -1,12 +1,12 @@
 +++
 title = "Reporting and fixing options"
-description = "The flags shared by lint, analyze, and ast for reporting issues, applying fixes, and managing baselines."
+description = "The flags shared by lint, analyze, and cst for reporting issues, applying fixes, and managing baselines."
 nav_order = 40
 nav_section = "Fundamentals"
 +++
 # Reporting and fixing options
 
-`mago lint`, `mago analyze`, and `mago ast` share a set of flags for how issues are reported and how fixes are applied. This page is the central reference for those flags so we don't repeat them on every command page.
+`mago lint`, `mago analyze`, and `mago cst` share a set of flags for how issues are reported and how fixes are applied. This page is the central reference for those flags so we don't repeat them on every command page.
 
 ## Auto-fixing
 

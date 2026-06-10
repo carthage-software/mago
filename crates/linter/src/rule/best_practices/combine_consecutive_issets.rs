@@ -6,12 +6,12 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Construct;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::IssetConstruct;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Construct;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::IssetConstruct;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;
@@ -152,8 +152,8 @@ impl LintRule for CombineConsecutiveIssetsRule {
 ///
 /// An argument is redundant if it is a proper prefix of (or equal to) any argument in `other`.
 fn all_args_redundant<'arena>(
-    candidate: &mago_syntax::ast::sequence::TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
-    other: &mago_syntax::ast::sequence::TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
+    candidate: &mago_syntax::cst::sequence::TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
+    other: &mago_syntax::cst::sequence::TokenSeparatedSequence<'arena, &'arena Expression<'arena>>,
 ) -> bool {
     let other_paths: Vec<_> = other.iter().filter_map(|expr| build_access_path(expr)).collect();
     if other_paths.is_empty() {

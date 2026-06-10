@@ -13,11 +13,11 @@ Un formateur déterministe pour PHP. Exécutez-le sur un fichier et vous obtenez
 
 Mago emprunte l'approche analyse-et-réimpression utilisée par Prettier, `rustfmt` et Black :
 
-1. Analyser le source en un AST.
+1. Analyser le source en un CST.
 2. Jeter le formatage original (espaces, sauts de ligne, indentation, tout).
-3. Réimprimer l'AST de zéro selon un ensemble fixe de règles, [PER-CS](https://www.php-fig.org/per/coding-style/) par défaut.
+3. Réimprimer l'CST de zéro selon un ensemble fixe de règles, [PER-CS](https://www.php-fig.org/per/coding-style/) par défaut.
 
-La sortie est identique pour un AST donné quel que soit le style d'entrée. Le comportement à l'exécution du code est préservé exactement : l'AST fait un aller-retour, seule la représentation de surface change.
+La sortie est identique pour un CST donné quel que soit le style d'entrée. Le comportement à l'exécution du code est préservé exactement : l'CST fait un aller-retour, seule la représentation de surface change.
 
 ## Ce que vous obtenez
 

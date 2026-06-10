@@ -5,7 +5,7 @@ use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
-use mago_syntax::ast::ClassConstantAccess;
+use mago_syntax::cst::ClassConstantAccess;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

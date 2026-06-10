@@ -1,30 +1,30 @@
 use mago_allocator::prelude::*;
 use mago_span::HasSpan;
-use mago_syntax::ast::Attribute;
-use mago_syntax::ast::Binary;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Class;
-use mago_syntax::ast::ClassConstantAccess;
-use mago_syntax::ast::Constant;
-use mago_syntax::ast::ConstantAccess;
-use mago_syntax::ast::Enum;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Extends;
-use mago_syntax::ast::Function;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::FunctionPartialApplication;
-use mago_syntax::ast::Hint;
-use mago_syntax::ast::Implements;
-use mago_syntax::ast::Instantiation;
-use mago_syntax::ast::Interface;
-use mago_syntax::ast::Namespace;
-use mago_syntax::ast::StaticMethodCall;
-use mago_syntax::ast::StaticMethodPartialApplication;
-use mago_syntax::ast::StaticPropertyAccess;
-use mago_syntax::ast::Trait;
-use mago_syntax::ast::TraitUse;
-use mago_syntax::ast::Use;
-use mago_syntax::ast::UseItems;
+use mago_syntax::cst::Attribute;
+use mago_syntax::cst::Binary;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Class;
+use mago_syntax::cst::ClassConstantAccess;
+use mago_syntax::cst::Constant;
+use mago_syntax::cst::ConstantAccess;
+use mago_syntax::cst::Enum;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Extends;
+use mago_syntax::cst::Function;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::FunctionPartialApplication;
+use mago_syntax::cst::Hint;
+use mago_syntax::cst::Implements;
+use mago_syntax::cst::Instantiation;
+use mago_syntax::cst::Interface;
+use mago_syntax::cst::Namespace;
+use mago_syntax::cst::StaticMethodCall;
+use mago_syntax::cst::StaticMethodPartialApplication;
+use mago_syntax::cst::StaticPropertyAccess;
+use mago_syntax::cst::Trait;
+use mago_syntax::cst::TraitUse;
+use mago_syntax::cst::Use;
+use mago_syntax::cst::UseItems;
 use mago_syntax::walker::MutWalker;
 
 use crate::ResolvedNames;
@@ -57,7 +57,7 @@ where
             self.resolved_names.insert_at(ns.span(), ns.value(), false);
         }
 
-        context.enter_namespace(namespace.name.as_ref().map(mago_syntax::ast::Identifier::value));
+        context.enter_namespace(namespace.name.as_ref().map(mago_syntax::cst::Identifier::value));
     }
 
     fn walk_in_use(&mut self, r#use: &'ast Use<'arena>, context: &mut NameResolutionContext<'arena, A>) {

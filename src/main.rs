@@ -250,7 +250,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         MagoCommand::ListFiles(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::Lint(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::Format(cmd) => cmd.execute(configuration, arguments.colors),
-        MagoCommand::Ast(cmd) => cmd.execute(configuration, arguments.colors),
+        MagoCommand::Cst(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::Analyze(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::Guard(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::GenerateCompletions(cmd) => cmd.execute(),

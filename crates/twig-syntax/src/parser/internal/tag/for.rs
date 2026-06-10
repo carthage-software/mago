@@ -1,8 +1,8 @@
-use crate::ast::ElseBranch;
-use crate::ast::For;
-use crate::ast::ForIfClause;
-use crate::ast::Statement;
-use crate::ast::TokenSeparatedSequence;
+use crate::cst::ElseBranch;
+use crate::cst::For;
+use crate::cst::ForIfClause;
+use crate::cst::Statement;
+use crate::cst::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;

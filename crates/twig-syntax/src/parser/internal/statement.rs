@@ -2,10 +2,10 @@ use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::Span;
 
-use crate::ast::Print;
-use crate::ast::Sequence;
-use crate::ast::Statement;
-use crate::ast::Text;
+use crate::cst::Print;
+use crate::cst::Sequence;
+use crate::cst::Statement;
+use crate::cst::Text;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;

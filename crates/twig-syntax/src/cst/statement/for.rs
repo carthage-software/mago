@@ -1,0 +1,46 @@
+use mago_span::HasSpan;
+use mago_span::Span;
+
+use crate::cst::Identifier;
+use crate::cst::Keyword;
+use crate::cst::Sequence;
+use crate::cst::TokenSeparatedSequence;
+use crate::cst::expression::Expression;
+use crate::cst::statement::Statement;
+use crate::cst::statement::r#if::ElseBranch;
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct ForIfClause<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub condition: Expression<'arena>,
+}
+
+impl HasSpan for ForIfClause<'_> {
+    fn span(&self) -> Span {
+        self.keyword.span.join(self.condition.span())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct For<'arena> {
+    pub open_tag: Span,
+    pub keyword: Keyword<'arena>,
+    pub targets: TokenSeparatedSequence<'arena, Identifier<'arena>>,
+    pub in_keyword: Keyword<'arena>,
+    pub sequence: Expression<'arena>,
+    pub if_clause: Option<ForIfClause<'arena>>,
+    pub close_tag: Span,
+    pub body: Sequence<'arena, Statement<'arena>>,
+    pub else_branch: Option<ElseBranch<'arena>>,
+    pub end_open_tag: Span,
+    pub end_keyword: Keyword<'arena>,
+    pub end_close_tag: Span,
+}
+
+impl HasSpan for For<'_> {
+    fn span(&self) -> Span {
+        self.open_tag.join(self.end_close_tag)
+    }
+}

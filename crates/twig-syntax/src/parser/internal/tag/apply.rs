@@ -1,7 +1,7 @@
-use crate::ast::Apply;
-use crate::ast::FilterApplication;
-use crate::ast::Statement;
-use crate::ast::TokenSeparatedSequence;
+use crate::cst::Apply;
+use crate::cst::FilterApplication;
+use crate::cst::Statement;
+use crate::cst::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;

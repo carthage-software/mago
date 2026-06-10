@@ -6,7 +6,7 @@
 
 #![allow(unused_variables, clippy::only_used_in_recursion, clippy::wildcard_imports)]
 
-use crate::ast::*;
+use crate::cst::*;
 
 macro_rules! define_walk_body {
     ($walker:ident, $context:ident, $var_name:ident, $code:block) => {

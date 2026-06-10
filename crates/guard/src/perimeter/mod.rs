@@ -1,27 +1,27 @@
 mod checker;
 
 use mago_span::HasSpan;
-use mago_syntax::ast::Attribute;
-use mago_syntax::ast::ClassConstantAccess;
-use mago_syntax::ast::ConstantAccess;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Extends;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::FunctionLikeParameter;
-use mago_syntax::ast::FunctionLikeReturnTypeHint;
-use mago_syntax::ast::FunctionPartialApplication;
-use mago_syntax::ast::Hint;
-use mago_syntax::ast::Implements;
-use mago_syntax::ast::Instantiation;
-use mago_syntax::ast::Namespace;
-use mago_syntax::ast::Property;
-use mago_syntax::ast::StaticMethodCall;
-use mago_syntax::ast::StaticMethodPartialApplication;
-use mago_syntax::ast::StaticPropertyAccess;
-use mago_syntax::ast::TraitUse;
-use mago_syntax::ast::Use;
-use mago_syntax::ast::UseItems;
-use mago_syntax::ast::UseType;
+use mago_syntax::cst::Attribute;
+use mago_syntax::cst::ClassConstantAccess;
+use mago_syntax::cst::ConstantAccess;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Extends;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::FunctionLikeParameter;
+use mago_syntax::cst::FunctionLikeReturnTypeHint;
+use mago_syntax::cst::FunctionPartialApplication;
+use mago_syntax::cst::Hint;
+use mago_syntax::cst::Implements;
+use mago_syntax::cst::Instantiation;
+use mago_syntax::cst::Namespace;
+use mago_syntax::cst::Property;
+use mago_syntax::cst::StaticMethodCall;
+use mago_syntax::cst::StaticMethodPartialApplication;
+use mago_syntax::cst::StaticPropertyAccess;
+use mago_syntax::cst::TraitUse;
+use mago_syntax::cst::Use;
+use mago_syntax::cst::UseItems;
+use mago_syntax::cst::UseType;
 use mago_syntax::walker::MutWalker;
 
 use crate::context::GuardContext;
@@ -64,7 +64,7 @@ impl DependenciesGuardWalker {
 
 impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for DependenciesGuardWalker {
     fn walk_in_namespace(&mut self, namespace: &'ast Namespace<'arena>, context: &mut GuardContext<'ctx, 'arena>) {
-        context.set_current_namespace(namespace.name.as_ref().map(mago_syntax::ast::Identifier::value));
+        context.set_current_namespace(namespace.name.as_ref().map(mago_syntax::cst::Identifier::value));
     }
 
     fn walk_out_namespace(&mut self, _namespace: &'ast Namespace<'arena>, context: &mut GuardContext<'ctx, 'arena>) {

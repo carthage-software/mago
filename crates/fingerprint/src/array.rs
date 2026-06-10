@@ -1,16 +1,16 @@
 use std::hash::Hash;
 
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Array;
-use mago_syntax::ast::ArrayAccess;
-use mago_syntax::ast::ArrayAppend;
-use mago_syntax::ast::ArrayElement;
-use mago_syntax::ast::KeyValueArrayElement;
-use mago_syntax::ast::LegacyArray;
-use mago_syntax::ast::List;
-use mago_syntax::ast::MissingArrayElement;
-use mago_syntax::ast::ValueArrayElement;
-use mago_syntax::ast::VariadicArrayElement;
+use mago_syntax::cst::Array;
+use mago_syntax::cst::ArrayAccess;
+use mago_syntax::cst::ArrayAppend;
+use mago_syntax::cst::ArrayElement;
+use mago_syntax::cst::KeyValueArrayElement;
+use mago_syntax::cst::LegacyArray;
+use mago_syntax::cst::List;
+use mago_syntax::cst::MissingArrayElement;
+use mago_syntax::cst::ValueArrayElement;
+use mago_syntax::cst::VariadicArrayElement;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;

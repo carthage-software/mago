@@ -1,7 +1,7 @@
-use crate::ast::ElseBranch;
-use crate::ast::Guard;
-use crate::ast::GuardKind;
-use crate::ast::Statement;
+use crate::cst::ElseBranch;
+use crate::cst::Guard;
+use crate::cst::GuardKind;
+use crate::cst::Statement;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;

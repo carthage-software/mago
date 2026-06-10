@@ -13,7 +13,7 @@ use mago_collector::Collector;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
 use mago_span::HasSpan;
-use mago_syntax::ast::Program;
+use mago_syntax::cst::Program;
 
 use crate::analysis_result::AnalysisResult;
 use crate::artifacts::AnalysisArtifacts;

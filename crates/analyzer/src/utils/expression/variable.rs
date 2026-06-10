@@ -1,15 +1,15 @@
 use foldhash::HashSet;
 
 use mago_span::Span;
-use mago_syntax::ast::ArrowFunction;
-use mago_syntax::ast::Class;
-use mago_syntax::ast::Closure;
-use mago_syntax::ast::DirectVariable;
-use mago_syntax::ast::Enum;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Function;
-use mago_syntax::ast::Interface;
-use mago_syntax::ast::Trait;
+use mago_syntax::cst::ArrowFunction;
+use mago_syntax::cst::Class;
+use mago_syntax::cst::Closure;
+use mago_syntax::cst::DirectVariable;
+use mago_syntax::cst::Enum;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Function;
+use mago_syntax::cst::Interface;
+use mago_syntax::cst::Trait;
 use mago_syntax::walker::MutWalker;
 use mago_syntax::walker::walk_arrow_function_mut;
 use mago_syntax::walker::walk_class_mut;

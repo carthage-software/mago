@@ -5,7 +5,7 @@ use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Global;
+use mago_syntax::cst::Global;
 use mago_word::Word;
 
 use crate::analyzable::Analyzable;

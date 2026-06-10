@@ -1,8 +1,8 @@
 use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
-use crate::ast::Identifier;
-use crate::ast::Keyword;
+use crate::cst::Identifier;
+use crate::cst::Keyword;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::stream::is_keyword_usable_as_name;

@@ -15,7 +15,7 @@ The linter and analyzer each carry their own baseline because the issues they re
 - Linter: `lint-baseline.toml`
 - Analyzer: `analysis-baseline.toml`
 
-The `mago ast` command reports parse errors and does not support a baseline.
+The `mago cst` command reports parse errors and does not support a baseline.
 
 ## Generating a baseline
 

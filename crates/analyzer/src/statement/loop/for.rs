@@ -1,6 +1,6 @@
 use mago_allocator::Arena;
 use mago_span::HasSpan;
-use mago_syntax::ast::For;
+use mago_syntax::cst::For;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

@@ -1,6 +1,6 @@
-use crate::ast::Expression;
-use crate::ast::Test;
-use crate::ast::TestArguments;
+use crate::cst::Expression;
+use crate::cst::Test;
+use crate::cst::TestArguments;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigTokenKind;
@@ -15,7 +15,7 @@ where
     pub(crate) fn parse_test(
         &mut self,
         operand: Expression<'arena>,
-        is_keyword: crate::ast::Keyword<'arena>,
+        is_keyword: crate::cst::Keyword<'arena>,
     ) -> Result<Expression<'arena>, ParseError<'arena>> {
         let mut not_keyword = None;
         if let Some(token) = self.stream.lookahead(0)?

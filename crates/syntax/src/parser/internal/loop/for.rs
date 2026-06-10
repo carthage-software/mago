@@ -1,9 +1,9 @@
 use crate::T;
-use crate::ast::ast::For;
-use crate::ast::ast::ForBody;
-use crate::ast::ast::ForColonDelimitedBody;
-use crate::ast::sequence::Sequence;
-use crate::ast::sequence::TokenSeparatedSequence;
+use crate::cst::cst::For;
+use crate::cst::cst::ForBody;
+use crate::cst::cst::ForColonDelimitedBody;
+use crate::cst::sequence::Sequence;
+use crate::cst::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use mago_allocator::prelude::*;

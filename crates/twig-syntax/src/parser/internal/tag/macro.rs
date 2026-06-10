@@ -1,6 +1,6 @@
-use crate::ast::Macro;
-use crate::ast::MacroArgument;
-use crate::ast::Statement;
+use crate::cst::Macro;
+use crate::cst::MacroArgument;
+use crate::cst::Statement;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;

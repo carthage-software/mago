@@ -3,7 +3,7 @@ use mago_codex::ttype::TType;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Constant;
+use mago_syntax::cst::Constant;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

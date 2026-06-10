@@ -7,8 +7,8 @@ use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Attribute;
-use mago_syntax::ast::AttributeList;
+use mago_syntax::cst::Attribute;
+use mago_syntax::cst::AttributeList;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;

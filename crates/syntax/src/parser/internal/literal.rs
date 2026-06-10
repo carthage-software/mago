@@ -7,12 +7,12 @@ use mago_syntax_core::utils::parse_literal_integer;
 use mago_syntax_core::utils::parse_literal_string_in;
 
 use crate::T;
-use crate::ast::ast::Keyword;
-use crate::ast::ast::Literal;
-use crate::ast::ast::LiteralFloat;
-use crate::ast::ast::LiteralInteger;
-use crate::ast::ast::LiteralString;
-use crate::ast::ast::LiteralStringKind;
+use crate::cst::cst::Keyword;
+use crate::cst::cst::Literal;
+use crate::cst::cst::LiteralFloat;
+use crate::cst::cst::LiteralInteger;
+use crate::cst::cst::LiteralString;
+use crate::cst::cst::LiteralStringKind;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

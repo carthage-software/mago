@@ -45,7 +45,7 @@ Les outils principaux :
 | Commande | Description |
 | :--- | :--- |
 | [`mago analyze`](/tools/analyzer/command-reference/) | Analyse statique : erreurs de type, bugs de logique. |
-| [`mago ast`](/guide/inspecting-the-ast/) | Affiche l'AST d'un fichier PHP. |
+| [`mago cst`](/guide/inspecting-the-cst/) | Affiche l'CST d'un fichier PHP. |
 | [`mago format`](/tools/formatter/command-reference/) | Formate les fichiers PHP. |
 | [`mago guard`](/tools/guard/command-reference/) | Applique les règles et frontières architecturales. |
 | [`mago lint`](/tools/linter/command-reference/) | Linte pour le style, la justesse et les bonnes pratiques. |

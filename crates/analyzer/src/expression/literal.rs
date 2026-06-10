@@ -8,7 +8,7 @@ use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_true;
-use mago_syntax::ast::Literal;
+use mago_syntax::cst::Literal;
 use mago_word::ascii_lowercase_word;
 use mago_word::word;
 

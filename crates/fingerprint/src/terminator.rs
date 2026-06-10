@@ -1,5 +1,5 @@
 use mago_names::ResolvedNames;
-use mago_syntax::ast::Terminator;
+use mago_syntax::cst::Terminator;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
@@ -28,9 +28,9 @@ mod tests {
     use mago_database::file::FileId;
     use mago_span::Position;
     use mago_span::Span;
-    use mago_syntax::ast::ast::tag::ClosingTag;
-    use mago_syntax::ast::ast::tag::OpeningTag;
-    use mago_syntax::ast::ast::tag::ShortOpeningTag;
+    use mago_syntax::cst::cst::tag::ClosingTag;
+    use mago_syntax::cst::cst::tag::OpeningTag;
+    use mago_syntax::cst::cst::tag::ShortOpeningTag;
     use std::hash::Hasher;
 
     fn fingerprint_item<T>(item: &T, opts: &FingerprintOptions, names: &ResolvedNames) -> u64

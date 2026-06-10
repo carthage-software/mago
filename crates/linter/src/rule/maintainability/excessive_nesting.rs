@@ -6,10 +6,10 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::Block;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::*;
+use mago_syntax::cst::Block;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
+use mago_syntax::cst::*;
 use mago_syntax::walker::MutWalker;
 use mago_syntax::walker::walk_block_mut;
 

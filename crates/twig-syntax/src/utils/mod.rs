@@ -1,6 +1,6 @@
 //! Utility helpers for inspecting Twig AST nodes.
 
-use crate::ast::Statement;
+use crate::cst::Statement;
 
 /// Returns `true` if the statement is a `{% block %}` declaration.
 #[inline]

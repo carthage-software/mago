@@ -7,7 +7,7 @@ use mago_codex::ttype::get_never;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Throw;
+use mago_syntax::cst::Throw;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

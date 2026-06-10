@@ -19,10 +19,10 @@ use crate::common::parse;
 use crate::common::parse_ok;
 use crate::common::parses;
 use mago_allocator::LocalArena;
-use mago_twig_syntax::ast::Expression;
-use mago_twig_syntax::ast::GuardKind;
-use mago_twig_syntax::ast::Statement;
-use mago_twig_syntax::ast::TriviaKind;
+use mago_twig_syntax::cst::Expression;
+use mago_twig_syntax::cst::GuardKind;
+use mago_twig_syntax::cst::Statement;
+use mago_twig_syntax::cst::TriviaKind;
 
 #[test]
 fn tag_if_basic() {
@@ -92,10 +92,10 @@ fn tag_set_single() {
     let Statement::Set(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.names.len(), 1);
     match &n.body {
-        mago_twig_syntax::ast::SetBody::Inline(i) => assert_eq!(i.values.len(), 1),
+        mago_twig_syntax::cst::SetBody::Inline(i) => assert_eq!(i.values.len(), 1),
         _ => assert_eq!(0usize, 1),
     };
-    assert!(matches!(n.body, mago_twig_syntax::ast::SetBody::Inline(_)));
+    assert!(matches!(n.body, mago_twig_syntax::cst::SetBody::Inline(_)));
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn tag_set_multiple() {
     let Statement::Set(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.names.len(), 2);
     match &n.body {
-        mago_twig_syntax::ast::SetBody::Inline(i) => assert_eq!(i.values.len(), 2),
+        mago_twig_syntax::cst::SetBody::Inline(i) => assert_eq!(i.values.len(), 2),
         _ => assert_eq!(0usize, 2),
     };
 }
@@ -116,9 +116,9 @@ fn tag_set_capture_body() {
     let tpl = parse_ok(&arena, "{% set x %}captured{% endset %}");
     let Statement::Set(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.names.len(), 1);
-    assert!(matches!(n.body, mago_twig_syntax::ast::SetBody::Capture(_)));
+    assert!(matches!(n.body, mago_twig_syntax::cst::SetBody::Capture(_)));
     match &n.body {
-        mago_twig_syntax::ast::SetBody::Inline(i) => assert_eq!(i.values.len(), 0),
+        mago_twig_syntax::cst::SetBody::Inline(i) => assert_eq!(i.values.len(), 0),
         _ => assert_eq!(0usize, 0),
     };
 }
@@ -129,7 +129,7 @@ fn tag_block_short_form() {
     let tpl = parse_ok(&arena, "{% block title 'hi' %}");
     let Statement::Block(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.name.value, b"title".as_slice());
-    assert!(matches!(n.body, mago_twig_syntax::ast::BlockBody::Short(_)));
+    assert!(matches!(n.body, mago_twig_syntax::cst::BlockBody::Short(_)));
 }
 
 #[test]
@@ -138,7 +138,7 @@ fn tag_block_body_form() {
     let tpl = parse_ok(&arena, "{% block main %}body{% endblock %}");
     let Statement::Block(n) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(n.name.value, b"main".as_slice());
-    assert!(matches!(n.body, mago_twig_syntax::ast::BlockBody::Long(_)));
+    assert!(matches!(n.body, mago_twig_syntax::cst::BlockBody::Long(_)));
 }
 
 #[test]
@@ -157,7 +157,7 @@ fn tag_nested_blocks() {
     let arena = LocalArena::new();
     let tpl = parse_ok(&arena, "{% block outer %}{% block inner %}hi{% endblock %}{% endblock %}");
     let Statement::Block(outer) = &tpl.statements.nodes[0] else { panic!() };
-    let mago_twig_syntax::ast::BlockBody::Long(long) = &outer.body else { panic!() };
+    let mago_twig_syntax::cst::BlockBody::Long(long) = &outer.body else { panic!() };
     assert!(long.body.iter().any(|n| matches!(n, Statement::Block(_))));
 }
 

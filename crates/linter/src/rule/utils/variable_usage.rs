@@ -5,7 +5,7 @@ use foldhash::HashMap;
 use foldhash::HashSet;
 
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::cst::*;
 use mago_syntax::walker::MutWalker;
 
 pub trait Recorder<'arena> {

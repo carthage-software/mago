@@ -1,5 +1,5 @@
 use crate::T;
-use crate::ast::ast::Return;
+use crate::cst::cst::Return;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use mago_allocator::prelude::*;

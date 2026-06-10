@@ -2,8 +2,8 @@ use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::T;
-use crate::ast::ast::UnaryPrefix;
-use crate::ast::ast::UnaryPrefixOperator;
+use crate::cst::cst::UnaryPrefix;
+use crate::cst::cst::UnaryPrefixOperator;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::GetPrecedence;

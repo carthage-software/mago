@@ -1,0 +1,71 @@
+use mago_span::HasSpan;
+use mago_span::Span;
+
+use crate::cst::ArgumentList;
+use crate::cst::Identifier;
+use crate::cst::expression::Expression;
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct GetAttribute<'arena> {
+    pub object: &'arena Expression<'arena>,
+    pub dot: Span,
+    pub null_safe: bool,
+    pub attribute: &'arena Expression<'arena>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct GetItem<'arena> {
+    pub object: &'arena Expression<'arena>,
+    pub left_bracket: Span,
+    pub index: &'arena Expression<'arena>,
+    pub right_bracket: Span,
+}
+
+/// `a[start:length]` slice access. `start` and `length` are both optional -
+/// `a[:3]`, `a[1:]`, and `a[:]` are all valid Twig.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct Slice<'arena> {
+    pub object: &'arena Expression<'arena>,
+    pub left_bracket: Span,
+    pub start: Option<&'arena Expression<'arena>>,
+    pub colon: Span,
+    pub length: Option<&'arena Expression<'arena>>,
+    pub right_bracket: Span,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct MethodCall<'arena> {
+    pub object: &'arena Expression<'arena>,
+    pub dot: Span,
+    pub null_safe: bool,
+    pub method: Identifier<'arena>,
+    pub argument_list: ArgumentList<'arena>,
+}
+
+impl HasSpan for GetAttribute<'_> {
+    fn span(&self) -> Span {
+        self.object.span().join(self.attribute.span())
+    }
+}
+
+impl HasSpan for GetItem<'_> {
+    fn span(&self) -> Span {
+        self.object.span().join(self.right_bracket)
+    }
+}
+
+impl HasSpan for Slice<'_> {
+    fn span(&self) -> Span {
+        self.object.span().join(self.right_bracket)
+    }
+}
+
+impl HasSpan for MethodCall<'_> {
+    fn span(&self) -> Span {
+        self.object.span().join(self.argument_list.right_parenthesis)
+    }
+}

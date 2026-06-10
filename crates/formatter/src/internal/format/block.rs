@@ -2,9 +2,9 @@ use mago_allocator::Arena;
 use mago_allocator::vec_in;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::Sequence;
-use mago_syntax::ast::Statement;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::Sequence;
+use mago_syntax::cst::Statement;
 
 use crate::document::BreakMode;
 use crate::document::Document;

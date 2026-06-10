@@ -4,9 +4,9 @@ use mago_allocator::vec_in;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::Statement;
-use mago_syntax::ast::Trivia;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::Trivia;
 
 use crate::document::BreakMode;
 use crate::document::Document;

@@ -2,9 +2,9 @@ use mago_allocator::Arena;
 use mago_docblock::tag::TypeString;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
-use mago_syntax::ast::Hint;
-use mago_syntax::ast::Identifier;
-use mago_syntax::ast::UnionHint;
+use mago_syntax::cst::Hint;
+use mago_syntax::cst::Identifier;
+use mago_syntax::cst::UnionHint;
 use mago_word::Word;
 use mago_word::word;
 

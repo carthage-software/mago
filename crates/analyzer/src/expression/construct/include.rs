@@ -3,11 +3,11 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_string;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::IncludeConstruct;
-use mago_syntax::ast::IncludeOnceConstruct;
-use mago_syntax::ast::RequireConstruct;
-use mago_syntax::ast::RequireOnceConstruct;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::IncludeConstruct;
+use mago_syntax::cst::IncludeOnceConstruct;
+use mago_syntax::cst::RequireConstruct;
+use mago_syntax::cst::RequireOnceConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

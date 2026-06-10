@@ -2,7 +2,7 @@ use mago_allocator::Arena;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_true;
-use mago_syntax::ast::EmptyConstruct;
+use mago_syntax::cst::EmptyConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

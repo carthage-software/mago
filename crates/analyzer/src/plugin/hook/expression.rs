@@ -1,6 +1,6 @@
 //! Expression hooks for intercepting expression analysis.
 
-use mago_syntax::ast::Expression;
+use mago_syntax::cst::Expression;
 
 use crate::plugin::context::HookContext;
 use crate::plugin::hook::ExpressionHookResult;

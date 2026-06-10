@@ -15,7 +15,7 @@ Le linter et l'analyseur portent chacun leur propre baseline car les problèmes 
 - Linter : `lint-baseline.toml`
 - Analyseur : `analysis-baseline.toml`
 
-La commande `mago ast` signale des erreurs d'analyse syntaxique et ne prend pas en charge de baseline.
+La commande `mago cst` signale des erreurs d'analyse syntaxique et ne prend pas en charge de baseline.
 
 ## Générer une baseline
 

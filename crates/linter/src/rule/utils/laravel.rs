@@ -1,7 +1,7 @@
 use mago_allocator::Arena;
-use mago_syntax::ast::ClassLikeMemberSelector;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::ClassLikeMemberSelector;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Variable;
 
 use crate::context::LintContext;
 use crate::scope::ClassLikeScope;

@@ -6,7 +6,7 @@ use mago_reporting::IssueCollection;
 use mago_span::HasSpan;
 use mago_span::Position;
 use mago_span::Span;
-use mago_syntax::ast::Program;
+use mago_syntax::cst::Program;
 
 const ISSUE_CODE: &str = "semantics";
 

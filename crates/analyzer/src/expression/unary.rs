@@ -45,12 +45,12 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::UnaryPostfix;
-use mago_syntax::ast::UnaryPostfixOperator;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::UnaryPrefixOperator;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::UnaryPostfix;
+use mago_syntax::cst::UnaryPostfixOperator;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
+use mago_syntax::cst::Variable;
 use mago_text_edit::TextEdit;
 
 use crate::analyzable::Analyzable;

@@ -3,7 +3,7 @@ use mago_allocator::Arena;
 use mago_collector::Collector;
 use mago_database::file::File;
 use mago_reporting::IssueCollection;
-use mago_syntax::ast::Program;
+use mago_syntax::cst::Program;
 
 use crate::report::breach::BoundaryBreach;
 use crate::report::flaw::StructuralFlaw;

@@ -1,7 +1,7 @@
-use crate::ast::BlockAlias;
-use crate::ast::Statement;
-use crate::ast::TokenSeparatedSequence;
-use crate::ast::Use;
+use crate::cst::BlockAlias;
+use crate::cst::Statement;
+use crate::cst::TokenSeparatedSequence;
+use crate::cst::Use;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::TwigToken;

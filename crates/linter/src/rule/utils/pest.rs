@@ -1,14 +1,14 @@
 use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Access;
-use mago_syntax::ast::Argument;
-use mago_syntax::ast::Call;
-use mago_syntax::ast::ClassLikeMemberSelector;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::MethodCall;
+use mago_syntax::cst::Access;
+use mago_syntax::cst::Argument;
+use mago_syntax::cst::Call;
+use mago_syntax::cst::ClassLikeMemberSelector;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::MethodCall;
 
 use crate::context::LintContext;
 use crate::rule::utils::call::function_call_matches;

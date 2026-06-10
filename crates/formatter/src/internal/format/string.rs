@@ -1,7 +1,7 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
 
-use mago_syntax::ast::LiteralStringKind;
+use mago_syntax::cst::LiteralStringKind;
 
 use crate::internal::FormatterState;
 

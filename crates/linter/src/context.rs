@@ -5,8 +5,8 @@ use mago_database::file::File;
 use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
 use mago_span::HasPosition;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 
 use crate::import_tracker::ImportKind;
 use crate::import_tracker::ImportResolution;

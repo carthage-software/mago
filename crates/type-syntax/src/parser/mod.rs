@@ -3,7 +3,7 @@ use mago_allocator::Arena;
 use mago_database::file::HasFileId;
 use mago_span::Position;
 
-use crate::ast::Type;
+use crate::cst::Type;
 use crate::error::ParseError;
 use crate::lexer::TypeLexer;
 use crate::parser::internal::stream::TypeTokenStream;

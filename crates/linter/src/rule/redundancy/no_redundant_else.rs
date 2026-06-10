@@ -1,7 +1,7 @@
 use indoc::indoc;
 use mago_allocator::Arena;
-use mago_syntax::ast::UnaryPostfix;
-use mago_syntax::ast::UnaryPrefix;
+use mago_syntax::cst::UnaryPostfix;
+use mago_syntax::cst::UnaryPrefix;
 use schemars::JsonSchema;
 
 use mago_reporting::Annotation;
@@ -9,7 +9,7 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::*;
+use mago_syntax::cst::*;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;

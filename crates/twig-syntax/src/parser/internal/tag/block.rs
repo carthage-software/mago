@@ -1,8 +1,8 @@
-use crate::ast::Block;
-use crate::ast::BlockBody;
-use crate::ast::BlockLong;
-use crate::ast::BlockShort;
-use crate::ast::Statement;
+use crate::cst::Block;
+use crate::cst::BlockBody;
+use crate::cst::BlockLong;
+use crate::cst::BlockShort;
+use crate::cst::Statement;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::parser::internal::BlockTerminator;

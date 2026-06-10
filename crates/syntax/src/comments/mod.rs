@@ -1,5 +1,5 @@
-use crate::ast::Trivia;
-use crate::ast::TriviaKind;
+use crate::cst::Trivia;
+use crate::cst::TriviaKind;
 
 pub mod docblock;
 

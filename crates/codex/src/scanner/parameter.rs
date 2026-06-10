@@ -1,7 +1,7 @@
 use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
-use mago_syntax::ast::FunctionLikeParameter;
+use mago_syntax::cst::FunctionLikeParameter;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::word;

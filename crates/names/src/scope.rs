@@ -2,9 +2,9 @@ use std::borrow::Cow;
 
 use foldhash::HashMap;
 
-use mago_syntax::ast::Use;
-use mago_syntax::ast::UseItems;
-use mago_syntax::ast::UseType;
+use mago_syntax::cst::Use;
+use mago_syntax::cst::UseItems;
+use mago_syntax::cst::UseType;
 
 use crate::kind::NameKind;
 

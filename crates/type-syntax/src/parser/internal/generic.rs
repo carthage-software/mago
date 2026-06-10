@@ -1,6 +1,6 @@
-use crate::ast::GenericParameterEntry;
-use crate::ast::GenericParameters;
-use crate::ast::SingleGenericParameter;
+use crate::cst::GenericParameterEntry;
+use crate::cst::GenericParameters;
+use crate::cst::SingleGenericParameter;
 use crate::error::ParseError;
 use crate::parser::internal::parse_type;
 use crate::parser::internal::stream::TypeTokenStream;
@@ -50,7 +50,7 @@ where
 
     let greater_than = stream.eat_span(TypeTokenKind::GreaterThan)?;
 
-    Ok(GenericParameters { less_than, entries: mago_syntax_core::ast::Sequence::new(entries), greater_than })
+    Ok(GenericParameters { less_than, entries: mago_syntax_core::cst::Sequence::new(entries), greater_than })
 }
 
 #[inline]

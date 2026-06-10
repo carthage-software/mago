@@ -1,19 +1,19 @@
 use indoc::indoc;
 use mago_allocator::Arena;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::UnaryPrefixOperator;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
 use schemars::JsonSchema;
 
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::ast::Closure;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::NodeKind;
-use mago_syntax::ast::Statement;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::Closure;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::Variable;
 use mago_syntax::walker::MutWalker;
 use mago_text_edit::TextEdit;
 

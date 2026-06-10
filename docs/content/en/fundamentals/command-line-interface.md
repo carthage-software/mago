@@ -45,7 +45,7 @@ The core tools:
 | Command | Description |
 | :--- | :--- |
 | [`mago analyze`](/tools/analyzer/command-reference/) | Static analysis: type errors, logic bugs. |
-| [`mago ast`](/guide/inspecting-the-ast/) | Print the AST of a PHP file. |
+| [`mago cst`](/guide/inspecting-the-cst/) | Print the CST of a PHP file. |
 | [`mago format`](/tools/formatter/command-reference/) | Format PHP files. |
 | [`mago guard`](/tools/guard/command-reference/) | Enforce architectural rules and boundaries. |
 | [`mago lint`](/tools/linter/command-reference/) | Lint for style, correctness, and best practices. |

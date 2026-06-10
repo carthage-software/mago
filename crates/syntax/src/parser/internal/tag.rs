@@ -2,10 +2,10 @@ use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::T;
-use crate::ast::ast::ClosingTag;
-use crate::ast::ast::FullOpeningTag;
-use crate::ast::ast::OpeningTag;
-use crate::ast::ast::ShortOpeningTag;
+use crate::cst::cst::ClosingTag;
+use crate::cst::cst::FullOpeningTag;
+use crate::cst::cst::OpeningTag;
+use crate::cst::cst::ShortOpeningTag;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

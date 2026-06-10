@@ -1,6 +1,6 @@
 use mago_allocator::prelude::*;
 
-use mago_syntax::ast::Use;
+use mago_syntax::cst::Use;
 
 use crate::kind::NameKind;
 use crate::scope::NamespaceScope;

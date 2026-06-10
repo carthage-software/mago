@@ -4,12 +4,12 @@ use mago_allocator::vec_in;
 
 use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
-use mago_syntax::ast::Argument;
-use mago_syntax::ast::ArgumentList;
-use mago_syntax::ast::Call;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Node;
-use mago_syntax::ast::PartialArgumentList;
+use mago_syntax::cst::Argument;
+use mago_syntax::cst::ArgumentList;
+use mago_syntax::cst::Call;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Node;
+use mago_syntax::cst::PartialArgumentList;
 
 use crate::document::BreakMode;
 use crate::document::Document;

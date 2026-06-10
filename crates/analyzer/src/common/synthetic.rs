@@ -3,22 +3,22 @@ use mago_allocator::vec_in;
 
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::ast::Argument;
-use mago_syntax::ast::ArgumentList;
-use mago_syntax::ast::Binary;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Call;
-use mago_syntax::ast::DirectVariable;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::FunctionCall;
-use mago_syntax::ast::Literal;
-use mago_syntax::ast::LiteralString;
-use mago_syntax::ast::LiteralStringKind;
-use mago_syntax::ast::PositionalArgument;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::UnaryPrefixOperator;
-use mago_syntax::ast::Variable;
-use mago_syntax::ast::sequence::TokenSeparatedSequence;
+use mago_syntax::cst::Argument;
+use mago_syntax::cst::ArgumentList;
+use mago_syntax::cst::Binary;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Call;
+use mago_syntax::cst::DirectVariable;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::LiteralString;
+use mago_syntax::cst::LiteralStringKind;
+use mago_syntax::cst::PositionalArgument;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
+use mago_syntax::cst::Variable;
+use mago_syntax::cst::sequence::TokenSeparatedSequence;
 
 pub fn new_synthetic_call<'arena, A>(arena: &'arena A, f: &str, expression: Expression<'arena>) -> Expression<'arena>
 where

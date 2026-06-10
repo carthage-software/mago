@@ -2,17 +2,17 @@ use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 
 use crate::T;
-use crate::ast::ast::MaybeTypedUseItem;
-use crate::ast::ast::MixedUseItemList;
-use crate::ast::ast::TypedUseItemList;
-use crate::ast::ast::TypedUseItemSequence;
-use crate::ast::ast::Use;
-use crate::ast::ast::UseItem;
-use crate::ast::ast::UseItemAlias;
-use crate::ast::ast::UseItemSequence;
-use crate::ast::ast::UseItems;
-use crate::ast::ast::UseType;
-use crate::ast::sequence::TokenSeparatedSequence;
+use crate::cst::cst::MaybeTypedUseItem;
+use crate::cst::cst::MixedUseItemList;
+use crate::cst::cst::TypedUseItemList;
+use crate::cst::cst::TypedUseItemSequence;
+use crate::cst::cst::Use;
+use crate::cst::cst::UseItem;
+use crate::cst::cst::UseItemAlias;
+use crate::cst::cst::UseItemSequence;
+use crate::cst::cst::UseItems;
+use crate::cst::cst::UseType;
+use crate::cst::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 

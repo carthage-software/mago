@@ -2,8 +2,8 @@ use mago_allocator::prelude::*;
 
 use mago_database::file::File;
 use mago_span::Span;
-use mago_syntax::ast::Trivia;
 use mago_syntax::comments::comment_lines;
+use mago_syntax::cst::Trivia;
 
 /// Allocate `bytes` as a UTF-8 `&str` in `arena` if valid; otherwise `None`.
 ///

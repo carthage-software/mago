@@ -13,11 +13,11 @@ nav_subsection = "Formatter"
 
 Mago 借鉴了 Prettier、`rustfmt` 和 Black 所使用的“解析后再打印”的思路:
 
-1. 把源代码解析为 AST。
+1. 把源代码解析为 CST。
 2. 丢弃原有的格式(空白、换行、缩进等所有信息)。
-3. 按一组固定的规则从头重新打印 AST,默认遵循 [PER-CS](https://www.php-fig.org/per/coding-style/)。
+3. 按一组固定的规则从头重新打印 CST,默认遵循 [PER-CS](https://www.php-fig.org/per/coding-style/)。
 
-对于给定的 AST,无论输入风格如何,输出都完全一致。代码的运行时行为被精确保留:AST 是可往返的,只有表层表示发生变化。
+对于给定的 CST,无论输入风格如何,输出都完全一致。代码的运行时行为被精确保留:AST 是可往返的,只有表层表示发生变化。
 
 ## 你能得到什么
 

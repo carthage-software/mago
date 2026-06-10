@@ -9,9 +9,9 @@ use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_true;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
-use mago_syntax::ast::Binary;
-use mago_syntax::ast::BinaryOperator;
-use mago_syntax::ast::Expression;
+use mago_syntax::cst::Binary;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Expression;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;

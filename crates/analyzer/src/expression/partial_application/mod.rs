@@ -8,9 +8,9 @@ use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::atomic::callable::parameter::TCallableParameter;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
-use mago_syntax::ast::PartialApplication;
-use mago_syntax::ast::PartialArgument;
-use mago_syntax::ast::PartialArgumentList;
+use mago_syntax::cst::PartialApplication;
+use mago_syntax::cst::PartialArgument;
+use mago_syntax::cst::PartialArgumentList;
 use mago_word::concat_word;
 use mago_word::word;
 

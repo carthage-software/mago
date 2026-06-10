@@ -1,7 +1,7 @@
 use mago_allocator::Arena;
 use mago_allocator::vec_in;
 use mago_span::HasSpan;
-use mago_syntax::ast::Expression;
+use mago_syntax::cst::Expression;
 
 use crate::document::Document;
 use crate::document::Group;

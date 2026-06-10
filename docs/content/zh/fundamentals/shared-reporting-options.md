@@ -1,12 +1,12 @@
 +++
 title = "报告与修复选项"
-description = "lint、analyze 和 ast 共用的一组参数,用于报告问题、应用修复以及管理 baseline。"
+description = "lint、analyze 和 cst 共用的一组参数,用于报告问题、应用修复以及管理 baseline。"
 nav_order = 40
 nav_section = "基础"
 +++
 # 报告与修复选项
 
-`mago lint`、`mago analyze` 和 `mago ast` 共用一组参数,用来控制问题如何被报告、修复如何被应用。本页是这些参数的集中参考,这样我们就不必在每个命令页里重复它们。
+`mago lint`、`mago analyze` 和 `mago cst` 共用一组参数,用来控制问题如何被报告、修复如何被应用。本页是这些参数的集中参考,这样我们就不必在每个命令页里重复它们。
 
 ## 自动修复
 

@@ -24,7 +24,7 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Closure;
+use mago_syntax::cst::Closure;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

@@ -1,0 +1,50 @@
+use strum::Display;
+
+use mago_span::HasSpan;
+use mago_span::Span;
+
+use crate::cst::cst::tag::ClosingTag;
+use crate::cst::cst::tag::OpeningTag;
+
+/// A statement terminator.
+///
+/// A PHP statement can be terminated with a semicolon `;` or a closing tag `?>`.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
+pub enum Terminator<'arena> {
+    /// A semicolon.
+    Semicolon(Span),
+    /// A closing tag.
+    ClosingTag(ClosingTag),
+    /// A closing tag followed immediately by an opening tag.
+    TagPair(ClosingTag, OpeningTag<'arena>),
+    /// Missing terminator.
+    #[strum(disabled)]
+    Missing(Span),
+}
+
+impl Terminator<'_> {
+    #[must_use]
+    #[inline]
+    pub const fn is_semicolon(&self) -> bool {
+        matches!(self, Terminator::Semicolon(_))
+    }
+
+    #[must_use]
+    #[inline]
+    pub const fn is_closing_tag(&self) -> bool {
+        matches!(self, Terminator::ClosingTag(_))
+    }
+}
+
+impl HasSpan for Terminator<'_> {
+    fn span(&self) -> Span {
+        match self {
+            Terminator::Semicolon(s) => *s,
+            Terminator::ClosingTag(t) => t.span(),
+            Terminator::TagPair(c, o) => c.span().join(o.span()),
+            Terminator::Missing(s) => *s,
+        }
+    }
+}

@@ -5,9 +5,9 @@ use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::StaticPropertyAccess;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::StaticPropertyAccess;
+use mago_syntax::cst::Variable;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;

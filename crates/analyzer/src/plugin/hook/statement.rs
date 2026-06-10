@@ -1,6 +1,6 @@
 //! Statement hooks for intercepting statement analysis.
 
-use mago_syntax::ast::Statement;
+use mago_syntax::cst::Statement;
 
 use crate::plugin::context::HookContext;
 use crate::plugin::hook::HookAction;

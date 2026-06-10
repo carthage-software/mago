@@ -1,6 +1,6 @@
 use crate::T;
-use crate::ast::ast::Global;
-use crate::ast::sequence::TokenSeparatedSequence;
+use crate::cst::cst::Global;
+use crate::cst::sequence::TokenSeparatedSequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use mago_allocator::prelude::*;

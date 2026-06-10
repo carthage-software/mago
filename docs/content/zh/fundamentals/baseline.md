@@ -15,7 +15,7 @@ linter 和分析器各自维护自己的 baseline,因为它们报告的问题不
 - Linter: `lint-baseline.toml`
 - 分析器: `analysis-baseline.toml`
 
-`mago ast` 命令报告的是解析错误,不支持 baseline。
+`mago cst` 命令报告的是解析错误,不支持 baseline。
 
 ## 生成 baseline
 

@@ -1,8 +1,8 @@
 use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
-use mago_syntax::ast::EnumCase;
-use mago_syntax::ast::EnumCaseItem;
+use mago_syntax::cst::EnumCase;
+use mago_syntax::cst::EnumCaseItem;
 use mago_word::Word;
 use mago_word::word;
 

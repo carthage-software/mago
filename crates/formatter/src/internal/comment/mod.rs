@@ -1,6 +1,6 @@
 use mago_database::file::File;
-use mago_syntax::ast::Trivia;
-use mago_syntax::ast::TriviaKind;
+use mago_syntax::cst::Trivia;
+use mago_syntax::cst::TriviaKind;
 
 pub mod format;
 pub mod placement;

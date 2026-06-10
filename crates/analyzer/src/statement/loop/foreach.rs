@@ -5,12 +5,12 @@ use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Expression;
-use mago_syntax::ast::Foreach;
-use mago_syntax::ast::ForeachTarget;
-use mago_syntax::ast::UnaryPrefix;
-use mago_syntax::ast::UnaryPrefixOperator;
-use mago_syntax::ast::Variable;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::Foreach;
+use mago_syntax::cst::ForeachTarget;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
+use mago_syntax::cst::Variable;
 use mago_word::Word;
 
 use crate::analyzable::Analyzable;

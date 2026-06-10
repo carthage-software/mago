@@ -23,7 +23,7 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::ast::Expression;
+use mago_syntax::cst::Expression;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::concat_word;
