@@ -254,6 +254,14 @@ pub fn is_contained_by(
         return false;
     }
 
+    if let TAtomic::Callable(TCallable::Signature(input_signature)) = input_type_part
+        && input_signature.is_closure()
+        && let TAtomic::Object(TObject::Named(container_object)) = container_type_part
+        && container_object.get_name().as_bytes().eq_ignore_ascii_case(b"Closure")
+    {
+        return true;
+    }
+
     if let TAtomic::Resource(_) = container_type_part {
         return resource_comparator::is_contained_by(input_type_part, container_type_part);
     }
