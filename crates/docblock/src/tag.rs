@@ -1084,7 +1084,7 @@ pub fn parse_method_tag(mut content: &[u8], mut span: Span) -> Result<MethodTag,
     loop {
         if let Some((new_content, char_count)) = try_consume(content, b"static ") {
             if is_static {
-                return Err(ParseError::InvalidMethodTag(span, "Duplicate 'static' modifier".to_string()));
+                break;
             }
 
             is_static = true;
@@ -1765,5 +1765,26 @@ mod tests {
         let (rest2, count2) = consume_whitespace(input2);
         assert_eq!(rest2, b"rest");
         assert_eq!(count2, 3);
+    }
+
+    #[test]
+    fn test_parse_method_tag_static_modifier_with_static_return_type() {
+        let input: &[u8] = b"static static magicMethod()";
+        let tag = parse_method_tag(input, test_span_for(input)).expect("tag should parse");
+
+        assert!(tag.method.is_static);
+        assert_eq!(tag.type_string.value, b"static");
+        assert_eq!(tag.method.name, b"magicMethod");
+        assert!(tag.method.argument_list.is_empty());
+    }
+
+    #[test]
+    fn test_parse_method_tag_static_modifier_with_concrete_return_type() {
+        let input: &[u8] = b"static int count()";
+        let tag = parse_method_tag(input, test_span_for(input)).expect("tag should parse");
+
+        assert!(tag.method.is_static);
+        assert_eq!(tag.type_string.value, b"int");
+        assert_eq!(tag.method.name, b"count");
     }
 }
