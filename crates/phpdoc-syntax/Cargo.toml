@@ -1,0 +1,37 @@
+[package]
+name = "mago-phpdoc-syntax"
+description = "A unified parser for PHPDoc comments and their embedded type and constant expressions."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-database = { workspace = true }
+mago-span = { workspace = true }
+mago-syntax-core = { workspace = true }
+mago-allocator = { workspace = true }
+memchr = { workspace = true }
+serde = { workspace = true, optional = true }
+strum = { workspace = true }
+ordered-float = { workspace = true, features = ["rand"] }
+
+[features]
+default = []
+serde = [
+    "dep:serde",
+    "ordered-float/serde",
+    "mago-allocator/serde",
+    "mago-database/serde",
+    "mago-span/serde",
+    "mago-syntax-core/serde",
+]
+
+[dev-dependencies]
+indoc = { workspace = true }

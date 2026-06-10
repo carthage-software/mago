@@ -1,0 +1,24 @@
+use mago_span::HasSpan;
+use mago_span::Span;
+
+use crate::cst::keyword::Keyword;
+use crate::cst::r#type::generics::GenericParameters;
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct TemplateTypeType<'arena> {
+    pub keyword: Keyword<'arena>,
+    pub parameters: GenericParameters<'arena>,
+}
+
+impl HasSpan for TemplateTypeType<'_> {
+    fn span(&self) -> Span {
+        self.keyword.span().join(self.parameters.span())
+    }
+}
+
+impl std::fmt::Display for TemplateTypeType<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.keyword, self.parameters)
+    }
+}

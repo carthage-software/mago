@@ -91,9 +91,10 @@ publish:
     cargo publish -p mago-reporting
     cargo publish -p mago-syntax-core
     cargo publish -p mago-syntax
-    cargo publish -p mago-collector
+    cargo publish -p mago-phpdoc-syntax
     cargo publish -p mago-type-syntax
     cargo publish -p mago-twig-syntax
+    cargo publish -p mago-collector
     cargo publish -p mago-composer
     cargo publish -p mago-docblock
     cargo publish -p mago-formatter

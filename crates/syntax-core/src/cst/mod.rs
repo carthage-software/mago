@@ -9,7 +9,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 
 /// A sequence of AST nodes allocated in an arena.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(transparent)]
 pub struct Sequence<'arena, T> {
