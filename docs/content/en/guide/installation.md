@@ -122,6 +122,27 @@ winget install CarthageSoftware.Mago
 mago self-update
 ```
 
+### Nixpkgs / NixOS
+
+[Nixpkgs](https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/ma/mago/package.nix) distributes pre-built
+Mago derivations:
+
+```sh
+nix-shell -p mago
+mago --version
+```
+
+### Nix Flake
+
+You can run and build Mago yourself via [Nix flakes](https://nixos.wiki/wiki/flakes):
+
+```sh
+nix run git+https://github.com/carthage-software/mago -- --version
+```
+
+Note: the Mago main repository relies on `.gitattributes` for distribution, so you have to use `git+https`
+in order to get all the files necessary for Mago to compile.
+
 ### Cargo
 
 Crates.io publishing can lag a few hours behind a release. Same pattern as Homebrew, and WinGet.

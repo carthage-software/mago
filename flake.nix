@@ -4,9 +4,17 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    naersk = {
+      url = "github:nmattia/naersk";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, fenix, naersk }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
@@ -14,8 +22,29 @@
         toolchain = "1.96.0";
         php = pkgs.php84;
         composer = pkgs.php84Packages.composer;
+        toolchain' = with fenix.packages.${system};
+          combine [
+            minimal.rustc
+            minimal.cargo
+            stable.rust-src
+            stable.rustfmt
+            stable.clippy
+            stable.rust-analyzer
+          ];
+
+        naersk' = naersk.lib.${system}.override {
+          cargo = toolchain';
+          rustc = toolchain';
+        };
+        
+        built = naersk'.buildPackage {
+          src = ./.;
+          doCheck = true;
+          copyLibs = true;
+        };
       in
       {
+        packages.default = built;
         devShells.default = pkgs.mkShell {
           buildInputs = [
             pkgs.rustup
