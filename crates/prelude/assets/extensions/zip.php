@@ -240,7 +240,7 @@ class ZipArchive implements Countable
 
     public function getStatusString(): string {}
 
-    public function addEmptyDir(string $dirname, int $flags): bool {}
+    public function addEmptyDir(string $dirname, int $flags = 0): bool {}
 
     public function addFromString(string $name, string $content, int $flags = 8192): bool {}
 
