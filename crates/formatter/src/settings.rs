@@ -736,9 +736,26 @@ generate_formatter_settings! {
     /// Default: false
     align_assignment_like: bool => "default_false",
 
-    /// How to sort use statements.
+    /// Controls how `use` statements are sorted.
     ///
-    /// Default: `alphanumeric-ascending`
+    /// With `alpha-ascending` (or `alphanumeric-ascending` or `true`):
+    /// ```php
+    /// use App\Services;
+    /// use App\Utils;
+    /// ```
+    ///
+    /// With `length-ascending`:
+    /// ```php
+    /// use App\Utils;
+    /// use App\Services;
+    /// ```
+    ///
+    /// Other options include:
+    /// * `alpha-descending` or `alphanumeric-descending`
+    /// * `length-descending`
+    /// * `preserve` or `false`
+    ///
+    /// Default: `alpha-ascending`
     sort_uses: SortUses => "SortUses::default",
 
     /// Whether to sort class methods by visibility and name.
