@@ -126,6 +126,27 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_empty_keywords() {
+        match do_parse("empty") {
+            Ok(Type::Empty(k)) => assert_eq!(k.value, b"empty".as_slice()),
+            other => panic!("Expected Type::Empty, got: {other:?}"),
+        }
+
+        match do_parse("empty-scalar") {
+            Ok(Type::EmptyScalar(k)) => assert_eq!(k.value, b"empty-scalar".as_slice()),
+            other => panic!("Expected Type::EmptyScalar, got: {other:?}"),
+        }
+
+        match do_parse("empty|object") {
+            Ok(Type::Union(u)) => {
+                assert!(matches!(u.left, Type::Empty(_)));
+                assert!(matches!(u.right, Type::Object(_)));
+            }
+            other => panic!("Expected Type::Union, got: {other:?}"),
+        }
+    }
+
+    #[test]
     fn test_parse_literal_ints() {
         let assert_parsed_literal_int = |input: &str, expected_value: u64| {
             let result = do_parse(input);

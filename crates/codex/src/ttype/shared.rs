@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 
 use mago_word::empty_word;
+use mago_word::word;
 
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
@@ -194,3 +195,25 @@ pub const SIGNUM_RESULT_SLICE: &[TAtomic] = &[
     TAtomic::Scalar(TScalar::literal_int(0)),
     TAtomic::Scalar(TScalar::literal_int(1)),
 ];
+
+pub static EMPTY_SCALAR_ATOMIC_SLICE: LazyLock<[TAtomic; 5]> = LazyLock::new(|| {
+    [
+        TAtomic::Scalar(TScalar::literal_int(0)),
+        TAtomic::Scalar(TScalar::literal_float(0.0)),
+        TAtomic::Scalar(TScalar::literal_string(word("0"))),
+        EMPTY_STRING_ATOMIC.clone(),
+        TAtomic::Scalar(TScalar::r#false()),
+    ]
+});
+
+pub static EMPTY_ATOMIC_SLICE: LazyLock<[TAtomic; 7]> = LazyLock::new(|| {
+    [
+        TAtomic::Null,
+        TAtomic::Scalar(TScalar::literal_int(0)),
+        TAtomic::Scalar(TScalar::literal_float(0.0)),
+        TAtomic::Scalar(TScalar::literal_string(word("0"))),
+        EMPTY_STRING_ATOMIC.clone(),
+        TAtomic::Scalar(TScalar::r#false()),
+        EMPTY_KEYED_ARRAY_ATOMIC.clone(),
+    ]
+});

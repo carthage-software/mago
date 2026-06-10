@@ -68,6 +68,8 @@ use crate::ttype::get_arraykey;
 use crate::ttype::get_bool;
 use crate::ttype::get_callable_string;
 use crate::ttype::get_closed_resource;
+use crate::ttype::get_empty;
+use crate::ttype::get_empty_scalar;
 use crate::ttype::get_false;
 use crate::ttype::get_float;
 use crate::ttype::get_int;
@@ -488,6 +490,8 @@ pub fn get_union_from_type_ast(
         Type::ArrayKey(_) => get_arraykey(),
         Type::Numeric(_) => get_numeric(),
         Type::Scalar(_) => get_scalar(),
+        Type::Empty(_) => get_empty(),
+        Type::EmptyScalar(_) => get_empty_scalar(),
         Type::CallableString(_) => get_callable_string(),
         Type::LowercaseCallableString(_) => get_string_with_props(false, false, false, true, TStringCasing::Lowercase),
         Type::UppercaseCallableString(_) => get_string_with_props(false, false, false, true, TStringCasing::Uppercase),

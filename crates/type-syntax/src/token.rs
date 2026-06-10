@@ -75,6 +75,8 @@ pub enum TypeTokenKind {
     Resource,
     Void,
     Scalar,
+    Empty,
+    EmptyScalar,
     Numeric,
     NoReturn,
     NeverReturn,
@@ -236,6 +238,8 @@ impl TypeTokenKind {
                 | Self::Resource
                 | Self::Void
                 | Self::Scalar
+                | Self::Empty
+                | Self::EmptyScalar
                 | Self::Numeric
                 | Self::NoReturn
                 | Self::NeverReturn

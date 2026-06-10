@@ -92,6 +92,7 @@ fn lookup_len4(bytes: &[u8]) -> Option<TypeTokenKind> {
 fn lookup_len5(bytes: &[u8]) -> Option<TypeTokenKind> {
     match bytes[0] | 0x20 {
         b'a' if eq(bytes, b"array") => Some(TypeTokenKind::Array),
+        b'e' if eq(bytes, b"empty") => Some(TypeTokenKind::Empty),
         b'f' => {
             if eq(bytes, b"false") {
                 Some(TypeTokenKind::False)
@@ -186,6 +187,7 @@ fn lookup_len11(bytes: &[u8]) -> Option<TypeTokenKind> {
 fn lookup_len12(bytes: &[u8]) -> Option<TypeTokenKind> {
     match bytes[0] | 0x20 {
         b'c' if eq(bytes, b"class-string") => Some(TypeTokenKind::ClassString),
+        b'e' if eq(bytes, b"empty-scalar") => Some(TypeTokenKind::EmptyScalar),
         b'n' => {
             if eq(bytes, b"never-return") {
                 Some(TypeTokenKind::NeverReturn)

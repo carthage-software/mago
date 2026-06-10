@@ -423,6 +423,8 @@ where
             parameters: parse_generic_parameters(stream)?,
         }),
         TypeTokenKind::Scalar => Type::Scalar(stream.consume_keyword()?),
+        TypeTokenKind::Empty => Type::Empty(stream.consume_keyword()?),
+        TypeTokenKind::EmptyScalar => Type::EmptyScalar(stream.consume_keyword()?),
         TypeTokenKind::Numeric => Type::Numeric(stream.consume_keyword()?),
         TypeTokenKind::ArrayKey => Type::ArrayKey(stream.consume_keyword()?),
         TypeTokenKind::StringableObject => Type::StringableObject(stream.consume_keyword()?),

@@ -32,7 +32,9 @@ use crate::ttype::shared::BOOL_ATOMIC;
 use crate::ttype::shared::CALLABLE_STRING_ATOMIC;
 use crate::ttype::shared::CLASS_STRING_ATOMIC;
 use crate::ttype::shared::CLOSED_RESOURCE_ATOMIC;
+use crate::ttype::shared::EMPTY_ATOMIC_SLICE;
 use crate::ttype::shared::EMPTY_KEYED_ARRAY_ATOMIC;
+use crate::ttype::shared::EMPTY_SCALAR_ATOMIC_SLICE;
 use crate::ttype::shared::EMPTY_STRING_ATOMIC;
 use crate::ttype::shared::ENUM_STRING_ATOMIC;
 use crate::ttype::shared::FALSE_ATOMIC;
@@ -797,6 +799,22 @@ pub fn get_mixed_iterable() -> TUnion {
 #[must_use]
 pub fn get_empty_keyed_array() -> TUnion {
     TUnion::from_single(Cow::Borrowed(&EMPTY_KEYED_ARRAY_ATOMIC))
+}
+
+/// The `empty` type: every value for which PHP's `empty()` returns true,
+/// i.e. `null|0|0.0|'0'|''|false|array{}`.
+#[inline]
+#[must_use]
+pub fn get_empty() -> TUnion {
+    TUnion::new(Cow::Borrowed(EMPTY_ATOMIC_SLICE.as_slice()))
+}
+
+/// The `empty-scalar` type: every scalar for which PHP's `empty()` returns
+/// true, i.e. `0|0.0|'0'|''|false`.
+#[inline]
+#[must_use]
+pub fn get_empty_scalar() -> TUnion {
+    TUnion::new(Cow::Borrowed(EMPTY_SCALAR_ATOMIC_SLICE.as_slice()))
 }
 
 #[inline]
