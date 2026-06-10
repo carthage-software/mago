@@ -2978,7 +2978,7 @@ function dns_get_record(
  *
  * @return false|int<0, max>
  */
-function stream_select(?array &$read, ?array &$write, ?array &$except, ?int $seconds, ?int $microseconds): int|false {}
+function stream_select(?array &$read, ?array &$write, ?array &$except, ?int $seconds, ?int $microseconds = null): int|false {}
 
 /**
  * @return resource
@@ -3021,7 +3021,7 @@ function stream_context_get_options($stream_or_context): array {}
 /**
  * @return resource
  */
-function stream_context_get_default(?array $options) {}
+function stream_context_get_default(?array $options = null) {}
 
 /**
  * @return resource
@@ -3099,7 +3099,7 @@ function stream_socket_get_name($socket, bool $remote): string|false {}
  *
  * @param-out string $address
  */
-function stream_socket_recvfrom($socket, int $length, int $flags = 0, &$address): string|false {}
+function stream_socket_recvfrom($socket, int $length, int $flags = 0, &$address = null): string|false {}
 
 /**
  * @param resource $socket
@@ -3131,7 +3131,7 @@ function stream_socket_pair(int $domain, int $type, int $protocol): array|false 
  * @param resource $from
  * @param resource $to
  */
-function stream_copy_to_stream($from, $to, ?int $length, int $offset = 0): int|false {}
+function stream_copy_to_stream($from, $to, ?int $length = null, int $offset = 0): int|false {}
 
 /**
  * @param resource $stream
@@ -3377,16 +3377,16 @@ function chroot(string $directory): bool {}
 function getcwd(): string|false {}
 
 /**
- * @param resource $dir_handle
+ * @param resource|null $dir_handle
  */
-function rewinddir($dir_handle): void {}
+function rewinddir($dir_handle = null): void {}
 
 /**
- * @param resource $dir_handle
+ * @param resource|null $dir_handle
  *
  * @return non-empty-string|false
  */
-function readdir($dir_handle): string|false {}
+function readdir($dir_handle = null): string|false {}
 
 /**
  * @param null|resource $context
