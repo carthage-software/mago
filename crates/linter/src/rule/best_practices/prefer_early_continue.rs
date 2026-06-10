@@ -222,6 +222,10 @@ impl LintRule for PreferEarlyContinueRule {
                 }
             }
 
+            let source = ctx.source_file.contents.as_ref();
+            let gap_has_comment =
+                |from: u32, to: u32| source[from as usize..to as usize].iter().any(|byte| !byte.is_ascii_whitespace());
+
             match &if_stmt.body {
                 IfBody::Statement(body) => {
                     if let Statement::Block(block) = body.statement {
@@ -229,19 +233,29 @@ impl LintRule for PreferEarlyContinueRule {
                             edits.push(TextEdit::replace(block.left_brace.join(block.right_brace), "{ continue; }"));
                         } else {
                             let first_stmt_start = block.statements.nodes[0].start_offset();
-                            let range_to_replace = block.left_brace.start_offset()..first_stmt_start;
-                            edits.push(TextEdit::replace(range_to_replace, "{ continue; }\n\n"));
+                            if gap_has_comment(block.left_brace.end_offset(), first_stmt_start) {
+                                edits.push(TextEdit::replace(block.left_brace, "{ continue; }\n"));
+                            } else {
+                                let range_to_replace = block.left_brace.start_offset()..first_stmt_start;
+                                edits.push(TextEdit::replace(range_to_replace, "{ continue; }\n\n"));
+                            }
 
                             let last_stmt_end = block.statements.nodes.last().unwrap().end_offset();
-                            let range_to_delete = last_stmt_end..block.right_brace.end_offset();
-                            edits.push(TextEdit::delete(range_to_delete));
+                            if gap_has_comment(last_stmt_end, block.right_brace.start_offset()) {
+                                edits.push(TextEdit::delete(block.right_brace));
+                            } else {
+                                let range_to_delete = last_stmt_end..block.right_brace.end_offset();
+                                edits.push(TextEdit::delete(range_to_delete));
+                            }
                         }
                     } else {
-                        // Non-block statement: `if ($x) statement;`
-                        // Transform to: `if (!$x) { continue; }\n\nstatement;`
                         let stmt_start = body.statement.start_offset();
-                        let range_to_replace = if_stmt.right_parenthesis.end_offset()..stmt_start;
-                        edits.push(TextEdit::replace(range_to_replace, " { continue; }\n\n"));
+                        if gap_has_comment(if_stmt.right_parenthesis.end_offset(), stmt_start) {
+                            edits.push(TextEdit::insert(if_stmt.right_parenthesis.end_offset(), " { continue; }\n"));
+                        } else {
+                            let range_to_replace = if_stmt.right_parenthesis.end_offset()..stmt_start;
+                            edits.push(TextEdit::replace(range_to_replace, " { continue; }\n\n"));
+                        }
                     }
                 }
                 IfBody::ColonDelimited(body) => {
@@ -250,13 +264,21 @@ impl LintRule for PreferEarlyContinueRule {
                         edits.push(TextEdit::replace(range, "{ continue; }"));
                     } else {
                         let first_stmt_start = body.statements.nodes[0].start_offset();
-                        let range_to_replace = body.colon.start_offset()..first_stmt_start;
-                        edits.push(TextEdit::replace(range_to_replace, "{ continue; }\n\n"));
+                        if gap_has_comment(body.colon.end_offset(), first_stmt_start) {
+                            edits.push(TextEdit::replace(body.colon, "{ continue; }\n"));
+                        } else {
+                            let range_to_replace = body.colon.start_offset()..first_stmt_start;
+                            edits.push(TextEdit::replace(range_to_replace, "{ continue; }\n\n"));
+                        }
 
                         let last_stmt_end = body.statements.nodes.last().unwrap().end_offset();
-                        let endif_end = body.terminator.end_offset();
-                        let range_to_delete = last_stmt_end..endif_end;
-                        edits.push(TextEdit::delete(range_to_delete));
+                        if gap_has_comment(last_stmt_end, body.endif.span().start_offset()) {
+                            edits.push(TextEdit::delete(body.endif.span().join(body.terminator.span())));
+                        } else {
+                            let endif_end = body.terminator.end_offset();
+                            let range_to_delete = last_stmt_end..endif_end;
+                            edits.push(TextEdit::delete(range_to_delete));
+                        }
                     }
                 }
             }
@@ -298,5 +320,137 @@ fn is_early_exit_statement(stmt: &Statement) -> bool {
         Statement::Expression(expr) => matches!(expr.expression, Expression::Throw(_)),
         Statement::Block(block) => block.statements.len() == 1 && is_early_exit_statement(&block.statements.nodes[0]),
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::PreferEarlyContinueRule;
+    use crate::test_lint_fix;
+
+    test_lint_fix! {
+        name = fix_without_comments_keeps_compact_shape,
+        rule = PreferEarlyContinueRule,
+        code = indoc! {r"
+            <?php
+
+            foreach ($nodes as $node) {
+                if (is_array($node)) {
+                    process($node);
+                }
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            foreach ($nodes as $node) {
+                if (!(is_array($node))) { continue; }
+
+            process($node);
+            }
+        "}
+    }
+
+    // Regression for issue #1946: comments inside the if body must survive
+    // the rewrite. The result may be poorly indented; `--fmt` handles that.
+    test_lint_fix! {
+        name = fix_preserves_leading_comment,
+        rule = PreferEarlyContinueRule,
+        code = indoc! {r"
+            <?php
+
+            foreach ($nodes as $node) {
+                if (is_array($node)) {
+                    // keep only array nodes
+                    process($node);
+                }
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            foreach ($nodes as $node) {
+                if (!(is_array($node))) { continue; }
+
+                    // keep only array nodes
+                    process($node);
+            }
+        "}
+    }
+
+    test_lint_fix! {
+        name = fix_preserves_trailing_comment,
+        rule = PreferEarlyContinueRule,
+        code = indoc! {r"
+            <?php
+
+            foreach ($nodes as $node) {
+                if (is_array($node)) {
+                    process($node);
+                    // trailing note
+                }
+            }
+        "},
+        fixed = concat!(
+            "<?php\n",
+            "\n",
+            "foreach ($nodes as $node) {\n",
+            "    if (!(is_array($node))) { continue; }\n",
+            "\n",
+            "process($node);\n",
+            "        // trailing note\n",
+            "    \n",
+            "}\n",
+        )
+    }
+
+    test_lint_fix! {
+        name = fix_preserves_comments_in_colon_delimited_body,
+        rule = PreferEarlyContinueRule,
+        code = indoc! {r"
+            <?php
+
+            foreach ($nodes as $node):
+                if (is_array($node)):
+                    // leading note
+                    process($node);
+                    // trailing note
+                endif;
+            endforeach;
+        "},
+        fixed = concat!(
+            "<?php\n",
+            "\n",
+            "foreach ($nodes as $node):\n",
+            "    if (!(is_array($node))){ continue; }\n",
+            "\n",
+            "        // leading note\n",
+            "        process($node);\n",
+            "        // trailing note\n",
+            "    \n",
+            "endforeach;\n",
+        )
+    }
+
+    test_lint_fix! {
+        name = fix_preserves_comment_before_non_block_statement,
+        rule = PreferEarlyContinueRule,
+        code = indoc! {r"
+            <?php
+
+            foreach ($nodes as $node) {
+                if (is_array($node)) /* keep */ process($node);
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            foreach ($nodes as $node) {
+                if (!(is_array($node))) { continue; }
+             /* keep */ process($node);
+            }
+        "}
     }
 }
