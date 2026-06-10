@@ -621,6 +621,18 @@ mago self-update
 <pre><code class="language-powershell">winget install CarthageSoftware.Mago
 mago self-update
 </code></pre>
+<h3 id="nixpkgs-nixos">Nixpkgs / NixOS</h3>
+<p><a href="https://github.com/NixOS/nixpkgs/blob/master/pkgs/by-name/ma/mago/package.nix">Nixpkgs</a> distributes pre-built
+Mago derivations:</p>
+<pre><code class="language-sh">nix-shell -p mago
+mago --version
+</code></pre>
+<h3 id="nix-flake">Nix Flake</h3>
+<p>You can run and build Mago yourself via <a href="https://nixos.wiki/wiki/flakes">Nix flakes</a>:</p>
+<pre><code class="language-sh">nix run git+https://github.com/carthage-software/mago -- --version
+</code></pre>
+<p>Note: the Mago main repository relies on <code>.gitattributes</code> for distribution, so you have to use <code>git+https</code>
+in order to get all the files necessary for Mago to compile.</p>
 <h3 id="cargo">Cargo</h3>
 <p>Crates.io publishing can lag a few hours behind a release. Same pattern as Homebrew, and WinGet.</p>
 <pre><code class="language-sh">cargo install mago
@@ -700,6 +712,14 @@ curl --proto '=https' --tlsv1.2 -sSf \
     
     <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#winget">WinGet</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#nixpkgs-nixos">Nixpkgs &#x2F; NixOS</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#nix-flake">Nix Flake</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
