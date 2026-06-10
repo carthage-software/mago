@@ -7940,6 +7940,11 @@
           "type": "boolean",
           "default": true
         },
+        "combine-opening-tag-and-declare": {
+          "description": "Whether to combine the opening `<?php` tag and an immediately following\n`declare` statement onto a single line.\n\nWhen enabled, an opening tag directly followed by a `declare` statement is\nrendered as `<?php declare(strict_types=1);`, even if the source has them on\nseparate lines. This takes precedence over `opening_tag_on_own_line` and\n`empty_line_after_opening_tag` for this specific pairing.\n\nWhen disabled (the default), the opening tag and `declare` are laid out\naccording to the other opening-tag settings, preserving the current behavior.\n\nDefault: false",
+          "type": "boolean",
+          "default": false
+        },
         "empty-line-after-namespace": {
           "description": "Whether to add an empty line after namespace.\n\nNote: if an empty line already exists, it will be preserved regardless of this\nsettings value.\n\nDefault: true",
           "type": "boolean",
