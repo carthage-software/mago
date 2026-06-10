@@ -8,6 +8,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::ast::Hint;
 use mago_syntax::ast::Node;
 use mago_syntax::ast::NodeKind;
 use mago_text_edit::TextEdit;
@@ -102,6 +103,10 @@ impl LintRule for SensitiveParameterRule {
             return; // Not a password-related parameter, no issue
         }
 
+        if parameter.hint.as_ref().is_some_and(is_boolean_like_hint) {
+            return;
+        }
+
         for attribute_list in &parameter.attribute_lists {
             for attribute in &attribute_list.attributes {
                 let name = ctx.resolved_names.get(&attribute.name);
@@ -123,6 +128,16 @@ impl LintRule for SensitiveParameterRule {
 
             edits.push(TextEdit::insert(start_position.offset, "#[\\SensitiveParameter] "));
         });
+    }
+}
+
+fn is_boolean_like_hint(hint: &Hint<'_>) -> bool {
+    match hint {
+        Hint::Bool(_) | Hint::True(_) | Hint::False(_) | Hint::Null(_) => true,
+        Hint::Nullable(nullable) => is_boolean_like_hint(nullable.hint),
+        Hint::Parenthesized(parenthesized) => is_boolean_like_hint(parenthesized.hint),
+        Hint::Union(union) => is_boolean_like_hint(union.left) && is_boolean_like_hint(union.right),
+        _ => false,
     }
 }
 
@@ -176,6 +191,45 @@ mod tests {
         "}
     }
 
+    test_lint_success! {
+        name = boolean_password_parameter,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
+        code = indoc! {r"
+            <?php
+
+            function policyTest(bool $canChangePassword): void {
+                // ...
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = nullable_boolean_password_parameter,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
+        code = indoc! {r"
+            <?php
+
+            function policyTest(?bool $canChangePassword): void {
+                // ...
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = boolean_union_password_parameter,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
+        code = indoc! {r"
+            <?php
+
+            function policyTest(null|true|false $canChangePassword): void {
+                // ...
+            }
+        "}
+    }
+
     test_lint_failure! {
         name = password_without_attribute,
         rule = SensitiveParameterRule,
@@ -184,6 +238,32 @@ mod tests {
             <?php
 
             function login(string $username, string $password): void {
+                // ...
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = untyped_password_parameter,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
+        code = indoc! {r"
+            <?php
+
+            function login(string $username, $password): void {
+                // ...
+            }
+        "}
+    }
+
+    test_lint_failure! {
+        name = boolean_string_union_password_parameter,
+        rule = SensitiveParameterRule,
+        settings = |s: &mut Settings| s.php_version = PHPVersion::PHP82,
+        code = indoc! {r"
+            <?php
+
+            function login(string $username, bool|string $password): void {
                 // ...
             }
         "}
