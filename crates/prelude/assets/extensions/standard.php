@@ -2806,7 +2806,7 @@ function ini_get(string $option): string|false {}
 /**
  * @return array{'global_value': string, 'local_value': string, 'access': int}|false
  */
-function ini_get_all(?string $extension, bool $details = true): array|false {}
+function ini_get_all(?string $extension = null, bool $details = true): array|false {}
 
 function ini_set(string $option, string|int|float|bool|null $value): string|false {}
 

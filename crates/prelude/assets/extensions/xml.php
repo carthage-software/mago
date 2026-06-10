@@ -5,7 +5,7 @@ final class XMLParser {}
 /**
  * @pure
  */
-function xml_parser_create(?string $encoding): XMLParser {}
+function xml_parser_create(?string $encoding = null): XMLParser {}
 
 /**
  * @pure
