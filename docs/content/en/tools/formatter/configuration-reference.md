@@ -218,6 +218,7 @@ public function bar(
 | `opening-tag-on-own-line` | boolean | `true` | Put `<?php` on its own line in pure PHP files (PER-CS 3.0). Templates with inline HTML are unaffected. |
 | `empty-line-after-opening-tag` | boolean | `true` | Blank line after `<?php`. |
 | `empty-line-after-declare` | boolean | `true` | Blank line after `declare`. |
+| `combine-opening-tag-and-declare` | boolean | `false` | Combine `<?php` and an immediately following `declare` onto one line (`<?php declare(strict_types=1);`). Takes precedence over `opening-tag-on-own-line` and `empty-line-after-opening-tag` for that pairing. |
 | `empty-line-after-namespace` | boolean | `true` | Blank line after `namespace`. |
 | `empty-line-after-use` | boolean | `true` | Blank line after `use` blocks. |
 | `empty-line-after-symbols` | boolean | `true` | Blank line after top-level symbols. |

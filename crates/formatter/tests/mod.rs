@@ -51,6 +51,8 @@ test_case!(dangling_block_comments);
 test_case!(opening_tag_trailing_comments);
 test_case!(opening_tag_on_own_line);
 test_case!(opening_tag_on_own_line_disabled);
+test_case!(combine_opening_tag_and_declare);
+test_case!(combine_opening_tag_and_declare_with_comment);
 test_case!(callee_needs_parens);
 test_case!(php83_instantiation_with_member_access_parentheses, PHPVersion::PHP83);
 test_case!(php84_instantiation_with_member_access_parentheses, PHPVersion::PHP84);

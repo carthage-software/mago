@@ -1064,6 +1064,20 @@ generate_formatter_settings! {
     /// Default: true
     empty_line_after_declare: bool => "default_true",
 
+    /// Whether to combine the opening `<?php` tag and an immediately following
+    /// `declare` statement onto a single line.
+    ///
+    /// When enabled, an opening tag directly followed by a `declare` statement is
+    /// rendered as `<?php declare(strict_types=1);`, even if the source has them on
+    /// separate lines. This takes precedence over `opening_tag_on_own_line` and
+    /// `empty_line_after_opening_tag` for this specific pairing.
+    ///
+    /// When disabled (the default), the opening tag and `declare` are laid out
+    /// according to the other opening-tag settings, preserving the current behavior.
+    ///
+    /// Default: false
+    combine_opening_tag_and_declare: bool => "default_false",
+
     /// Whether to add an empty line after namespace.
     ///
     /// Note: if an empty line already exists, it will be preserved regardless of this
