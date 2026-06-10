@@ -116,3 +116,24 @@ class C8
     public readonly string $prop = '';
     use T9;
 }
+
+// Test 9: Magic @property tag vs trait property (OK)
+// PHP: No error - magic properties are not real declarations and do not
+// participate in trait composition.
+trait T10
+{
+    protected int $prop;
+}
+
+/**
+ * @property int $prop
+ */
+class C9
+{
+    use T10;
+
+    public function __get(string $name): int
+    {
+        return $this->prop;
+    }
+}
