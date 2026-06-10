@@ -293,5 +293,13 @@ fn build_database_configuration(root: &Path, configuration: &Configuration) -> D
         })
         .collect();
 
-    DatabaseConfiguration { workspace, paths, includes, excludes, extensions, glob: source.glob.to_database_settings() }
+    DatabaseConfiguration {
+        workspace,
+        paths,
+        includes,
+        excludes,
+        extensions,
+        patches: Vec::new(),
+        glob: source.glob.to_database_settings(),
+    }
 }
