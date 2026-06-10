@@ -215,8 +215,8 @@
       </li>
       
       <li>
-        <a href="../../../../main/zh/guide/inspecting-the-ast">
-          <span>查看 AST</span>
+        <a href="../../../../main/zh/guide/inspecting-the-cst">
+          <span>查看 CST</span>
         </a>
       </li>
       
@@ -589,7 +589,7 @@
 <li>Linter: <code>lint-baseline.toml</code></li>
 <li>分析器: <code>analysis-baseline.toml</code></li>
 </ul>
-<p><code>mago ast</code> 命令报告的是解析错误,不支持 baseline。</p>
+<p><code>mago cst</code> 命令报告的是解析错误,不支持 baseline。</p>
 <h2 id="generating-a-baseline">生成 baseline</h2>
 <pre><code class="language-sh">mago lint --generate-baseline --baseline lint-baseline.toml
 mago analyze --generate-baseline --baseline analysis-baseline.toml

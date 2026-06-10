@@ -215,8 +215,8 @@
       </li>
       
       <li>
-        <a href="../../../../../main/fr/guide/inspecting-the-ast">
-          <span>Inspecter l&#x27;AST</span>
+        <a href="../../../../../main/fr/guide/inspecting-the-cst">
+          <span>Inspecter l&#x27;CST</span>
         </a>
       </li>
       
@@ -559,11 +559,11 @@
 <h2 id="how-it-works">Comment ça fonctionne</h2>
 <p>Mago emprunte l'approche analyse-et-réimpression utilisée par Prettier, <code>rustfmt</code> et Black :</p>
 <ol>
-<li>Analyser le source en un AST.</li>
+<li>Analyser le source en un CST.</li>
 <li>Jeter le formatage original (espaces, sauts de ligne, indentation, tout).</li>
-<li>Réimprimer l'AST de zéro selon un ensemble fixe de règles, <a href="https://www.php-fig.org/per/coding-style/">PER-CS</a> par défaut.</li>
+<li>Réimprimer l'CST de zéro selon un ensemble fixe de règles, <a href="https://www.php-fig.org/per/coding-style/">PER-CS</a> par défaut.</li>
 </ol>
-<p>La sortie est identique pour un AST donné quel que soit le style d'entrée. Le comportement à l'exécution du code est préservé exactement : l'AST fait un aller-retour, seule la représentation de surface change.</p>
+<p>La sortie est identique pour un CST donné quel que soit le style d'entrée. Le comportement à l'exécution du code est préservé exactement : l'CST fait un aller-retour, seule la représentation de surface change.</p>
 <h2 id="what-you-get">Ce que vous obtenez</h2>
 <ul>
 <li><strong>Un style cohérent</strong> sur l'ensemble du projet. Le formateur est volontairement opinionné.</li>

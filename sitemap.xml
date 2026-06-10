@@ -13,7 +13,7 @@
   <url><loc>https://mago.carthage.software/main/en/guide/generate-completions</loc></url>
   <url><loc>https://mago.carthage.software/main/en/guide/getting-started</loc></url>
   <url><loc>https://mago.carthage.software/main/en/guide/initialization</loc></url>
-  <url><loc>https://mago.carthage.software/main/en/guide/inspecting-the-ast</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/guide/inspecting-the-cst</loc></url>
   <url><loc>https://mago.carthage.software/main/en/guide/installation</loc></url>
   <url><loc>https://mago.carthage.software/main/en/guide/list-files</loc></url>
   <url><loc>https://mago.carthage.software/main/en/guide/upgrading</loc></url>
@@ -56,7 +56,7 @@
   <url><loc>https://mago.carthage.software/main/fr/guide/generate-completions</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/guide/getting-started</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/guide/initialization</loc></url>
-  <url><loc>https://mago.carthage.software/main/fr/guide/inspecting-the-ast</loc></url>
+  <url><loc>https://mago.carthage.software/main/fr/guide/inspecting-the-cst</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/guide/installation</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/guide/list-files</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/guide/upgrading</loc></url>
@@ -99,7 +99,7 @@
   <url><loc>https://mago.carthage.software/main/zh/guide/generate-completions</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/guide/getting-started</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/guide/initialization</loc></url>
-  <url><loc>https://mago.carthage.software/main/zh/guide/inspecting-the-ast</loc></url>
+  <url><loc>https://mago.carthage.software/main/zh/guide/inspecting-the-cst</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/guide/installation</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/guide/list-files</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/guide/upgrading</loc></url>

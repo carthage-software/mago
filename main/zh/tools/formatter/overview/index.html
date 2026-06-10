@@ -215,8 +215,8 @@
       </li>
       
       <li>
-        <a href="../../../../../main/zh/guide/inspecting-the-ast">
-          <span>查看 AST</span>
+        <a href="../../../../../main/zh/guide/inspecting-the-cst">
+          <span>查看 CST</span>
         </a>
       </li>
       
@@ -586,11 +586,11 @@
 <h2 id="how-it-works">工作原理</h2>
 <p>Mago 借鉴了 Prettier、<code>rustfmt</code> 和 Black 所使用的“解析后再打印”的思路:</p>
 <ol>
-<li>把源代码解析为 AST。</li>
+<li>把源代码解析为 CST。</li>
 <li>丢弃原有的格式(空白、换行、缩进等所有信息)。</li>
-<li>按一组固定的规则从头重新打印 AST,默认遵循 <a href="https://www.php-fig.org/per/coding-style/">PER-CS</a>。</li>
+<li>按一组固定的规则从头重新打印 CST,默认遵循 <a href="https://www.php-fig.org/per/coding-style/">PER-CS</a>。</li>
 </ol>
-<p>对于给定的 AST,无论输入风格如何,输出都完全一致。代码的运行时行为被精确保留:AST 是可往返的,只有表层表示发生变化。</p>
+<p>对于给定的 CST,无论输入风格如何,输出都完全一致。代码的运行时行为被精确保留:AST 是可往返的,只有表层表示发生变化。</p>
 <h2 id="what-you-get">你能得到什么</h2>
 <ul>
 <li>**整个项目一致的风格。**格式化器在设计上就是有主见的。</li>

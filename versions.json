@@ -18,7 +18,7 @@
                 "guide/generate-completions",
                 "guide/getting-started",
                 "guide/initialization",
-                "guide/inspecting-the-ast",
+                "guide/inspecting-the-cst",
                 "guide/installation",
                 "guide/list-files",
                 "guide/upgrading",
