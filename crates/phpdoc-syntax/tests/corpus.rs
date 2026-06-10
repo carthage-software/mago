@@ -219,7 +219,8 @@ fn fenced_code_blocks_are_parsed_as_code_elements() {
 #[test]
 fn block_code_inline_code_and_inline_tags_are_separated() {
     let arena = LocalArena::new();
-    let source = b"/**\n * Some text\n *\n * ```\n * Hello\n * ```\n * Text with `code` and {@see Foo}\n * @return string\n */";
+    let source =
+        b"/**\n * Some text\n *\n * ```\n * Hello\n * ```\n * Text with `code` and {@see Foo}\n * @return string\n */";
     let document = parse(&arena, source);
 
     let elements: Vec<&Element> = document.elements.iter().collect();
