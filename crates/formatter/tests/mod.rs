@@ -12,6 +12,7 @@ use mago_formatter::settings::FormatSettings;
 use mago_formatter::settings::MethodChainBreakingStyle;
 use mago_formatter::settings::NullTypeHint;
 use mago_formatter::settings::SortOrder;
+use mago_formatter::settings::SortUses;
 use mago_php_version::PHPVersion;
 
 #[macro_export]

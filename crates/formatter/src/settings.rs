@@ -735,10 +735,10 @@ generate_formatter_settings! {
     /// Default: false
     align_assignment_like: bool => "default_false",
 
-    /// Whether to sort use statements alphabetically.
+    /// How to sort use statements.
     ///
-    /// Default: true
-    sort_uses: bool => "default_true",
+    /// Default: `alphanumeric-ascending`
+    sort_uses: SortUses => "SortUses::default",
 
     /// Whether to sort class methods by visibility and name.
     ///
@@ -1222,6 +1222,36 @@ pub enum SortOrder {
     AlphanumericDescending,
     LengthAscending,
     LengthDescending,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[serde(from = "SortUsesWire")]
+#[schemars(with = "SortUsesWire")]
+pub struct SortUses(pub SortOrder);
+
+#[derive(JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[serde(untagged)]
+enum SortUsesWire {
+    Bool(bool),
+    Order(SortOrder),
+}
+
+impl From<SortUsesWire> for SortUses {
+    fn from(wire: SortUsesWire) -> Self {
+        match wire {
+            SortUsesWire::Bool(true) => SortUses(SortOrder::AlphanumericAscending),
+            SortUsesWire::Bool(false) => SortUses(SortOrder::Preserve),
+            SortUsesWire::Order(order) => SortUses(order),
+        }
+    }
+}
+
+impl Default for SortUses {
+    fn default() -> Self {
+        Self(SortOrder::AlphanumericAscending)
+    }
 }
 
 /// Specifies the style of line endings.
