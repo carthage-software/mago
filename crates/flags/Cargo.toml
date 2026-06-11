@@ -1,0 +1,20 @@
+[package]
+name = "mago-flags"
+description = "Compact, type-tagged bitsets for Mago: generic `U8Flags`...`U128Flags` over any `Into<uN>` flag type."
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+serde = ["dep:serde"]
+
+[dependencies]
+serde = { workspace = true, optional = true }

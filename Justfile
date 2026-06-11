@@ -94,6 +94,7 @@ publish:
     cargo publish -p mago-phpdoc-syntax
     cargo publish -p mago-type-syntax
     cargo publish -p mago-twig-syntax
+    cargo publish -p mago-flags
     cargo publish -p mago-collector
     cargo publish -p mago-composer
     cargo publish -p mago-docblock
