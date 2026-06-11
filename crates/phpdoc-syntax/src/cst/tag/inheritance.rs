@@ -20,7 +20,7 @@ pub struct ImplementsTagValue<'arena> {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct UsesTagValue<'arena> {
+pub struct UseTagValue<'arena> {
     pub r#type: &'arena Type<'arena>,
     pub description: Option<Text<'arena>>,
 }
@@ -71,7 +71,7 @@ macro_rules! single_type_with_description {
 single_type_with_description!(
     ExtendsTagValue,
     ImplementsTagValue,
-    UsesTagValue,
+    UseTagValue,
     RequireExtendsTagValue,
     RequireImplementsTagValue,
     SealedTagValue,

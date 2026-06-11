@@ -5,6 +5,7 @@ use crate::cst::tag::InvalidTagValue;
 use crate::cst::tag::Tag;
 use crate::cst::tag::TagValue;
 use crate::cst::tag::TagVendor;
+use crate::cst::tag::TemplateTagValueVariance;
 use crate::error::ParseError;
 use crate::parser::PHPDocParser;
 use crate::parser::internal::tag::vendor::remainder_after_vendor;
@@ -22,10 +23,7 @@ pub(crate) mod value;
 pub(crate) mod vendor;
 pub(crate) mod where_clause;
 
-#[inline]
-pub(crate) fn is_inherit_doc_name(name: &[u8]) -> bool {
-    name.eq_ignore_ascii_case(b"inheritdoc") || name.eq_ignore_ascii_case(b"inheritdocs")
-}
+const NORMALIZED_NAME_CAPACITY: usize = 48;
 
 impl<'arena, A> PHPDocParser<'arena, A>
 where
@@ -57,46 +55,81 @@ where
 
     #[inline]
     fn dispatch_tag_value(&mut self, remainder: &[u8]) -> Result<TagValue<'arena>, ParseError> {
-        if is_inherit_doc_name(remainder) {
-            return self.parse_inherit_doc_tag_value();
+        let mut buffer = [0u8; NORMALIZED_NAME_CAPACITY];
+        let mut length = 0;
+        for byte in remainder {
+            if *byte == b'-' {
+                continue;
+            }
+
+            if length == buffer.len() {
+                return self.parse_generic_tag_value();
+            }
+
+            buffer[length] = byte.to_ascii_lowercase();
+            length += 1;
         }
 
-        let mut buffer = [0u8; 48];
-        let name = if remainder.len() <= buffer.len() {
-            buffer[..remainder.len()].copy_from_slice(remainder);
-            buffer[..remainder.len()].make_ascii_lowercase();
-            &buffer[..remainder.len()]
-        } else {
-            remainder
-        };
+        let name = &buffer[..length];
 
         match name {
             b"param" => self.parse_param_tag_value(),
-            b"param-out" => self.parse_param_out_tag_value(),
-            b"param-closure-this" => self.parse_param_closure_this_tag_value(),
-            b"param-immediately-invoked-callable" => self.parse_param_immediately_invoked_callable_tag_value(),
-            b"param-later-invoked-callable" => self.parse_param_later_invoked_callable_tag_value(),
-            b"pure-unless-callable-is-impure" => self.parse_pure_unless_callable_is_impure_tag_value(),
-            b"return" | b"real-return" => self.parse_return_tag_value(),
+            b"paramout" => self.parse_param_out_tag_value(),
+            b"paramclosurethis" => self.parse_param_closure_this_tag_value(),
+            b"paramimmediatelyinvokedcallable" => self.parse_param_immediately_invoked_callable_tag_value(),
+            b"paramlaterinvokedcallable" => self.parse_param_later_invoked_callable_tag_value(),
+            b"pureunlesscallableisimpure" => self.parse_pure_unless_callable_is_impure_tag_value(),
+            b"return" => Ok(TagValue::Return(self.parse_return_tag_value()?)),
+            b"realreturn" => Ok(TagValue::RealReturn(self.parse_return_tag_value()?)),
             b"var" => self.parse_var_tag_value(),
             b"throws" => self.parse_throws_tag_value(),
             b"mixin" => self.parse_mixin_tag_value(),
-            b"self-out" | b"this-out" => self.parse_self_out_tag_value(),
-            b"property" | b"property-read" | b"property-write" => self.parse_property_tag_value(),
-            b"template" | b"template-covariant" | b"template-contravariant" => self.parse_template_tag(),
-            b"extends" | b"inherits" | b"template-extends" => self.parse_extends_tag_value(),
-            b"implements" | b"template-implements" => self.parse_implements_tag_value(),
-            b"use" | b"uses" | b"template-use" => self.parse_uses_tag_value(),
-            b"require-extends" => self.parse_require_extends_tag_value(),
-            b"require-implements" => self.parse_require_implements_tag_value(),
+            b"selfout" | b"thisout" => self.parse_self_out_tag_value(),
+            b"property" => Ok(TagValue::Property(self.parse_property_tag_value()?)),
+            b"propertyread" => Ok(TagValue::PropertyRead(self.parse_property_tag_value()?)),
+            b"propertywrite" => Ok(TagValue::PropertyWrite(self.parse_property_tag_value()?)),
+            b"template" | b"templateinvariant" => self.parse_template_tag(TemplateTagValueVariance::Invariant),
+            b"templatecovariant" => self.parse_template_tag(TemplateTagValueVariance::Covariant),
+            b"templatecontravariant" => self.parse_template_tag(TemplateTagValueVariance::Contravariant),
+            b"extends" | b"templateextends" => self.parse_extends_tag_value(),
+            b"implements" | b"templateimplements" => self.parse_implements_tag_value(),
+            b"use" | b"templateuse" => self.parse_use_tag_value(),
+            b"requireextends" => self.parse_require_extends_tag_value(),
+            b"requireimplements" => self.parse_require_implements_tag_value(),
             b"sealed" => self.parse_sealed_tag_value(),
             b"inheritors" => self.parse_inheritors_tag_value(),
             b"method" => self.parse_method_tag_value(),
-            b"assert" | b"assert-if-true" | b"assert-if-false" => self.parse_assert_tag_value(),
+            b"assert" => Ok(TagValue::Assert(self.parse_assert_tag_value()?)),
+            b"assertiftrue" => Ok(TagValue::AssertIfTrue(self.parse_assert_tag_value()?)),
+            b"assertiffalse" => Ok(TagValue::AssertIfFalse(self.parse_assert_tag_value()?)),
             b"where" => self.parse_where_tag_value(),
             b"type" => self.parse_type_alias_tag_value(),
-            b"import-type" => self.parse_type_alias_import_tag_value(),
+            b"importtype" => self.parse_type_alias_import_tag_value(),
             b"deprecated" => self.parse_deprecated_tag_value(),
+            b"notdeprecated" => self.parse_not_deprecated_tag_value(),
+            b"inheritdoc" | b"inheritdocs" => self.parse_inherit_doc_tag_value(),
+            b"final" => self.parse_final_tag_value(),
+            b"internal" => self.parse_internal_tag_value(),
+            b"api" => self.parse_api_tag_value(),
+            b"experimental" => self.parse_experimental_tag_value(),
+            b"pure" => self.parse_pure_tag_value(),
+            b"impure" => self.parse_impure_tag_value(),
+            b"readonly" => self.parse_readonly_tag_value(),
+            b"mustuse" => self.parse_must_use_tag_value(),
+            b"nonamedarguments" => self.parse_no_named_arguments_tag_value(),
+            b"enuminterface" => self.parse_enum_interface_tag_value(),
+            b"consistentconstructor" => self.parse_consistent_constructor_tag_value(),
+            b"consistenttemplates" => self.parse_consistent_templates_tag_value(),
+            b"sealproperties" => self.parse_seal_properties_tag_value(),
+            b"nosealproperties" => self.parse_no_seal_properties_tag_value(),
+            b"sealmethods" => self.parse_seal_methods_tag_value(),
+            b"nosealmethods" => self.parse_no_seal_methods_tag_value(),
+            b"mutationfree" => self.parse_mutation_free_tag_value(),
+            b"externalmutationfree" => self.parse_external_mutation_free_tag_value(),
+            b"suspendsfiber" => self.parse_suspends_fiber_tag_value(),
+            b"ignorenullablereturn" => self.parse_ignore_nullable_return_tag_value(),
+            b"ignorefalsablereturn" => self.parse_ignore_falsable_return_tag_value(),
+            b"trace" => self.parse_trace_tag_value(),
             _ => self.parse_generic_tag_value(),
         }
     }

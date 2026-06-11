@@ -5,7 +5,7 @@ use crate::cst::code::Code;
 use crate::cst::tag::Tag;
 use crate::cst::text::Text;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
 pub enum Element<'arena> {

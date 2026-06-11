@@ -5,7 +5,7 @@ use crate::cst::tag::RequireExtendsTagValue;
 use crate::cst::tag::RequireImplementsTagValue;
 use crate::cst::tag::SealedTagValue;
 use crate::cst::tag::TagValue;
-use crate::cst::tag::UsesTagValue;
+use crate::cst::tag::UseTagValue;
 use crate::error::ParseError;
 use crate::parser::PHPDocParser;
 use mago_allocator::Arena;
@@ -30,12 +30,12 @@ where
         Ok(TagValue::Implements(ImplementsTagValue { r#type, description }))
     }
 
-    pub(crate) fn parse_uses_tag_value(&mut self) -> Result<TagValue<'arena>, ParseError> {
+    pub(crate) fn parse_use_tag_value(&mut self) -> Result<TagValue<'arena>, ParseError> {
         let r#type = self.parse_type()?;
         let r#type = self.alloc(r#type);
         let description = self.parse_optional_description(true)?;
 
-        Ok(TagValue::Uses(UsesTagValue { r#type, description }))
+        Ok(TagValue::Use(UseTagValue { r#type, description }))
     }
 
     pub(crate) fn parse_require_extends_tag_value(&mut self) -> Result<TagValue<'arena>, ParseError> {

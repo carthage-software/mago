@@ -10,6 +10,7 @@ use crate::cst::tag::MethodTagValueParameterDefault;
 use crate::cst::tag::MethodTemplateParameter;
 use crate::cst::tag::MethodTemplateParameterList;
 use crate::cst::tag::TagValue;
+use crate::cst::tag::TemplateTagValueVariance;
 use crate::cst::tag::Visibility;
 use crate::cst::r#type::ReferenceKind;
 use crate::cst::r#type::Type;
@@ -122,7 +123,7 @@ where
 
         let mut entries = self.new_vec::<MethodTemplateParameter<'arena>>();
         loop {
-            let template = self.parse_template_tag_value(false)?;
+            let template = self.parse_template_tag_value(TemplateTagValueVariance::Invariant, false)?;
             let comma = if self.stream.is_at(TokenKind::Comma) { Some(self.stream.consume_span()?) } else { None };
             let has_comma = comma.is_some();
             entries.push(MethodTemplateParameter { template, comma });

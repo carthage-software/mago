@@ -10,9 +10,18 @@ use crate::cst::r#type::Type;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TemplateTagValue<'arena> {
     pub name: Identifier<'arena>,
+    pub variance: TemplateTagValueVariance,
     pub bound: Option<TemplateTagValueBound<'arena>>,
     pub default: Option<TemplateTagValueDefault<'arena>>,
     pub description: Option<Text<'arena>>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub enum TemplateTagValueVariance {
+    Invariant,
+    Covariant,
+    Contravariant,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]

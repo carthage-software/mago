@@ -23,7 +23,7 @@ pub enum TextSegment<'arena> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct InlineTag<'arena> {
     pub left_brace: Span,
-    pub tag: Tag<'arena>,
+    pub tag: &'arena Tag<'arena>,
     pub right_brace: Span,
 }
 

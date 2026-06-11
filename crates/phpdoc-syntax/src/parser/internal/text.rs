@@ -115,7 +115,7 @@ where
             }
         };
 
-        Ok(InlineTag { left_brace, tag, right_brace })
+        Ok(InlineTag { left_brace, tag: self.alloc(tag), right_brace })
     }
 
     pub(crate) fn parse_optional_description(&mut self, limit_start: bool) -> Result<Option<Text<'arena>>, ParseError> {

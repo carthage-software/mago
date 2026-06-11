@@ -2,6 +2,8 @@ use mago_allocator::LocalArena;
 
 use mago_database::file::FileId;
 use mago_phpdoc_syntax::PHPDocParser;
+use mago_phpdoc_syntax::cst::AssertPattern;
+use mago_phpdoc_syntax::cst::AssertSubject;
 use mago_phpdoc_syntax::cst::ConstantExpression;
 use mago_phpdoc_syntax::cst::Document;
 use mago_phpdoc_syntax::cst::Element;
@@ -185,10 +187,13 @@ fn parses_assert_property() {
     let tag = first_tag(&document);
 
     assert_eq!(tag.vendor, Some(TagVendor::PhpStan));
-    let TagValue::AssertProperty(assert) = &tag.value else { panic!("got {:?}", tag.value) };
+    let TagValue::Assert(assert) = &tag.value else { panic!("got {:?}", tag.value) };
     assert!(assert.bang.is_some());
-    assert_eq!(assert.parameter.value, b"$this");
-    assert_eq!(assert.property.value, b"value");
+    let AssertSubject::Property { parameter, property, .. } = &assert.subject else {
+        panic!("got {:?}", assert.subject)
+    };
+    assert_eq!(parameter.value, b"$this");
+    assert_eq!(property.value, b"value");
 }
 
 #[test]
@@ -198,8 +203,31 @@ fn parses_assert_method() {
     let tag = first_tag(&document);
 
     assert_eq!(tag.vendor, Some(TagVendor::Psalm));
-    let TagValue::AssertMethod(assert) = &tag.value else { panic!() };
-    assert_eq!(assert.method.value, b"bar");
+    let TagValue::Assert(assert) = &tag.value else { panic!() };
+    let AssertSubject::Method { method, .. } = &assert.subject else { panic!("got {:?}", assert.subject) };
+    assert_eq!(method.value, b"bar");
+}
+
+#[test]
+fn parses_assert_if_true_with_keyword_pattern() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @assert-if-true truthy $foo */");
+    let tag = first_tag(&document);
+
+    let TagValue::AssertIfTrue(assert) = &tag.value else { panic!("got {:?}", tag.value) };
+    assert!(matches!(assert.pattern, AssertPattern::Truthy(_)));
+    let AssertSubject::Parameter { variable } = &assert.subject else { panic!("got {:?}", assert.subject) };
+    assert_eq!(variable.value, b"$foo");
+}
+
+#[test]
+fn parses_assert_keyword_named_type_when_not_followed_by_variable() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @assert truthy|string $foo */");
+    let tag = first_tag(&document);
+
+    let TagValue::Assert(assert) = &tag.value else { panic!("got {:?}", tag.value) };
+    assert!(matches!(assert.pattern, AssertPattern::Type(Type::Union(_))));
 }
 
 #[test]

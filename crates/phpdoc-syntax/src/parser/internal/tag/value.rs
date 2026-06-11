@@ -13,12 +13,12 @@ impl<'arena, A> PHPDocParser<'arena, A>
 where
     A: Arena,
 {
-    pub(crate) fn parse_return_tag_value(&mut self) -> Result<TagValue<'arena>, ParseError> {
+    pub(crate) fn parse_return_tag_value(&mut self) -> Result<ReturnTagValue<'arena>, ParseError> {
         let r#type = self.parse_type()?;
         let r#type = self.alloc(r#type);
         let description = self.parse_optional_description(true)?;
 
-        Ok(TagValue::Return(ReturnTagValue { r#type, description }))
+        Ok(ReturnTagValue { r#type, description })
     }
 
     pub(crate) fn parse_throws_tag_value(&mut self) -> Result<TagValue<'arena>, ParseError> {

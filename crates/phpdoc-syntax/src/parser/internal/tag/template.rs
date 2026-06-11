@@ -1,3 +1,4 @@
+use crate::cst::TemplateTagValueVariance;
 use crate::cst::tag::TagValue;
 use crate::cst::tag::TemplateTagValue;
 use crate::cst::tag::TemplateTagValueBound;
@@ -13,6 +14,7 @@ where
 {
     pub(crate) fn parse_template_tag_value(
         &mut self,
+        variance: TemplateTagValueVariance,
         parse_description: bool,
     ) -> Result<TemplateTagValue<'arena>, ParseError> {
         let name = self.parse_identifier()?;
@@ -39,10 +41,13 @@ where
 
         let description = if parse_description { self.parse_optional_description(true)? } else { None };
 
-        Ok(TemplateTagValue { name, bound, default, description })
+        Ok(TemplateTagValue { name, variance, bound, default, description })
     }
 
-    pub(crate) fn parse_template_tag(&mut self) -> Result<TagValue<'arena>, ParseError> {
-        Ok(TagValue::Template(self.parse_template_tag_value(true)?))
+    pub(crate) fn parse_template_tag(
+        &mut self,
+        variance: TemplateTagValueVariance,
+    ) -> Result<TagValue<'arena>, ParseError> {
+        Ok(TagValue::Template(self.parse_template_tag_value(variance, true)?))
     }
 }

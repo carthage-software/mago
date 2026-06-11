@@ -33,7 +33,7 @@ pub struct Document<'arena> {
     pub errors: &'arena [ParseError],
 }
 
-impl Document<'_> {
+impl<'arena> Document<'arena> {
     #[inline]
     #[must_use]
     pub fn has_errors(&self) -> bool {
@@ -41,12 +41,20 @@ impl Document<'_> {
     }
 
     #[inline]
+    pub fn tags(&self) -> impl Iterator<Item = &'arena Tag<'arena>> + '_ {
+        self.elements.iter().filter_map(|element| match element {
+            Element::Tag(tag) => Some(*tag),
+            _ => None,
+        })
+    }
+
+    #[inline]
     #[must_use]
     pub fn has_inherit_doc(&self) -> bool {
         self.elements.iter().any(|element| match element {
-            Element::Tag(tag) => tag.name.value.eq_ignore_ascii_case(b"inheritDoc"),
+            Element::Tag(tag) => matches!(tag.value, TagValue::InheritDoc(_)),
             Element::Text(text) => text.segments.iter().any(|segment| match segment {
-                TextSegment::InlineTag(inline_tag) => inline_tag.tag.name.value.eq_ignore_ascii_case(b"inheritDoc"),
+                TextSegment::InlineTag(inline_tag) => matches!(inline_tag.tag.value, TagValue::InheritDoc(_)),
                 _ => false,
             }),
             _ => false,
