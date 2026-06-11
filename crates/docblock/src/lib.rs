@@ -18,6 +18,8 @@ pub mod tag;
 /// # Errors
 ///
 /// Returns a [`ParseError`] if the trivia is not a docblock comment or parsing fails.
+#[deprecated(note = "use `mago_phpdoc_syntax::PHPDocParser` instead")]
+#[allow(deprecated)]
 #[inline]
 pub fn parse_trivia<'arena, A>(arena: &'arena A, trivia: &Trivia<'arena>) -> Result<Document<'arena>, ParseError>
 where
@@ -35,6 +37,7 @@ where
 /// # Errors
 ///
 /// Returns a [`ParseError`] if tokenization or parsing fails.
+#[deprecated(note = "use `mago_phpdoc_syntax::PHPDocParser` instead")]
 #[inline]
 pub fn parse_phpdoc_with_span<'arena, A>(
     arena: &'arena A,
@@ -50,7 +53,7 @@ where
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(deprecated, clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
