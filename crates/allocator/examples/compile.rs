@@ -1,13 +1,3 @@
-//! End-to-end sketch of the parallel compilation pipeline an arena has to support:
-//!
-//! 1. parse + lower + scan — one task per file, in parallel.
-//! 2. link — merge every definition table into one symbol table, serially.
-//! 3. infer + check — one task per file, in parallel, against the shared table.
-//!
-//! The whole thing runs on a single [`SharedArena`] shared across the rayon
-//! workers; every pass is generic over `A: Arena` and never learns whether the
-//! arena it was handed is local or shared.
-
 #![allow(clippy::inline_trait_bounds)]
 #![allow(clippy::missing_assert_message)]
 #![allow(clippy::wildcard_imports)]
@@ -29,6 +19,14 @@ struct DefinitionTable<'arena> {
     _phantom: PhantomData<&'arena ()>,
 }
 
+impl DefinitionTable<'_> {
+    /// Deep-copies the table into `dst`. In real code this re-interns strings,
+    /// copies signatures, etc.
+    fn copy_into<'other, A: Arena>(&self, _dst: &'other A) -> DefinitionTable<'other> {
+        DefinitionTable { _phantom: PhantomData }
+    }
+}
+
 struct SymbolTable<'arena, A: Arena> {
     _symbols: HashMap<'arena, u32, DefinitionTable<'arena>, A>,
 }
@@ -41,75 +39,86 @@ fn parse<'arena, A: Arena>(arena: &'arena A, _source: &str) -> &'arena Ast<'aren
     arena.alloc(Ast { _phantom: PhantomData })
 }
 
-fn lower<'arena, A: Arena>(arena: &'arena A, _ast: &Ast<'arena>) -> &'arena Ir<'arena, ()> {
+fn lower<'ast, 'arena, A: Arena>(arena: &'arena A, _ast: &'ast Ast<'ast>) -> &'arena Ir<'arena, ()> {
     arena.alloc(Ir { _phantom: PhantomData })
 }
 
-fn scan<'arena, A: Arena>(_arena: &'arena A, _ir: &Ir<'arena, ()>) -> DefinitionTable<'arena> {
+fn scan<'ir, 'arena, A: Arena>(_arena: &'arena A, _ir: &'ir Ir<'ir, ()>) -> DefinitionTable<'arena> {
     DefinitionTable { _phantom: PhantomData }
 }
 
-fn link<'arena, A: Arena>(
+fn link<'defs, 'arena, A: Arena>(
     arena: &'arena A,
-    definitions: Vec<'arena, DefinitionTable<'arena>, A>,
+    definitions: &'defs [DefinitionTable<'defs>],
 ) -> SymbolTable<'arena, A> {
     let mut symbols: HashMap<'arena, u32, DefinitionTable<'arena>, A> = HashMap::new_in(arena);
-    for (index, definition) in definitions.into_iter().enumerate() {
-        symbols.insert(index as u32, definition);
+    for (index, definition) in definitions.iter().enumerate() {
+        symbols.insert(index as u32, definition.copy_into(arena));
     }
 
     SymbolTable { _symbols: symbols }
 }
 
-fn inference<'arena, A: Arena>(
+fn inference<'arena, A: Arena, S: Arena>(
     arena: &'arena A,
+    scratch: &S,
     _symbol_table: &SymbolTable<'arena, A>,
-    _ir: &Ir<'arena, ()>,
+    _ir: &Ir<'_, ()>,
 ) -> &'arena Ir<'arena, Type<'arena>> {
+    let _ = scratch;
     arena.alloc(Ir { _phantom: PhantomData })
 }
 
-fn check<'arena, A: Arena>(_arena: &'arena A, _ir: &Ir<'arena, Type<'arena>>) -> bool {
+fn check<'arena>(_ir: &Ir<'arena, Type<'arena>>) -> bool {
     true
 }
 
-fn compile<'arena>(arena: &'arena SharedArena, sources: &[String]) -> bool {
-    let ir_and_defs: Vec<'arena, _, SharedArena> = sources
-        .par_iter()
-        .map(|source| {
-            let ast = parse(arena, source);
-            let ir = lower(arena, ast);
-            let definition_table = scan(arena, ir);
+fn compile(arena: &SharedArena, sources: &[&str]) -> bool {
+    let ir_arena = SharedArena::with_chunk_size(2 * 1024 * 1024);
+    let definitions_arena = SharedArena::new();
 
-            (ir, definition_table)
-        })
-        .collect_in(arena);
+    let parse_and_scan_file = |scratch: &mut ScopedArena<'_>, source: &&str| {
+        let ast = parse(&*scratch, source);
+        let ir = lower(&ir_arena, ast);
+        let definition_table = scan(&definitions_arena, ir);
+        scratch.reset();
+        (ir, definition_table)
+    };
 
-    let mut irs = Vec::with_capacity_in(ir_and_defs.len(), arena);
-    let mut defs = Vec::with_capacity_in(ir_and_defs.len(), arena);
-    for (ir, definition_table) in ir_and_defs {
-        irs.push(ir);
-        defs.push(definition_table);
+    let ir_and_definitions: Vec<'_, _, SharedArena> =
+        sources.par_iter().map_init(|| ir_arena.scoped(), parse_and_scan_file).collect_in(&ir_arena);
+
+    let file_count = ir_and_definitions.len();
+    let mut untyped_irs: Vec<'_, &Ir<'_, ()>, SharedArena> = Vec::with_capacity_in(file_count, &ir_arena);
+    let mut definition_tables: Vec<'_, DefinitionTable<'_>, SharedArena> = Vec::with_capacity_in(file_count, &ir_arena);
+    for (ir, definition_table) in ir_and_definitions {
+        untyped_irs.push(ir);
+        definition_tables.push(definition_table);
     }
 
-    let symbol_table = link(arena, defs);
+    let symbol_table = link(arena, definition_tables.as_slice());
+    drop(definition_tables);
+    drop(definitions_arena);
 
-    let results = irs
+    let infer_and_check_file = |scratch: &mut ScopedArena<'_>, ir: &&Ir<'_, ()>| {
+        let typed_ir = inference(arena, &*scratch, &symbol_table, ir);
+        scratch.reset();
+        check(typed_ir)
+    };
+
+    let all_files_passed = untyped_irs
         .as_slice()
         .par_iter()
-        .map(|&ir| {
-            let ir_with_types = inference(arena, &symbol_table, ir);
+        .map_init(|| arena.scoped(), infer_and_check_file)
+        .all(|file_passed| file_passed);
 
-            check(arena, ir_with_types)
-        })
-        .collect_in(arena);
+    drop(untyped_irs);
+    drop(ir_arena);
 
-    results.into_iter().all(|result| result)
+    all_files_passed
 }
 
 fn main() {
     let arena = SharedArena::new();
-    let sources = [String::from("<?php echo 1;"), String::from("<?php echo 2;")];
-
-    assert!(compile(&arena, &sources));
+    assert!(compile(&arena, &["<?php echo 1;", "<?php echo 2;"]));
 }
