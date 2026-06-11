@@ -17,7 +17,7 @@ mago-bytes = { workspace = true }
 mago-word = { workspace = true }
 mago-text-edit = { workspace = true }
 mago-reporting = { workspace = true }
-mago-docblock = { workspace = true }
+mago-phpdoc-syntax = { workspace = true }
 mago-span = { workspace = true }
 mago-syntax = { workspace = true }
 mago-database = { workspace = true }

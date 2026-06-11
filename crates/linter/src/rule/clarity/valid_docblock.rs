@@ -1,5 +1,6 @@
 use indoc::indoc;
 use mago_allocator::Arena;
+use mago_phpdoc_syntax::PHPDocParser;
 use schemars::JsonSchema;
 
 use mago_reporting::Annotation;
@@ -110,11 +111,12 @@ impl LintRule for ValidDocblockRule {
         };
 
         for trivia in &program.trivia {
-            if trivia.kind == TriviaKind::DocBlockComment {
-                let Err(parse_error) = mago_docblock::parse_trivia(ctx.arena, trivia) else {
-                    continue;
-                };
+            if trivia.kind != TriviaKind::DocBlockComment {
+                continue;
+            }
 
+            let document = PHPDocParser::parse_with_span(ctx.arena, trivia.value, trivia.span);
+            for parse_error in document.errors {
                 let issue = Issue::new(self.cfg.level(), parse_error.to_string())
                     .with_code(self.meta.code)
                     .with_annotation(Annotation::primary(parse_error.span()))
