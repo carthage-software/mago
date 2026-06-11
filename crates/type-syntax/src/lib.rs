@@ -37,6 +37,7 @@ pub mod token;
 /// # Errors
 ///
 /// Returns a [`ParseError`] if any lexing or parsing error occurs.
+#[deprecated(note = "use `mago_phpdoc_syntax::parse_type` instead")]
 pub fn parse_str<'arena, A>(arena: &'arena A, span: Span, input: &'arena [u8]) -> Result<Type<'arena>, ParseError>
 where
     A: Arena,
@@ -66,6 +67,7 @@ where
 ///
 /// Returns a [`ParseError`] if the prefix does not start with a valid
 /// type.
+#[deprecated(note = "use `mago_phpdoc_syntax::parse_type` instead")]
 pub fn parse_prefix<'arena, A>(
     arena: &'arena A,
     span: Span,
@@ -80,7 +82,7 @@ where
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[allow(deprecated, clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use mago_allocator::LocalArena;
 

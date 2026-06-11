@@ -1,6 +1,7 @@
 //! Type-syntax parser fuzz target.
 
 #![no_main]
+#![allow(deprecated)]
 
 use mago_allocator::LocalArena;
 use libfuzzer_sys::fuzz_target;
