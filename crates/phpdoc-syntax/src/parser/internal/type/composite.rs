@@ -11,6 +11,7 @@ use crate::parser::internal::r#type::is_keyword;
 use crate::parser::internal::r#type::keyword::TypeKeyword;
 use crate::token::TokenKind;
 use mago_allocator::Arena;
+use mago_span::HasSpan;
 
 impl<'arena, A> PHPDocParser<'arena, A>
 where
@@ -81,7 +82,9 @@ where
 
                     self.parse_conditional_type(subject)?
                 }
-                TokenKind::LeftBracket if min_precedence <= TypePrecedence::Postfix => {
+                TokenKind::LeftBracket
+                    if min_precedence <= TypePrecedence::Postfix && token.start.offset == inner.span().end.offset =>
+                {
                     let left_bracket = self.stream.consume_span()?;
 
                     if self.stream.is_at(TokenKind::RightBracket) {

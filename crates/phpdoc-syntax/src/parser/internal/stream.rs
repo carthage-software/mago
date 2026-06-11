@@ -204,6 +204,20 @@ where
     }
 
     #[inline]
+    pub fn is_preceded_by_whitespace(&mut self, n: usize) -> bool {
+        let Some(token) = self.lookahead(n) else {
+            return false;
+        };
+
+        let offset = token.start.offset.saturating_sub(self.base) as usize;
+        let Some(previous) = offset.checked_sub(1) else {
+            return true;
+        };
+
+        self.source.get(previous).is_none_or(|byte| byte.is_ascii_whitespace())
+    }
+
+    #[inline]
     #[must_use]
     pub fn raw_between(&self, from: Position, to: Position) -> &'arena [u8] {
         let start = from.offset.saturating_sub(self.base) as usize;

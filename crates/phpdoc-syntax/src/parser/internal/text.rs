@@ -64,7 +64,7 @@ where
                 continue;
             }
 
-            if self.stream.peek_kind(0) == Some(TokenKind::Backtick) {
+            if self.stream.peek_kind(0) == Some(TokenKind::Backtick) && self.stream.is_preceded_by_whitespace(0) {
                 if plain_end.offset > plain_start.offset {
                     segments.push(TextSegment::PlainText(PlainText {
                         span: Span::new(file_id, plain_start, plain_end),

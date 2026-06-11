@@ -450,3 +450,68 @@ fn parses_var_with_description_starting_with_is() {
     let Some(description) = &var.description else { panic!("expected a description") };
     assert_eq!(plain(description), b"Is null for add operations");
 }
+
+#[test]
+fn return_description_starting_with_bracket_is_not_index_access() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @return array{int<0, max>, int<0, max>} [bytes_a_to_b, bytes_b_to_a] */");
+
+    assert!(!document.has_errors(), "expected no errors, got {:?}", document.errors);
+
+    let tag = first_tag(&document);
+    let TagValue::Return(return_tag) = &tag.value else { panic!("got {:?}", tag.value) };
+    assert!(matches!(return_tag.r#type, Type::Shape(_)));
+
+    let Some(description) = &return_tag.description else { panic!("expected a description") };
+    assert_eq!(plain(description), b"[bytes_a_to_b, bytes_b_to_a]");
+}
+
+#[test]
+fn adjacent_bracket_still_parses_as_slice_and_index_access() {
+    let arena = LocalArena::new();
+
+    let document = parse(&arena, b"/** @return string[] */");
+    let TagValue::Return(return_tag) = &first_tag(&document).value else { panic!() };
+    assert!(matches!(return_tag.r#type, Type::Slice(_)));
+
+    let document = parse(&arena, b"/** @return Foo[Bar] */");
+    let TagValue::Return(return_tag) = &first_tag(&document).value else { panic!() };
+    assert!(matches!(return_tag.r#type, Type::IndexAccess(_)));
+}
+
+#[test]
+fn escaped_backtick_does_not_open_inline_code() {
+    let arena = LocalArena::new();
+    let document = parse(
+        &arena,
+        b"/**\n * Processes escape sequences:\n * - Punctuation: \\\\, \\?, \\\", \\', \\`\n * - Whitespace: \\a, \\b\n */",
+    );
+
+    assert!(!document.has_errors(), "expected no errors, got {:?}", document.errors);
+
+    let Some(Element::Text(text)) = document.elements.first() else {
+        panic!("expected a text element");
+    };
+    assert!(
+        text.segments.iter().all(|segment| matches!(segment, TextSegment::PlainText(_))),
+        "expected plain text only, got {:?}",
+        text.segments
+    );
+}
+
+#[test]
+fn backtick_after_whitespace_still_opens_inline_code() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** some `code` here */");
+
+    assert!(!document.has_errors(), "expected no errors, got {:?}", document.errors);
+
+    let Some(Element::Text(text)) = document.elements.first() else {
+        panic!("expected a text element");
+    };
+    assert!(
+        text.segments.iter().any(|segment| matches!(segment, TextSegment::InlineCode(_))),
+        "expected an inline code segment, got {:?}",
+        text.segments
+    );
+}
