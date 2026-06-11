@@ -6,7 +6,7 @@ use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::reference::TReference;
-use mago_codex::ttype::builder::get_type_from_string;
+use mago_codex::ttype::builder::get_union_from_type;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
@@ -14,9 +14,8 @@ use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::union::populate_union_type;
-use mago_docblock::document::Element;
-use mago_docblock::document::TagKind;
-use mago_docblock::tag::parse_var_tag;
+use mago_phpdoc_syntax::cst::Element;
+use mago_phpdoc_syntax::cst::TagValue;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -151,8 +150,8 @@ where
             _ => None,
         })
         .filter_map(|tag| {
-            if allow_tracing && tag.kind == TagKind::PsalmTrace {
-                let variable_name_bytes = tag.description.trim_ascii();
+            if allow_tracing && let TagValue::Trace(trace) = &tag.value {
+                let variable_name_bytes = trace.variable.value;
                 let variable_atom = mago_word::word(variable_name_bytes);
                 let variable_name = BytesDisplay(variable_name_bytes);
                 match block_context.locals.get(&variable_atom) {
@@ -166,7 +165,7 @@ where
                                 "Trace: Type of `{variable_name}` is `{variable_type_str}`"
                             ))
                             .with_annotation(
-                                Annotation::primary(tag.description_span)
+                                Annotation::primary(trace.variable.span)
                                     .with_message(format!("Type is: `{variable_type_str}`")),
                             )
                             .with_note(
@@ -183,7 +182,7 @@ where
                             Issue::error(format!(
                                 "Invalid `@psalm-trace`: Variable `{variable_name}` not found in this scope."
                             ))
-                            .with_annotation(Annotation::primary(tag.description_span).with_message(
+                            .with_annotation(Annotation::primary(trace.variable.span).with_message(
                                 "This variable is not defined or is out of scope here",
                             ))
                             .with_help(
@@ -196,20 +195,14 @@ where
                 return None;
             }
 
-            if !matches!(tag.kind, TagKind::Var | TagKind::PsalmVar | TagKind::PhpstanVar) {
+            let TagValue::Var(var_tag) = &tag.value else {
                 return None;
-            }
+            };
 
-            let tag_content = tag.description;
+            let variable_name = var_tag.variable.as_ref().map(|v| mago_word::word(v.value));
 
-            let var_tag = parse_var_tag(tag_content, tag.description_span).ok()?;
-            let variable_name = var_tag.variable.map(|v| mago_word::word(&v.name));
-            let type_string = var_tag.type_string;
-
-            match get_type_from_string(
-                context.arena,
-                &type_string.value,
-                type_string.span,
+            match get_union_from_type(
+                var_tag.r#type,
                 &context.scope,
                 &context.type_resolution_context,
                 block_context.scope.get_class_like_name(),
@@ -232,7 +225,7 @@ where
                         },
                     );
 
-                    Some((variable_name, variable_type, type_string.span))
+                    Some((variable_name, variable_type, var_tag.r#type.span()))
                 }
                 Err(type_error) => {
                     context.collector.report_with_code(
