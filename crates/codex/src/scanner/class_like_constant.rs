@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
+use mago_phpdoc_syntax::cst::TagValue;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -14,10 +15,11 @@ use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
-use crate::scanner::docblock::ConstantDocblockComment;
+use crate::scanner::docblock::find_most_trusted_tag;
+use crate::scanner::docblock::parse_docblock;
 use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
-use crate::scanner::ttype::get_type_metadata_from_type_string;
+use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::atomic::TAtomic;
@@ -52,9 +54,10 @@ where
     let mut flags = if is_final { MetadataFlags::FINAL } else { MetadataFlags::empty() };
     flags |= MetadataFlags::origin_flags(context.file.file_type);
 
-    let docblock = match ConstantDocblockComment::create(context, constant) {
-        Ok(docblock) => docblock,
-        Err(parse_error) => {
+    let document = parse_docblock(context, constant);
+
+    if let Some(document) = document.as_ref() {
+        for parse_error in document.errors {
             class_like_metadata.issues.push(
                 Issue::error("Failed to parse constant docblock comment.")
                     .with_code(ScanningIssueKind::MalformedDocblockComment)
@@ -62,10 +65,8 @@ where
                     .with_note(parse_error.note())
                     .with_help(parse_error.help()),
             );
-
-            None
         }
-    };
+    }
 
     constant
         .items
@@ -90,26 +91,35 @@ where
                 meta.inferred_type = Some(TAtomic::Never);
             }
 
-            if let Some(docblock) = docblock.as_ref() {
-                if docblock.is_deprecated {
-                    meta.flags |= MetadataFlags::DEPRECATED;
+            if let Some(document) = document.as_ref() {
+                for tag in document.tags() {
+                    match &tag.value {
+                        TagValue::Deprecated(_) => {
+                            meta.flags |= MetadataFlags::DEPRECATED;
+                        }
+                        TagValue::NotDeprecated(_) => {
+                            meta.flags.set(MetadataFlags::DEPRECATED, false);
+                        }
+                        TagValue::Internal(_) => {
+                            meta.flags |= MetadataFlags::INTERNAL;
+                        }
+                        TagValue::Experimental(_) => {
+                            meta.flags |= MetadataFlags::EXPERIMENTAL;
+                        }
+                        TagValue::Final(_) => {
+                            meta.flags |= MetadataFlags::FINAL;
+                        }
+                        _ => {}
+                    }
                 }
 
-                if docblock.is_internal {
-                    meta.flags |= MetadataFlags::INTERNAL;
-                }
+                let var = find_most_trusted_tag(document, |tag| match &tag.value {
+                    TagValue::Var(var) => Some(*var),
+                    _ => None,
+                });
 
-                if docblock.is_experimental {
-                    meta.flags |= MetadataFlags::EXPERIMENTAL;
-                }
-
-                if docblock.is_final {
-                    meta.flags |= MetadataFlags::FINAL;
-                }
-
-                if let Some(type_string) = &docblock.type_string {
-                    match get_type_metadata_from_type_string(context.arena, type_string, classname, type_context, scope)
-                    {
+                if let Some(var) = &var {
+                    match get_type_metadata_from_type(var.r#type, classname, type_context, scope) {
                         Ok(type_metadata) => {
                             let real_type = meta.type_declaration.as_ref();
                             let type_metadata = merge_type_preserving_nullability(type_metadata, real_type);

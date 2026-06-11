@@ -2,9 +2,10 @@ use mago_allocator::Arena;
 use mago_word::Word;
 use std::collections::BTreeMap;
 
-use mago_docblock::tag::Visibility as DocblockVisibility;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
+use mago_phpdoc_syntax::cst::TagValue;
+use mago_phpdoc_syntax::cst::Visibility as DocblockVisibility;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -52,11 +53,10 @@ use crate::scanner::TemplateConstraintList;
 use crate::scanner::attribute::get_attribute_flags;
 use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::class_like_constant::scan_class_like_constants;
-use crate::scanner::docblock::ClassLikeDocblockComment;
-use crate::scanner::docblock::TraitUseDocblockComment;
+use crate::scanner::docblock::parse_docblock;
 use crate::scanner::enum_case::scan_enum_case;
 use crate::scanner::property::scan_properties;
-use crate::scanner::ttype::get_type_metadata_from_type_string;
+use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::symbol::SymbolKind;
 use crate::ttype::TType;
@@ -434,9 +434,10 @@ where
     }
 
     let mut type_context = TypeResolutionContext::new();
-    let docblock = match ClassLikeDocblockComment::create(context, span, scope) {
-        Ok(docblock) => docblock,
-        Err(parse_error) => {
+    let document = parse_docblock(context, span);
+
+    if let Some(document) = document {
+        for parse_error in document.errors {
             class_like_metadata.issues.push(
                 Issue::error("Failed to parse class-like docblock comment.")
                     .with_code(ScanningIssueKind::MalformedDocblockComment)
@@ -444,51 +445,64 @@ where
                     .with_note(parse_error.note())
                     .with_help(parse_error.help()),
             );
-
-            None
-        }
-    };
-
-    if let Some(docblock) = docblock {
-        if class_like_metadata.kind.is_interface() && docblock.is_enum_interface {
-            class_like_metadata.flags |= MetadataFlags::ENUM_INTERFACE;
         }
 
-        if docblock.is_final {
-            class_like_metadata.flags |= MetadataFlags::FINAL;
+        for tag in document.tags() {
+            match &tag.value {
+                TagValue::EnumInterface(_) => {
+                    if class_like_metadata.kind.is_interface() {
+                        class_like_metadata.flags |= MetadataFlags::ENUM_INTERFACE;
+                    }
+                }
+                TagValue::Final(_) => {
+                    class_like_metadata.flags |= MetadataFlags::FINAL;
+                }
+                TagValue::Deprecated(_) => {
+                    class_like_metadata.flags |= MetadataFlags::DEPRECATED;
+                }
+                TagValue::NotDeprecated(_) => {
+                    class_like_metadata.flags.set(MetadataFlags::DEPRECATED, false);
+                }
+                TagValue::Internal(_) => {
+                    class_like_metadata.flags |= MetadataFlags::INTERNAL;
+                }
+                TagValue::Experimental(_) => {
+                    class_like_metadata.flags |= MetadataFlags::EXPERIMENTAL;
+                }
+                TagValue::Api(_) => {
+                    class_like_metadata.flags |= MetadataFlags::API;
+                }
+                TagValue::ConsistentConstructor(_) => {
+                    class_like_metadata.flags |= MetadataFlags::CONSISTENT_CONSTRUCTOR;
+                }
+                TagValue::ConsistentTemplates(_) => {
+                    class_like_metadata.flags |= MetadataFlags::CONSISTENT_TEMPLATES;
+                }
+                TagValue::SealProperties(_) => {
+                    class_like_metadata.has_sealed_properties = Some(true);
+                }
+                TagValue::NoSealProperties(_) => {
+                    class_like_metadata.has_sealed_properties = Some(false);
+                }
+                TagValue::SealMethods(_) => {
+                    class_like_metadata.has_sealed_methods = Some(true);
+                }
+                TagValue::NoSealMethods(_) => {
+                    class_like_metadata.has_sealed_methods = Some(false);
+                }
+                _ => {}
+            }
         }
 
-        if docblock.is_deprecated {
-            class_like_metadata.flags |= MetadataFlags::DEPRECATED;
-        }
+        for tag in document.tags() {
+            let TagValue::TypeAliasImport(imported_type_alias) = &tag.value else {
+                continue;
+            };
 
-        if docblock.is_internal {
-            class_like_metadata.flags |= MetadataFlags::INTERNAL;
-        }
-
-        if docblock.is_experimental {
-            class_like_metadata.flags |= MetadataFlags::EXPERIMENTAL;
-        }
-
-        if docblock.is_api {
-            class_like_metadata.flags |= MetadataFlags::API;
-        }
-
-        if docblock.has_consistent_constructor {
-            class_like_metadata.flags |= MetadataFlags::CONSISTENT_CONSTRUCTOR;
-        }
-
-        if docblock.has_consistent_templates {
-            class_like_metadata.flags |= MetadataFlags::CONSISTENT_TEMPLATES;
-        }
-
-        class_like_metadata.has_sealed_methods = docblock.has_sealed_methods;
-        class_like_metadata.has_sealed_properties = docblock.has_sealed_properties;
-
-        for imported_type_alias in &docblock.imported_type_aliases {
-            let fqcn = ascii_lowercase_word(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
-            let type_name = word(&imported_type_alias.name);
-            let alias = imported_type_alias.alias.as_ref().map_or(type_name, |a| word(&a.0));
+            let fqcn =
+                ascii_lowercase_word(&scope.resolve_str(NameKind::Default, imported_type_alias.imported_from.value).0);
+            let type_name = word(imported_type_alias.imported_alias.value);
+            let alias = imported_type_alias.imported_as.as_ref().map_or(type_name, |a| word(a.local.value));
 
             if fqcn == name {
                 continue;
@@ -497,22 +511,29 @@ where
             type_context = type_context.with_imported_type_alias(alias, fqcn, type_name);
         }
 
-        for type_alias in &docblock.type_aliases {
-            type_context = type_context.with_type_alias(word(&type_alias.name));
+        for tag in document.tags() {
+            let TagValue::TypeAlias(type_alias) = &tag.value else {
+                continue;
+            };
+
+            type_context = type_context.with_type_alias(word(type_alias.alias.value));
+        }
+
+        for tag in document.tags() {
+            if let TagValue::Template(template) = &tag.value {
+                scope.add(NameKind::Default, template.name.value, &(None as Option<&str>));
+            }
         }
 
         let mut template_variance = Vec::new();
-        for template in &docblock.templates {
-            let template_name = word(&template.name);
-            let template_as_type = if let Some(type_string) = &template.type_string {
-                match builder::get_type_from_string(
-                    context.arena,
-                    &type_string.value,
-                    type_string.span,
-                    scope,
-                    &type_context,
-                    Some(name),
-                ) {
+        for tag in document.tags() {
+            let TagValue::Template(template) = &tag.value else {
+                continue;
+            };
+
+            let template_name = word(template.name.value);
+            let template_as_type = if let Some(bound) = &template.bound {
+                match builder::get_union_from_type(bound.r#type, scope, &type_context, Some(name)) {
                     Ok(tunion) => tunion,
                     Err(typing_error) => {
                         class_like_metadata.issues.push(
@@ -532,15 +553,8 @@ where
                 get_mixed()
             };
 
-            let template_default = if let Some(type_string) = &template.default {
-                match builder::get_type_from_string(
-                    context.arena,
-                    &type_string.value,
-                    type_string.span,
-                    scope,
-                    &type_context,
-                    Some(name),
-                ) {
+            let template_default = if let Some(default) = &template.default {
+                match builder::get_union_from_type(default.r#type, scope, &type_context, Some(name)) {
                     Ok(tunion) => Some(tunion),
                     Err(typing_error) => {
                         class_like_metadata.issues.push(
@@ -566,14 +580,7 @@ where
             class_like_metadata.add_template_type(template_name, definition.clone());
             type_context = type_context.with_template_definition(template_name, vec![definition]);
 
-            let variance = if template.covariant {
-                Variance::Covariant
-            } else if template.contravariant {
-                Variance::Contravariant
-            } else {
-                Variance::Invariant
-            };
-
+            let variance = Variance::from(template.variance);
             if variance.is_readonly() {
                 class_like_metadata.template_readonly.insert(template_name);
             }
@@ -585,17 +592,22 @@ where
 
         // Aliases were already registered in `type_context` above; here we
         // record them on the class metadata and report any diagnostics.
-        for imported_type_alias in docblock.imported_type_aliases {
-            let fqcn = ascii_lowercase_word(&scope.resolve_str(NameKind::Default, &imported_type_alias.from).0);
-            let type_name = word(&imported_type_alias.name);
-            let alias = imported_type_alias.alias.as_ref().map_or(type_name, |a| word(&a.0));
+        for tag in document.tags() {
+            let TagValue::TypeAliasImport(imported_type_alias) = &tag.value else {
+                continue;
+            };
+
+            let fqcn =
+                ascii_lowercase_word(&scope.resolve_str(NameKind::Default, imported_type_alias.imported_from.value).0);
+            let type_name = word(imported_type_alias.imported_alias.value);
+            let alias = imported_type_alias.imported_as.as_ref().map_or(type_name, |a| word(a.local.value));
 
             if fqcn == name {
                 class_like_metadata.issues.push(
                     Issue::help("Type alias is importing from itself, which is unnecessary.")
                         .with_code(ScanningIssueKind::CircularTypeImport)
                         .with_annotation(
-                            Annotation::primary(imported_type_alias.span)
+                            Annotation::primary(imported_type_alias.span())
                                 .with_message(format!("Type alias `{type_name}` is already defined in this class")),
                         )
                         .with_help("Remove this import statement as the type is already available locally."),
@@ -604,18 +616,16 @@ where
                 continue;
             }
 
-            class_like_metadata.imported_type_aliases.insert(alias, (fqcn, type_name, imported_type_alias.span));
+            class_like_metadata.imported_type_aliases.insert(alias, (fqcn, type_name, imported_type_alias.span()));
         }
 
-        for type_alias in &docblock.type_aliases {
-            let alias_name = word(&type_alias.name);
-            match get_type_metadata_from_type_string(
-                context.arena,
-                &type_alias.type_string,
-                Some(name),
-                &type_context,
-                scope,
-            ) {
+        for tag in document.tags() {
+            let TagValue::TypeAlias(type_alias) = &tag.value else {
+                continue;
+            };
+
+            let alias_name = word(type_alias.alias.value);
+            match get_type_metadata_from_type(type_alias.r#type, Some(name), &type_context, scope) {
                 Ok(type_metadata) => {
                     class_like_metadata.type_aliases.insert(alias_name, type_metadata);
                 }
@@ -633,37 +643,36 @@ where
             }
         }
 
-        for extended_type in docblock.template_extends {
-            let extended_union = match builder::get_type_from_string(
-                context.arena,
-                &extended_type.value,
-                extended_type.span,
-                scope,
-                &type_context,
-                Some(name),
-            ) {
-                Ok(tunion) => tunion,
-                Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the generic type in the `@extends` tag.")
-                            .with_code(ScanningIssueKind::InvalidExtendsTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
-
-                    continue;
-                }
+        for tag in document.tags() {
+            let TagValue::Extends(extended_type) = &tag.value else {
+                continue;
             };
+
+            let extended_union =
+                match builder::get_union_from_type(extended_type.r#type, scope, &type_context, Some(name)) {
+                    Ok(tunion) => tunion,
+                    Err(typing_error) => {
+                        class_like_metadata.issues.push(
+                            Issue::error("Could not resolve the generic type in the `@extends` tag.")
+                                .with_code(ScanningIssueKind::InvalidExtendsTag)
+                                .with_annotation(
+                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                )
+                                .with_note(typing_error.note())
+                                .with_help(typing_error.help()),
+                        );
+
+                        continue;
+                    }
+                };
 
             if !extended_union.is_single() {
                 class_like_metadata.issues.push(
                     Issue::error("The `@extends` tag must specify a single parent class.")
                         .with_code(ScanningIssueKind::InvalidExtendsTag)
                         .with_annotation(
-                            Annotation::primary(extended_type.span).with_message("Union types are not allowed here."),
+                            Annotation::primary(extended_type.r#type.span())
+                                .with_message("Union types are not allowed here."),
                         )
                         .with_note("The `@extends` tag provides concrete types for generics from a direct parent type.")
                         .with_help("Provide a single parent type, e.g., `@extends Box<string>`."),
@@ -682,7 +691,7 @@ where
                     Issue::error("The `@extends` tag expects a generic class type.")
                         .with_code(ScanningIssueKind::InvalidExtendsTag)
                         .with_annotation(
-                            Annotation::primary(extended_type.span)
+                            Annotation::primary(extended_type.r#type.span())
                                 .with_message("This must be a class name, not a primitive or other complex type."),
                         )
                         .with_note(
@@ -706,7 +715,7 @@ where
                 class_like_metadata.issues.push(
                     Issue::error("`@extends` tag must refer to a direct parent class or interface.")
                         .with_code(ScanningIssueKind::InvalidExtendsTag)
-                        .with_annotation(Annotation::primary(extended_type.span).with_message(format!(
+                        .with_annotation(Annotation::primary(extended_type.r#type.span()).with_message(format!(
                             "The class `{parent_name}` is not a direct parent."
                         )))
                         .with_note("The `@extends` tag is used to provide type information for the class or interface that is directly extended.")
@@ -724,37 +733,35 @@ where
             }
         }
 
-        for implemented_type in docblock.template_implements {
-            let implemented_union = match builder::get_type_from_string(
-                context.arena,
-                &implemented_type.value,
-                implemented_type.span,
-                scope,
-                &type_context,
-                Some(name),
-            ) {
-                Ok(tunion) => tunion,
-                Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the interface name in the `@implements` tag.")
-                            .with_code(ScanningIssueKind::InvalidImplementsTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
-
-                    continue;
-                }
+        for tag in document.tags() {
+            let TagValue::Implements(implemented_type) = &tag.value else {
+                continue;
             };
+
+            let implemented_union =
+                match builder::get_union_from_type(implemented_type.r#type, scope, &type_context, Some(name)) {
+                    Ok(tunion) => tunion,
+                    Err(typing_error) => {
+                        class_like_metadata.issues.push(
+                            Issue::error("Could not resolve the interface name in the `@implements` tag.")
+                                .with_code(ScanningIssueKind::InvalidImplementsTag)
+                                .with_annotation(
+                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                )
+                                .with_note(typing_error.note())
+                                .with_help(typing_error.help()),
+                        );
+
+                        continue;
+                    }
+                };
 
             if !implemented_union.is_single() {
                 class_like_metadata.issues.push(
                     Issue::error("The `@implements` tag expects a single interface type.")
                         .with_code(ScanningIssueKind::InvalidImplementsTag)
                         .with_annotation(
-                            Annotation::primary(implemented_type.span).with_message("Union types are not supported here."),
+                            Annotation::primary(implemented_type.r#type.span()).with_message("Union types are not supported here."),
                         )
                         .with_note("The `@implements` tag provides concrete types for generics from a direct parent interface.")
                         .with_help("Provide a single parent interface, e.g., `@implements Serializable<string>`."),
@@ -774,7 +781,7 @@ where
                         Issue::error("The `@implements` tag expects a single interface type.")
                             .with_code(ScanningIssueKind::InvalidImplementsTag)
                             .with_annotation(
-                                Annotation::primary(implemented_type.span)
+                                Annotation::primary(implemented_type.r#type.span())
                                     .with_message(format!("This must be an interface, not `{atomic_str}`.")),
                             )
                             .with_note("The `@implements` tag provides concrete types for type parameters from a direct parent interface.")
@@ -791,7 +798,7 @@ where
                 class_like_metadata.issues.push(
                     Issue::error("The `@implements` tag must refer to a direct parent interface.")
                         .with_code(ScanningIssueKind::InvalidImplementsTag)
-                        .with_annotation(Annotation::primary(implemented_type.span).with_message(format!(
+                        .with_annotation(Annotation::primary(implemented_type.r#type.span()).with_message(format!(
                             "The interface `{parent_name}` is not a direct parent."
                         )))
                         .with_note("The `@implements` tag is used to provide type information for the interface that is directly implemented.")
@@ -809,37 +816,35 @@ where
             }
         }
 
-        for require_extend in docblock.require_extends {
-            let required_union = match builder::get_type_from_string(
-                context.arena,
-                &require_extend.value,
-                require_extend.span,
-                scope,
-                &type_context,
-                Some(name),
-            ) {
-                Ok(tunion) => tunion,
-                Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the class name in the `@require-extends` tag.")
-                            .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
-
-                    continue;
-                }
+        for tag in document.tags() {
+            let TagValue::RequireExtends(require_extend) = &tag.value else {
+                continue;
             };
+
+            let required_union =
+                match builder::get_union_from_type(require_extend.r#type, scope, &type_context, Some(name)) {
+                    Ok(tunion) => tunion,
+                    Err(typing_error) => {
+                        class_like_metadata.issues.push(
+                            Issue::error("Could not resolve the class name in the `@require-extends` tag.")
+                                .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
+                                .with_annotation(
+                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                )
+                                .with_note(typing_error.note())
+                                .with_help(typing_error.help()),
+                        );
+
+                        continue;
+                    }
+                };
 
             if !required_union.is_single() {
                 class_like_metadata.issues.push(
                     Issue::error("The `@require-extends` tag expects a single class name.")
                         .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
                         .with_annotation(
-                            Annotation::primary(require_extend.span)
+                            Annotation::primary(require_extend.r#type.span())
                                 .with_message("Union types are not supported here."),
                         )
                         .with_note("The `@require-extends` tag forces any type that inherits from this one to also extend a specific base class.")
@@ -860,7 +865,7 @@ where
                         Issue::error("The `@require-extends` tag expects a single class name.")
                             .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
                             .with_annotation(
-                                Annotation::primary(require_extend.span)
+                                Annotation::primary(require_extend.r#type.span())
                                     .with_message("Intersection types are not supported here."),
                             )
                             .with_note("The `@require-extends` tag forces any type that inherits from this one to also extend a specific base class.")
@@ -876,7 +881,7 @@ where
                     Issue::error("The `@require-extends` tag expects a single class name.")
                         .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
                         .with_annotation(
-                            Annotation::primary(require_extend.span)
+                            Annotation::primary(require_extend.r#type.span())
                                 .with_message("This must be a class name, not a primitive or other complex type.")
                         )
                         .with_note("The `@require-extends` tag forces any type that inherits from this one to also extend a specific base class.")
@@ -892,37 +897,35 @@ where
             }
         }
 
-        for require_implements in docblock.require_implements {
-            let required_union = match builder::get_type_from_string(
-                context.arena,
-                &require_implements.value,
-                require_implements.span,
-                scope,
-                &type_context,
-                Some(name),
-            ) {
-                Ok(tunion) => tunion,
-                Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the interface name in the `@require-implements` tag.")
-                            .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
-
-                    continue;
-                }
+        for tag in document.tags() {
+            let TagValue::RequireImplements(require_implements) = &tag.value else {
+                continue;
             };
+
+            let required_union =
+                match builder::get_union_from_type(require_implements.r#type, scope, &type_context, Some(name)) {
+                    Ok(tunion) => tunion,
+                    Err(typing_error) => {
+                        class_like_metadata.issues.push(
+                            Issue::error("Could not resolve the interface name in the `@require-implements` tag.")
+                                .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
+                                .with_annotation(
+                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                )
+                                .with_note(typing_error.note())
+                                .with_help(typing_error.help()),
+                        );
+
+                        continue;
+                    }
+                };
 
             if !required_union.is_single() {
                 class_like_metadata.issues.push(
                     Issue::error("The `@require-implements` tag expects a single interface name.")
                         .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
                         .with_annotation(
-                            Annotation::primary(require_implements.span)
+                            Annotation::primary(require_implements.r#type.span())
                                 .with_message("Union types are not supported here."),
                         )
                         .with_note("The `@require-implements` tag forces any type that inherits from this one to also implement a specific interface.")
@@ -943,7 +946,7 @@ where
                         Issue::error("The `@require-implements` tag expects a single interface name.")
                             .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
                             .with_annotation(
-                                Annotation::primary(require_implements.span)
+                                Annotation::primary(require_implements.r#type.span())
                                     .with_message("Intersection types are not supported here."),
                             )
                             .with_note("The `@require-implements` tag forces any type that inherits from this one to also implement a specific interface.")
@@ -959,7 +962,7 @@ where
                     Issue::error("The `@require-implements` tag expects a single interface name.")
                         .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
                         .with_annotation(
-                            Annotation::primary(require_implements.span)
+                            Annotation::primary(require_implements.r#type.span())
                                 .with_message("This must be an interface, not a primitive or other complex type."),
                         )
                         .with_note("The `@require-implements` tag forces any type that inherits from this one to also implement a specific interface.")
@@ -975,15 +978,15 @@ where
             }
         }
 
-        if let Some(inheritors) = docblock.inheritors {
-            match builder::get_type_from_string(
-                context.arena,
-                &inheritors.value,
-                inheritors.span,
-                scope,
-                &type_context,
-                Some(name),
-            ) {
+        let mut inheritors = None;
+        for tag in document.tags() {
+            if let TagValue::Inheritors(inheritors_tag) = &tag.value {
+                inheritors = Some(*inheritors_tag);
+            }
+        }
+
+        if let Some(inheritors) = inheritors {
+            match builder::get_union_from_type(inheritors.r#type, scope, &type_context, Some(name)) {
                 Ok(inheritors_union) => {
                     for inheritor in inheritors_union.types.as_ref() {
                         match inheritor {
@@ -998,7 +1001,7 @@ where
                                     Issue::error("The `@inheritors` tag only accepts class, interface, or enum names.")
                                         .with_code(ScanningIssueKind::InvalidInheritorsTag)
                                         .with_annotation(
-                                            Annotation::primary(inheritors.span)
+                                            Annotation::primary(inheritors.r#type.span())
                                                 .with_message("This type is not a simple class-like name."),
                                         ),
                                 );
@@ -1020,15 +1023,12 @@ where
             }
         }
 
-        for mixin in &docblock.mixins {
-            match builder::get_type_from_string(
-                context.arena,
-                &mixin.value,
-                mixin.span,
-                scope,
-                &type_context,
-                Some(name),
-            ) {
+        for tag in document.tags() {
+            let TagValue::Mixin(mixin) = &tag.value else {
+                continue;
+            };
+
+            match builder::get_union_from_type(mixin.r#type, scope, &type_context, Some(name)) {
                 Ok(mixin_type) => {
                     class_like_metadata.mixins.push(mixin_type);
                 }
@@ -1046,8 +1046,12 @@ where
             }
         }
 
-        for method_tag in &docblock.methods {
-            let method_name = ascii_lowercase_word(&method_tag.method.name);
+        for tag in document.tags() {
+            let TagValue::Method(method_tag) = &tag.value else {
+                continue;
+            };
+
+            let method_name = ascii_lowercase_word(method_tag.name.value);
             class_like_metadata.methods.insert(method_name);
             class_like_metadata.pseudo_methods.insert(method_name);
             class_like_metadata
@@ -1059,8 +1063,8 @@ where
             let mut function_like_metadata = FunctionLikeMetadata::new(
                 FunctionLikeKind::Method,
                 method_name,
-                word(&method_tag.method.name),
-                method_tag.span,
+                word(method_tag.name.value),
+                method_tag.span(),
                 MetadataFlags::empty(),
             );
 
@@ -1068,62 +1072,63 @@ where
                 continue;
             };
 
-            method_metadata.is_static = method_tag.method.is_static;
-            method_metadata.visibility = match method_tag.method.visibility {
-                DocblockVisibility::Public => Visibility::Public,
-                DocblockVisibility::Protected => Visibility::Protected,
-                DocblockVisibility::Private => Visibility::Private,
+            method_metadata.is_static = method_tag.is_static();
+            method_metadata.visibility = match method_tag.visibility {
+                None | Some(DocblockVisibility::Public(_)) => Visibility::Public,
+                Some(DocblockVisibility::Protected(_)) => Visibility::Protected,
+                Some(DocblockVisibility::Private(_)) => Visibility::Private,
             };
 
-            function_like_metadata.flags.set(MetadataFlags::STATIC, method_tag.method.is_static);
+            function_like_metadata.flags.set(MetadataFlags::STATIC, method_tag.is_static());
             function_like_metadata.flags.set(MetadataFlags::MAGIC_METHOD, true);
 
-            for argument in &method_tag.method.argument_list {
+            for argument in method_tag.parameters.entries.iter() {
                 let mut function_parameter_metadata = FunctionLikeParameterMetadata::new(
-                    VariableIdentifier(word(&argument.variable.name)),
-                    argument.argument_span,
-                    argument.variable_span,
+                    VariableIdentifier(word(argument.parameter.value)),
+                    argument.span(),
+                    argument.parameter.span(),
                     MetadataFlags::empty(),
                 );
 
-                if let Some(type_hint) = &argument.type_hint {
+                if let Some(parameter_type) = argument.r#type {
                     function_parameter_metadata.set_type_declaration_metadata(
-                        get_type_metadata_from_type_string(context.arena, type_hint, Some(name), &type_context, scope)
-                            .ok(),
+                        get_type_metadata_from_type(parameter_type, Some(name), &type_context, scope).ok(),
                     );
                 }
 
-                if argument.variable.is_variadic {
+                if argument.is_variadic() {
                     function_parameter_metadata.flags.set(MetadataFlags::VARIADIC, true);
                 }
 
-                if argument.variable.is_by_reference {
+                if argument.is_by_reference() {
                     function_parameter_metadata.flags.set(MetadataFlags::BY_REFERENCE, true);
                 }
 
-                if argument.has_default {
+                if argument.is_optional() {
                     function_parameter_metadata.flags.set(MetadataFlags::HAS_DEFAULT, true);
                 }
 
                 function_like_metadata.parameters.push(function_parameter_metadata);
             }
 
-            function_like_metadata.return_type_metadata = get_type_metadata_from_type_string(
-                context.arena,
-                &method_tag.type_string,
-                Some(name),
-                &type_context,
-                scope,
-            )
-            .ok();
+            function_like_metadata.return_type_metadata = method_tag.return_type.and_then(|return_type| {
+                get_type_metadata_from_type(return_type, Some(name), &type_context, scope).ok()
+            });
 
             codebase.function_likes.insert(method_id, function_like_metadata);
         }
 
-        for property in &docblock.properties {
-            let property_name = word(&property.variable.name);
-            let type_metadata = if let Some(type_string) = &property.type_string {
-                match get_type_metadata_from_type_string(context.arena, type_string, Some(name), &type_context, scope) {
+        for tag in document.tags() {
+            let (property, is_read, is_write) = match &tag.value {
+                TagValue::Property(property) => (property, true, true),
+                TagValue::PropertyRead(property) => (property, true, false),
+                TagValue::PropertyWrite(property) => (property, false, true),
+                _ => continue,
+            };
+
+            let property_name = word(property.variable.value);
+            let type_metadata = if let Some(property_type) = property.r#type {
+                match get_type_metadata_from_type(property_type, Some(name), &type_context, scope) {
                     Ok(type_metadata) => Some(type_metadata),
                     Err(typing_error) => {
                         class_like_metadata.issues.push(
@@ -1144,17 +1149,17 @@ where
             };
 
             let mut new_property = PropertyMetadata::new(VariableIdentifier(property_name), MetadataFlags::empty());
-            if property.is_read {
+            if is_read {
                 new_property.read_visibility = Visibility::Public;
             }
 
-            if property.is_write {
+            if is_write {
                 new_property.write_visibility = Visibility::Public;
             }
 
-            if property.is_read && !property.is_write {
+            if is_read && !is_write {
                 new_property.flags.set(MetadataFlags::READONLY, true);
-            } else if !property.is_read && property.is_write {
+            } else if !is_read && is_write {
                 new_property.flags.set(MetadataFlags::WRITEONLY, true);
             }
 
@@ -1311,58 +1316,52 @@ where
                     }
                 }
 
-                let docblock = match TraitUseDocblockComment::create(context, trait_use) {
-                    Ok(docblock) => docblock,
-                    Err(parse_error) => {
-                        class_like_metadata.issues.push(
-                            Issue::error("Failed to parse trait use docblock comment.")
-                                .with_code(ScanningIssueKind::MalformedDocblockComment)
-                                .with_annotation(
-                                    Annotation::primary(parse_error.span()).with_message(parse_error.to_string()),
-                                )
-                                .with_note(parse_error.note())
-                                .with_help(parse_error.help()),
-                        );
-
-                        continue;
-                    }
-                };
-
-                let Some(docblock) = docblock else {
+                let Some(document) = parse_docblock(context, trait_use) else {
                     continue;
                 };
 
-                for template_use in docblock.template_use {
-                    let template_use_type = match builder::get_type_from_string(
-                        context.arena,
-                        &template_use.value,
-                        template_use.span,
-                        scope,
-                        &type_context,
-                        Some(name),
-                    ) {
-                        Ok(template_use_type) => template_use_type,
-                        Err(typing_error) => {
-                            class_like_metadata.issues.push(
-                                Issue::error("Could not resolve the trait type in the `@use` tag.")
-                                    .with_code(ScanningIssueKind::InvalidUseTag)
-                                    .with_annotation(
-                                        Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                    )
-                                    .with_note(typing_error.note())
-                                    .with_help(typing_error.help()),
-                            );
+                for parse_error in document.errors {
+                    class_like_metadata.issues.push(
+                        Issue::error("Failed to parse trait use docblock comment.")
+                            .with_code(ScanningIssueKind::MalformedDocblockComment)
+                            .with_annotation(
+                                Annotation::primary(parse_error.span()).with_message(parse_error.to_string()),
+                            )
+                            .with_note(parse_error.note())
+                            .with_help(parse_error.help()),
+                    );
+                }
 
-                            continue;
-                        }
+                for tag in document.tags() {
+                    let TagValue::Use(template_use) = &tag.value else {
+                        continue;
                     };
+
+                    let template_use_type =
+                        match builder::get_union_from_type(template_use.r#type, scope, &type_context, Some(name)) {
+                            Ok(template_use_type) => template_use_type,
+                            Err(typing_error) => {
+                                class_like_metadata.issues.push(
+                                    Issue::error("Could not resolve the trait type in the `@use` tag.")
+                                        .with_code(ScanningIssueKind::InvalidUseTag)
+                                        .with_annotation(
+                                            Annotation::primary(typing_error.span())
+                                                .with_message(typing_error.to_string()),
+                                        )
+                                        .with_note(typing_error.note())
+                                        .with_help(typing_error.help()),
+                                );
+
+                                continue;
+                            }
+                        };
 
                     if !template_use_type.is_single() {
                         class_like_metadata.issues.push(
                             Issue::error("The `@use` tag expects a single trait type.")
                                 .with_code(ScanningIssueKind::InvalidUseTag)
                                 .with_annotation(
-                                    Annotation::primary(template_use.span)
+                                    Annotation::primary(template_use.r#type.span())
                                         .with_message("Union types are not allowed here."),
                                 )
                                 .with_note("The `@use` tag provides concrete types for generics from a trait.")
@@ -1382,7 +1381,7 @@ where
                             Issue::error("The `@use` tag expects a single trait type.")
                                 .with_code(ScanningIssueKind::InvalidUseTag)
                                 .with_annotation(
-                                    Annotation::primary(template_use.span).with_message(
+                                    Annotation::primary(template_use.r#type.span()).with_message(
                                         "This must be a trait name, not a primitive or other complex type.",
                                     ),
                                 )
@@ -1399,7 +1398,7 @@ where
                             Issue::error("The `@use` tag must refer to a trait that is used.")
                                 .with_code(ScanningIssueKind::InvalidUseTag)
                                 .with_annotation(
-                                    Annotation::primary(template_use.span).with_message(format!(
+                                    Annotation::primary(template_use.r#type.span()).with_message(format!(
                                         "The trait `{trait_name}` is not used in this class.",
                                     )),
                                 )
@@ -1427,7 +1426,7 @@ where
                                 Issue::error("The `@use` tag must specify type parameters.")
                                     .with_code(ScanningIssueKind::InvalidUseTag)
                                     .with_annotation(
-                                        Annotation::primary(template_use.span).with_message(
+                                        Annotation::primary(template_use.r#type.span()).with_message(
                                             "This tag must provide type parameters for the trait.",
                                         ),
                                     )
@@ -1438,12 +1437,16 @@ where
                     }
                 }
 
-                for template_implements in docblock.template_implements {
+                for tag in document.tags() {
+                    let TagValue::Implements(template_implements) = &tag.value else {
+                        continue;
+                    };
+
                     class_like_metadata.issues.push(
                         Issue::error("The `@implements` tag is not allowed in trait use.")
                             .with_code(ScanningIssueKind::InvalidUseTag)
                             .with_annotation(
-                                Annotation::primary(template_implements.span)
+                                Annotation::primary(template_implements.span())
                                     .with_message("Use `@use` for traits, not `@implements`."),
                             )
                             .with_note("The `@implements` tag is used for interface, not traits.")
@@ -1451,12 +1454,16 @@ where
                     );
                 }
 
-                for template_extends in docblock.template_extends {
+                for tag in document.tags() {
+                    let TagValue::Extends(template_extends) = &tag.value else {
+                        continue;
+                    };
+
                     class_like_metadata.issues.push(
                         Issue::error("The `@extends` tag is not allowed in trait use.")
                             .with_code(ScanningIssueKind::InvalidUseTag)
                             .with_annotation(
-                                Annotation::primary(template_extends.span)
+                                Annotation::primary(template_extends.span())
                                     .with_message("Use `@use` for traits, not `@extends`."),
                             )
                             .with_note("The `@extends` tag is used for classes and interfaces, not traits.")

@@ -18,20 +18,18 @@ property-tests = []
 serde = [
     "dep:serde",
     "mago-reporting/serde",
-    "mago-docblock/serde",
+    "mago-phpdoc-syntax/serde",
     "mago-word/serde",
-    "mago-type-syntax/serde",
     "mago-php-version/serde",
 ]
 
 [dependencies]
 mago-reporting = { workspace = true }
-mago-docblock = { workspace = true }
+mago-phpdoc-syntax = { workspace = true }
 mago-word = { workspace = true }
 mago-bytes = { workspace = true }
 mago-span = { workspace = true }
 mago-syntax = { workspace = true }
-mago-type-syntax = { workspace = true }
 mago-names = { workspace = true }
 mago-database = { workspace = true }
 mago-fingerprint = { workspace = true }

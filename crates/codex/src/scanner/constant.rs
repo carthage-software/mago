@@ -1,6 +1,7 @@
 use mago_allocator::Arena;
-use mago_docblock::error::ParseError;
 use mago_names::scope::NamespaceScope;
+use mago_phpdoc_syntax::cst::Document;
+use mago_phpdoc_syntax::cst::TagValue;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -16,9 +17,10 @@ use crate::metadata::constant::ConstantMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
-use crate::scanner::docblock::ConstantDocblockComment;
+use crate::scanner::docblock::find_most_trusted_tag;
+use crate::scanner::docblock::parse_docblock;
 use crate::scanner::inference::infer;
-use crate::scanner::ttype::get_type_metadata_from_type_string;
+use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::resolution::TypeResolutionContext;
 
@@ -35,7 +37,7 @@ where
     let verdict = evaluate_version_attributes(&constant.attribute_lists, context, context.php_version);
 
     let attributes = scan_attribute_lists(&constant.attribute_lists, context);
-    let docblock = ConstantDocblockComment::create(context, constant);
+    let document = parse_docblock(context, constant);
 
     let flags = MetadataFlags::origin_flags(context.file.file_type);
 
@@ -50,7 +52,7 @@ where
             metadata.attributes.clone_from(&attributes);
             metadata.inferred_type = infer(context, scope, item.value, None);
 
-            process_constant_docblock(context.arena, &mut metadata, &docblock, None, type_context, scope);
+            process_constant_docblock(&mut metadata, document.as_ref(), None, type_context, scope);
 
             if metadata.attributes.iter().any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"Deprecated")) {
                 metadata.flags |= MetadataFlags::DEPRECATED;
@@ -88,7 +90,7 @@ where
         return None;
     };
 
-    let docblock = ConstantDocblockComment::create(context, define);
+    let document = parse_docblock(context, define);
 
     let name = ascii_lowercase_constant_name_word(name_string.value?);
     let flags = MetadataFlags::origin_flags(context.file.file_type);
@@ -96,57 +98,58 @@ where
     let mut metadata = ConstantMetadata::new(name, define.span(), flags);
     metadata.inferred_type = infer(context, scope, value_arg.value(), None);
 
-    process_constant_docblock(context.arena, &mut metadata, &docblock, None, type_context, scope);
+    process_constant_docblock(&mut metadata, document.as_ref(), None, type_context, scope);
 
     Some(metadata)
 }
 
 #[inline]
-fn process_constant_docblock<A>(
-    arena: &A,
+fn process_constant_docblock(
     metadata: &mut ConstantMetadata,
-    docblock: &Result<Option<ConstantDocblockComment>, ParseError>,
+    document: Option<&Document<'_>>,
     classname: Option<Word>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
-) where
-    A: Arena,
-{
-    let docblock = match docblock {
-        Ok(docblock) => match docblock {
-            Some(docblock) => docblock,
-            None => {
-                // No docblock comment found, return.
-                return;
-            }
-        },
-        Err(parse_error) => {
-            metadata.issues.push(
-                Issue::error("Failed to parse constant docblock comment.")
-                    .with_code(ScanningIssueKind::MalformedDocblockComment)
-                    .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
-                    .with_note(parse_error.note())
-                    .with_help(parse_error.help()),
-            );
-
-            return;
-        }
+) {
+    let Some(document) = document else {
+        return;
     };
 
-    if docblock.is_deprecated {
-        metadata.flags |= MetadataFlags::DEPRECATED;
+    for parse_error in document.errors {
+        metadata.issues.push(
+            Issue::error("Failed to parse constant docblock comment.")
+                .with_code(ScanningIssueKind::MalformedDocblockComment)
+                .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
+                .with_note(parse_error.note())
+                .with_help(parse_error.help()),
+        );
     }
 
-    if docblock.is_internal {
-        metadata.flags |= MetadataFlags::INTERNAL;
+    for tag in document.tags() {
+        match &tag.value {
+            TagValue::Deprecated(_) => {
+                metadata.flags |= MetadataFlags::DEPRECATED;
+            }
+            TagValue::NotDeprecated(_) => {
+                metadata.flags.set(MetadataFlags::DEPRECATED, false);
+            }
+            TagValue::Internal(_) => {
+                metadata.flags |= MetadataFlags::INTERNAL;
+            }
+            TagValue::Experimental(_) => {
+                metadata.flags |= MetadataFlags::EXPERIMENTAL;
+            }
+            _ => {}
+        }
     }
 
-    if docblock.is_experimental {
-        metadata.flags |= MetadataFlags::EXPERIMENTAL;
-    }
+    let var = find_most_trusted_tag(document, |tag| match &tag.value {
+        TagValue::Var(var) => Some(*var),
+        _ => None,
+    });
 
-    if let Some(type_string) = &docblock.type_string {
-        match get_type_metadata_from_type_string(arena, type_string, classname, type_context, scope) {
+    if let Some(var) = &var {
+        match get_type_metadata_from_type(var.r#type, classname, type_context, scope) {
             Ok(type_metadata) => {
                 metadata.type_metadata = Some(type_metadata);
             }

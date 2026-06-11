@@ -2,34 +2,11 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_allocator::Arena;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
-use mago_span::HasSpan;
-use mago_span::Span;
-use mago_type_syntax;
-use mago_type_syntax::cst::AliasName;
-use mago_type_syntax::cst::ArrayType;
-use mago_type_syntax::cst::AssociativeArrayType;
-use mago_type_syntax::cst::CallableType;
-use mago_type_syntax::cst::GenericParameters;
-use mago_type_syntax::cst::GlobalWildcardSelector;
-use mago_type_syntax::cst::Identifier;
-use mago_type_syntax::cst::IntOrKeyword;
-use mago_type_syntax::cst::LiteralIntOrFloatType;
-use mago_type_syntax::cst::MemberReferenceSelector;
-use mago_type_syntax::cst::PropertiesOfFilter;
-use mago_type_syntax::cst::ShapeKey;
-use mago_type_syntax::cst::ShapeType;
-use mago_type_syntax::cst::SingleGenericParameter;
-use mago_type_syntax::cst::Type;
-use mago_type_syntax::cst::UnionType;
-use mago_type_syntax::cst::object::ObjectType;
-use mago_word::Word;
-use mago_word::ascii_lowercase_word;
-use mago_word::concat_word;
-use mago_word::i64_word;
-use mago_word::word;
+use mago_phpdoc_syntax::cst::r#type::*;
+use mago_span::*;
+use mago_word::*;
 
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -55,80 +32,25 @@ use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::iterable::TIterable;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
-use crate::ttype::atomic::reference::TGlobalReferenceSelector;
-use crate::ttype::atomic::reference::TReference;
-use crate::ttype::atomic::reference::TReferenceMemberSelector;
+use crate::ttype::atomic::reference::*;
 use crate::ttype::atomic::scalar::TScalar;
-use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
-use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
+use crate::ttype::atomic::scalar::class_like_string::*;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::error::TypeError;
-use crate::ttype::get_arraykey;
-use crate::ttype::get_bool;
-use crate::ttype::get_callable_string;
-use crate::ttype::get_closed_resource;
-use crate::ttype::get_empty;
-use crate::ttype::get_empty_scalar;
-use crate::ttype::get_false;
-use crate::ttype::get_float;
-use crate::ttype::get_int;
-use crate::ttype::get_literal_float;
-use crate::ttype::get_literal_int;
-use crate::ttype::get_literal_string;
-use crate::ttype::get_lowercase_string;
-use crate::ttype::get_mixed;
-use crate::ttype::get_negative_int;
-use crate::ttype::get_never;
-use crate::ttype::get_non_empty_lowercase_string;
-use crate::ttype::get_non_empty_string;
-use crate::ttype::get_non_empty_unspecified_literal_string;
-use crate::ttype::get_non_empty_uppercase_string;
-use crate::ttype::get_non_negative_int;
-use crate::ttype::get_non_positive_int;
-use crate::ttype::get_non_zero_int;
-use crate::ttype::get_null;
-use crate::ttype::get_nullable_float;
-use crate::ttype::get_nullable_int;
-use crate::ttype::get_nullable_object;
-use crate::ttype::get_nullable_scalar;
-use crate::ttype::get_nullable_string;
-use crate::ttype::get_numeric;
-use crate::ttype::get_numeric_string;
-use crate::ttype::get_open_resource;
-use crate::ttype::get_positive_int;
-use crate::ttype::get_resource;
-use crate::ttype::get_scalar;
-use crate::ttype::get_string;
-use crate::ttype::get_string_with_props;
-use crate::ttype::get_true;
-use crate::ttype::get_truthy_mixed;
-use crate::ttype::get_truthy_string;
-use crate::ttype::get_unspecified_literal_float;
-use crate::ttype::get_unspecified_literal_int;
-use crate::ttype::get_unspecified_literal_string;
-use crate::ttype::get_uppercase_string;
-use crate::ttype::get_void;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::template::GenericTemplate;
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
+use crate::ttype::*;
 
-/// Parses a type string (typically from a `PHPDoc` comment) and resolves it
-/// into a semantic `TUnion` type representation.
-///
-/// This function orchestrates the two main phases:
-///
-/// 1. Parsing the raw string into an Abstract Syntax Tree (AST) using the `mago_type_syntax` crate.
-/// 2. Converting the AST into a `TUnion`, resolving names, templates, and
-///    keywords into their semantic counterparts.
+/// Converts a parsed `PHPDoc` type node into a semantic `TUnion` type representation,
+/// resolving names, templates, and keywords into their semantic counterparts.
 ///
 /// # Arguments
 ///
-/// * `type_string` - The raw string slice containing the type to parse (e.g., `"int|string"`).
-/// * `span` - The original `Span` of the `type_string` within its source file.
-///   This is crucial for accurate error reporting and position tracking.
-/// * `scope` - The `NamespaceScope` active at the location of the type string.
+/// * `ttype` - The type node, as parsed by the `mago_phpdoc_syntax` crate.
+/// * `scope` - The `NamespaceScope` active at the location of the type.
 ///   Used during conversion to resolve unqualified names, aliases (`use` statements),
 ///   and namespace-relative names.
 /// * `type_context` - The context providing information about currently defined
@@ -138,36 +60,6 @@ use crate::ttype::wrap_atomic;
 ///   of the current class context. Used during conversion to resolve
 ///   `self` type references. Should be `None` if not in a class context.
 ///
-/// # Returns
-///
-/// * `Ok(TUnion)`: The resolved semantic type representation on success.
-/// * `Err(TypeError)`: If any parsing or conversion error occurs.
-///
-/// # Errors
-///
-/// Returns a [`TypeError`] if:
-/// - The type string contains invalid syntax
-/// - An unsupported type construct is encountered
-/// - Type references cannot be resolved (e.g., `self` outside a class context)
-/// - Invalid type combinations are used (e.g., incompatible intersection types)
-pub fn get_type_from_string<'arena, A>(
-    arena: &'arena A,
-    type_string: &'arena [u8],
-    span: Span,
-    scope: &NamespaceScope,
-    type_context: &TypeResolutionContext,
-    classname: Option<Word>,
-) -> Result<TUnion, TypeError>
-where
-    A: Arena,
-{
-    let ast = mago_type_syntax::parse_str(arena, span, type_string)?;
-
-    get_union_from_type_ast(&ast, scope, type_context, classname)
-}
-
-/// Converts a type AST node into a semantic `TUnion` type representation.
-///
 /// # Errors
 ///
 /// Returns a [`TypeError`] if:
@@ -176,7 +68,7 @@ where
 /// - Invalid type combinations are used (e.g., incompatible intersection types)
 /// - Int range has minimum greater than maximum
 #[inline]
-pub fn get_union_from_type_ast(
+pub fn get_union_from_type(
     ttype: &Type<'_>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
@@ -184,7 +76,7 @@ pub fn get_union_from_type_ast(
 ) -> Result<TUnion, TypeError> {
     Ok(match ttype {
         Type::Parenthesized(parenthesized_type) => {
-            get_union_from_type_ast(parenthesized_type.inner, scope, type_context, classname)?
+            get_union_from_type(parenthesized_type.inner, scope, type_context, classname)?
         }
         Type::Nullable(nullable_type) => match nullable_type.inner {
             Type::Null(_) => get_null(),
@@ -193,7 +85,7 @@ pub fn get_union_from_type_ast(
             Type::Float(_) => get_nullable_float(),
             Type::Object(_) => get_nullable_object(),
             Type::Scalar(_) => get_nullable_scalar(),
-            _ => get_union_from_type_ast(nullable_type.inner, scope, type_context, classname)?.as_nullable(),
+            _ => get_union_from_type(nullable_type.inner, scope, type_context, classname)?.as_nullable(),
         },
         Type::Union(UnionType { left, right, .. }) if matches!(**left, Type::Null(_)) => match **right {
             Type::Null(_) => get_null(),
@@ -202,7 +94,7 @@ pub fn get_union_from_type_ast(
             Type::Float(_) => get_nullable_float(),
             Type::Object(_) => get_nullable_object(),
             Type::Scalar(_) => get_nullable_scalar(),
-            _ => get_union_from_type_ast(right, scope, type_context, classname)?.as_nullable(),
+            _ => get_union_from_type(right, scope, type_context, classname)?.as_nullable(),
         },
         Type::Union(UnionType { left, right, .. }) if matches!(**right, Type::Null(_)) => match **left {
             Type::Null(_) => get_null(),
@@ -211,11 +103,11 @@ pub fn get_union_from_type_ast(
             Type::Float(_) => get_nullable_float(),
             Type::Object(_) => get_nullable_object(),
             Type::Scalar(_) => get_nullable_scalar(),
-            _ => get_union_from_type_ast(left, scope, type_context, classname)?.as_nullable(),
+            _ => get_union_from_type(left, scope, type_context, classname)?.as_nullable(),
         },
         Type::Union(union_type) => {
-            let left = get_union_from_type_ast(union_type.left, scope, type_context, classname)?;
-            let right = get_union_from_type_ast(union_type.right, scope, type_context, classname)?;
+            let left = get_union_from_type(union_type.left, scope, type_context, classname)?;
+            let right = get_union_from_type(union_type.right, scope, type_context, classname)?;
 
             let combined_types: Vec<TAtomic> = left.types.iter().chain(right.types.iter()).cloned().collect();
 
@@ -253,8 +145,8 @@ pub fn get_union_from_type_ast(
                 return Ok(wrap_atomic(TAtomic::Object(TObject::new_has_method(word("__invoke")))));
             }
 
-            let left = get_union_from_type_ast(intersection.left, scope, type_context, classname)?;
-            let right = get_union_from_type_ast(intersection.right, scope, type_context, classname)?;
+            let left = get_union_from_type(intersection.left, scope, type_context, classname)?;
+            let right = get_union_from_type(intersection.right, scope, type_context, classname)?;
 
             let left_str = left.get_id();
             let right_str = right.get_id();
@@ -297,7 +189,7 @@ pub fn get_union_from_type_ast(
             TUnion::from_vec(intersection_types)
         }
         Type::Slice(slice) => {
-            wrap_atomic(get_array_type_from_ast(None, Some(slice.inner), false, scope, type_context, classname)?)
+            wrap_atomic(get_array_type(None, Some(slice.inner), false, scope, type_context, classname)?)
         }
         Type::Array(ArrayType { parameters, .. }) | Type::AssociativeArray(AssociativeArrayType { parameters, .. }) => {
             let (key, value) = match parameters {
@@ -310,7 +202,7 @@ pub fn get_union_from_type_ast(
                 None => (None, None),
             };
 
-            wrap_atomic(get_array_type_from_ast(key, value, false, scope, type_context, classname)?)
+            wrap_atomic(get_array_type(key, value, false, scope, type_context, classname)?)
         }
         Type::NonEmptyArray(non_empty_array) => {
             let (key, value) = match &non_empty_array.parameters {
@@ -323,19 +215,19 @@ pub fn get_union_from_type_ast(
                 None => (None, None),
             };
 
-            wrap_atomic(get_array_type_from_ast(key, value, true, scope, type_context, classname)?)
+            wrap_atomic(get_array_type(key, value, true, scope, type_context, classname)?)
         }
         Type::List(list_type) => {
             let value = list_type.parameters.as_ref().and_then(|p| p.entries.first().map(|g| &g.inner));
 
-            wrap_atomic(get_list_type_from_ast(value, false, scope, type_context, classname)?)
+            wrap_atomic(get_list_type(value, false, scope, type_context, classname)?)
         }
         Type::NonEmptyList(non_empty_list_type) => {
             let value = non_empty_list_type.parameters.as_ref().and_then(|p| p.entries.first().map(|g| &g.inner));
 
-            wrap_atomic(get_list_type_from_ast(value, true, scope, type_context, classname)?)
+            wrap_atomic(get_list_type(value, true, scope, type_context, classname)?)
         }
-        Type::ClassString(class_string_type) => get_class_string_type_from_ast(
+        Type::ClassString(class_string_type) => get_class_string_type(
             class_string_type.span(),
             TClassLikeStringKind::Class,
             class_string_type.parameter.as_ref(),
@@ -343,7 +235,7 @@ pub fn get_union_from_type_ast(
             type_context,
             classname,
         )?,
-        Type::InterfaceString(interface_string_type) => get_class_string_type_from_ast(
+        Type::InterfaceString(interface_string_type) => get_class_string_type(
             interface_string_type.span(),
             TClassLikeStringKind::Interface,
             interface_string_type.parameter.as_ref(),
@@ -351,7 +243,7 @@ pub fn get_union_from_type_ast(
             type_context,
             classname,
         )?,
-        Type::EnumString(enum_string_type) => get_class_string_type_from_ast(
+        Type::EnumString(enum_string_type) => get_class_string_type(
             enum_string_type.span(),
             TClassLikeStringKind::Enum,
             enum_string_type.parameter.as_ref(),
@@ -359,7 +251,7 @@ pub fn get_union_from_type_ast(
             type_context,
             classname,
         )?,
-        Type::TraitString(trait_string_type) => get_class_string_type_from_ast(
+        Type::TraitString(trait_string_type) => get_class_string_type(
             trait_string_type.span(),
             TClassLikeStringKind::Trait,
             trait_string_type.parameter.as_ref(),
@@ -367,27 +259,39 @@ pub fn get_union_from_type_ast(
             type_context,
             classname,
         )?,
+        Type::ClassLikeString(_) => {
+            return Err(TypeError::UnsupportedType(ttype.to_string(), ttype.span()));
+        }
         Type::MemberReference(member_reference) => {
-            let class_like_name = if member_reference.class.value.eq_ignore_ascii_case(b"self")
-                || member_reference.class.value.eq_ignore_ascii_case(b"static")
-                || member_reference.class.value.eq(b"this")
-                || member_reference.class.value.eq(b"$this")
-            {
-                let Some(classname) = classname else {
-                    return Err(TypeError::InvalidType(
-                        ttype.to_string(),
-                        "Cannot resolve `self` type reference outside of a class context".to_string(),
-                        member_reference.span(),
-                    ));
-                };
+            let class_like_name = match &member_reference.kind {
+                ReferenceKind::Self_(_) | ReferenceKind::Static(_) => {
+                    let Some(classname) = classname else {
+                        return Err(TypeError::InvalidType(
+                            ttype.to_string(),
+                            "Cannot resolve `self` type reference outside of a class context".to_string(),
+                            member_reference.span(),
+                        ));
+                    };
 
-                classname
-            } else if member_reference.class.value.eq_ignore_ascii_case(b"parent") {
-                word("parent")
-            } else {
-                let (class_like_name, _) = scope.resolve(NameKind::Default, member_reference.class.value);
+                    classname
+                }
+                ReferenceKind::Identifier(identifier) if identifier.value.eq(b"this") => {
+                    let Some(classname) = classname else {
+                        return Err(TypeError::InvalidType(
+                            ttype.to_string(),
+                            "Cannot resolve `self` type reference outside of a class context".to_string(),
+                            member_reference.span(),
+                        ));
+                    };
 
-                word(&class_like_name)
+                    classname
+                }
+                ReferenceKind::Parent(_) => word("parent"),
+                ReferenceKind::Identifier(identifier) => {
+                    let (class_like_name, _) = scope.resolve(NameKind::Default, identifier.value);
+
+                    word(&class_like_name)
+                }
             };
 
             let member_selector = match member_reference.member {
@@ -418,26 +322,35 @@ pub fn get_union_from_type_ast(
             wrap_atomic(TAtomic::Reference(TReference::Global { selector }))
         }
         Type::AliasReference(alias_reference) => {
-            let class_like_name = if alias_reference.class.value.eq_ignore_ascii_case(b"self")
-                || alias_reference.class.value.eq_ignore_ascii_case(b"static")
-                || alias_reference.class.value.eq(b"this")
-                || alias_reference.class.value.eq(b"$this")
-            {
-                let Some(classname) = classname else {
-                    return Err(TypeError::InvalidType(
-                        ttype.to_string(),
-                        "Cannot resolve `self` type reference outside of a class context".to_string(),
-                        alias_reference.span(),
-                    ));
-                };
+            let class_like_name = match &alias_reference.class {
+                ReferenceKind::Self_(_) | ReferenceKind::Static(_) => {
+                    let Some(classname) = classname else {
+                        return Err(TypeError::InvalidType(
+                            ttype.to_string(),
+                            "Cannot resolve `self` type reference outside of a class context".to_string(),
+                            alias_reference.span(),
+                        ));
+                    };
 
-                classname
-            } else if alias_reference.class.value.eq_ignore_ascii_case(b"parent") {
-                word("parent")
-            } else {
-                let (class_like_name, _) = scope.resolve(NameKind::Default, alias_reference.class.value);
+                    classname
+                }
+                ReferenceKind::Identifier(identifier) if identifier.value.eq(b"this") => {
+                    let Some(classname) = classname else {
+                        return Err(TypeError::InvalidType(
+                            ttype.to_string(),
+                            "Cannot resolve `self` type reference outside of a class context".to_string(),
+                            alias_reference.span(),
+                        ));
+                    };
 
-                ascii_lowercase_word(&class_like_name)
+                    classname
+                }
+                ReferenceKind::Parent(_) => word("parent"),
+                ReferenceKind::Identifier(identifier) => {
+                    let (class_like_name, _) = scope.resolve(NameKind::Default, identifier.value);
+
+                    ascii_lowercase_word(&class_like_name)
+                }
             };
 
             let alias_name = match alias_reference.alias {
@@ -447,26 +360,28 @@ pub fn get_union_from_type_ast(
 
             wrap_atomic(TAtomic::Alias(TAlias::new(class_like_name, alias_name)))
         }
-        Type::Object(object_type) => wrap_atomic(get_object_from_ast(object_type, scope, type_context, classname)?),
-        Type::Shape(shape_type) => wrap_atomic(get_shape_from_ast(shape_type, scope, type_context, classname)?),
+        Type::Object(object_type) => wrap_atomic(get_object_from_type(object_type, scope, type_context, classname)?),
+        Type::Shape(shape_type) => wrap_atomic(get_shape_from_type(shape_type, scope, type_context, classname)?),
         Type::Callable(callable_type) => {
-            wrap_atomic(get_callable_from_ast(callable_type, scope, type_context, classname)?)
+            wrap_atomic(get_callable_from_type(callable_type, scope, type_context, classname)?)
         }
         Type::Reference(reference_type) => {
-            let reference_name_atom = word(reference_type.identifier.value);
+            if let ReferenceKind::Identifier(identifier) = &reference_type.kind {
+                let reference_name_atom = word(identifier.value);
 
-            if let Some((source_class, original_name)) = type_context.get_imported_type_alias(reference_name_atom) {
-                return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(*source_class, *original_name))));
+                if let Some((source_class, original_name)) = type_context.get_imported_type_alias(reference_name_atom) {
+                    return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(*source_class, *original_name))));
+                }
+
+                if type_context.has_type_alias(reference_name_atom)
+                    && let Some(class_name) = classname
+                {
+                    return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(class_name, reference_name_atom))));
+                }
             }
 
-            if type_context.has_type_alias(reference_name_atom)
-                && let Some(class_name) = classname
-            {
-                return Ok(wrap_atomic(TAtomic::Alias(TAlias::new(class_name, reference_name_atom))));
-            }
-
-            wrap_atomic(get_reference_from_ast(
-                &reference_type.identifier,
+            wrap_atomic(get_reference_from_kind(
+                &reference_type.kind,
                 reference_type.parameters.as_ref(),
                 scope,
                 type_context,
@@ -509,29 +424,28 @@ pub fn get_union_from_type_ast(
         Type::LiteralFloat(lit) => get_literal_float(*lit.value),
         Type::LiteralInt(lit) => get_literal_int(lit.value as i64),
         Type::LiteralString(lit) => get_literal_string(word(lit.value)),
-        Type::Negated(negated) => match negated.number {
-            LiteralIntOrFloatType::Int(lit) => get_literal_int(-(lit.value as i64)),
-            LiteralIntOrFloatType::Float(lit) => get_literal_float(-(*lit.value)),
+        Type::Negated(negated) => match negated.operand {
+            Type::LiteralInt(lit) => get_literal_int(-(lit.value as i64)),
+            Type::LiteralFloat(lit) => get_literal_float(-(*lit.value)),
+            _ => return Err(TypeError::UnsupportedType(ttype.to_string(), ttype.span())),
         },
-        Type::Posited(posited) => match posited.number {
-            LiteralIntOrFloatType::Int(lit) => get_literal_int(lit.value as i64),
-            LiteralIntOrFloatType::Float(lit) => get_literal_float(*lit.value),
+        Type::Posited(posited) => match posited.operand {
+            Type::LiteralInt(lit) => get_literal_int(lit.value as i64),
+            Type::LiteralFloat(lit) => get_literal_float(*lit.value),
+            _ => return Err(TypeError::UnsupportedType(ttype.to_string(), ttype.span())),
         },
         Type::Iterable(iterable) => match iterable.parameters.as_ref() {
             Some(parameters) => match parameters.entries.len() {
                 0 => wrap_atomic(TAtomic::Iterable(TIterable::mixed())),
                 1 => {
-                    let value_type =
-                        get_union_from_type_ast(&parameters.entries[0].inner, scope, type_context, classname)?;
+                    let value_type = get_union_from_type(&parameters.entries[0].inner, scope, type_context, classname)?;
 
                     wrap_atomic(TAtomic::Iterable(TIterable::of_value(Arc::new(value_type))))
                 }
                 _ => {
-                    let key_type =
-                        get_union_from_type_ast(&parameters.entries[0].inner, scope, type_context, classname)?;
+                    let key_type = get_union_from_type(&parameters.entries[0].inner, scope, type_context, classname)?;
 
-                    let value_type =
-                        get_union_from_type_ast(&parameters.entries[1].inner, scope, type_context, classname)?;
+                    let value_type = get_union_from_type(&parameters.entries[1].inner, scope, type_context, classname)?;
 
                     wrap_atomic(TAtomic::Iterable(TIterable::new(Arc::new(key_type), Arc::new(value_type))))
                 }
@@ -543,7 +457,7 @@ pub fn get_union_from_type_ast(
         Type::NonPositiveInt(_) => get_non_positive_int(),
         Type::NonNegativeInt(_) => get_non_negative_int(),
         Type::NonZeroInt(_) => get_non_zero_int(),
-        Type::TrailingPipe(trailing) => get_union_from_type_ast(trailing.inner, scope, type_context, classname)?,
+        Type::TrailingPipe(trailing) => get_union_from_type(trailing.inner, scope, type_context, classname)?,
         Type::IntRange(range) => {
             let min = match range.min {
                 IntOrKeyword::NegativeInt { int, .. } => Some(-(int.value as i64)),
@@ -570,39 +484,45 @@ pub fn get_union_from_type_ast(
             TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::Integer(TInteger::from_bounds(min, max)))))
         }
         Type::Conditional(conditional) => TUnion::from_single(Cow::Owned(TAtomic::Conditional(TConditional::new(
-            Arc::new(get_union_from_type_ast(conditional.subject, scope, type_context, classname)?),
-            Arc::new(get_union_from_type_ast(conditional.target, scope, type_context, classname)?),
-            Arc::new(get_union_from_type_ast(conditional.then, scope, type_context, classname)?),
-            Arc::new(get_union_from_type_ast(conditional.otherwise, scope, type_context, classname)?),
+            Arc::new(get_union_from_type(conditional.subject, scope, type_context, classname)?),
+            Arc::new(get_union_from_type(conditional.target, scope, type_context, classname)?),
+            Arc::new(get_union_from_type(conditional.then, scope, type_context, classname)?),
+            Arc::new(get_union_from_type(conditional.r#else, scope, type_context, classname)?),
             conditional.is_negated(),
         )))),
-        Type::Variable(variable_type) => {
-            if variable_type.value == b"$this" {
+        Type::ThisVariable(_) => {
+            TUnion::from_single(Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new_this(word("$this"))))))
+        }
+        Type::Variable(variable) => {
+            if variable.value == b"$this" {
                 TUnion::from_single(Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new_this(word("$this"))))))
             } else {
-                TUnion::from_single(Cow::Owned(TAtomic::Variable(word(variable_type.value))))
+                TUnion::from_single(Cow::Owned(TAtomic::Variable(word(variable.value))))
             }
         }
         Type::KeyOf(key_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::KeyOf(TKeyOf::new(Arc::new(
-            get_union_from_type_ast(&key_of_type.parameter.entry.inner, scope, type_context, classname)?,
+            get_union_from_type(&key_of_type.parameter.entry.inner, scope, type_context, classname)?,
         ))))),
         Type::ValueOf(value_of_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(TValueOf::new(
-            Arc::new(get_union_from_type_ast(&value_of_type.parameter.entry.inner, scope, type_context, classname)?),
+            Arc::new(get_union_from_type(&value_of_type.parameter.entry.inner, scope, type_context, classname)?),
         )))),
         Type::IntMask(int_mask_type) => {
             let mut values = Vec::new();
             for entry in &int_mask_type.parameters.entries {
-                values.push(get_union_from_type_ast(&entry.inner, scope, type_context, classname)?);
+                values.push(get_union_from_type(&entry.inner, scope, type_context, classname)?);
             }
             TUnion::from_atomic(TAtomic::Derived(TDerived::IntMask(TIntMask::new(values))))
         }
         Type::IntMaskOf(int_mask_of_type) => {
-            TUnion::from_atomic(TAtomic::Derived(TDerived::IntMaskOf(TIntMaskOf::new(Arc::new(
-                get_union_from_type_ast(&int_mask_of_type.parameter.entry.inner, scope, type_context, classname)?,
-            )))))
+            TUnion::from_atomic(TAtomic::Derived(TDerived::IntMaskOf(TIntMaskOf::new(Arc::new(get_union_from_type(
+                &int_mask_of_type.parameter.entry.inner,
+                scope,
+                type_context,
+                classname,
+            )?)))))
         }
         Type::New(new_type) => TUnion::from_atomic(TAtomic::Derived(TDerived::New(TNew::new(Arc::new(
-            get_union_from_type_ast(&new_type.parameter.entry.inner, scope, type_context, classname)?,
+            get_union_from_type(&new_type.parameter.entry.inner, scope, type_context, classname)?,
         ))))),
         Type::TemplateType(template_type_type) => {
             let entries = &template_type_type.parameters.entries;
@@ -617,9 +537,9 @@ pub fn get_union_from_type_ast(
                 ));
             }
 
-            let object = Arc::new(get_union_from_type_ast(&entries[0].inner, scope, type_context, classname)?);
-            let class_arg = Arc::new(get_union_from_type_ast(&entries[1].inner, scope, type_context, classname)?);
-            let template_name = Arc::new(get_union_from_type_ast(&entries[2].inner, scope, type_context, classname)?);
+            let object = Arc::new(get_union_from_type(&entries[0].inner, scope, type_context, classname)?);
+            let class_arg = Arc::new(get_union_from_type(&entries[1].inner, scope, type_context, classname)?);
+            let template_name = Arc::new(get_union_from_type(&entries[2].inner, scope, type_context, classname)?);
 
             TUnion::from_atomic(TAtomic::Derived(TDerived::TemplateType(TTemplateType::new(
                 object,
@@ -629,25 +549,25 @@ pub fn get_union_from_type_ast(
         }
         Type::PropertiesOf(properties_of_type) => {
             TUnion::from_atomic(TAtomic::Derived(TDerived::PropertiesOf(match properties_of_type.filter {
-                PropertiesOfFilter::All => TPropertiesOf::new(Arc::new(get_union_from_type_ast(
+                PropertiesOfFilter::All => TPropertiesOf::new(Arc::new(get_union_from_type(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
                     classname,
                 )?)),
-                PropertiesOfFilter::Public => TPropertiesOf::public(Arc::new(get_union_from_type_ast(
+                PropertiesOfFilter::Public => TPropertiesOf::public(Arc::new(get_union_from_type(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
                     classname,
                 )?)),
-                PropertiesOfFilter::Protected => TPropertiesOf::protected(Arc::new(get_union_from_type_ast(
+                PropertiesOfFilter::Protected => TPropertiesOf::protected(Arc::new(get_union_from_type(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
                     classname,
                 )?)),
-                PropertiesOfFilter::Private => TPropertiesOf::private(Arc::new(get_union_from_type_ast(
+                PropertiesOfFilter::Private => TPropertiesOf::private(Arc::new(get_union_from_type(
                     &properties_of_type.parameter.entry.inner,
                     scope,
                     type_context,
@@ -657,8 +577,8 @@ pub fn get_union_from_type_ast(
         }
         Type::IndexAccess(index_access_type) => {
             TUnion::from_atomic(TAtomic::Derived(TDerived::IndexAccess(TIndexAccess::new(
-                get_union_from_type_ast(index_access_type.target, scope, type_context, classname)?,
-                get_union_from_type_ast(index_access_type.index, scope, type_context, classname)?,
+                get_union_from_type(index_access_type.target, scope, type_context, classname)?,
+                get_union_from_type(index_access_type.index, scope, type_context, classname)?,
             ))))
         }
         _ => {
@@ -668,7 +588,7 @@ pub fn get_union_from_type_ast(
 }
 
 #[inline]
-fn get_object_from_ast(
+fn get_object_from_type(
     object: &ObjectType<'_>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
@@ -694,7 +614,7 @@ fn get_object_from_ast(
             }
         };
 
-        let property_type = get_union_from_type_ast(property.value, scope, type_context, classname)?;
+        let property_type = get_union_from_type(property.value, scope, type_context, classname)?;
 
         known_properties.insert(key, (property_is_optional, property_type));
     }
@@ -703,7 +623,7 @@ fn get_object_from_ast(
 }
 
 #[inline]
-fn get_shape_from_ast(
+fn get_shape_from_type(
     shape: &ShapeType<'_>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
@@ -713,7 +633,7 @@ fn get_shape_from_ast(
         let mut list = TList::new(match &shape.additional_fields {
             Some(additional_fields) => match &additional_fields.parameters {
                 Some(parameters) => Arc::new(if let Some(k) = parameters.entries.first().map(|g| &g.inner) {
-                    get_union_from_type_ast(k, scope, type_context, classname)?
+                    get_union_from_type(k, scope, type_context, classname)?
                 } else {
                     get_mixed()
                 }),
@@ -778,7 +698,7 @@ fn get_shape_from_ast(
                     offset
                 };
 
-                let mut field_value_type = get_union_from_type_ast(field.value, scope, type_context, classname)?;
+                let mut field_value_type = get_union_from_type(field.value, scope, type_context, classname)?;
                 if field_is_optional {
                     field_value_type.set_possibly_undefined(true, None);
                 }
@@ -799,12 +719,12 @@ fn get_shape_from_ast(
             Some(additional_fields) => Some(match &additional_fields.parameters {
                 Some(parameters) => (
                     Arc::new(if let Some(k) = parameters.entries.first().map(|g| &g.inner) {
-                        get_union_from_type_ast(k, scope, type_context, classname)?
+                        get_union_from_type(k, scope, type_context, classname)?
                     } else {
                         get_mixed()
                     }),
                     Arc::new(if let Some(v) = parameters.entries.get(1).map(|g| &g.inner) {
-                        get_union_from_type_ast(v, scope, type_context, classname)?
+                        get_union_from_type(v, scope, type_context, classname)?
                     } else {
                         get_mixed()
                     }),
@@ -858,7 +778,7 @@ fn get_shape_from_ast(
                     array_key
                 };
 
-                let mut field_value_type = get_union_from_type_ast(field.value, scope, type_context, classname)?;
+                let mut field_value_type = get_union_from_type(field.value, scope, type_context, classname)?;
                 if field_is_optional {
                     field_value_type.set_possibly_undefined(true, None);
                 }
@@ -876,7 +796,7 @@ fn get_shape_from_ast(
 }
 
 #[inline]
-fn get_callable_from_ast(
+fn get_callable_from_type(
     callable: &CallableType<'_>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
@@ -888,7 +808,7 @@ fn get_callable_from_ast(
     if let Some(specification) = &callable.specification {
         for parameter_ast in &specification.parameters.entries {
             let parameter_type = if let Some(parameter_type) = &parameter_ast.parameter_type {
-                get_union_from_type_ast(parameter_type, scope, type_context, classname)?
+                get_union_from_type(parameter_type, scope, type_context, classname)?
             } else {
                 get_mixed()
             };
@@ -902,7 +822,7 @@ fn get_callable_from_ast(
         }
 
         if let Some(ret) = specification.return_type.as_ref() {
-            return_type = Some(get_union_from_type_ast(ret.return_type, scope, type_context, classname)?);
+            return_type = Some(get_union_from_type(ret.return_type, scope, type_context, classname)?);
         }
     } else {
         // `callable` without a specification should be treated the same as
@@ -919,56 +839,69 @@ fn get_callable_from_ast(
 }
 
 #[inline]
-fn get_reference_from_ast(
-    reference_identifier: &Identifier<'_>,
+fn get_reference_from_kind(
+    kind: &ReferenceKind<'_>,
     generics: Option<&GenericParameters<'_>>,
     scope: &NamespaceScope,
     type_context: &TypeResolutionContext,
     classname: Option<Word>,
 ) -> Result<TAtomic, TypeError> {
-    let reference_name = reference_identifier.value;
-
     let mut is_this = false;
     let mut is_static = false;
     let mut is_named_object = false;
-    let fq_reference_name_id = if reference_name == b"this" || reference_name == b"static" || reference_name == b"self"
-    {
-        is_named_object = true;
-        is_this = reference_name == b"this";
-        is_static = reference_name != b"self";
+    let fq_reference_name_id = match kind {
+        ReferenceKind::Self_(_) => {
+            is_named_object = true;
 
-        classname.unwrap_or_else(|| word("static"))
-    } else if reference_name == b"parent" {
-        is_named_object = true;
-
-        word("parent")
-    } else {
-        let reference_name_atom = word(reference_name);
-        if let Some(defining_entities) = type_context.get_template_definition(reference_name_atom)
-            && generics.is_none()
-        {
-            return Ok(get_template_atomic(defining_entities, reference_name_atom));
+            classname.unwrap_or_else(|| word("static"))
         }
+        ReferenceKind::Static(_) => {
+            is_named_object = true;
+            is_static = true;
 
-        let (fq_reference_name, _) = scope.resolve(NameKind::Default, reference_name);
-
-        // `Closure` -> `Closure(mixed...): mixed`
-        if fq_reference_name.eq_ignore_ascii_case(b"Closure") && generics.is_none() {
-            return Ok(TAtomic::Callable(TCallable::Signature(
-                TCallableSignature::new(false, true)
-                    .with_parameters(vec![TCallableParameter::new(Some(Arc::new(get_mixed())), false, true, false)])
-                    .with_return_type(Some(Arc::new(get_mixed()))),
-            )));
+            classname.unwrap_or_else(|| word("static"))
         }
+        ReferenceKind::Identifier(identifier) if identifier.value == b"this" => {
+            is_named_object = true;
+            is_this = true;
+            is_static = true;
 
-        word(&fq_reference_name)
+            classname.unwrap_or_else(|| word("static"))
+        }
+        ReferenceKind::Parent(_) => {
+            is_named_object = true;
+
+            word("parent")
+        }
+        ReferenceKind::Identifier(identifier) => {
+            let reference_name = identifier.value;
+            let reference_name_atom = word(reference_name);
+            if let Some(defining_entities) = type_context.get_template_definition(reference_name_atom)
+                && generics.is_none()
+            {
+                return Ok(get_template_atomic(defining_entities, reference_name_atom));
+            }
+
+            let (fq_reference_name, _) = scope.resolve(NameKind::Default, reference_name);
+
+            // `Closure` -> `Closure(mixed...): mixed`
+            if fq_reference_name.eq_ignore_ascii_case(b"Closure") && generics.is_none() {
+                return Ok(TAtomic::Callable(TCallable::Signature(
+                    TCallableSignature::new(false, true)
+                        .with_parameters(vec![TCallableParameter::new(Some(Arc::new(get_mixed())), false, true, false)])
+                        .with_return_type(Some(Arc::new(get_mixed()))),
+                )));
+            }
+
+            word(&fq_reference_name)
+        }
     };
 
     let mut type_parameters = None;
     if let Some(generics) = generics {
         let mut parameters = vec![];
         for generic in &generics.entries {
-            let mut generic_type = get_union_from_type_ast(&generic.inner, scope, type_context, classname)?;
+            let mut generic_type = get_union_from_type(&generic.inner, scope, type_context, classname)?;
 
             for atomic in generic_type.types.to_mut() {
                 if let TAtomic::Object(TObject::Named(named)) = atomic
@@ -1044,7 +977,7 @@ fn get_reference_from_ast(
 }
 
 #[inline]
-fn get_array_type_from_ast<'src>(
+fn get_array_type<'src>(
     mut key: Option<&'src Type<'src>>,
     mut value: Option<&'src Type<'src>>,
     non_empty: bool,
@@ -1058,12 +991,12 @@ fn get_array_type_from_ast<'src>(
 
     let mut array = TKeyedArray::new_with_parameters(
         Arc::new(if let Some(k) = key {
-            get_union_from_type_ast(k, scope, type_context, classname)?
+            get_union_from_type(k, scope, type_context, classname)?
         } else {
             get_arraykey()
         }),
         Arc::new(if let Some(v) = value {
-            get_union_from_type_ast(v, scope, type_context, classname)?
+            get_union_from_type(v, scope, type_context, classname)?
         } else {
             get_mixed()
         }),
@@ -1075,7 +1008,7 @@ fn get_array_type_from_ast<'src>(
 }
 
 #[inline]
-fn get_list_type_from_ast(
+fn get_list_type(
     value: Option<&Type<'_>>,
     non_empty: bool,
     scope: &NamespaceScope,
@@ -1084,7 +1017,7 @@ fn get_list_type_from_ast(
 ) -> Result<TAtomic, TypeError> {
     Ok(TAtomic::Array(TArray::List(TList {
         element_type: Arc::new(if let Some(v) = value {
-            get_union_from_type_ast(v, scope, type_context, classname)?
+            get_union_from_type(v, scope, type_context, classname)?
         } else {
             get_mixed()
         }),
@@ -1095,7 +1028,7 @@ fn get_list_type_from_ast(
 }
 
 #[inline]
-fn get_class_string_type_from_ast(
+fn get_class_string_type(
     span: Span,
     kind: TClassLikeStringKind,
     parameter: Option<&SingleGenericParameter<'_>>,
@@ -1105,7 +1038,7 @@ fn get_class_string_type_from_ast(
 ) -> Result<TUnion, TypeError> {
     Ok(match parameter {
         Some(parameter) => {
-            let constraint_union = get_union_from_type_ast(&parameter.entry.inner, scope, type_context, classname)?;
+            let constraint_union = get_union_from_type(&parameter.entry.inner, scope, type_context, classname)?;
 
             let mut class_strings = vec![];
             for constraint in constraint_union.types.into_owned() {

@@ -1,6 +1,6 @@
 use mago_allocator::Arena;
-use mago_docblock::tag::TypeString;
 use mago_names::scope::NamespaceScope;
+use mago_phpdoc_syntax::cst::r#type::Type;
 use mago_span::HasSpan;
 use mago_syntax::cst::Hint;
 use mago_syntax::cst::Identifier;
@@ -58,18 +58,14 @@ where
 }
 
 #[inline]
-pub fn get_type_metadata_from_type_string<A>(
-    arena: &A,
-    ttype: &TypeString,
+pub fn get_type_metadata_from_type(
+    ttype: &Type<'_>,
     classname: Option<Word>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
-) -> Result<TypeMetadata, TypeError>
-where
-    A: Arena,
-{
-    builder::get_type_from_string(arena, &ttype.value, ttype.span, scope, type_context, classname).map(|type_union| {
-        let mut type_metadata = TypeMetadata::new(type_union, ttype.span);
+) -> Result<TypeMetadata, TypeError> {
+    builder::get_union_from_type(ttype, scope, type_context, classname).map(|type_union| {
+        let mut type_metadata = TypeMetadata::new(type_union, ttype.span());
         type_metadata.from_docblock = true;
         type_metadata
     })

@@ -1,6 +1,12 @@
 use mago_allocator::Arena;
-use mago_docblock::tag::TypeString;
+use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
+use mago_phpdoc_syntax::cst::AssertPattern;
+use mago_phpdoc_syntax::cst::AssertTagValue;
+use mago_phpdoc_syntax::cst::Element;
+use mago_phpdoc_syntax::cst::TagValue;
+use mago_phpdoc_syntax::cst::TextSegment;
+use mago_phpdoc_syntax::cst::r#type::Type;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -40,11 +46,14 @@ use crate::scanner::Context;
 use crate::scanner::assertion_inference::infer_assertions_from_block_body;
 use crate::scanner::assertion_inference::infer_assertions_from_expression_body;
 use crate::scanner::attribute::scan_attribute_lists;
-use crate::scanner::docblock::FunctionLikeDocblockComment;
+use crate::scanner::docblock::assertion_subject_word;
+use crate::scanner::docblock::find_most_trusted_tag;
+use crate::scanner::docblock::for_each_tag_by_ascending_trust;
+use crate::scanner::docblock::parse_docblock;
 use crate::scanner::parameter::scan_function_like_parameter;
 use crate::scanner::parameter::scan_function_like_parameter_with_constants;
 use crate::scanner::ttype::get_type_metadata_from_hint;
-use crate::scanner::ttype::get_type_metadata_from_type_string;
+use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::builder;
@@ -348,95 +357,117 @@ fn scan_function_like_docblock<A>(
 ) where
     A: Arena,
 {
-    let docblock = match FunctionLikeDocblockComment::create(context, span, scope) {
-        Ok(Some(docblock)) => docblock,
-        Ok(None) => {
-            metadata.has_docblock = false;
+    let Some(document) = parse_docblock(context, span) else {
+        metadata.has_docblock = false;
 
-            return;
-        }
-        Err(parse_error) => {
-            metadata.issues.push(
-                Issue::error("Failed to parse function-like docblock comment.")
-                    .with_code(ScanningIssueKind::MalformedDocblockComment)
-                    .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
-                    .with_note(parse_error.note())
-                    .with_help(parse_error.help()),
-            );
-
-            return;
-        }
+        return;
     };
 
     metadata.has_docblock = true;
 
-    if docblock.is_deprecated {
-        metadata.flags |= MetadataFlags::DEPRECATED;
+    for parse_error in document.errors {
+        metadata.issues.push(
+            Issue::error("Failed to parse function-like docblock comment.")
+                .with_code(ScanningIssueKind::MalformedDocblockComment)
+                .with_annotation(Annotation::primary(parse_error.span()).with_message(parse_error.to_string()))
+                .with_note(parse_error.note())
+                .with_help(parse_error.help()),
+        );
     }
 
-    if docblock.is_internal {
-        metadata.flags |= MetadataFlags::INTERNAL;
+    let mut ignore_nullable_return = false;
+    let mut ignore_falsable_return = false;
+
+    for element in document.elements.iter() {
+        let tag = match element {
+            Element::Tag(tag) => tag,
+            Element::Text(text) => {
+                let has_inline_inherit_doc = text.segments.iter().any(|segment| {
+                    matches!(
+                        segment,
+                        TextSegment::InlineTag(inline_tag)
+                            if matches!(inline_tag.tag.value, TagValue::InheritDoc(_))
+                    )
+                });
+
+                if has_inline_inherit_doc {
+                    metadata.flags |= MetadataFlags::INHERITS_DOCS;
+                }
+
+                continue;
+            }
+            Element::Code(_) => continue,
+        };
+
+        match &tag.value {
+            TagValue::Deprecated(_) => {
+                metadata.flags |= MetadataFlags::DEPRECATED;
+            }
+            TagValue::NotDeprecated(_) => {
+                metadata.flags.set(MetadataFlags::DEPRECATED, false);
+            }
+            TagValue::Internal(_) => {
+                metadata.flags |= MetadataFlags::INTERNAL;
+            }
+            TagValue::Experimental(_) => {
+                metadata.flags |= MetadataFlags::EXPERIMENTAL;
+            }
+            TagValue::MustUse(_) => {
+                metadata.flags |= MetadataFlags::MUST_USE;
+            }
+            TagValue::Pure(_) => {
+                metadata.flags |= MetadataFlags::PURE;
+            }
+            TagValue::Impure(_) => {
+                metadata.flags.set(MetadataFlags::PURE, false);
+            }
+            TagValue::MutationFree(_) => {
+                metadata.flags |= MetadataFlags::MUTATION_FREE;
+                metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
+            }
+            TagValue::ExternalMutationFree(_) => {
+                metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
+            }
+            TagValue::SuspendsFiber(_) => {
+                metadata.flags |= MetadataFlags::SUSPENDS_FIBER;
+            }
+            TagValue::IgnoreNullableReturn(_) => {
+                metadata.flags |= MetadataFlags::IGNORE_NULLABLE_RETURN;
+                ignore_nullable_return = true;
+            }
+            TagValue::IgnoreFalsableReturn(_) => {
+                metadata.flags |= MetadataFlags::IGNORE_FALSABLE_RETURN;
+                ignore_falsable_return = true;
+            }
+            TagValue::InheritDoc(_) => {
+                metadata.flags |= MetadataFlags::INHERITS_DOCS;
+            }
+            TagValue::NoNamedArguments(_) => {
+                metadata.flags |= MetadataFlags::NO_NAMED_ARGUMENTS;
+            }
+            _ => {}
+        }
     }
 
-    if docblock.is_experimental {
-        metadata.flags |= MetadataFlags::EXPERIMENTAL;
-    }
-
-    if docblock.must_use {
-        metadata.flags |= MetadataFlags::MUST_USE;
-    }
-
-    if docblock.is_pure {
-        metadata.flags |= MetadataFlags::PURE;
-    }
-
-    if docblock.is_mutation_free {
-        metadata.flags |= MetadataFlags::MUTATION_FREE;
-        metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
-    } else if docblock.is_external_mutation_free {
-        metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
-    }
-
-    if docblock.suspends_fiber {
-        metadata.flags |= MetadataFlags::SUSPENDS_FIBER;
-    }
-
-    if docblock.ignore_falsable_return {
-        metadata.flags |= MetadataFlags::IGNORE_FALSABLE_RETURN;
-    }
-
-    if docblock.ignore_nullable_return {
-        metadata.flags |= MetadataFlags::IGNORE_NULLABLE_RETURN;
-    }
-
-    if docblock.inherits_docs {
-        metadata.flags |= MetadataFlags::INHERITS_DOCS;
-    }
-
-    if docblock.no_named_arguments {
-        metadata.flags |= MetadataFlags::NO_NAMED_ARGUMENTS;
-    }
-
-    if docblock.unchecked {
-        metadata.flags |= MetadataFlags::UNCHECKED;
+    for tag in document.tags() {
+        if let TagValue::Template(template) = &tag.value {
+            scope.add(NameKind::Default, template.name.value, &(None as Option<&str>));
+        }
     }
 
     let mut type_context = metadata.type_resolution_context.clone().unwrap_or_default();
-    for template in &docblock.templates {
-        let template_name = word(&template.name);
-        let template_as_type = if let Some(type_string) = &template.type_string {
-            match builder::get_type_from_string(
-                context.arena,
-                &type_string.value,
-                type_string.span,
-                scope,
-                &type_context,
-                classname,
-            ) {
+    for tag in document.tags() {
+        let TagValue::Template(template) = &tag.value else {
+            continue;
+        };
+
+        let template_name = word(template.name.value);
+        let template_as_type = if let Some(bound) = &template.bound {
+            match builder::get_union_from_type(bound.r#type, scope, &type_context, classname) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
                     metadata.issues.push(
-                        Issue::error("Invalid `@template` type string.")
+                        Issue::error("Invalid `@template` type.")
                             .with_code(ScanningIssueKind::InvalidTemplateTag)
                             .with_annotation(
                                 Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
@@ -452,19 +483,12 @@ fn scan_function_like_docblock<A>(
             get_mixed()
         };
 
-        let template_default = if let Some(type_string) = &template.default {
-            match builder::get_type_from_string(
-                context.arena,
-                &type_string.value,
-                type_string.span,
-                scope,
-                &type_context,
-                classname,
-            ) {
+        let template_default = if let Some(default) = &template.default {
+            match builder::get_union_from_type(default.r#type, scope, &type_context, classname) {
                 Ok(tunion) => Some(tunion),
                 Err(typing_error) => {
                     metadata.issues.push(
-                        Issue::error("Invalid `@template` default type string.")
+                        Issue::error("Invalid `@template` default type.")
                             .with_code(ScanningIssueKind::InvalidTemplateTag)
                             .with_annotation(
                                 Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
@@ -487,22 +511,21 @@ fn scan_function_like_docblock<A>(
         type_context = type_context.with_template_definition(template_name, vec![definition]);
     }
 
-    for parameter_tag in docblock.parameters {
-        let parameter_name = word(&parameter_tag.variable.name);
-        let param_type_string = &parameter_tag.type_string;
-        let is_variadic = parameter_tag.variable.is_variadic;
-
-        let Some(param_type_string) = param_type_string else {
-            continue;
+    for_each_tag_by_ascending_trust(&document, |tag| {
+        let TagValue::Param(parameter_tag) = &tag.value else {
+            return;
         };
+
+        let parameter_name = word(parameter_tag.parameter.value);
+        let is_variadic = parameter_tag.is_variadic();
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(parameter_name) else {
             metadata.issues.push(
                 Issue::error("The @param tag references an unknown parameter.")
                     .with_code(ScanningIssueKind::InvalidParamTag)
-                    .with_annotation(Annotation::primary(parameter_tag.span).with_message(format!(
+                    .with_annotation(Annotation::primary(parameter_tag.span()).with_message(format!(
                         "Parameter `{}` is not defined in this function",
-                        parameter_tag.variable
+                        parameter_tag.parameter
                     )))
                     .with_note(
                         "Each `@param` tag in a docblock must correspond to a parameter in the function's signature.",
@@ -510,7 +533,7 @@ fn scan_function_like_docblock<A>(
                     .with_help("Please check for typos or add the parameter to the function signature."),
             );
 
-            continue;
+            return;
         };
 
         let mut variadic_mismatch_issue = None;
@@ -521,7 +544,7 @@ fn scan_function_like_docblock<A>(
             variadic_mismatch_issue = Some(
                 Issue::error("@param tag has a variadic mismatch.")
                     .with_code(ScanningIssueKind::InvalidParamTag)
-                    .with_annotation(Annotation::primary(parameter_tag.span).with_message(
+                    .with_annotation(Annotation::primary(parameter_tag.span()).with_message(
                         "This docblock declares the parameter as variadic, but the function signature does not",
                     ))
                     .with_annotation(
@@ -533,7 +556,7 @@ fn scan_function_like_docblock<A>(
             );
         }
 
-        match get_type_metadata_from_type_string(context.arena, param_type_string, classname, &type_context, scope) {
+        match get_type_metadata_from_type(parameter_tag.r#type, classname, &type_context, scope) {
             Ok(mut provided_type) => {
                 let resulting_type = if !is_variadic
                     && parameter_metadata.flags.is_variadic()
@@ -566,18 +589,22 @@ fn scan_function_like_docblock<A>(
         if let Some(variadic_mismatch_issue) = variadic_mismatch_issue {
             metadata.issues.push(variadic_mismatch_issue);
         }
-    }
+    });
 
-    for param_out in docblock.parameters_out {
-        let param_name = word(&param_out.variable.name);
+    for tag in document.tags() {
+        let TagValue::ParamOut(param_out) = &tag.value else {
+            continue;
+        };
+
+        let param_name = word(param_out.parameter.value);
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(param_name) else {
             metadata.issues.push(
                 Issue::error("@param-out tag references an unknown parameter.")
                     .with_code(ScanningIssueKind::InvalidParamOutTag)
                     .with_annotation(
-                        Annotation::primary(param_out.span)
-                            .with_message(format!("Parameter `{}` does not exist", param_out.variable)),
+                        Annotation::primary(param_out.span())
+                            .with_message(format!("Parameter `{}` does not exist", param_out.parameter)),
                     )
                     .with_note("The `@param-out` tag specifies the type of a by-reference parameter after the function has executed.")
                     .with_help("Check for typos or ensure this parameter exists in the function signature."),
@@ -591,7 +618,7 @@ fn scan_function_like_docblock<A>(
                 Issue::error("@param-out tag used on a non-by-reference parameter")
                     .with_code(ScanningIssueKind::InvalidParamOutTag)
                     .with_annotation(
-                        Annotation::primary(param_out.span)
+                        Annotation::primary(param_out.span())
                             .with_message("This parameter is not declared as by-reference"),
                     )
                     .with_note("The `@param-out` tag can only be used with parameters that are passed by reference.")
@@ -601,8 +628,7 @@ fn scan_function_like_docblock<A>(
             continue;
         }
 
-        match get_type_metadata_from_type_string(context.arena, &param_out.type_string, classname, &type_context, scope)
-        {
+        match get_type_metadata_from_type(param_out.r#type, classname, &type_context, scope) {
             Ok(parameter_out_type) => {
                 parameter_metadata.out_type = Some(parameter_out_type);
             }
@@ -620,14 +646,13 @@ fn scan_function_like_docblock<A>(
         }
     }
 
-    if let Some(return_type) = docblock.return_type.as_ref() {
-        match get_type_metadata_from_type_string(
-            context.arena,
-            &return_type.type_string,
-            classname,
-            &type_context,
-            scope,
-        ) {
+    let return_tag = find_most_trusted_tag(&document, |tag| match &tag.value {
+        TagValue::Return(return_tag) => Some(*return_tag),
+        _ => None,
+    });
+
+    if let Some(return_type) = return_tag.as_ref() {
+        match get_type_metadata_from_type(return_type.r#type, classname, &type_context, scope) {
             Ok(return_type_signature) => {
                 let real_return_type = metadata.return_type_declaration_metadata.as_ref();
                 let return_type_signature = merge_type_preserving_nullability(return_type_signature, real_return_type);
@@ -648,13 +673,17 @@ fn scan_function_like_docblock<A>(
         }
     }
 
-    for where_tag in docblock.where_constraints {
+    for tag in document.tags() {
+        let TagValue::Where(where_tag) = &tag.value else {
+            continue;
+        };
+
         let Some(method_metadata) = metadata.get_method_metadata_mut() else {
             metadata.issues.push(
                 Issue::error("`@where` tag cannot be used on functions or closures.")
                     .with_code(ScanningIssueKind::InvalidWhereTag)
                     .with_annotation(
-                        Annotation::primary(where_tag.span)
+                        Annotation::primary(where_tag.span())
                             .with_message("`@where` is only valid on instance methods"),
                     )
                     .with_note("The `@where` tag constrains template types based on the instance type of `$this`. Functions and closures do not have a `$this` context.")
@@ -669,7 +698,7 @@ fn scan_function_like_docblock<A>(
                 Issue::error("`@where` tag cannot be used on static methods.")
                     .with_code(ScanningIssueKind::InvalidWhereTag)
                     .with_annotation(
-                        Annotation::primary(where_tag.span)
+                        Annotation::primary(where_tag.span())
                             .with_message("This constraint is not allowed on a static method"),
                     )
                     .with_note("The `@where` tag constrains template types based on the instance type of `$this`. Static methods are not tied to an instance and have no `$this` context.")
@@ -679,28 +708,28 @@ fn scan_function_like_docblock<A>(
             continue;
         }
 
-        match get_type_metadata_from_type_string(context.arena, &where_tag.type_string, classname, &type_context, scope)
-        {
+        match get_type_metadata_from_type(where_tag.r#type, classname, &type_context, scope) {
             Ok(constraint_type) => {
-                let template_name = word(&where_tag.name);
+                let template_name = word(where_tag.name.value);
 
                 method_metadata.where_constraints.insert(template_name, constraint_type);
             }
             Err(typing_error) => metadata.issues.push(
-                Issue::error(format!(
-                    "Invalid constraint type `{}` in `@where` tag.",
-                    mago_bytes::BytesDisplay(&where_tag.type_string.value)
-                ))
-                .with_code(ScanningIssueKind::InvalidWhereTag)
-                .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
-                .with_note(typing_error.note())
-                .with_help(typing_error.help()),
+                Issue::error(format!("Invalid constraint type `{}` in `@where` tag.", where_tag.r#type))
+                    .with_code(ScanningIssueKind::InvalidWhereTag)
+                    .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
+                    .with_note(typing_error.note())
+                    .with_help(typing_error.help()),
             ),
         }
     }
 
-    for thrown in docblock.throws {
-        match get_type_metadata_from_type_string(context.arena, &thrown.type_string, classname, &type_context, scope) {
+    for tag in document.tags() {
+        let TagValue::Throws(thrown) = &tag.value else {
+            continue;
+        };
+
+        match get_type_metadata_from_type(thrown.r#type, classname, &type_context, scope) {
             Ok(thrown_type) => {
                 metadata.thrown_types.push(thrown_type);
             }
@@ -718,105 +747,81 @@ fn scan_function_like_docblock<A>(
         }
     }
 
-    for assertion_tag in docblock.assertions {
-        let assertion_param_name = word(&assertion_tag.variable.name);
+    for tag in document.tags() {
+        let (TagValue::Assert(assertion_tag)
+        | TagValue::AssertIfTrue(assertion_tag)
+        | TagValue::AssertIfFalse(assertion_tag)) = &tag.value
+        else {
+            continue;
+        };
 
-        let assertions =
-            parse_assertion_string(context.arena, assertion_tag.type_string, classname, &type_context, scope, metadata);
+        let assertion_subject = assertion_subject_word(&assertion_tag.subject);
+        let assertions = parse_assertions_from_tag(assertion_tag, classname, &type_context, scope, metadata);
 
-        for assertion in assertions {
-            metadata.assertions.entry(assertion_param_name).or_default().push(assertion);
-        }
-    }
-
-    for assertion_tag in docblock.if_true_assertions {
-        let assertion_param_name = word(&assertion_tag.variable.name);
-
-        let assertions =
-            parse_assertion_string(context.arena, assertion_tag.type_string, classname, &type_context, scope, metadata);
-
-        for assertion in assertions {
-            metadata.if_true_assertions.entry(assertion_param_name).or_default().push(assertion);
-        }
-    }
-
-    for assertion_tag in docblock.if_false_assertions {
-        let assertion_param_name = word(&assertion_tag.variable.name);
-
-        let assertions =
-            parse_assertion_string(context.arena, assertion_tag.type_string, classname, &type_context, scope, metadata);
+        let bucket = match &tag.value {
+            TagValue::AssertIfTrue(_) => &mut metadata.if_true_assertions,
+            TagValue::AssertIfFalse(_) => &mut metadata.if_false_assertions,
+            _ => &mut metadata.assertions,
+        };
 
         for assertion in assertions {
-            metadata.if_false_assertions.entry(assertion_param_name).or_default().push(assertion);
+            bucket.entry(assertion_subject).or_default().push(assertion);
         }
     }
 
     metadata.type_resolution_context = Some(type_context);
 
-    if docblock.ignore_nullable_return || docblock.ignore_falsable_return {
+    if ignore_nullable_return || ignore_falsable_return {
         if let Some(return_type) = &mut metadata.return_type_metadata {
-            return_type.type_union.set_ignore_nullable_issues(docblock.ignore_nullable_return);
-            return_type.type_union.set_ignore_falsable_issues(docblock.ignore_falsable_return);
+            return_type.type_union.set_ignore_nullable_issues(ignore_nullable_return);
+            return_type.type_union.set_ignore_falsable_issues(ignore_falsable_return);
         }
 
         if let Some(return_type) = &mut metadata.return_type_declaration_metadata {
-            return_type.type_union.set_ignore_nullable_issues(docblock.ignore_nullable_return);
-            return_type.type_union.set_ignore_falsable_issues(docblock.ignore_falsable_return);
+            return_type.type_union.set_ignore_nullable_issues(ignore_nullable_return);
+            return_type.type_union.set_ignore_falsable_issues(ignore_falsable_return);
         }
     }
 }
 
-fn parse_assertion_string<A>(
-    arena: &A,
-    mut type_string: TypeString,
+fn parse_assertions_from_tag(
+    assertion_tag: &AssertTagValue<'_>,
     classname: Option<Word>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
     function_like_metadata: &mut FunctionLikeMetadata,
-) -> Vec<Assertion>
-where
-    A: Arena,
-{
+) -> Vec<Assertion> {
     let mut assertions = Vec::new();
-    if type_string.value.eq_ignore_ascii_case(b"truthy") || type_string.value.eq_ignore_ascii_case(b"!falsy") {
-        assertions.push(Assertion::Truthy);
+
+    let is_negation = assertion_tag.is_negated();
+    let is_equal = assertion_tag.is_equality();
+
+    let asserted_type = match &assertion_tag.pattern {
+        AssertPattern::Truthy(_) => {
+            assertions.push(if is_negation { Assertion::Falsy } else { Assertion::Truthy });
+
+            return assertions;
+        }
+        AssertPattern::Falsy(_) => {
+            assertions.push(if is_negation { Assertion::Truthy } else { Assertion::Falsy });
+
+            return assertions;
+        }
+        AssertPattern::NonEmpty(_) => {
+            assertions.push(if is_negation { Assertion::Empty } else { Assertion::NonEmpty });
+
+            return assertions;
+        }
+        AssertPattern::Type(asserted_type) => asserted_type,
+    };
+
+    if !is_equal && matches!(asserted_type, Type::Empty(_)) {
+        assertions.push(if is_negation { Assertion::NonEmpty } else { Assertion::Empty });
 
         return assertions;
     }
 
-    if type_string.value.eq_ignore_ascii_case(b"falsy") || type_string.value.eq_ignore_ascii_case(b"!truthy") {
-        assertions.push(Assertion::Falsy);
-
-        return assertions;
-    }
-
-    if type_string.value.eq_ignore_ascii_case(b"empty") || type_string.value.eq_ignore_ascii_case(b"!non-empty") {
-        assertions.push(Assertion::Empty);
-
-        return assertions;
-    }
-
-    if type_string.value.eq_ignore_ascii_case(b"non-empty") || type_string.value.eq_ignore_ascii_case(b"!empty") {
-        assertions.push(Assertion::NonEmpty);
-
-        return assertions;
-    }
-
-    let mut is_equal = false;
-    let mut is_negation = false;
-    if type_string.value.starts_with(b"!") {
-        is_negation = true;
-        type_string.value = type_string.value[1..].to_vec();
-        type_string.span = type_string.span.from_start(type_string.span.start + 1);
-    }
-
-    if type_string.value.starts_with(b"=") {
-        is_equal = true;
-        type_string.value = type_string.value[1..].to_vec();
-        type_string.span = type_string.span.from_start(type_string.span.start + 1);
-    }
-
-    match get_type_metadata_from_type_string(arena, &type_string, classname, type_context, scope) {
+    match get_type_metadata_from_type(asserted_type, classname, type_context, scope) {
         Ok(type_metadata) => match (is_equal, is_negation) {
             (true, true) => {
                 for atomic in type_metadata.type_union.types.into_owned() {

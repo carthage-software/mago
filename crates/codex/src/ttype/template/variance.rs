@@ -1,9 +1,21 @@
+use mago_phpdoc_syntax::cst::TemplateTagValueVariance;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Variance {
     Invariant,
     Covariant,
     Contravariant,
+}
+
+impl From<TemplateTagValueVariance> for Variance {
+    fn from(variance: TemplateTagValueVariance) -> Self {
+        match variance {
+            TemplateTagValueVariance::Invariant => Variance::Invariant,
+            TemplateTagValueVariance::Covariant => Variance::Covariant,
+            TemplateTagValueVariance::Contravariant => Variance::Contravariant,
+        }
+    }
 }
 
 impl Variance {

@@ -1,839 +1,93 @@
 use mago_allocator::Arena;
-use mago_docblock::error::ParseError;
-use mago_docblock::tag::AssertionTag;
-use mago_docblock::tag::ImportTypeTag;
-use mago_docblock::tag::MethodTag;
-use mago_docblock::tag::ParameterOutTag;
-use mago_docblock::tag::ParameterTag;
-use mago_docblock::tag::PropertyTag;
-use mago_docblock::tag::ReturnTypeTag;
-use mago_docblock::tag::TemplateTag;
-use mago_docblock::tag::ThrowsTag;
-use mago_docblock::tag::TypeString;
-use mago_docblock::tag::TypeTag;
-use mago_docblock::tag::WhereTag;
-use mago_docblock::tag::parse_assertion_tag;
-use mago_docblock::tag::parse_import_type_tag;
-use mago_docblock::tag::parse_method_tag;
-use mago_docblock::tag::parse_param_out_tag;
-use mago_docblock::tag::parse_param_tag;
-use mago_docblock::tag::parse_property_tag;
-use mago_docblock::tag::parse_return_tag;
-use mago_docblock::tag::parse_template_tag;
-use mago_docblock::tag::parse_throws_tag;
-use mago_docblock::tag::parse_type_tag;
-use mago_docblock::tag::parse_where_tag;
-use mago_docblock::tag::split_tag_content;
-use mago_names::kind::NameKind;
-use mago_names::scope::NamespaceScope;
-
-use mago_docblock::document::Element;
-use mago_docblock::document::Tag;
-use mago_docblock::document::TagKind;
-use mago_docblock::document::TextSegment;
-use mago_docblock::parse_trivia;
+use mago_phpdoc_syntax::PHPDocParser;
+use mago_phpdoc_syntax::cst::AssertSubject;
+use mago_phpdoc_syntax::cst::Document;
+use mago_phpdoc_syntax::cst::ParamTagValue;
+use mago_phpdoc_syntax::cst::Tag;
+use mago_phpdoc_syntax::cst::TagVendor;
+use mago_phpdoc_syntax::cst::TypelessParamTagValue;
+use mago_phpdoc_syntax::cst::r#type::Type;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use crate::scanner::Context;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+const VENDORS_BY_ASCENDING_TRUST: [Option<TagVendor>; 5] =
+    [None, Some(TagVendor::Phan), Some(TagVendor::PhpStan), Some(TagVendor::Psalm), Some(TagVendor::Mago)];
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ClassLikeDocblockComment {
-    pub span: Span,
-    pub is_deprecated: bool,
-    pub is_final: bool,
-    pub is_internal: bool,
-    pub is_api: bool,
-    pub is_experimental: bool,
-    pub is_enum_interface: bool,
-    pub has_consistent_constructor: bool,
-    pub has_consistent_templates: bool,
-    pub has_sealed_properties: Option<bool>,
-    pub has_sealed_methods: Option<bool>,
-    pub templates: Vec<TemplateTag>,
-    pub template_extends: Vec<TypeString>,
-    pub template_implements: Vec<TypeString>,
-    pub require_extends: Vec<TypeString>,
-    pub require_implements: Vec<TypeString>,
-    pub inheritors: Option<TypeString>,
-    pub unchecked: bool,
-    pub methods: Vec<MethodTag>,
-    pub properties: Vec<PropertyTag>,
-    pub type_aliases: Vec<TypeTag>,
-    pub imported_type_aliases: Vec<ImportTypeTag>,
-    pub mixins: Vec<TypeString>,
+pub enum HookParamTag<'arena> {
+    Typed(ParamTagValue<'arena>),
+    Typeless(TypelessParamTagValue<'arena>),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct FunctionLikeDocblockComment {
-    pub span: Span,
-    pub is_deprecated: bool,
-    pub is_internal: bool,
-    pub is_experimental: bool,
-    pub is_pure: bool,
-    pub is_external_mutation_free: bool,
-    pub is_mutation_free: bool,
-    pub suspends_fiber: bool,
-    pub ignore_nullable_return: bool,
-    pub ignore_falsable_return: bool,
-    pub inherits_docs: bool,
-    pub no_named_arguments: bool,
-    pub return_type: Option<ReturnTypeTag>,
-    pub parameters: Vec<ParameterTag>,
-    pub parameters_out: Vec<ParameterOutTag>,
-    pub where_constraints: Vec<WhereTag>,
-    pub throws: Vec<ThrowsTag>,
-    pub templates: Vec<TemplateTag>,
-    pub assertions: Vec<AssertionTag>,
-    pub if_true_assertions: Vec<AssertionTag>,
-    pub if_false_assertions: Vec<AssertionTag>,
-    pub must_use: bool,
-    pub unchecked: bool,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct PropertyDocblockComment {
-    pub span: Span,
-    pub type_string: Option<TypeString>,
-    pub is_deprecated: bool,
-    pub is_internal: bool,
-    pub is_experimental: bool,
-    pub is_readonly: bool,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ConstantDocblockComment {
-    pub span: Span,
-    pub type_string: Option<TypeString>,
-    pub is_deprecated: bool,
-    pub is_internal: bool,
-    pub is_experimental: bool,
-    pub is_final: bool,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-#[allow(clippy::struct_field_names)]
-pub struct TraitUseDocblockComment {
-    pub template_extends: Vec<TypeString>,
-    pub template_implements: Vec<TypeString>,
-    pub template_use: Vec<TypeString>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct PropertyHookDocblockComment {
-    pub span: Span,
-    pub param_type_string: Option<ParameterTag>,
-    pub return_type_string: Option<TypeString>,
-    pub is_deprecated: bool,
-    pub is_internal: bool,
-    pub is_experimental: bool,
-}
-
-impl ClassLikeDocblockComment {
-    pub fn create<A>(
-        context: &Context<'_, '_, A>,
-        class_like: impl HasSpan,
-        scope: &mut NamespaceScope,
-    ) -> Result<Option<ClassLikeDocblockComment>, ParseError>
-    where
-        A: Arena,
-    {
-        let Some(docblock) = context.get_docblock(class_like) else {
-            return Ok(None);
-        };
-
-        let mut is_final = false;
-        let mut is_deprecated = false;
-        let mut is_internal = false;
-        let mut is_experimental = false;
-        let mut is_api = false;
-        let mut has_consistent_constructor = false;
-        let mut has_consistent_templates = false;
-        let mut has_sealed_properties = None;
-        let mut has_sealed_methods = None;
-        let mut templates = Vec::new();
-        let mut template_extends = Vec::new();
-        let mut template_implements = Vec::new();
-        let mut require_extends = Vec::new();
-        let mut require_implements = Vec::new();
-        let mut inheritors = None;
-        let mut is_enum_interface = false;
-        let mut unchecked = false;
-        let mut methods = Vec::new();
-        let mut properties = Vec::new();
-        let mut type_aliases = Vec::new();
-        let mut imported_type_aliases = Vec::new();
-        let mut mixins = Vec::new();
-
-        let parsed_docblock = parse_trivia(context.arena, docblock)?;
-
-        for element in parsed_docblock.elements {
-            let Element::Tag(tag) = element else {
-                continue;
-            };
-
-            match tag.kind {
-                TagKind::Unchecked | TagKind::MagoUnchecked => {
-                    unchecked = true;
-                }
-                TagKind::Deprecated => {
-                    is_deprecated = true;
-                }
-                TagKind::NotDeprecated => {
-                    is_deprecated = false;
-                }
-                TagKind::EnumInterface => {
-                    is_enum_interface = true;
-                }
-                TagKind::Final => {
-                    is_final = true;
-                }
-                TagKind::PsalmInternal | TagKind::Internal => {
-                    is_internal = true;
-                }
-                TagKind::Experimental => {
-                    is_experimental = true;
-                }
-                TagKind::Api | TagKind::PsalmApi => {
-                    is_api = true;
-                }
-                TagKind::PsalmSealProperties | TagKind::SealProperties => {
-                    has_sealed_properties = Some(true);
-                }
-                TagKind::PsalmNoSealProperties | TagKind::NoSealProperties => {
-                    has_sealed_properties = Some(false);
-                }
-                TagKind::PsalmSealMethods | TagKind::SealMethods => {
-                    has_sealed_methods = Some(true);
-                }
-                TagKind::PsalmNoSealMethods | TagKind::NoSealMethods => {
-                    has_sealed_methods = Some(false);
-                }
-                TagKind::Inheritors | TagKind::PsalmInheritors => {
-                    let description_str = tag.description;
-                    let description_span = tag.description_span;
-
-                    if let Some((inheritors_tag, _)) = split_tag_content(description_str, description_span) {
-                        inheritors = Some(inheritors_tag);
-                    }
-                }
-                TagKind::PhpstanTemplate
-                | TagKind::PsalmTemplate
-                | TagKind::Template
-                | TagKind::TemplateInvariant
-                | TagKind::PhpstanTemplateInvariant
-                | TagKind::PsalmTemplateInvariant => {
-                    let description_str = tag.description;
-                    let description_span = tag.description_span;
-
-                    let template = parse_template_tag(description_str, description_span, false, false)?;
-                    scope.add(NameKind::Default, &template.name, &(None as Option<&str>));
-                    templates.push(template);
-                }
-                TagKind::PhpstanTemplateContravariant
-                | TagKind::PsalmTemplateContravariant
-                | TagKind::TemplateContravariant => {
-                    let description_str = tag.description;
-                    let description_span = tag.description_span;
-
-                    let template = parse_template_tag(description_str, description_span, false, true)?;
-                    scope.add(NameKind::Default, &template.name, &(None as Option<&str>));
-
-                    templates.push(template);
-                }
-                TagKind::PhpstanTemplateCovariant | TagKind::PsalmTemplateCovariant | TagKind::TemplateCovariant => {
-                    let description_str = tag.description;
-                    let description_span = tag.description_span;
-
-                    let template = parse_template_tag(description_str, description_span, true, false)?;
-                    scope.add(NameKind::Default, &template.name, &(None as Option<&str>));
-
-                    templates.push(template);
-                }
-                TagKind::TemplateExtends | TagKind::Extends => {
-                    let description_str = tag.description;
-                    let description_span = tag.description_span;
-
-                    if let Some((extended_type, _)) = split_tag_content(description_str, description_span) {
-                        template_extends.push(extended_type);
-                    }
-                }
-                TagKind::TemplateImplements | TagKind::Implements => {
-                    let description_str = tag.description;
-                    let description_span = tag.description_span;
-
-                    if let Some((implemented_type, _)) = split_tag_content(description_str, description_span) {
-                        template_implements.push(implemented_type);
-                    }
-                }
-                TagKind::ConsistentConstructor | TagKind::PsalmConsistentConstructor => {
-                    has_consistent_constructor = true;
-                }
-                TagKind::PsalmConsistentTemplates => {
-                    has_consistent_templates = true;
-                }
-                TagKind::RequireExtends | TagKind::PhpstanRequireExtends | TagKind::PsalmRequireExtends => {
-                    require_extends.push(TypeString { value: tag.description.to_vec(), span: tag.description_span });
-                }
-                TagKind::RequireImplements | TagKind::PhpstanRequireImplements | TagKind::PsalmRequireImplements => {
-                    require_implements.push(TypeString { value: tag.description.to_vec(), span: tag.description_span });
-                }
-                TagKind::Method | TagKind::PsalmMethod => {
-                    let method = parse_method_tag(tag.description, tag.description_span)?;
-                    methods.push(method);
-                }
-                TagKind::Property | TagKind::PsalmProperty => {
-                    let property_tag = parse_property_tag(tag.description, tag.description_span, true, true)?;
-                    properties.push(property_tag);
-                }
-                TagKind::PropertyRead | TagKind::PsalmPropertyRead => {
-                    let property_tag = parse_property_tag(tag.description, tag.description_span, true, false)?;
-                    properties.push(property_tag);
-                }
-                TagKind::PropertyWrite | TagKind::PsalmPropertyWrite => {
-                    let property_tag = parse_property_tag(tag.description, tag.description_span, false, true)?;
-                    properties.push(property_tag);
-                }
-                TagKind::Type | TagKind::PsalmType | TagKind::PhpstanType => {
-                    let type_tag = parse_type_tag(tag.description, tag.description_span)?;
-                    type_aliases.push(type_tag);
-                }
-                TagKind::ImportType | TagKind::PsalmImportType | TagKind::PhpstanImportType => {
-                    let import_type_tag = parse_import_type_tag(tag.description, tag.description_span)?;
-                    imported_type_aliases.push(import_type_tag);
-                }
-                TagKind::Mixin => {
-                    if let Some((mixin_type, _)) = split_tag_content(tag.description, tag.description_span) {
-                        mixins.push(mixin_type);
-                    }
-                }
-                _ => {
-                    // Ignore other tags
-                }
-            }
+impl<'arena> HookParamTag<'arena> {
+    #[must_use]
+    pub fn get_type(&self) -> Option<&'arena Type<'arena>> {
+        match self {
+            HookParamTag::Typed(value) => Some(value.r#type),
+            HookParamTag::Typeless(_) => None,
         }
-
-        Ok(Some(ClassLikeDocblockComment {
-            span: docblock.span,
-            is_deprecated,
-            is_final,
-            is_internal,
-            is_experimental,
-            is_api,
-            is_enum_interface,
-            has_sealed_properties,
-            has_sealed_methods,
-            has_consistent_constructor,
-            has_consistent_templates,
-            templates,
-            template_extends,
-            template_implements,
-            require_extends,
-            require_implements,
-            inheritors,
-            unchecked,
-            methods,
-            properties,
-            type_aliases,
-            imported_type_aliases,
-            mixins,
-        }))
     }
 }
 
-impl FunctionLikeDocblockComment {
-    pub fn create<A>(
-        context: &Context<'_, '_, A>,
-        function: impl HasSpan,
-        scope: &mut NamespaceScope,
-    ) -> Result<Option<FunctionLikeDocblockComment>, ParseError>
-    where
-        A: Arena,
-    {
-        let Some(docblock) = context.get_docblock(function) else {
-            return Ok(None);
-        };
-
-        let mut is_deprecated = false;
-        let mut is_internal = false;
-        let mut is_experimental = false;
-        let mut is_pure = false;
-        let mut is_external_mutation_free = false;
-        let mut is_mutation_free = false;
-        let mut suspends_fiber = false;
-        let mut ignore_nullable_return = false;
-        let mut ignore_falsable_return = false;
-        let mut inherits_docs = false;
-        let mut no_named_arguments = false;
-        let mut generic_return_type: Option<ReturnTypeTag> = None;
-        let mut psalm_return_type: Option<ReturnTypeTag> = None;
-        let mut phpstan_return_type: Option<ReturnTypeTag> = None;
-        let mut plain_parameters: Vec<ParameterTag> = Vec::new();
-        let mut phpstan_parameters: Vec<ParameterTag> = Vec::new();
-        let mut psalm_parameters: Vec<ParameterTag> = Vec::new();
-        let mut parameters_out: Vec<ParameterOutTag> = Vec::new();
-        let mut where_constraints: Vec<WhereTag> = Vec::new();
-        let mut throws: Vec<ThrowsTag> = Vec::new();
-        let mut templates: Vec<TemplateTag> = Vec::new();
-        let mut assertions: Vec<AssertionTag> = Vec::new();
-        let mut if_true_assertions: Vec<AssertionTag> = Vec::new();
-        let mut if_false_assertions: Vec<AssertionTag> = Vec::new();
-        let mut unchecked = false;
-        let mut must_use = false;
-
-        let parsed_docblock = parse_trivia(context.arena, docblock)?;
-
-        for element in parsed_docblock.elements {
-            let tag = match element {
-                Element::Tag(tag) => tag,
-                Element::Text(text) => {
-                    inherits_docs = inherits_docs
-                        || text
-                            .segments
-                            .iter()
-                            .any(|s| matches!(s, TextSegment::InlineTag(Tag { kind: TagKind::InheritDoc, .. })));
-
-                    continue;
-                }
-                _ => continue,
-            };
-
-            match tag.kind {
-                TagKind::Unchecked | TagKind::MagoUnchecked => {
-                    unchecked = true;
-                }
-                TagKind::MustUse => {
-                    must_use = true;
-                }
-                TagKind::Deprecated => {
-                    is_deprecated = true;
-                }
-                TagKind::Internal | TagKind::PsalmInternal => {
-                    is_internal = true;
-                }
-                TagKind::Experimental => {
-                    is_experimental = true;
-                }
-                TagKind::Param => {
-                    let param = parse_param_tag(tag.description, tag.description_span)?;
-                    plain_parameters.push(param);
-                }
-                TagKind::PhpstanParam => {
-                    let param = parse_param_tag(tag.description, tag.description_span)?;
-                    phpstan_parameters.push(param);
-                }
-                TagKind::PsalmParam => {
-                    let param = parse_param_tag(tag.description, tag.description_span)?;
-                    psalm_parameters.push(param);
-                }
-                TagKind::NoNamedArguments => {
-                    no_named_arguments = true;
-                }
-                TagKind::PhpstanTemplate
-                | TagKind::PsalmTemplate
-                | TagKind::Template
-                | TagKind::TemplateInvariant
-                | TagKind::PhpstanTemplateInvariant
-                | TagKind::PsalmTemplateInvariant => {
-                    let t = parse_template_tag(tag.description, tag.description_span, false, false)?;
-                    scope.add(NameKind::Default, &t.name, &(None as Option<&str>));
-
-                    templates.push(t);
-                }
-                TagKind::TemplateCovariant | TagKind::PhpstanTemplateCovariant | TagKind::PsalmTemplateCovariant => {
-                    let t = parse_template_tag(tag.description, tag.description_span, true, false)?;
-                    scope.add(NameKind::Default, &t.name, &(None as Option<&str>));
-
-                    templates.push(t);
-                }
-                TagKind::TemplateContravariant
-                | TagKind::PhpstanTemplateContravariant
-                | TagKind::PsalmTemplateContravariant => {
-                    let t = parse_template_tag(tag.description, tag.description_span, false, true)?;
-                    scope.add(NameKind::Default, &t.name, &(None as Option<&str>));
-
-                    templates.push(t);
-                }
-                TagKind::Return => {
-                    let return_tag = parse_return_tag(tag.description, tag.description_span)?;
-                    generic_return_type = Some(return_tag);
-                }
-                TagKind::PhpstanReturn => {
-                    let return_tag = parse_return_tag(tag.description, tag.description_span)?;
-                    phpstan_return_type = Some(return_tag);
-                }
-                TagKind::PsalmReturn => {
-                    let return_tag = parse_return_tag(tag.description, tag.description_span)?;
-                    psalm_return_type = Some(return_tag);
-                }
-                TagKind::Throws => {
-                    let throws_tag = parse_throws_tag(tag.description, tag.description_span)?;
-                    throws.push(throws_tag);
-                }
-                TagKind::NotDeprecated => {
-                    is_deprecated = false;
-                }
-                TagKind::PhpstanImpure => {
-                    is_pure = false;
-                }
-                TagKind::PsalmPure | TagKind::PhpstanPure | TagKind::Pure => {
-                    is_pure = true;
-                }
-                TagKind::PsalmParamOut | TagKind::ParamOut => {
-                    let param_out = parse_param_out_tag(tag.description, tag.description_span)?;
-                    parameters_out.push(param_out);
-                }
-                TagKind::Assert | TagKind::PsalmAssert | TagKind::PhpstanAssert => {
-                    let assertion = parse_assertion_tag(tag.description, tag.description_span)?;
-                    assertions.push(assertion);
-                }
-                TagKind::AssertIfTrue | TagKind::PsalmAssertIfTrue | TagKind::PhpstanAssertIfTrue => {
-                    let assertion = parse_assertion_tag(tag.description, tag.description_span)?;
-                    if_true_assertions.push(assertion);
-                }
-                TagKind::AssertIfFalse | TagKind::PsalmAssertIfFalse | TagKind::PhpstanAssertIfFalse => {
-                    let assertion = parse_assertion_tag(tag.description, tag.description_span)?;
-                    if_false_assertions.push(assertion);
-                }
-                TagKind::Where => {
-                    let where_tag = parse_where_tag(tag.description, tag.description_span)?;
-                    where_constraints.push(where_tag);
-                }
-                TagKind::IgnoreNullableReturn | TagKind::PsalmIgnoreNullableReturn => {
-                    ignore_nullable_return = true;
-                }
-                TagKind::IgnoreFalsableReturn | TagKind::PsalmIgnoreFalsableReturn => {
-                    ignore_falsable_return = true;
-                }
-                TagKind::InheritDoc => {
-                    inherits_docs = true;
-                }
-                TagKind::MutationFree | TagKind::PsalmMutationFree => {
-                    is_mutation_free = true;
-                    is_external_mutation_free = true;
-                }
-                TagKind::ExternalMutationFree | TagKind::PsalmExternalMutationFree => {
-                    is_external_mutation_free = true;
-                }
-                TagKind::SuspendsFiber => {
-                    suspends_fiber = true;
-                }
-                _ => {
-                    // Ignore other tags
-                }
-            }
+impl HasSpan for HookParamTag<'_> {
+    fn span(&self) -> Span {
+        match self {
+            HookParamTag::Typed(value) => value.span(),
+            HookParamTag::Typeless(value) => value.span(),
         }
-
-        Ok(Some(FunctionLikeDocblockComment {
-            span: docblock.span,
-            is_deprecated,
-            is_internal,
-            is_experimental,
-            is_pure,
-            is_external_mutation_free,
-            is_mutation_free,
-            suspends_fiber,
-            ignore_nullable_return,
-            ignore_falsable_return,
-            inherits_docs,
-            no_named_arguments,
-            return_type: psalm_return_type.or(phpstan_return_type).or(generic_return_type),
-            parameters: {
-                let mut all = plain_parameters;
-                all.extend(phpstan_parameters);
-                all.extend(psalm_parameters);
-                all
-            },
-            parameters_out,
-            where_constraints,
-            throws,
-            templates,
-            assertions,
-            if_true_assertions,
-            if_false_assertions,
-            must_use,
-            unchecked,
-        }))
     }
 }
 
-impl PropertyDocblockComment {
-    pub fn create<A>(
-        context: &Context<'_, '_, A>,
-        property: impl HasSpan,
-    ) -> Result<Option<PropertyDocblockComment>, ParseError>
-    where
-        A: Arena,
-    {
-        let Some(docblock) = context.get_docblock(property) else {
-            return Ok(None);
-        };
+pub fn parse_docblock<'arena, A>(context: &Context<'_, 'arena, A>, node: impl HasSpan) -> Option<Document<'arena>>
+where
+    A: Arena,
+{
+    let docblock = context.get_docblock(node)?;
 
-        let mut is_deprecated = false;
-        let mut is_internal = false;
-        let mut is_experimental = false;
-        let mut is_readonly = false;
-        let mut generic_type_string: Option<TypeString> = None;
-        let mut phpstan_type_string: Option<TypeString> = None;
-        let mut psalm_type_string: Option<TypeString> = None;
+    Some(PHPDocParser::parse_with_span(context.arena, docblock.value, docblock.span))
+}
 
-        let parsed_docblock = parse_trivia(context.arena, docblock)?;
-
-        for element in parsed_docblock.elements {
-            let Element::Tag(tag) = element else {
-                continue;
-            };
-
-            match tag.kind {
-                TagKind::Deprecated => {
-                    is_deprecated = true;
-                }
-                TagKind::Internal | TagKind::PsalmInternal => {
-                    is_internal = true;
-                }
-                TagKind::Experimental => {
-                    is_experimental = true;
-                }
-                TagKind::PhpstanReadOnly | TagKind::PsalmReadOnly | TagKind::ReadOnly => {
-                    is_readonly = true;
-                }
-                TagKind::PsalmVar => {
-                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
-                        psalm_type_string = Some(type_string_tag.0);
-                    }
-                }
-                TagKind::PhpstanVar => {
-                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
-                        phpstan_type_string = Some(type_string_tag.0);
-                    }
-                }
-                TagKind::Var => {
-                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
-                        generic_type_string = Some(type_string_tag.0);
-                    }
-                }
-                _ => {}
-            }
+pub fn find_most_trusted_tag<'arena, T>(
+    document: &Document<'arena>,
+    mut extract: impl FnMut(&'arena Tag<'arena>) -> Option<T>,
+) -> Option<T> {
+    let mut selected: Option<(Option<TagVendor>, T)> = None;
+    for tag in document.tags() {
+        if selected.as_ref().is_some_and(|(vendor, _)| tag.vendor < *vendor) {
+            continue;
         }
 
-        Ok(Some(PropertyDocblockComment {
-            span: docblock.span,
-            type_string: psalm_type_string.or(phpstan_type_string).or(generic_type_string),
-            is_deprecated,
-            is_internal,
-            is_experimental,
-            is_readonly,
-        }))
+        if let Some(value) = extract(tag) {
+            selected = Some((tag.vendor, value));
+        }
+    }
+
+    selected.map(|(_, value)| value)
+}
+
+pub fn for_each_tag_by_ascending_trust<'arena>(
+    document: &Document<'arena>,
+    mut apply: impl FnMut(&'arena Tag<'arena>),
+) {
+    for vendor in VENDORS_BY_ASCENDING_TRUST {
+        for tag in document.tags() {
+            if tag.vendor == vendor {
+                apply(tag);
+            }
+        }
     }
 }
 
-impl ConstantDocblockComment {
-    pub fn create<A>(
-        context: &Context<'_, '_, A>,
-        constant: impl HasSpan,
-    ) -> Result<Option<ConstantDocblockComment>, ParseError>
-    where
-        A: Arena,
-    {
-        let Some(docblock) = context.get_docblock(constant) else {
-            return Ok(None);
-        };
-
-        let mut is_deprecated = false;
-        let mut is_internal = false;
-        let mut is_experimental = false;
-        let mut is_final = false;
-
-        let mut generic_type_string: Option<TypeString> = None;
-        let mut phpstan_type_string: Option<TypeString> = None;
-        let mut psalm_type_string: Option<TypeString> = None;
-
-        let parsed_docblock = parse_trivia(context.arena, docblock)?;
-
-        for element in parsed_docblock.elements {
-            let Element::Tag(tag) = element else {
-                continue;
-            };
-
-            match tag.kind {
-                TagKind::Deprecated => {
-                    is_deprecated = true;
-                }
-                TagKind::Internal | TagKind::PsalmInternal => {
-                    is_internal = true;
-                }
-                TagKind::Experimental => {
-                    is_experimental = true;
-                }
-                TagKind::Final => {
-                    is_final = true;
-                }
-                TagKind::PsalmVar => {
-                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
-                        psalm_type_string = Some(type_string_tag.0);
-                    }
-                }
-                TagKind::PhpstanVar => {
-                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
-                        phpstan_type_string = Some(type_string_tag.0);
-                    }
-                }
-                TagKind::Var => {
-                    if let Some(type_string_tag) = split_tag_content(tag.description, tag.description_span) {
-                        generic_type_string = Some(type_string_tag.0);
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        Ok(Some(ConstantDocblockComment {
-            span: docblock.span,
-            is_deprecated,
-            is_internal,
-            is_experimental,
-            is_final,
-            type_string: psalm_type_string.or(phpstan_type_string).or(generic_type_string),
-        }))
-    }
-}
-
-impl TraitUseDocblockComment {
-    pub fn create<A>(
-        context: &Context<'_, '_, A>,
-        trait_use: impl HasSpan,
-    ) -> Result<Option<TraitUseDocblockComment>, ParseError>
-    where
-        A: Arena,
-    {
-        let Some(docblock) = context.get_docblock(trait_use) else {
-            return Ok(None);
-        };
-
-        let mut template_extends = Vec::new();
-        let mut template_implements = Vec::new();
-        let mut template_use = Vec::new();
-
-        let parsed_docblock = parse_trivia(context.arena, docblock)?;
-
-        for element in parsed_docblock.elements {
-            let Element::Tag(tag) = element else {
-                continue;
-            };
-
-            match tag.kind {
-                TagKind::TemplateExtends | TagKind::Extends => {
-                    let description_str = tag.description;
-                    let description_span = tag.description_span;
-
-                    if let Some((extended_type, _)) = split_tag_content(description_str, description_span) {
-                        template_extends.push(extended_type);
-                    }
-                }
-                TagKind::TemplateImplements | TagKind::Implements => {
-                    let description_str = tag.description;
-                    let description_span = tag.description_span;
-
-                    if let Some((implemented_type, _)) = split_tag_content(description_str, description_span) {
-                        template_implements.push(implemented_type);
-                    }
-                }
-                TagKind::Use | TagKind::TemplateUse => {
-                    let description_str = tag.description;
-                    let description_span = tag.description_span;
-
-                    if let Some((used_type, _)) = split_tag_content(description_str, description_span) {
-                        template_use.push(used_type);
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        Ok(Some(TraitUseDocblockComment { template_extends, template_implements, template_use }))
-    }
-}
-
-impl PropertyHookDocblockComment {
-    pub fn create<A>(
-        context: &Context<'_, '_, A>,
-        hook: impl HasSpan,
-    ) -> Result<Option<PropertyHookDocblockComment>, ParseError>
-    where
-        A: Arena,
-    {
-        let Some(docblock) = context.get_docblock(hook) else {
-            return Ok(None);
-        };
-
-        let mut is_deprecated = false;
-        let mut is_internal = false;
-        let mut is_experimental = false;
-        let mut generic_return_type: Option<TypeString> = None;
-        let mut psalm_return_type: Option<TypeString> = None;
-        let mut phpstan_return_type: Option<TypeString> = None;
-        let mut plain_param: Option<ParameterTag> = None;
-        let mut phpstan_param: Option<ParameterTag> = None;
-        let mut psalm_param: Option<ParameterTag> = None;
-
-        let parsed_docblock = parse_trivia(context.arena, docblock)?;
-
-        for element in parsed_docblock.elements {
-            let Element::Tag(tag) = element else {
-                continue;
-            };
-
-            match tag.kind {
-                TagKind::Deprecated => {
-                    is_deprecated = true;
-                }
-                TagKind::Internal | TagKind::PsalmInternal => {
-                    is_internal = true;
-                }
-                TagKind::Experimental => {
-                    is_experimental = true;
-                }
-                TagKind::Param => {
-                    plain_param = Some(parse_param_tag(tag.description, tag.description_span)?);
-                }
-                TagKind::PhpstanParam => {
-                    phpstan_param = Some(parse_param_tag(tag.description, tag.description_span)?);
-                }
-                TagKind::PsalmParam => {
-                    psalm_param = Some(parse_param_tag(tag.description, tag.description_span)?);
-                }
-                TagKind::Return => {
-                    if let Some((type_string, _)) = split_tag_content(tag.description, tag.description_span) {
-                        generic_return_type = Some(type_string);
-                    }
-                }
-                TagKind::PsalmReturn => {
-                    if let Some((type_string, _)) = split_tag_content(tag.description, tag.description_span) {
-                        psalm_return_type = Some(type_string);
-                    }
-                }
-                TagKind::PhpstanReturn => {
-                    if let Some((type_string, _)) = split_tag_content(tag.description, tag.description_span) {
-                        phpstan_return_type = Some(type_string);
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        Ok(Some(PropertyHookDocblockComment {
-            span: docblock.span,
-            param_type_string: psalm_param.or(phpstan_param).or(plain_param),
-            return_type_string: psalm_return_type.or(phpstan_return_type).or(generic_return_type),
-            is_deprecated,
-            is_internal,
-            is_experimental,
-        }))
+pub fn assertion_subject_word(subject: &AssertSubject<'_>) -> Word {
+    match subject {
+        AssertSubject::Parameter { variable } => word(variable.value),
+        AssertSubject::Method { parameter, method, .. } => concat_word!(parameter.value, b"->", method.value, b"()"),
+        AssertSubject::Property { parameter, property, .. } => concat_word!(parameter.value, b"->", property.value),
     }
 }
