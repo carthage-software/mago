@@ -27,7 +27,8 @@
 //! [`collections`], each built with its `*_in(arena)` constructor; to collect an
 //! iterator straight into the arena, use [`CollectIn`] (and `ParallelCollectIn`
 //! under the `rayon` feature); for an immutable string copied into the arena, use
-//! [`Arena::alloc_str`].
+//! [`Arena::alloc_str`]; to deep-copy an arena-resident value into a different
+//! arena, implement [`CopyInto`].
 //!
 //! Each module also re-exports the items of its underlying crate (`allocator_api2`
 //! for [`alloc`](mod@alloc), [`boxed`], [`vec`](mod@vec); `hashbrown` for
@@ -38,6 +39,7 @@ pub mod alloc;
 pub mod arena;
 pub mod boxed;
 pub mod collections;
+pub mod copy;
 pub mod iter;
 pub mod prelude;
 pub mod vec;
@@ -46,7 +48,7 @@ pub use arena::Arena;
 pub use arena::LocalArena;
 pub use arena::ScopedArena;
 pub use arena::SharedArena;
-
+pub use copy::CopyInto;
 pub use iter::CollectIn;
 pub use iter::FromIteratorIn;
 #[cfg(feature = "rayon")]

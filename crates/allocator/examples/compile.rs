@@ -4,8 +4,9 @@
 
 use std::marker::PhantomData;
 
-use mago_allocator::prelude::*;
 use rayon::prelude::*;
+
+use mago_allocator::prelude::*;
 
 struct Ast<'arena> {
     _phantom: PhantomData<&'arena ()>,
@@ -19,10 +20,13 @@ struct DefinitionTable<'arena> {
     _phantom: PhantomData<&'arena ()>,
 }
 
-impl DefinitionTable<'_> {
-    /// Deep-copies the table into `dst`. In real code this re-interns strings,
-    /// copies signatures, etc.
-    fn copy_into<'other, A: Arena>(&self, _dst: &'other A) -> DefinitionTable<'other> {
+impl CopyInto for DefinitionTable<'_> {
+    type Output<'arena> = DefinitionTable<'arena>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
         DefinitionTable { _phantom: PhantomData }
     }
 }
