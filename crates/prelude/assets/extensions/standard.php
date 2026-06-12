@@ -1399,16 +1399,22 @@ function quotemeta(string $string): string {}
 
 /**
  * @pure
+ *
+ * @return ($string is non-empty-string ? non-empty-string : string)
  */
 function ucfirst(string $string): string {}
 
 /**
  * @pure
+ *
+ * @return ($string is non-empty-string ? non-empty-string : string)
  */
 function lcfirst(string $string): string {}
 
 /**
  * @pure
+ *
+ * @return ($string is non-empty-string ? non-empty-string : string)
  */
 function ucwords(string $string, string $separators = " \t\r\n\f\v"): string {}
 
@@ -1421,11 +1427,15 @@ function strtr(string $string, string|array $from, string $to = ''): string {}
 
 /**
  * @pure
+ *
+ * @return ($string is non-empty-string ? non-empty-string : string)
  */
 function addslashes(string $string): string {}
 
 /**
  * @pure
+ *
+ * @return ($string is non-empty-string ? non-empty-string : string)
  */
 function addcslashes(string $string, string $characters): string {}
 
@@ -1472,11 +1482,20 @@ function str_ireplace(
 
 /**
  * @pure
+ *
+ * @param non-negative-int $times
+ * @return (
+ *   $string is non-empty-string
+ *     ? ($times is positive-int ? non-empty-string : string)
+ *     : string
+ * )
  */
 function str_repeat(string $string, int $times): string {}
 
 /**
  * @pure
+ *
+ * @return non-empty-list<non-negative-int>
  */
 function count_chars(string $string, int $mode = 0): array|string {}
 
