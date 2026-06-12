@@ -164,6 +164,7 @@ mago-text-edit = { path = "crates/text-edit", version = "1.30.0" }
 mago-formatter = { path = "crates/formatter", version = "1.30.0" }
 mago-fingerprint = { path = "crates/fingerprint", version = "1.30.0" }
 mago-flags = { path = "crates/flags", version = "1.30.0" }
+mago-hir = { path = "crates/hir", version = "1.30.0" }
 mago-word = { path = "crates/word", version = "1.30.0" }
 mago-bytes = { path = "crates/bytes", version = "1.30.0" }
 mago-linter = { path = "crates/linter", version = "1.30.0" }

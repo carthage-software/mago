@@ -1652,6 +1652,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-flags"
+version = "1.30.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "mago-formatter"
 version = "1.30.0"
 dependencies = [
@@ -1693,6 +1700,26 @@ dependencies = [
  "schemars",
  "serde",
  "toml",
+]
+
+[[package]]
+name = "mago-hir"
+version = "1.30.0"
+dependencies = [
+ "itoa",
+ "mago-allocator",
+ "mago-database",
+ "mago-flags",
+ "mago-php-version",
+ "mago-phpdoc-syntax",
+ "mago-span",
+ "mago-syntax",
+ "mago-syntax-core",
+ "memchr",
+ "ordered-float",
+ "paste",
+ "serde",
+ "strum 0.28.0",
 ]
 
 [[package]]

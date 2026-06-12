@@ -1,0 +1,33 @@
+[package]
+name = "mago-hir"
+description = "A high-level intermediate representation (HIR) for PHP, lowered from the PHP and PHPDoc concrete syntax trees."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+serde = ["dep:serde", "ordered-float/serde", "mago-flags/serde", "mago-span/serde", "mago-php-version/serde"]
+
+[dependencies]
+mago-database = { workspace = true }
+mago-php-version = { workspace = true }
+mago-span = { workspace = true }
+mago-syntax-core = { workspace = true }
+mago-flags = { workspace = true }
+mago-syntax = { workspace = true }
+mago-phpdoc-syntax = { workspace = true }
+mago-allocator = { workspace = true }
+itoa = { workspace = true }
+serde = { workspace = true, optional = true }
+strum = { workspace = true }
+paste = { workspace = true }
+ordered-float = { workspace = true, features = ["rand"] }
+memchr = { workspace = true }
