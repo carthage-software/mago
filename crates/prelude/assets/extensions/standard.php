@@ -1968,6 +1968,8 @@ function base64_decode(string $string, bool $strict = false): string|false {}
 
 /**
  * @pure
+ *
+ * @return ($string is non-empty-string ? non-empty-string : '')
  */
 function base64_encode(string $string): string {}
 
