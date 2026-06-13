@@ -54,9 +54,14 @@ use crate::ty::lattice::atom_is_empty_container;
 use crate::ty::lattice::atom_refines;
 use crate::ty::lattice::family::mixed as mixed_family;
 use crate::ty::well_known;
+use crate::ty::well_known::INT;
 use crate::ty::well_known::MIXED;
 use crate::ty::well_known::NEVER;
 use crate::ty::well_known::PLACEHOLDER;
+use crate::ty::well_known::STRING;
+use crate::ty::well_known::TYPE_ARRAY_KEY;
+use crate::ty::well_known::TYPE_INT;
+use crate::ty::well_known::TYPE_MIXED;
 use crate::world::Variance;
 use crate::world::World;
 
@@ -363,17 +368,20 @@ where
         return false;
     }
 
-    if a_payload.name == b_payload.name
-        && let (Some(a_supplied), Some(b_supplied)) = (a_payload.type_arguments, b_payload.type_arguments)
-    {
+    if a_payload.name == b_payload.name {
         let arity = world.template_parameter_arity(a_payload.name);
-        if arity > 0 {
+        let one_side_bare = a_payload.type_arguments.is_none() || b_payload.type_arguments.is_none();
+        let skip_for_coercion = options.template_default_coercion && one_side_bare;
+        if arity > 0 && !skip_for_coercion {
+            let a_supplied: &[Type<'arena>] = a_payload.type_arguments.unwrap_or_default();
+            let b_supplied: &[Type<'arena>] = b_payload.type_arguments.unwrap_or_default();
             let fill = |index: usize| -> Type<'arena> {
                 world
                     .template_parameter_at(a_payload.name, index)
                     .and_then(|parameter| parameter.upper_bound)
-                    .unwrap_or(well_known::TYPE_MIXED)
+                    .unwrap_or(TYPE_MIXED)
             };
+
             for index in 0..arity {
                 let a_argument = a_supplied.get(index).copied().unwrap_or_else(|| fill(index));
                 let b_argument = b_supplied.get(index).copied().unwrap_or_else(|| fill(index));
@@ -605,7 +613,7 @@ where
 {
     if payload.flags.contains(ArrayFlag::NonEmpty) {
         if let Some(key_type) = payload.key_param {
-            let int_or_string = builder.union_of(&[well_known::INT, well_known::STRING]);
+            let int_or_string = builder.union_of(&[INT, STRING]);
             if !overlaps(key_type, int_or_string, world, LatticeOptions::default(), &mut LatticeReport::new(), builder)
             {
                 return true;
@@ -1030,8 +1038,8 @@ where
         return true;
     }
 
-    let array_key = array_payload.key_param.unwrap_or(well_known::TYPE_ARRAY_KEY);
-    let array_value = array_payload.value_param.unwrap_or(well_known::TYPE_MIXED);
+    let array_key = array_payload.key_param.unwrap_or(TYPE_ARRAY_KEY);
+    let array_value = array_payload.value_param.unwrap_or(TYPE_MIXED);
     overlaps(iterable_payload.key_type, array_key, world, options, report, builder)
         && overlaps(iterable_payload.value_type, array_value, world, options, report, builder)
 }
@@ -1066,7 +1074,7 @@ where
         return true;
     }
 
-    if !lattice::refines(well_known::TYPE_INT, iterable_payload.key_type, world, options, report, builder) {
+    if !lattice::refines(TYPE_INT, iterable_payload.key_type, world, options, report, builder) {
         return false;
     }
 
@@ -1104,12 +1112,12 @@ where
     }
 
     if let Some(array_key_param) = array_payload.key_param
-        && !lattice::refines(well_known::TYPE_INT, array_key_param, world, options, report, builder)
+        && !lattice::refines(TYPE_INT, array_key_param, world, options, report, builder)
     {
         return false;
     }
 
-    let array_value = array_payload.value_param.unwrap_or(well_known::TYPE_MIXED);
+    let array_value = array_payload.value_param.unwrap_or(TYPE_MIXED);
     overlaps(list_payload.element_type, array_value, world, options, report, builder)
 }
 
