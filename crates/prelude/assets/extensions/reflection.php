@@ -1268,7 +1268,7 @@ class ReflectionClass implements Reflector
     public function getProperties(?int $filter = null): array {}
 
     /**
-     * @return ReflectionClassConstant<T>
+     * @return false|ReflectionClassConstant<T>
      *
      * @pure
      */
