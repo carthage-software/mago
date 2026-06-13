@@ -12,8 +12,8 @@ use std::collections::HashSet;
 use mago_allocator::LocalArena;
 use mago_flags::U8Flags;
 
-use mago_oracle::ty::Atom;
 use mago_oracle::name::Name;
+use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
 use mago_oracle::ty::atom::payload::array::ArrayKey;
@@ -989,8 +989,9 @@ where
     W: World<'arena>,
 {
     let mut report = LatticeReport::new();
+    let options = LatticeOptions::default().with_template_default_coercion();
 
-    lattice::refines(input, container, world, LatticeOptions::default(), &mut report, &mut f.builder)
+    lattice::refines(input, container, world, options, &mut report, &mut f.builder)
 }
 
 pub fn is_contained_capturing<'arena, W>(
@@ -1003,7 +1004,8 @@ where
     W: World<'arena>,
 {
     let mut report = LatticeReport::new();
-    let verdict = lattice::refines(input, container, world, LatticeOptions::default(), &mut report, &mut f.builder);
+    let options = LatticeOptions::default().with_template_default_coercion();
+    let verdict = lattice::refines(input, container, world, options, &mut report, &mut f.builder);
 
     (verdict, report)
 }
@@ -1020,7 +1022,8 @@ pub fn is_contained_with<'arena, W>(
 where
     W: World<'arena>,
 {
-    let options = LatticeOptions { ignore_null, ignore_false, inside_assertion };
+    let options = LatticeOptions { ignore_null, ignore_false, inside_assertion, ..LatticeOptions::default() }
+        .with_template_default_coercion();
     let mut report = LatticeReport::new();
 
     lattice::refines(input, container, world, options, &mut report, &mut f.builder)

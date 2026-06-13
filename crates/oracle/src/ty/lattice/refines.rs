@@ -3,9 +3,12 @@
 
 use mago_allocator::Arena;
 
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
+use crate::ty::atom::payload::array::ArrayAtom;
 use crate::ty::atom::payload::array::ArrayFlag;
+use crate::ty::atom::payload::array::ListAtom;
 use crate::ty::atom::payload::array::ListFlag;
 use crate::ty::atom::payload::scalar::int::IntAtom;
 use crate::ty::atom::payload::scalar::mixed::MixedAtom;
@@ -20,7 +23,6 @@ use crate::ty::lattice::LatticeReport;
 use crate::ty::lattice::family;
 use crate::ty::lattice::overlaps::type_is_value_never;
 use crate::ty::lattice::sealed::SealedResidual;
-use crate::ty::Type;
 use crate::ty::well_known;
 use crate::world::World;
 
@@ -115,6 +117,10 @@ where
             }
 
             if sealed_survivors_cover(*atom, container.atoms, world, options, report, builder) {
+                return true;
+            }
+
+            if sealed_intersected_union_cover(*atom, container.atoms, world, options, report, builder) {
                 return true;
             }
 
@@ -363,11 +369,19 @@ pub(crate) fn atom_admits_empty_container(atom: Atom<'_>) -> bool {
     }
 }
 
-/// True iff a `array<K, V>` input is covered by the union of all
-/// `Array` atoms in `containers`. Mirrors [`list_union_covers`]:
-/// the empty-array singleton needs coverage by some non-empty=false
-/// container, and the (key, value) parameters must refine the
-/// pointwise union of the containers' parameters.
+/// True iff a possibly-empty `array<K, V>` input is covered by the union of
+/// `containers`. An `array<K, V>` is the empty array together with the
+/// non-empty arrays, so it refines the union exactly when (1) some container
+/// admits the empty container and (2) the non-empty arrays refine the union.
+///
+/// The non-empty part is checked by a real recursive [`refines`], so it is
+/// covered by a single container (`array<K, V> <: array<K', V'>` when
+/// `K <: K'` and `V <: V'`) or by the `!B | B` intersected-partition split -
+/// never by a pointwise product of the containers' parameters. The pointwise
+/// product is unsound: it would accept `array<int, object>` into
+/// `array<int(0), mixed> | array<int, int>` even though `[5 => obj]` inhabits
+/// neither member. A non-empty input needs no split and is left to the
+/// caller's single-container `atom_refines` checks (recursing here would loop).
 #[inline]
 fn array_union_covers<'arena, S, A, W>(
     input: Atom<'arena>,
@@ -386,72 +400,31 @@ where
         return false;
     };
 
-    if !containers.iter().any(|atom| matches!(atom, Atom::Array(_)))
-        && !containers.iter().any(|atom| matches!(atom, Atom::Intersected(_)))
-    {
+    if input_payload.known_items.is_some() || input_payload.flags.contains(ArrayFlag::NonEmpty) {
         return false;
     }
 
-    if input_payload.known_items.is_some() {
+    if input_payload.key_param.is_none() || input_payload.value_param.is_none() {
         return false;
     }
 
-    let (Some(input_key), Some(input_value)) = (input_payload.key_param, input_payload.value_param) else {
-        return false;
-    };
-
-    let mut key_types: Vec<Type<'arena>> = Vec::new();
-    let mut value_types: Vec<Type<'arena>> = Vec::new();
-    for &candidate in containers {
-        let head_payload = match candidate {
-            Atom::Array(payload) => payload,
-            Atom::Intersected(intersected) => match *intersected.head {
-                Atom::Array(payload) => payload,
-                _ => continue,
-            },
-            _ => continue,
-        };
-
-        if head_payload.known_items.is_some() {
-            continue;
-        }
-
-        let (Some(key), Some(value)) = (head_payload.key_param, head_payload.value_param) else {
-            continue;
-        };
-
-        key_types.push(key);
-        value_types.push(value);
-    }
-
-    if key_types.is_empty() {
+    if !union_admits_empty_container(containers) {
         return false;
     }
 
-    if !input_payload.flags.contains(ArrayFlag::NonEmpty) && !union_admits_empty_container(containers) {
-        return false;
-    }
+    let non_empty = builder.array(ArrayAtom { flags: input_payload.flags.with(ArrayFlag::NonEmpty), ..*input_payload });
+    let non_empty_type = builder.union_of(&[non_empty]);
+    let containers_type = builder.union_of(containers);
 
-    let mut key_union: Vec<Atom<'arena>> = Vec::new();
-    for ty in &key_types {
-        key_union.extend_from_slice(ty.atoms);
-    }
-
-    let key_type = builder.union_of(&key_union);
-    let mut value_union: Vec<Atom<'arena>> = Vec::new();
-    for ty in &value_types {
-        value_union.extend_from_slice(ty.atoms);
-    }
-
-    let value_type = builder.union_of(&value_union);
-    refines(input_key, key_type, world, options, report, builder)
-        && refines(input_value, value_type, world, options, report, builder)
+    refines(non_empty_type, containers_type, world, options, report, builder)
 }
 
-/// True iff a `list<E>` input is covered by the union of all `List`
-/// atoms in `containers`. Empty-list coverage requires some
-/// container with `non_empty=false`; non-empty coverage requires
-/// `E` to refine the union of all container element types.
+/// True iff a possibly-empty `list<E>` input is covered by the union of
+/// `containers`, by the same empty/non-empty split as [`array_union_covers`]:
+/// the empty list must be admitted by some container, and the non-empty lists
+/// must refine the union via a real recursive [`refines`] rather than a
+/// pointwise element union (`list<A | B>` does not refine `list<A> | list<B>`,
+/// since `[a, b]` inhabits neither).
 #[inline]
 fn list_union_covers<'arena, S, A, W>(
     input: Atom<'arena>,
@@ -470,49 +443,19 @@ where
         return false;
     };
 
-    if !containers.iter().any(|atom| matches!(atom, Atom::List(_)))
-        && !containers.iter().any(|atom| matches!(atom, Atom::Intersected(_)))
-    {
+    if input_payload.known_elements.is_some() || input_payload.flags.contains(ListFlag::NonEmpty) {
         return false;
     }
 
-    if input_payload.known_elements.is_some() {
+    if !union_admits_empty_container(containers) {
         return false;
     }
 
-    let mut element_types: Vec<Type<'arena>> = Vec::new();
-    for &candidate in containers {
-        let head_payload = match candidate {
-            Atom::List(payload) => payload,
-            Atom::Intersected(intersected) => match *intersected.head {
-                Atom::List(payload) => payload,
-                _ => continue,
-            },
-            _ => continue,
-        };
+    let non_empty = builder.list(ListAtom { flags: input_payload.flags.with(ListFlag::NonEmpty), ..*input_payload });
+    let non_empty_type = builder.union_of(&[non_empty]);
+    let containers_type = builder.union_of(containers);
 
-        if head_payload.known_elements.is_some() {
-            continue;
-        }
-
-        element_types.push(head_payload.element_type);
-    }
-
-    if element_types.is_empty() {
-        return false;
-    }
-
-    if !input_payload.flags.contains(ListFlag::NonEmpty) && !union_admits_empty_container(containers) {
-        return false;
-    }
-
-    let mut union_atoms: Vec<Atom<'arena>> = Vec::new();
-    for ty in &element_types {
-        union_atoms.extend_from_slice(ty.atoms);
-    }
-
-    let union_type = builder.union_of(&union_atoms);
-    refines(input_payload.element_type, union_type, world, options, report, builder)
+    refines(non_empty_type, containers_type, world, options, report, builder)
 }
 
 /// Expand `!!X` atom shapes inside a union to `X`'s atoms.
@@ -1008,6 +951,61 @@ where
     }
 
     false
+}
+
+/// Sealed-cover for an `Intersected(H sealed, conjuncts)` input against the
+/// whole container union: `H ≡ ⋃ inheritors`, so the input equals the union
+/// of each surviving inheritor intersected with the original conjuncts. The
+/// input refines the container when every such `survivor & conjuncts` does.
+///
+/// Unlike [`sealed_intersected_cover`], which sees one container atom at a
+/// time, this runs in the top-level union dispatch with all container atoms in
+/// hand - necessary because the survivors typically land in *different*
+/// container atoms (`C & E ≡ (A & E) | (B & E)`, with `A & E` and `B & E` in
+/// separate union members). The conjuncts are carried onto each survivor so a
+/// positive constraint like `& E` is not silently dropped.
+#[inline]
+fn sealed_intersected_union_cover<'arena, S, A, W>(
+    input: Atom<'arena>,
+    containers: &[Atom<'arena>],
+    world: &W,
+    options: LatticeOptions,
+    report: &mut LatticeReport<'arena>,
+    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+) -> bool
+where
+    S: Arena,
+    A: Arena,
+    W: World<'arena>,
+{
+    let Atom::Intersected(payload) = input else {
+        return false;
+    };
+
+    if !matches!(payload.head, Atom::Object(_)) {
+        return false;
+    }
+
+    let mut negated_inners: Vec<Type<'arena>> = Vec::with_capacity(payload.conjuncts.len());
+    for &conjunct in payload.conjuncts {
+        if let Atom::Negated(inner) = conjunct {
+            negated_inners.push(*inner);
+        }
+    }
+
+    let residual = lattice::sealed::compute_residual(*payload.head, &negated_inners, world, options, report, builder);
+    let surviving = match residual {
+        SealedResidual::Surviving(surviving) => surviving,
+        SealedResidual::FullyCovered => return true,
+        SealedResidual::NotSealed => return false,
+    };
+
+    let containers_type = builder.union_of(containers);
+    surviving.iter().all(|&survivor| {
+        let survivor_atom = builder.intersected(survivor, payload.conjuncts);
+        let survivor_type = builder.union_of(&[survivor_atom]);
+        refines(survivor_type, containers_type, world, options, report, builder)
+    })
 }
 
 /// Sealed-cover: `Intersected(H sealed, conjuncts) <: container` when
