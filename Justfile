@@ -97,6 +97,7 @@ publish:
     cargo publish -p mago-flags
     cargo publish -p mago-hir
     cargo publish -p mago-collector
+    cargo publish -p mago-oracl
     cargo publish -p mago-composer
     cargo publish -p mago-docblock
     cargo publish -p mago-formatter
