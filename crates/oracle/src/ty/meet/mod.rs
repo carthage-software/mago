@@ -45,6 +45,7 @@
 use mago_allocator::Arena;
 use mago_flags::U8Flags;
 
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
 use crate::ty::atom::payload::array::ArrayAtom;
@@ -66,7 +67,6 @@ use crate::ty::lattice::refines;
 use crate::ty::lattice::sealed::SealedResidual;
 use crate::ty::lattice::sealed::compute_residual;
 use crate::ty::meet::family::generic;
-use crate::ty::Type;
 use crate::ty::well_known;
 use crate::world::World;
 
@@ -507,7 +507,25 @@ where
         let residual = compute_residual(*payload.head, &negated_inners, world, options, report, builder);
         match residual {
             SealedResidual::Surviving(survivors) if survivors.len() == 1 => {
-                return survivors.first().copied();
+                let survivor = survivors.first().copied()?;
+                let survivor_type = builder.union_of(&[survivor]);
+                let mut residual_conjuncts: Vec<Atom<'arena>> = Vec::with_capacity(kept.len());
+                for &conjunct in &kept {
+                    let still_applies = match conjunct {
+                        Atom::Negated(inner) => overlaps(survivor_type, *inner, world, options, report, builder),
+                        _ => true,
+                    };
+
+                    if still_applies {
+                        residual_conjuncts.push(conjunct);
+                    }
+                }
+
+                return if residual_conjuncts.is_empty() {
+                    Some(survivor)
+                } else {
+                    Some(builder.intersected(survivor, &residual_conjuncts))
+                };
             }
             SealedResidual::FullyCovered => {
                 return Some(well_known::NEVER);

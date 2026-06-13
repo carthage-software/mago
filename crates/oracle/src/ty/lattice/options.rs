@@ -29,6 +29,19 @@ pub struct LatticeOptions {
     /// `assert($x instanceof Foo)`). Some rules become more permissive in
     /// this mode.
     pub inside_assertion: bool,
+    /// Treat an unpinned generic type argument (a raw `Foo` where the
+    /// declaration has parameters, e.g. `Foo` against `Foo<int>`) as
+    /// compatible with any pinned argument, recording
+    /// [`CoercionCause::TemplateDefault`](crate::ty::lattice::CoercionCause::TemplateDefault).
+    /// This is the gradual-typing posture the checker uses for raw generics.
+    ///
+    /// It is **off by default** because the leniency is unsound as a lattice
+    /// relation: under an invariant parameter it would let `meet` keep
+    /// `Foo<int>` as a lower bound of `Foo<mixed>` even though `Foo<int>` is
+    /// not a `Foo<mixed>`, breaking the meet/subtract laws. The lattice
+    /// operations and their property tests run with it off (strict, sound);
+    /// assignment-compatibility checks opt in.
+    pub template_default_coercion: bool,
 }
 
 impl LatticeOptions {
@@ -43,6 +56,7 @@ impl LatticeOptions {
             ignore_null: flags.contains(FlowFlag::IgnoreNullableIssues),
             ignore_false: flags.contains(FlowFlag::IgnoreFalsableIssues),
             inside_assertion: false,
+            template_default_coercion: false,
         }
     }
 
@@ -75,6 +89,15 @@ impl LatticeOptions {
     #[inline]
     pub const fn inside_assertion(mut self) -> Self {
         self.inside_assertion = true;
+        self
+    }
+
+    /// Set [`template_default_coercion`](Self::template_default_coercion) to
+    /// `true`.
+    #[must_use]
+    #[inline]
+    pub const fn with_template_default_coercion(mut self) -> Self {
+        self.template_default_coercion = true;
         self
     }
 }

@@ -45,6 +45,7 @@ mod family;
 
 use mago_allocator::Arena;
 
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
 use crate::ty::atom::payload::array::ArrayAtom;
@@ -70,7 +71,6 @@ use crate::ty::subtract::family::iterable;
 use crate::ty::subtract::family::list;
 use crate::ty::subtract::family::object;
 use crate::ty::subtract::family::string;
-use crate::ty::Type;
 use crate::ty::well_known;
 use crate::ty::well_known::BOOL;
 use crate::ty::well_known::FALSE;
@@ -217,7 +217,28 @@ fn canonicalise_sealed_residuals<'arena, S, A, W>(
                 }
                 SealedResidual::Surviving(survivors) => {
                     if let [survivor] = survivors.as_slice() {
-                        atoms[index] = *survivor;
+                        let survivor = *survivor;
+                        let survivor_type = builder.union_of(&[survivor]);
+                        let mut residual_conjuncts: Vec<Atom<'arena>> = Vec::with_capacity(kept.len());
+                        for &conjunct in &kept {
+                            let still_applies = match conjunct {
+                                Atom::Negated(inner) => {
+                                    overlaps(survivor_type, *inner, world, options, report, builder)
+                                }
+                                _ => true,
+                            };
+
+                            if still_applies {
+                                residual_conjuncts.push(conjunct);
+                            }
+                        }
+
+                        atoms[index] = if residual_conjuncts.is_empty() {
+                            survivor
+                        } else {
+                            builder.intersected(survivor, &residual_conjuncts)
+                        };
+
                         index += 1;
                         continue;
                     }

@@ -11,6 +11,8 @@
 
 use mago_allocator::Arena;
 
+use crate::name::Name;
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
 use crate::ty::atom::payload::generic_parameter::DefiningEntity;
@@ -20,8 +22,6 @@ use crate::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
-use crate::name::Name;
-use crate::ty::Type;
 use crate::ty::well_known;
 use crate::world::TemplateParameter;
 use crate::world::Variance;
@@ -197,7 +197,9 @@ where
                 crate::ty::lattice::refines(substituted, ancestor_arg, world, options, report, builder)
                     && crate::ty::lattice::refines(ancestor_arg, substituted, world, options, report, builder)
             }
-            Variance::Covariant => crate::ty::lattice::refines(substituted, ancestor_arg, world, options, report, builder),
+            Variance::Covariant => {
+                crate::ty::lattice::refines(substituted, ancestor_arg, world, options, report, builder)
+            }
             Variance::Contravariant => {
                 crate::ty::lattice::refines(ancestor_arg, substituted, world, options, report, builder)
             }
@@ -500,62 +502,75 @@ where
         return Some(None);
     }
 
-    match (a.type_arguments, b.type_arguments) {
-        (None, None) => Some(None),
-        (Some(arguments), None) | (None, Some(arguments)) => {
-            let all_contravariant = (0..arity).all(|index| {
-                matches!(
-                    world.template_parameter_at(a.name, index).map(|parameter| parameter.variance),
-                    Some(Variance::Contravariant)
-                )
-            });
+    if a.type_arguments.is_none() && b.type_arguments.is_none() {
+        return Some(None);
+    }
 
-            if all_contravariant { Some(None) } else { Some(Some(arguments)) }
+    if a.type_arguments.is_none() || b.type_arguments.is_none() {
+        let all_contravariant = (0..arity).all(|index| {
+            matches!(
+                world.template_parameter_at(a.name, index).map(|parameter| parameter.variance),
+                Some(Variance::Contravariant)
+            )
+        });
+
+        // A raw side carries no lower bound to join, so an all-contravariant
+        // raw meet stays raw. With coercion on, a raw side meets to the pinned
+        // arguments verbatim; without it (sound default) the raw side is
+        // default-filled and merged pointwise below so the result is a genuine
+        // lower bound of the pinned side.
+        if all_contravariant {
+            return Some(None);
         }
-        (Some(a_supplied), Some(b_supplied)) => {
-            let fill = |index: usize| -> Type<'arena> {
-                world
-                    .template_parameter_at(a.name, index)
-                    .and_then(|parameter| parameter.upper_bound)
-                    .unwrap_or(well_known::TYPE_MIXED)
-            };
-            let a_args: Vec<Type<'arena>> =
-                (0..arity).map(|index| a_supplied.get(index).copied().unwrap_or_else(|| fill(index))).collect();
-            let b_args: Vec<Type<'arena>> =
-                (0..arity).map(|index| b_supplied.get(index).copied().unwrap_or_else(|| fill(index))).collect();
 
-            let mut merged: Vec<Type<'arena>> = Vec::with_capacity(arity);
-            for (index, (&a_arg, &b_arg)) in a_args.iter().zip(b_args.iter()).enumerate() {
-                let variance = world
-                    .template_parameter_at(a.name, index)
-                    .map_or(Variance::Invariant, |parameter| parameter.variance);
-                let arg = match variance {
-                    Variance::Covariant => crate::ty::meet::compute(a_arg, b_arg, world, options, report, builder),
-                    Variance::Invariant => {
-                        let a_refines_b = crate::ty::lattice::refines(a_arg, b_arg, world, options, report, builder);
-                        let b_refines_a = crate::ty::lattice::refines(b_arg, a_arg, world, options, report, builder);
-                        if !a_refines_b || !b_refines_a {
-                            return None;
-                        }
+        if options.template_default_coercion {
+            let arguments = a.type_arguments.or(b.type_arguments).unwrap_or_default();
+            return Some(Some(arguments));
+        }
+    }
 
-                        a_arg
-                    }
-                    Variance::Contravariant => {
-                        let mut atoms: Vec<Atom<'arena>> = a_arg.atoms.to_vec();
-                        atoms.extend_from_slice(b_arg.atoms);
+    let a_supplied: &[Type<'arena>] = a.type_arguments.unwrap_or_default();
+    let b_supplied: &[Type<'arena>] = b.type_arguments.unwrap_or_default();
+    let fill = |index: usize| -> Type<'arena> {
+        world
+            .template_parameter_at(a.name, index)
+            .and_then(|parameter| parameter.upper_bound)
+            .unwrap_or(well_known::TYPE_MIXED)
+    };
+    let a_args: Vec<Type<'arena>> =
+        (0..arity).map(|index| a_supplied.get(index).copied().unwrap_or_else(|| fill(index))).collect();
+    let b_args: Vec<Type<'arena>> =
+        (0..arity).map(|index| b_supplied.get(index).copied().unwrap_or_else(|| fill(index))).collect();
 
-                        builder.union_of(&atoms)
-                    }
-                };
-
-                if matches!(variance, Variance::Covariant) && arg.is_never() {
+    let mut merged: Vec<Type<'arena>> = Vec::with_capacity(arity);
+    for (index, (&a_arg, &b_arg)) in a_args.iter().zip(b_args.iter()).enumerate() {
+        let variance =
+            world.template_parameter_at(a.name, index).map_or(Variance::Invariant, |parameter| parameter.variance);
+        let arg = match variance {
+            Variance::Covariant => crate::ty::meet::compute(a_arg, b_arg, world, options, report, builder),
+            Variance::Invariant => {
+                let a_refines_b = crate::ty::lattice::refines(a_arg, b_arg, world, options, report, builder);
+                let b_refines_a = crate::ty::lattice::refines(b_arg, a_arg, world, options, report, builder);
+                if !a_refines_b || !b_refines_a {
                     return None;
                 }
 
-                merged.push(arg);
+                a_arg
             }
+            Variance::Contravariant => {
+                let mut atoms: Vec<Atom<'arena>> = a_arg.atoms.to_vec();
+                atoms.extend_from_slice(b_arg.atoms);
 
-            Some(Some(builder.types(&merged)))
+                builder.union_of(&atoms)
+            }
+        };
+
+        if matches!(variance, Variance::Covariant) && arg.is_never() {
+            return None;
         }
+
+        merged.push(arg);
     }
+
+    Some(Some(builder.types(&merged)))
 }
