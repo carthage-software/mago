@@ -65,11 +65,14 @@ where
     };
 
     if opposite_casings && matches!(literal, StringLiteral::None | StringLiteral::Unspecified) {
-        if flags.contains(StringRefinementFlag::NonEmpty) {
-            return None;
+        let empty_string_admitted = !flags.contains(StringRefinementFlag::NonEmpty)
+            && !flags.contains(StringRefinementFlag::Truthy)
+            && !flags.contains(StringRefinementFlag::Numeric);
+        if empty_string_admitted {
+            return Some(builder.string_literal(b""));
         }
 
-        return Some(builder.string_literal(b""));
+        return None;
     }
 
     let merged = StringAtom { literal, casing, flags };
