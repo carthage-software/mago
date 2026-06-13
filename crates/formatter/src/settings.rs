@@ -499,6 +499,19 @@ generate_formatter_settings! {
     /// Default: false
     preserve_breaking_condition_expression: bool => "default_false",
 
+    /// Whether to preserve intentional line breaks before binary operators (`&&`, `||`, `and`, `or`, `??`, `.`, etc.).
+    ///
+    /// When enabled, if the original source has a newline before a binary operator's right-hand
+    /// operand, the formatter keeps the expression broken rather than collapsing it onto one line.
+    /// This is useful when integrating Mago alongside tools like PHP-CS-Fixer that intentionally
+    /// place each operand on its own line.
+    ///
+    /// When disabled (the default), the formatter always collapses binary expressions that fit
+    /// within `print-width` onto a single line.
+    ///
+    /// Default: false
+    preserve_breaking_binary_expression: bool => "default_false",
+
     /// Whether to break a parameter list with one or more promoted properties into multiple lines.
     ///
     /// When enabled, parameter lists with promoted properties are always multi-line:
