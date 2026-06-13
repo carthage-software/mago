@@ -483,9 +483,13 @@ where
 }
 
 /// Compare a single type-argument pair under the container parameter's
-/// declared variance. A default-filled position on either side bypasses
-/// the check and records [`CoercionCause::TemplateDefault`] so the
-/// consumer can warn about the unpinned position.
+/// declared variance. When [`LatticeOptions::template_default_coercion`] is
+/// set, a default-filled position on either side bypasses the check and
+/// records [`CoercionCause::TemplateDefault`] so the consumer can warn about
+/// the unpinned position. With the flag off (the sound default) the
+/// default-filled value is compared like any other: a covariant or
+/// contravariant default still passes through `mixed` at the top/bottom, but
+/// an invariant default must match exactly, so the lattice stays sound.
 #[inline]
 fn compare_with_variance<'arena, S, A, W>(
     input: Type<'arena>,
@@ -503,14 +507,16 @@ where
     A: Arena,
     W: World<'arena>,
 {
-    if container_is_default && !matches!(variance, Variance::Contravariant) {
-        report.add_cause(CoercionCause::TemplateDefault);
-        return true;
-    }
+    if options.template_default_coercion {
+        if container_is_default && !matches!(variance, Variance::Contravariant) {
+            report.add_cause(CoercionCause::TemplateDefault);
+            return true;
+        }
 
-    if input_is_default && matches!(variance, Variance::Contravariant) {
-        report.add_cause(CoercionCause::TemplateDefault);
-        return true;
+        if input_is_default && matches!(variance, Variance::Contravariant) {
+            report.add_cause(CoercionCause::TemplateDefault);
+            return true;
+        }
     }
 
     match variance {

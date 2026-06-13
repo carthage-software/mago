@@ -5,15 +5,17 @@
 use mago_allocator::Arena;
 use mago_flags::U8Flags;
 
+use crate::name::Name;
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::object::named::ObjectAtom;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
-use crate::name::Name;
-use crate::ty::Type;
+use crate::ty::predicates::contains_template_anywhere;
 use crate::ty::well_known;
+use crate::world::Variance;
 use crate::world::World;
 
 /// The result of asking "what survives of `H`'s sealed cover after
@@ -94,6 +96,10 @@ where
     let mut surviving: Vec<Atom<'arena>> = Vec::new();
 
     for &inheritor in inheritors {
+        if !inheritor_admits_head_arguments(*head_payload, inheritor, world, options, report, builder) {
+            continue;
+        }
+
         let inheritor_atom = build_inheritor_atom(*head_payload, inheritor, world, builder);
 
         let covered = negated_inners.iter().any(|negated| {
@@ -137,6 +143,68 @@ where
     }
 
     if surviving.is_empty() { SealedResidual::FullyCovered } else { SealedResidual::Surviving(surviving) }
+}
+
+/// `true` iff `inheritor`, viewed through its declared extension of the
+/// sealed head class, can carry the head's `type_arguments`. A sealed class
+/// equals the union of its inheritors, so an inheritor that pins the head's
+/// parameter to an incompatible type (e.g. `A extends C<mixed>` against a head
+/// `C<int(0)>` with an invariant `T`) shares no instance with the head and
+/// contributes nothing to the cover. A position where the inheritor forwards
+/// the parameter (its inherited argument still mentions a template) can take
+/// any value, so it is always compatible.
+#[inline]
+fn inheritor_admits_head_arguments<'arena, S, A, W>(
+    head_payload: ObjectAtom<'arena>,
+    inheritor: Name<'arena>,
+    world: &W,
+    options: LatticeOptions,
+    report: &mut LatticeReport<'arena>,
+    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+) -> bool
+where
+    S: Arena,
+    A: Arena,
+    W: World<'arena>,
+{
+    let Some(head_arguments) = head_payload.type_arguments else {
+        return true;
+    };
+
+    let arity = world.template_parameter_arity(head_payload.name);
+    if arity == 0 || head_arguments.len() != arity {
+        return true;
+    }
+
+    for (position, &head_argument) in head_arguments.iter().enumerate() {
+        let Some(inherited) = world.inherited_template_argument(inheritor, head_payload.name, position) else {
+            continue;
+        };
+
+        if contains_template_anywhere(inherited) {
+            continue;
+        }
+
+        let variance = world
+            .template_parameter_at(head_payload.name, position)
+            .map(|parameter| parameter.variance)
+            .unwrap_or_default();
+
+        let compatible = match variance {
+            Variance::Covariant => lattice::refines(inherited, head_argument, world, options, report, builder),
+            Variance::Contravariant => lattice::refines(head_argument, inherited, world, options, report, builder),
+            Variance::Invariant => {
+                lattice::refines(inherited, head_argument, world, options, report, builder)
+                    && lattice::refines(head_argument, inherited, world, options, report, builder)
+            }
+        };
+
+        if !compatible {
+            return false;
+        }
+    }
+
+    true
 }
 
 #[inline]
