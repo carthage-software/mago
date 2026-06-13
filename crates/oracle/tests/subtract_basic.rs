@@ -10,6 +10,7 @@ use mago_oracle::ty::atom::payload::array::ListFlag;
 use mago_oracle::ty::join;
 use mago_oracle::ty::lattice::LatticeOptions;
 use mago_oracle::ty::lattice::LatticeReport;
+use mago_oracle::ty::lattice::is_uninhabited;
 use mago_oracle::ty::lattice::refines;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::subtract;
@@ -735,5 +736,37 @@ fn possibly_empty_array_with_uninhabited_value_is_the_empty_container() {
         let iterable = f.t_iterable(well_known::TYPE_BOOL, well_known::TYPE_STRING);
         let iterable_type = f.u(iterable);
         assert!(refines_of(f, a, iterable_type, &w), "the empty array inhabits every iterable<K, V>");
+    });
+}
+
+#[test]
+fn sealed_invariant_generic_with_unsatisfiable_argument_is_uninhabited() {
+    fixture(|f| {
+        let mut w = MockWorld::new();
+        for class in ["A", "B", "C", "D", "E"] {
+            w.with_templates(class, &[("T", Variance::Invariant)]);
+        }
+
+        w.with_extended("A", "C", vec![well_known::TYPE_MIXED]);
+        w.with_extended("B", "C", vec![well_known::TYPE_MIXED]);
+        w.with_sealed("C", &["A", "B"]);
+
+        let zero = f.ui(0);
+        let c_zero = f.t_generic_named("C", vec![zero]);
+        let a = f.u(c_zero);
+        let c_mixed = f.t_generic_named("C", vec![well_known::TYPE_MIXED]);
+        let b = f.u(c_mixed);
+
+        assert!(
+            is_uninhabited(c_zero, &w, &mut f.builder),
+            "C is sealed to A|B, both fixed to C<mixed>; under an invariant T no inheritor is C<0>, so C<0> is uninhabited",
+        );
+
+        assert!(!is_uninhabited(c_mixed, &w, &mut f.builder), "C<mixed> is inhabited by its inheritors");
+
+        assert!(!overlaps(f, a, b, &w), "an uninhabited type overlaps nothing");
+        assert!(meet_of(f, a, b, &w).is_never(), "meet with an uninhabited operand is never");
+        assert!(subtract_of(f, a, b, &w).is_never(), "subtracting from an uninhabited type is never");
+        assert!(refines_of(f, a, b, &w), "an uninhabited type refines anything");
     });
 }

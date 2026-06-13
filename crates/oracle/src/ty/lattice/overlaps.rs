@@ -26,6 +26,8 @@
 use mago_allocator::Arena;
 use mago_flags::U8Flags;
 
+use crate::name::Name;
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
 use crate::ty::atom::payload::array::ArrayAtom;
@@ -51,8 +53,6 @@ use crate::ty::lattice::atom_admits_empty_container;
 use crate::ty::lattice::atom_is_empty_container;
 use crate::ty::lattice::atom_refines;
 use crate::ty::lattice::family::mixed as mixed_family;
-use crate::name::Name;
-use crate::ty::Type;
 use crate::ty::well_known;
 use crate::ty::well_known::MIXED;
 use crate::ty::well_known::NEVER;
@@ -711,6 +711,25 @@ where
     let Some(type_arguments) = payload.type_arguments else {
         return false;
     };
+
+    if world.sealed_direct_inheritors(payload.name).is_some() {
+        let head = builder.object(ObjectAtom {
+            name: payload.name,
+            type_arguments: Some(type_arguments),
+            flags: payload.flags,
+        });
+        let residual = lattice::sealed::compute_residual(
+            head,
+            &[],
+            world,
+            LatticeOptions::default(),
+            &mut LatticeReport::new(),
+            builder,
+        );
+        if matches!(residual, lattice::sealed::SealedResidual::FullyCovered) {
+            return true;
+        }
+    }
 
     type_arguments.iter().enumerate().any(|(index, &argument)| {
         if !type_is_value_never(argument, world, builder) {
