@@ -1733,6 +1733,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-oracle"
+version = "1.30.0"
+dependencies = [
+ "codspeed-criterion-compat",
+ "mago-allocator",
+ "mago-database",
+ "mago-flags",
+ "mago-hir",
+ "mago-span",
+ "mago-syntax",
+ "ordered-float",
+ "proptest",
+ "serde",
+]
+
+[[package]]
 name = "mago-orchestrator"
 version = "1.42.0"
 dependencies = [
