@@ -3,6 +3,7 @@
 
 use mago_allocator::Arena;
 
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
 use crate::ty::atom::payload::array::ArrayFlag;
@@ -20,7 +21,6 @@ use crate::ty::lattice::LatticeReport;
 use crate::ty::lattice::family;
 use crate::ty::lattice::overlaps::type_is_value_never;
 use crate::ty::lattice::sealed::SealedResidual;
-use crate::ty::Type;
 use crate::ty::well_known;
 use crate::world::World;
 
@@ -115,6 +115,10 @@ where
             }
 
             if sealed_survivors_cover(*atom, container.atoms, world, options, report, builder) {
+                return true;
+            }
+
+            if sealed_intersected_union_cover(*atom, container.atoms, world, options, report, builder) {
                 return true;
             }
 
@@ -1008,6 +1012,61 @@ where
     }
 
     false
+}
+
+/// Sealed-cover for an `Intersected(H sealed, conjuncts)` input against the
+/// whole container union: `H ≡ ⋃ inheritors`, so the input equals the union
+/// of each surviving inheritor intersected with the original conjuncts. The
+/// input refines the container when every such `survivor & conjuncts` does.
+///
+/// Unlike [`sealed_intersected_cover`], which sees one container atom at a
+/// time, this runs in the top-level union dispatch with all container atoms in
+/// hand - necessary because the survivors typically land in *different*
+/// container atoms (`C & E ≡ (A & E) | (B & E)`, with `A & E` and `B & E` in
+/// separate union members). The conjuncts are carried onto each survivor so a
+/// positive constraint like `& E` is not silently dropped.
+#[inline]
+fn sealed_intersected_union_cover<'arena, S, A, W>(
+    input: Atom<'arena>,
+    containers: &[Atom<'arena>],
+    world: &W,
+    options: LatticeOptions,
+    report: &mut LatticeReport<'arena>,
+    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+) -> bool
+where
+    S: Arena,
+    A: Arena,
+    W: World<'arena>,
+{
+    let Atom::Intersected(payload) = input else {
+        return false;
+    };
+
+    if !matches!(payload.head, Atom::Object(_)) {
+        return false;
+    }
+
+    let mut negated_inners: Vec<Type<'arena>> = Vec::with_capacity(payload.conjuncts.len());
+    for &conjunct in payload.conjuncts {
+        if let Atom::Negated(inner) = conjunct {
+            negated_inners.push(*inner);
+        }
+    }
+
+    let residual = lattice::sealed::compute_residual(*payload.head, &negated_inners, world, options, report, builder);
+    let surviving = match residual {
+        SealedResidual::Surviving(surviving) => surviving,
+        SealedResidual::FullyCovered => return true,
+        SealedResidual::NotSealed => return false,
+    };
+
+    let containers_type = builder.union_of(containers);
+    surviving.iter().all(|&survivor| {
+        let survivor_atom = builder.intersected(survivor, payload.conjuncts);
+        let survivor_type = builder.union_of(&[survivor_atom]);
+        refines(survivor_type, containers_type, world, options, report, builder)
+    })
 }
 
 /// Sealed-cover: `Intersected(H sealed, conjuncts) <: container` when

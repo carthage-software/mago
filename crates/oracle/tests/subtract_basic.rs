@@ -770,3 +770,74 @@ fn sealed_invariant_generic_with_unsatisfiable_argument_is_uninhabited() {
         assert!(refines_of(f, a, b, &w), "an uninhabited type refines anything");
     });
 }
+
+#[test]
+fn subtract_list_by_iterable_removes_the_empty_list() {
+    fixture(|f| {
+        let mut w = MockWorld::new();
+        for class in ["A", "B", "C", "D", "E"] {
+            w.with_templates(class, &[("T", Variance::Invariant)]);
+        }
+
+        w.with_extended("A", "C", vec![well_known::TYPE_MIXED]);
+
+        let int_t = well_known::TYPE_INT;
+        let list_int = f.t_list(int_t, false);
+        let a = f.builder.union_of(&[well_known::INT, list_int]);
+
+        let d = f.t_named("D");
+        let a_and_d = f.t_named_intersected("A", &[d]);
+        let a_and_d_t = f.u(a_and_d);
+        let list_ad = f.t_list(a_and_d_t, false);
+        let b = f.u(list_ad);
+
+        let zero = f.ui(0);
+        let iter_0_int = f.t_iterable(zero, int_t);
+        let c = f.u(iter_0_int);
+
+        let a_minus_c = subtract_of(f, a, c, &w);
+        let a_minus_b = subtract_of(f, a, b, &w);
+
+        assert!(
+            refines_of(f, a_minus_c, a_minus_b, &w),
+            "anti-monotonicity: b={b:?} <: c={c:?}, so (a\\c)={a_minus_c:?} must refine (a\\b)={a_minus_b:?}; the \
+             empty list is shared by every iterable and must be removed when subtracting iterable<0, int>",
+        );
+    });
+}
+
+#[test]
+fn partition_holds_for_sealed_class_extending_its_arguments() {
+    fixture(|f| {
+        let mut w = MockWorld::new();
+        for class in ["A", "B", "C", "D", "E"] {
+            w.with_templates(class, &[("T", Variance::Invariant)]);
+        }
+
+        w.with_extended("C", "E", vec![well_known::TYPE_MIXED]);
+        w.with_extended("A", "C", vec![well_known::TYPE_MIXED]);
+        w.with_extended("B", "C", vec![well_known::TYPE_MIXED]);
+        w.with_sealed("C", &["A", "B"]);
+
+        let e = f.t_named("E");
+        let c_and_e = f.t_named_intersected("C", &[e]);
+        let zero_int = f.t_lit_int(0);
+        let a = f.builder.union_of(&[c_and_e, zero_int]);
+
+        let e2 = f.t_named("E");
+        let a_and_e = f.t_named_intersected("A", &[e2]);
+        let zero_float = f.t_lit_float(0.0);
+        let b = f.builder.union_of(&[a_and_e, zero_float, well_known::INT]);
+
+        let m = meet_of(f, a, b, &w);
+        let s = subtract_of(f, a, b, &w);
+        let mut atoms = m.atoms.to_vec();
+        atoms.extend_from_slice(s.atoms);
+        let union = f.builder.union_of(&atoms);
+        assert!(
+            refines_of(f, a, union, &w),
+            "partition: C is sealed to A|B, so C&E equals (A&E)|(B&E) and must refine meet(A,B) union subtract(A,B); \
+             a={a:?} m={m:?} s={s:?}",
+        );
+    });
+}

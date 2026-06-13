@@ -19,6 +19,7 @@ use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::lattice::is_uninhabited;
+use crate::ty::meet;
 use crate::ty::well_known;
 use crate::world::World;
 
@@ -47,8 +48,7 @@ where
         return sealed_list_meet(*a_payload, *b_payload, world, options, report, builder);
     }
 
-    let element_type =
-        crate::ty::meet::compute(a_payload.element_type, b_payload.element_type, world, options, report, builder);
+    let element_type = meet::compute(a_payload.element_type, b_payload.element_type, world, options, report, builder);
     let non_empty = a_payload.flags.contains(ListFlag::NonEmpty) || b_payload.flags.contains(ListFlag::NonEmpty);
     if non_empty && element_type.is_never() {
         return None;
@@ -86,15 +86,15 @@ where
         let b_entry = b_entries.get(index).copied();
         let (value, optional) = match (a_entry, b_entry) {
             (Some(a_element), Some(b_element)) => (
-                crate::ty::meet::compute(a_element.value, b_element.value, world, options, report, builder),
+                meet::compute(a_element.value, b_element.value, world, options, report, builder),
                 a_element.optional && b_element.optional,
             ),
             (Some(a_element), None) => (
-                crate::ty::meet::compute(a_element.value, b_payload.element_type, world, options, report, builder),
+                meet::compute(a_element.value, b_payload.element_type, world, options, report, builder),
                 a_element.optional,
             ),
             (None, Some(b_element)) => (
-                crate::ty::meet::compute(a_payload.element_type, b_element.value, world, options, report, builder),
+                meet::compute(a_payload.element_type, b_element.value, world, options, report, builder),
                 b_element.optional,
             ),
             (None, None) => continue,
@@ -110,8 +110,7 @@ where
     let known_elements = if merged.is_empty() { None } else { Some(builder.known_elements(&merged)) };
     let non_empty = a_payload.flags.contains(ListFlag::NonEmpty) || b_payload.flags.contains(ListFlag::NonEmpty);
     let known_count = NonZeroU32::new(merged.len() as u32);
-    let element_type =
-        crate::ty::meet::compute(a_payload.element_type, b_payload.element_type, world, options, report, builder);
+    let element_type = meet::compute(a_payload.element_type, b_payload.element_type, world, options, report, builder);
     let mut flags = U8Flags::empty();
     flags.set_value(ListFlag::NonEmpty, non_empty);
     let merged_payload = ListAtom { element_type, known_elements, known_count, flags };
@@ -159,7 +158,7 @@ where
         merged
             .entry(b_entry.key)
             .and_modify(|existing| {
-                existing.value = crate::ty::meet::compute(existing.value, b_entry.value, world, options, report, builder);
+                existing.value = meet::compute(existing.value, b_entry.value, world, options, report, builder);
                 existing.optional = existing.optional && b_entry.optional;
             })
             .or_insert(*b_entry);
@@ -213,7 +212,7 @@ where
             crate::ty::lattice::refines(key_type, key_constraint, world, options, report, builder)
         });
         let value = if let Some(value_constraint) = value_param {
-            crate::ty::meet::compute(entry.value, value_constraint, world, options, report, builder)
+            meet::compute(entry.value, value_constraint, world, options, report, builder)
         } else {
             entry.value
         };
@@ -284,8 +283,7 @@ where
     }
 
     let array_value_param = array_payload.value_param.unwrap_or(well_known::TYPE_MIXED);
-    let element_type =
-        crate::ty::meet::compute(list_payload.element_type, array_value_param, world, options, report, builder);
+    let element_type = meet::compute(list_payload.element_type, array_value_param, world, options, report, builder);
 
     if non_empty && element_type.is_never() {
         return None;
@@ -324,15 +322,13 @@ where
     };
 
     let key_param = match array_payload.key_param {
-        Some(array_key) => {
-            Some(crate::ty::meet::compute(array_key, iterable_payload.key_type, world, options, report, builder))
-        }
+        Some(array_key) => Some(meet::compute(array_key, iterable_payload.key_type, world, options, report, builder)),
         None => Some(iterable_payload.key_type),
     };
 
     let value_param = match array_payload.value_param {
         Some(array_value) => {
-            Some(crate::ty::meet::compute(array_value, iterable_payload.value_type, world, options, report, builder))
+            Some(meet::compute(array_value, iterable_payload.value_type, world, options, report, builder))
         }
         None => Some(iterable_payload.value_type),
     };
@@ -342,8 +338,7 @@ where
         Some(entries) => {
             let mut narrowed: Vec<KnownItem<'arena>> = Vec::with_capacity(entries.len());
             for entry in entries {
-                let value =
-                    crate::ty::meet::compute(entry.value, iterable_payload.value_type, world, options, report, builder);
+                let value = meet::compute(entry.value, iterable_payload.value_type, world, options, report, builder);
                 if value.is_never() && !entry.optional {
                     return None;
                 }
@@ -367,14 +362,13 @@ where
 }
 
 /// `iterable<K, V> ∧ list<E>` narrows the list's element type by the
-/// iterable's value type. A list has implicit `int` keys, so the
-/// non-empty intersection only inhabits values when `int <: K`. When
-/// `int` doesn't fit `K`, the lattice has no representation that
-/// refines both sides structurally (the empty list `{[]}` is the
-/// only shared value, but `list<never>` doesn't refine
-/// `iterable<int(0), V>` because list keys are still `int`), so
-/// the meet conservatively returns `None`. The matching overlap
-/// rule reports the same to keep the lattice consistent.
+/// iterable's value type. A list has implicit `int` keys, so a non-empty
+/// list only inhabits the iterable when `int <: K`. When `int` doesn't fit
+/// `K`, the only shared value is the empty list `{[]}` (an empty iterator
+/// inhabits every `iterable<K, V>`): a possibly-empty list meets to the
+/// empty list `list<never>`, while a non-empty list has no shared value and
+/// the meet is `None`. The matching overlap rule reports the same to keep
+/// the lattice consistent.
 pub(in crate::ty::meet) fn iterable_list_meet<'arena, S, A, W>(
     iterable: Atom<'arena>,
     list: Atom<'arena>,
@@ -393,11 +387,20 @@ where
     };
 
     if !crate::ty::lattice::refines(well_known::TYPE_INT, iterable_payload.key_type, world, options, report, builder) {
-        return None;
+        if list_payload.flags.contains(ListFlag::NonEmpty) {
+            return None;
+        }
+
+        return Some(builder.list(ListAtom {
+            element_type: well_known::TYPE_NEVER,
+            known_elements: None,
+            known_count: None,
+            flags: U8Flags::empty(),
+        }));
     }
 
     let element_type =
-        crate::ty::meet::compute(list_payload.element_type, iterable_payload.value_type, world, options, report, builder);
+        meet::compute(list_payload.element_type, iterable_payload.value_type, world, options, report, builder);
     if list_payload.flags.contains(ListFlag::NonEmpty) && element_type.is_never() {
         return None;
     }
@@ -432,13 +435,13 @@ where
     }
 
     let key_param = match (a_payload.key_param, b_payload.key_param) {
-        (Some(a_key), Some(b_key)) => Some(crate::ty::meet::compute(a_key, b_key, world, options, report, builder)),
+        (Some(a_key), Some(b_key)) => Some(meet::compute(a_key, b_key, world, options, report, builder)),
         (Some(key), None) | (None, Some(key)) => Some(key),
         (None, None) => None,
     };
 
     let value_param = match (a_payload.value_param, b_payload.value_param) {
-        (Some(a_value), Some(b_value)) => Some(crate::ty::meet::compute(a_value, b_value, world, options, report, builder)),
+        (Some(a_value), Some(b_value)) => Some(meet::compute(a_value, b_value, world, options, report, builder)),
         (Some(value), None) | (None, Some(value)) => Some(value),
         (None, None) => None,
     };

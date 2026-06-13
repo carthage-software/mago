@@ -1036,13 +1036,10 @@ where
         && overlaps(iterable_payload.value_type, array_value, world, options, report, builder)
 }
 
-/// `iterable<K,V> ∩ list<E>` overlaps when `int` fits `K` (so the
-/// list's keys are admissible) and `V` overlaps the list element
-/// type (so any non-empty list value can match). The empty list is
-/// shared by any pair structurally, but the lattice has no atom
-/// that refines both sides simultaneously when `int <: K` fails,
-/// so this rule mirrors the meet rule's precision rather than the
-/// pure value-set semantics.
+/// `iterable<K,V> ∩ list<E>`. The empty list `[]` is an empty iterator and
+/// inhabits every `iterable<K, V>`, so a possibly-empty list always overlaps.
+/// A non-empty list shares a value only when `int` fits `K` (the list's keys
+/// are `int`) and `V` overlaps the list element type.
 #[inline]
 fn iterable_list_overlap<'arena, S, A, W>(
     a: Atom<'arena>,
@@ -1065,12 +1062,12 @@ where
         return false;
     };
 
-    if !lattice::refines(well_known::TYPE_INT, iterable_payload.key_type, world, options, report, builder) {
-        return false;
-    }
-
     if !list_payload.flags.contains(ListFlag::NonEmpty) {
         return true;
+    }
+
+    if !lattice::refines(well_known::TYPE_INT, iterable_payload.key_type, world, options, report, builder) {
+        return false;
     }
 
     overlaps(iterable_payload.value_type, list_payload.element_type, world, options, report, builder)
