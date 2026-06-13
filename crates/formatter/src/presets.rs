@@ -14,6 +14,7 @@ use crate::settings::FormatSettings;
 use crate::settings::MethodChainBreakingStyle;
 use crate::settings::NullTypeHint;
 use crate::settings::SortOrder;
+use crate::settings::SortUses;
 
 /// Available formatter presets.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, JsonSchema)]
@@ -162,7 +163,7 @@ const DEFAULT_PRESET: FormatSettings = FormatSettings {
     align_parameters: false,
     array_table_style_alignment: true,
     align_assignment_like: false,
-    sort_uses: true,
+    sort_uses: SortUses(SortOrder::AlphanumericAscending),
     sort_class_methods: false,
     separate_use_types: true,
     expand_use_groups: true,
@@ -260,7 +261,7 @@ const PSR12_PRESET: FormatSettings = FormatSettings {
     align_parameters: false,
     array_table_style_alignment: true,
     align_assignment_like: false,
-    sort_uses: false,
+    sort_uses: SortUses(SortOrder::Preserve),
     sort_class_methods: false,
     separate_use_types: true,
     expand_use_groups: false,
@@ -358,7 +359,7 @@ const PINT_PRESET: FormatSettings = FormatSettings {
     align_parameters: false,
     array_table_style_alignment: true,
     align_assignment_like: false,
-    sort_uses: true,
+    sort_uses: SortUses(SortOrder::AlphanumericAscending),
     sort_class_methods: false,
     separate_use_types: true,
     expand_use_groups: true,
@@ -456,7 +457,7 @@ const TEMPEST_PRESET: FormatSettings = FormatSettings {
     align_parameters: false,
     array_table_style_alignment: true,
     align_assignment_like: false,
-    sort_uses: true,
+    sort_uses: SortUses(SortOrder::AlphanumericAscending),
     sort_class_methods: false,
     separate_use_types: true,
     expand_use_groups: true,
@@ -554,7 +555,7 @@ const HACK_PRESET: FormatSettings = FormatSettings {
     align_parameters: false,
     array_table_style_alignment: true,
     align_assignment_like: false,
-    sort_uses: true,
+    sort_uses: SortUses(SortOrder::AlphanumericAscending),
     sort_class_methods: false,
     separate_use_types: true,
     expand_use_groups: true,
@@ -652,7 +653,7 @@ const DRUPAL_PRESET: FormatSettings = FormatSettings {
     align_parameters: false,
     array_table_style_alignment: false,
     align_assignment_like: false,
-    sort_uses: true,
+    sort_uses: SortUses(SortOrder::AlphanumericAscending),
     sort_class_methods: false,
     separate_use_types: true,
     expand_use_groups: true,

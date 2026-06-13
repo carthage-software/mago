@@ -174,7 +174,7 @@ public function bar(
 
 | 选项 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
-| `sort-uses` | 布尔值 | `true` | 按字母顺序排序 `use` 语句。 |
+| `sort-uses` | 枚举 | `"alpha-ascending"` | 控制 `use` 语句的排序方式。取值:`preserve`（别名 `as-is`、`none`、`keep`、`false`）、`alphanumeric-ascending`（别名 `alpha-ascending`、`ascending`、`true`）、`alphanumeric-descending`（别名 `alpha-descending`、`descending`）、`length-ascending`、`length-descending`。按长度排序时按源码中 use 语句的码点数计算；长度相同的语句以 `alphanumeric-ascending` 作为次级排序，保证输出稳定。 |
 | `sort-class-methods` | 布尔值 | `false` | 按可见性和类型排序类方法:构造函数在前,然后是静态方法,然后按可见性排序的实例方法,析构函数在最后。 |
 | `separate-use-types` | 布尔值 | `true` | 在不同种类的 `use` 之间插入空行。 |
 | `expand-use-groups` | 布尔值 | `true` | 把分组的 `use` 语句展开为单独的语句。 |

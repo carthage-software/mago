@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::str::FromStr;
 
 use crate::presets::FormatterPreset;
@@ -735,10 +736,27 @@ generate_formatter_settings! {
     /// Default: false
     align_assignment_like: bool => "default_false",
 
-    /// Whether to sort use statements alphabetically.
+    /// Controls how `use` statements are sorted.
     ///
-    /// Default: true
-    sort_uses: bool => "default_true",
+    /// With `alpha-ascending` (or `alphanumeric-ascending` or `true`):
+    /// ```php
+    /// use App\Services;
+    /// use App\Utils;
+    /// ```
+    ///
+    /// With `length-ascending`:
+    /// ```php
+    /// use App\Utils;
+    /// use App\Services;
+    /// ```
+    ///
+    /// Other options include:
+    /// * `alpha-descending` or `alphanumeric-descending`
+    /// * `length-descending`
+    /// * `preserve` or `false`
+    ///
+    /// Default: `alpha-ascending`
+    sort_uses: SortUses => "SortUses::default",
 
     /// Whether to sort class methods by visibility and name.
     ///
@@ -1236,6 +1254,45 @@ pub enum SortOrder {
     AlphanumericDescending,
     LengthAscending,
     LengthDescending,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[serde(from = "SortUsesWire")]
+#[schemars(with = "SortUsesWire")]
+pub struct SortUses(pub SortOrder);
+
+#[derive(JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
+#[serde(untagged)]
+enum SortUsesWire {
+    Bool(bool),
+    Order(SortOrder),
+}
+
+impl From<SortUsesWire> for SortUses {
+    fn from(wire: SortUsesWire) -> Self {
+        match wire {
+            SortUsesWire::Bool(true) => SortUses(SortOrder::AlphanumericAscending),
+            SortUsesWire::Bool(false) => SortUses(SortOrder::Preserve),
+            SortUsesWire::Order(order) => SortUses(order),
+        }
+    }
+}
+
+// Implement Deref so SortUses automatically coerces into SortOrder
+impl Deref for SortUses {
+    type Target = SortOrder;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Default for SortUses {
+    fn default() -> Self {
+        Self(SortOrder::AlphanumericAscending)
+    }
 }
 
 /// Specifies the style of line endings.

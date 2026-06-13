@@ -174,7 +174,7 @@ public function bar(
 
 | Option | Type | Défaut | Description |
 | :--- | :--- | :--- | :--- |
-| `sort-uses` | booléen | `true` | Trier les instructions `use` alphabétiquement. |
+| `sort-uses` | enum | `"alpha-ascending"` | Contrôler l'ordre de tri des instructions `use`. Valeurs : `preserve` (alias `as-is`, `none`, `keep`, `false`), `alphanumeric-ascending` (alias `alpha-ascending`, `ascending`, `true`), `alphanumeric-descending` (alias `alpha-descending`, `descending`), `length-ascending`, `length-descending`. Les modes par longueur comptent les codepoints dans l'orthographe source de l'instruction use ; en cas d'égalité, le tri alphanumérique ascendant sert de critère secondaire pour une sortie stable. |
 | `sort-class-methods` | booléen | `false` | Ordonner les méthodes de classe par visibilité et type : constructeur en premier, puis méthodes statiques, puis méthodes d'instance par visibilité, destructeur en dernier. |
 | `separate-use-types` | booléen | `true` | Insérer une ligne vide entre différents types de `use`. |
 | `expand-use-groups` | booléen | `true` | Étendre les instructions `use` groupées en instructions individuelles. |
