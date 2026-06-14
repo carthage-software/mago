@@ -47,6 +47,7 @@
 mod family;
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
@@ -88,7 +89,10 @@ use crate::world::NullWorld;
 /// [`Type`]: crate::Type
 #[inline]
 #[must_use]
-pub fn compute<'arena, S, A>(atoms: &[Atom<'arena>], builder: &mut TypeBuilder<'_, 'arena, S, A>) -> Vec<Atom<'arena>>
+pub fn compute<'scratch, 'arena, S, A>(
+    atoms: &[Atom<'arena>],
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+) -> ScratchVec<'scratch, Atom<'arena>, S>
 where
     S: Arena,
     A: Arena,
@@ -104,30 +108,30 @@ where
 /// aggressiveness per call site.
 #[inline]
 #[must_use]
-pub fn compute_with<'arena, S, A>(
+pub fn compute_with<'scratch, 'arena, S, A>(
     atoms: &[Atom<'arena>],
     options: &JoinOptions,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Vec<Atom<'arena>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+) -> ScratchVec<'scratch, Atom<'arena>, S>
 where
     S: Arena,
     A: Arena,
 {
     if atoms.is_empty() {
-        return vec![NEVER];
+        return builder.scratch_vec_from_slice(&[NEVER]);
     }
 
     if atoms.iter().any(|atom| atom.kind() == AtomKind::Mixed)
         && let Some(mixed_result) = family::mixed::apply_mixed_constraint_join(atoms)
     {
-        return vec![mixed_result];
+        return builder.scratch_vec_from_slice(&[mixed_result]);
     }
 
-    let mut output: Vec<Atom<'arena>> =
+    let mut output: ScratchVec<'scratch, Atom<'arena>, S> =
         if options.merge_string_axes && atoms.iter().filter(|atom| atom.kind() == AtomKind::String).count() >= 2 {
             family::string::apply_string_axis_merge_in_order(atoms, builder)
         } else {
-            atoms.to_vec()
+            builder.scratch_vec_from_slice(atoms)
         };
     output.sort_unstable();
     output.dedup();
@@ -385,8 +389,10 @@ impl JoinOptions {
 /// `int|float` distinct preserves the information that the value was
 /// originally typed as `int`.
 #[inline]
-fn apply_subtype_absorption<'arena, S, A>(atoms: &mut Vec<Atom<'arena>>, builder: &mut TypeBuilder<'_, 'arena, S, A>)
-where
+fn apply_subtype_absorption<'scratch, 'arena, S, A>(
+    atoms: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+) where
     S: Arena,
     A: Arena,
 {
@@ -396,7 +402,8 @@ where
 
     let world = NullWorld;
     let options = LatticeOptions::default();
-    let mut absorbed = vec![false; atoms.len()];
+    let mut absorbed: ScratchVec<'scratch, bool, S> = builder.scratch_vec_with(atoms.len());
+    absorbed.resize(atoms.len(), false);
 
     for input_index in 0..atoms.len() {
         if absorbed[input_index] {
@@ -429,7 +436,10 @@ where
 /// Apply the structural canonicalization rules. `atoms` must be sorted
 /// and deduplicated on entry; sorted order is preserved on exit.
 #[inline]
-fn canonicalize(atoms: &mut Vec<Atom<'_>>) {
+fn canonicalize<S>(atoms: &mut ScratchVec<'_, Atom<'_>, S>)
+where
+    S: Arena,
+{
     if atoms.contains(&MIXED) {
         atoms.clear();
         atoms.push(MIXED);
@@ -483,7 +493,10 @@ fn canonicalize(atoms: &mut Vec<Atom<'_>>) {
 /// If `dominator` is in `atoms`, drop every other atom of the same
 /// kind (the dominator is the unrefined / top-of-its-family form).
 #[inline]
-fn apply_same_kind_dominator<'arena>(atoms: &mut Vec<Atom<'arena>>, dominator: Atom<'arena>) {
+fn apply_same_kind_dominator<'arena, S>(atoms: &mut ScratchVec<'_, Atom<'arena>, S>, dominator: Atom<'arena>)
+where
+    S: Arena,
+{
     if !atoms.contains(&dominator) {
         return;
     }

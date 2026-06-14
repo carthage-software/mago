@@ -15,6 +15,7 @@
 //! this function never sees that case.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
 use crate::ty::atom::Atom;
@@ -27,13 +28,13 @@ use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::world::World;
 
-pub(in crate::ty::meet) fn callable_meet<'arena, S, A, W>(
+pub(in crate::ty::meet) fn callable_meet<'scratch, 'arena, S, A, W>(
     a: Atom<'arena>,
     b: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
@@ -52,9 +53,10 @@ where
         return None;
     }
 
-    let mut merged_parameters: Vec<Parameter<'arena>> = Vec::with_capacity(a_parameters.len());
+    let mut merged_parameters: ScratchVec<'scratch, Parameter<'arena>, S> =
+        builder.scratch_vec_with(a_parameters.len());
     for (a_parameter, b_parameter) in a_parameters.iter().zip(b_parameters.iter()) {
-        let mut combined: Vec<Atom<'arena>> = a_parameter.r#type.atoms.to_vec();
+        let mut combined: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_from_slice(a_parameter.r#type.atoms);
         combined.extend_from_slice(b_parameter.r#type.atoms);
         let widened = crate::ty::join::compute(&combined, builder);
         let r#type = builder.union_of(&widened);

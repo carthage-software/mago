@@ -2,6 +2,7 @@
 //! narrowing via `Negated` intersection conjuncts.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
 use crate::ty::atom::Atom;
@@ -31,25 +32,26 @@ use crate::world::World;
 /// together with `meet` to reconstruct the input, so subtract still
 /// partitions. Returns `None` when the two lists are not the identical fixed
 /// shape; the caller then keeps the input unchanged.
-pub(in crate::ty::subtract) fn sealed_list_residue<'arena, S, A, W>(
+pub(in crate::ty::subtract) fn sealed_list_residue<'scratch, 'arena, S, A, W>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> bool
 where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
     let (Atom::List(input_payload), Atom::List(removed_payload)) = (input, removed) else {
-        return None;
+        return false;
     };
     let (Some(input_elements), Some(removed_elements)) = (input_payload.known_elements, removed_payload.known_elements)
     else {
-        return None;
+        return false;
     };
 
     if input_payload.element_type != TYPE_NEVER
@@ -58,17 +60,17 @@ where
         || input_payload.known_count != removed_payload.known_count
         || input_elements.len() != removed_elements.len()
     {
-        return None;
+        return false;
     }
     for (left, right) in input_elements.iter().zip(removed_elements) {
         if left.index != right.index || left.optional || right.optional {
-            return None;
+            return false;
         }
     }
 
-    let mut pieces: Vec<Atom<'arena>> = Vec::new();
     for first_out in 0..input_elements.len() {
-        let mut new_elements: Vec<KnownElement<'arena>> = Vec::with_capacity(input_elements.len());
+        let mut new_elements: ScratchVec<'scratch, KnownElement<'arena>, S> =
+            builder.scratch_vec_with(input_elements.len());
         let mut uninhabited = false;
         for (position, element) in input_elements.iter().enumerate() {
             let value = if position < first_out {
@@ -99,10 +101,11 @@ where
         }
 
         let known_elements = builder.known_elements(&new_elements);
-        pieces.push(builder.list(ListAtom { known_elements: Some(known_elements), ..*input_payload }));
+        let piece = builder.list(ListAtom { known_elements: Some(known_elements), ..*input_payload });
+        out.push(piece);
     }
 
-    Some(pieces)
+    true
 }
 
 /// `list<E1> \ list<E2>` (or `\ non-empty-list<E2>`). The empty-list
@@ -114,30 +117,30 @@ where
 /// When the element types are equal and only the input allows empty,
 /// the non-empty values of the input are entirely covered by the
 /// removed side, so only the empty piece survives.
-pub(in crate::ty::subtract) fn list_minus<'arena, S, A>(
+pub(in crate::ty::subtract) fn list_minus<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> bool
 where
     S: Arena,
     A: Arena,
 {
     let (Atom::List(input_payload), Atom::List(removed_payload)) = (input, removed) else {
-        return None;
+        return false;
     };
 
     if input_payload.known_elements.is_some() || removed_payload.known_elements.is_some() {
-        return None;
+        return false;
     }
 
     let input_allows_empty = !input_payload.flags.contains(ListFlag::NonEmpty);
     let removed_allows_empty = !removed_payload.flags.contains(ListFlag::NonEmpty);
 
-    let mut pieces: Vec<Atom<'arena>> = Vec::new();
-
     if input_allows_empty && !removed_allows_empty {
-        pieces.push(empty_list(builder));
+        let empty = empty_list(builder);
+        out.push(empty);
     }
 
     let non_empty_residue = ListAtom { flags: input_payload.flags.with(ListFlag::NonEmpty), ..*input_payload };
@@ -145,12 +148,14 @@ where
         let removed_type = builder.union_of(&[removed]);
         let negated = builder.negated(removed_type);
         let head = builder.list(non_empty_residue);
-        pieces.push(builder.intersected(head, &[negated]));
+        let intersected = builder.intersected(head, &[negated]);
+        out.push(intersected);
     } else if input_allows_empty == removed_allows_empty {
-        pieces.push(builder.list(non_empty_residue));
+        let residue = builder.list(non_empty_residue);
+        out.push(residue);
     }
 
-    Some(pieces)
+    true
 }
 
 #[inline]
@@ -172,25 +177,28 @@ where
 /// removed side and gets removed. Element-type narrowing on the
 /// non-empty pieces is captured by attaching a `Negated(iterable<K, V>)`
 /// conjunct, the same way [`list_minus`] does for list-vs-list.
-pub(in crate::ty::subtract) fn list_minus_iterable<'arena, S, A>(
+pub(in crate::ty::subtract) fn list_minus_iterable<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> bool
 where
     S: Arena,
     A: Arena,
 {
     let Atom::List(input_payload) = input else {
-        return None;
+        return false;
     };
 
     if input_payload.known_elements.is_some() {
-        return None;
+        return false;
     }
 
     let head = builder.list(ListAtom { flags: input_payload.flags.with(ListFlag::NonEmpty), ..*input_payload });
     let removed_type = builder.union_of(&[removed]);
     let negated = builder.negated(removed_type);
-    Some(vec![builder.intersected(head, &[negated])])
+    let intersected = builder.intersected(head, &[negated]);
+    out.push(intersected);
+    true
 }

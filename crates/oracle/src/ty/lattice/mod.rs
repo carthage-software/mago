@@ -22,19 +22,22 @@
 //! overlap logic in a dedicated submodule.
 
 pub mod family;
-mod options;
+
 pub(crate) mod overlaps;
-mod refines;
-mod report;
 pub(crate) mod sealed;
 
-pub use self::options::LatticeOptions;
-pub use self::overlaps::is_uninhabited;
-pub use self::overlaps::overlaps;
-pub(crate) use self::refines::atom_admits_empty_container;
-pub(crate) use self::refines::atom_is_empty_container;
-pub(crate) use self::refines::atom_refines;
-pub use self::refines::generalizes;
-pub use self::refines::refines;
-pub use self::report::CoercionCause;
-pub use self::report::LatticeReport;
+mod options;
+mod refines;
+mod report;
+
+pub use crate::ty::lattice::options::LatticeOptions;
+pub use crate::ty::lattice::overlaps::is_uninhabited;
+pub use crate::ty::lattice::overlaps::overlaps;
+pub use crate::ty::lattice::refines::generalizes;
+pub use crate::ty::lattice::refines::refines;
+pub use crate::ty::lattice::report::CoercionCause;
+pub use crate::ty::lattice::report::LatticeReport;
+
+pub(crate) use crate::ty::lattice::refines::atom_admits_empty_container;
+pub(crate) use crate::ty::lattice::refines::atom_is_empty_container;
+pub(crate) use crate::ty::lattice::refines::atom_refines;

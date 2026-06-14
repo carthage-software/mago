@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::num::NonZeroU32;
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
 use crate::ty::atom::Atom;
@@ -64,13 +65,13 @@ where
 }
 
 #[inline]
-fn sealed_list_meet<'arena, S, A, W>(
+fn sealed_list_meet<'scratch, 'arena, S, A, W>(
     a_payload: ListAtom<'arena>,
     b_payload: ListAtom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
@@ -80,7 +81,7 @@ where
     let a_entries: &[KnownElement<'arena>] = a_payload.known_elements.unwrap_or(&[]);
     let b_entries: &[KnownElement<'arena>] = b_payload.known_elements.unwrap_or(&[]);
     let max_index = a_entries.len().max(b_entries.len());
-    let mut merged: Vec<KnownElement<'arena>> = Vec::with_capacity(max_index);
+    let mut merged: ScratchVec<'scratch, KnownElement<'arena>, S> = builder.scratch_vec_with(max_index);
     for index in 0..max_index {
         let a_entry = a_entries.get(index).copied();
         let b_entry = b_entries.get(index).copied();
@@ -124,13 +125,13 @@ where
 /// union of keys; values at shared keys are met. Optional flags AND-merge
 /// (a key is required iff it's required on both sides). Unsealed × unsealed
 /// composes the open key/value parameters pointwise.
-pub(in crate::ty::meet) fn keyed_array_meet<'arena, S, A, W>(
+pub(in crate::ty::meet) fn keyed_array_meet<'scratch, 'arena, S, A, W>(
     a: Atom<'arena>,
     b: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
@@ -164,7 +165,8 @@ where
             .or_insert(*b_entry);
     }
 
-    let entries: Vec<KnownItem<'arena>> = merged.into_values().collect();
+    let mut entries: ScratchVec<'scratch, KnownItem<'arena>, S> = builder.scratch_vec();
+    entries.extend(merged.into_values());
     let known_items = builder.known_items(&entries);
     let non_empty = a_payload.flags.contains(ArrayFlag::NonEmpty) || b_payload.flags.contains(ArrayFlag::NonEmpty);
     let mut flags = U8Flags::empty();
@@ -181,13 +183,13 @@ where
 /// makes that item's value `never`, dropping or contradicting the
 /// item depending on `optional`).
 #[inline]
-fn sealed_unsealed_array_meet<'arena, S, A, W>(
+fn sealed_unsealed_array_meet<'scratch, 'arena, S, A, W>(
     a_payload: ArrayAtom<'arena>,
     b_payload: ArrayAtom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
@@ -199,7 +201,7 @@ where
     let key_param = unsealed.key_param;
     let value_param = unsealed.value_param;
     let entries = sealed.known_items?;
-    let mut merged: Vec<KnownItem<'arena>> = Vec::with_capacity(entries.len());
+    let mut merged: ScratchVec<'scratch, KnownItem<'arena>, S> = builder.scratch_vec_with(entries.len());
     for entry in entries {
         let key_atom = match entry.key {
             ArrayKey::Int(value) => Atom::int_literal(value),
@@ -304,13 +306,13 @@ where
 /// array shape (the array is the more refined family member); the
 /// iterable side is consumed entirely. `known_items` value types
 /// also narrow against the iterable's value type.
-pub(in crate::ty::meet) fn iterable_array_meet<'arena, S, A, W>(
+pub(in crate::ty::meet) fn iterable_array_meet<'scratch, 'arena, S, A, W>(
     iterable: Atom<'arena>,
     array: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
@@ -336,7 +338,7 @@ where
     let known_items = match array_payload.known_items {
         None => None,
         Some(entries) => {
-            let mut narrowed: Vec<KnownItem<'arena>> = Vec::with_capacity(entries.len());
+            let mut narrowed: ScratchVec<'scratch, KnownItem<'arena>, S> = builder.scratch_vec_with(entries.len());
             for entry in entries {
                 let value = meet::compute(entry.value, iterable_payload.value_type, world, options, report, builder);
                 if value.is_never() && !entry.optional {

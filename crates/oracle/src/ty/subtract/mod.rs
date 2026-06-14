@@ -44,6 +44,7 @@
 mod family;
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::ty::Type;
 use crate::ty::atom::Atom;
@@ -121,13 +122,13 @@ impl<'arena> SubtractOutcome<'arena> {
 /// `result <: input` always; `result ∧ narrowing ≡ ⊥` when the family
 /// rules cover every surviving atom precisely.
 #[inline]
-pub fn narrow<'arena, S, A, W>(
+pub fn narrow<'scratch, 'arena, S, A, W>(
     input: Type<'arena>,
     narrowing: Type<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> SubtractOutcome<'arena>
 where
     S: Arena,
@@ -138,10 +139,10 @@ where
         return SubtractOutcome::Impossible;
     }
 
-    let mut atoms: Vec<Atom<'arena>> = Vec::with_capacity(input.atoms.len());
+    let mut atoms: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(input.atoms.len());
 
-    let mut current_scratch: Vec<Atom<'arena>> = Vec::new();
-    let mut next_scratch: Vec<Atom<'arena>> = Vec::new();
+    let mut current_scratch: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
+    let mut next_scratch: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
     for &atom in input.atoms {
         let pieces =
             subtract_all(atom, narrowing, world, options, report, builder, &mut current_scratch, &mut next_scratch);
@@ -161,12 +162,12 @@ where
 }
 
 #[inline]
-fn canonicalise_sealed_residuals<'arena, S, A, W>(
-    atoms: &mut Vec<Atom<'arena>>,
+fn canonicalise_sealed_residuals<'scratch, 'arena, S, A, W>(
+    atoms: &mut ScratchVec<'scratch, Atom<'arena>, S>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) where
     S: Arena,
     A: Arena,
@@ -188,8 +189,8 @@ fn canonicalise_sealed_residuals<'arena, S, A, W>(
         let head = *payload.head;
         let head_type = if matches!(head, Atom::Object(_)) { Some(builder.union_of(&[head])) } else { None };
 
-        let mut kept: Vec<Atom<'arena>> = Vec::with_capacity(conjuncts.len());
-        let mut negated_inners: Vec<Type<'arena>> = Vec::with_capacity(conjuncts.len());
+        let mut kept: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(conjuncts.len());
+        let mut negated_inners: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(conjuncts.len());
         for &conjunct in conjuncts {
             if let Atom::Negated(inner) = conjunct {
                 if let Some(head_type) = head_type
@@ -219,7 +220,8 @@ fn canonicalise_sealed_residuals<'arena, S, A, W>(
                     if let [survivor] = survivors.as_slice() {
                         let survivor = *survivor;
                         let survivor_type = builder.union_of(&[survivor]);
-                        let mut residual_conjuncts: Vec<Atom<'arena>> = Vec::with_capacity(kept.len());
+                        let mut residual_conjuncts: ScratchVec<'scratch, Atom<'arena>, S> =
+                            builder.scratch_vec_with(kept.len());
                         for &conjunct in &kept {
                             let still_applies = match conjunct {
                                 Atom::Negated(inner) => {
@@ -283,16 +285,16 @@ where
 /// function clears and refills them, returning a borrowed view into
 /// `current_scratch` for the caller to copy out.
 #[inline]
-fn subtract_all<'scratch, 'arena, S, A, W>(
+fn subtract_all<'buffer, 'scratch, 'arena, S, A, W>(
     atom: Atom<'arena>,
     narrowing: Type<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-    current_scratch: &'scratch mut Vec<Atom<'arena>>,
-    next_scratch: &mut Vec<Atom<'arena>>,
-) -> &'scratch [Atom<'arena>]
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    current_scratch: &'buffer mut ScratchVec<'scratch, Atom<'arena>, S>,
+    next_scratch: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> &'buffer [Atom<'arena>]
 where
     S: Arena,
     A: Arena,
@@ -307,7 +309,7 @@ where
 
         next_scratch.clear();
         for &surviving in current_scratch.iter() {
-            next_scratch.extend(atom_minus(surviving, removed, world, options, report, builder));
+            atom_minus(surviving, removed, world, options, report, builder, next_scratch);
         }
 
         core::mem::swap(current_scratch, next_scratch);
@@ -327,127 +329,149 @@ where
 /// [module documentation](self). Negation routes through the duality
 /// with the meet: `subtract(X, !T)` ≡ `meet(X, T)` and
 /// `subtract(!T, X)` ≡ `!(T ∪ X)`.
-pub(in crate::ty::subtract) fn atom_minus<'arena, S, A, W>(
+pub(in crate::ty::subtract) fn atom_minus<'scratch, 'arena, S, A, W>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Vec<Atom<'arena>>
-where
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
     if input == removed || input == NEVER {
-        return Vec::new();
+        return;
     }
 
     if removed == NEVER {
-        return vec![input];
+        out.push(input);
+        return;
     }
 
     if removed == MIXED {
-        return Vec::new();
+        return;
     }
 
     if is_uninhabited(removed, world, builder) {
-        return vec![input];
+        out.push(input);
+        return;
     }
 
     if is_uninhabited(input, world, builder) {
-        return Vec::new();
+        return;
     }
 
     if let Atom::Intersected(payload) = input {
         let input_type = builder.union_of(&[input]);
         let removed_type = builder.union_of(&[removed]);
         if refines(input_type, removed_type, world, options, report, builder) {
-            return Vec::new();
+            return;
         }
 
         if !overlaps(input_type, removed_type, world, options, report, builder) {
-            return vec![input];
+            out.push(input);
+            return;
         }
 
-        let head_pieces = atom_minus(*payload.head, removed, world, options, report, builder);
+        let mut head_pieces = builder.scratch_vec();
+        atom_minus(*payload.head, removed, world, options, report, builder, &mut head_pieces);
+        for head in head_pieces {
+            let intersected = builder.intersected(head, payload.conjuncts);
+            out.push(intersected);
+        }
 
-        return head_pieces.into_iter().map(|head| builder.intersected(head, payload.conjuncts)).collect();
+        return;
     }
 
     if let Atom::Negated(inner) = removed {
         let input_type = builder.union_of(&[input]);
         let kept = meet::compute(input_type, *inner, world, options, report, builder);
-
-        return kept.atoms.to_vec();
+        out.extend_from_slice(kept.atoms);
+        return;
     }
 
     if let Atom::Negated(inner) = input {
-        let mut union_atoms: Vec<Atom<'arena>> = inner.atoms.to_vec();
+        let mut union_atoms: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_from_slice(inner.atoms);
         union_atoms.push(removed);
         let union_type = builder.union_of(&union_atoms);
-        return vec![builder.negated(union_type)];
+        let negated = builder.negated(union_type);
+        out.push(negated);
+        return;
     }
 
     if input == MIXED {
         let removed_type = builder.union_of(&[removed]);
-        return vec![builder.negated(removed_type)];
+        let negated = builder.negated(removed_type);
+        out.push(negated);
+        return;
     }
 
     if input == NON_NULL_MIXED {
         let union_type = builder.union_of(&[NULL, removed]);
-        return vec![builder.negated(union_type)];
+        let negated = builder.negated(union_type);
+        out.push(negated);
+        return;
     }
 
     if matches!(input, Atom::ClassLikeString(_)) && matches!(removed, Atom::ClassLikeString(_)) && input != removed {
         let removed_type = builder.union_of(&[removed]);
         let negated = builder.negated(removed_type);
-        return vec![builder.intersected(input, &[negated])];
+        let intersected = builder.intersected(input, &[negated]);
+        out.push(intersected);
+        return;
     }
 
-    if let Some(pieces) = list::sealed_list_residue(input, removed, world, options, report, builder) {
-        return pieces;
+    if list::sealed_list_residue(input, removed, world, options, report, builder, out) {
+        return;
     }
 
     let input_type = builder.union_of(&[input]);
     let removed_type = builder.union_of(&[removed]);
 
     if refines(input_type, removed_type, world, options, report, builder) {
-        return Vec::new();
+        return;
     }
 
     if !overlaps(input_type, removed_type, world, options, report, builder) {
-        return vec![input];
+        out.push(input);
+        return;
     }
 
     if matches!(input, Atom::GenericParameter(_)) {
-        return generic::generic_parameter_minus(input, removed, world, options, report, builder)
-            .unwrap_or_else(|| vec![input]);
+        if !generic::generic_parameter_minus(input, removed, world, options, report, builder, out) {
+            out.push(input);
+        }
+        return;
     }
 
-    if let Some(pieces) = dominator::true_union_minus(input, removed, world, options, report, builder) {
-        return pieces;
+    if dominator::true_union_minus(input, removed, world, options, report, builder, out) {
+        return;
     }
 
-    if let Some(pieces) = object::object_descendant_minus(input, removed, world, builder) {
-        return pieces;
+    if object::object_descendant_minus(input, removed, world, builder, out) {
+        return;
     }
 
-    if let Some(pieces) = family_atom_minus(input, removed, builder) {
-        return pieces;
+    if family_atom_minus(input, removed, builder, out) {
+        return;
     }
 
     if matches!(removed, Atom::Intersected(_)) {
-        return vec![input];
+        out.push(input);
+        return;
     }
 
     if scalar_supports_intersected_subtract(input.kind()) {
         let negated = builder.negated(removed_type);
-        return vec![builder.intersected(input, &[negated])];
+        let intersected = builder.intersected(input, &[negated]);
+        out.push(intersected);
+        return;
     }
 
-    vec![input]
+    out.push(input);
 }
 
 #[inline]
@@ -468,45 +492,49 @@ const fn scalar_supports_intersected_subtract(kind: AtomKind) -> bool {
 }
 
 #[inline]
-fn family_atom_minus<'arena, S, A>(
+fn family_atom_minus<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> bool
 where
     S: Arena,
     A: Arena,
 {
     if matches!(input, Atom::Int(_)) && matches!(removed, Atom::Int(_)) {
-        return Some(int::int_minus(input, removed, builder));
+        int::int_minus(input, removed, builder, out);
+        return true;
     }
 
     if input == BOOL && removed == TRUE {
-        return Some(vec![FALSE]);
+        out.push(FALSE);
+        return true;
     }
 
     if input == BOOL && removed == FALSE {
-        return Some(vec![TRUE]);
+        out.push(TRUE);
+        return true;
     }
 
     if matches!(input, Atom::String(_)) && matches!(removed, Atom::String(_)) {
-        return string::string_minus(input, removed, builder);
+        return string::string_minus(input, removed, builder, out);
     }
 
     if matches!(input, Atom::List(_)) && matches!(removed, Atom::List(_)) {
-        return list::list_minus(input, removed, builder);
+        return list::list_minus(input, removed, builder, out);
     }
 
     if matches!(input, Atom::Array(_)) && matches!(removed, Atom::Array(_)) {
-        return array::array_minus(input, removed, builder);
+        return array::array_minus(input, removed, builder, out);
     }
 
     if matches!(input, Atom::List(_)) && matches!(removed, Atom::Iterable(_)) {
-        return list::list_minus_iterable(input, removed, builder);
+        return list::list_minus_iterable(input, removed, builder, out);
     }
 
     if matches!(input, Atom::Array(_)) && matches!(removed, Atom::Iterable(_)) {
-        return array::array_minus_iterable(input, removed, builder);
+        return array::array_minus_iterable(input, removed, builder, out);
     }
 
     if let (Atom::List(input_payload), Atom::Array(removed_payload)) = (input, removed) {
@@ -519,7 +547,9 @@ where
 
         let removed_type = builder.union_of(&[removed]);
         let negated = builder.negated(removed_type);
-        return Some(vec![builder.intersected(head, &[negated])]);
+        let intersected = builder.intersected(head, &[negated]);
+        out.push(intersected);
+        return true;
     }
 
     if let (Atom::Array(input_payload), Atom::List(removed_payload)) = (input, removed) {
@@ -532,24 +562,26 @@ where
 
         let removed_type = builder.union_of(&[removed]);
         let negated = builder.negated(removed_type);
-        return Some(vec![builder.intersected(head, &[negated])]);
+        let intersected = builder.intersected(head, &[negated]);
+        out.push(intersected);
+        return true;
     }
 
     if matches!(input, Atom::Iterable(_)) && matches!(removed, Atom::Iterable(_)) {
-        return iterable::iterable_minus(input, removed, builder);
+        return iterable::iterable_minus(input, removed, builder, out);
     }
 
     if matches!(input, Atom::Callable(_)) && matches!(removed, Atom::Callable(_)) {
-        return callable::callable_minus(input, removed, builder);
+        return callable::callable_minus(input, removed, builder, out);
     }
 
     if matches!(input, Atom::HasMethod(_)) && matches!(removed, Atom::HasMethod(_)) {
-        return has_member::has_method_minus(input, removed, builder);
+        return has_member::has_method_minus(input, removed, builder, out);
     }
 
     if matches!(input, Atom::HasProperty(_)) && matches!(removed, Atom::HasProperty(_)) {
-        return has_member::has_property_minus(input, removed, builder);
+        return has_member::has_property_minus(input, removed, builder, out);
     }
 
-    None
+    false
 }

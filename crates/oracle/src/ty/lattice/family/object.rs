@@ -229,7 +229,7 @@ where
         None => builder.union_of(&[well_known::NON_EMPTY_STRING]),
     };
 
-    let mut properties = Vec::with_capacity(2);
+    let mut properties = builder.scratch_vec_with(2);
     properties.push(KnownProperty { name: builder.name(b"name"), value: name_type, optional: false });
     if let EnumBacking::Backed(value_type) = backing {
         properties.push(KnownProperty { name: builder.name(b"value"), value: value_type, optional: false });
