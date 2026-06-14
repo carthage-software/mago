@@ -23,7 +23,7 @@ struct DefinitionTable<'arena> {
 impl CopyInto for DefinitionTable<'_> {
     type Output<'arena> = DefinitionTable<'arena>;
 
-    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
     where
         A: Arena,
     {

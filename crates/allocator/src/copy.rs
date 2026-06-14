@@ -63,3 +63,23 @@ where
 {
     arena.alloc_slice_fill_iter(values.iter().map(|value| value.copy_into(arena)))
 }
+
+macro_rules! trivial_copy_into {
+    ($ty:ty) => {
+        impl CopyInto for $ty {
+            type Output<'arena> = $ty;
+
+            fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+            where
+                A: Arena,
+            {
+                *self
+            }
+        }
+    };
+    ($($ty:ty),+) => {
+        $(trivial_copy_into!($ty);)+
+    };
+}
+
+trivial_copy_into!((), bool, u8, u16, u32, u64, usize, i8, i16, i32, i64, isize, f32, f64);
