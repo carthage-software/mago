@@ -501,9 +501,7 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
             TypeRecipe::HasMethod(name) => {
                 let method_name = self.builder.name(name.as_bytes());
 
-                vec![Atom::HasMethod(mago_oracle::ty::atom::payload::object::has_method::HasMethodAtom {
-                    method_name,
-                })]
+                vec![Atom::HasMethod(mago_oracle::ty::atom::payload::object::has_method::HasMethodAtom { method_name })]
             }
             TypeRecipe::HasProperty(name) => {
                 let property_name = self.builder.name(name.as_bytes());
