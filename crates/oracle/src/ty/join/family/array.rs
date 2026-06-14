@@ -2,10 +2,11 @@
 //! collapse, empty-array overwrite, and int-keyed → list rewrite.
 
 use std::collections::BTreeSet;
-use std::collections::HashMap;
 use std::num::NonZeroU32;
 
 use mago_allocator::Arena;
+use mago_allocator::collections::HashMap;
+use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
 use crate::ty::atom::Atom;
@@ -26,14 +27,14 @@ use crate::ty::well_known::TYPE_NEVER;
 /// into a single keyed array with unioned key+value parameters. Sealed
 /// keyed arrays (with `known_items`) are left to
 /// [`apply_merge_array_shapes`].
-pub fn apply_merge_keyed_array_params<'arena, S, A>(
-    atoms: &mut Vec<Atom<'arena>>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+pub fn apply_merge_keyed_array_params<'scratch, 'arena, S, A>(
+    atoms: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) where
     S: Arena,
     A: Arena,
 {
-    let mut groups: HashMap<bool, Vec<usize>> = HashMap::new();
+    let mut groups: HashMap<'scratch, bool, ScratchVec<'scratch, usize, S>, S> = HashMap::new_in(builder.scratch());
     for (index, atom) in atoms.iter().enumerate() {
         let Atom::Array(payload) = atom else {
             continue;
@@ -41,7 +42,7 @@ pub fn apply_merge_keyed_array_params<'arena, S, A>(
         if payload.known_items.is_some() || payload.key_param.is_none() || payload.value_param.is_none() {
             continue;
         }
-        groups.entry(payload.flags.contains(ArrayFlag::NonEmpty)).or_default().push(index);
+        groups.entry(payload.flags.contains(ArrayFlag::NonEmpty)).or_insert_with(|| builder.scratch_vec()).push(index);
     }
 
     let mut to_remove: BTreeSet<usize> = BTreeSet::new();
@@ -49,8 +50,8 @@ pub fn apply_merge_keyed_array_params<'arena, S, A>(
         if indices.len() < 2 {
             continue;
         }
-        let mut key_atoms: Vec<Atom<'arena>> = Vec::new();
-        let mut value_atoms: Vec<Atom<'arena>> = Vec::new();
+        let mut key_atoms: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
+        let mut value_atoms: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
         for &index in indices {
             let Atom::Array(payload) = atoms[index] else {
                 continue;
@@ -84,7 +85,10 @@ pub fn apply_merge_keyed_array_params<'arena, S, A>(
 
 /// When the union has more than `threshold` array shapes, replace
 /// them all with the general `array<array-key, mixed>` form.
-pub fn apply_array_shape_collapse(atoms: &mut Vec<Atom<'_>>, threshold: u16) {
+pub fn apply_array_shape_collapse<S>(atoms: &mut ScratchVec<'_, Atom<'_>, S>, threshold: u16)
+where
+    S: Arena,
+{
     let shape_count = atoms
         .iter()
         .filter(|atom| matches!(atom.kind(), AtomKind::Array | AtomKind::List) && **atom != EMPTY_ARRAY)
@@ -102,7 +106,10 @@ pub fn apply_array_shape_collapse(atoms: &mut Vec<Atom<'_>>, threshold: u16) {
 
 /// Drop `EMPTY_ARRAY` from the union when another `Array` or `List`
 /// atom is present.
-pub fn apply_overwrite_empty_array(atoms: &mut Vec<Atom<'_>>) {
+pub fn apply_overwrite_empty_array<S>(atoms: &mut ScratchVec<'_, Atom<'_>, S>)
+where
+    S: Arena,
+{
     if !atoms.iter().any(|atom| matches!(atom.kind(), AtomKind::Array | AtomKind::List)) {
         return;
     }
@@ -117,9 +124,9 @@ pub fn apply_overwrite_empty_array(atoms: &mut Vec<Atom<'_>>) {
 /// Detect keyed-array atoms whose `known_items` use contiguous integer
 /// keys `0..n-1` (and whose key/value rest types are absent or
 /// list-compatible) and rewrite them as `List` atoms.
-pub fn apply_rewrite_int_keyed_to_list<'arena, S, A>(
+pub fn apply_rewrite_int_keyed_to_list<'scratch, 'arena, S, A>(
     atoms: &mut [Atom<'arena>],
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) where
     S: Arena,
     A: Arena,
@@ -134,7 +141,7 @@ pub fn apply_rewrite_int_keyed_to_list<'arena, S, A>(
         let Some(entries) = payload.known_items else {
             continue;
         };
-        let mut indexed: Vec<(i64, KnownItem<'arena>)> = Vec::with_capacity(entries.len());
+        let mut indexed: ScratchVec<'scratch, (i64, KnownItem<'arena>), S> = builder.scratch_vec_with(entries.len());
         let mut all_int = true;
         for entry in entries {
             match entry.key {
@@ -153,10 +160,12 @@ pub fn apply_rewrite_int_keyed_to_list<'arena, S, A>(
             continue;
         }
 
-        let known_elements: Vec<KnownElement<'arena>> = indexed
-            .iter()
-            .map(|(key, entry)| KnownElement { index: *key as u32, value: entry.value, optional: entry.optional })
-            .collect();
+        let mut known_elements: ScratchVec<'scratch, KnownElement<'arena>, S> = builder.scratch_vec_with(indexed.len());
+        known_elements.extend(
+            indexed
+                .iter()
+                .map(|(key, entry)| KnownElement { index: *key as u32, value: entry.value, optional: entry.optional }),
+        );
         let known_count = NonZeroU32::new(known_elements.len() as u32);
         let known_elements = builder.known_elements(&known_elements);
         let mut flags = U8Flags::empty();
@@ -174,20 +183,17 @@ pub fn apply_rewrite_int_keyed_to_list<'arena, S, A>(
 /// When the union contains multiple keyed-array atoms that share at
 /// least one literal key, fold them into a single shape whose value
 /// at every shared key is the union of the source values.
-pub fn apply_merge_array_shapes<'arena, S, A>(
-    atoms: &mut Vec<Atom<'arena>>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+pub fn apply_merge_array_shapes<'scratch, 'arena, S, A>(
+    atoms: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) where
     S: Arena,
     A: Arena,
 {
-    let mut shapes: Vec<usize> = atoms
-        .iter()
-        .enumerate()
-        .filter_map(|(index, atom)| {
-            matches!(atom, Atom::Array(payload) if payload.known_items.is_some()).then_some(index)
-        })
-        .collect();
+    let mut shapes: ScratchVec<'scratch, usize, S> = builder.scratch_vec();
+    shapes.extend(atoms.iter().enumerate().filter_map(|(index, atom)| {
+        matches!(atom, Atom::Array(payload) if payload.known_items.is_some()).then_some(index)
+    }));
 
     if shapes.len() < 2 {
         return;
@@ -200,8 +206,8 @@ pub fn apply_merge_array_shapes<'arena, S, A>(
     let Some(head_known) = head_payload.known_items else {
         return;
     };
-    let mut new_known: Vec<KnownItem<'arena>> = head_known.to_vec();
-    let mut absorbed: Vec<usize> = Vec::new();
+    let mut new_known: ScratchVec<'scratch, KnownItem<'arena>, S> = builder.scratch_vec_from_slice(head_known);
+    let mut absorbed: ScratchVec<'scratch, usize, S> = builder.scratch_vec();
     let mut accumulated_non_empty = head_payload.flags.contains(ArrayFlag::NonEmpty);
 
     for &shape_index in &shapes {
@@ -223,7 +229,8 @@ pub fn apply_merge_array_shapes<'arena, S, A>(
 
         for other_entry in other_entries {
             if let Some(existing) = new_known.iter_mut().find(|entry| entry.key == other_entry.key) {
-                let mut merged_atoms: Vec<Atom<'arena>> = existing.value.atoms.to_vec();
+                let mut merged_atoms: ScratchVec<'scratch, Atom<'arena>, S> =
+                    builder.scratch_vec_from_slice(existing.value.atoms);
                 merged_atoms.extend_from_slice(other_entry.value.atoms);
                 existing.value = builder.union_of(&merged_atoms);
                 existing.optional = existing.optional || other_entry.optional;

@@ -24,6 +24,7 @@
 //! overlap).
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
 use crate::name::Name;
@@ -53,7 +54,6 @@ use crate::ty::lattice::atom_admits_empty_container;
 use crate::ty::lattice::atom_is_empty_container;
 use crate::ty::lattice::atom_refines;
 use crate::ty::lattice::family::mixed as mixed_family;
-use crate::ty::well_known;
 use crate::ty::well_known::INT;
 use crate::ty::well_known::MIXED;
 use crate::ty::well_known::NEVER;
@@ -301,13 +301,11 @@ fn class_satisfies_structural<'arena, W>(class: Name<'arena>, structural: Atom<'
 where
     W: World<'arena>,
 {
-    let conjuncts: Vec<Atom<'arena>> = vec![structural];
-
-    conjuncts.iter().all(|conjunct| match conjunct {
+    match structural {
         Atom::HasMethod(has_method) => world.class_has_method(class, has_method.method_name),
         Atom::HasProperty(has_property) => world.class_has_property(class, has_property.property_name),
         _ => true,
-    })
+    }
 }
 
 /// Object × Object overlap. Two named classes share values when:
@@ -330,13 +328,13 @@ where
 /// is conservative: a future world surface for shared interfaces /
 /// traits can lift the answer to `true`.
 #[inline]
-fn object_overlap<'arena, S, A, W>(
+fn object_overlap<'scratch, 'arena, S, A, W>(
     a: Atom<'arena>,
     b: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
@@ -347,9 +345,7 @@ where
         return false;
     };
 
-    let a_classes = collect_class_names(a, a_payload);
-    let b_classes = collect_class_names(b, b_payload);
-    let combined: Vec<Name<'arena>> = a_classes.iter().chain(b_classes.iter()).copied().collect();
+    let combined = [a_payload.name, b_payload.name];
     if intersection_uninhabited_under_finality(&combined, world) {
         return false;
     }
@@ -553,15 +549,6 @@ where
     false
 }
 
-/// Collects the head + every object-kind conjunct's class name. Used
-/// by `object_overlap` to enforce single-inheritance consistency
-/// across the whole intersection.
-#[inline]
-fn collect_class_names<'arena>(atom: Atom<'arena>, payload: &ObjectAtom<'arena>) -> Vec<Name<'arena>> {
-    let _ = atom;
-    vec![payload.name]
-}
-
 /// `true` for atoms that are structurally non-`never` but whose value
 /// set is empty: `non-empty-list<never>`, `non-empty-array<…, never>`,
 /// `Foo<never>` with a non-contravariant template, and any container
@@ -640,11 +627,11 @@ where
 }
 
 #[inline]
-fn object_uninhabited<'arena, S, A, W>(
+fn object_uninhabited<'scratch, 'arena, S, A, W>(
     payload: &ObjectAtom<'arena>,
     intersections: Option<&[Atom<'arena>]>,
     world: &W,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
@@ -652,9 +639,9 @@ where
     W: World<'arena>,
 {
     if let Some(conjunct_list) = intersections {
-        let mut classes: Vec<Name<'arena>> = vec![payload.name];
-        let mut structurals: Vec<Atom<'arena>> = Vec::new();
-        let mut negations: Vec<Atom<'arena>> = Vec::new();
+        let mut classes: ScratchVec<'scratch, Name<'arena>, S> = builder.scratch_vec_from_slice(&[payload.name]);
+        let mut structurals: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
+        let mut negations: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
         for &conjunct in conjunct_list {
             match conjunct {
                 Atom::Object(conjunct_payload) => classes.push(conjunct_payload.name),
@@ -831,18 +818,18 @@ where
 /// inner of any Negated conjunct, making `Intersected(H, C1, …, !T)`
 /// uninhabited.
 #[inline]
-fn intersected_negated_contradiction<'arena, S, A, W>(
+fn intersected_negated_contradiction<'scratch, 'arena, S, A, W>(
     head: Atom<'arena>,
     conjuncts: &[Atom<'arena>],
     world: &W,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
-    let mut non_negated: Vec<Atom<'arena>> = Vec::with_capacity(conjuncts.len());
+    let mut non_negated: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(conjuncts.len());
     for &conjunct in conjuncts {
         if !matches!(conjunct, Atom::Negated(_)) {
             non_negated.push(conjunct);
@@ -870,18 +857,18 @@ where
 /// and every direct inheritor of `H` is covered by some Negated
 /// conjunct, making the Intersected uninhabited.
 #[inline]
-fn sealed_cover_fully_excluded<'arena, S, A, W>(
+fn sealed_cover_fully_excluded<'scratch, 'arena, S, A, W>(
     head: Atom<'arena>,
     conjuncts: &[Atom<'arena>],
     world: &W,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
-    let mut negated_inners: Vec<Type<'arena>> = Vec::with_capacity(conjuncts.len());
+    let mut negated_inners: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(conjuncts.len());
     for &conjunct in conjuncts {
         if let Atom::Negated(inner) = conjunct {
             negated_inners.push(*inner);

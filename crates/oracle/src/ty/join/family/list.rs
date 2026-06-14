@@ -4,9 +4,10 @@
 //! position.
 
 use std::collections::BTreeSet;
-use std::collections::HashMap;
 
 use mago_allocator::Arena;
+use mago_allocator::collections::HashMap;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::array::KnownElement;
@@ -18,14 +19,14 @@ use crate::ty::builder::TypeBuilder;
 /// single list whose element type is the type-union of theirs. Sealed
 /// lists (those with `known_elements`) and lists with differing
 /// `non_empty` flags are left alone.
-pub fn apply_merge_list_element_types<'arena, S, A>(
-    atoms: &mut Vec<Atom<'arena>>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+pub fn apply_merge_list_element_types<'scratch, 'arena, S, A>(
+    atoms: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) where
     S: Arena,
     A: Arena,
 {
-    let mut groups: HashMap<bool, Vec<usize>> = HashMap::new();
+    let mut groups: HashMap<'scratch, bool, ScratchVec<'scratch, usize, S>, S> = HashMap::new_in(builder.scratch());
     for (index, atom) in atoms.iter().enumerate() {
         let Atom::List(payload) = atom else {
             continue;
@@ -33,7 +34,7 @@ pub fn apply_merge_list_element_types<'arena, S, A>(
         if payload.known_elements.is_some() {
             continue;
         }
-        groups.entry(payload.flags.contains(ListFlag::NonEmpty)).or_default().push(index);
+        groups.entry(payload.flags.contains(ListFlag::NonEmpty)).or_insert_with(|| builder.scratch_vec()).push(index);
     }
 
     let mut to_remove: BTreeSet<usize> = BTreeSet::new();
@@ -41,7 +42,7 @@ pub fn apply_merge_list_element_types<'arena, S, A>(
         if indices.len() < 2 {
             continue;
         }
-        let mut merged_atoms: Vec<Atom<'arena>> = Vec::new();
+        let mut merged_atoms: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
         for &index in indices {
             let Atom::List(payload) = atoms[index] else {
                 continue;
@@ -80,9 +81,9 @@ pub fn apply_merge_list_element_types<'arena, S, A>(
 /// admit cross-combinations like `list{A.0, C.1}`), so those are left as
 /// distinct members. The pass runs to a fixpoint, so a chain of
 /// single-position variants collapses fully.
-pub fn apply_merge_sealed_lists<'arena, S, A>(
-    atoms: &mut Vec<Atom<'arena>>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+pub fn apply_merge_sealed_lists<'scratch, 'arena, S, A>(
+    atoms: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) where
     S: Arena,
     A: Arena,
@@ -149,11 +150,11 @@ fn single_differing_position<'arena>(left: Atom<'arena>, right: Atom<'arena>) ->
 /// Build the merged list: `left`'s shape with the element at `position`
 /// replaced by the union of `left`'s and `right`'s element there.
 #[inline]
-fn merge_lists_at_position<'arena, S, A>(
+fn merge_lists_at_position<'scratch, 'arena, S, A>(
     left: Atom<'arena>,
     right: Atom<'arena>,
     position: usize,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Atom<'arena>
 where
     S: Arena,
@@ -167,12 +168,13 @@ where
         return left;
     };
 
-    let mut merged_value_atoms: Vec<Atom<'arena>> = left_elements[position].value.atoms.to_vec();
+    let mut merged_value_atoms: ScratchVec<'scratch, Atom<'arena>, S> =
+        builder.scratch_vec_from_slice(left_elements[position].value.atoms);
     merged_value_atoms.extend_from_slice(right_elements[position].value.atoms);
     let merged_value_atoms = super::super::compute(&merged_value_atoms, builder);
     let merged_value = builder.union_of(&merged_value_atoms);
 
-    let mut new_elements: Vec<KnownElement<'arena>> = left_elements.to_vec();
+    let mut new_elements: ScratchVec<'scratch, KnownElement<'arena>, S> = builder.scratch_vec_from_slice(left_elements);
     new_elements[position] = KnownElement { value: merged_value, ..left_elements[position] };
     let known_elements = builder.known_elements(&new_elements);
 

@@ -10,6 +10,7 @@
 //!   uninhabitable and we return `None`.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::name::Name;
 use crate::ty::Type;
@@ -27,24 +28,23 @@ use crate::world::TemplateParameter;
 use crate::world::Variance;
 use crate::world::World;
 
-pub(in crate::ty::meet) fn compose_object_intersection<'arena, S, A, W>(
+pub(in crate::ty::meet) fn compose_object_intersection<'scratch, 'arena, S, A, W>(
     a: Atom<'arena>,
     b: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
-    let participants: Vec<Atom<'arena>> = vec![a, b];
-    let same_class_merged = merge_same_class_participants(participants, world, options, report, builder)?;
+    let same_class_merged = merge_same_class_participants(&[a, b], world, options, report, builder)?;
     let reconciled = reconcile_descendant_participants(same_class_merged, world, options, report, builder)?;
 
-    finalize_object_composition(reconciled, world, builder)
+    finalize_object_composition(&reconciled, world, builder)
 }
 
 /// Reconcile pairs of object participants where one nominally
@@ -55,19 +55,20 @@ where
 /// ancestor is redundant (the descendant is strictly more specific)
 /// and we drop it from the merged list.
 #[inline]
-fn reconcile_descendant_participants<'arena, S, A, W>(
-    merged: Vec<Atom<'arena>>,
+fn reconcile_descendant_participants<'scratch, 'arena, S, A, W>(
+    mut merged: ScratchVec<'scratch, Atom<'arena>, S>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+) -> Option<ScratchVec<'scratch, Atom<'arena>, S>>
 where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
-    let mut keep: Vec<bool> = vec![true; merged.len()];
+    let mut keep: ScratchVec<'scratch, bool, S> = builder.scratch_vec_with(merged.len());
+    keep.resize(merged.len(), true);
 
     for descendant_index in 0..merged.len() {
         if !keep[descendant_index] {
@@ -110,7 +111,10 @@ where
         }
     }
 
-    Some(merged.into_iter().zip(keep).filter_map(|(atom, kept)| kept.then_some(atom)).collect())
+    let mut keep = keep.into_iter();
+    merged.retain(|_| keep.next().unwrap_or(false));
+
+    Some(merged)
 }
 
 /// `true` iff `negated_atom` (a `Negated` conjunct) excludes every
@@ -237,11 +241,11 @@ where
 /// the structural collapses to `None`. When the world already
 /// records that a positive class in the intersection has the
 /// method/property, the redundant conjunct is dropped.
-pub(in crate::ty::meet) fn compose_object_with_structural<'arena, S, A, W>(
+pub(in crate::ty::meet) fn compose_object_with_structural<'scratch, 'arena, S, A, W>(
     object: Atom<'arena>,
     structural: Atom<'arena>,
     world: &W,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
@@ -262,7 +266,7 @@ where
         return Some(object);
     }
 
-    finalize_object_composition(vec![object, structural], world, builder)
+    finalize_object_composition(&[object, structural], world, builder)
 }
 
 /// `final C & HasMethod(m)` is uninhabited when `C` is final and the
@@ -300,19 +304,19 @@ where
 /// same intersection (the `X & !X` shape), makes the composition
 /// uninhabited.
 #[inline]
-fn finalize_object_composition<'arena, S, A, W>(
-    merged: Vec<Atom<'arena>>,
+fn finalize_object_composition<'scratch, 'arena, S, A, W>(
+    merged: &[Atom<'arena>],
     world: &W,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
-    let mut object_parts: Vec<Atom<'arena>> = Vec::new();
-    let mut other_parts: Vec<Atom<'arena>> = Vec::new();
-    for atom in merged {
+    let mut object_parts: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
+    let mut other_parts: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
+    for &atom in merged {
         if atom.kind() == AtomKind::Object {
             object_parts.push(atom);
         } else {
@@ -320,7 +324,7 @@ where
         }
     }
 
-    if !single_inheritance_consistent(&object_parts, world) {
+    if !single_inheritance_consistent(&object_parts, world, builder) {
         return None;
     }
 
@@ -367,7 +371,8 @@ where
 
     let mut object_iterator = object_parts.into_iter();
     let head = object_iterator.next()?;
-    let mut conjuncts: Vec<Atom<'arena>> = object_iterator.collect();
+    let mut conjuncts: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
+    conjuncts.extend(object_iterator);
     conjuncts.extend(other_parts);
 
     Some(builder.intersected(head, &conjuncts))
@@ -381,17 +386,21 @@ where
 /// optimistically allow the composition (PHP's open world might
 /// supply a common subclass via interfaces / traits).
 #[inline]
-fn single_inheritance_consistent<'arena, W>(objects: &[Atom<'arena>], world: &W) -> bool
+fn single_inheritance_consistent<'scratch, 'arena, S, A, W>(
+    objects: &[Atom<'arena>],
+    world: &W,
+    builder: &TypeBuilder<'scratch, 'arena, S, A>,
+) -> bool
 where
+    S: Arena,
+    A: Arena,
     W: World<'arena>,
 {
-    let names: Vec<Name<'arena>> = objects
-        .iter()
-        .filter_map(|atom| match atom {
-            Atom::Object(payload) => Some(payload.name),
-            _ => None,
-        })
-        .collect();
+    let mut names: ScratchVec<'scratch, Name<'arena>, S> = builder.scratch_vec_with(objects.len());
+    names.extend(objects.iter().filter_map(|atom| match atom {
+        Atom::Object(payload) => Some(payload.name),
+        _ => None,
+    }));
     for &final_candidate in &names {
         if !world.is_final(final_candidate) {
             continue;
@@ -428,21 +437,21 @@ where
 }
 
 #[inline]
-fn merge_same_class_participants<'arena, S, A, W>(
-    participants: Vec<Atom<'arena>>,
+fn merge_same_class_participants<'scratch, 'arena, S, A, W>(
+    participants: &[Atom<'arena>],
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+) -> Option<ScratchVec<'scratch, Atom<'arena>, S>>
 where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
-    let mut out: Vec<Atom<'arena>> = Vec::with_capacity(participants.len());
+    let mut out: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(participants.len());
 
-    for atom in participants {
+    for &atom in participants {
         let Atom::Object(payload) = atom else {
             out.push(atom);
             continue;
@@ -483,13 +492,13 @@ where
 /// Both sides are first normalized to exactly `arity` positions
 /// (over-supply truncated, under-supply default-filled).
 #[inline]
-fn merge_args<'arena, S, A, W>(
+fn merge_args<'scratch, 'arena, S, A, W>(
     a: ObjectAtom<'arena>,
     b: ObjectAtom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Option<&'arena [Type<'arena>]>>
 where
     S: Arena,
@@ -537,12 +546,12 @@ where
             .and_then(|parameter| parameter.upper_bound)
             .unwrap_or(well_known::TYPE_MIXED)
     };
-    let a_args: Vec<Type<'arena>> =
-        (0..arity).map(|index| a_supplied.get(index).copied().unwrap_or_else(|| fill(index))).collect();
-    let b_args: Vec<Type<'arena>> =
-        (0..arity).map(|index| b_supplied.get(index).copied().unwrap_or_else(|| fill(index))).collect();
+    let mut a_args: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(arity);
+    a_args.extend((0..arity).map(|index| a_supplied.get(index).copied().unwrap_or_else(|| fill(index))));
+    let mut b_args: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(arity);
+    b_args.extend((0..arity).map(|index| b_supplied.get(index).copied().unwrap_or_else(|| fill(index))));
 
-    let mut merged: Vec<Type<'arena>> = Vec::with_capacity(arity);
+    let mut merged: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(arity);
     for (index, (&a_arg, &b_arg)) in a_args.iter().zip(b_args.iter()).enumerate() {
         let variance =
             world.template_parameter_at(a.name, index).map_or(Variance::Invariant, |parameter| parameter.variance);
@@ -558,7 +567,7 @@ where
                 a_arg
             }
             Variance::Contravariant => {
-                let mut atoms: Vec<Atom<'arena>> = a_arg.atoms.to_vec();
+                let mut atoms: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_from_slice(a_arg.atoms);
                 atoms.extend_from_slice(b_arg.atoms);
 
                 builder.union_of(&atoms)
