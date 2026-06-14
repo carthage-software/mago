@@ -1,6 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use mago_allocator::Arena;
 use mago_php_version::PHPVersionRange;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -11,6 +12,9 @@ use crate::ir::item::Item;
 use crate::ir::item::annotation::ItemAnnotation;
 use crate::ir::item::attribute::Attribute;
 use crate::ir::item::member::MemberItem;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -21,6 +25,29 @@ pub struct Trait<'arena, I, S, E> {
     pub version_constraint: &'arena [PHPVersionRange],
     pub name: Identifier<'arena>,
     pub members: Delimited<'arena, MemberItem<'arena, I, S, E>>,
+}
+
+impl<I, S, E> CopyInto for Trait<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Trait<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Trait {
+            span: self.span,
+            annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
+            attributes: copy_slice_into(self.attributes, arena),
+            version_constraint: arena.alloc_slice_copy(self.version_constraint),
+            name: self.name.copy_into(arena),
+            members: self.members.copy_into(arena),
+        }
+    }
 }
 
 impl<'arena, I, S, E> Item<'arena, I, S, E> for Trait<'arena, I, S, E> {

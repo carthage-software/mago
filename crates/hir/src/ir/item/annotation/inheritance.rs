@@ -59,48 +59,6 @@ pub struct MixinAnnotation<'arena> {
     pub r#type: TypeAnnotationKind<'arena>,
 }
 
-impl HasSpan for ImplementsAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for ExtendsAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for SealedAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for RequireExtendsAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for RequireImplementsAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for MixinAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for UseAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
 impl CopyInto for ImplementsAnnotation<'_> {
     type Output<'arena> = ImplementsAnnotation<'arena>;
 
@@ -175,5 +133,47 @@ impl CopyInto for MixinAnnotation<'_> {
         A: Arena,
     {
         MixinAnnotation { span: self.span, r#type: self.r#type.copy_into(arena) }
+    }
+}
+
+impl HasSpan for ImplementsAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for ExtendsAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for SealedAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for RequireExtendsAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for RequireImplementsAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for MixinAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for UseAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

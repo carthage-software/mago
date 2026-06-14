@@ -31,16 +31,6 @@ pub enum Variance {
     Contravariant,
 }
 
-impl From<TemplateTagValueVariance> for Variance {
-    fn from(variance: TemplateTagValueVariance) -> Self {
-        match variance {
-            TemplateTagValueVariance::Invariant => Variance::Invariant,
-            TemplateTagValueVariance::Covariant => Variance::Covariant,
-            TemplateTagValueVariance::Contravariant => Variance::Contravariant,
-        }
-    }
-}
-
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct TypeParameterAnnotation<'arena> {
@@ -69,21 +59,14 @@ pub struct WhereConstraintAnnotation<'arena> {
     pub constraint: &'arena TypeAnnotation<'arena>,
 }
 
-impl HasSpan for TypeParameterAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
+impl CopyInto for Variance {
+    type Output<'arena> = Variance;
 
-impl HasSpan for WhereConstraintAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for InheritedTypeParameterAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
     }
 }
 
@@ -155,5 +138,33 @@ impl CopyInto for WhereConstraintAnnotation<'_> {
             type_parameter: self.type_parameter.copy_into(arena),
             constraint: copy_ref_into(self.constraint, arena),
         }
+    }
+}
+
+impl From<TemplateTagValueVariance> for Variance {
+    fn from(variance: TemplateTagValueVariance) -> Self {
+        match variance {
+            TemplateTagValueVariance::Invariant => Variance::Invariant,
+            TemplateTagValueVariance::Covariant => Variance::Covariant,
+            TemplateTagValueVariance::Contravariant => Variance::Contravariant,
+        }
+    }
+}
+
+impl HasSpan for TypeParameterAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for WhereConstraintAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for InheritedTypeParameterAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

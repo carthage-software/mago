@@ -7,6 +7,7 @@ use mago_span::Span;
 
 use crate::ir::expression::Expression;
 use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
 
 pub mod annotation;
 
@@ -26,9 +27,34 @@ pub struct DirectVariable<'arena> {
     pub name: &'arena [u8],
 }
 
-impl HasSpan for DirectVariable<'_> {
-    fn span(&self) -> Span {
-        self.span
+impl<I, S, E> CopyInto for Variable<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Variable<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        match self {
+            Variable::Direct(variable) => Variable::Direct(variable.copy_into(arena)),
+            Variable::Indirect(expression) => Variable::Indirect(copy_ref_into(*expression, arena)),
+            Variable::Nested(variable) => Variable::Nested(copy_ref_into(*variable, arena)),
+        }
+    }
+}
+
+impl CopyInto for DirectVariable<'_> {
+    type Output<'arena> = DirectVariable<'arena>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        DirectVariable { span: self.span, name: arena.alloc_slice_copy(self.name) }
     }
 }
 
@@ -42,13 +68,8 @@ impl<I, S, E> HasSpan for Variable<'_, I, S, E> {
     }
 }
 
-impl CopyInto for DirectVariable<'_> {
-    type Output<'arena> = DirectVariable<'arena>;
-
-    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
-    where
-        A: Arena,
-    {
-        DirectVariable { span: self.span, name: arena.alloc_slice_copy(self.name) }
+impl HasSpan for DirectVariable<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

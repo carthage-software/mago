@@ -42,12 +42,6 @@ pub enum TypeKind<'arena> {
     Iterable,
 }
 
-impl HasSpan for Type<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
 impl CopyInto for Type<'_> {
     type Output<'arena> = Type<'arena>;
 
@@ -86,5 +80,11 @@ impl CopyInto for TypeKind<'_> {
             TypeKind::Mixed => TypeKind::Mixed,
             TypeKind::Iterable => TypeKind::Iterable,
         }
+    }
+}
+
+impl HasSpan for Type<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

@@ -18,6 +18,20 @@ pub struct Delimited<'arena, T> {
     pub items: &'arena [T],
 }
 
+impl<T> CopyInto for Delimited<'_, T>
+where
+    T: CopyInto,
+{
+    type Output<'arena> = Delimited<'arena, T::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Delimited { span: self.span, items: copy_slice_into(self.items, arena) }
+    }
+}
+
 impl<'arena, T> Delimited<'arena, T> {
     #[must_use]
     pub fn as_slice(&self) -> &'arena [T] {
@@ -54,19 +68,5 @@ impl<'arena, T> IntoIterator for &Delimited<'arena, T> {
 impl<T> HasSpan for Delimited<'_, T> {
     fn span(&self) -> Span {
         self.span
-    }
-}
-
-impl<T> CopyInto for Delimited<'_, T>
-where
-    T: CopyInto,
-{
-    type Output<'arena> = Delimited<'arena, T::Output<'arena>>;
-
-    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
-    where
-        A: Arena,
-    {
-        Delimited { span: self.span, items: copy_slice_into(self.items, arena) }
     }
 }

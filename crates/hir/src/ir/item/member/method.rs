@@ -1,6 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use mago_allocator::Arena;
 use mago_flags::U8Flags;
 use mago_php_version::PHPVersionRange;
 use mago_span::HasSpan;
@@ -16,6 +17,9 @@ use crate::ir::name::Name;
 use crate::ir::statement::Statement;
 use crate::ir::r#type::Type;
 use crate::ir::variable::DirectVariable;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
@@ -42,6 +46,45 @@ pub struct Method<'arena, I, S, E> {
     pub return_type: Option<&'arena Type<'arena>>,
     pub direct_accessed_globals: &'arena [DirectVariable<'arena>],
     pub body: Option<&'arena Statement<'arena, I, S, E>>,
+}
+
+impl CopyInto for MethodFlag {
+    type Output<'arena> = MethodFlag;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl<I, S, E> CopyInto for Method<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Method<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Method {
+            span: self.span,
+            annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
+            attributes: copy_slice_into(self.attributes, arena),
+            version_constraint: arena.alloc_slice_copy(self.version_constraint),
+            flags: self.flags,
+            modifiers: arena.alloc_slice_copy(self.modifiers),
+            name: self.name.copy_into(arena),
+            parameters: self.parameters.copy_into(arena),
+            return_type: self.return_type.map(|node| copy_ref_into(node, arena)),
+            direct_accessed_globals: copy_slice_into(self.direct_accessed_globals, arena),
+            body: self.body.map(|node| copy_ref_into(node, arena)),
+        }
+    }
 }
 
 impl From<MethodFlag> for u8 {

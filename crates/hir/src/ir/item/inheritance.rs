@@ -23,18 +23,6 @@ pub struct Extends<'arena> {
     pub types: &'arena [Identifier<'arena>],
 }
 
-impl HasSpan for Implements<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for Extends<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
 impl CopyInto for Implements<'_> {
     type Output<'arena> = Implements<'arena>;
 
@@ -54,5 +42,17 @@ impl CopyInto for Extends<'_> {
         A: Arena,
     {
         Extends { span: self.span, types: copy_slice_into(self.types, arena) }
+    }
+}
+
+impl HasSpan for Implements<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for Extends<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

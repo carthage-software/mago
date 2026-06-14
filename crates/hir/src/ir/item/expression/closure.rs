@@ -15,6 +15,8 @@ use crate::ir::statement::Statement;
 use crate::ir::r#type::Type;
 use crate::ir::variable::DirectVariable;
 use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
@@ -56,6 +58,65 @@ pub struct ClosureUseClauseVariable<'arena> {
     pub span: Span,
     pub flags: U8Flags<ClosureUseClauseVariableFlag>,
     pub variable: DirectVariable<'arena>,
+}
+
+impl CopyInto for ClosureFlag {
+    type Output<'arena> = ClosureFlag;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl CopyInto for ClosureUseClauseVariableFlag {
+    type Output<'arena> = ClosureUseClauseVariableFlag;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl<I, S, E> CopyInto for Closure<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Closure<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Closure {
+            span: self.span,
+            annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
+            attributes: copy_slice_into(self.attributes, arena),
+            flags: self.flags,
+            parameters: self.parameters.copy_into(arena),
+            return_type: self.return_type.map(|node| copy_ref_into(node, arena)),
+            use_variables: self.use_variables.as_ref().map(|node| node.copy_into(arena)),
+            direct_accessed_globals: copy_slice_into(self.direct_accessed_globals, arena),
+            body: copy_ref_into(self.body, arena),
+        }
+    }
+}
+
+impl CopyInto for ClosureUseClauseVariable<'_> {
+    type Output<'arena> = ClosureUseClauseVariable<'arena>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        ClosureUseClauseVariable { span: self.span, flags: self.flags, variable: self.variable.copy_into(arena) }
+    }
 }
 
 impl<I, S, E> Closure<'_, I, S, E> {
@@ -118,16 +179,5 @@ impl<'arena, I, S, E> Item<'arena, I, S, E> for Closure<'arena, I, S, E> {
 
     fn annotation(&self) -> Option<&'arena ItemAnnotation<'arena, I, S, E>> {
         self.annotation
-    }
-}
-
-impl CopyInto for ClosureUseClauseVariable<'_> {
-    type Output<'arena> = ClosureUseClauseVariable<'arena>;
-
-    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
-    where
-        A: Arena,
-    {
-        ClosureUseClauseVariable { span: self.span, flags: self.flags, variable: self.variable.copy_into(arena) }
     }
 }

@@ -11,6 +11,7 @@ use crate::ir::item::annotation::ItemAnnotation;
 use crate::ir::item::modifier::Modifier;
 use crate::ir::name::Name;
 use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
 use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -49,29 +50,23 @@ pub struct TraitUseAliasAdaptation<'arena> {
     pub alias: Name<'arena>,
 }
 
-impl<I, S, E> HasSpan for TraitUse<'_, I, S, E> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
+impl<I, S, E> CopyInto for TraitUse<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = TraitUse<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
 
-impl HasSpan for TraitUsePrecedenceAdaptation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for TraitUseAliasAdaptation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for TraitUseAdaptation<'_> {
-    fn span(&self) -> Span {
-        match self {
-            TraitUseAdaptation::Precedence(adaptation) => adaptation.span(),
-            TraitUseAdaptation::Alias(adaptation) => adaptation.span(),
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        TraitUse {
+            span: self.span,
+            annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
+            traits: copy_slice_into(self.traits, arena),
+            adaptations: self.adaptations.map(|node| node.copy_into(arena)),
         }
     }
 }
@@ -119,6 +114,33 @@ impl CopyInto for TraitUseAliasAdaptation<'_> {
             method: self.method.copy_into(arena),
             visibility: self.visibility,
             alias: self.alias.copy_into(arena),
+        }
+    }
+}
+
+impl<I, S, E> HasSpan for TraitUse<'_, I, S, E> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for TraitUsePrecedenceAdaptation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for TraitUseAliasAdaptation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for TraitUseAdaptation<'_> {
+    fn span(&self) -> Span {
+        match self {
+            TraitUseAdaptation::Precedence(adaptation) => adaptation.span(),
+            TraitUseAdaptation::Alias(adaptation) => adaptation.span(),
         }
     }
 }

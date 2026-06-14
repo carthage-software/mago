@@ -28,18 +28,6 @@ pub struct ImportedTypeAliasAnnotation<'arena> {
     pub r#as: Option<Name<'arena>>,
 }
 
-impl HasSpan for TypeAliasAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for ImportedTypeAliasAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
 impl CopyInto for TypeAliasAnnotation<'_> {
     type Output<'arena> = TypeAliasAnnotation<'arena>;
 
@@ -68,5 +56,17 @@ impl CopyInto for ImportedTypeAliasAnnotation<'_> {
             from: self.from.copy_into(arena),
             r#as: self.r#as.map(|r#as| r#as.copy_into(arena)),
         }
+    }
+}
+
+impl HasSpan for TypeAliasAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for ImportedTypeAliasAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

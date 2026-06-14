@@ -1,6 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use mago_allocator::Arena;
 use mago_php_version::PHPVersionRange;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -14,6 +15,9 @@ use crate::ir::item::member::hook::Hook;
 use crate::ir::item::modifier::Modifier;
 use crate::ir::r#type::Type;
 use crate::ir::variable::DirectVariable;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -46,6 +50,75 @@ pub struct PropertyItem<'arena, I, S, E> {
     pub span: Span,
     pub variable: DirectVariable<'arena>,
     pub default_value: Option<&'arena Expression<'arena, I, S, E>>,
+}
+
+impl<I, S, E> CopyInto for Property<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Property<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Property {
+            span: self.span,
+            annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
+            attributes: copy_slice_into(self.attributes, arena),
+            version_constraint: arena.alloc_slice_copy(self.version_constraint),
+            modifiers: arena.alloc_slice_copy(self.modifiers),
+            r#type: self.r#type.map(|node| copy_ref_into(node, arena)),
+            items: copy_slice_into(self.items, arena),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for HookedProperty<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = HookedProperty<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        HookedProperty {
+            span: self.span,
+            annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
+            attributes: copy_slice_into(self.attributes, arena),
+            version_constraint: arena.alloc_slice_copy(self.version_constraint),
+            modifiers: arena.alloc_slice_copy(self.modifiers),
+            r#type: self.r#type.map(|node| copy_ref_into(node, arena)),
+            item: self.item.copy_into(arena),
+            hooks: self.hooks.copy_into(arena),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for PropertyItem<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = PropertyItem<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        PropertyItem {
+            span: self.span,
+            variable: self.variable.copy_into(arena),
+            default_value: self.default_value.map(|node| copy_ref_into(node, arena)),
+        }
+    }
 }
 
 impl<I, S, E> Property<'_, I, S, E> {

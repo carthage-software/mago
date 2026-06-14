@@ -1,6 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use mago_allocator::Arena;
 use mago_flags::U8Flags;
 use mago_php_version::PHPVersionRange;
 use mago_span::HasSpan;
@@ -15,6 +16,9 @@ use crate::ir::item::modifier::Modifier;
 use crate::ir::item::parameter::Parameter;
 use crate::ir::name::Name;
 use crate::ir::statement::Statement;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
@@ -52,6 +56,78 @@ pub struct HookBody<'arena, I, S, E> {
 pub enum HookBodyKind<'arena, I, S, E> {
     Expression(&'arena Expression<'arena, I, S, E>),
     Statements(&'arena [Statement<'arena, I, S, E>]),
+}
+
+impl CopyInto for HookFlag {
+    type Output<'arena> = HookFlag;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl<I, S, E> CopyInto for Hook<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Hook<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Hook {
+            span: self.span,
+            annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
+            attributes: copy_slice_into(self.attributes, arena),
+            version_constraint: arena.alloc_slice_copy(self.version_constraint),
+            flags: self.flags,
+            modifiers: arena.alloc_slice_copy(self.modifiers),
+            name: self.name.copy_into(arena),
+            parameters: self.parameters.as_ref().map(|node| node.copy_into(arena)),
+            body: self.body.as_ref().map(|node| node.copy_into(arena)),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for HookBody<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = HookBody<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        HookBody { span: self.span, kind: self.kind.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for HookBodyKind<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = HookBodyKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        match self {
+            HookBodyKind::Expression(expression) => HookBodyKind::Expression(copy_ref_into(*expression, arena)),
+            HookBodyKind::Statements(statements) => HookBodyKind::Statements(copy_slice_into(statements, arena)),
+        }
+    }
 }
 
 impl<I, S, E> Hook<'_, I, S, E> {

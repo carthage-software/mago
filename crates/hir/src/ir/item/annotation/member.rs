@@ -45,15 +45,27 @@ pub enum PropertyAnnotationKind {
     ReadWrite,
 }
 
-impl<I, S, E> HasSpan for MethodAnnotation<'_, I, S, E> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
+impl<I, S, E> CopyInto for MethodAnnotation<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = MethodAnnotation<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
 
-impl HasSpan for PropertyAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        MethodAnnotation {
+            span: self.span,
+            visibility: self.visibility.map(|node| node.copy_into(arena)),
+            r#static: self.r#static,
+            name: self.name.copy_into(arena),
+            type_parameters: self.type_parameters.map(|node| node.copy_into(arena)),
+            parameters: self.parameters.copy_into(arena),
+            return_type: self.return_type.map(|node| copy_ref_into(node, arena)),
+        }
     }
 }
 
@@ -70,5 +82,28 @@ impl CopyInto for PropertyAnnotation<'_> {
             r#type: self.r#type.map(|r#type| copy_ref_into(r#type, arena)),
             variable: self.variable.copy_into(arena),
         }
+    }
+}
+
+impl CopyInto for PropertyAnnotationKind {
+    type Output<'arena> = PropertyAnnotationKind;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl<I, S, E> HasSpan for MethodAnnotation<'_, I, S, E> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for PropertyAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

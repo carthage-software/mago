@@ -1,6 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -18,6 +19,9 @@ use crate::ir::identifier::Identifier;
 use crate::ir::item::expression::ItemExpression;
 use crate::ir::literal::Literal;
 use crate::ir::variable::Variable;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 
 pub mod annotation;
 pub mod operator;
@@ -269,6 +273,509 @@ pub struct CompositeStringPart<'arena, I, S, E> {
 pub enum CompositeStringPartKind<'arena, I, S, E> {
     Literal(&'arena [u8]),
     Expression(&'arena Expression<'arena, I, S, E>),
+}
+
+impl<I, S, E> CopyInto for Expression<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Expression<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Expression { span: self.span, meta: self.meta.copy_into(arena), kind: self.kind.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for ExpressionKind<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = ExpressionKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        match self {
+            ExpressionKind::Binary(node) => ExpressionKind::Binary(copy_ref_into(*node, arena)),
+            ExpressionKind::UnaryPrefix(node) => ExpressionKind::UnaryPrefix(copy_ref_into(*node, arena)),
+            ExpressionKind::UnaryPostfix(node) => ExpressionKind::UnaryPostfix(copy_ref_into(*node, arena)),
+            ExpressionKind::Literal(node) => ExpressionKind::Literal(copy_ref_into(*node, arena)),
+            ExpressionKind::CompositeString(parts) => ExpressionKind::CompositeString(copy_slice_into(parts, arena)),
+            ExpressionKind::ShellExecute(parts) => ExpressionKind::ShellExecute(copy_slice_into(parts, arena)),
+            ExpressionKind::Assignment(node) => ExpressionKind::Assignment(copy_ref_into(*node, arena)),
+            ExpressionKind::Annotation(node) => ExpressionKind::Annotation(copy_ref_into(*node, arena)),
+            ExpressionKind::Conditional(node) => ExpressionKind::Conditional(copy_ref_into(*node, arena)),
+            ExpressionKind::Array(delimited) => ExpressionKind::Array(delimited.copy_into(arena)),
+            ExpressionKind::List(delimited) => ExpressionKind::List(delimited.copy_into(arena)),
+            ExpressionKind::ArrayAppend(node) => ExpressionKind::ArrayAppend(copy_ref_into(*node, arena)),
+            ExpressionKind::Item(node) => ExpressionKind::Item(copy_ref_into(*node, arena)),
+            ExpressionKind::Call(node) => ExpressionKind::Call(copy_ref_into(*node, arena)),
+            ExpressionKind::PartialApplication(node) => ExpressionKind::PartialApplication(copy_ref_into(*node, arena)),
+            ExpressionKind::Access(node) => ExpressionKind::Access(copy_ref_into(*node, arena)),
+            ExpressionKind::Clone(node) => ExpressionKind::Clone(copy_ref_into(*node, arena)),
+            ExpressionKind::Empty(node) => ExpressionKind::Empty(copy_ref_into(*node, arena)),
+            ExpressionKind::Eval(node) => ExpressionKind::Eval(copy_ref_into(*node, arena)),
+            ExpressionKind::Include(node) => ExpressionKind::Include(copy_ref_into(*node, arena)),
+            ExpressionKind::IncludeOnce(node) => ExpressionKind::IncludeOnce(copy_ref_into(*node, arena)),
+            ExpressionKind::Require(node) => ExpressionKind::Require(copy_ref_into(*node, arena)),
+            ExpressionKind::RequireOnce(node) => ExpressionKind::RequireOnce(copy_ref_into(*node, arena)),
+            ExpressionKind::Print(node) => ExpressionKind::Print(copy_ref_into(*node, arena)),
+            ExpressionKind::Isset(delimited) => ExpressionKind::Isset(delimited.copy_into(arena)),
+            ExpressionKind::Exit(arguments) => {
+                ExpressionKind::Exit(arguments.as_ref().map(|node| node.copy_into(arena)))
+            }
+            ExpressionKind::MagicConstant(constant) => ExpressionKind::MagicConstant(constant.copy_into(arena)),
+            ExpressionKind::Constant(identifier) => ExpressionKind::Constant(identifier.copy_into(arena)),
+            ExpressionKind::Instantiation(node) => ExpressionKind::Instantiation(copy_ref_into(*node, arena)),
+            ExpressionKind::Variable(variable) => ExpressionKind::Variable(variable.copy_into(arena)),
+            ExpressionKind::Yield(node) => ExpressionKind::Yield(copy_ref_into(*node, arena)),
+            ExpressionKind::Throw(node) => ExpressionKind::Throw(copy_ref_into(*node, arena)),
+            ExpressionKind::Parent => ExpressionKind::Parent,
+            ExpressionKind::Self_ => ExpressionKind::Self_,
+            ExpressionKind::Static => ExpressionKind::Static,
+            ExpressionKind::Match(node) => ExpressionKind::Match(copy_ref_into(*node, arena)),
+            ExpressionKind::Identifier(identifier) => ExpressionKind::Identifier(identifier.copy_into(arena)),
+            ExpressionKind::Error(span) => ExpressionKind::Error(*span),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for Assignment<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Assignment<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Assignment {
+            span: self.span,
+            left: copy_ref_into(self.left, arena),
+            operator: self.operator,
+            right: copy_ref_into(self.right, arena),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for Binary<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Binary<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Binary {
+            span: self.span,
+            left: copy_ref_into(self.left, arena),
+            operator: self.operator,
+            right: copy_ref_into(self.right, arena),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for UnaryPrefix<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = UnaryPrefix<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        UnaryPrefix { span: self.span, operator: self.operator, operand: copy_ref_into(self.operand, arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for UnaryPostfix<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = UnaryPostfix<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        UnaryPostfix { span: self.span, operand: copy_ref_into(self.operand, arena), operator: self.operator }
+    }
+}
+
+impl<I, S, E> CopyInto for Conditional<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Conditional<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Conditional {
+            span: self.span,
+            condition: copy_ref_into(self.condition, arena),
+            then: self.then.map(|node| copy_ref_into(node, arena)),
+            r#else: copy_ref_into(self.r#else, arena),
+        }
+    }
+}
+
+impl CopyInto for MagicConstant {
+    type Output<'arena> = MagicConstant;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        MagicConstant { span: self.span, kind: self.kind }
+    }
+}
+
+impl CopyInto for MagicConstantKind {
+    type Output<'arena> = MagicConstantKind;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl<I, S, E> CopyInto for Instantiation<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Instantiation<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Instantiation {
+            span: self.span,
+            class: copy_ref_into(self.class, arena),
+            arguments: self.arguments.as_ref().map(|node| node.copy_into(arena)),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for Callee<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Callee<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Callee { span: self.span, kind: self.kind.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for CalleeKind<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = CalleeKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        match self {
+            CalleeKind::Function(expression) => CalleeKind::Function(copy_ref_into(*expression, arena)),
+            CalleeKind::Method(expression, selector) => {
+                CalleeKind::Method(copy_ref_into(*expression, arena), selector.copy_into(arena))
+            }
+            CalleeKind::NullsafeMethod(expression, selector) => {
+                CalleeKind::NullsafeMethod(copy_ref_into(*expression, arena), selector.copy_into(arena))
+            }
+            CalleeKind::StaticMethod(expression, selector) => {
+                CalleeKind::StaticMethod(copy_ref_into(*expression, arena), selector.copy_into(arena))
+            }
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for Call<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Call<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Call { span: self.span, callee: self.callee.copy_into(arena), arguments: self.arguments.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for PartialApplication<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = PartialApplication<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        PartialApplication {
+            span: self.span,
+            callee: self.callee.copy_into(arena),
+            arguments: self.arguments.copy_into(arena),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for Access<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Access<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Access { span: self.span, kind: self.kind.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for AccessKind<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = AccessKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        match self {
+            AccessKind::Array(target, index) => {
+                AccessKind::Array(copy_ref_into(*target, arena), copy_ref_into(*index, arena))
+            }
+            AccessKind::Property(target, selector) => {
+                AccessKind::Property(copy_ref_into(*target, arena), selector.copy_into(arena))
+            }
+            AccessKind::NullsafeProperty(target, selector) => {
+                AccessKind::NullsafeProperty(copy_ref_into(*target, arena), selector.copy_into(arena))
+            }
+            AccessKind::StaticProperty(target, variable) => {
+                AccessKind::StaticProperty(copy_ref_into(*target, arena), variable.copy_into(arena))
+            }
+            AccessKind::ClassConstant(target, selector) => {
+                AccessKind::ClassConstant(copy_ref_into(*target, arena), selector.copy_into(arena))
+            }
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for Yield<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Yield<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Yield { span: self.span, kind: self.kind.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for YieldKind<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = YieldKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        match self {
+            YieldKind::Nothing => YieldKind::Nothing,
+            YieldKind::Expression(expression) => YieldKind::Expression(copy_ref_into(*expression, arena)),
+            YieldKind::Pair(key, value) => YieldKind::Pair(copy_ref_into(*key, arena), copy_ref_into(*value, arena)),
+            YieldKind::From(expression) => YieldKind::From(copy_ref_into(*expression, arena)),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for Match<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Match<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Match { span: self.span, subject: copy_ref_into(self.subject, arena), arms: self.arms.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for MatchArm<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = MatchArm<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        MatchArm { span: self.span, kind: self.kind.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for MatchArmKind<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = MatchArmKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        match self {
+            MatchArmKind::Expression(conditions, body) => {
+                MatchArmKind::Expression(copy_slice_into(conditions, arena), copy_ref_into(*body, arena))
+            }
+            MatchArmKind::Default(body) => MatchArmKind::Default(copy_ref_into(*body, arena)),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for ArrayElement<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = ArrayElement<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        ArrayElement { span: self.span, kind: self.kind.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for ArrayElementKind<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = ArrayElementKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        match self {
+            ArrayElementKind::KeyValue(key, value) => {
+                ArrayElementKind::KeyValue(copy_ref_into(*key, arena), copy_ref_into(*value, arena))
+            }
+            ArrayElementKind::Value(value) => ArrayElementKind::Value(copy_ref_into(*value, arena)),
+            ArrayElementKind::Variadic(value) => ArrayElementKind::Variadic(copy_ref_into(*value, arena)),
+            ArrayElementKind::Missing => ArrayElementKind::Missing,
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for CompositeStringPart<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = CompositeStringPart<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        CompositeStringPart { span: self.span, kind: self.kind.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for CompositeStringPartKind<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = CompositeStringPartKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        match self {
+            CompositeStringPartKind::Literal(bytes) => CompositeStringPartKind::Literal(arena.alloc_slice_copy(bytes)),
+            CompositeStringPartKind::Expression(expression) => {
+                CompositeStringPartKind::Expression(copy_ref_into(*expression, arena))
+            }
+        }
+    }
 }
 
 impl<I, S, E> HasSpan for Expression<'_, I, S, E> {

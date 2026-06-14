@@ -86,18 +86,6 @@ pub enum ReferenceKind<'arena> {
     Parent(Identifier<'arena>),
 }
 
-impl<'arena> ReferenceKind<'arena> {
-    #[must_use]
-    pub fn identifier(&self) -> Identifier<'arena> {
-        match self {
-            ReferenceKind::Identifier(identifier)
-            | ReferenceKind::Self_(identifier)
-            | ReferenceKind::Static(identifier)
-            | ReferenceKind::Parent(identifier) => *identifier,
-        }
-    }
-}
-
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct NamedTypeAnnotation<'arena> {
@@ -272,72 +260,6 @@ pub struct ObjectShapeTypeAnnotation<'arena> {
     pub sealed: bool,
 }
 
-impl HasSpan for TypeAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for NamedTypeAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for GenericParameterTypeAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for StringTypeAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for CallableTypeAnnotationParameter<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for CallableTypeAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for ConditionalTypeAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for ShapeTypeAnnotationField<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for ShapeTypeAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for ShapeTypeAnnotationAdditionalFields<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for ObjectShapeTypeAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
 impl CopyInto for TypeAnnotation<'_> {
     type Output<'arena> = TypeAnnotation<'arena>;
 
@@ -510,6 +432,39 @@ impl CopyInto for GlobalSelector<'_> {
     }
 }
 
+impl CopyInto for IntLiteral {
+    type Output<'arena> = IntLiteral;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl CopyInto for FloatLiteral {
+    type Output<'arena> = FloatLiteral;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl CopyInto for StringCasing {
+    type Output<'arena> = StringCasing;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
 impl CopyInto for StringLiteral<'_> {
     type Output<'arena> = StringLiteral<'arena>;
 
@@ -540,6 +495,28 @@ impl CopyInto for StringTypeAnnotation<'_> {
             truthy: self.truthy,
             callable: self.callable,
         }
+    }
+}
+
+impl CopyInto for PropertiesOfFilter {
+    type Output<'arena> = PropertiesOfFilter;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl CopyInto for CallableTypeKind {
+    type Output<'arena> = CallableTypeKind;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
     }
 }
 
@@ -668,5 +645,83 @@ impl CopyInto for ObjectShapeTypeAnnotation<'_> {
         A: Arena,
     {
         ObjectShapeTypeAnnotation { span: self.span, fields: self.fields.copy_into(arena), sealed: self.sealed }
+    }
+}
+
+impl<'arena> ReferenceKind<'arena> {
+    #[must_use]
+    pub fn identifier(&self) -> Identifier<'arena> {
+        match self {
+            ReferenceKind::Identifier(identifier)
+            | ReferenceKind::Self_(identifier)
+            | ReferenceKind::Static(identifier)
+            | ReferenceKind::Parent(identifier) => *identifier,
+        }
+    }
+}
+
+impl HasSpan for TypeAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for NamedTypeAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for GenericParameterTypeAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for StringTypeAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for CallableTypeAnnotationParameter<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for CallableTypeAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for ConditionalTypeAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for ShapeTypeAnnotationField<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for ShapeTypeAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for ShapeTypeAnnotationAdditionalFields<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for ObjectShapeTypeAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

@@ -20,12 +20,6 @@ pub struct VariableAnnotation<'arena> {
     pub errors: &'arena [AnnotationError],
 }
 
-impl HasSpan for VariableAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
 impl CopyInto for VariableAnnotation<'_> {
     type Output<'arena> = VariableAnnotation<'arena>;
 
@@ -39,5 +33,11 @@ impl CopyInto for VariableAnnotation<'_> {
             variable: self.variable.map(|variable| variable.copy_into(arena)),
             errors: arena.alloc_slice_copy(self.errors),
         }
+    }
+}
+
+impl HasSpan for VariableAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

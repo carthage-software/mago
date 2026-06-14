@@ -1,6 +1,9 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_slice_into;
 use mago_flags::U32Flags;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -100,6 +103,61 @@ pub struct ItemAnnotation<'arena, I, S, E> {
     pub var: &'arena [VariableAnnotation<'arena>],
     pub tags: U32Flags<ItemAnnotationTag>,
     pub errors: &'arena [AnnotationError],
+}
+
+impl CopyInto for ItemAnnotationTag {
+    type Output<'arena> = ItemAnnotationTag;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl<I, S, E> CopyInto for ItemAnnotation<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = ItemAnnotation<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        ItemAnnotation {
+            span: self.span,
+            type_aliases: copy_slice_into(self.type_aliases, arena),
+            imported_type_aliases: copy_slice_into(self.imported_type_aliases, arena),
+            type_parameters: copy_slice_into(self.type_parameters, arena),
+            inherited_type_parameters: copy_slice_into(self.inherited_type_parameters, arena),
+            extends: copy_slice_into(self.extends, arena),
+            require_extends: copy_slice_into(self.require_extends, arena),
+            implements: copy_slice_into(self.implements, arena),
+            require_implements: copy_slice_into(self.require_implements, arena),
+            uses: copy_slice_into(self.uses, arena),
+            sealings: copy_slice_into(self.sealings, arena),
+            mixins: copy_slice_into(self.mixins, arena),
+            methods: copy_slice_into(self.methods, arena),
+            properties: copy_slice_into(self.properties, arena),
+            parameters: copy_slice_into(self.parameters, arena),
+            parameter_outs: copy_slice_into(self.parameter_outs, arena),
+            where_constraints: copy_slice_into(self.where_constraints, arena),
+            return_type: copy_slice_into(self.return_type, arena),
+            throws: copy_slice_into(self.throws, arena),
+            asserts: copy_slice_into(self.asserts, arena),
+            asserts_if_true: copy_slice_into(self.asserts_if_true, arena),
+            asserts_if_false: copy_slice_into(self.asserts_if_false, arena),
+            self_out: copy_slice_into(self.self_out, arena),
+            pure_unless_callable_impure: copy_slice_into(self.pure_unless_callable_impure, arena),
+            var: copy_slice_into(self.var, arena),
+            tags: self.tags,
+            errors: arena.alloc_slice_copy(self.errors),
+        }
+    }
 }
 
 impl<I, S, E> HasSpan for ItemAnnotation<'_, I, S, E> {

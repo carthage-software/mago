@@ -1,6 +1,7 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -12,6 +13,9 @@ use crate::ir::item::attribute::Attribute;
 use crate::ir::item::inheritance::Extends;
 use crate::ir::item::inheritance::Implements;
 use crate::ir::item::member::MemberItem;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -23,6 +27,30 @@ pub struct AnonymousClass<'arena, I, S, E> {
     pub extends: Option<&'arena Extends<'arena>>,
     pub implements: Option<&'arena Implements<'arena>>,
     pub members: Delimited<'arena, MemberItem<'arena, I, S, E>>,
+}
+
+impl<I, S, E> CopyInto for AnonymousClass<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = AnonymousClass<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        AnonymousClass {
+            span: self.span,
+            annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
+            attributes: copy_slice_into(self.attributes, arena),
+            arguments: self.arguments.as_ref().map(|node| node.copy_into(arena)),
+            extends: self.extends.map(|node| copy_ref_into(node, arena)),
+            implements: self.implements.map(|node| copy_ref_into(node, arena)),
+            members: self.members.copy_into(arena),
+        }
+    }
 }
 
 impl<I, S, E> HasSpan for AnonymousClass<'_, I, S, E> {

@@ -68,36 +68,6 @@ pub struct SelfOutAnnotation<'arena> {
     pub r#type: &'arena TypeAnnotation<'arena>,
 }
 
-impl HasSpan for ThrowsAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for AssertAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for SelfOutAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for AssertAnnotationPattern<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for AssertAnnotationTarget<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
 impl CopyInto for ThrowsAnnotation<'_> {
     type Output<'arena> = ThrowsAnnotation<'arena>;
 
@@ -195,5 +165,35 @@ impl CopyInto for SelfOutAnnotation<'_> {
         A: Arena,
     {
         SelfOutAnnotation { span: self.span, r#type: copy_ref_into(self.r#type, arena) }
+    }
+}
+
+impl HasSpan for ThrowsAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for AssertAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for SelfOutAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for AssertAnnotationPattern<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for AssertAnnotationTarget<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

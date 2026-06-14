@@ -1,12 +1,14 @@
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ir::argument::Argument;
 use crate::ir::delimited::Delimited;
 use crate::ir::identifier::Identifier;
+use mago_allocator::copy::CopyInto;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
@@ -29,6 +31,37 @@ pub struct Attribute<'arena, I, S, E> {
     pub span: Span,
     pub class: Identifier<'arena>,
     pub arguments: Option<Delimited<'arena, Argument<'arena, I, S, E>>>,
+}
+
+impl CopyInto for AttributeTarget {
+    type Output<'arena> = AttributeTarget;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
+impl<I, S, E> CopyInto for Attribute<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Attribute<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Attribute {
+            span: self.span,
+            class: self.class.copy_into(arena),
+            arguments: self.arguments.as_ref().map(|node| node.copy_into(arena)),
+        }
+    }
 }
 
 impl<I, S, E> Attribute<'_, I, S, E> {

@@ -60,30 +60,6 @@ pub struct LiteralFloat<'arena> {
     pub value: OrderedFloat<f64>,
 }
 
-impl HasSpan for Literal<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for LiteralString<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for LiteralInteger<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl HasSpan for LiteralFloat<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
 impl CopyInto for Literal<'_> {
     type Output<'arena> = Literal<'arena>;
 
@@ -110,6 +86,17 @@ impl CopyInto for LiteralKind<'_> {
             LiteralKind::False => LiteralKind::False,
             LiteralKind::Null => LiteralKind::Null,
         }
+    }
+}
+
+impl CopyInto for LiteralStringKind {
+    type Output<'arena> = LiteralStringKind;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
     }
 }
 
@@ -148,5 +135,29 @@ impl CopyInto for LiteralFloat<'_> {
         A: Arena,
     {
         LiteralFloat { span: self.span, raw: arena.alloc_slice_copy(self.raw), value: self.value }
+    }
+}
+
+impl HasSpan for Literal<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for LiteralString<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for LiteralInteger<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for LiteralFloat<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

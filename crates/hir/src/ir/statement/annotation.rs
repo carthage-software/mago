@@ -18,12 +18,6 @@ pub struct VariableBindingAnnotation<'arena> {
     pub type_annotation: &'arena TypeAnnotation<'arena>,
 }
 
-impl HasSpan for VariableBindingAnnotation<'_> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
 impl CopyInto for VariableBindingAnnotation<'_> {
     type Output<'arena> = VariableBindingAnnotation<'arena>;
 
@@ -36,5 +30,11 @@ impl CopyInto for VariableBindingAnnotation<'_> {
             variable: self.variable.copy_into(arena),
             type_annotation: copy_ref_into(self.type_annotation, arena),
         }
+    }
+}
+
+impl HasSpan for VariableBindingAnnotation<'_> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

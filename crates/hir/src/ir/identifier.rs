@@ -24,6 +24,28 @@ pub enum IdentifierKind {
     FullyQualified,
 }
 
+impl CopyInto for Identifier<'_> {
+    type Output<'arena> = Identifier<'arena>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Identifier { span: self.span, value: arena.alloc_slice_copy(self.value), kind: self.kind }
+    }
+}
+
+impl CopyInto for IdentifierKind {
+    type Output<'arena> = IdentifierKind;
+
+    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        *self
+    }
+}
+
 impl<'arena> Identifier<'arena> {
     #[inline]
     #[must_use]
@@ -56,16 +78,5 @@ impl<'arena> Identifier<'arena> {
 impl HasSpan for Identifier<'_> {
     fn span(&self) -> Span {
         self.span
-    }
-}
-
-impl CopyInto for Identifier<'_> {
-    type Output<'arena> = Identifier<'arena>;
-
-    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
-    where
-        A: Arena,
-    {
-        Identifier { span: self.span, value: arena.alloc_slice_copy(self.value), kind: self.kind }
     }
 }
