@@ -71,13 +71,13 @@ use mago_allocator::copy::CopyInto;
 use mago_allocator::copy::copy_slice_into;
 use mago_flags::U16Flags;
 
+pub use crate::name::Name;
 pub use crate::ty::atom::Atom;
 pub use crate::ty::atom::kind::AtomKind;
 pub use crate::ty::atom::set::AtomKindSet;
 pub use crate::ty::builder::TypeBuilder;
 pub use crate::ty::builder::union_buffer::UnionBuffer;
 pub use crate::ty::flags::FlowFlag;
-pub use crate::name::Name;
 pub use crate::world::World;
 
 pub mod atom;

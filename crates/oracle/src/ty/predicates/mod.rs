@@ -21,10 +21,10 @@
 
 pub(crate) mod atom;
 
+use crate::ty::Type;
 use crate::ty::atom::kind::AtomKind;
 use crate::ty::atom::set::AtomKindSet;
 use crate::ty::inspect;
-use crate::ty::Type;
 use crate::ty::well_known;
 
 /// `true` iff `ty` is the bottom type (no values).

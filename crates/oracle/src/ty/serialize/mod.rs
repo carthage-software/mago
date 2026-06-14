@@ -49,6 +49,9 @@ use mago_flags::U8Flags;
 use mago_flags::U16Flags;
 use mago_span::Span;
 
+use crate::name::Name;
+use crate::ty::Type;
+use crate::ty::Typed;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::alias::AliasAtom;
 use crate::ty::atom::payload::array::ArrayAtom;
@@ -97,9 +100,6 @@ use crate::ty::atom::payload::scalar::string::StringLiteral;
 use crate::ty::atom::payload::scalar::string::StringRefinementFlag;
 use crate::ty::atom::payload::variable::VariableAtom;
 use crate::ty::builder::TypeBuilder;
-use crate::name::Name;
-use crate::ty::Type;
-use crate::ty::Typed;
 use crate::ty::well_known;
 
 /// Self-contained structural form of a [`Type`].

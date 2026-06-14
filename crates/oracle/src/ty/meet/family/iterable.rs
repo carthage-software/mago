@@ -28,7 +28,8 @@ where
     };
 
     let key_type = crate::ty::meet::compute(a_payload.key_type, b_payload.key_type, world, options, report, builder);
-    let value_type = crate::ty::meet::compute(a_payload.value_type, b_payload.value_type, world, options, report, builder);
+    let value_type =
+        crate::ty::meet::compute(a_payload.value_type, b_payload.value_type, world, options, report, builder);
 
     Some(builder.iterable(IterableAtom { key_type, value_type }))
 }

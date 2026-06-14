@@ -1,9 +1,9 @@
 use mago_flags::U8Flags;
 
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::template::Bound;
 use crate::ty::template::TemplateKey;
-use crate::ty::Type;
 
 /// Diagnostic output from the lattice operations.
 ///

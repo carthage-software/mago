@@ -295,11 +295,7 @@ where
 /// Pushes the shared constituents into `out` and returns `true` when
 /// the pair is a cross-dominator; returns `false` to fall through.
 #[inline]
-fn cross_dominator_meet<'arena, S>(
-    a: Atom<'arena>,
-    b: Atom<'arena>,
-    out: &mut ScratchVec<'_, Atom<'arena>, S>,
-) -> bool
+fn cross_dominator_meet<'arena, S>(a: Atom<'arena>, b: Atom<'arena>, out: &mut ScratchVec<'_, Atom<'arena>, S>) -> bool
 where
     S: Arena,
 {
@@ -447,7 +443,8 @@ where
     let result = match (a, b) {
         (Atom::Intersected(a_payload), Atom::Intersected(b_payload)) => {
             let head = atom_meet(*a_payload.head, *b_payload.head, world, options, report, builder)?;
-            let mut all_conjuncts: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_from_slice(a_payload.conjuncts);
+            let mut all_conjuncts: ScratchVec<'scratch, Atom<'arena>, S> =
+                builder.scratch_vec_from_slice(a_payload.conjuncts);
             all_conjuncts.extend_from_slice(b_payload.conjuncts);
 
             builder.intersected(head, &all_conjuncts)
