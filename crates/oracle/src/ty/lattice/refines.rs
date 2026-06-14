@@ -2,6 +2,7 @@
 //! of type `a` is also a value of type `b` (i.e. `a <: b`).
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::ty::Type;
 use crate::ty::atom::Atom;
@@ -38,13 +39,13 @@ use crate::world::World;
 /// family by family; what isn't implemented returns `false`
 /// conservatively.
 #[inline]
-pub fn refines<'arena, S, A, W>(
+pub fn refines<'scratch, 'arena, S, A, W>(
     input: Type<'arena>,
     container: Type<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
@@ -80,7 +81,7 @@ where
                 return true;
             }
 
-            if int_union_covers(*atom, container.atoms) {
+            if int_union_covers(*atom, container.atoms, builder) {
                 return true;
             }
 
@@ -132,13 +133,13 @@ where
 /// container has a `Negated(Y)` atom whose inner `Y` is covered by
 /// some other container atom, making the union `mixed`.
 #[inline]
-fn negation_partition_covers<'arena, S, A, W>(
+fn negation_partition_covers<'scratch, 'arena, S, A, W>(
     _input: Atom<'arena>,
     containers: &[Atom<'arena>],
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
@@ -154,7 +155,8 @@ where
             continue;
         };
 
-        let others: Vec<Atom<'arena>> = containers.iter().copied().filter(|&other| other != candidate).collect();
+        let mut others: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
+        others.extend(containers.iter().copied().filter(|&other| other != candidate));
         if others.is_empty() {
             continue;
         }
@@ -181,13 +183,13 @@ where
 /// Intersected narrowed by `X` refines `Y`). The partition `!X | X` covers
 /// everything, so the Intersected is again replaced by its head.
 #[inline]
-fn intersected_partition_covers<'arena, S, A, W>(
+fn intersected_partition_covers<'scratch, 'arena, S, A, W>(
     input: Atom<'arena>,
     containers: &[Atom<'arena>],
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
@@ -231,7 +233,7 @@ where
             continue;
         }
 
-        let mut reduced: Vec<Atom<'arena>> = containers.to_vec();
+        let mut reduced: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_from_slice(containers);
         reduced[index] = *payload.head;
         let input_type = builder.union_of(&[input]);
         let reduced_type = builder.union_of(&reduced);
@@ -245,7 +247,7 @@ where
             continue;
         };
 
-        let mut non_negated: Vec<Atom<'arena>> = Vec::new();
+        let mut non_negated: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
         for &conjunct in payload.conjuncts {
             if !matches!(conjunct, Atom::Negated(_)) {
                 non_negated.push(conjunct);
@@ -283,7 +285,7 @@ where
             });
 
             if has_matching {
-                let mut reduced: Vec<Atom<'arena>> = containers.to_vec();
+                let mut reduced: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_from_slice(containers);
                 reduced[index] = *payload.head;
                 let input_type = builder.union_of(&[input]);
                 let reduced_type = builder.union_of(&reduced);
@@ -463,7 +465,10 @@ where
 /// survives as `Negated(Negated(T))` and gets flattened here so
 /// the structural dispatch sees the inner atoms.
 #[inline]
-fn expand_double_negation<'arena, S, A>(ty: Type<'arena>, builder: &mut TypeBuilder<'_, 'arena, S, A>) -> Type<'arena>
+fn expand_double_negation<'scratch, 'arena, S, A>(
+    ty: Type<'arena>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+) -> Type<'arena>
 where
     S: Arena,
     A: Arena,
@@ -472,7 +477,7 @@ where
         return ty;
     }
 
-    let mut expanded: Vec<Atom<'arena>> = Vec::with_capacity(ty.atoms.len());
+    let mut expanded: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(ty.atoms.len());
     for &atom in ty.atoms {
         if let Atom::Negated(inner) = atom
             && let [Atom::Negated(inner_inner)] = inner.atoms
@@ -500,13 +505,13 @@ fn is_double_negation(atom: Atom<'_>) -> bool {
 /// atom contributes its constraint; if their union covers `X`, the input
 /// is in the container (just split across same-template narrowings).
 #[inline]
-fn generic_parameter_union_covers<'arena, S, A, W>(
+fn generic_parameter_union_covers<'scratch, 'arena, S, A, W>(
     input: Atom<'arena>,
     containers: &[Atom<'arena>],
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
@@ -517,7 +522,7 @@ where
         return false;
     };
 
-    let mut container_constraints: Vec<Atom<'arena>> = Vec::new();
+    let mut container_constraints: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
     for &candidate in containers {
         let Atom::GenericParameter(candidate_payload) = candidate else {
             continue;
@@ -586,7 +591,15 @@ where
 /// when the disjuncts collectively cover the full integer range; required
 /// for partition-style properties like `meet(a,b) ∪ subtract(a,b) ⊇ a`.
 #[inline]
-fn int_union_covers(input: Atom<'_>, containers: &[Atom<'_>]) -> bool {
+fn int_union_covers<'scratch, 'arena, S, A>(
+    input: Atom<'_>,
+    containers: &[Atom<'_>],
+    builder: &TypeBuilder<'scratch, 'arena, S, A>,
+) -> bool
+where
+    S: Arena,
+    A: Arena,
+{
     let Atom::Int(input_payload) = input else {
         return false;
     };
@@ -601,14 +614,12 @@ fn int_union_covers(input: Atom<'_>, containers: &[Atom<'_>]) -> bool {
 
     let (input_lower, input_upper) = int_bounds_of(input_payload);
 
-    let mut ranges: Vec<(Option<i64>, Option<i64>)> = containers
-        .iter()
-        .filter_map(|candidate| match candidate {
-            Atom::Int(IntAtom::UnspecifiedLiteral) => None,
-            Atom::Int(payload) => Some(int_bounds_of(*payload)),
-            _ => None,
-        })
-        .collect();
+    let mut ranges: ScratchVec<'scratch, (Option<i64>, Option<i64>), S> = builder.scratch_vec();
+    ranges.extend(containers.iter().filter_map(|candidate| match candidate {
+        Atom::Int(IntAtom::UnspecifiedLiteral) => None,
+        Atom::Int(payload) => Some(int_bounds_of(*payload)),
+        _ => None,
+    }));
 
     if ranges.is_empty() {
         return false;
@@ -965,13 +976,13 @@ where
 /// separate union members). The conjuncts are carried onto each survivor so a
 /// positive constraint like `& E` is not silently dropped.
 #[inline]
-fn sealed_intersected_union_cover<'arena, S, A, W>(
+fn sealed_intersected_union_cover<'scratch, 'arena, S, A, W>(
     input: Atom<'arena>,
     containers: &[Atom<'arena>],
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
@@ -986,7 +997,7 @@ where
         return false;
     }
 
-    let mut negated_inners: Vec<Type<'arena>> = Vec::with_capacity(payload.conjuncts.len());
+    let mut negated_inners: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(payload.conjuncts.len());
     for &conjunct in payload.conjuncts {
         if let Atom::Negated(inner) = conjunct {
             negated_inners.push(*inner);
@@ -1011,13 +1022,13 @@ where
 /// Sealed-cover: `Intersected(H sealed, conjuncts) <: container` when
 /// `H`'s surviving inheritors each refine `container`.
 #[inline]
-fn sealed_intersected_cover<'arena, S, A, W>(
+fn sealed_intersected_cover<'scratch, 'arena, S, A, W>(
     input: Atom<'arena>,
     container: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
@@ -1032,7 +1043,7 @@ where
         return false;
     }
 
-    let mut negated_inners: Vec<Type<'arena>> = Vec::with_capacity(payload.conjuncts.len());
+    let mut negated_inners: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(payload.conjuncts.len());
     for &conjunct in payload.conjuncts {
         if let Atom::Negated(inner) = conjunct {
             negated_inners.push(*inner);

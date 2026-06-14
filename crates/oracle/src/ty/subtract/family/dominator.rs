@@ -3,6 +3,7 @@
 //! lands inside one of the sub-families.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
@@ -32,14 +33,15 @@ use crate::world::World;
 /// `scalar = bool | int | float | string`,
 /// `numeric = int | float | numeric-string`,
 /// `array-key = int | string`.
-pub(in crate::ty::subtract) fn true_union_minus<'arena, S, A, W>(
+pub(in crate::ty::subtract) fn true_union_minus<'scratch, 'arena, S, A, W>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> bool
 where
     S: Arena,
     A: Arena,
@@ -52,21 +54,18 @@ where
     } else if input == ARRAY_KEY {
         &[INT, STRING]
     } else {
-        return None;
+        return false;
     };
 
     if !members.iter().any(|member| dominator_member_covers(*member, removed)) {
-        return None;
+        return false;
     }
 
-    let mut pieces: Vec<Atom<'arena>> = Vec::with_capacity(members.len());
     for &member in members {
-        for piece in crate::ty::subtract::atom_minus(member, removed, world, options, report, builder) {
-            pieces.push(piece);
-        }
+        crate::ty::subtract::atom_minus(member, removed, world, options, report, builder, out);
     }
 
-    Some(pieces)
+    true
 }
 
 /// `true` iff `member` and `removed` share at least one runtime axis,

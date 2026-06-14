@@ -84,7 +84,7 @@ where
         return crate::ty::lattice::refines(*container_inner, *input_inner, world, options, report, builder);
     }
 
-    let mut union_atoms: Vec<Atom<'arena>> = input_inner.atoms.to_vec();
+    let mut union_atoms = builder.scratch_vec_from_slice(input_inner.atoms);
     union_atoms.push(container);
     let union_type = builder.union_of(&union_atoms);
 

@@ -3,6 +3,7 @@
 //! [`Intersected`](crate::ty::atom::kind::AtomKind::Intersected) wrapper.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::ty::atom::Atom;
 use crate::ty::builder::TypeBuilder;
@@ -14,19 +15,20 @@ use crate::world::World;
 /// (`HasMethod` / `HasProperty` / `ObjectShape`). For the strict
 /// bare-descendant case the exclusion binds to the bare descendant
 /// class so the whole nominal subtree is excluded.
-pub(in crate::ty::subtract) fn object_descendant_minus<'arena, S, A, W>(
+pub(in crate::ty::subtract) fn object_descendant_minus<'scratch, 'arena, S, A, W>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
     world: &W,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> bool
 where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
     let Atom::Object(input_payload) = input else {
-        return None;
+        return false;
     };
 
     let removed_is_object = matches!(removed, Atom::Object(_));
@@ -34,7 +36,7 @@ where
     let removed_is_structural = matches!(removed, Atom::HasMethod(_) | Atom::HasProperty(_) | Atom::ObjectShape(_));
 
     if !removed_is_object && !removed_is_structural && !removed_is_intersected {
-        return None;
+        return false;
     }
 
     let (head, exclude_atom) = if let Atom::Intersected(removed_payload) = removed {
@@ -65,10 +67,12 @@ where
     };
 
     if head.is_none() && removed_is_intersected {
-        return None;
+        return false;
     }
 
     let exclude_type = builder.union_of(&[exclude_atom]);
     let negated = builder.negated(exclude_type);
-    Some(vec![builder.intersected(input, &[negated])])
+    let intersected = builder.intersected(input, &[negated]);
+    out.push(intersected);
+    true
 }

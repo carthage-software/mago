@@ -1,6 +1,7 @@
 //! Integer-range / literal subtract.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::scalar::int::IntAtom;
@@ -9,23 +10,22 @@ use crate::ty::builder::TypeBuilder;
 /// Difference of two integer atoms when neither side fully refines the
 /// other. Produces 0, 1, or 2 surviving pieces, each of which is a
 /// `Range` collapsed to a `Literal` when its bounds coincide.
-pub(in crate::ty::subtract) fn int_minus<'arena, S, A>(
+pub(in crate::ty::subtract) fn int_minus<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Vec<Atom<'arena>>
-where
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) where
     S: Arena,
     A: Arena,
 {
     let (Atom::Int(input_payload), Atom::Int(removed_payload)) = (input, removed) else {
-        return vec![input];
+        out.push(input);
+        return;
     };
 
     let (input_lower, input_upper) = int_bounds(input_payload);
     let (removed_lower, removed_upper) = int_bounds(removed_payload);
-
-    let mut pieces: Vec<Atom<'arena>> = Vec::new();
 
     if let Some(removed_lower_value) = removed_lower
         && let Some(upper_bound) = removed_lower_value.checked_sub(1)
@@ -42,7 +42,8 @@ where
             };
 
             if non_empty_interval(input_lower, piece_upper) {
-                pieces.push(make_int_piece(input_lower, piece_upper, builder));
+                let piece = make_int_piece(input_lower, piece_upper, builder);
+                out.push(piece);
             }
         }
     }
@@ -62,12 +63,11 @@ where
             };
 
             if non_empty_interval(piece_lower, input_upper) {
-                pieces.push(make_int_piece(piece_lower, input_upper, builder));
+                let piece = make_int_piece(piece_lower, input_upper, builder);
+                out.push(piece);
             }
         }
     }
-
-    pieces
 }
 
 #[inline]
