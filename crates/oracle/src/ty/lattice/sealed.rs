@@ -3,6 +3,7 @@
 //! lattice can prove identities that open-world reasoning cannot reach.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
 use crate::name::Name;
@@ -19,24 +20,28 @@ use crate::world::Variance;
 use crate::world::World;
 
 /// The result of asking "what survives of `H`'s sealed cover after
-/// these negation conjuncts filter out some inheritors?".
+/// these negation conjuncts filter out some inheritors?". The surviving
+/// inheritors live on the builder's scratch arena.
 #[derive(Debug, Clone)]
-pub(crate) enum SealedResidual<'arena> {
+pub(crate) enum SealedResidual<'scratch, 'arena, S>
+where
+    S: Arena,
+{
     NotSealed,
     FullyCovered,
-    Surviving(Vec<Atom<'arena>>),
+    Surviving(ScratchVec<'scratch, Atom<'arena>, S>),
 }
 
 const DEPTH_CAP: usize = 16;
 
-pub(crate) fn compute_residual<'arena, S, A, W>(
+pub(crate) fn compute_residual<'scratch, 'arena, S, A, W>(
     head: Atom<'arena>,
     negated_inners: &[Type<'arena>],
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> SealedResidual<'arena>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+) -> SealedResidual<'scratch, 'arena, S>
 where
     S: Arena,
     A: Arena,
@@ -52,7 +57,7 @@ where
         return SealedResidual::NotSealed;
     };
 
-    let mut visited: Vec<Name<'arena>> = Vec::with_capacity(8);
+    let mut visited: ScratchVec<'scratch, Name<'arena>, S> = builder.scratch_vec_with(8);
     visited.push(class_name);
 
     compute_residual_impl(head, negated_inners, inheritors, world, options, report, builder, &mut visited, 0)
@@ -69,17 +74,17 @@ where
 /// refines / overlaps consumers would loop forever asking the same
 /// question. Callers fall back to non-sealed reasoning.
 #[inline]
-fn compute_residual_impl<'arena, S, A, W>(
+fn compute_residual_impl<'scratch, 'arena, S, A, W>(
     head: Atom<'arena>,
     negated_inners: &[Type<'arena>],
     inheritors: &[Name<'arena>],
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-    visited: &mut Vec<Name<'arena>>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    visited: &mut ScratchVec<'scratch, Name<'arena>, S>,
     depth: usize,
-) -> SealedResidual<'arena>
+) -> SealedResidual<'scratch, 'arena, S>
 where
     S: Arena,
     A: Arena,
@@ -93,7 +98,7 @@ where
         return SealedResidual::NotSealed;
     };
 
-    let mut surviving: Vec<Atom<'arena>> = Vec::new();
+    let mut surviving: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
 
     for &inheritor in inheritors {
         if !inheritor_admits_head_arguments(*head_payload, inheritor, world, options, report, builder) {
@@ -224,7 +229,7 @@ where
     let type_arguments = if let Some(head_arguments) = head_payload.type_arguments
         && arity != 0
     {
-        let mut projected: Vec<Type<'arena>> = Vec::with_capacity(arity);
+        let mut projected = builder.scratch_vec_with(arity);
         for position in 0..arity {
             let argument = world
                 .inherited_template_argument(inheritor, head_payload.name, position)

@@ -78,6 +78,7 @@ where
     A: Arena,
 {
     arena: &'arena A,
+    scratch: &'scratch S,
     names: HashSet<'scratch, &'arena [u8], S>,
     int_ranges: HashSet<'scratch, &'arena IntRange, S>,
     strings: HashSet<'scratch, &'arena StringAtom<'arena>, S>,
@@ -154,6 +155,7 @@ where
     pub fn new(arena: &'arena A, scratch: &'scratch S) -> TypeBuilder<'scratch, 'arena, S, A> {
         let mut builder = TypeBuilder {
             arena,
+            scratch,
             names: HashSet::new_in(scratch),
             int_ranges: HashSet::new_in(scratch),
             strings: HashSet::new_in(scratch),
@@ -215,6 +217,49 @@ where
         for ty in well_known::types() {
             self.atom_slices.insert(ty.atoms);
         }
+    }
+
+    /// The scratch arena backing this builder's deduplication tables. It
+    /// resets per file, so it doubles as the temp-allocation arena for the
+    /// lattice operations: the returned reference is tied to `'scratch`, not
+    /// to `&self`, so a scratch-allocated [`Vec`](mago_allocator::vec::Vec)
+    /// coexists with later `&mut self` builder calls.
+    #[inline]
+    #[must_use]
+    pub fn scratch(&self) -> &'scratch S {
+        self.scratch
+    }
+
+    /// An empty growable buffer allocated on the scratch arena (never the
+    /// heap). Use for the lattice operations' temporary atom/type lists; it is
+    /// freed wholesale when the scratch arena resets.
+    #[inline]
+    #[must_use]
+    pub fn scratch_vec<T>(&self) -> mago_allocator::vec::Vec<'scratch, T, S> {
+        mago_allocator::vec::Vec::new_in(self.scratch)
+    }
+
+    /// Like [`scratch_vec`](Self::scratch_vec) but pre-sized to `capacity`, so
+    /// a temporary that never grows past its bound makes a single scratch
+    /// allocation and never leaks intermediate buffers into the bump arena.
+    #[inline]
+    #[must_use]
+    pub fn scratch_vec_with<T>(&self, capacity: usize) -> mago_allocator::vec::Vec<'scratch, T, S> {
+        mago_allocator::vec::Vec::with_capacity_in(capacity, self.scratch)
+    }
+
+    /// A scratch-arena buffer pre-filled with a copy of `values`. The
+    /// scratch-arena replacement for `slice.to_vec()` and `vec![..]` when the
+    /// elements are already in hand.
+    #[inline]
+    #[must_use]
+    pub fn scratch_vec_from_slice<T>(&self, values: &[T]) -> mago_allocator::vec::Vec<'scratch, T, S>
+    where
+        T: Copy,
+    {
+        let mut buffer = mago_allocator::vec::Vec::with_capacity_in(values.len(), self.scratch);
+        buffer.extend_from_slice(values);
+        buffer
     }
 
     /// Intern a name. Within one builder, equal byte sequences share one
@@ -354,12 +399,12 @@ where
 
         let (real_head, mut all_conjuncts) = match head {
             Atom::Intersected(existing) => {
-                let mut accumulated: Vec<Atom<'arena>> = existing.conjuncts.to_vec();
+                let mut accumulated = self.scratch_vec_from_slice(existing.conjuncts);
                 accumulated.extend_from_slice(conjuncts);
 
                 (*existing.head, accumulated)
             }
-            _ => (head, conjuncts.to_vec()),
+            _ => (head, self.scratch_vec_from_slice(conjuncts)),
         };
 
         all_conjuncts.retain(|conjunct| *conjunct != real_head);
@@ -464,7 +509,7 @@ where
     /// consing equivalent of [`CopyInto`](mago_allocator::copy::CopyInto).
     #[must_use]
     pub fn import(&mut self, ty: Type<'_>) -> Type<'arena> {
-        let mut imported: Vec<Atom<'arena>> = Vec::with_capacity(ty.atoms.len());
+        let mut imported = self.scratch_vec_with(ty.atoms.len());
         for atom in ty.atoms {
             imported.push(self.import_atom(*atom));
         }
@@ -532,7 +577,7 @@ where
             Atom::ObjectShape(payload) => {
                 let known_properties = match payload.known_properties {
                     Some(entries) => {
-                        let mut imported: Vec<KnownProperty<'arena>> = Vec::with_capacity(entries.len());
+                        let mut imported = self.scratch_vec_with(entries.len());
                         for entry in entries {
                             imported.push(KnownProperty {
                                 name: self.name(entry.name.as_bytes()),
@@ -559,7 +604,7 @@ where
                 let value_param = payload.value_param.map(|value_param| self.import(value_param));
                 let known_items = match payload.known_items {
                     Some(entries) => {
-                        let mut imported: Vec<KnownItem<'arena>> = Vec::with_capacity(entries.len());
+                        let mut imported = self.scratch_vec_with(entries.len());
                         for entry in entries {
                             imported.push(KnownItem {
                                 key: self.import_array_key(entry.key),
@@ -579,7 +624,7 @@ where
                 let element_type = self.import(payload.element_type);
                 let known_elements = match payload.known_elements {
                     Some(entries) => {
-                        let mut imported: Vec<KnownElement<'arena>> = Vec::with_capacity(entries.len());
+                        let mut imported = self.scratch_vec_with(entries.len());
                         for entry in entries {
                             imported.push(KnownElement {
                                 index: entry.index,
@@ -697,7 +742,7 @@ where
             }
             Atom::Intersected(payload) => {
                 let head = self.import_atom(*payload.head);
-                let mut conjuncts: Vec<Atom<'arena>> = Vec::with_capacity(payload.conjuncts.len());
+                let mut conjuncts = self.scratch_vec_with(payload.conjuncts.len());
                 for conjunct in payload.conjuncts {
                     conjuncts.push(self.import_atom(*conjunct));
                 }
@@ -708,7 +753,7 @@ where
     }
 
     fn import_types(&mut self, types: &[Type<'_>]) -> &'arena [Type<'arena>] {
-        let mut imported: Vec<Type<'arena>> = Vec::with_capacity(types.len());
+        let mut imported = self.scratch_vec_with(types.len());
         for ty in types {
             imported.push(self.import(*ty));
         }
@@ -729,7 +774,7 @@ where
     fn import_signature(&mut self, signature: &Signature<'_>) -> &'arena Signature<'arena> {
         let parameters = match signature.parameters {
             Some(parameters) => {
-                let mut imported: Vec<Parameter<'arena>> = Vec::with_capacity(parameters.len());
+                let mut imported = self.scratch_vec_with(parameters.len());
                 for parameter in parameters {
                     imported.push(Parameter {
                         name: self.name(parameter.name.as_bytes()),

@@ -43,6 +43,7 @@
 //! `Impossible`, never as a false `Redundant`/`Narrowed`.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
 use crate::ty::Type;
@@ -108,13 +109,13 @@ impl<'arena> MeetOutcome<'arena> {
 /// `Narrowed` and `Redundant` variants; `Impossible` corresponds to
 /// `result ≡ ⊥`.
 #[inline]
-pub fn narrow<'arena, S, A, W>(
+pub fn narrow<'scratch, 'arena, S, A, W>(
     input: Type<'arena>,
     narrowing: Type<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> MeetOutcome<'arena>
 where
     S: Arena,
@@ -125,7 +126,8 @@ where
         return MeetOutcome::Redundant(input);
     }
 
-    let mut atoms: Vec<Atom<'arena>> = Vec::with_capacity(input.atoms.len().saturating_mul(narrowing.atoms.len()));
+    let mut atoms: ScratchVec<'scratch, Atom<'arena>, S> =
+        builder.scratch_vec_with(input.atoms.len().saturating_mul(narrowing.atoms.len()));
 
     let any_negated = input.kinds.contains(AtomKind::Negated) || narrowing.kinds.contains(AtomKind::Negated);
     let any_mixed = input.kinds.contains(AtomKind::Mixed) || narrowing.kinds.contains(AtomKind::Mixed);
@@ -133,17 +135,15 @@ where
     for &input_atom in input.atoms {
         for &narrowing_atom in narrowing.atoms {
             if any_negated && (input_atom.kind() == AtomKind::Negated || narrowing_atom.kind() == AtomKind::Negated) {
-                atoms.extend(negated_atom_meet_multi(input_atom, narrowing_atom, world, options, report, builder));
+                negated_atom_meet_multi(input_atom, narrowing_atom, world, options, report, builder, &mut atoms);
                 continue;
             }
 
-            if let Some(pieces) = cross_dominator_meet(input_atom, narrowing_atom) {
-                atoms.extend(pieces);
+            if cross_dominator_meet(input_atom, narrowing_atom, &mut atoms) {
                 continue;
             }
 
-            if any_mixed && let Some(pieces) = narrowed_mixed_meet_multi(input_atom, narrowing_atom, world, builder) {
-                atoms.extend(pieces);
+            if any_mixed && narrowed_mixed_meet_multi(input_atom, narrowing_atom, world, builder, &mut atoms) {
                 continue;
             }
 
@@ -292,61 +292,74 @@ where
 /// Cross-dominator pair meet: `(ArrayKey, Numeric)` shares `int`
 /// and `numeric-string` but neither dominates, so subsumption
 /// can't fire. `(Scalar, *)` already collapses via subsumption.
+/// Pushes the shared constituents into `out` and returns `true` when
+/// the pair is a cross-dominator; returns `false` to fall through.
 #[inline]
-fn cross_dominator_meet<'arena>(a: Atom<'arena>, b: Atom<'arena>) -> Option<Vec<Atom<'arena>>> {
+fn cross_dominator_meet<'arena, S>(
+    a: Atom<'arena>,
+    b: Atom<'arena>,
+    out: &mut ScratchVec<'_, Atom<'arena>, S>,
+) -> bool
+where
+    S: Arena,
+{
     if matches!((a.kind(), b.kind()), (AtomKind::ArrayKey, AtomKind::Numeric) | (AtomKind::Numeric, AtomKind::ArrayKey))
     {
-        return Some(vec![well_known::INT, well_known::NUMERIC_STRING]);
+        out.push(well_known::INT);
+        out.push(well_known::NUMERIC_STRING);
+        return true;
     }
 
-    None
+    false
 }
 
 /// Multi-atom variant of [`negated_atom_meet`] used by [`narrow`]:
-/// returns every surviving atom (e.g. `meet(non-negative-int, !int(1))`
-/// yields `[int(0), int<2,∞>]`).
+/// pushes every surviving atom into `out` (e.g.
+/// `meet(non-negative-int, !int(1))` yields `[int(0), int<2,∞>]`).
 #[inline]
-fn negated_atom_meet_multi<'arena, S, A, W>(
+fn negated_atom_meet_multi<'scratch, 'arena, S, A, W>(
     a: Atom<'arena>,
     b: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Vec<Atom<'arena>>
-where
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
     if a.kind() == AtomKind::Negated && b.kind() == AtomKind::Negated {
-        return vec![negated_pair_meet(a, b, world, options, report, builder)];
+        let met = negated_pair_meet(a, b, world, options, report, builder);
+        out.push(met);
+        return;
     }
 
     let (positive, negated_inner) = match (a, b) {
         (Atom::Negated(inner), other) | (other, Atom::Negated(inner)) => (other, *inner),
-        _ => return Vec::new(),
+        _ => return,
     };
 
     let positive_type = builder.union_of(&[positive]);
     let surviving = crate::ty::subtract::compute(positive_type, negated_inner, world, options, report, builder);
     if surviving.is_never() {
-        return Vec::new();
+        return;
     }
 
-    surviving.atoms.to_vec()
+    out.extend_from_slice(surviving.atoms);
 }
 
 /// `meet(!T, !U) ≡ !(T ∪ U)`. When `T <: U` the union collapses
 /// to `U` and the result is `!U`; symmetric for `U <: T`.
 #[inline]
-fn negated_pair_meet<'arena, S, A, W>(
+fn negated_pair_meet<'scratch, 'arena, S, A, W>(
     a: Atom<'arena>,
     b: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Atom<'arena>
 where
     S: Arena,
@@ -365,7 +378,7 @@ where
         return a;
     }
 
-    let mut union_atoms: Vec<Atom<'arena>> = a_inner.atoms.to_vec();
+    let mut union_atoms: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_from_slice(a_inner.atoms);
     union_atoms.extend_from_slice(b_inner.atoms);
     let union_type = builder.union_of(&union_atoms);
 
@@ -418,13 +431,13 @@ where
 }
 
 #[inline]
-fn intersected_atom_meet<'arena, S, A, W>(
+fn intersected_atom_meet<'scratch, 'arena, S, A, W>(
     a: Atom<'arena>,
     b: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
@@ -434,7 +447,7 @@ where
     let result = match (a, b) {
         (Atom::Intersected(a_payload), Atom::Intersected(b_payload)) => {
             let head = atom_meet(*a_payload.head, *b_payload.head, world, options, report, builder)?;
-            let mut all_conjuncts: Vec<Atom<'arena>> = a_payload.conjuncts.to_vec();
+            let mut all_conjuncts: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_from_slice(a_payload.conjuncts);
             all_conjuncts.extend_from_slice(b_payload.conjuncts);
 
             builder.intersected(head, &all_conjuncts)
@@ -464,12 +477,12 @@ where
 /// After dropping redundancies, a sealed-cover single-survivor residual
 /// replaces the Intersected with the bare inheritor.
 #[inline]
-fn canonicalise_intersected<'arena, S, A, W>(
+fn canonicalise_intersected<'scratch, 'arena, S, A, W>(
     atom: Atom<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
@@ -483,8 +496,8 @@ where
     let head_is_object = payload.head.kind() == AtomKind::Object;
     let head_type = if head_is_object { Some(builder.union_of(&[*payload.head])) } else { None };
 
-    let mut kept: Vec<Atom<'arena>> = Vec::with_capacity(payload.conjuncts.len());
-    let mut negated_inners: Vec<Type<'arena>> = Vec::with_capacity(payload.conjuncts.len());
+    let mut kept: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(payload.conjuncts.len());
+    let mut negated_inners: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(payload.conjuncts.len());
     for &conjunct in payload.conjuncts {
         if let Atom::Negated(inner) = conjunct {
             if let Some(head) = head_type
@@ -509,7 +522,8 @@ where
             SealedResidual::Surviving(survivors) if survivors.len() == 1 => {
                 let survivor = survivors.first().copied()?;
                 let survivor_type = builder.union_of(&[survivor]);
-                let mut residual_conjuncts: Vec<Atom<'arena>> = Vec::with_capacity(kept.len());
+                let mut residual_conjuncts: ScratchVec<'scratch, Atom<'arena>, S> =
+                    builder.scratch_vec_with(kept.len());
                 for &conjunct in &kept {
                     let still_applies = match conjunct {
                         Atom::Negated(inner) => overlaps(survivor_type, *inner, world, options, report, builder),
@@ -546,35 +560,41 @@ where
 /// flag, expressed via the universal `Intersected` / `Negated`
 /// machinery and PHP truthiness semantics for each atom kind.
 #[inline]
-fn narrowed_mixed_meet<'arena, S, A, W>(
+fn narrowed_mixed_meet<'scratch, 'arena, S, A, W>(
     a: Atom<'arena>,
     b: Atom<'arena>,
     world: &W,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
     W: World<'arena>,
 {
-    let pieces = narrowed_mixed_meet_multi(a, b, world, builder)?;
+    let mut pieces: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
+    if !narrowed_mixed_meet_multi(a, b, world, builder, &mut pieces) {
+        return None;
+    }
+
     match pieces.as_slice() {
-        [] => None,
         [single] => Some(*single),
         _ => None,
     }
 }
 
-/// Multi-atom variant of [`narrowed_mixed_meet`]. Returns `None` when
-/// neither side is a `Mixed` atom. Returns `Some(vec![])` for the
-/// empty meet.
+/// Multi-atom variant of [`narrowed_mixed_meet`]. Pushes the surviving
+/// atoms into `out` and returns `true` when one side is a `Mixed` atom;
+/// returns `false` (pushing nothing) when neither side is `Mixed` so
+/// the caller falls through. A `true` with no pushed atoms is the empty
+/// meet.
 #[inline]
-fn narrowed_mixed_meet_multi<'arena, S, A, W>(
+fn narrowed_mixed_meet_multi<'scratch, 'arena, S, A, W>(
     a: Atom<'arena>,
     b: Atom<'arena>,
     world: &W,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> bool
 where
     S: Arena,
     A: Arena,
@@ -583,7 +603,7 @@ where
     if let (Atom::Mixed(a_payload), Atom::Mixed(b_payload)) = (a, b) {
         let merged_truthiness = match (a_payload.truthiness(), b_payload.truthiness()) {
             (Truthiness::Truthy, Truthiness::Falsy) | (Truthiness::Falsy, Truthiness::Truthy) => {
-                return Some(Vec::new());
+                return true;
             }
             (Truthiness::Truthy, _) | (_, Truthiness::Truthy) => Truthiness::Truthy,
             (Truthiness::Falsy, _) | (_, Truthiness::Falsy) => Truthiness::Falsy,
@@ -596,57 +616,61 @@ where
             .with_is_isset_from_loop(a_payload.is_isset_from_loop() || b_payload.is_isset_from_loop())
             .with_truthiness(merged_truthiness);
 
-        return Some(vec![Atom::Mixed(merged)]);
+        out.push(Atom::Mixed(merged));
+        return true;
     }
 
     let ((Atom::Mixed(mixed_payload), other) | (other, Atom::Mixed(mixed_payload))) = (a, b) else {
-        return None;
+        return false;
     };
 
     if mixed_payload == MixedAtom::EMPTY {
-        if is_uninhabited(other, world, builder) {
-            return Some(Vec::new());
+        if !is_uninhabited(other, world, builder) {
+            out.push(other);
         }
 
-        return Some(vec![other]);
+        return true;
     }
 
     if mixed_payload.is_non_null() && other == well_known::NULL {
-        return Some(Vec::new());
+        return true;
     }
 
-    let truthy_pieces = narrow_by_truthiness(other, mixed_payload.truthiness(), builder);
-    let with_non_null: Vec<Atom<'arena>> = if mixed_payload.is_non_null() {
+    let start = out.len();
+    narrow_by_truthiness(other, mixed_payload.truthiness(), builder, out);
+    if mixed_payload.is_non_null() {
         let negated_null = builder.negated(well_known::TYPE_NULL);
-        truthy_pieces.into_iter().map(|piece| builder.intersected(piece, &[negated_null])).collect()
-    } else {
-        truthy_pieces
-    };
+        for index in start..out.len() {
+            out[index] = builder.intersected(out[index], &[negated_null]);
+        }
+    }
 
-    Some(with_non_null)
+    true
 }
 
-/// Narrow `other` by PHP truthiness. `Vec::new()` when the kind is
-/// incompatible with the requested truthiness (e.g. `Object` is always
-/// truthy, so falsy narrowing yields the empty set). `vec![other]`
-/// when truthiness is undetermined.
+/// Narrow `other` by PHP truthiness, pushing the surviving atoms into
+/// `out`. Pushes nothing when the kind is incompatible with the
+/// requested truthiness (e.g. `Object` is always truthy, so falsy
+/// narrowing yields the empty set), and pushes `other` unchanged when
+/// truthiness is undetermined.
 #[inline]
-fn narrow_by_truthiness<'arena, S, A>(
+fn narrow_by_truthiness<'scratch, 'arena, S, A>(
     other: Atom<'arena>,
     truthiness: Truthiness,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Vec<Atom<'arena>>
-where
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) where
     S: Arena,
     A: Arena,
 {
     if matches!(truthiness, Truthiness::Undetermined) {
-        return vec![other];
+        out.push(other);
+        return;
     }
 
     match (other, truthiness) {
-        (Atom::Null | Atom::False, Truthiness::Truthy) => Vec::new(),
-        (Atom::True, Truthiness::Falsy) => Vec::new(),
+        (Atom::Null | Atom::False, Truthiness::Truthy) => {}
+        (Atom::True, Truthiness::Falsy) => {}
         (
             Atom::Object(_)
             | Atom::ObjectAny
@@ -658,37 +682,46 @@ where
             | Atom::Callable(_)
             | Atom::ClassLikeString(_),
             Truthiness::Falsy,
-        ) => Vec::new(),
-        (Atom::Bool, Truthiness::Truthy) => vec![well_known::TRUE],
-        (Atom::Bool, Truthiness::Falsy) => vec![well_known::FALSE],
+        ) => {}
+        (Atom::Bool, Truthiness::Truthy) => out.push(well_known::TRUE),
+        (Atom::Bool, Truthiness::Falsy) => out.push(well_known::FALSE),
         (Atom::Int(_), Truthiness::Truthy) => {
             let zero_type = builder.union_of(&[well_known::INT_ZERO]);
             let negated_zero = builder.negated(zero_type);
+            let intersected = builder.intersected(other, &[negated_zero]);
 
-            vec![builder.intersected(other, &[negated_zero])]
+            out.push(intersected);
         }
-        (Atom::Int(_), Truthiness::Falsy) => vec![well_known::INT_ZERO],
+        (Atom::Int(_), Truthiness::Falsy) => out.push(well_known::INT_ZERO),
         (Atom::Float(_), Truthiness::Truthy) => {
             let zero = Atom::float_literal(0.0);
             let zero_type = builder.union_of(&[zero]);
             let negated_zero = builder.negated(zero_type);
+            let intersected = builder.intersected(other, &[negated_zero]);
 
-            vec![builder.intersected(other, &[negated_zero])]
+            out.push(intersected);
         }
-        (Atom::Float(_), Truthiness::Falsy) => vec![Atom::float_literal(0.0)],
-        (Atom::String(payload), Truthiness::Truthy) => vec![narrow_string_truthy(payload, builder)],
-        (Atom::String(payload), Truthiness::Falsy) => narrow_string_falsy(payload, builder),
+        (Atom::Float(_), Truthiness::Falsy) => out.push(Atom::float_literal(0.0)),
+        (Atom::String(payload), Truthiness::Truthy) => {
+            let truthy = narrow_string_truthy(payload, builder);
+
+            out.push(truthy);
+        }
+        (Atom::String(payload), Truthiness::Falsy) => narrow_string_falsy(payload, builder, out),
         (Atom::List(_) | Atom::Array(_) | Atom::Iterable(_), Truthiness::Truthy) => {
-            vec![force_non_empty(other, builder)]
+            let non_empty = force_non_empty(other, builder);
+
+            out.push(non_empty);
         }
-        (Atom::List(_) | Atom::Array(_), Truthiness::Falsy) => match falsy_collection(other, builder) {
-            Some(empty) => vec![empty],
-            None => Vec::new(),
-        },
-        (Atom::Iterable(_), Truthiness::Falsy) => Vec::new(),
+        (Atom::List(_) | Atom::Array(_), Truthiness::Falsy) => {
+            if let Some(empty) = falsy_collection(other, builder) {
+                out.push(empty);
+            }
+        }
+        (Atom::Iterable(_), Truthiness::Falsy) => {}
         _ => match (crate::ty::lattice::family::mixed::truthiness_of(other), truthiness) {
-            (Truthiness::Truthy, Truthiness::Falsy) | (Truthiness::Falsy, Truthiness::Truthy) => Vec::new(),
-            _ => vec![other],
+            (Truthiness::Truthy, Truthiness::Falsy) | (Truthiness::Falsy, Truthiness::Truthy) => {}
+            _ => out.push(other),
         },
     }
 }
@@ -755,50 +788,62 @@ where
 }
 
 #[inline]
-fn narrow_string_falsy<'arena, S, A>(
+fn narrow_string_falsy<'scratch, 'arena, S, A>(
     payload: &'arena StringAtom<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Vec<Atom<'arena>>
-where
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) where
     S: Arena,
     A: Arena,
 {
     if let StringLiteral::Value(value) = payload.literal {
         let bytes = value.as_bytes();
-        return if bytes.is_empty() || bytes == b"0" { vec![Atom::String(payload)] } else { Vec::new() };
+        if bytes.is_empty() || bytes == b"0" {
+            out.push(Atom::String(payload));
+        }
+
+        return;
     }
 
     if payload.flags.contains(StringRefinementFlag::NonEmpty) && !zero_string_compatible(*payload) {
-        return Vec::new();
+        return;
     }
 
     if payload.flags.contains(StringRefinementFlag::Truthy) {
-        return Vec::new();
+        return;
     }
 
-    let mut pieces: Vec<Atom<'arena>> = Vec::new();
+    let numeric = payload.flags.contains(StringRefinementFlag::Numeric);
     if !payload.flags.contains(StringRefinementFlag::NonEmpty) {
-        pieces.push(builder.string_literal(b""));
+        let empty = builder.string_literal(b"");
+        if string_falsy_piece_retained(payload.casing, numeric, empty) {
+            out.push(empty);
+        }
     }
 
     if zero_string_compatible(*payload) {
-        pieces.push(builder.string_literal(b"0"));
+        let zero = builder.string_literal(b"0");
+        if string_falsy_piece_retained(payload.casing, numeric, zero) {
+            out.push(zero);
+        }
     }
+}
 
-    pieces.retain(|&piece| {
-        let Atom::String(piece_payload) = piece else {
-            return true;
-        };
-        let StringLiteral::Value(piece_value) = piece_payload.literal else {
-            return true;
-        };
+/// The retain predicate for [`narrow_string_falsy`]'s candidate pieces:
+/// keep a string literal only when its casing matches the source's
+/// casing refinement and, for a numeric-refined source, the literal
+/// parses as an integer. Non-string or non-literal pieces are kept.
+#[inline]
+fn string_falsy_piece_retained(casing: StringCasing, numeric: bool, piece: Atom<'_>) -> bool {
+    let Atom::String(piece_payload) = piece else {
+        return true;
+    };
+    let StringLiteral::Value(piece_value) = piece_payload.literal else {
+        return true;
+    };
 
-        casing_compatible(payload.casing, piece_value.as_bytes())
-            && (!payload.flags.contains(StringRefinementFlag::Numeric)
-                || core::str::from_utf8(piece_value.as_bytes()).is_ok_and(|text| text.parse::<i64>().is_ok()))
-    });
-
-    pieces
+    casing_compatible(casing, piece_value.as_bytes())
+        && (!numeric || core::str::from_utf8(piece_value.as_bytes()).is_ok_and(|text| text.parse::<i64>().is_ok()))
 }
 
 #[inline]

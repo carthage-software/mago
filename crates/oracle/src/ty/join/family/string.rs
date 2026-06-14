@@ -1,6 +1,7 @@
 //! String-family join: axis merging and literal-count collapse.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::name::Name;
 use crate::ty::atom::Atom;
@@ -27,17 +28,17 @@ use crate::ty::well_known::STRING;
 ///   literal absorbed).
 /// - `numeric_string | lit("abc")` → `numeric_string`, `lit("abc")`
 ///   (non-numeric literal stays separate).
-pub fn apply_string_axis_merge_in_order<'arena, S, A>(
+pub fn apply_string_axis_merge_in_order<'scratch, 'arena, S, A>(
     atoms: &[Atom<'arena>],
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Vec<Atom<'arena>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+) -> ScratchVec<'scratch, Atom<'arena>, S>
 where
     S: Arena,
     A: Arena,
 {
-    let mut other: Vec<Atom<'arena>> = Vec::with_capacity(atoms.len());
+    let mut other: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(atoms.len());
     let mut general: Option<StringAtom<'arena>> = None;
-    let mut literals: Vec<Name<'arena>> = Vec::new();
+    let mut literals: ScratchVec<'scratch, Name<'arena>, S> = builder.scratch_vec();
 
     for &atom in atoms {
         let Atom::String(payload) = atom else {
@@ -74,7 +75,7 @@ where
                     || new_payload.flags.contains(StringRefinementFlag::Numeric)
                     || new_payload.casing != StringCasing::Unspecified
                 {
-                    let mut kept_literals: Vec<Name<'arena>> = Vec::new();
+                    let mut kept_literals: ScratchVec<'scratch, Name<'arena>, S> = builder.scratch_vec();
                     for literal in &literals {
                         let value = literal.as_bytes();
                         if value.is_empty() {
@@ -135,8 +136,8 @@ where
         }
     }
 
-    let mut new_strings: Vec<Atom<'arena>> =
-        literals.into_iter().map(|literal| builder.string_literal(literal.as_bytes())).collect();
+    let mut new_strings: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(literals.len());
+    new_strings.extend(literals.into_iter().map(|literal| builder.string_literal(literal.as_bytes())));
     if let Some(payload) = general {
         new_strings.push(builder.string(payload));
     }
@@ -185,7 +186,10 @@ fn is_numeric_string(input: &[u8]) -> bool {
 
 /// Drop string literals and add the broad `string` form when the
 /// distinct-literal count exceeds `threshold`.
-pub fn apply_string_literal_collapse(atoms: &mut Vec<Atom<'_>>, threshold: u16) {
+pub fn apply_string_literal_collapse<S>(atoms: &mut ScratchVec<'_, Atom<'_>, S>, threshold: u16)
+where
+    S: Arena,
+{
     if atoms.contains(&STRING) {
         return;
     }

@@ -3,6 +3,7 @@
 use std::cmp::Ordering;
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::scalar::int::IntAtom;
@@ -12,15 +13,15 @@ use crate::ty::well_known::INT;
 /// Merge adjacent integer literals and bounded ranges into wider
 /// ranges. `Unspecified` and `UnspecifiedLiteral` are dominators /
 /// virtual forms and stay as-is.
-pub fn apply_merge_int_ranges<'arena, S, A>(
-    atoms: &mut Vec<Atom<'arena>>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+pub fn apply_merge_int_ranges<'scratch, 'arena, S, A>(
+    atoms: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) where
     S: Arena,
     A: Arena,
 {
-    let mut intervals: Vec<(Option<i64>, Option<i64>)> = Vec::new();
-    let mut other: Vec<Atom<'arena>> = Vec::with_capacity(atoms.len());
+    let mut intervals: ScratchVec<'scratch, (Option<i64>, Option<i64>), S> = builder.scratch_vec();
+    let mut other: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(atoms.len());
     for &atom in atoms.iter() {
         let Atom::Int(payload) = atom else {
             other.push(atom);
@@ -44,7 +45,7 @@ pub fn apply_merge_int_ranges<'arena, S, A>(
         (Some(left_lower), Some(right_lower)) => left_lower.cmp(&right_lower),
     });
 
-    let mut merged: Vec<(Option<i64>, Option<i64>)> = Vec::with_capacity(intervals.len());
+    let mut merged: ScratchVec<'scratch, (Option<i64>, Option<i64>), S> = builder.scratch_vec_with(intervals.len());
     for interval in intervals {
         if let Some(last) = merged.last_mut() {
             let adjacent = match (last.1, interval.0) {
@@ -65,7 +66,7 @@ pub fn apply_merge_int_ranges<'arena, S, A>(
         merged.push(interval);
     }
 
-    let mut new_atoms: Vec<Atom<'arena>> = other;
+    let mut new_atoms: ScratchVec<'scratch, Atom<'arena>, S> = other;
     for (lower, upper) in merged {
         let atom = match (lower, upper) {
             (None, None) => INT,
@@ -79,7 +80,10 @@ pub fn apply_merge_int_ranges<'arena, S, A>(
 
 /// Drop integer literals and add the broad `int` form when the
 /// distinct-literal count exceeds `threshold`.
-pub fn apply_int_literal_collapse(atoms: &mut Vec<Atom<'_>>, threshold: u16) {
+pub fn apply_int_literal_collapse<S>(atoms: &mut ScratchVec<'_, Atom<'_>, S>, threshold: u16)
+where
+    S: Arena,
+{
     if atoms.contains(&INT) {
         return;
     }

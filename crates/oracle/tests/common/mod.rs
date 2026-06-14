@@ -1103,7 +1103,7 @@ pub fn assert_atomic_not_subtype<'arena>(f: &mut Fixture<'_, 'arena>, input: Ato
 }
 
 pub fn combine_default<'arena>(f: &mut Fixture<'_, 'arena>, atoms: Vec<Atom<'arena>>) -> Vec<Atom<'arena>> {
-    join::compute(&atoms, &mut f.builder)
+    join::compute(&atoms, &mut f.builder).as_slice().to_vec()
 }
 
 pub fn combine_with_int_threshold<'arena>(
@@ -1113,7 +1113,7 @@ pub fn combine_with_int_threshold<'arena>(
 ) -> Vec<Atom<'arena>> {
     let options = JoinOptions::structural().with_int_literal_collapse_threshold(threshold);
 
-    join::compute_with(&atoms, &options, &mut f.builder)
+    join::compute_with(&atoms, &options, &mut f.builder).as_slice().to_vec()
 }
 
 pub fn combine_with_string_threshold<'arena>(
@@ -1123,7 +1123,7 @@ pub fn combine_with_string_threshold<'arena>(
 ) -> Vec<Atom<'arena>> {
     let options = JoinOptions::structural().with_string_literal_collapse_threshold(threshold);
 
-    join::compute_with(&atoms, &options, &mut f.builder)
+    join::compute_with(&atoms, &options, &mut f.builder).as_slice().to_vec()
 }
 
 pub fn combine_with_float_threshold<'arena>(
@@ -1133,7 +1133,7 @@ pub fn combine_with_float_threshold<'arena>(
 ) -> Vec<Atom<'arena>> {
     let options = JoinOptions::structural().with_float_literal_collapse_threshold(threshold);
 
-    join::compute_with(&atoms, &options, &mut f.builder)
+    join::compute_with(&atoms, &options, &mut f.builder).as_slice().to_vec()
 }
 
 pub fn combine_with_array_threshold<'arena>(
@@ -1143,13 +1143,13 @@ pub fn combine_with_array_threshold<'arena>(
 ) -> Vec<Atom<'arena>> {
     let options = JoinOptions::structural().with_array_shape_collapse_threshold(threshold);
 
-    join::compute_with(&atoms, &options, &mut f.builder)
+    join::compute_with(&atoms, &options, &mut f.builder).as_slice().to_vec()
 }
 
 pub fn combine_overwrite<'arena>(f: &mut Fixture<'_, 'arena>, atoms: Vec<Atom<'arena>>) -> Vec<Atom<'arena>> {
     let options = JoinOptions::default().with_overwrite_empty_array(true);
 
-    join::compute_with(&atoms, &options, &mut f.builder)
+    join::compute_with(&atoms, &options, &mut f.builder).as_slice().to_vec()
 }
 
 #[track_caller]

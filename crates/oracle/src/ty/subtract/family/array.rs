@@ -2,6 +2,7 @@
 //! narrowing via `Negated` intersection conjuncts.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
 use crate::ty::atom::Atom;
@@ -20,30 +21,30 @@ use crate::ty::well_known::TYPE_NEVER;
 /// ≡ ⊥`. When the parameters are equal and only the input allows empty,
 /// the non-empty values of the input are entirely covered by the
 /// removed side, so only the empty piece survives.
-pub(in crate::ty::subtract) fn array_minus<'arena, S, A>(
+pub(in crate::ty::subtract) fn array_minus<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> bool
 where
     S: Arena,
     A: Arena,
 {
     let (Atom::Array(input_payload), Atom::Array(removed_payload)) = (input, removed) else {
-        return None;
+        return false;
     };
 
     if input_payload.known_items.is_some() || removed_payload.known_items.is_some() {
-        return None;
+        return false;
     }
 
     let input_allows_empty = !input_payload.flags.contains(ArrayFlag::NonEmpty);
     let removed_allows_empty = !removed_payload.flags.contains(ArrayFlag::NonEmpty);
 
-    let mut pieces: Vec<Atom<'arena>> = Vec::new();
-
     if input_allows_empty && !removed_allows_empty {
-        pieces.push(empty_array(builder));
+        let empty = empty_array(builder);
+        out.push(empty);
     }
 
     let non_empty_residue = ArrayAtom { flags: input_payload.flags.with(ArrayFlag::NonEmpty), ..*input_payload };
@@ -52,12 +53,14 @@ where
         let removed_type = builder.union_of(&[removed]);
         let negated = builder.negated(removed_type);
         let head = builder.array(non_empty_residue);
-        pieces.push(builder.intersected(head, &[negated]));
+        let intersected = builder.intersected(head, &[negated]);
+        out.push(intersected);
     } else if input_allows_empty == removed_allows_empty {
-        pieces.push(builder.array(non_empty_residue));
+        let residue = builder.array(non_empty_residue);
+        out.push(residue);
     }
 
-    Some(pieces)
+    true
 }
 
 #[inline]
@@ -76,25 +79,28 @@ where
 
 /// `array<K, V> \ iterable<K2, V2>`: symmetric to
 /// [`crate::ty::subtract::family::list::list_minus_iterable`].
-pub(in crate::ty::subtract) fn array_minus_iterable<'arena, S, A>(
+pub(in crate::ty::subtract) fn array_minus_iterable<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> bool
 where
     S: Arena,
     A: Arena,
 {
     let Atom::Array(input_payload) = input else {
-        return None;
+        return false;
     };
 
     if input_payload.known_items.is_some() {
-        return None;
+        return false;
     }
 
     let head = builder.array(ArrayAtom { flags: input_payload.flags.with(ArrayFlag::NonEmpty), ..*input_payload });
     let removed_type = builder.union_of(&[removed]);
     let negated = builder.negated(removed_type);
-    Some(vec![builder.intersected(head, &[negated])])
+    let intersected = builder.intersected(head, &[negated]);
+    out.push(intersected);
+    true
 }

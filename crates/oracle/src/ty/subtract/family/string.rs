@@ -1,6 +1,7 @@
 //! `String \ String` axis-narrowing rules.
 
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::scalar::string::StringCasing;
@@ -23,24 +24,25 @@ use crate::ty::builder::TypeBuilder;
 ///   strings - any string that doesn't parse as a number, plus the
 ///   empty string (numeric requires non-empty in PHP) - via a
 ///   `Negated` conjunct.
-pub(in crate::ty::subtract) fn string_minus<'arena, S, A>(
+pub(in crate::ty::subtract) fn string_minus<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    builder: &mut TypeBuilder<'_, 'arena, S, A>,
-) -> Option<Vec<Atom<'arena>>>
+    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
+) -> bool
 where
     S: Arena,
     A: Arena,
 {
     let (Atom::String(input_payload), Atom::String(removed_payload)) = (input, removed) else {
-        return None;
+        return false;
     };
 
     if let StringLiteral::Value(input_value) = input_payload.literal
         && let StringLiteral::Value(removed_value) = removed_payload.literal
         && input_value == removed_value
     {
-        return Some(Vec::new());
+        return true;
     }
 
     let input_is_general = matches!(input_payload.literal, StringLiteral::None | StringLiteral::Unspecified)
@@ -51,14 +53,18 @@ where
     let removed_requires_non_empty = removed_payload.flags.contains(StringRefinementFlag::NonEmpty)
         || removed_payload.flags.contains(StringRefinementFlag::Truthy);
     if input_is_general && removed_is_broad && removed_requires_non_empty {
-        return Some(vec![builder.string_literal(b"")]);
+        let empty = builder.string_literal(b"");
+        out.push(empty);
+        return true;
     }
 
     if input_is_general && removed_is_broad && removed_payload.flags.contains(StringRefinementFlag::Numeric) {
         let removed_type = builder.union_of(&[removed]);
         let negated = builder.negated(removed_type);
-        return Some(vec![builder.intersected(input, &[negated])]);
+        let intersected = builder.intersected(input, &[negated]);
+        out.push(intersected);
+        return true;
     }
 
-    None
+    false
 }
