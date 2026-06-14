@@ -183,6 +183,7 @@ mago-collector = { path = "crates/collector", version = "1.30.0" }
 mago-database = { path = "crates/database", version = "1.30.0" }
 mago-guard = { path = "crates/guard", version = "1.30.0" }
 mago-orchestrator = { path = "crates/orchestrator", version = "1.30.0" }
+mago-server = { path = "crates/server", version = "1.30.0" }
 tracing = { version = "0.1.40" }
 foldhash = "0.2"
 serde_json = { version = "1.0.138" }
@@ -241,10 +242,13 @@ notify = "8.2"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 serde-sarif = "0.8"
 schemars = { version = "1.1", features = ["preserve_order"] }
+simdutf8 = { version = "0.1.5" }
 anyhow = "1"
 pulldown-cmark = "0.13"
 tera = "1.20"
 temp-env = "0.3.6"
+tower-lsp-server = { version = "0.23.0" }
+tokio = { version = "1", features = ["rt-multi-thread", "io-std"] }
 
 [dependencies]
 mago-allocator = { workspace = true }
@@ -266,6 +270,9 @@ mago-algebra = { workspace = true }
 mago-codex = { workspace = true }
 mago-guard = { workspace = true, features = ["serde"] }
 mago-orchestrator = { workspace = true }
+mago-server = { workspace = true }
+mago-semantics = { workspace = true }
+mago-span = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }
@@ -293,6 +300,11 @@ unicode-width = { workspace = true }
 notify = { workspace = true }
 dhat = { workspace = true, optional = true }
 schemars = { workspace = true }
+foldhash = { workspace = true }
+xxhash-rust = { workspace = true }
+memchr = { workspace = true }
+tokio = { workspace = true }
+tower-lsp-server = { workspace = true }
 
 [[test]]
 name = "suite"
@@ -304,6 +316,7 @@ serde = { workspace = true }
 temp-env = { workspace = true }
 pretty_assertions = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-std", "io-util", "time"] }
 
 [build-dependencies]
 mago-prelude = { workspace = true, features = ["build"] }
