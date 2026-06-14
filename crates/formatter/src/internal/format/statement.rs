@@ -43,6 +43,7 @@ use crate::internal::format::alignment::get_statement_alignment;
 use crate::internal::format::alignment::has_comment_between;
 use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::misc::has_new_line_in_range;
+use crate::settings::SortOrder;
 
 pub fn print_statement_sequence<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
@@ -583,7 +584,26 @@ where
         bytes.leak()
     }
 
-    let should_sort = f.settings.sort_uses;
+    fn compare_case_insensitive_bytes(a: &[u8], b: &[u8]) -> Ordering {
+        let mut a_iter = a.iter().map(u8::to_ascii_lowercase);
+        let mut b_iter = b.iter().map(u8::to_ascii_lowercase);
+
+        loop {
+            match (a_iter.next(), b_iter.next()) {
+                (Some(ac), Some(bc)) => {
+                    let ord = ac.cmp(&bc);
+                    if ord != Ordering::Equal {
+                        return ord;
+                    }
+                }
+                (Some(_), None) => return Ordering::Greater,
+                (None, Some(_)) => return Ordering::Less,
+                (None, None) => return Ordering::Equal,
+            }
+        }
+    }
+
+    let sort_uses = *f.settings.sort_uses;
     let should_separate = f.settings.separate_use_types;
     let should_expand = f.settings.expand_use_groups;
 
@@ -592,7 +612,7 @@ where
         all_expanded_items.extend(expand_use(f, use_stmt, should_expand));
     }
 
-    if should_sort {
+    if sort_uses != SortOrder::Preserve {
         all_expanded_items.sort_by(|a, b| {
             let a_type_order = match a.use_type {
                 None => 0,
@@ -623,19 +643,18 @@ where
             let a_full_name = join_item_name(f.arena, a.namespace, a.name);
             let b_full_name = join_item_name(f.arena, b.namespace, b.name);
 
-            let mut a_iter = a_full_name.iter().map(u8::to_ascii_lowercase);
-            let mut b_iter = b_full_name.iter().map(u8::to_ascii_lowercase);
-
-            loop {
-                match (a_iter.next(), b_iter.next()) {
-                    (Some(ac), Some(bc)) => match ac.cmp(&bc) {
-                        Ordering::Equal => {}
-                        other => return other,
-                    },
-                    (None, Some(_)) => return Ordering::Less,
-                    (Some(_), None) => return Ordering::Greater,
-                    (None, None) => return Ordering::Equal,
-                }
+            match sort_uses {
+                SortOrder::AlphanumericAscending => compare_case_insensitive_bytes(a_full_name, b_full_name),
+                SortOrder::AlphanumericDescending => compare_case_insensitive_bytes(b_full_name, a_full_name),
+                SortOrder::LengthAscending => a_full_name
+                    .len()
+                    .cmp(&b_full_name.len())
+                    .then_with(|| compare_case_insensitive_bytes(a_full_name, b_full_name)),
+                SortOrder::LengthDescending => b_full_name
+                    .len()
+                    .cmp(&a_full_name.len())
+                    .then_with(|| compare_case_insensitive_bytes(a_full_name, b_full_name)),
+                _ => unreachable!(),
             }
         });
     }

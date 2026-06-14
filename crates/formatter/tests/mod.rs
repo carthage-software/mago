@@ -12,6 +12,7 @@ use mago_formatter::settings::FormatSettings;
 use mago_formatter::settings::MethodChainBreakingStyle;
 use mago_formatter::settings::NullTypeHint;
 use mago_formatter::settings::SortOrder;
+use mago_formatter::settings::SortUses;
 use mago_php_version::PHPVersion;
 
 #[macro_export]
@@ -105,6 +106,9 @@ test_case!(use_sorting_with_expansion);
 test_case!(use_sorting_with_grouping);
 test_case!(use_sorting_with_grouping_and_separation);
 test_case!(use_sorting_separation_expansion);
+test_case!(use_sorting_by_length);
+test_case!(use_sorting_by_length_with_expansion);
+test_case!(use_sorting_by_length_with_grouping);
 test_case!(use_no_change);
 test_case!(use_mixed_use_list);
 test_case!(use_mixed_use_list_expanded);

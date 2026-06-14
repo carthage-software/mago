@@ -529,7 +529,7 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, UseItemSequence, {
-            if f.settings.sort_uses {
+            if *f.settings.sort_uses != SortOrder::Preserve {
                 Document::Group(Group::new(vec_in![f.arena;
                     Document::Indent(Document::join(
                         f.arena,
@@ -567,7 +567,7 @@ where
             ];
 
             if !self.items.is_empty() {
-                let mut items: Vec<'arena, _, A> = if f.settings.sort_uses {
+                let mut items: Vec<'arena, _, A> = if *f.settings.sort_uses != SortOrder::Preserve {
                     Document::join(
                         f.arena,
                         statement::sort_use_items(self.items.iter()).into_iter().map(|i| i.format(f)),
@@ -605,7 +605,7 @@ where
                 vec_in![f.arena; self.namespace.format(f), Document::String(b"\\"), Document::String(b"{")];
 
             if !self.items.is_empty() {
-                let mut items = if f.settings.sort_uses {
+                let mut items = if *f.settings.sort_uses != SortOrder::Preserve {
                     Document::join(
                         f.arena,
                         statement::sort_maybe_typed_use_items(self.items.iter()).into_iter().map(|i| i.format(f)),
@@ -658,7 +658,7 @@ where
             Document::Group(Group::new(vec_in![f.arena;
                 self.r#type.format(f),
                 Document::space(),
-                if f.settings.sort_uses {
+                if *f.settings.sort_uses != SortOrder::Preserve {
                     Document::Indent(Document::join(
                         f.arena,
                         statement::sort_use_items(self.items.iter()).into_iter().map(|i| i.format(f)),

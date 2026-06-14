@@ -174,7 +174,7 @@ public function bar(
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `sort-uses` | boolean | `true` | Sort `use` statements alphabetically. |
+| `sort-uses` | enum | `"alpha-ascending"` | Control how `use` statements are sorted. Values: `preserve` (aliases `as-is`, `none`, `keep`, `false`), `alphanumeric-ascending` (aliases `alpha-ascending`, `ascending`, `true`), `alphanumeric-descending` (aliases `alpha-descending`, `descending`), `length-ascending`, `length-descending`. Length modes count codepoints in the source spelling of the use statement; ties fall back to ascending alphanumeric for stable output. |
 | `sort-class-methods` | boolean | `false` | Order class methods by visibility and type: constructor first, then static methods, then instance methods by visibility, destructor last. |
 | `separate-use-types` | boolean | `true` | Insert a blank line between different kinds of `use`. |
 | `expand-use-groups` | boolean | `true` | Expand grouped `use` statements into individual ones. |
