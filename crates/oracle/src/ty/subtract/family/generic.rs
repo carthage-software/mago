@@ -4,12 +4,12 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
-use crate::ty::Type;
 use crate::world::World;
 
 /// `(T of X) \ Y`: narrow `T`'s constraint by removing `Y` from its

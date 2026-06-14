@@ -74,7 +74,14 @@ where
         let mut uninhabited = false;
         for (position, element) in input_elements.iter().enumerate() {
             let value = if position < first_out {
-                crate::ty::meet::compute(element.value, removed_elements[position].value, world, options, report, builder)
+                crate::ty::meet::compute(
+                    element.value,
+                    removed_elements[position].value,
+                    world,
+                    options,
+                    report,
+                    builder,
+                )
             } else if position == first_out {
                 crate::ty::subtract::compute(
                     element.value,

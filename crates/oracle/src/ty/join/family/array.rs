@@ -161,11 +161,11 @@ pub fn apply_rewrite_int_keyed_to_list<'scratch, 'arena, S, A>(
         }
 
         let mut known_elements: ScratchVec<'scratch, KnownElement<'arena>, S> = builder.scratch_vec_with(indexed.len());
-        known_elements.extend(
-            indexed
-                .iter()
-                .map(|(key, entry)| KnownElement { index: *key as u32, value: entry.value, optional: entry.optional }),
-        );
+        known_elements.extend(indexed.iter().map(|(key, entry)| KnownElement {
+            index: *key as u32,
+            value: entry.value,
+            optional: entry.optional,
+        }));
         let known_count = NonZeroU32::new(known_elements.len() as u32);
         let known_elements = builder.known_elements(&known_elements);
         let mut flags = U8Flags::empty();

@@ -57,7 +57,8 @@ where
         _ => return None,
     };
 
-    let new_constraint = crate::ty::meet::compute(template.constraint, other_constraint, world, options, report, builder);
+    let new_constraint =
+        crate::ty::meet::compute(template.constraint, other_constraint, world, options, report, builder);
     if new_constraint.is_never() {
         return None;
     }
