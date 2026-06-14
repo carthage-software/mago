@@ -53,7 +53,9 @@ fn overwrite_empty_array_off_keeps_both() {
         let string = f.u(f.t_string());
         let int = f.u(f.t_int());
         let other = t_array_with_params(f, string, int);
-        let out = join::compute_with(&[f.t_empty_array(), other], &JoinOptions::structural(), &mut f.builder).as_slice().to_vec();
+        let out = join::compute_with(&[f.t_empty_array(), other], &JoinOptions::structural(), &mut f.builder)
+            .as_slice()
+            .to_vec();
         let mut sorted = out;
         sorted.sort_unstable();
         let mut expected = vec![f.t_empty_array(), other];
@@ -94,7 +96,9 @@ fn merge_int_ranges_collapses_consecutive_literals() {
             &[f.t_lit_int(0), f.t_lit_int(1), f.t_lit_int(2), f.t_lit_int(3)],
             &options,
             &mut f.builder,
-        ).as_slice().to_vec();
+        )
+        .as_slice()
+        .to_vec();
         assert_eq!(out, vec![f.t_int_range(0, 3)]);
     });
 }
@@ -103,7 +107,9 @@ fn merge_int_ranges_collapses_consecutive_literals() {
 fn merge_int_ranges_with_gap_keeps_separate() {
     fixture(|f| {
         let options = JoinOptions::structural().with_merge_int_ranges(true);
-        let out = join::compute_with(&[f.t_lit_int(0), f.t_lit_int(1), f.t_lit_int(5)], &options, &mut f.builder).as_slice().to_vec();
+        let out = join::compute_with(&[f.t_lit_int(0), f.t_lit_int(1), f.t_lit_int(5)], &options, &mut f.builder)
+            .as_slice()
+            .to_vec();
         let mut sorted = out;
         sorted.sort_unstable();
         let mut expected = vec![f.t_int_range(0, 1), f.t_lit_int(5)];
@@ -126,7 +132,9 @@ fn merge_int_ranges_combines_overlapping_ranges() {
 #[test]
 fn merge_int_ranges_off_keeps_separate() {
     fixture(|f| {
-        let out = join::compute_with(&[f.t_lit_int(0), f.t_lit_int(1)], &JoinOptions::structural(), &mut f.builder).as_slice().to_vec();
+        let out = join::compute_with(&[f.t_lit_int(0), f.t_lit_int(1)], &JoinOptions::structural(), &mut f.builder)
+            .as_slice()
+            .to_vec();
         let mut sorted = out;
         sorted.sort_unstable();
         let mut expected = vec![f.t_lit_int(0), f.t_lit_int(1)];
