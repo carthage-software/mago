@@ -7796,9 +7796,9 @@
           "default": false
         },
         "sort-uses": {
-          "description": "Whether to sort use statements alphabetically.\n\nDefault: true",
-          "type": "boolean",
-          "default": true
+          "description": "Controls how `use` statements are sorted.\n\nWith `alpha-ascending` (or `alphanumeric-ascending` or `true`):\n```php\nuse App\\Services;\nuse App\\Utils;\n```\n\nWith `length-ascending`:\n```php\nuse App\\Utils;\nuse App\\Services;\n```\n\nOther options include:\n* `alpha-descending` or `alphanumeric-descending`\n* `length-descending`\n* `preserve` or `false`\n\nDefault: `alpha-ascending`",
+          "$ref": "#/$defs/SortUsesWire",
+          "default": "alphanumeric-ascending"
         },
         "sort-class-methods": {
           "description": "Whether to sort class methods by visibility and name.\n\nWhen enabled, methods in class-like structures are automatically reordered:\n1. Constructor (`__construct`) - always first\n2. Static methods (by visibility: public, protected, private)\n   - Abstract methods before concrete methods\n   - Alphabetically by name within each group\n3. Instance methods (by visibility: public, protected, private)\n   - Abstract methods before concrete methods\n   - Alphabetically by name within each group\n4. Other magic methods (e.g., `__toString`, `__get`, `__set`)\n   - Sorted alphabetically by name\n5. Destructor (`__destruct`) - always last\n\nThis applies to all class-like structures: classes, traits, interfaces, and enums.\nOther members (constants, properties, trait uses, enum cases) remain in their original positions.\n\nDefault: false",
@@ -8086,13 +8086,14 @@
         "next_line"
       ]
     },
-    "NullTypeHint": {
-      "description": "Specifies null type hint style.",
-      "type": "string",
-      "enum": [
-        "null_pipe",
-        "null_pipe_last",
-        "question"
+    "SortUsesWire": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/SortOrder"
+        }
       ]
     },
     "SortOrder": {
@@ -8103,6 +8104,15 @@
         "alphanumeric-descending",
         "length-ascending",
         "length-descending"
+      ]
+    },
+    "NullTypeHint": {
+      "description": "Specifies null type hint style.",
+      "type": "string",
+      "enum": [
+        "null_pipe",
+        "null_pipe_last",
+        "question"
       ]
     },
     "FormatterPreset": {
