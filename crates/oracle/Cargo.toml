@@ -20,6 +20,7 @@ serde = ["dep:serde", "ordered-float/serde", "mago-flags/serde", "mago-span/serd
 mago-allocator = { workspace = true }
 mago-flags = { workspace = true }
 mago-span = { workspace = true }
+mago-hir = { workspace = true }
 ordered-float = { workspace = true }
 serde = { workspace = true, optional = true }
 
