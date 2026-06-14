@@ -13,11 +13,11 @@
 
 use mago_allocator::Arena;
 
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::transform;
-use crate::ty::Type;
 
 /// Apply a substitution closure to every free template parameter in
 /// `ty`.

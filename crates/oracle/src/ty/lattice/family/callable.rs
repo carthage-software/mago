@@ -26,6 +26,7 @@
 
 use mago_allocator::Arena;
 
+use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::callable::CallableAtom;
 use crate::ty::atom::payload::callable::Parameter;
@@ -37,7 +38,6 @@ use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::lattice::refines as type_refines;
-use crate::ty::Type;
 use crate::world::World;
 
 #[inline]

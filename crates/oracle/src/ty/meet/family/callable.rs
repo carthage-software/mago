@@ -56,7 +56,8 @@ where
     let mut merged_parameters: ScratchVec<'scratch, Parameter<'arena>, S> =
         builder.scratch_vec_with(a_parameters.len());
     for (a_parameter, b_parameter) in a_parameters.iter().zip(b_parameters.iter()) {
-        let mut combined: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_from_slice(a_parameter.r#type.atoms);
+        let mut combined: ScratchVec<'scratch, Atom<'arena>, S> =
+            builder.scratch_vec_from_slice(a_parameter.r#type.atoms);
         combined.extend_from_slice(b_parameter.r#type.atoms);
         let widened = crate::ty::join::compute(&combined, builder);
         let r#type = builder.union_of(&widened);

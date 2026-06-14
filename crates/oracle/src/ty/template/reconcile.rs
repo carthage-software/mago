@@ -30,11 +30,11 @@
 
 use mago_allocator::Arena;
 
+use crate::ty::Type;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::template::Bound;
 use crate::ty::template::TemplateKey;
 use crate::ty::template::standin::TemplateState;
-use crate::ty::Type;
 
 /// Run depth-based selection on a list of bounds and return the
 /// unioned witness type. Returns `None` when the bound list is

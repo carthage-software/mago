@@ -24,12 +24,12 @@ use std::collections::BTreeSet;
 
 use mago_allocator::Arena;
 
+use crate::name::Name;
+use crate::ty::Type;
 use crate::ty::atom::payload::generic_parameter::DefiningEntity;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use crate::ty::builder::TypeBuilder;
-use crate::name::Name;
 use crate::ty::template::substitute;
-use crate::ty::Type;
 use crate::world::World;
 
 /// Builder collecting direct parent edges before transitive composition.

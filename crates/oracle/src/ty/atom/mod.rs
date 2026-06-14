@@ -9,6 +9,7 @@ use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 use mago_allocator::copy::copy_ref_into;
 
+use crate::ty::Type;
 use crate::ty::atom::kind::AtomKind;
 use crate::ty::atom::payload::alias::AliasAtom;
 use crate::ty::atom::payload::array::ArrayAtom;
@@ -35,7 +36,6 @@ use crate::ty::atom::payload::scalar::int::IntAtom;
 use crate::ty::atom::payload::scalar::mixed::MixedAtom;
 use crate::ty::atom::payload::scalar::string::StringAtom;
 use crate::ty::atom::payload::variable::VariableAtom;
-use crate::ty::Type;
 
 pub mod kind;
 pub mod payload;
