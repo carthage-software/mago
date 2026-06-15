@@ -48,15 +48,13 @@ function preg_match(string $pattern, string $subject, &$matches = [], int $flags
 
 /**
  * @param-out list<array<string>> $matches
- *
- * @pure
  */
-function preg_match_all(string $pattern, string $subject, &$matches, int $flags = 0, int $offset = 0): int|false {}
+function preg_match_all(string $pattern, string $subject, &$matches = null, int $flags = 0, int $offset = 0): int|false {}
 
 /**
  * @param string|array<string> $pattern
- * @param string|array<string> $replacement <p>
- * @param string|array<string> $subject <p>
+ * @param string|array<string> $replacement
+ * @param string|array<string> $subject
  *
  * @param-out int $count
  *
@@ -91,12 +89,12 @@ function preg_replace_callback(
 ): array|string|null {}
 
 /**
- * @param array<(callable(array<string>): string)> $pattern
+ * @param array<string, (callable(array<string>): string)> $pattern
  * @param string|array<string> $subject
  *
  * @param-out int $count
  *
- * @return ($subject is string ? string|false : array<string>|false)
+ * @return ($subject is string ? string|null : array<string>|null)
  */
 function preg_replace_callback_array(
     array $pattern,
