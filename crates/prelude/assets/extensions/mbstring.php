@@ -54,7 +54,7 @@ function mb_internal_encoding(?string $encoding = null): string|bool {}
  *
  * @return ($type is 'G'|'P'|'C'|'S'|'L'|null ? string|false : list<string>|false)
  */
-function mb_http_input(?string $type): array|string|false {}
+function mb_http_input(?string $type = null): array|string|false {}
 
 /**
  * @return ($encoding is null ? string : bool)
@@ -261,7 +261,7 @@ function mb_convert_variables(
 ): string|false {}
 
 /**
- * @param int[] $map <p>
+ * @param int[] $map
  *
  * @pure
  */
@@ -279,7 +279,7 @@ function mb_send_mail(
     string $subject,
     string $message,
     array|string $additional_headers = [],
-    ?string $additional_params,
+    ?string $additional_params = null,
 ): bool {}
 
 /**
@@ -317,12 +317,12 @@ function mb_regex_set_options(?string $options): string {}
 /**
  * @param string[] &$matches
  */
-function mb_ereg(string $pattern, string $string, &$matches): bool {}
+function mb_ereg(string $pattern, string $string, &$matches = null): bool {}
 
 /**
  * @param string[] &$matches
  */
-function mb_eregi(string $pattern, string $string, &$matches): bool {}
+function mb_eregi(string $pattern, string $string, &$matches = null): bool {}
 
 /**
  * @pure
@@ -360,28 +360,28 @@ function mb_split(string $pattern, string $string, int $limit = -1): array|false
 /**
  * @pure
  */
-function mb_ereg_match(string $pattern, string $string, ?string $options): bool {}
+function mb_ereg_match(string $pattern, string $string, ?string $options = null): bool {}
 
 /**
  * @pure
  */
-function mb_ereg_search(?string $pattern, ?string $options): bool {}
+function mb_ereg_search(?string $pattern = null, ?string $options = null): bool {}
 
 /**
  * @return list<int>|false
  *
  * @pure
  */
-function mb_ereg_search_pos(?string $pattern, ?string $options): array|false {}
+function mb_ereg_search_pos(?string $pattern = null, ?string $options = null): array|false {}
 
 /**
  * @return list<string>|false
  *
  * @pure
  */
-function mb_ereg_search_regs(?string $pattern, ?string $options): array|false {}
+function mb_ereg_search_regs(?string $pattern = null, ?string $options = null): array|false {}
 
-function mb_ereg_search_init(string $string, ?string $pattern, ?string $options): bool {}
+function mb_ereg_search_init(string $string, ?string $pattern = null, ?string $options = null): bool {}
 
 /**
  * @return list<string>|false
@@ -406,7 +406,7 @@ function mb_ereg_search_setpos(int $offset): bool {}
 function mb_chr(int $codepoint, ?string $encoding = null): string|false {}
 
 /**
- * @return int<0, max>
+ * @return int<0, max>|false
  *
  * @pure
  */
