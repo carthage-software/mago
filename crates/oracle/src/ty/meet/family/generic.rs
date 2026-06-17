@@ -83,5 +83,5 @@ where
         return false;
     };
 
-    world.template_parameter_forwards_to(from_class, from.name, to_class, to.name)
+    world.template_parameter_forwards_to(from_class.id, from.name, to_class.id, to.name)
 }

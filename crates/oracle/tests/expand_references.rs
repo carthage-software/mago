@@ -34,7 +34,7 @@ fn t_reference_intersected<'arena>(
 
 fn t_member_ref<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, member: &str) -> Atom<'arena> {
     let class_like_name = f.name(class);
-    let member = f.name(member);
+    let member = f.builder.intern(member.as_bytes());
     f.builder.member_reference(MemberReferenceAtom { class_like_name, selector: NameSelector::Identifier(member) })
 }
 
@@ -45,24 +45,24 @@ fn t_member_ref_wildcard<'arena>(f: &mut Fixture<'_, 'arena>, class: &str) -> At
 
 fn t_member_ref_prefix<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, prefix: &str) -> Atom<'arena> {
     let class_like_name = f.name(class);
-    let prefix = f.name(prefix);
+    let prefix = f.builder.intern(prefix.as_bytes());
     f.builder.member_reference(MemberReferenceAtom { class_like_name, selector: NameSelector::StartsWith(prefix) })
 }
 
 fn t_member_ref_suffix<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, suffix: &str) -> Atom<'arena> {
     let class_like_name = f.name(class);
-    let suffix = f.name(suffix);
+    let suffix = f.builder.intern(suffix.as_bytes());
     f.builder.member_reference(MemberReferenceAtom { class_like_name, selector: NameSelector::EndsWith(suffix) })
 }
 
 fn t_member_ref_contains<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, needle: &str) -> Atom<'arena> {
     let class_like_name = f.name(class);
-    let needle = f.name(needle);
+    let needle = f.builder.intern(needle.as_bytes());
     f.builder.member_reference(MemberReferenceAtom { class_like_name, selector: NameSelector::Contains(needle) })
 }
 
 fn t_global_ref<'arena>(f: &mut Fixture<'_, 'arena>, name: &str) -> Atom<'arena> {
-    let name = f.name(name);
+    let name = f.builder.intern(name.as_bytes());
     f.builder.global_reference(GlobalReferenceAtom { selector: NameSelector::Identifier(name) })
 }
 
@@ -126,7 +126,7 @@ fn intersected_reference_resolves_to_intersected_object() {
 fn member_reference_resolves_to_constant_type() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Status", "ACTIVE", well_known::TYPE_INT);
+        world.with_class_constant(&mut f.builder, "Status", "ACTIVE", well_known::TYPE_INT);
         let reference = t_member_ref(f, "Status", "ACTIVE");
         let ty = f.u(reference);
         let result = expand::expand(ty, &world, &mut f.builder);
@@ -148,7 +148,7 @@ fn unknown_member_reference_passes_through() {
 fn member_reference_inherits_from_ancestor() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Base", "ID", well_known::TYPE_STRING);
+        world.with_class_constant(&mut f.builder, "Base", "ID", well_known::TYPE_STRING);
         world.add_edge("Sub", "Base");
         let reference = t_member_ref(f, "Sub", "ID");
         let ty = f.u(reference);
@@ -160,8 +160,8 @@ fn member_reference_inherits_from_ancestor() {
 fn member_reference_wildcard_unions_all_constants() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Status", "ACTIVE", well_known::TYPE_INT);
-        world.with_class_constant("Status", "LABEL", well_known::TYPE_STRING);
+        world.with_class_constant(&mut f.builder, "Status", "ACTIVE", well_known::TYPE_INT);
+        world.with_class_constant(&mut f.builder, "Status", "LABEL", well_known::TYPE_STRING);
         let reference = t_member_ref_wildcard(f, "Status");
         let ty = f.u(reference);
         let result = expand::expand(ty, &world, &mut f.builder);
@@ -173,7 +173,7 @@ fn member_reference_wildcard_unions_all_constants() {
 fn member_reference_wildcard_single_constant_resolves_to_that_type() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Status", "ACTIVE", well_known::TYPE_INT);
+        world.with_class_constant(&mut f.builder, "Status", "ACTIVE", well_known::TYPE_INT);
         let reference = t_member_ref_wildcard(f, "Status");
         let ty = f.u(reference);
         let result = expand::expand(ty, &world, &mut f.builder);
@@ -195,9 +195,9 @@ fn member_reference_wildcard_unknown_class_passes_through() {
 fn member_reference_prefix_selects_matching_constants() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Status", "STATUS_ON", well_known::TYPE_INT);
-        world.with_class_constant("Status", "STATUS_OFF", well_known::TYPE_STRING);
-        world.with_class_constant("Status", "OTHER", well_known::TYPE_FLOAT);
+        world.with_class_constant(&mut f.builder, "Status", "STATUS_ON", well_known::TYPE_INT);
+        world.with_class_constant(&mut f.builder, "Status", "STATUS_OFF", well_known::TYPE_STRING);
+        world.with_class_constant(&mut f.builder, "Status", "OTHER", well_known::TYPE_FLOAT);
         let reference = t_member_ref_prefix(f, "Status", "STATUS_");
         let ty = f.u(reference);
         let result = expand::expand(ty, &world, &mut f.builder);
@@ -209,9 +209,9 @@ fn member_reference_prefix_selects_matching_constants() {
 fn member_reference_suffix_selects_matching_constants() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Flags", "READ_FLAG", well_known::TYPE_INT);
-        world.with_class_constant("Flags", "WRITE_FLAG", well_known::TYPE_STRING);
-        world.with_class_constant("Flags", "VERSION", well_known::TYPE_FLOAT);
+        world.with_class_constant(&mut f.builder, "Flags", "READ_FLAG", well_known::TYPE_INT);
+        world.with_class_constant(&mut f.builder, "Flags", "WRITE_FLAG", well_known::TYPE_STRING);
+        world.with_class_constant(&mut f.builder, "Flags", "VERSION", well_known::TYPE_FLOAT);
         let reference = t_member_ref_suffix(f, "Flags", "_FLAG");
         let ty = f.u(reference);
         let result = expand::expand(ty, &world, &mut f.builder);
@@ -223,9 +223,9 @@ fn member_reference_suffix_selects_matching_constants() {
 fn member_reference_contains_selects_matching_constants() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Config", "DB_HOST_NAME", well_known::TYPE_INT);
-        world.with_class_constant("Config", "CACHE_HOST_PORT", well_known::TYPE_STRING);
-        world.with_class_constant("Config", "TIMEOUT", well_known::TYPE_FLOAT);
+        world.with_class_constant(&mut f.builder, "Config", "DB_HOST_NAME", well_known::TYPE_INT);
+        world.with_class_constant(&mut f.builder, "Config", "CACHE_HOST_PORT", well_known::TYPE_STRING);
+        world.with_class_constant(&mut f.builder, "Config", "TIMEOUT", well_known::TYPE_FLOAT);
         let reference = t_member_ref_contains(f, "Config", "HOST");
         let ty = f.u(reference);
         let result = expand::expand(ty, &world, &mut f.builder);
@@ -237,7 +237,7 @@ fn member_reference_contains_selects_matching_constants() {
 fn member_reference_prefix_no_match_passes_through() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Status", "ACTIVE", well_known::TYPE_INT);
+        world.with_class_constant(&mut f.builder, "Status", "ACTIVE", well_known::TYPE_INT);
         let reference = t_member_ref_prefix(f, "Status", "MISSING_");
         let ty = f.u(reference);
         assert_eq!(expand::expand(ty, &world, &mut f.builder), ty);
@@ -249,8 +249,8 @@ fn member_reference_wildcard_unions_enum_cases() {
     fixture(|f| {
         let mut world = MockWorld::new();
         world.with_pure_enum("Suit");
-        world.with_enum_case("Suit", "Hearts");
-        world.with_enum_case("Suit", "Spades");
+        world.with_enum_case(&mut f.builder, "Suit", "Hearts");
+        world.with_enum_case(&mut f.builder, "Suit", "Spades");
         let reference = t_member_ref_wildcard(f, "Suit");
         let ty = f.u(reference);
         let result = expand::expand(ty, &world, &mut f.builder);
@@ -266,9 +266,9 @@ fn member_reference_prefix_selects_matching_enum_cases() {
     fixture(|f| {
         let mut world = MockWorld::new();
         world.with_pure_enum("Event");
-        world.with_enum_case("Event", "OnOpen");
-        world.with_enum_case("Event", "OnClose");
-        world.with_enum_case("Event", "Reset");
+        world.with_enum_case(&mut f.builder, "Event", "OnOpen");
+        world.with_enum_case(&mut f.builder, "Event", "OnClose");
+        world.with_enum_case(&mut f.builder, "Event", "Reset");
         let reference = t_member_ref_prefix(f, "Event", "On");
         let ty = f.u(reference);
         let result = expand::expand(ty, &world, &mut f.builder);
@@ -284,8 +284,8 @@ fn member_reference_wildcard_enum_unions_cases_and_constants() {
     fixture(|f| {
         let mut world = MockWorld::new();
         world.with_pure_enum("Mode");
-        world.with_enum_case("Mode", "Fast");
-        world.with_class_constant("Mode", "DEFAULT_TIMEOUT", well_known::TYPE_INT);
+        world.with_enum_case(&mut f.builder, "Mode", "Fast");
+        world.with_class_constant(&mut f.builder, "Mode", "DEFAULT_TIMEOUT", well_known::TYPE_INT);
         let reference = t_member_ref_wildcard(f, "Mode");
         let ty = f.u(reference);
         let result = expand::expand(ty, &world, &mut f.builder);
@@ -320,7 +320,7 @@ fn unknown_global_reference_passes_through() {
 fn member_reference_to_union_constant_flat_merges() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Foo", "MIXED", well_known::TYPE_INT_OR_STRING);
+        world.with_class_constant(&mut f.builder, "Foo", "MIXED", well_known::TYPE_INT_OR_STRING);
         let reference = t_member_ref(f, "Foo", "MIXED");
         let ty = f.u(reference);
         assert_eq!(expand::expand(ty, &world, &mut f.builder), well_known::TYPE_INT_OR_STRING);
@@ -348,7 +348,7 @@ fn reference_inside_list_expands() {
 fn member_reference_inside_iterable_expands() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Foo", "K", well_known::TYPE_STRING);
+        world.with_class_constant(&mut f.builder, "Foo", "K", well_known::TYPE_STRING);
         let reference = t_member_ref(f, "Foo", "K");
         let key = f.u(reference);
         let iterable_atom = f.t_iterable(key, well_known::TYPE_INT);
@@ -377,6 +377,6 @@ fn chained_alias_then_reference_resolves() {
 
 fn t_alias_via_world<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, alias: &str) -> Atom<'arena> {
     let class_name = f.name(class);
-    let alias_name = f.name(alias);
+    let alias_name = f.builder.intern(alias.as_bytes());
     f.builder.alias(AliasAtom { class_name, alias_name })
 }

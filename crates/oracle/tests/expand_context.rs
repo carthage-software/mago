@@ -281,7 +281,7 @@ fn conditional_with_alias_inside_branch_resolves_after_pick() {
         let mut world = MockWorld::new();
         world.with_alias("Foo", "Result", well_known::TYPE_STRING);
         let class_name = f.name("Foo");
-        let alias_name = f.name("Result");
+        let alias_name = f.builder.intern(b"Result");
         let alias = f.builder.alias(AliasAtom { class_name, alias_name });
         let alias_type = f.u(alias);
         let conditional =

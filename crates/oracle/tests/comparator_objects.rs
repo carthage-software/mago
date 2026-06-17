@@ -367,11 +367,11 @@ fn mock_world_transitive_closure() {
         let mammal = f.name("Mammal");
         let sloth = f.name("Sloth");
         let cat = f.name("Cat");
-        assert!(world.descends_from(cocker, animal));
-        assert!(world.descends_from(cocker, mammal));
-        assert!(world.descends_from(sloth, animal));
-        assert!(world.descends_from(mammal, animal));
-        assert!(!world.descends_from(animal, mammal));
-        assert!(!world.descends_from(cocker, cat));
+        assert!(world.descends_from(cocker.id, animal.id));
+        assert!(world.descends_from(cocker.id, mammal.id));
+        assert!(world.descends_from(sloth.id, animal.id));
+        assert!(world.descends_from(mammal.id, animal.id));
+        assert!(!world.descends_from(animal.id, mammal.id));
+        assert!(!world.descends_from(cocker.id, cat.id));
     });
 }

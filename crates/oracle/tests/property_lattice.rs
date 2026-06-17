@@ -6,6 +6,9 @@ use proptest::prelude::*;
 
 use mago_allocator::LocalArena;
 use mago_allocator::copy::CopyInto;
+use mago_oracle::id::SymbolId;
+use mago_oracle::path::Path;
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
@@ -21,7 +24,6 @@ use mago_oracle::ty::lattice::refines;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::subtract;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 use mago_oracle::world::World;
 
 const CLASSES: &[&str] = &["A", "B", "C", "D", "E"];
@@ -157,7 +159,10 @@ fn arb_world() -> impl Strategy<Value = WorldRecipe> {
     )
 }
 
-fn build_world<'arena>(recipe: &WorldRecipe) -> MockWorld<'arena> {
+fn build_world<'arena>(
+    recipe: &WorldRecipe,
+    builder: &mut TypeBuilder<'_, 'arena, LocalArena, LocalArena>,
+) -> MockWorld<'arena> {
     let mut world = MockWorld::new();
 
     for (index, class) in CLASSES.iter().enumerate() {
@@ -217,10 +222,10 @@ fn build_world<'arena>(recipe: &WorldRecipe) -> MockWorld<'arena> {
             continue;
         }
 
-        let class_name = mago_oracle::name::Name::new(class.as_bytes());
-        let has_descendants = CLASSES.iter().any(|other| {
-            *other != *class && world.descends_from(mago_oracle::name::Name::new(other.as_bytes()), class_name)
-        });
+        let class_name = SymbolId::class_like(class.as_bytes());
+        let has_descendants = CLASSES
+            .iter()
+            .any(|other| *other != *class && world.descends_from(SymbolId::class_like(other.as_bytes()), class_name));
         if !has_descendants {
             world.with_final(class);
         }
@@ -232,7 +237,7 @@ fn build_world<'arena>(recipe: &WorldRecipe) -> MockWorld<'arena> {
             _ => continue,
         };
 
-        let class_name = mago_oracle::name::Name::new(class.as_bytes());
+        let class_name = SymbolId::class_like(class.as_bytes());
         let direct_children: Vec<&'static str> = CLASSES
             .iter()
             .filter(|&&candidate| {
@@ -240,7 +245,7 @@ fn build_world<'arena>(recipe: &WorldRecipe) -> MockWorld<'arena> {
                     return false;
                 }
 
-                let candidate_name = mago_oracle::name::Name::new(candidate.as_bytes());
+                let candidate_name = SymbolId::class_like(candidate.as_bytes());
                 if !world.descends_from(candidate_name, class_name) {
                     return false;
                 }
@@ -248,8 +253,8 @@ fn build_world<'arena>(recipe: &WorldRecipe) -> MockWorld<'arena> {
                 !CLASSES.iter().any(|&intermediate| {
                     intermediate != *class
                         && intermediate != candidate
-                        && world.descends_from(candidate_name, mago_oracle::name::Name::new(intermediate.as_bytes()))
-                        && world.descends_from(mago_oracle::name::Name::new(intermediate.as_bytes()), class_name)
+                        && world.descends_from(candidate_name, SymbolId::class_like(intermediate.as_bytes()))
+                        && world.descends_from(SymbolId::class_like(intermediate.as_bytes()), class_name)
                 })
             })
             .copied()
@@ -262,7 +267,7 @@ fn build_world<'arena>(recipe: &WorldRecipe) -> MockWorld<'arena> {
         let inheritors: Vec<&'static str> =
             direct_children.iter().take(count.min(direct_children.len())).copied().collect();
         if inheritors.len() >= 2 {
-            world.with_sealed(class, &inheritors);
+            world.with_sealed(builder, class, &inheritors);
         }
     }
 
@@ -478,7 +483,10 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
         scratch: &'scratch LocalArena,
         world_recipe: &WorldRecipe,
     ) -> Probe<'scratch, 'arena> {
-        Probe { builder: TypeBuilder::new(output, scratch), world: build_world(world_recipe) }
+        let mut builder = TypeBuilder::new(output, scratch);
+        let world = build_world(world_recipe, &mut builder);
+
+        Probe { builder, world }
     }
 
     fn build(&mut self, recipe: &TypeRecipe) -> Type<'arena> {
@@ -499,12 +507,12 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
             TypeRecipe::ClassObject(name) => vec![self.builder.object_named(name.as_bytes())],
             TypeRecipe::Enumeration(name) => vec![self.builder.enum_any(name.as_bytes())],
             TypeRecipe::HasMethod(name) => {
-                let method_name = self.builder.name(name.as_bytes());
+                let method_name = self.builder.intern(name.as_bytes());
 
                 vec![Atom::HasMethod(mago_oracle::ty::atom::payload::object::has_method::HasMethodAtom { method_name })]
             }
             TypeRecipe::HasProperty(name) => {
-                let property_name = self.builder.name(name.as_bytes());
+                let property_name = self.builder.intern(name.as_bytes());
 
                 vec![Atom::HasProperty(mago_oracle::ty::atom::payload::object::has_property::HasPropertyAtom {
                     property_name,
@@ -518,8 +526,8 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
             }
             TypeRecipe::Template(scope, name, constraint) => {
                 let constraint_type = self.constraint_type(*constraint);
-                let parameter_name = self.builder.name(name.as_bytes());
-                let class = self.builder.name(scope.as_bytes());
+                let parameter_name = self.builder.intern(name.as_bytes());
+                let class = self.builder.intern_class_like_path(scope.as_bytes());
 
                 vec![self.builder.generic_parameter(
                     mago_oracle::ty::atom::payload::generic_parameter::GenericParameterAtom {
@@ -554,7 +562,7 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
             }
             TypeRecipe::Generic(name, argument) => {
                 let argument_type = self.build(argument);
-                let class_name = self.builder.name(name.as_bytes());
+                let class_name = self.builder.intern_class_like_path(name.as_bytes());
                 let arguments = self.builder.types(&[argument_type]);
 
                 vec![self.builder.object(mago_oracle::ty::atom::payload::object::named::ObjectAtom {
@@ -566,8 +574,8 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
             TypeRecipe::ObjectShape(first, second, optional, sealed) => {
                 let first_type = self.build(first);
                 let second_type = self.build(second);
-                let x = self.builder.name(b"x");
-                let y = self.builder.name(b"y");
+                let x = self.builder.intern(b"x");
+                let y = self.builder.intern(b"y");
                 let properties = self.builder.known_properties(&[
                     mago_oracle::ty::atom::payload::object::shape::KnownProperty {
                         name: x,
@@ -617,7 +625,7 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
             .iter()
             .enumerate()
             .map(|(index, parameter_type)| {
-                let name = self.builder.name(format!("p{index}").as_bytes());
+                let name = self.builder.intern(format!("p{index}").as_bytes());
 
                 mago_oracle::ty::atom::payload::callable::Parameter {
                     name,
@@ -666,12 +674,12 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
         match conjunct {
             ConjunctRecipe::Named(name) => self.builder.object_named(name.as_bytes()),
             ConjunctRecipe::HasMethod(name) => {
-                let method_name = self.builder.name(name.as_bytes());
+                let method_name = self.builder.intern(name.as_bytes());
 
                 Atom::HasMethod(mago_oracle::ty::atom::payload::object::has_method::HasMethodAtom { method_name })
             }
             ConjunctRecipe::HasProperty(name) => {
-                let property_name = self.builder.name(name.as_bytes());
+                let property_name = self.builder.intern(name.as_bytes());
 
                 Atom::HasProperty(mago_oracle::ty::atom::payload::object::has_property::HasPropertyAtom {
                     property_name,
@@ -763,7 +771,7 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
             return false;
         };
 
-        let mut classes: Vec<mago_oracle::name::Name<'arena>> = vec![head.name];
+        let mut classes: Vec<Path<'arena>> = vec![head.name];
         for conjunct in payload.conjuncts {
             if let Atom::Object(object) = conjunct {
                 classes.push(object.name);
@@ -776,7 +784,7 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
                     continue;
                 }
 
-                if !self.world.descends_from(*left, *right) && !self.world.descends_from(*right, *left) {
+                if !self.world.descends_from(left.id, right.id) && !self.world.descends_from(right.id, left.id) {
                     return true;
                 }
             }
@@ -1734,9 +1742,9 @@ proptest! {
     fn sealed_full_cover_subtract_is_never((world, _a) in arb_world_and_type()) {
         with_probe(&world, |probe| {
             for &class_name in CLASSES {
-                let name = mago_oracle::name::Name::new(class_name.as_bytes());
+                let name = SymbolId::class_like(class_name.as_bytes());
                 let inheritors = match probe.world.sealed_direct_inheritors(name) {
-                    Some(list) => list.iter().map(|inheritor| inheritor.as_bytes().to_vec()).collect::<Vec<_>>(),
+                    Some(list) => list.iter().map(|inheritor| inheritor.target.as_bytes().to_vec()).collect::<Vec<_>>(),
                     None => continue,
                 };
                 if inheritors.is_empty() {

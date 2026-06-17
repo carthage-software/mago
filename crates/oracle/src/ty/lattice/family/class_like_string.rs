@@ -21,7 +21,8 @@
 use mago_allocator::Arena;
 use mago_flags::U8Flags;
 
-use crate::name::Name;
+use crate::id::SymbolId;
+use crate::path::Path;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::object::named::ObjectAtom;
@@ -85,11 +86,11 @@ where
             return false;
         };
 
-        if !is_valid_class_name(value.as_bytes()) {
+        if !is_valid_class_name(value) {
             return false;
         }
 
-        return match world.class_like_kind(value) {
+        return match world.class_like_kind(SymbolId::class_like(value)) {
             Some(kind) => kind == container_kind,
             None => true,
         };
@@ -145,18 +146,19 @@ where
         return None;
     };
 
-    if !is_valid_class_name(value.as_bytes()) {
+    if !is_valid_class_name(value) {
         return None;
     }
 
-    let kind = kind_from_world(value, world);
+    let name = builder.intern_class_like_path(value);
+    let kind = kind_from_world(name, world);
 
-    Some(name_as_object_type(value, kind, world, builder))
+    Some(name_as_object_type(name, kind, world, builder))
 }
 
 #[inline]
 fn name_as_object_type<'arena, S, A, W>(
-    name: Name<'arena>,
+    name: Path<'arena>,
     kind: ClassLikeKind,
     _world: &W,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -177,11 +179,11 @@ where
 }
 
 #[inline]
-fn kind_from_world<'arena, W>(name: Name<'_>, world: &W) -> ClassLikeKind
+fn kind_from_world<'arena, W>(name: Path<'_>, world: &W) -> ClassLikeKind
 where
     W: World<'arena>,
 {
-    world.class_like_kind(name).unwrap_or(ClassLikeKind::Class)
+    world.class_like_kind(name.id).unwrap_or(ClassLikeKind::Class)
 }
 
 /// Validate that `bytes` is a syntactically well-formed PHP class name

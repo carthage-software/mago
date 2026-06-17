@@ -11,8 +11,19 @@ use std::collections::HashSet;
 
 use mago_allocator::LocalArena;
 use mago_flags::U8Flags;
+use mago_span::Span;
 
-use mago_oracle::name::Name;
+use mago_oracle::id::SymbolId;
+use mago_oracle::path::Path;
+use mago_oracle::symbol::class_like::part::constant::ClassLikeConstantMember;
+use mago_oracle::symbol::class_like::part::enum_case::EnumCaseMember;
+use mago_oracle::symbol::class_like::part::inheritance::InheritedType;
+use mago_oracle::symbol::class_like::part::inheritance::Provenance;
+use mago_oracle::symbol::class_like::part::visibility::Visibility;
+use mago_oracle::symbol::part::constraint::SymbolConstraint;
+use mago_oracle::symbol::part::generic::Variance;
+use mago_oracle::symbol::part::origin::Origin;
+use mago_oracle::symbol::part::ty::TypeSlot;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
@@ -23,7 +34,6 @@ use mago_oracle::ty::atom::payload::callable::Parameter;
 use mago_oracle::ty::atom::payload::callable::ParameterFlag;
 use mago_oracle::ty::atom::payload::callable::Signature;
 use mago_oracle::ty::atom::payload::callable::SignatureFlag;
-use mago_oracle::ty::atom::payload::derived::Visibility;
 use mago_oracle::ty::atom::payload::generic_parameter::DefiningEntity;
 use mago_oracle::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use mago_oracle::ty::atom::payload::object::has_method::HasMethodAtom;
@@ -42,12 +52,10 @@ use mago_oracle::ty::lattice;
 use mago_oracle::ty::lattice::LatticeOptions;
 use mago_oracle::ty::lattice::LatticeReport;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::ClassConstant;
 use mago_oracle::world::ClassProperty;
 use mago_oracle::world::EnumBacking;
 use mago_oracle::world::NullWorld;
 use mago_oracle::world::TemplateParameter;
-use mago_oracle::world::Variance;
 use mago_oracle::world::World;
 
 /// The per-test environment: a consing builder over fresh arenas and a
@@ -55,6 +63,7 @@ use mago_oracle::world::World;
 pub struct Fixture<'scratch, 'arena> {
     pub builder: TypeBuilder<'scratch, 'arena, LocalArena, LocalArena>,
     pub world: MockWorld<'arena>,
+    pub arena: &'arena LocalArena,
 }
 
 /// Run `run` against a fresh [`Fixture`] backed by function-local arenas.
@@ -64,7 +73,7 @@ where
 {
     let arena = LocalArena::new();
     let scratch = LocalArena::new();
-    let mut instance = Fixture { builder: TypeBuilder::new(&arena, &scratch), world: MockWorld::new() };
+    let mut instance = Fixture { builder: TypeBuilder::new(&arena, &scratch), world: MockWorld::new(), arena: &arena };
     run(&mut instance);
 }
 
@@ -84,11 +93,11 @@ pub fn assert_multiset_eq<'arena>(actual: &[Atom<'arena>], expected: &[Atom<'are
 }
 
 impl<'arena> Fixture<'_, 'arena> {
-    pub fn name(&mut self, text: &str) -> Name<'arena> {
-        self.builder.name(text.as_bytes())
+    pub fn name(&mut self, text: &str) -> Path<'arena> {
+        self.builder.intern_class_like_path(text.as_bytes())
     }
 
-    pub fn name_atom(&mut self, text: &str) -> Name<'arena> {
+    pub fn name_atom(&mut self, text: &str) -> Path<'arena> {
         self.name(text)
     }
 
@@ -299,7 +308,8 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_generic_named(&mut self, name: &str, arguments: Vec<Type<'arena>>) -> Atom<'arena> {
-        let name = self.builder.name(name.as_bytes());
+        let name = self.builder.intern_class_like_path(name.as_bytes());
+
         let type_arguments = Some(self.builder.types(&arguments));
 
         self.builder.object(ObjectAtom { name, type_arguments, flags: U8Flags::empty() })
@@ -312,7 +322,7 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_named_static(&mut self, name: &str) -> Atom<'arena> {
-        let name = self.builder.name(name.as_bytes());
+        let name = self.builder.intern_class_like_path(name.as_bytes());
 
         self.builder.object(ObjectAtom {
             name,
@@ -322,7 +332,7 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_named_this(&mut self, name: &str) -> Atom<'arena> {
-        let name = self.builder.name(name.as_bytes());
+        let name = self.builder.intern_class_like_path(name.as_bytes());
 
         self.builder.object(ObjectAtom {
             name,
@@ -332,13 +342,13 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_has_method(&mut self, name: &str) -> Atom<'arena> {
-        let method_name = self.builder.name(name.as_bytes());
+        let method_name = self.builder.intern(name.as_bytes());
 
         Atom::HasMethod(HasMethodAtom { method_name })
     }
 
     pub fn t_has_property(&mut self, name: &str) -> Atom<'arena> {
-        let property_name = self.builder.name(name.as_bytes());
+        let property_name = self.builder.intern(name.as_bytes());
 
         Atom::HasProperty(HasPropertyAtom { property_name })
     }
@@ -346,7 +356,7 @@ impl<'arena> Fixture<'_, 'arena> {
     pub fn t_object_shape(&mut self, properties: &[(&str, Type<'arena>, bool)], sealed: bool) -> Atom<'arena> {
         let mut entries: Vec<KnownProperty<'arena>> = Vec::with_capacity(properties.len());
         for (name, value, optional) in properties {
-            let name = self.builder.name(name.as_bytes());
+            let name = self.builder.intern(name.as_bytes());
             entries.push(KnownProperty { name, value: *value, optional: *optional });
         }
 
@@ -362,8 +372,8 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_template_of(&mut self, class_name: &str, template_name: &str, constraint: Type<'arena>) -> Atom<'arena> {
-        let name = self.builder.name(template_name.as_bytes());
-        let class = self.builder.name(class_name.as_bytes());
+        let name = self.builder.intern(template_name.as_bytes());
+        let class = self.builder.intern_class_like_path(class_name.as_bytes());
 
         self.builder.generic_parameter(GenericParameterAtom {
             name,
@@ -420,7 +430,7 @@ impl<'arena> Fixture<'_, 'arena> {
     ) -> Atom<'arena> {
         let mut entries: Vec<Parameter<'arena>> = Vec::with_capacity(parameters.len());
         for (index, (ty, has_default, by_reference, variadic)) in parameters.iter().enumerate() {
-            let name = self.builder.name(format!("p{index}").as_bytes());
+            let name = self.builder.intern(format!("p{index}").as_bytes());
             let mut flags = U8Flags::empty();
             flags.set_value(ParameterFlag::HasDefault, *has_default);
             flags.set_value(ParameterFlag::ByReference, *by_reference);
@@ -452,7 +462,7 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn ak_str(&mut self, value: &str) -> ArrayKey<'arena> {
-        ArrayKey::String(self.builder.name(value.as_bytes()))
+        ArrayKey::String(self.builder.intern(value.as_bytes()))
     }
 
     pub fn u(&mut self, atom: Atom<'arena>) -> Type<'arena> {
@@ -478,28 +488,33 @@ impl<'arena> Fixture<'_, 'arena> {
 /// per-class type parameters, and per-extension type arguments.
 ///
 /// Registration methods take `&'static str` names (tests use literals);
-/// query lookups compare exact bytes against any-lifetime [`Name`]s.
+/// class-like identities are keyed by [`SymbolId`], member names by exact
+/// bytes - matching how the type algebra now queries the world.
 #[derive(Debug)]
 pub struct MockWorld<'arena> {
-    ancestors: HashMap<Vec<u8>, HashSet<Vec<u8>>>,
-    traits_used: HashMap<Vec<u8>, HashSet<Vec<u8>>>,
-    templates: HashMap<Vec<u8>, Vec<TemplateParameter<'arena>>>,
-    extended: HashMap<(Vec<u8>, Vec<u8>), Vec<Type<'arena>>>,
-    methods: HashMap<Vec<u8>, HashSet<Vec<u8>>>,
-    properties: HashMap<Vec<u8>, Vec<ClassProperty<'arena>>>,
-    enums: HashMap<Vec<u8>, EnumBacking<'arena>>,
-    class_like_kinds: HashMap<Vec<u8>, ClassLikeKind>,
-    final_classes: HashSet<Vec<u8>>,
-    aliases: HashMap<(Vec<u8>, Vec<u8>), Type<'arena>>,
-    class_constants: HashMap<Vec<u8>, Vec<ClassConstant<'arena>>>,
-    enum_cases: HashMap<Vec<u8>, Vec<Name<'arena>>>,
-    global_constants: HashMap<Vec<u8>, Type<'arena>>,
-    sealed_inheritors: HashMap<Vec<u8>, Vec<Name<'static>>>,
-    sealed_parent: HashMap<Vec<u8>, Name<'static>>,
+    ancestors: HashMap<SymbolId, HashSet<SymbolId>>,
+    traits_used: HashMap<SymbolId, HashSet<SymbolId>>,
+    templates: HashMap<SymbolId, Vec<TemplateParameter<'arena>>>,
+    extended: HashMap<(SymbolId, SymbolId), Vec<Type<'arena>>>,
+    methods: HashMap<SymbolId, HashSet<Vec<u8>>>,
+    properties: HashMap<SymbolId, Vec<ClassProperty<'arena>>>,
+    enums: HashMap<SymbolId, EnumBacking<'arena>>,
+    class_like_kinds: HashMap<SymbolId, ClassLikeKind>,
+    final_classes: HashSet<SymbolId>,
+    aliases: HashMap<(SymbolId, Vec<u8>), Type<'arena>>,
+    class_constants: HashMap<SymbolId, Vec<ClassLikeConstantMember<'arena>>>,
+    enum_cases: HashMap<SymbolId, Vec<EnumCaseMember<'arena>>>,
+    global_constants: HashMap<SymbolId, Type<'arena>>,
+    sealed_inheritors: HashMap<SymbolId, Vec<InheritedType<'arena>>>,
+    sealed_parent: HashMap<SymbolId, Path<'arena>>,
 }
 
 fn key(text: &str) -> Vec<u8> {
     text.as_bytes().to_vec()
+}
+
+fn class_id(text: &str) -> SymbolId {
+    SymbolId::class_like(text.as_bytes())
 }
 
 impl<'arena> MockWorld<'arena> {
@@ -526,10 +541,12 @@ impl<'arena> MockWorld<'arena> {
     /// Add a single `child extends/implements parent` edge and recompute the
     /// transitive closure.
     pub fn add_edge(&mut self, child: &str, parent: &str) -> &mut Self {
-        self.ancestors.entry(key(child)).or_default().insert(key(child));
-        self.ancestors.entry(key(parent)).or_default().insert(key(parent));
-        if let Some(entry) = self.ancestors.get_mut(child.as_bytes()) {
-            entry.insert(key(parent));
+        let child_id = class_id(child);
+        let parent_id = class_id(parent);
+        self.ancestors.entry(child_id).or_default().insert(child_id);
+        self.ancestors.entry(parent_id).or_default().insert(parent_id);
+        if let Some(entry) = self.ancestors.get_mut(&child_id) {
+            entry.insert(parent_id);
         }
 
         self.recompute_closure();
@@ -550,35 +567,36 @@ impl<'arena> MockWorld<'arena> {
     /// for the ancestor closure.
     pub fn add_trait_use(&mut self, class: &str, trait_name: &str) -> &mut Self {
         self.add_edge(class, trait_name);
-        self.traits_used.entry(key(class)).or_default().insert(key(trait_name));
+        self.traits_used.entry(class_id(class)).or_default().insert(class_id(trait_name));
         self
     }
 
     /// Register a class-like with no ancestors (so reflexive queries like
     /// `descends_from(C, C)` still answer yes).
     pub fn declare(&mut self, name: &str) -> &mut Self {
-        self.ancestors.entry(key(name)).or_default().insert(key(name));
+        let name_id = class_id(name);
+        self.ancestors.entry(name_id).or_default().insert(name_id);
         self
     }
 
     /// Tag `name` as an interface. Implicitly declares `name`.
     pub fn declare_interface(&mut self, name: &str) -> &mut Self {
         self.declare(name);
-        self.class_like_kinds.insert(key(name), ClassLikeKind::Interface);
+        self.class_like_kinds.insert(class_id(name), ClassLikeKind::Interface);
         self
     }
 
     /// Tag `name` as a trait. Implicitly declares `name`.
     pub fn declare_trait(&mut self, name: &str) -> &mut Self {
         self.declare(name);
-        self.class_like_kinds.insert(key(name), ClassLikeKind::Trait);
+        self.class_like_kinds.insert(class_id(name), ClassLikeKind::Trait);
         self
     }
 
     /// Mark `name` as `final`. Implicitly declares `name`.
     pub fn with_final(&mut self, name: &str) -> &mut Self {
         self.declare(name);
-        self.final_classes.insert(key(name));
+        self.final_classes.insert(class_id(name));
         self
     }
 
@@ -587,11 +605,11 @@ impl<'arena> MockWorld<'arena> {
     pub fn with_templates(&mut self, class_like: &str, parameters: &[(&'static str, Variance)]) -> &mut Self {
         self.declare(class_like);
         self.templates.insert(
-            key(class_like),
+            class_id(class_like),
             parameters
                 .iter()
                 .map(|(name, variance)| TemplateParameter {
-                    name: Name::new(name.as_bytes()),
+                    name: name.as_bytes(),
                     variance: *variance,
                     upper_bound: None,
                 })
@@ -603,9 +621,8 @@ impl<'arena> MockWorld<'arena> {
     /// Set the upper bound (`@template T of Foo`) on `class_like`'s `name`d
     /// template parameter.
     pub fn with_template_bound(&mut self, class_like: &str, name: &str, bound: Type<'arena>) -> &mut Self {
-        if let Some(parameters) = self.templates.get_mut(class_like.as_bytes())
-            && let Some(parameter) =
-                parameters.iter_mut().find(|parameter| parameter.name.as_bytes() == name.as_bytes())
+        if let Some(parameters) = self.templates.get_mut(&class_id(class_like))
+            && let Some(parameter) = parameters.iter_mut().find(|parameter| parameter.name == name.as_bytes())
         {
             parameter.upper_bound = Some(bound);
         }
@@ -618,7 +635,7 @@ impl<'arena> MockWorld<'arena> {
     /// `child extends ancestor`.
     pub fn with_extended(&mut self, child: &str, ancestor: &str, arguments: Vec<Type<'arena>>) -> &mut Self {
         self.add_edge(child, ancestor);
-        self.extended.insert((key(child), key(ancestor)), arguments);
+        self.extended.insert((class_id(child), class_id(ancestor)), arguments);
         self
     }
 
@@ -626,7 +643,7 @@ impl<'arena> MockWorld<'arena> {
     /// walked at query time).
     pub fn with_method(&mut self, class: &str, name: &str) -> &mut Self {
         self.declare(class);
-        self.methods.entry(key(class)).or_default().insert(key(name));
+        self.methods.entry(class_id(class)).or_default().insert(key(name));
         self
     }
 
@@ -644,8 +661,8 @@ impl<'arena> MockWorld<'arena> {
         visibility: Visibility,
     ) -> &mut Self {
         self.declare(class);
-        self.properties.entry(key(class)).or_default().push(ClassProperty {
-            name: Name::new(name.as_bytes()),
+        self.properties.entry(class_id(class)).or_default().push(ClassProperty {
+            name: name.as_bytes(),
             r#type,
             visibility,
         });
@@ -655,7 +672,7 @@ impl<'arena> MockWorld<'arena> {
     /// Declare a pure enum: cases expose only `name`.
     pub fn with_pure_enum(&mut self, name: &str) -> &mut Self {
         self.declare(name);
-        self.enums.insert(key(name), EnumBacking::Pure);
+        self.enums.insert(class_id(name), EnumBacking::Pure);
         self
     }
 
@@ -663,22 +680,38 @@ impl<'arena> MockWorld<'arena> {
     /// is of `backing` (typically `int` or `string`).
     pub fn with_backed_enum(&mut self, name: &str, backing: Type<'arena>) -> &mut Self {
         self.declare(name);
-        self.enums.insert(key(name), EnumBacking::Backed(backing));
+        self.enums.insert(class_id(name), EnumBacking::Backed(backing));
         self
     }
 
     /// Declare an enum case, in declaration order. Enumerated by
     /// [`World::enum_cases`] for wildcard member references (`Suit::*`).
-    pub fn with_enum_case(&mut self, enum_name: &str, case: &'static str) -> &mut Self {
+    pub fn with_enum_case(
+        &mut self,
+        builder: &mut TypeBuilder<'_, 'arena, LocalArena, LocalArena>,
+        enum_name: &str,
+        case: &'static str,
+    ) -> &mut Self {
         self.declare(enum_name);
-        self.enum_cases.entry(key(enum_name)).or_default().push(Name::new(case.as_bytes()));
+        let name = builder.intern_enum_case_path(enum_name.as_bytes(), case.as_bytes());
+        let member = EnumCaseMember::new(
+            Span::zero(),
+            name,
+            class_id(enum_name),
+            U8Flags::empty(),
+            SymbolConstraint::unconstrained(),
+            &[],
+            None,
+            Origin::Project,
+        );
+        self.enum_cases.entry(class_id(enum_name)).or_default().push(member);
         self
     }
 
     /// Declare a `@type` alias on `class`: `Class::alias = body`.
     pub fn with_alias(&mut self, class: &str, alias: &str, body: Type<'arena>) -> &mut Self {
         self.declare(class);
-        self.aliases.insert((key(class), key(alias)), body);
+        self.aliases.insert((class_id(class), key(alias)), body);
         self
     }
 
@@ -686,53 +719,81 @@ impl<'arena> MockWorld<'arena> {
     /// Enumerated directly by [`World::class_constants`]; the inheritance walk
     /// for a single `Class::CONST` lookup lives in
     /// [`World::class_constant_type`].
-    pub fn with_class_constant(&mut self, class: &str, name: &'static str, r#type: Type<'arena>) -> &mut Self {
+    pub fn with_class_constant(
+        &mut self,
+        builder: &mut TypeBuilder<'_, 'arena, LocalArena, LocalArena>,
+        class: &str,
+        name: &'static str,
+        r#type: Type<'arena>,
+    ) -> &mut Self {
         self.declare(class);
-        self.class_constants
-            .entry(key(class))
-            .or_default()
-            .push(ClassConstant { name: Name::new(name.as_bytes()), r#type });
+        let path = builder.intern_class_like_constant_path(class.as_bytes(), name.as_bytes());
+        let member = ClassLikeConstantMember::new(
+            Span::zero(),
+            Visibility::Public,
+            path,
+            class_id(class),
+            U8Flags::empty(),
+            SymbolConstraint::unconstrained(),
+            &[],
+            TypeSlot { hint: None, annotation: Some(r#type), inferred: None },
+            Origin::Project,
+        );
+        self.class_constants.entry(class_id(class)).or_default().push(member);
         self
     }
 
     /// Declare a global constant: `define('NAME', value)`.
     pub fn with_global_constant(&mut self, name: &str, r#type: Type<'arena>) -> &mut Self {
-        self.global_constants.insert(key(name), r#type);
+        self.global_constants.insert(SymbolId::constant(name.as_bytes()), r#type);
         self
     }
 
     /// Mark `class` as sealed with the given direct inheritors. Atomically
     /// registers `descends_from` edges so the world stays consistent.
-    pub fn with_sealed(&mut self, class: &'static str, inheritors: &[&'static str]) -> &mut Self {
-        let class_key = key(class);
+    pub fn with_sealed(
+        &mut self,
+        builder: &mut TypeBuilder<'_, 'arena, LocalArena, LocalArena>,
+        class: &'static str,
+        inheritors: &[&'static str],
+    ) -> &mut Self {
+        let class_key = class_id(class);
         for inheritor in inheritors {
-            self.ancestors.entry(key(inheritor)).or_default().insert(class_key.clone());
-            self.sealed_parent.insert(key(inheritor), Name::new(class.as_bytes()));
+            self.ancestors.entry(class_id(inheritor)).or_default().insert(class_key);
+            self.sealed_parent.insert(class_id(inheritor), builder.intern_class_like_path(class.as_bytes()));
         }
 
-        self.sealed_inheritors
-            .insert(class_key, inheritors.iter().map(|inheritor| Name::new(inheritor.as_bytes())).collect());
+        self.sealed_inheritors.insert(
+            class_key,
+            inheritors
+                .iter()
+                .map(|inheritor| {
+                    let target = builder.intern_class_like_path(inheritor.as_bytes());
+                    InheritedType::new(Span::zero(), target, Provenance::Direct, &[])
+                })
+                .collect(),
+        );
         self
     }
 
-    fn collect_visible_properties(&self, class: &[u8]) -> Vec<ClassProperty<'arena>> {
-        let Some(ancestors) = self.ancestors.get(class) else {
+    fn collect_visible_properties(&self, class: SymbolId) -> Vec<ClassProperty<'arena>> {
+        let Some(ancestors) = self.ancestors.get(&class) else {
             return Vec::new();
         };
 
-        let mut chain: Vec<&[u8]> = vec![class];
+        let mut chain: Vec<SymbolId> = vec![class];
         for ancestor in ancestors {
-            if ancestor.as_slice() != class {
-                chain.push(ancestor);
+            if *ancestor != class {
+                chain.push(*ancestor);
             }
         }
 
         let mut seen: HashSet<&[u8]> = HashSet::new();
         let mut collected: Vec<ClassProperty<'arena>> = Vec::new();
         for link in chain {
-            if let Some(properties) = self.properties.get(link) {
+            if let Some(properties) = self.properties.get(&link) {
                 for property in properties {
-                    if seen.insert(property.name.as_bytes()) {
+                    if seen.insert(property.name) {
                         collected.push(*property);
                     }
                 }
@@ -745,7 +806,7 @@ impl<'arena> MockWorld<'arena> {
     fn recompute_closure(&mut self) {
         loop {
             let mut changed = false;
-            let names: Vec<Vec<u8>> = self.ancestors.keys().cloned().collect();
+            let names: Vec<SymbolId> = self.ancestors.keys().copied().collect();
             for name in &names {
                 let Some(direct) = self.ancestors.get(name).cloned() else {
                     continue;
@@ -779,54 +840,53 @@ impl Default for MockWorld<'_> {
 }
 
 impl<'arena> World<'arena> for MockWorld<'arena> {
-    fn descends_from(&self, child: Name<'_>, ancestor: Name<'_>) -> bool {
-        if child.as_bytes() == ancestor.as_bytes() {
+    fn descends_from(&self, child: SymbolId, ancestor: SymbolId) -> bool {
+        if child == ancestor {
             return true;
         }
 
-        self.ancestors.get(child.as_bytes()).is_some_and(|set| set.contains(ancestor.as_bytes()))
+        self.ancestors.get(&child).is_some_and(|set| set.contains(&ancestor))
     }
 
-    fn uses_trait(&self, class: Name<'_>, trait_name: Name<'_>) -> bool {
-        self.traits_used.get(class.as_bytes()).is_some_and(|set| set.contains(trait_name.as_bytes()))
+    fn uses_trait(&self, class: SymbolId, trait_name: SymbolId) -> bool {
+        self.traits_used.get(&class).is_some_and(|set| set.contains(&trait_name))
     }
 
-    fn template_parameter_arity(&self, class: Name<'_>) -> usize {
-        self.templates.get(class.as_bytes()).map_or(0, Vec::len)
+    fn template_parameter_arity(&self, class: SymbolId) -> usize {
+        self.templates.get(&class).map_or(0, Vec::len)
     }
 
-    fn template_parameter_at(&self, class: Name<'_>, position: usize) -> Option<TemplateParameter<'arena>> {
-        self.templates.get(class.as_bytes())?.get(position).copied()
+    fn template_parameter_at(&self, class: SymbolId, position: usize) -> Option<TemplateParameter<'arena>> {
+        self.templates.get(&class)?.get(position).copied()
     }
 
-    fn template_parameter_index(&self, class: Name<'_>, name: Name<'_>) -> Option<usize> {
-        self.templates.get(class.as_bytes())?.iter().position(|parameter| parameter.name.as_bytes() == name.as_bytes())
+    fn template_parameter_index(&self, class: SymbolId, name: &[u8]) -> Option<usize> {
+        self.templates.get(&class)?.iter().position(|parameter| parameter.name == name)
     }
 
     fn inherited_template_argument(
         &self,
-        child: Name<'_>,
-        ancestor: Name<'_>,
+        child: SymbolId,
+        ancestor: SymbolId,
         position: usize,
     ) -> Option<Type<'arena>> {
         if !self.descends_from(child, ancestor) {
             return None;
         }
 
-        if let Some(arguments) = self.extended.get(&(child.as_bytes().to_vec(), ancestor.as_bytes().to_vec()))
+        if let Some(arguments) = self.extended.get(&(child, ancestor))
             && let Some(argument) = arguments.get(position).copied()
         {
             return Some(argument);
         }
 
         for (parent_child, parent_ancestor) in self.extended.keys() {
-            if parent_child.as_slice() != child.as_bytes() {
+            if *parent_child != child {
                 continue;
             }
 
-            let parent_ancestor_name = Name::new(parent_ancestor);
-            if self.descends_from(parent_ancestor_name, ancestor)
-                && let Some(argument) = self.inherited_template_argument(parent_ancestor_name, ancestor, position)
+            if self.descends_from(*parent_ancestor, ancestor)
+                && let Some(argument) = self.inherited_template_argument(*parent_ancestor, ancestor, position)
             {
                 return Some(argument);
             }
@@ -837,15 +897,14 @@ impl<'arena> World<'arena> for MockWorld<'arena> {
 
     fn template_parameter_forwards_to(
         &self,
-        from_class: Name<'_>,
-        from_parameter: Name<'_>,
-        to_class: Name<'_>,
-        to_parameter: Name<'_>,
+        from_class: SymbolId,
+        from_parameter: &[u8],
+        to_class: SymbolId,
+        to_parameter: &[u8],
     ) -> bool {
-        let target = (to_class.as_bytes().to_vec(), to_parameter.as_bytes().to_vec());
-        let mut queue: Vec<(Vec<u8>, Vec<u8>)> =
-            vec![(from_class.as_bytes().to_vec(), from_parameter.as_bytes().to_vec())];
-        let mut visited: HashSet<(Vec<u8>, Vec<u8>)> = HashSet::new();
+        let target = (to_class, to_parameter.to_vec());
+        let mut queue: Vec<(SymbolId, Vec<u8>)> = vec![(from_class, from_parameter.to_vec())];
+        let mut visited: HashSet<(SymbolId, Vec<u8>)> = HashSet::new();
         while let Some(node) = queue.pop() {
             if node == target {
                 return true;
@@ -856,7 +915,7 @@ impl<'arena> World<'arena> for MockWorld<'arena> {
 
             let (class, parameter) = node;
             for ((child, parent), arguments) in &self.extended {
-                if child.as_slice() != class.as_slice() {
+                if *child != class {
                     continue;
                 }
 
@@ -867,14 +926,14 @@ impl<'arena> World<'arena> for MockWorld<'arena> {
                     let DefiningEntity::ClassLike(generic_class) = generic.defining_entity else {
                         continue;
                     };
-                    if generic_class.as_bytes() != class.as_slice() || generic.name.as_bytes() != parameter.as_slice() {
+                    if generic_class.id != class || generic.name != parameter.as_slice() {
                         continue;
                     }
 
                     if let Some(parent_parameters) = self.templates.get(parent)
                         && let Some(parent_parameter) = parent_parameters.get(slot)
                     {
-                        queue.push((parent.clone(), parent_parameter.name.as_bytes().to_vec()));
+                        queue.push((*parent, parent_parameter.name.to_vec()));
                     }
                 }
             }
@@ -883,99 +942,97 @@ impl<'arena> World<'arena> for MockWorld<'arena> {
         false
     }
 
-    fn class_has_method(&self, class: Name<'_>, method: Name<'_>) -> bool {
-        let Some(ancestors) = self.ancestors.get(class.as_bytes()) else {
+    fn class_has_method(&self, class: SymbolId, method: &[u8]) -> bool {
+        let Some(ancestors) = self.ancestors.get(&class) else {
             return false;
         };
 
-        ancestors.iter().any(|ancestor| self.methods.get(ancestor).is_some_and(|set| set.contains(method.as_bytes())))
+        ancestors.iter().any(|ancestor| self.methods.get(ancestor).is_some_and(|set| set.contains(method)))
     }
 
-    fn class_property_type(&self, class: Name<'_>, property: Name<'_>) -> Option<Type<'arena>> {
-        self.collect_visible_properties(class.as_bytes())
+    fn class_property_type(&self, class: SymbolId, property: &[u8]) -> Option<Type<'arena>> {
+        self.collect_visible_properties(class)
             .into_iter()
-            .find(|entry| entry.name.as_bytes() == property.as_bytes())
+            .find(|entry| entry.name == property)
             .map(|entry| entry.r#type)
     }
 
-    fn class_has_property(&self, class: Name<'_>, property: Name<'_>) -> bool {
-        let Some(ancestors) = self.ancestors.get(class.as_bytes()) else {
+    fn class_has_property(&self, class: SymbolId, property: &[u8]) -> bool {
+        let Some(ancestors) = self.ancestors.get(&class) else {
             return false;
         };
 
         ancestors.iter().any(|ancestor| {
-            self.properties
-                .get(ancestor)
-                .is_some_and(|entries| entries.iter().any(|entry| entry.name.as_bytes() == property.as_bytes()))
+            self.properties.get(ancestor).is_some_and(|entries| entries.iter().any(|entry| entry.name == property))
         })
     }
 
-    fn enum_backing(&self, enum_name: Name<'_>) -> Option<EnumBacking<'arena>> {
-        self.enums.get(enum_name.as_bytes()).copied()
+    fn enum_backing(&self, enum_name: SymbolId) -> Option<EnumBacking<'arena>> {
+        self.enums.get(&enum_name).copied()
     }
 
-    fn class_like_kind(&self, name: Name<'_>) -> Option<ClassLikeKind> {
-        if let Some(kind) = self.class_like_kinds.get(name.as_bytes()) {
+    fn class_like_kind(&self, name: SymbolId) -> Option<ClassLikeKind> {
+        if let Some(kind) = self.class_like_kinds.get(&name) {
             return Some(*kind);
         }
 
-        if self.enums.contains_key(name.as_bytes()) {
+        if self.enums.contains_key(&name) {
             return Some(ClassLikeKind::Enum);
         }
 
-        if self.ancestors.contains_key(name.as_bytes()) {
+        if self.ancestors.contains_key(&name) {
             return Some(ClassLikeKind::Class);
         }
 
         None
     }
 
-    fn is_final(&self, name: Name<'_>) -> bool {
-        self.enums.contains_key(name.as_bytes()) || self.final_classes.contains(name.as_bytes())
+    fn is_final(&self, name: SymbolId) -> bool {
+        self.enums.contains_key(&name) || self.final_classes.contains(&name)
     }
 
-    fn alias_body(&self, class: Name<'_>, alias: Name<'_>) -> Option<Type<'arena>> {
-        self.aliases.get(&(class.as_bytes().to_vec(), alias.as_bytes().to_vec())).copied()
+    fn alias_body(&self, class: SymbolId, alias: &[u8]) -> Option<Type<'arena>> {
+        self.aliases.get(&(class, alias.to_vec())).copied()
     }
 
-    fn class_constant_type(&self, class: Name<'_>, constant: Name<'_>) -> Option<Type<'arena>> {
-        let ancestors = self.ancestors.get(class.as_bytes())?;
+    fn class_constant_type(&self, class: SymbolId, constant: &[u8]) -> Option<Type<'arena>> {
+        let ancestors = self.ancestors.get(&class)?;
 
         ancestors.iter().find_map(|ancestor| {
             self.class_constants
                 .get(ancestor)?
                 .iter()
-                .find(|entry| entry.name.as_bytes() == constant.as_bytes())
-                .map(|entry| entry.r#type)
+                .find(|entry| entry.name.as_bytes() == constant)
+                .and_then(|entry| entry.ty.effective())
         })
     }
 
-    fn class_constants(&self, class: Name<'_>) -> &[ClassConstant<'arena>] {
-        self.class_constants.get(class.as_bytes()).map_or(&[], Vec::as_slice)
+    fn class_constants(&self, class: SymbolId) -> &[ClassLikeConstantMember<'arena>] {
+        self.class_constants.get(&class).map_or(&[], Vec::as_slice)
     }
 
-    fn enum_cases(&self, enum_name: Name<'_>) -> &[Name<'arena>] {
-        self.enum_cases.get(enum_name.as_bytes()).map_or(&[], Vec::as_slice)
+    fn enum_cases(&self, enum_name: SymbolId) -> &[EnumCaseMember<'arena>] {
+        self.enum_cases.get(&enum_name).map_or(&[], Vec::as_slice)
     }
 
-    fn global_constant_type(&self, name: Name<'_>) -> Option<Type<'arena>> {
-        self.global_constants.get(name.as_bytes()).copied()
+    fn global_constant_type(&self, name: SymbolId) -> Option<Type<'arena>> {
+        self.global_constants.get(&name).copied()
     }
 
-    fn class_property_count(&self, class: Name<'_>) -> usize {
-        self.collect_visible_properties(class.as_bytes()).len()
+    fn class_property_count(&self, class: SymbolId) -> usize {
+        self.collect_visible_properties(class).len()
     }
 
-    fn class_property_at(&self, class: Name<'_>, position: usize) -> Option<ClassProperty<'arena>> {
-        self.collect_visible_properties(class.as_bytes()).into_iter().nth(position)
+    fn class_property_at(&self, class: SymbolId, position: usize) -> Option<ClassProperty<'arena>> {
+        self.collect_visible_properties(class).into_iter().nth(position)
     }
 
-    fn sealed_direct_inheritors(&self, class_like: Name<'_>) -> Option<&[Name<'arena>]> {
-        self.sealed_inheritors.get(class_like.as_bytes()).map(Vec::as_slice)
+    fn sealed_direct_inheritors(&self, class_like: SymbolId) -> Option<&[InheritedType<'arena>]> {
+        self.sealed_inheritors.get(&class_like).map(Vec::as_slice)
     }
 
-    fn sealed_parent_of(&self, child: Name<'_>) -> Option<Name<'arena>> {
-        self.sealed_parent.get(child.as_bytes()).copied()
+    fn sealed_parent_of(&self, child: SymbolId) -> Option<Path<'arena>> {
+        self.sealed_parent.get(&child).copied()
     }
 }
 

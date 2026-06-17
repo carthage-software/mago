@@ -27,7 +27,7 @@
 
 use mago_allocator::Arena;
 
-use crate::name::Name;
+use crate::path::Path;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
@@ -145,7 +145,7 @@ where
     a_classes.iter().any(|a_class| {
         b_classes
             .iter()
-            .any(|b_class| world.descends_from(*a_class, *b_class) || world.descends_from(*b_class, *a_class))
+            .any(|b_class| world.descends_from(a_class.id, b_class.id) || world.descends_from(b_class.id, a_class.id))
     })
 }
 
@@ -154,7 +154,7 @@ where
 /// `object{...}`, `has-method`, `has-property`) and therefore matches any
 /// class.
 #[inline]
-fn nominal_classes(atom: Atom<'_>) -> Vec<Name<'_>> {
+fn nominal_classes(atom: Atom<'_>) -> Vec<Path<'_>> {
     match atom {
         Atom::Object(payload) => vec![payload.name],
         Atom::Enum(payload) => vec![payload.name],

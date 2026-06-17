@@ -2,8 +2,8 @@ mod common;
 
 use common::*;
 
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::lattice::CoercionCause;
-use mago_oracle::world::Variance;
 
 #[test]
 fn box_int_in_box_int_reflexive() {

@@ -8,7 +8,7 @@ use serde::Serialize;
 use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 
-use crate::name::Name;
+use crate::path::Path;
 use crate::ty::Type;
 
 /// `class-string`, `interface-string<T>`, `enum-string`, `trait-string`,
@@ -42,7 +42,7 @@ pub enum ClassLikeKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ClassLikeStringSpecifier<'arena> {
     Any,
-    Literal { value: Name<'arena> },
+    Literal { value: Path<'arena> },
     OfType { constraint: Type<'arena> },
     Generic { constraint: Type<'arena> },
 }
@@ -65,7 +65,7 @@ impl Display for ClassLikeStringAtom<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match &self.specifier {
             ClassLikeStringSpecifier::Any => f.write_str(self.kind.as_str()),
-            ClassLikeStringSpecifier::Literal { value } => write!(f, "class-string('{}')", value.as_str_lossy()),
+            ClassLikeStringSpecifier::Literal { value } => write!(f, "class-string('{}')", value),
             ClassLikeStringSpecifier::OfType { constraint } | ClassLikeStringSpecifier::Generic { constraint } => {
                 write!(f, "{}<{}>", self.kind.as_str(), constraint)
             }

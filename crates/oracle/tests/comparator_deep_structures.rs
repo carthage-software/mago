@@ -4,10 +4,10 @@ use std::collections::BTreeMap;
 
 use common::*;
 
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::array::KnownElement;
-use mago_oracle::world::Variance;
 
 fn t_sealed_list<'arena>(f: &mut Fixture<'_, 'arena>, elements: &[Type<'arena>], non_empty: bool) -> Atom<'arena> {
     let entries: Vec<KnownElement<'arena>> = elements

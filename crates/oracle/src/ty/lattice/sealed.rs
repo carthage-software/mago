@@ -6,7 +6,9 @@ use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
-use crate::name::Name;
+use crate::path::Path;
+use crate::symbol::class_like::part::inheritance::InheritedType;
+use crate::symbol::part::generic::Variance;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::object::named::ObjectAtom;
@@ -16,7 +18,6 @@ use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::predicates::contains_template_anywhere;
 use crate::ty::well_known;
-use crate::world::Variance;
 use crate::world::World;
 
 /// The result of asking "what survives of `H`'s sealed cover after
@@ -53,11 +54,11 @@ where
 
     let class_name = head_payload.name;
 
-    let Some(inheritors) = world.sealed_direct_inheritors(class_name) else {
+    let Some(inheritors) = world.sealed_direct_inheritors(class_name.id) else {
         return SealedResidual::NotSealed;
     };
 
-    let mut visited: ScratchVec<'scratch, Name<'arena>, S> = builder.scratch_vec_with(8);
+    let mut visited: ScratchVec<'scratch, Path<'arena>, S> = builder.scratch_vec_with(8);
     visited.push(class_name);
 
     compute_residual_impl(head, negated_inners, inheritors, world, options, report, builder, &mut visited, 0)
@@ -77,12 +78,12 @@ where
 fn compute_residual_impl<'scratch, 'arena, S, A, W>(
     head: Atom<'arena>,
     negated_inners: &[Type<'arena>],
-    inheritors: &[Name<'arena>],
+    inheritors: &[InheritedType<'arena>],
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
-    visited: &mut ScratchVec<'scratch, Name<'arena>, S>,
+    visited: &mut ScratchVec<'scratch, Path<'arena>, S>,
     depth: usize,
 ) -> SealedResidual<'scratch, 'arena, S>
 where
@@ -100,7 +101,8 @@ where
 
     let mut surviving: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
 
-    for &inheritor in inheritors {
+    for inheritor in inheritors {
+        let inheritor = inheritor.target;
         if !inheritor_admits_head_arguments(*head_payload, inheritor, world, options, report, builder) {
             continue;
         }
@@ -116,7 +118,7 @@ where
             continue;
         }
 
-        if let Some(grandchildren) = world.sealed_direct_inheritors(inheritor) {
+        if let Some(grandchildren) = world.sealed_direct_inheritors(inheritor.id) {
             if visited.contains(&inheritor) {
                 return SealedResidual::NotSealed;
             }
@@ -161,7 +163,7 @@ where
 #[inline]
 fn inheritor_admits_head_arguments<'arena, S, A, W>(
     head_payload: ObjectAtom<'arena>,
-    inheritor: Name<'arena>,
+    inheritor: Path<'arena>,
     world: &W,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
@@ -176,13 +178,13 @@ where
         return true;
     };
 
-    let arity = world.template_parameter_arity(head_payload.name);
+    let arity = world.template_parameter_arity(head_payload.name.id);
     if arity == 0 || head_arguments.len() != arity {
         return true;
     }
 
     for (position, &head_argument) in head_arguments.iter().enumerate() {
-        let Some(inherited) = world.inherited_template_argument(inheritor, head_payload.name, position) else {
+        let Some(inherited) = world.inherited_template_argument(inheritor.id, head_payload.name.id, position) else {
             continue;
         };
 
@@ -191,7 +193,7 @@ where
         }
 
         let variance = world
-            .template_parameter_at(head_payload.name, position)
+            .template_parameter_at(head_payload.name.id, position)
             .map(|parameter| parameter.variance)
             .unwrap_or_default();
 
@@ -215,7 +217,7 @@ where
 #[inline]
 fn build_inheritor_atom<'arena, S, A, W>(
     head_payload: ObjectAtom<'arena>,
-    inheritor: Name<'arena>,
+    inheritor: Path<'arena>,
     world: &W,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Atom<'arena>
@@ -224,7 +226,7 @@ where
     A: Arena,
     W: World<'arena>,
 {
-    let arity = world.template_parameter_arity(inheritor);
+    let arity = world.template_parameter_arity(inheritor.id);
 
     let type_arguments = if let Some(head_arguments) = head_payload.type_arguments
         && arity != 0
@@ -232,7 +234,7 @@ where
         let mut projected = builder.scratch_vec_with(arity);
         for position in 0..arity {
             let argument = world
-                .inherited_template_argument(inheritor, head_payload.name, position)
+                .inherited_template_argument(inheritor.id, head_payload.name.id, position)
                 .unwrap_or_else(|| head_arguments.get(position).copied().unwrap_or(well_known::TYPE_MIXED));
             projected.push(argument);
         }

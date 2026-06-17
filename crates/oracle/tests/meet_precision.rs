@@ -4,12 +4,12 @@ use std::collections::BTreeMap;
 
 use common::*;
 
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::lattice::LatticeOptions;
 use mago_oracle::ty::lattice::LatticeReport;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 use mago_oracle::world::World;
 
 fn meet_eq<'arena>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, expected: Type<'arena>) {

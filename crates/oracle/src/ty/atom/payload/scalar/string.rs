@@ -9,8 +9,6 @@ use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 use mago_flags::U8Flags;
 
-use crate::name::Name;
-
 /// `string` and its refinement axes: `non-empty-string`, `truthy-string`,
 /// `lowercase-string`, `numeric-string`, `callable-string`, literal values,
 /// and combinations thereof.
@@ -29,7 +27,7 @@ pub struct StringAtom<'arena> {
 pub enum StringLiteral<'arena> {
     None,
     Unspecified,
-    Value(Name<'arena>),
+    Value(&'arena [u8]),
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -64,7 +62,7 @@ impl Display for StringAtom<'_> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         let label = match self.literal {
-            StringLiteral::Value(value) => return write!(f, "string('{}')", value.as_str_lossy()),
+            StringLiteral::Value(value) => return write!(f, "string('{}')", String::from_utf8_lossy(value)),
             StringLiteral::Unspecified => label_literal_string(self),
             StringLiteral::None => label_general_string(self),
         };
@@ -164,7 +162,7 @@ impl CopyInto for StringLiteral<'_> {
         match *self {
             StringLiteral::None => StringLiteral::None,
             StringLiteral::Unspecified => StringLiteral::Unspecified,
-            StringLiteral::Value(value) => StringLiteral::Value(value.copy_into(arena)),
+            StringLiteral::Value(value) => StringLiteral::Value(arena.alloc_slice_copy(value)),
         }
     }
 }

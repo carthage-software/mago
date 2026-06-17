@@ -11,7 +11,7 @@ use mago_hir::ir::item::statement::interface::Interface;
 use mago_hir::ir::item::statement::r#trait::Trait;
 use mago_hir::walker::MutWalker;
 
-use crate::def::DefinitionTable;
+use crate::definition::DefinitionTable;
 
 /// Scans the IR and collects all definitions into a definition table.
 ///

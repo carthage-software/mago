@@ -71,7 +71,6 @@ use mago_allocator::copy::CopyInto;
 use mago_allocator::copy::copy_slice_into;
 use mago_flags::U16Flags;
 
-pub use crate::name::Name;
 pub use crate::ty::atom::Atom;
 pub use crate::ty::atom::kind::AtomKind;
 pub use crate::ty::atom::set::AtomKindSet;

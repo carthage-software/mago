@@ -2,11 +2,11 @@ mod common;
 
 use common::*;
 
-use mago_oracle::name::Name;
+use mago_oracle::path::Path;
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::hierarchy::Hierarchy;
 use mago_oracle::ty::hierarchy::HierarchyBuilder;
-use mago_oracle::world::Variance;
 
 fn build_with_template_world<'arena>(
     f: &mut Fixture<'_, 'arena>,
@@ -203,7 +203,7 @@ fn iter_yields_every_pair() {
         hierarchy_builder.add_edge(child_c, child_b, vec![]);
         let hierarchy = hierarchy_builder.build(&world, &mut f.builder);
 
-        let pairs: Vec<(Name<'_>, Name<'_>)> = hierarchy.iter().map(|(pair, _)| pair).collect();
+        let pairs: Vec<(Path<'_>, Path<'_>)> = hierarchy.iter().map(|(pair, _)| pair).collect();
         assert!(pairs.contains(&(child_b, ancestor)));
         assert!(pairs.contains(&(child_c, child_b)));
         assert!(pairs.contains(&(child_c, ancestor)));

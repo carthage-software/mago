@@ -8,7 +8,7 @@ use serde::Serialize;
 use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 
-use crate::name::Name;
+use crate::path::Path;
 use crate::ty::Type;
 
 /// A template parameter occurrence: `T` of `Foo` (or of `Foo::bar`,
@@ -16,7 +16,7 @@ use crate::ty::Type;
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GenericParameterAtom<'arena> {
-    pub name: Name<'arena>,
+    pub name: &'arena [u8],
     pub defining_entity: DefiningEntity<'arena>,
     pub constraint: Type<'arena>,
 }
@@ -25,20 +25,20 @@ pub struct GenericParameterAtom<'arena> {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DefiningEntity<'arena> {
-    ClassLike(Name<'arena>),
-    Method { class: Name<'arena>, method: Name<'arena> },
-    Function(Name<'arena>),
+    ClassLike(Path<'arena>),
+    Method { class: Path<'arena>, method: &'arena [u8] },
+    Function(Path<'arena>),
 }
 
 impl Display for DefiningEntity<'_> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            DefiningEntity::ClassLike(name) => f.write_str(&name.as_str_lossy()),
+            DefiningEntity::ClassLike(name) => name.fmt(f),
             DefiningEntity::Method { class, method } => {
-                write!(f, "{}::{}", class.as_str_lossy(), method.as_str_lossy())
+                write!(f, "{}::{}", class, String::from_utf8_lossy(method))
             }
-            DefiningEntity::Function(name) => f.write_str(&name.as_str_lossy()),
+            DefiningEntity::Function(name) => name.fmt(f),
         }
     }
 }
@@ -46,7 +46,7 @@ impl Display for DefiningEntity<'_> {
 impl Display for GenericParameterAtom<'_> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "'{}.{} extends {}", self.name.as_str_lossy(), self.defining_entity, self.constraint)
+        write!(f, "'{}.{} extends {}", String::from_utf8_lossy(self.name), self.defining_entity, self.constraint)
     }
 }
 
@@ -58,7 +58,7 @@ impl CopyInto for GenericParameterAtom<'_> {
         A: Arena,
     {
         GenericParameterAtom {
-            name: self.name.copy_into(arena),
+            name: arena.alloc_slice_copy(self.name),
             defining_entity: self.defining_entity.copy_into(arena),
             constraint: self.constraint.copy_into(arena),
         }
@@ -75,7 +75,7 @@ impl CopyInto for DefiningEntity<'_> {
         match *self {
             DefiningEntity::ClassLike(name) => DefiningEntity::ClassLike(name.copy_into(arena)),
             DefiningEntity::Method { class, method } => {
-                DefiningEntity::Method { class: class.copy_into(arena), method: method.copy_into(arena) }
+                DefiningEntity::Method { class: class.copy_into(arena), method: arena.alloc_slice_copy(method) }
             }
             DefiningEntity::Function(name) => DefiningEntity::Function(name.copy_into(arena)),
         }

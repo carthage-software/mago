@@ -1725,10 +1725,12 @@ name = "mago-oracle"
 version = "1.30.0"
 dependencies = [
  "codspeed-criterion-compat",
+ "foldhash 0.2.0",
  "mago-allocator",
  "mago-database",
  "mago-flags",
  "mago-hir",
+ "mago-php-version",
  "mago-span",
  "mago-syntax",
  "ordered-float",

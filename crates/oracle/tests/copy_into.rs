@@ -17,8 +17,8 @@ where
     S: Arena,
     A: Arena,
 {
-    let label = builder.name(b"label");
-    let hello = builder.name(b"hello");
+    let label = builder.intern(b"label");
+    let hello = builder.intern(b"hello");
     let literal = builder.string(StringAtom {
         literal: StringLiteral::Value(hello),
         casing: StringCasing::Unspecified,
@@ -34,7 +34,7 @@ where
         flags: U8Flags::empty(),
     });
 
-    let collection_name = builder.name(b"Collection");
+    let collection_name = builder.intern_class_like_path(b"Collection");
     let arguments = builder.types(&[well_known::TYPE_INT, literal_type]);
     let collection =
         builder.object(ObjectAtom { name: collection_name, type_arguments: Some(arguments), flags: U8Flags::empty() });
@@ -97,7 +97,7 @@ fn covariance_lets_static_values_mix_with_arena_values() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let name = builder.name(b"Foo");
+    let name = builder.intern_class_like_path(b"Foo");
     let foo = builder.object(ObjectAtom { name, type_arguments: None, flags: U8Flags::empty() });
     let mixed_origin = builder.union_of(&[well_known::STRING, foo]);
 

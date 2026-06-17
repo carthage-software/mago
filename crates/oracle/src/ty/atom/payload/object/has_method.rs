@@ -8,19 +8,17 @@ use serde::Serialize;
 use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 
-use crate::name::Name;
-
 /// `has-method<'foo'>`: any object exposing a method with the given name.
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct HasMethodAtom<'arena> {
-    pub method_name: Name<'arena>,
+    pub method_name: &'arena [u8],
 }
 
 impl Display for HasMethodAtom<'_> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "has-method<'{}'>", self.method_name.as_str_lossy())
+        write!(f, "has-method<'{}'>", String::from_utf8_lossy(self.method_name))
     }
 }
 
@@ -31,6 +29,6 @@ impl CopyInto for HasMethodAtom<'_> {
     where
         A: Arena,
     {
-        HasMethodAtom { method_name: self.method_name.copy_into(arena) }
+        HasMethodAtom { method_name: arena.alloc_slice_copy(self.method_name) }
     }
 }

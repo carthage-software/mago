@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use common::*;
 
-use mago_oracle::name::Name;
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::atom::payload::generic_parameter::DefiningEntity;
 use mago_oracle::ty::template;
 use mago_oracle::ty::template::BoundKind;
@@ -12,12 +12,11 @@ use mago_oracle::ty::template::StandinOptions;
 use mago_oracle::ty::template::TemplateKey;
 use mago_oracle::ty::template::TemplateState;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 
-fn key_for(class: &'static str, name: &'static str) -> TemplateKey<'static> {
+fn key_for<'arena>(f: &mut Fixture<'_, 'arena>, class: &'static str, name: &'static str) -> TemplateKey<'arena> {
     TemplateKey {
-        defining_entity: DefiningEntity::ClassLike(Name::new(class.as_bytes())),
-        name: Name::new(name.as_bytes()),
+        defining_entity: DefiningEntity::ClassLike(f.builder.intern_class_like_path(class.as_bytes())),
+        name: name.as_bytes(),
     }
 }
 
@@ -34,7 +33,7 @@ fn keyed_array_value_param_records_lower_bound() {
         let argument_atom = f.t_keyed_unsealed(well_known::TYPE_STRING, well_known::TYPE_INT, false);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("F", "T"));
+        let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds.len(), 1);
         assert_eq!(bounds[0].kind, BoundKind::Lower);
         assert_eq!(bounds[0].ty, well_known::TYPE_INT);
@@ -55,7 +54,7 @@ fn keyed_array_known_item_walked_when_arg_has_matching_key() {
         let argument_atom = f.t_keyed_sealed(BTreeMap::from([(name_key, (false, well_known::TYPE_STRING))]), false);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("F", "T"));
+        let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds[0].ty, well_known::TYPE_STRING);
     });
 }
@@ -75,8 +74,8 @@ fn keyed_array_against_iterable_walks_key_and_value_params() {
         let argument_atom = f.t_iterable(well_known::TYPE_STRING, well_known::TYPE_INT);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        assert_eq!(state.bounds_for(key_for("F", "K"))[0].ty, well_known::TYPE_STRING);
-        assert_eq!(state.bounds_for(key_for("F", "V"))[0].ty, well_known::TYPE_INT);
+        assert_eq!(state.bounds_for(key_for(f, "F", "K"))[0].ty, well_known::TYPE_STRING);
+        assert_eq!(state.bounds_for(key_for(f, "F", "V"))[0].ty, well_known::TYPE_INT);
     });
 }
 
@@ -93,7 +92,7 @@ fn callable_return_walked_covariantly() {
         let argument_atom = f.t_callable(&[], well_known::TYPE_INT);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("F", "T"));
+        let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds.len(), 1);
         assert_eq!(bounds[0].kind, BoundKind::Lower);
         assert_eq!(bounds[0].ty, well_known::TYPE_INT);
@@ -113,7 +112,7 @@ fn callable_parameter_walked_contravariantly() {
         let argument_atom = f.t_callable(&[well_known::TYPE_INT], well_known::TYPE_VOID);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("F", "T"));
+        let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds.len(), 1);
         assert_eq!(bounds[0].kind, BoundKind::Upper);
         assert_eq!(bounds[0].ty, well_known::TYPE_INT);
@@ -135,10 +134,10 @@ fn callable_records_both_param_and_return_bounds() {
         let argument_atom = f.t_callable(&[well_known::TYPE_INT], well_known::TYPE_STRING);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        assert_eq!(state.bounds_for(key_for("F", "P"))[0].kind, BoundKind::Upper);
-        assert_eq!(state.bounds_for(key_for("F", "P"))[0].ty, well_known::TYPE_INT);
-        assert_eq!(state.bounds_for(key_for("F", "R"))[0].kind, BoundKind::Lower);
-        assert_eq!(state.bounds_for(key_for("F", "R"))[0].ty, well_known::TYPE_STRING);
+        assert_eq!(state.bounds_for(key_for(f, "F", "P"))[0].kind, BoundKind::Upper);
+        assert_eq!(state.bounds_for(key_for(f, "F", "P"))[0].ty, well_known::TYPE_INT);
+        assert_eq!(state.bounds_for(key_for(f, "F", "R"))[0].kind, BoundKind::Lower);
+        assert_eq!(state.bounds_for(key_for(f, "F", "R"))[0].ty, well_known::TYPE_STRING);
     });
 }
 
@@ -159,7 +158,7 @@ fn descendant_class_arg_threads_through_extension_binding() {
         let argument_atom = f.t_named("B");
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("F", "T"));
+        let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds.len(), 1);
         assert_eq!(bounds[0].ty, well_known::TYPE_INT);
     });
@@ -184,7 +183,7 @@ fn descendant_class_arg_substitutes_own_template_args() {
         let argument_atom = f.t_generic_named("B", vec![well_known::TYPE_STRING]);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("F", "T"));
+        let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds[0].ty, well_known::TYPE_STRING);
     });
 }
@@ -215,7 +214,7 @@ fn iteration_depth_zero_records_top_level_binding() {
         let template = f.t_template("F", "T");
         let parameter = f.u(template);
         template::standin(parameter, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
-        assert_eq!(state.bounds_for(key_for("F", "T")).len(), 1, "the depth 0 walk fires before the cutoff check");
+        assert_eq!(state.bounds_for(key_for(f, "F", "T")).len(), 1, "the depth 0 walk fires before the cutoff check");
     });
 }
 
@@ -286,6 +285,6 @@ fn keyed_array_known_value_against_lit_walks_to_lit_bound() {
         let argument_atom = f.t_keyed_sealed(BTreeMap::from([(value_key, (false, forty_two))]), false);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        assert_eq!(state.bounds_for(key_for("F", "T"))[0].ty, forty_two);
+        assert_eq!(state.bounds_for(key_for(f, "F", "T"))[0].ty, forty_two);
     });
 }

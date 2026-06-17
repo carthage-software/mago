@@ -4,10 +4,10 @@ use common::assert_multiset_eq;
 use common::empty_world;
 use common::fixture;
 
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::well_known;
 use mago_oracle::world::EnumBacking;
-use mago_oracle::world::Variance;
 use mago_oracle::world::World;
 
 #[test]
@@ -178,14 +178,14 @@ fn mock_world_answers_hierarchy_queries() {
         let helper = f.name("Helper");
         let stranger = f.name("Stranger");
 
-        assert!(f.world.descends_from(child, child));
-        assert!(f.world.descends_from(child, parent));
-        assert!(f.world.descends_from(child, grand_parent));
-        assert!(!f.world.descends_from(parent, child));
-        assert!(!f.world.descends_from(child, stranger));
+        assert!(f.world.descends_from(child.id, child.id));
+        assert!(f.world.descends_from(child.id, parent.id));
+        assert!(f.world.descends_from(child.id, grand_parent.id));
+        assert!(!f.world.descends_from(parent.id, child.id));
+        assert!(!f.world.descends_from(child.id, stranger.id));
 
-        assert!(f.world.uses_trait(child, helper));
-        assert!(!f.world.uses_trait(parent, helper));
+        assert!(f.world.uses_trait(child.id, helper.id));
+        assert!(!f.world.uses_trait(parent.id, helper.id));
     });
 }
 
@@ -199,18 +199,18 @@ fn mock_world_answers_template_queries() {
 
         let container = f.name("Container");
         let int_map = f.name("IntMap");
-        let v = f.name("V");
+        let v = f.builder.intern(b"V");
 
-        assert_eq!(f.world.template_parameter_arity(container), 2);
-        assert_eq!(f.world.template_parameter_index(container, v), Some(1));
+        assert_eq!(f.world.template_parameter_arity(container.id), 2);
+        assert_eq!(f.world.template_parameter_index(container.id, v), Some(1));
 
-        let Some(parameter) = f.world.template_parameter_at(container, 1) else {
+        let Some(parameter) = f.world.template_parameter_at(container.id, 1) else {
             panic!("Container must declare a second template parameter");
         };
         assert_eq!(parameter.variance, Variance::Covariant);
 
-        assert_eq!(f.world.inherited_template_argument(int_map, container, 0), Some(int));
-        assert_eq!(f.world.inherited_template_argument(int_map, container, 1), Some(string));
+        assert_eq!(f.world.inherited_template_argument(int_map.id, container.id, 0), Some(int));
+        assert_eq!(f.world.inherited_template_argument(int_map.id, container.id, 1), Some(string));
     });
 }
 
@@ -225,31 +225,31 @@ fn mock_world_answers_member_queries() {
         f.world.add_edge("Bar", "Foo");
         f.world.with_property("Bar", "label", string);
         f.world.with_backed_enum("Suit", string);
-        f.world.with_sealed("Shape", &["Circle", "Square"]);
+        f.world.with_sealed(&mut f.builder, "Shape", &["Circle", "Square"]);
 
         let foo = f.name("Foo");
         let bar = f.name("Bar");
-        let run = f.name("run");
-        let count = f.name("count");
-        let label = f.name("label");
+        let run = f.builder.intern(b"run");
+        let count = f.builder.intern(b"count");
+        let label = f.builder.intern(b"label");
         let suit = f.name("Suit");
         let shape = f.name("Shape");
         let circle = f.name("Circle");
 
-        assert!(f.world.class_has_method(foo, run));
-        assert!(f.world.class_has_method(bar, run));
-        assert_eq!(f.world.class_property_type(bar, count), Some(int));
-        assert!(f.world.class_has_property(bar, label));
-        assert_eq!(f.world.class_property_count(bar), 2);
+        assert!(f.world.class_has_method(foo.id, run));
+        assert!(f.world.class_has_method(bar.id, run));
+        assert_eq!(f.world.class_property_type(bar.id, count), Some(int));
+        assert!(f.world.class_has_property(bar.id, label));
+        assert_eq!(f.world.class_property_count(bar.id), 2);
 
-        assert_eq!(f.world.enum_backing(suit), Some(EnumBacking::Backed(string)));
-        assert!(f.world.is_final(suit));
+        assert_eq!(f.world.enum_backing(suit.id), Some(EnumBacking::Backed(string)));
+        assert!(f.world.is_final(suit.id));
 
-        let Some(inheritors) = f.world.sealed_direct_inheritors(shape) else {
+        let Some(inheritors) = f.world.sealed_direct_inheritors(shape.id) else {
             panic!("Shape must be sealed");
         };
         assert_eq!(inheritors.len(), 2);
-        assert_eq!(f.world.sealed_parent_of(circle).map(|name| name.as_bytes().to_vec()), Some(b"Shape".to_vec()));
+        assert_eq!(f.world.sealed_parent_of(circle.id).map(|name| name.as_bytes().to_vec()), Some(b"Shape".to_vec()));
     });
 }
 
@@ -260,8 +260,8 @@ fn null_world_knows_nothing() {
         let foo = f.name("Foo");
         let bar = f.name("Bar");
 
-        assert!(!World::descends_from(&world, foo, bar));
-        assert_eq!(World::template_parameter_arity(&world, foo), 0);
-        assert_eq!(World::class_like_kind(&world, foo), None);
+        assert!(!World::descends_from(&world, foo.id, bar.id));
+        assert_eq!(World::template_parameter_arity(&world, foo.id), 0);
+        assert_eq!(World::class_like_kind(&world, foo.id), None);
     });
 }

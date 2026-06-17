@@ -325,7 +325,7 @@ where
     match key {
         ArrayKey::Int(value) => builder.union_of(&[Atom::int_literal(value)]),
         ArrayKey::String(name) => {
-            let literal = builder.string_literal(name.as_bytes());
+            let literal = builder.string_literal(name);
 
             builder.union_of(&[literal])
         }

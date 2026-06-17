@@ -61,7 +61,8 @@ use std::collections::BTreeMap;
 use mago_allocator::Arena;
 use mago_span::Span;
 
-use crate::name::Name;
+use crate::path::Path;
+use crate::symbol::part::generic::Variance;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
@@ -86,7 +87,6 @@ use crate::ty::template::BoundKind;
 use crate::ty::template::StandinOptions;
 use crate::ty::template::TemplateKey;
 use crate::ty::well_known;
-use crate::world::Variance;
 use crate::world::World;
 
 impl StandinOptions {
@@ -435,7 +435,7 @@ fn walk_type<'arena, S, A, W>(
     argument: Type<'arena>,
     variance: Variance,
     depth: u32,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     world: &W,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
@@ -519,7 +519,7 @@ fn walk_atom<'arena, S, A, W>(
     argument: Type<'arena>,
     variance: Variance,
     depth: u32,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     world: &W,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
@@ -568,7 +568,7 @@ fn walk_generic_parameter<'arena>(
     argument: Type<'arena>,
     variance: Variance,
     depth: u32,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
 ) -> Walk<'arena> {
@@ -613,7 +613,7 @@ fn walk_generic_parameter<'arena>(
 fn walk_object<'arena, S, A, W>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     depth: u32,
     world: &W,
     state: &mut TemplateState<'arena>,
@@ -660,7 +660,7 @@ where
 fn walk_reference<'arena, S, A, W>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     depth: u32,
     world: &W,
     state: &mut TemplateState<'arena>,
@@ -705,7 +705,7 @@ where
 /// `Reference` atoms share. The standin co-traverses both identically.
 #[derive(Clone, Copy)]
 struct NamedGenericView<'arena> {
-    name: Name<'arena>,
+    name: Path<'arena>,
     type_arguments: Option<&'arena [Type<'arena>]>,
 }
 
@@ -726,10 +726,10 @@ fn named_generic_view(atom: Atom<'_>) -> Option<NamedGenericView<'_>> {
 /// argument atom names `container_name` (or a descendant) or nothing changed.
 #[inline]
 fn refine_named_generic_arguments<'arena, S, A, W>(
-    container_name: Name<'arena>,
+    container_name: Path<'arena>,
     parameter_arguments: &'arena [Type<'arena>],
     argument: Type<'arena>,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     depth: u32,
     world: &W,
     state: &mut TemplateState<'arena>,
@@ -743,7 +743,7 @@ where
 {
     let argument_view = argument.atoms.iter().copied().find_map(|atom| {
         named_generic_view(atom)
-            .filter(|view| view.name == container_name || world.descends_from(view.name, container_name))
+            .filter(|view| view.name == container_name || world.descends_from(view.name.id, container_name.id))
     })?;
 
     let mut new_arguments: Vec<Type<'arena>> = Vec::with_capacity(parameter_arguments.len());
@@ -751,7 +751,7 @@ where
     for (position, &parameter_argument) in parameter_arguments.iter().enumerate() {
         let projected = projected_named_argument(container_name, argument_view, position, world, builder);
         let position_variance = world
-            .template_parameter_at(container_name, position)
+            .template_parameter_at(container_name.id, position)
             .map_or(Variance::Invariant, |template_parameter| template_parameter.variance);
         let nested_introducing_class = match position_variance {
             Variance::Invariant => Some(container_name),
@@ -787,7 +787,7 @@ where
 /// the argument's own template arguments into the inherited expression.
 #[inline]
 fn projected_named_argument<'arena, S, A, W>(
-    container_class: Name<'arena>,
+    container_class: Path<'arena>,
     argument_view: NamedGenericView<'arena>,
     position: usize,
     world: &W,
@@ -803,7 +803,7 @@ where
         return type_arguments.get(position).copied();
     }
 
-    let inherited = world.inherited_template_argument(argument_view.name, container_class, position)?;
+    let inherited = world.inherited_template_argument(argument_view.name.id, container_class.id, position)?;
 
     let actual_arguments: &[Type<'arena>] = argument_view.type_arguments.unwrap_or_default();
     let argument_entity = DefiningEntity::ClassLike(argument_view.name);
@@ -814,7 +814,7 @@ where
             if payload.defining_entity != argument_entity {
                 return None;
             }
-            let parameter_position = world.template_parameter_index(argument_view.name, payload.name)?;
+            let parameter_position = world.template_parameter_index(argument_view.name.id, payload.name)?;
             actual_arguments.get(parameter_position).copied()
         },
         builder,
@@ -831,7 +831,7 @@ fn walk_class_like_string<'arena, S, A, W>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     world: &W,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
@@ -917,7 +917,7 @@ fn walk_object_shape<'arena, S, A, W>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     world: &W,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
@@ -984,7 +984,7 @@ fn walk_list<'arena, S, A, W>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     world: &W,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
@@ -1034,7 +1034,7 @@ fn walk_iterable<'arena, S, A, W>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     world: &W,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
@@ -1099,7 +1099,7 @@ fn walk_keyed_array<'arena, S, A, W>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     world: &W,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
@@ -1220,7 +1220,7 @@ fn walk_callable<'arena, S, A, W>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
-    introducing_class: Option<Name<'arena>>,
+    introducing_class: Option<Path<'arena>>,
     world: &W,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,

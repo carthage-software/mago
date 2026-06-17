@@ -8,13 +8,13 @@ use serde::Serialize;
 use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 
-use crate::name::Name;
+use crate::var::Var;
 
 /// A type variable bound to a PHP variable, e.g. `$x` in `@assert` clauses.
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct VariableAtom<'arena> {
-    pub name: Name<'arena>,
+    pub name: Var<'arena>,
 }
 
 impl Display for VariableAtom<'_> {

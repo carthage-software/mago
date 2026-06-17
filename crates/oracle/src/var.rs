@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result as FmtResult;
+use std::hash::Hash;
 
 #[cfg(feature = "serde")]
 use serde::Serialize;
@@ -9,22 +10,22 @@ use serde::Serialize;
 use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 
-/// A symbol name: class-like, function, method, property, constant, template
-/// parameter, or variable.
-///
-/// Names are exact byte sequences; equality, ordering, and hashing are all
-/// byte-wise. PHP's case-insensitive lookups (class and function names) are a
-/// resolution concern that belongs to [`World`](crate::world) implementations,
-/// never to name identity.
 #[cfg_attr(feature = "serde", derive(Serialize))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Name<'arena>(&'arena [u8]);
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
+pub struct Var<'arena>(&'arena [u8]);
 
-impl<'arena> Name<'arena> {
+impl<'arena> Var<'arena> {
     #[inline]
     #[must_use]
-    pub const fn new(bytes: &'arena [u8]) -> Self {
-        Self(bytes)
+    pub const fn new(name: &'arena [u8]) -> Self {
+        Self(name)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn name(self) -> &'arena [u8] {
+        self.0
     }
 
     #[inline]
@@ -52,20 +53,20 @@ impl<'arena> Name<'arena> {
     }
 }
 
-impl Display for Name<'_> {
+impl Display for Var<'_> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.write_str(&self.as_str_lossy())
     }
 }
 
-impl CopyInto for Name<'_> {
-    type Output<'arena> = Name<'arena>;
+impl CopyInto for Var<'_> {
+    type Output<'arena> = Var<'arena>;
 
     fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
     where
         A: Arena,
     {
-        Name(arena.alloc_slice_copy(self.0))
+        Var(arena.alloc_slice_copy(self.0))
     }
 }
