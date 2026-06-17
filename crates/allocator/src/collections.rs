@@ -1,5 +1,3 @@
-pub use hashbrown::*;
-
 /// The default hash builder used by the arena-backed hash collections.
 pub use hashbrown::DefaultHashBuilder;
 
