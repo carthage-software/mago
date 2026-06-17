@@ -104,6 +104,7 @@ test_case!(arrays_array_reverse_list);
 test_case!(arrays_array_search);
 test_case!(arrays_array_shift);
 test_case!(arrays_array_slice_list);
+test_case!(arrays_array_splice_list);
 test_case!(arrays_array_sum);
 test_case!(arrays_array_unique);
 test_case!(arrays_array_unshift);

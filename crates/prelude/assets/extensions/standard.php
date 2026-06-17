@@ -4661,6 +4661,8 @@ function array_unshift(array &$array, mixed ...$values): int {}
  *   )
  * ) $array
  *
+ * @return ($array is list<InputValue> ? list<InputValue> : array<InputKey, InputValue>)
+ *
  * @pure
  */
 function array_splice(array &$array, int $offset, ?int $length = null, mixed $replacement = []): array {}
