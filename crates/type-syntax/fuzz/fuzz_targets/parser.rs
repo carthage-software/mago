@@ -3,6 +3,7 @@
 #![no_main]
 #![allow(deprecated)]
 
+use mago_allocator::Arena;
 use mago_allocator::LocalArena;
 use libfuzzer_sys::fuzz_target;
 
