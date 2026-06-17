@@ -1,6 +1,4 @@
-use itoa::Buffer as IntegerBuffer;
 use mago_allocator::Arena;
-use mago_allocator::vec::Vec;
 
 use mago_span::HasSpan;
 use mago_syntax::cst;
@@ -28,20 +26,8 @@ where
         let implements = anonymous_class.implements.as_ref().map(|implements| self.lower_implements(implements));
 
         let span = anonymous_class.span();
-        let line = self.file.line_number(span.start.offset).saturating_add(1);
-        let column = self.file.column_number(span.start.offset).saturating_add(1);
-        let mut line_buffer = IntegerBuffer::new();
-        let mut column_buffer = IntegerBuffer::new();
-        let mut owner_name = Vec::new_in(self.arena);
-        owner_name.extend_from_slice(b"{anonymous-class:");
-        owner_name.extend_from_slice(self.file.name.as_ref());
-        owner_name.push(b':');
-        owner_name.extend_from_slice(line_buffer.format(line).as_bytes());
-        owner_name.push(b':');
-        owner_name.extend_from_slice(column_buffer.format(column).as_bytes());
-        owner_name.push(b'}');
-
-        let owner = Identifier { span, value: owner_name.leak(), kind: IdentifierKind::Local };
+        let name = self.build_synthetic_name(b"anonymous-class", span);
+        let owner = Identifier { span, value: name, kind: IdentifierKind::Local };
         let document = self.phpdoc_resolution.get(anonymous_class.span());
         self.type_resolution.enter_scope(TypeParameterDefiningEntity::ClassLike(owner));
         let annotation = self.lower_item_annotation(document.as_ref(), Some(owner));
@@ -53,6 +39,6 @@ where
 
         self.type_resolution.leave_scope();
 
-        self.arena.alloc(AnonymousClass { span, annotation, attributes, arguments, extends, implements, members })
+        self.arena.alloc(AnonymousClass { span, name, annotation, attributes, arguments, extends, implements, members })
     }
 }

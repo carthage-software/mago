@@ -53,6 +53,8 @@ pub enum TypeAnnotationKind<'arena> {
     Numeric,
     ArrayKey,
     Scalar,
+    Empty,
+    EmptyScalar,
     MemberReference(Identifier<'arena>, MemberReferenceSelector<'arena>),
     AliasReference(ReferenceKind<'arena>, Name<'arena>),
     Shape(ShapeTypeAnnotation<'arena>),
@@ -318,6 +320,8 @@ impl CopyInto for TypeAnnotationKind<'_> {
             TypeAnnotationKind::Numeric => TypeAnnotationKind::Numeric,
             TypeAnnotationKind::ArrayKey => TypeAnnotationKind::ArrayKey,
             TypeAnnotationKind::Scalar => TypeAnnotationKind::Scalar,
+            TypeAnnotationKind::Empty => TypeAnnotationKind::Empty,
+            TypeAnnotationKind::EmptyScalar => TypeAnnotationKind::EmptyScalar,
             TypeAnnotationKind::MemberReference(identifier, selector) => {
                 TypeAnnotationKind::MemberReference(identifier.copy_into(arena), selector.copy_into(arena))
             }

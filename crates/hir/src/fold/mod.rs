@@ -1525,6 +1525,7 @@ generate_fold! {
     AnonymousClass as anonymous_class => {
         AnonymousClass {
             span: anonymous_class.span,
+            name: folder.arena().alloc_slice_copy(anonymous_class.name),
             annotation: anonymous_class.annotation.map(|annotation| &*folder.arena().alloc(folder.fold_item_annotation(annotation))),
             attributes: folder.arena().alloc_slice_fill_iter(
                 anonymous_class.attributes.iter().map(|attribute| folder.fold_attribute(attribute)),
@@ -1542,6 +1543,7 @@ generate_fold! {
     Closure as closure => {
         Closure {
             span: closure.span,
+            name: folder.arena().alloc_slice_copy(closure.name),
             annotation: closure.annotation.map(|annotation| &*folder.arena().alloc(folder.fold_item_annotation(annotation))),
             attributes: folder
                 .arena()
@@ -1558,6 +1560,7 @@ generate_fold! {
     ArrowFunction as arrow_function => {
         ArrowFunction {
             span: arrow_function.span,
+            name: folder.arena().alloc_slice_copy(arrow_function.name),
             annotation: arrow_function.annotation.map(|annotation| &*folder.arena().alloc(folder.fold_item_annotation(annotation))),
             attributes: folder.arena().alloc_slice_fill_iter(
                 arrow_function.attributes.iter().map(|attribute| folder.fold_attribute(attribute)),

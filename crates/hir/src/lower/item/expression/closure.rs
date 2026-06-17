@@ -78,6 +78,7 @@ where
 
         self.arena.alloc(Closure {
             span: closure.span(),
+            name: self.build_synthetic_name(b"closure", closure.span()),
             annotation,
             attributes,
             flags,

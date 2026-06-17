@@ -2,6 +2,8 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
 use mago_phpdoc_syntax::cst::tag::TemplateTagValueVariance;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -9,8 +11,6 @@ use mago_span::Span;
 use crate::ir::identifier::Identifier;
 use crate::ir::name::Name;
 use crate::ir::r#type::annotation::TypeAnnotation;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_ref_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]

@@ -2,6 +2,9 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -13,14 +16,12 @@ use crate::ir::item::attribute::Attribute;
 use crate::ir::item::inheritance::Extends;
 use crate::ir::item::inheritance::Implements;
 use crate::ir::item::member::MemberItem;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_ref_into;
-use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct AnonymousClass<'arena, I, S, E> {
     pub span: Span,
+    pub name: &'arena [u8],
     pub annotation: Option<&'arena ItemAnnotation<'arena, I, S, E>>,
     pub attributes: &'arena [Attribute<'arena, I, S, E>],
     pub arguments: Option<Delimited<'arena, Argument<'arena, I, S, E>>>,
@@ -43,6 +44,7 @@ where
     {
         AnonymousClass {
             span: self.span,
+            name: arena.alloc_slice_copy(self.name),
             annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
             attributes: copy_slice_into(self.attributes, arena),
             arguments: self.arguments.as_ref().map(|node| node.copy_into(arena)),

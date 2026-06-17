@@ -1,7 +1,10 @@
+use itoa::Buffer as IntegerBuffer;
+
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
 use mago_database::file::File;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst::Program;
 
 use crate::ir::IR;
@@ -100,6 +103,32 @@ where
 
     pub(crate) fn leave_function_like_body(&mut self, outer: BodyEffects<'arena, A>) -> BodyEffects<'arena, A> {
         std::mem::replace(&mut self.body_effects, outer)
+    }
+
+    /// Builds the synthetic display name for an anonymous construct (closure,
+    /// arrow function, or anonymous class).
+    ///
+    /// Format: `{<prefix>:<workspace-relative path>:<line>:<column>}`, with
+    /// 1-based line and column computed from the span's start offset, matching
+    /// PHP's own `{closure:...}` stringification.
+    pub(crate) fn build_synthetic_name(&self, prefix: &[u8], span: Span) -> &'arena [u8] {
+        let line = self.file.line_number(span.start.offset).saturating_add(1);
+        let column = self.file.column_number(span.start.offset).saturating_add(1);
+
+        let mut line_buffer = IntegerBuffer::new();
+        let mut column_buffer = IntegerBuffer::new();
+
+        let mut name = Vec::new_in(self.arena);
+        name.push(b'{');
+        name.extend_from_slice(prefix);
+        name.push(b':');
+        name.extend_from_slice(self.file.name.as_ref());
+        name.push(b':');
+        name.extend_from_slice(line_buffer.format(line).as_bytes());
+        name.push(b':');
+        name.extend_from_slice(column_buffer.format(column).as_bytes());
+        name.push(b'}');
+        name.leak()
     }
 
     #[must_use]

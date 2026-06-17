@@ -42,6 +42,7 @@ pub enum ClosureUseClauseVariableFlag {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct Closure<'arena, I, S, E> {
     pub span: Span,
+    pub name: &'arena [u8],
     pub annotation: Option<&'arena ItemAnnotation<'arena, I, S, E>>,
     pub attributes: &'arena [Attribute<'arena, I, S, E>],
     pub flags: U8Flags<ClosureFlag>,
@@ -96,6 +97,7 @@ where
     {
         Closure {
             span: self.span,
+            name: arena.alloc_slice_copy(self.name),
             annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
             attributes: copy_slice_into(self.attributes, arena),
             flags: self.flags,

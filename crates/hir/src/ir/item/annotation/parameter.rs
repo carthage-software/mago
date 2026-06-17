@@ -2,14 +2,14 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ir::expression::Expression;
 use crate::ir::r#type::annotation::TypeAnnotation;
 use crate::ir::variable::DirectVariable;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_ref_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]

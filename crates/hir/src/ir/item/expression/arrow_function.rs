@@ -2,6 +2,9 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 use mago_flags::U8Flags;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -13,9 +16,6 @@ use crate::ir::item::annotation::ItemAnnotation;
 use crate::ir::item::attribute::Attribute;
 use crate::ir::item::parameter::Parameter;
 use crate::ir::r#type::Type;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_ref_into;
-use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
@@ -33,6 +33,7 @@ pub enum ArrowFunctionFlag {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct ArrowFunction<'arena, I, S, E> {
     pub span: Span,
+    pub name: &'arena [u8],
     pub annotation: Option<&'arena ItemAnnotation<'arena, I, S, E>>,
     pub attributes: &'arena [Attribute<'arena, I, S, E>],
     pub flags: U8Flags<ArrowFunctionFlag>,
@@ -66,6 +67,7 @@ where
     {
         ArrowFunction {
             span: self.span,
+            name: arena.alloc_slice_copy(self.name),
             annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
             attributes: copy_slice_into(self.attributes, arena),
             flags: self.flags,

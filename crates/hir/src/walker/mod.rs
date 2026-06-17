@@ -1439,6 +1439,8 @@ generate_walker! {
             | TypeAnnotationKind::Numeric
             | TypeAnnotationKind::ArrayKey
             | TypeAnnotationKind::Scalar
+            | TypeAnnotationKind::Empty
+            | TypeAnnotationKind::EmptyScalar
             | TypeAnnotationKind::ThisVariable
             | TypeAnnotationKind::IntRange(_, _)
             | TypeAnnotationKind::Wildcard => {}

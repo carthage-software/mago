@@ -55,6 +55,7 @@ where
 
         self.arena.alloc(ArrowFunction {
             span: arrow_function.span(),
+            name: self.build_synthetic_name(b"closure", arrow_function.span()),
             annotation,
             attributes,
             flags,

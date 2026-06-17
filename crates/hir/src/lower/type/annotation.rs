@@ -127,6 +127,8 @@ where
             Type::ArrayKey(_) => self.array_key_kind(),
             Type::Numeric(_) => TypeAnnotationKind::Numeric,
             Type::Scalar(_) => self.scalar_kind(),
+            Type::Empty(_) => TypeAnnotationKind::Empty,
+            Type::EmptyScalar(_) => TypeAnnotationKind::EmptyScalar,
             Type::CallableString(_) => self.string(ty.span(), None, None, false, false, false, true),
             Type::LowercaseCallableString(_) => {
                 self.string(ty.span(), Some(StringCasing::Lowercase), None, false, false, false, true)
