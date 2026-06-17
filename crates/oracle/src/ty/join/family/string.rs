@@ -3,7 +3,6 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 
-use crate::name::Name;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::scalar::string::StringAtom;
 use crate::ty::atom::payload::scalar::string::StringCasing;
@@ -38,7 +37,7 @@ where
 {
     let mut other: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(atoms.len());
     let mut general: Option<StringAtom<'arena>> = None;
-    let mut literals: ScratchVec<'scratch, Name<'arena>, S> = builder.scratch_vec();
+    let mut literals: ScratchVec<'scratch, &'arena [u8], S> = builder.scratch_vec();
 
     for &atom in atoms {
         let Atom::String(payload) = atom else {
@@ -48,7 +47,7 @@ where
         let payload = *payload;
         if let StringLiteral::Value(value) = payload.literal {
             if let Some(ref mut existing) = general {
-                let literal_value = value.as_bytes();
+                let literal_value = value;
                 let incompatible = (existing.flags.contains(StringRefinementFlag::Numeric)
                     && !is_numeric_string(literal_value))
                     || (existing.flags.contains(StringRefinementFlag::Truthy)
@@ -75,9 +74,9 @@ where
                     || new_payload.flags.contains(StringRefinementFlag::Numeric)
                     || new_payload.casing != StringCasing::Unspecified
                 {
-                    let mut kept_literals: ScratchVec<'scratch, Name<'arena>, S> = builder.scratch_vec();
+                    let mut kept_literals: ScratchVec<'scratch, &'arena [u8], S> = builder.scratch_vec();
                     for literal in &literals {
-                        let value = literal.as_bytes();
+                        let value = *literal;
                         if value.is_empty() {
                             let has_other_flags = new_payload.flags.contains(StringRefinementFlag::Truthy)
                                 || new_payload.flags.contains(StringRefinementFlag::Numeric);
@@ -137,7 +136,7 @@ where
     }
 
     let mut new_strings: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(literals.len());
-    new_strings.extend(literals.into_iter().map(|literal| builder.string_literal(literal.as_bytes())));
+    new_strings.extend(literals.into_iter().map(|literal| builder.string_literal(literal)));
     if let Some(payload) = general {
         new_strings.push(builder.string(payload));
     }
@@ -162,11 +161,11 @@ fn combine_string_atoms<'arena>(left: StringAtom<'arena>, right: StringAtom<'are
 
     let left_casing_neutral = matches!(
         left.literal,
-        StringLiteral::Value(value) if value.as_bytes().iter().all(|byte| !byte.is_ascii_alphabetic())
+        StringLiteral::Value(value) if value.iter().all(|byte| !byte.is_ascii_alphabetic())
     );
     let right_casing_neutral = matches!(
         right.literal,
-        StringLiteral::Value(value) if value.as_bytes().iter().all(|byte| !byte.is_ascii_alphabetic())
+        StringLiteral::Value(value) if value.iter().all(|byte| !byte.is_ascii_alphabetic())
     );
     let casing = match (left.casing, right.casing) {
         (StringCasing::Lowercase, StringCasing::Lowercase) => StringCasing::Lowercase,

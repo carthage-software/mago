@@ -9,6 +9,7 @@ use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 use mago_allocator::copy::copy_slice_into;
 
+use crate::symbol::class_like::part::visibility::Visibility;
 use crate::ty::Type;
 
 /// A type derived from another type: `key-of<T>`, `value-of<T>`, `T[K]`,
@@ -42,27 +43,6 @@ pub enum DerivedAtom<'arena> {
     /// `new<T>`: if `T` is `class-string<Foo>` or a literal class-string,
     /// produce `Foo` (the instance type).
     New(Type<'arena>),
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize))]
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Visibility {
-    Public,
-    Protected,
-    Private,
-}
-
-impl Visibility {
-    #[inline]
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Visibility::Public => "public",
-            Visibility::Protected => "protected",
-            Visibility::Private => "private",
-        }
-    }
 }
 
 impl Display for DerivedAtom<'_> {

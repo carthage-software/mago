@@ -11,7 +11,7 @@ use mago_allocator::copy::CopyInto;
 use mago_allocator::copy::copy_slice_into;
 use mago_flags::U8Flags;
 
-use crate::name::Name;
+use crate::path::Path;
 use crate::ty::Type;
 
 /// A literal key in a keyed-array shape.
@@ -22,8 +22,8 @@ use crate::ty::Type;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ArrayKey<'arena> {
     Int(i64),
-    String(Name<'arena>),
-    Const { class: Name<'arena>, name: Name<'arena> },
+    String(&'arena [u8]),
+    Const { class: Path<'arena>, name: &'arena [u8] },
 }
 
 /// One entry in a keyed-array shape's known items list.
@@ -111,8 +111,10 @@ impl Display for ArrayKey<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             ArrayKey::Int(value) => write!(f, "{value}"),
-            ArrayKey::String(name) => write!(f, "'{}'", name.as_str_lossy()),
-            ArrayKey::Const { class, name } => write!(f, "{}::{}", class.as_str_lossy(), name.as_str_lossy()),
+            ArrayKey::String(name) => write!(f, "'{}'", String::from_utf8_lossy(name)),
+            ArrayKey::Const { class, name } => {
+                write!(f, "{}::{}", class, String::from_utf8_lossy(name))
+            }
         }
     }
 }
@@ -197,9 +199,9 @@ impl CopyInto for ArrayKey<'_> {
     {
         match *self {
             ArrayKey::Int(value) => ArrayKey::Int(value),
-            ArrayKey::String(name) => ArrayKey::String(name.copy_into(arena)),
+            ArrayKey::String(name) => ArrayKey::String(arena.alloc_slice_copy(name)),
             ArrayKey::Const { class, name } => {
-                ArrayKey::Const { class: class.copy_into(arena), name: name.copy_into(arena) }
+                ArrayKey::Const { class: class.copy_into(arena), name: arena.alloc_slice_copy(name) }
             }
         }
     }

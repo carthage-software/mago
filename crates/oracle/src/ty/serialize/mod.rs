@@ -49,7 +49,7 @@ use mago_flags::U8Flags;
 use mago_flags::U16Flags;
 use mago_span::Span;
 
-use crate::name::Name;
+use crate::symbol::class_like::part::visibility::Visibility;
 use crate::ty::Type;
 use crate::ty::Typed;
 use crate::ty::atom::Atom;
@@ -69,7 +69,6 @@ use crate::ty::atom::payload::callable::Signature;
 use crate::ty::atom::payload::callable::SignatureFlag;
 use crate::ty::atom::payload::conditional::ConditionalAtom;
 use crate::ty::atom::payload::derived::DerivedAtom;
-use crate::ty::atom::payload::derived::Visibility;
 use crate::ty::atom::payload::generic_parameter::DefiningEntity;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use crate::ty::atom::payload::iterable::IterableAtom;
@@ -101,6 +100,7 @@ use crate::ty::atom::payload::scalar::string::StringRefinementFlag;
 use crate::ty::atom::payload::variable::VariableAtom;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::well_known;
+use crate::var::Var;
 
 /// Self-contained structural form of a [`Type`].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -414,7 +414,7 @@ pub enum SerializableDerived {
     ValueOf(Box<SerializableType>),
     PropertiesOf {
         target: Box<SerializableType>,
-        visibility: Option<SerializableVisibility>,
+        visibility: Option<Visibility>,
     },
     IndexAccess {
         target: Box<SerializableType>,
@@ -428,15 +428,6 @@ pub enum SerializableDerived {
         template_name: Box<SerializableType>,
     },
     New(Box<SerializableType>),
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[non_exhaustive]
-pub enum SerializableVisibility {
-    Public,
-    Protected,
-    Private,
 }
 
 impl Type<'_> {
@@ -523,8 +514,8 @@ fn encode_type(ty: Type<'_>) -> SerializableType {
 }
 
 #[inline]
-fn encode_name(name: Name<'_>) -> Vec<u8> {
-    name.as_bytes().to_vec()
+fn encode_name(name: &[u8]) -> Vec<u8> {
+    name.to_vec()
 }
 
 #[inline]
@@ -554,7 +545,7 @@ fn encode_atom(atom: Atom<'_>) -> SerializableAtom {
             specifier: encode_class_like_specifier(payload.specifier),
         },
         Atom::Object(payload) => SerializableAtom::Object {
-            name: encode_name(payload.name),
+            name: encode_name(payload.name.as_bytes()),
             type_arguments: payload
                 .type_arguments
                 .map(|type_arguments| type_arguments.iter().map(|&ty| encode_type(ty)).collect()),
@@ -563,7 +554,7 @@ fn encode_atom(atom: Atom<'_>) -> SerializableAtom {
             remapped_parameters: payload.flags.contains(ObjectFlag::RemappedParameters),
         },
         Atom::Enum(payload) => {
-            SerializableAtom::Enum { name: encode_name(payload.name), case: payload.case.map(encode_name) }
+            SerializableAtom::Enum { name: encode_name(payload.name.as_bytes()), case: payload.case.map(encode_name) }
         }
         Atom::ObjectShape(payload) => {
             let known_properties: Vec<SerializableKnownProperty> = payload
@@ -641,22 +632,22 @@ fn encode_atom(atom: Atom<'_>) -> SerializableAtom {
             defining_entity: encode_defining_entity(payload.defining_entity),
             constraint: Box::new(encode_type(payload.constraint)),
         },
-        Atom::Variable(payload) => SerializableAtom::Variable { name: encode_name(payload.name) },
+        Atom::Variable(payload) => SerializableAtom::Variable { name: encode_name(payload.name.as_bytes()) },
         Atom::Reference(payload) => SerializableAtom::Reference {
-            name: encode_name(payload.name),
+            name: encode_name(payload.name.as_bytes()),
             type_arguments: payload
                 .type_arguments
                 .map(|type_arguments| type_arguments.iter().map(|&ty| encode_type(ty)).collect()),
         },
         Atom::MemberReference(payload) => SerializableAtom::MemberReference {
-            class_like_name: encode_name(payload.class_like_name),
+            class_like_name: encode_name(payload.class_like_name.as_bytes()),
             selector: encode_name_selector(payload.selector),
         },
         Atom::GlobalReference(payload) => {
             SerializableAtom::GlobalReference { selector: encode_name_selector(payload.selector) }
         }
         Atom::Alias(payload) => SerializableAtom::Alias {
-            class_name: encode_name(payload.class_name),
+            class_name: encode_name(payload.class_name.as_bytes()),
             alias_name: encode_name(payload.alias_name),
         },
         Atom::Conditional(payload) => SerializableAtom::Conditional {
@@ -738,7 +729,7 @@ fn encode_class_like_specifier(specifier: ClassLikeStringSpecifier<'_>) -> Seria
     match specifier {
         ClassLikeStringSpecifier::Any => SerializableClassLikeSpecifier::Any,
         ClassLikeStringSpecifier::Literal { value } => {
-            SerializableClassLikeSpecifier::Literal { value: encode_name(value) }
+            SerializableClassLikeSpecifier::Literal { value: encode_name(value.as_bytes()) }
         }
         ClassLikeStringSpecifier::OfType { constraint } => {
             SerializableClassLikeSpecifier::OfType { constraint: Box::new(encode_type(constraint)) }
@@ -755,7 +746,7 @@ fn encode_array_key(key: ArrayKey<'_>) -> SerializableArrayKey {
         ArrayKey::Int(value) => SerializableArrayKey::Int(value),
         ArrayKey::String(name) => SerializableArrayKey::String(encode_name(name)),
         ArrayKey::Const { class, name } => {
-            SerializableArrayKey::Const { class: encode_name(class), name: encode_name(name) }
+            SerializableArrayKey::Const { class: encode_name(class.as_bytes()), name: encode_name(name) }
         }
     }
 }
@@ -800,9 +791,9 @@ fn encode_signature(signature: &Signature<'_>) -> SerializableSignature {
 #[inline]
 fn encode_callable_alias(alias: &CallableAlias<'_>) -> SerializableCallableAlias {
     match *alias {
-        CallableAlias::Function(name) => SerializableCallableAlias::Function(encode_name(name)),
+        CallableAlias::Function(name) => SerializableCallableAlias::Function(encode_name(name.as_bytes())),
         CallableAlias::Method { class, method } => {
-            SerializableCallableAlias::Method { class: encode_name(class), method: encode_name(method) }
+            SerializableCallableAlias::Method { class: encode_name(class.as_bytes()), method: encode_name(method) }
         }
         CallableAlias::Closure(span) => SerializableCallableAlias::Closure(span),
     }
@@ -820,11 +811,11 @@ const fn encode_resource(payload: ResourceAtom) -> SerializableResource {
 #[inline]
 fn encode_defining_entity(entity: DefiningEntity<'_>) -> SerializableDefiningEntity {
     match entity {
-        DefiningEntity::ClassLike(name) => SerializableDefiningEntity::ClassLike(encode_name(name)),
+        DefiningEntity::ClassLike(name) => SerializableDefiningEntity::ClassLike(encode_name(name.as_bytes())),
         DefiningEntity::Method { class, method } => {
-            SerializableDefiningEntity::Method { class: encode_name(class), method: encode_name(method) }
+            SerializableDefiningEntity::Method { class: encode_name(class.as_bytes()), method: encode_name(method) }
         }
-        DefiningEntity::Function(name) => SerializableDefiningEntity::Function(encode_name(name)),
+        DefiningEntity::Function(name) => SerializableDefiningEntity::Function(encode_name(name.as_bytes())),
     }
 }
 
@@ -844,10 +835,9 @@ fn encode_derived(payload: DerivedAtom<'_>) -> SerializableDerived {
     match payload {
         DerivedAtom::KeyOf(target) => SerializableDerived::KeyOf(Box::new(encode_type(target))),
         DerivedAtom::ValueOf(target) => SerializableDerived::ValueOf(Box::new(encode_type(target))),
-        DerivedAtom::PropertiesOf { target, visibility } => SerializableDerived::PropertiesOf {
-            target: Box::new(encode_type(target)),
-            visibility: visibility.map(encode_visibility),
-        },
+        DerivedAtom::PropertiesOf { target, visibility } => {
+            SerializableDerived::PropertiesOf { target: Box::new(encode_type(target)), visibility }
+        }
         DerivedAtom::IndexAccess { target, index } => SerializableDerived::IndexAccess {
             target: Box::new(encode_type(target)),
             index: Box::new(encode_type(index)),
@@ -862,15 +852,6 @@ fn encode_derived(payload: DerivedAtom<'_>) -> SerializableDerived {
             template_name: Box::new(encode_type(template_name)),
         },
         DerivedAtom::New(target) => SerializableDerived::New(Box::new(encode_type(target))),
-    }
-}
-
-#[inline]
-const fn encode_visibility(visibility: Visibility) -> SerializableVisibility {
-    match visibility {
-        Visibility::Public => SerializableVisibility::Public,
-        Visibility::Protected => SerializableVisibility::Protected,
-        Visibility::Private => SerializableVisibility::Private,
     }
 }
 
@@ -908,7 +889,7 @@ where
             builder.class_like_string(ClassLikeStringAtom { kind, specifier })
         }
         SerializableAtom::Object { name, type_arguments, is_static, is_this, remapped_parameters } => {
-            let name = builder.name(name);
+            let name = builder.intern_class_like_path(name);
             let type_arguments = type_arguments.as_ref().map(|arguments| {
                 let types: Vec<Type<'arena>> = arguments.iter().map(|argument| argument.build(builder)).collect();
 
@@ -922,8 +903,8 @@ where
             builder.object(ObjectAtom { name, type_arguments, flags })
         }
         SerializableAtom::Enum { name, case } => {
-            let name = builder.name(name);
-            let case = case.as_ref().map(|case| builder.name(case));
+            let name = builder.intern_class_like_path(name);
+            let case = case.as_ref().map(|case| builder.intern(case));
 
             builder.enumeration(EnumAtom { name, case })
         }
@@ -934,7 +915,7 @@ where
                 let entries: Vec<KnownProperty<'arena>> = known_properties
                     .iter()
                     .map(|property| KnownProperty {
-                        name: builder.name(&property.name),
+                        name: builder.intern(&property.name),
                         value: property.value.build(builder),
                         optional: property.optional,
                     })
@@ -948,10 +929,10 @@ where
             builder.object_shape(ObjectShapeAtom { known_properties, flags })
         }
         SerializableAtom::HasMethod { method_name } => {
-            Atom::HasMethod(HasMethodAtom { method_name: builder.name(method_name) })
+            Atom::HasMethod(HasMethodAtom { method_name: builder.intern(method_name) })
         }
         SerializableAtom::HasProperty { property_name } => {
-            Atom::HasProperty(HasPropertyAtom { property_name: builder.name(property_name) })
+            Atom::HasProperty(HasPropertyAtom { property_name: builder.intern(property_name) })
         }
         SerializableAtom::Array { key_param, value_param, known_items, non_empty } => {
             let key_param = key_param.as_ref().map(|ty| ty.build(builder));
@@ -1010,15 +991,15 @@ where
         SerializableAtom::Callable(callable) => Atom::Callable(decode_callable(callable, builder)),
         SerializableAtom::Resource(resource) => Atom::Resource(decode_resource(*resource)),
         SerializableAtom::GenericParameter { name, defining_entity, constraint } => {
-            let name = builder.name(name);
+            let name = builder.intern(name);
             let defining_entity = decode_defining_entity(defining_entity, builder);
             let constraint = constraint.build(builder);
 
             builder.generic_parameter(GenericParameterAtom { name, defining_entity, constraint })
         }
-        SerializableAtom::Variable { name } => Atom::Variable(VariableAtom { name: builder.name(name) }),
+        SerializableAtom::Variable { name } => Atom::Variable(VariableAtom { name: Var::new(builder.intern(name)) }),
         SerializableAtom::Reference { name, type_arguments } => {
-            let name = builder.name(name);
+            let name = builder.intern_class_like_path(name);
             let type_arguments = type_arguments.as_ref().map(|arguments| {
                 let types: Vec<Type<'arena>> = arguments.iter().map(|argument| argument.build(builder)).collect();
 
@@ -1028,7 +1009,7 @@ where
             builder.reference(SymbolReferenceAtom { name, type_arguments })
         }
         SerializableAtom::MemberReference { class_like_name, selector } => {
-            let class_like_name = builder.name(class_like_name);
+            let class_like_name = builder.intern_class_like_path(class_like_name);
             let selector = decode_name_selector(selector, builder);
 
             builder.member_reference(MemberReferenceAtom { class_like_name, selector })
@@ -1039,8 +1020,8 @@ where
             builder.global_reference(GlobalReferenceAtom { selector })
         }
         SerializableAtom::Alias { class_name, alias_name } => {
-            let class_name = builder.name(class_name);
-            let alias_name = builder.name(alias_name);
+            let class_name = builder.intern_class_like_path(class_name);
+            let alias_name = builder.intern(alias_name);
 
             builder.alias(AliasAtom { class_name, alias_name })
         }
@@ -1116,7 +1097,7 @@ where
     let literal = match &payload.literal {
         SerializableStringLiteral::None => StringLiteral::None,
         SerializableStringLiteral::Unspecified => StringLiteral::Unspecified,
-        SerializableStringLiteral::Value(value) => StringLiteral::Value(builder.name(value)),
+        SerializableStringLiteral::Value(value) => StringLiteral::Value(builder.intern(value)),
     };
     let casing = match payload.casing {
         SerializableStringCasing::Unspecified => StringCasing::Unspecified,
@@ -1154,7 +1135,7 @@ where
     match specifier {
         SerializableClassLikeSpecifier::Any => ClassLikeStringSpecifier::Any,
         SerializableClassLikeSpecifier::Literal { value } => {
-            ClassLikeStringSpecifier::Literal { value: builder.name(value) }
+            ClassLikeStringSpecifier::Literal { value: builder.intern_class_like_path(value) }
         }
         SerializableClassLikeSpecifier::OfType { constraint } => {
             ClassLikeStringSpecifier::OfType { constraint: constraint.build(builder) }
@@ -1176,9 +1157,11 @@ where
 {
     match key {
         SerializableArrayKey::Int(value) => ArrayKey::Int(*value),
-        SerializableArrayKey::String(name) => ArrayKey::String(builder.name(name)),
+        SerializableArrayKey::String(name) => ArrayKey::String(builder.intern(name)),
         SerializableArrayKey::Const { class, name } => {
-            ArrayKey::Const { class: builder.name(class), name: builder.name(name) }
+            let class = builder.intern_class_like_path(class);
+            let name = builder.intern(name);
+            ArrayKey::Const { class, name }
         }
     }
 }
@@ -1233,7 +1216,7 @@ where
                 flags.set_value(ParameterFlag::ByReference, parameter.by_reference);
                 flags.set_value(ParameterFlag::Variadic, parameter.variadic);
 
-                Parameter { name: builder.name(&parameter.name), r#type: parameter.r#type.build(builder), flags }
+                Parameter { name: builder.intern(&parameter.name), r#type: parameter.r#type.build(builder), flags }
             })
             .collect();
 
@@ -1258,9 +1241,11 @@ where
     A: Arena,
 {
     match alias {
-        SerializableCallableAlias::Function(name) => CallableAlias::Function(builder.name(name)),
+        SerializableCallableAlias::Function(name) => CallableAlias::Function(builder.intern_function_like_path(name)),
         SerializableCallableAlias::Method { class, method } => {
-            CallableAlias::Method { class: builder.name(class), method: builder.name(method) }
+            let class = builder.intern_class_like_path(class);
+            let method = builder.intern(method);
+            CallableAlias::Method { class, method }
         }
         SerializableCallableAlias::Closure(span) => CallableAlias::Closure(*span),
     }
@@ -1285,11 +1270,13 @@ where
     A: Arena,
 {
     match entity {
-        SerializableDefiningEntity::ClassLike(name) => DefiningEntity::ClassLike(builder.name(name)),
+        SerializableDefiningEntity::ClassLike(name) => DefiningEntity::ClassLike(builder.intern_class_like_path(name)),
         SerializableDefiningEntity::Method { class, method } => {
-            DefiningEntity::Method { class: builder.name(class), method: builder.name(method) }
+            let class = builder.intern_class_like_path(class);
+            let method = builder.intern(method);
+            DefiningEntity::Method { class, method }
         }
-        SerializableDefiningEntity::Function(name) => DefiningEntity::Function(builder.name(name)),
+        SerializableDefiningEntity::Function(name) => DefiningEntity::Function(builder.intern_function_like_path(name)),
     }
 }
 
@@ -1303,10 +1290,10 @@ where
     A: Arena,
 {
     match selector {
-        SerializableNameSelector::Identifier(name) => NameSelector::Identifier(builder.name(name)),
-        SerializableNameSelector::StartsWith(name) => NameSelector::StartsWith(builder.name(name)),
-        SerializableNameSelector::EndsWith(name) => NameSelector::EndsWith(builder.name(name)),
-        SerializableNameSelector::Contains(name) => NameSelector::Contains(builder.name(name)),
+        SerializableNameSelector::Identifier(name) => NameSelector::Identifier(builder.intern(name)),
+        SerializableNameSelector::StartsWith(name) => NameSelector::StartsWith(builder.intern(name)),
+        SerializableNameSelector::EndsWith(name) => NameSelector::EndsWith(builder.intern(name)),
+        SerializableNameSelector::Contains(name) => NameSelector::Contains(builder.intern(name)),
         SerializableNameSelector::Wildcard => NameSelector::Wildcard,
     }
 }
@@ -1324,7 +1311,7 @@ where
         SerializableDerived::KeyOf(target) => DerivedAtom::KeyOf(target.build(builder)),
         SerializableDerived::ValueOf(target) => DerivedAtom::ValueOf(target.build(builder)),
         SerializableDerived::PropertiesOf { target, visibility } => {
-            DerivedAtom::PropertiesOf { target: target.build(builder), visibility: visibility.map(decode_visibility) }
+            DerivedAtom::PropertiesOf { target: target.build(builder), visibility: *visibility }
         }
         SerializableDerived::IndexAccess { target, index } => {
             DerivedAtom::IndexAccess { target: target.build(builder), index: index.build(builder) }
@@ -1341,14 +1328,5 @@ where
             template_name: template_name.build(builder),
         },
         SerializableDerived::New(target) => DerivedAtom::New(target.build(builder)),
-    }
-}
-
-#[inline]
-const fn decode_visibility(visibility: SerializableVisibility) -> Visibility {
-    match visibility {
-        SerializableVisibility::Public => Visibility::Public,
-        SerializableVisibility::Protected => Visibility::Protected,
-        SerializableVisibility::Private => Visibility::Private,
     }
 }

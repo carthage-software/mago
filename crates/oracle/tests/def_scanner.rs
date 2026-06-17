@@ -6,8 +6,8 @@ use mago_database::file::File;
 use mago_hir::ir::IR;
 use mago_hir::lower::LowerSettings;
 use mago_hir::lower::Lowering;
-use mago_oracle::def::DefinitionTable;
-use mago_oracle::def::scanner::scan_definitions;
+use mago_oracle::definition::DefinitionTable;
+use mago_oracle::definition::scanner::scan_definitions;
 use mago_syntax::parser::parse_file;
 
 /// Parse and lower `code` to an untyped IR, scan it for definitions, and hand

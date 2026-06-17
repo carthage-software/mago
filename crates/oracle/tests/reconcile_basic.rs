@@ -2,7 +2,9 @@ mod common;
 
 use common::*;
 
-use mago_oracle::name::Name;
+use mago_allocator::LocalArena;
+use mago_oracle::path::Path;
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::generic_parameter::DefiningEntity;
 use mago_oracle::ty::template;
@@ -12,18 +14,23 @@ use mago_oracle::ty::template::StandinOptions;
 use mago_oracle::ty::template::TemplateKey;
 use mago_oracle::ty::template::TemplateState;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 
-fn key_for(class: &'static str, name: &'static str) -> TemplateKey<'static> {
+fn key_for<'arena>(arena: &'arena LocalArena, class: &'static str, name: &'static str) -> TemplateKey<'arena> {
     TemplateKey {
-        defining_entity: DefiningEntity::ClassLike(Name::new(class.as_bytes())),
-        name: Name::new(name.as_bytes()),
+        defining_entity: DefiningEntity::ClassLike(Path::class_like(arena, class.as_bytes())),
+        name: name.as_bytes(),
     }
 }
 
-const fn bound(kind: BoundKind, ty: Type<'_>, depth: u32, offset: u32) -> Bound<'_> {
+fn bound<'arena>(
+    arena: &'arena LocalArena,
+    kind: BoundKind,
+    ty: Type<'arena>,
+    depth: u32,
+    offset: u32,
+) -> Bound<'arena> {
     let equality_bound_classlike = match kind {
-        BoundKind::Equality => Some(Name::new(b"C")),
+        BoundKind::Equality => Some(Path::class_like(arena, b"C")),
         BoundKind::Lower | BoundKind::Upper => None,
     };
 
@@ -40,7 +47,8 @@ fn empty_bounds_returns_none() {
 #[test]
 fn single_bound_yields_that_type() {
     fixture(|f| {
-        let result = template::reconcile(&[bound(BoundKind::Lower, well_known::TYPE_INT, 0, 0)], &mut f.builder);
+        let result =
+            template::reconcile(&[bound(f.arena, BoundKind::Lower, well_known::TYPE_INT, 0, 0)], &mut f.builder);
         assert_eq!(result, Some(well_known::TYPE_INT));
     });
 }
@@ -50,8 +58,8 @@ fn two_shallow_bounds_at_same_depth_union() {
     fixture(|f| {
         let result = template::reconcile(
             &[
-                bound(BoundKind::Lower, well_known::TYPE_INT, 0, 0),
-                bound(BoundKind::Lower, well_known::TYPE_STRING, 0, 1),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_INT, 0, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_STRING, 0, 1),
             ],
             &mut f.builder,
         );
@@ -64,8 +72,8 @@ fn deeper_bound_discarded_without_equality_marker() {
     fixture(|f| {
         let result = template::reconcile(
             &[
-                bound(BoundKind::Lower, well_known::TYPE_INT, 0, 0),
-                bound(BoundKind::Lower, well_known::TYPE_STRING, 1, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_INT, 0, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_STRING, 1, 0),
             ],
             &mut f.builder,
         );
@@ -78,8 +86,8 @@ fn deeper_bound_included_when_baseline_is_equality_marker_and_offset_matches() {
     fixture(|f| {
         let result = template::reconcile(
             &[
-                bound(BoundKind::Equality, well_known::TYPE_INT, 0, 0),
-                bound(BoundKind::Lower, well_known::TYPE_STRING, 1, 0),
+                bound(f.arena, BoundKind::Equality, well_known::TYPE_INT, 0, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_STRING, 1, 0),
             ],
             &mut f.builder,
         );
@@ -92,8 +100,8 @@ fn deeper_bound_discarded_when_equality_marker_present_but_offset_differs() {
     fixture(|f| {
         let result = template::reconcile(
             &[
-                bound(BoundKind::Equality, well_known::TYPE_INT, 0, 0),
-                bound(BoundKind::Lower, well_known::TYPE_STRING, 1, 1),
+                bound(f.arena, BoundKind::Equality, well_known::TYPE_INT, 0, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_STRING, 1, 1),
             ],
             &mut f.builder,
         );
@@ -106,9 +114,9 @@ fn equality_marker_propagates_to_further_depths() {
     fixture(|f| {
         let result = template::reconcile(
             &[
-                bound(BoundKind::Equality, well_known::TYPE_INT, 0, 0),
-                bound(BoundKind::Lower, well_known::TYPE_STRING, 1, 0),
-                bound(BoundKind::Lower, well_known::TYPE_FLOAT, 2, 0),
+                bound(f.arena, BoundKind::Equality, well_known::TYPE_INT, 0, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_STRING, 1, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_FLOAT, 2, 0),
             ],
             &mut f.builder,
         );
@@ -122,9 +130,9 @@ fn unsorted_input_is_handled_correctly() {
     fixture(|f| {
         let result = template::reconcile(
             &[
-                bound(BoundKind::Lower, well_known::TYPE_FLOAT, 2, 0),
-                bound(BoundKind::Equality, well_known::TYPE_INT, 0, 0),
-                bound(BoundKind::Lower, well_known::TYPE_STRING, 1, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_FLOAT, 2, 0),
+                bound(f.arena, BoundKind::Equality, well_known::TYPE_INT, 0, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_STRING, 1, 0),
             ],
             &mut f.builder,
         );
@@ -138,9 +146,9 @@ fn multiple_baseline_bounds_with_equality_propagate() {
     fixture(|f| {
         let result = template::reconcile(
             &[
-                bound(BoundKind::Lower, well_known::TYPE_INT, 0, 0),
-                bound(BoundKind::Equality, well_known::TYPE_STRING, 0, 1),
-                bound(BoundKind::Lower, well_known::TYPE_FLOAT, 1, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_INT, 0, 0),
+                bound(f.arena, BoundKind::Equality, well_known::TYPE_STRING, 0, 1),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_FLOAT, 1, 0),
             ],
             &mut f.builder,
         );
@@ -153,7 +161,7 @@ fn multiple_baseline_bounds_with_equality_propagate() {
 fn witness_falls_back_when_no_bound_collected() {
     fixture(|f| {
         let state = TemplateState::new();
-        let key = key_for("Box", "T");
+        let key = key_for(f.arena, "Box", "T");
         let result = state.witness(key, well_known::TYPE_MIXED, &mut f.builder);
         assert_eq!(result, well_known::TYPE_MIXED);
     });
@@ -168,7 +176,7 @@ fn witness_uses_recorded_bounds_when_present() {
         let template = f.t_template("Box", "T");
         let ty = f.u(template);
         template::standin(ty, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
-        let result = state.witness(key_for("Box", "T"), well_known::TYPE_MIXED, &mut f.builder);
+        let result = state.witness(key_for(f.arena, "Box", "T"), well_known::TYPE_MIXED, &mut f.builder);
         assert_eq!(result, well_known::TYPE_INT);
     });
 }
@@ -186,7 +194,7 @@ fn witness_after_two_arguments_unions_bounds() {
         let options1 = StandinOptions::default().with_argument_offset(1).with_default_variance(Variance::Covariant);
         template::standin(ty, well_known::TYPE_STRING, &world, &mut state, &options1, &mut f.builder);
 
-        let result = state.witness(key_for("F", "T"), well_known::TYPE_MIXED, &mut f.builder);
+        let result = state.witness(key_for(f.arena, "F", "T"), well_known::TYPE_MIXED, &mut f.builder);
         assert_eq!(result, well_known::TYPE_INT_OR_STRING);
     });
 }
@@ -205,7 +213,7 @@ fn witness_after_invariant_then_nested_arg_keeps_deep_bound() {
         let argument_atom = f.t_generic_named("Cell", vec![well_known::TYPE_INT]);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let result = state.witness(key_for("F", "T"), well_known::TYPE_MIXED, &mut f.builder);
+        let result = state.witness(key_for(f.arena, "F", "T"), well_known::TYPE_MIXED, &mut f.builder);
         assert_eq!(result, well_known::TYPE_INT);
     });
 }
@@ -215,8 +223,8 @@ fn covariant_only_bounds_keep_shallowest_only() {
     fixture(|f| {
         let result = template::reconcile(
             &[
-                bound(BoundKind::Lower, well_known::TYPE_INT, 0, 0),
-                bound(BoundKind::Lower, well_known::TYPE_STRING, 5, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_INT, 0, 0),
+                bound(f.arena, BoundKind::Lower, well_known::TYPE_STRING, 5, 0),
             ],
             &mut f.builder,
         );
@@ -227,7 +235,8 @@ fn covariant_only_bounds_keep_shallowest_only() {
 #[test]
 fn upper_bound_alone_is_returned_as_witness() {
     fixture(|f| {
-        let result = template::reconcile(&[bound(BoundKind::Upper, well_known::TYPE_STRING, 0, 0)], &mut f.builder);
+        let result =
+            template::reconcile(&[bound(f.arena, BoundKind::Upper, well_known::TYPE_STRING, 0, 0)], &mut f.builder);
         assert_eq!(result, Some(well_known::TYPE_STRING));
     });
 }

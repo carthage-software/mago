@@ -15,7 +15,7 @@ fn union_of_is_idempotent_by_pointer() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let name = builder.name(b"Foo");
+    let name = builder.intern_class_like_path(b"Foo");
     let foo = builder.object(ObjectAtom { name, type_arguments: None, flags: U8Flags::empty() });
 
     let first = builder.union_of(&[well_known::NULL, foo]);
@@ -108,11 +108,11 @@ fn names_are_interned_once() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let first = builder.name(b"Vendor\\Collection");
-    let second = builder.name(b"Vendor\\Collection");
+    let first = builder.intern(b"Vendor\\Collection");
+    let second = builder.intern(b"Vendor\\Collection");
 
     assert_eq!(first, second);
-    assert!(first.as_bytes().as_ptr() == second.as_bytes().as_ptr());
+    assert!(first.as_ptr() == second.as_ptr());
 }
 
 #[test]
@@ -121,7 +121,7 @@ fn intersected_with_empty_conjuncts_returns_head() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let name = builder.name(b"Foo");
+    let name = builder.intern_class_like_path(b"Foo");
     let foo = builder.object(ObjectAtom { name, type_arguments: None, flags: U8Flags::empty() });
     let intersected = builder.intersected(foo, &[]);
 
@@ -134,9 +134,9 @@ fn intersected_sorts_and_dedupes_conjuncts() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let foo_name = builder.name(b"Foo");
-    let bar_name = builder.name(b"Bar");
-    let qux_name = builder.name(b"Qux");
+    let foo_name = builder.intern_class_like_path(b"Foo");
+    let bar_name = builder.intern_class_like_path(b"Bar");
+    let qux_name = builder.intern_class_like_path(b"Qux");
     let foo = builder.object(ObjectAtom { name: foo_name, type_arguments: None, flags: U8Flags::empty() });
     let bar = builder.object(ObjectAtom { name: bar_name, type_arguments: None, flags: U8Flags::empty() });
     let qux = builder.object(ObjectAtom { name: qux_name, type_arguments: None, flags: U8Flags::empty() });
@@ -155,7 +155,7 @@ fn import_within_one_builder_is_identity_by_pointer() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let name = builder.name(b"Foo");
+    let name = builder.intern_class_like_path(b"Foo");
     let arguments = builder.types(&[well_known::TYPE_INT, well_known::TYPE_STRING]);
     let foo = builder.object(ObjectAtom { name, type_arguments: Some(arguments), flags: U8Flags::empty() });
     let ty = builder.union_of(&[well_known::NULL, foo]);
@@ -171,8 +171,8 @@ fn import_across_arenas_preserves_structure() {
     let source_scratch = LocalArena::new();
     let mut source = TypeBuilder::new(&source_arena, &source_scratch);
 
-    let name = source.name(b"Collection");
-    let value = source.name(b"item");
+    let name = source.intern_class_like_path(b"Collection");
+    let value = source.intern(b"item");
     let literal = source.string(StringAtom {
         literal: StringLiteral::Value(value),
         casing: StringCasing::Unspecified,
@@ -200,7 +200,7 @@ fn import_twice_is_pointer_idempotent() {
     let source_scratch = LocalArena::new();
     let mut source = TypeBuilder::new(&source_arena, &source_scratch);
 
-    let name = source.name(b"Foo");
+    let name = source.intern_class_like_path(b"Foo");
     let foo = source.object(ObjectAtom { name, type_arguments: None, flags: U8Flags::empty() });
     let ty = source.union_of(&[well_known::NULL, foo]);
 

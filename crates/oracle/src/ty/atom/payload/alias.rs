@@ -8,21 +8,21 @@ use serde::Serialize;
 use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 
-use crate::name::Name;
+use crate::path::Path;
 
 /// `Foo::Bar` where `Bar` is a `@type` alias declared on `Foo`. Expansion
 /// resolves it to the alias body.
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct AliasAtom<'arena> {
-    pub class_name: Name<'arena>,
-    pub alias_name: Name<'arena>,
+    pub class_name: Path<'arena>,
+    pub alias_name: &'arena [u8],
 }
 
 impl Display for AliasAtom<'_> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}::{}", self.class_name.as_str_lossy(), self.alias_name.as_str_lossy())
+        write!(f, "{}::{}", self.class_name, String::from_utf8_lossy(self.alias_name))
     }
 }
 
@@ -33,6 +33,6 @@ impl CopyInto for AliasAtom<'_> {
     where
         A: Arena,
     {
-        AliasAtom { class_name: self.class_name.copy_into(arena), alias_name: self.alias_name.copy_into(arena) }
+        AliasAtom { class_name: self.class_name.copy_into(arena), alias_name: arena.alloc_slice_copy(self.alias_name) }
     }
 }

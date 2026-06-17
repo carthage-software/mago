@@ -10,7 +10,6 @@ use mago_allocator::copy::CopyInto;
 use mago_allocator::copy::copy_slice_into;
 use mago_flags::U8Flags;
 
-use crate::name::Name;
 use crate::ty::Type;
 
 /// `object{name: string, ...}`: a structural object shape.
@@ -25,7 +24,7 @@ pub struct ObjectShapeAtom<'arena> {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct KnownProperty<'arena> {
-    pub name: Name<'arena>,
+    pub name: &'arena [u8],
     pub value: Type<'arena>,
     pub optional: bool,
 }
@@ -55,7 +54,7 @@ impl Display for ObjectShapeAtom<'_> {
                 }
 
                 first = false;
-                f.write_str(&entry.name.as_str_lossy())?;
+                f.write_str(&String::from_utf8_lossy(entry.name))?;
                 if entry.optional {
                     f.write_str("?")?;
                 }
@@ -98,6 +97,10 @@ impl CopyInto for KnownProperty<'_> {
     where
         A: Arena,
     {
-        KnownProperty { name: self.name.copy_into(arena), value: self.value.copy_into(arena), optional: self.optional }
+        KnownProperty {
+            name: arena.alloc_slice_copy(self.name),
+            value: self.value.copy_into(arena),
+            optional: self.optional,
+        }
     }
 }

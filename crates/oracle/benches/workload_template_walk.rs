@@ -51,8 +51,8 @@ fn workload(c: &mut Criterion) {
     let pool = TypePool::new(SEED, &mut builder);
     let mut rng = Rng::new(SEED);
 
-    let class_name = builder.name(b"Foo");
-    let parameter_name = builder.name(b"T");
+    let class_name = builder.intern_class_like_path(b"Foo");
+    let parameter_name = builder.intern(b"T");
     let parameter_atom = builder.generic_parameter(GenericParameterAtom {
         name: parameter_name,
         defining_entity: DefiningEntity::ClassLike(class_name),

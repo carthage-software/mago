@@ -2,6 +2,7 @@ mod common;
 
 use common::*;
 
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::atom::payload::alias::AliasAtom;
 use mago_oracle::ty::atom::payload::reference::GlobalReferenceAtom;
@@ -10,22 +11,21 @@ use mago_oracle::ty::atom::payload::reference::NameSelector;
 use mago_oracle::ty::expand;
 use mago_oracle::ty::expand::ExpansionContext;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 
 fn alias_atom<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, alias: &str) -> Atom<'arena> {
     let class_name = f.name(class);
-    let alias_name = f.name(alias);
+    let alias_name = f.builder.intern(alias.as_bytes());
     f.builder.alias(AliasAtom { class_name, alias_name })
 }
 
 fn class_const_atom<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, name: &str) -> Atom<'arena> {
     let class_like_name = f.name(class);
-    let constant = f.name(name);
+    let constant = f.builder.intern(name.as_bytes());
     f.builder.member_reference(MemberReferenceAtom { class_like_name, selector: NameSelector::Identifier(constant) })
 }
 
 fn global_const_atom<'arena>(f: &mut Fixture<'_, 'arena>, name: &str) -> Atom<'arena> {
-    let constant = f.name(name);
+    let constant = f.builder.intern(name.as_bytes());
     f.builder.global_reference(GlobalReferenceAtom { selector: NameSelector::Identifier(constant) })
 }
 
@@ -56,7 +56,7 @@ fn alias_passes_through_when_eval_aliases_off() {
 fn class_constant_resolves_when_flag_on() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Foo", "BAR", well_known::TYPE_INT);
+        world.with_class_constant(&mut f.builder, "Foo", "BAR", well_known::TYPE_INT);
         let constant = class_const_atom(f, "Foo", "BAR");
         let ty = f.u(constant);
         assert_eq!(expand::expand_with(ty, &world, &ExpansionContext::default(), &mut f.builder), well_known::TYPE_INT);
@@ -67,7 +67,7 @@ fn class_constant_resolves_when_flag_on() {
 fn class_constant_passes_through_when_flag_off() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.with_class_constant("Foo", "BAR", well_known::TYPE_INT);
+        world.with_class_constant(&mut f.builder, "Foo", "BAR", well_known::TYPE_INT);
         let constant = class_const_atom(f, "Foo", "BAR");
         let ty = f.u(constant);
         let context = ExpansionContext::default().with_evaluate_class_constants(false);

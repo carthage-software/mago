@@ -27,7 +27,8 @@ use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
-use crate::name::Name;
+use crate::path::Path;
+use crate::symbol::part::generic::Variance;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
@@ -62,7 +63,6 @@ use crate::ty::well_known::STRING;
 use crate::ty::well_known::TYPE_ARRAY_KEY;
 use crate::ty::well_known::TYPE_INT;
 use crate::ty::well_known::TYPE_MIXED;
-use crate::world::Variance;
 use crate::world::World;
 
 #[inline]
@@ -279,8 +279,8 @@ where
         return false;
     };
 
-    world.template_parameter_forwards_to(a_class, a.name, b_class, b.name)
-        || world.template_parameter_forwards_to(b_class, b.name, a_class, a.name)
+    world.template_parameter_forwards_to(a_class.id, a.name, b_class.id, b.name)
+        || world.template_parameter_forwards_to(b_class.id, b.name, a_class.id, a.name)
 }
 
 #[inline]
@@ -293,17 +293,17 @@ where
     };
 
     let class = payload.name;
-    !world.is_final(class) || class_satisfies_structural(class, structural, world)
+    !world.is_final(class.id) || class_satisfies_structural(class, structural, world)
 }
 
 #[inline]
-fn class_satisfies_structural<'arena, W>(class: Name<'arena>, structural: Atom<'arena>, world: &W) -> bool
+fn class_satisfies_structural<'arena, W>(class: Path<'arena>, structural: Atom<'arena>, world: &W) -> bool
 where
     W: World<'arena>,
 {
     match structural {
-        Atom::HasMethod(has_method) => world.class_has_method(class, has_method.method_name),
-        Atom::HasProperty(has_property) => world.class_has_property(class, has_property.property_name),
+        Atom::HasMethod(has_method) => world.class_has_method(class.id, has_method.method_name),
+        Atom::HasProperty(has_property) => world.class_has_property(class.id, has_property.property_name),
         _ => true,
     }
 }
@@ -356,16 +356,16 @@ where
 
     if a_payload.name != b_payload.name
         && let (Some(a_parent), Some(b_parent)) =
-            (world.sealed_parent_of(a_payload.name), world.sealed_parent_of(b_payload.name))
+            (world.sealed_parent_of(a_payload.name.id), world.sealed_parent_of(b_payload.name.id))
         && a_parent == b_parent
-        && !world.descends_from(a_payload.name, b_payload.name)
-        && !world.descends_from(b_payload.name, a_payload.name)
+        && !world.descends_from(a_payload.name.id, b_payload.name.id)
+        && !world.descends_from(b_payload.name.id, a_payload.name.id)
     {
         return false;
     }
 
     if a_payload.name == b_payload.name {
-        let arity = world.template_parameter_arity(a_payload.name);
+        let arity = world.template_parameter_arity(a_payload.name.id);
         let one_side_bare = a_payload.type_arguments.is_none() || b_payload.type_arguments.is_none();
         let skip_for_coercion = options.template_default_coercion && one_side_bare;
         if arity > 0 && !skip_for_coercion {
@@ -373,7 +373,7 @@ where
             let b_supplied: &[Type<'arena>] = b_payload.type_arguments.unwrap_or_default();
             let fill = |index: usize| -> Type<'arena> {
                 world
-                    .template_parameter_at(a_payload.name, index)
+                    .template_parameter_at(a_payload.name.id, index)
                     .and_then(|parameter| parameter.upper_bound)
                     .unwrap_or(TYPE_MIXED)
             };
@@ -382,7 +382,7 @@ where
                 let a_argument = a_supplied.get(index).copied().unwrap_or_else(|| fill(index));
                 let b_argument = b_supplied.get(index).copied().unwrap_or_else(|| fill(index));
                 let variance = world
-                    .template_parameter_at(a_payload.name, index)
+                    .template_parameter_at(a_payload.name.id, index)
                     .map_or(Variance::Invariant, |parameter| parameter.variance);
                 match variance {
                     Variance::Invariant => {
@@ -404,9 +404,9 @@ where
     }
 
     if a_payload.name != b_payload.name {
-        let (descendant, ancestor) = if world.descends_from(a_payload.name, b_payload.name) {
+        let (descendant, ancestor) = if world.descends_from(a_payload.name.id, b_payload.name.id) {
             (a_payload, b_payload)
-        } else if world.descends_from(b_payload.name, a_payload.name) {
+        } else if world.descends_from(b_payload.name.id, a_payload.name.id) {
             (b_payload, a_payload)
         } else {
             return true;
@@ -434,7 +434,7 @@ where
     A: Arena,
     W: World<'arena>,
 {
-    let arity = world.template_parameter_arity(ancestor.name);
+    let arity = world.template_parameter_arity(ancestor.name.id);
     if arity == 0 {
         return true;
     }
@@ -450,7 +450,7 @@ where
     let descendant_actuals: &[Type<'arena>] = descendant.type_arguments.unwrap_or_default();
 
     for (position, &ancestor_argument) in ancestor_arguments.iter().enumerate() {
-        let Some(inherited) = world.inherited_template_argument(descendant.name, ancestor.name, position) else {
+        let Some(inherited) = world.inherited_template_argument(descendant.name.id, ancestor.name.id, position) else {
             return true;
         };
 
@@ -461,13 +461,13 @@ where
                     return None;
                 }
 
-                let actual_position = world.template_parameter_index(descendant.name, parameter.name)?;
+                let actual_position = world.template_parameter_index(descendant.name.id, parameter.name)?;
                 descendant_actuals.get(actual_position).copied()
             },
             builder,
         );
         let variance = world
-            .template_parameter_at(ancestor.name, position)
+            .template_parameter_at(ancestor.name.id, position)
             .map(|parameter| parameter.variance)
             .unwrap_or_default();
         let compatible = match variance {
@@ -493,19 +493,19 @@ where
 /// intersection. Without a final witness we stay open-world
 /// (return `false`).
 #[inline]
-fn intersection_uninhabited_under_finality<'arena, W>(classes: &[Name<'arena>], world: &W) -> bool
+fn intersection_uninhabited_under_finality<'arena, W>(classes: &[Path<'arena>], world: &W) -> bool
 where
     W: World<'arena>,
 {
     classes.iter().any(|&final_candidate| {
-        if !world.is_final(final_candidate) {
+        if !world.is_final(final_candidate.id) {
             return false;
         }
 
         classes.iter().any(|&other| {
             other != final_candidate
-                && !world.descends_from(final_candidate, other)
-                && !world.descends_from(other, final_candidate)
+                && !world.descends_from(final_candidate.id, other.id)
+                && !world.descends_from(other.id, final_candidate.id)
         })
     })
 }
@@ -526,21 +526,21 @@ where
 /// `Class`-kind names, `descends_from` forms a forest (no class has two
 /// unrelated class ancestors).
 #[inline]
-fn intersection_has_unrelated_concrete_classes<'arena, W>(classes: &[Name<'arena>], world: &W) -> bool
+fn intersection_has_unrelated_concrete_classes<'arena, W>(classes: &[Path<'arena>], world: &W) -> bool
 where
     W: World<'arena>,
 {
     for (index, &left) in classes.iter().enumerate() {
-        if world.class_like_kind(left) != Some(ClassLikeKind::Class) {
+        if world.class_like_kind(left.id) != Some(ClassLikeKind::Class) {
             continue;
         }
 
         for &right in &classes[index + 1..] {
-            if world.class_like_kind(right) != Some(ClassLikeKind::Class) {
+            if world.class_like_kind(right.id) != Some(ClassLikeKind::Class) {
                 continue;
             }
 
-            if left != right && !world.descends_from(left, right) && !world.descends_from(right, left) {
+            if left != right && !world.descends_from(left.id, right.id) && !world.descends_from(right.id, left.id) {
                 return true;
             }
         }
@@ -639,7 +639,7 @@ where
     W: World<'arena>,
 {
     if let Some(conjunct_list) = intersections {
-        let mut classes: ScratchVec<'scratch, Name<'arena>, S> = builder.scratch_vec_from_slice(&[payload.name]);
+        let mut classes: ScratchVec<'scratch, Path<'arena>, S> = builder.scratch_vec_from_slice(&[payload.name]);
         let mut structurals: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
         let mut negations: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
         for &conjunct in conjunct_list {
@@ -685,14 +685,14 @@ where
         }
 
         for &class in &classes {
-            if !world.is_final(class) {
+            if !world.is_final(class.id) {
                 continue;
             }
 
             for &structural in &structurals {
                 let satisfied = match structural {
-                    Atom::HasMethod(has_method) => world.class_has_method(class, has_method.method_name),
-                    Atom::HasProperty(has_property) => world.class_has_property(class, has_property.property_name),
+                    Atom::HasMethod(has_method) => world.class_has_method(class.id, has_method.method_name),
+                    Atom::HasProperty(has_property) => world.class_has_property(class.id, has_property.property_name),
                     _ => true,
                 };
 
@@ -707,7 +707,7 @@ where
         return false;
     };
 
-    if world.sealed_direct_inheritors(payload.name).is_some() {
+    if world.sealed_direct_inheritors(payload.name.id).is_some() {
         let head = builder.object(ObjectAtom {
             name: payload.name,
             type_arguments: Some(type_arguments),
@@ -732,7 +732,7 @@ where
         }
 
         let variance = world
-            .template_parameter_at(payload.name, index)
+            .template_parameter_at(payload.name.id, index)
             .map_or(Variance::Contravariant, |parameter| parameter.variance);
         !matches!(variance, Variance::Contravariant)
     })
@@ -1191,8 +1191,9 @@ fn numeric_string_overlap(a: Atom<'_>, b: Atom<'_>) -> bool {
     };
 
     match payload.literal {
-        StringLiteral::Value(value) => core::str::from_utf8(value.as_bytes())
-            .is_ok_and(|text| text.parse::<i64>().is_ok() || text.parse::<f64>().is_ok()),
+        StringLiteral::Value(value) => {
+            core::str::from_utf8(value).is_ok_and(|text| text.parse::<i64>().is_ok() || text.parse::<f64>().is_ok())
+        }
         StringLiteral::None | StringLiteral::Unspecified => true,
     }
 }
@@ -1211,7 +1212,7 @@ fn string_class_like_string_overlap(a: Atom<'_>, b: Atom<'_>) -> bool {
     };
 
     if let StringLiteral::Value(value) = payload.literal {
-        return is_valid_class_name(value.as_bytes());
+        return is_valid_class_name(value);
     }
 
     if payload.flags.contains(StringRefinementFlag::Numeric) || payload.flags.contains(StringRefinementFlag::Callable) {
@@ -1285,7 +1286,7 @@ fn mixed_overlap(a: Atom<'_>, b: Atom<'_>) -> bool {
 /// `true` iff two distinct names in `names` share the same sealed
 /// parent: distinct direct inheritors of one sealed class are disjoint.
 #[inline]
-fn sealed_siblings_disjoint<'arena, W>(names: &[Name<'arena>], world: &W) -> bool
+fn sealed_siblings_disjoint<'arena, W>(names: &[Path<'arena>], world: &W) -> bool
 where
     W: World<'arena>,
 {
@@ -1300,7 +1301,7 @@ where
             }
 
             if let (Some(first_parent), Some(second_parent)) =
-                (world.sealed_parent_of(names[first_index]), world.sealed_parent_of(names[second_index]))
+                (world.sealed_parent_of(names[first_index].id), world.sealed_parent_of(names[second_index].id))
                 && first_parent == second_parent
             {
                 return true;

@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
 use mago_allocator::LocalArena;
-use mago_oracle::name::Name;
+use mago_oracle::id::SymbolId;
+use mago_oracle::path::Path;
+use mago_oracle::symbol::class_like::part::constant::ClassLikeConstantMember;
+use mago_oracle::symbol::class_like::part::enum_case::EnumCaseMember;
+use mago_oracle::symbol::class_like::part::inheritance::InheritedType;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
 use mago_oracle::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
@@ -9,15 +13,18 @@ use mago_oracle::ty::lattice::LatticeOptions;
 use mago_oracle::ty::lattice::LatticeReport;
 use mago_oracle::ty::lattice::refines;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::ClassConstant;
 use mago_oracle::world::ClassProperty;
 use mago_oracle::world::EnumBacking;
 use mago_oracle::world::TemplateParameter;
 use mago_oracle::world::World;
 
 struct StubCodebase<'world> {
-    return_types: HashMap<Vec<u8>, Type<'world>>,
-    edges: HashMap<Vec<u8>, Vec<u8>>,
+    return_types: HashMap<SymbolId, Type<'world>>,
+    edges: HashMap<SymbolId, SymbolId>,
+}
+
+fn class_id(text: &str) -> SymbolId {
+    SymbolId::class_like(text.as_bytes())
 }
 
 impl<'world> StubCodebase<'world> {
@@ -26,56 +33,56 @@ impl<'world> StubCodebase<'world> {
     }
 
     fn declare_function(&mut self, name: &str, return_type: Type<'world>) {
-        self.return_types.insert(name.as_bytes().to_vec(), return_type);
+        self.return_types.insert(SymbolId::constant(name.as_bytes()), return_type);
     }
 
     fn declare_edge(&mut self, child: &str, parent: &str) {
-        self.edges.insert(child.as_bytes().to_vec(), parent.as_bytes().to_vec());
+        self.edges.insert(class_id(child), class_id(parent));
     }
 
     fn return_type(&self, name: &str) -> Option<Type<'world>> {
-        self.return_types.get(name.as_bytes()).copied()
+        self.return_types.get(&SymbolId::constant(name.as_bytes())).copied()
     }
 }
 
 impl<'world: 'arena, 'arena> World<'arena> for StubCodebase<'world> {
-    fn descends_from(&self, child: Name<'_>, ancestor: Name<'_>) -> bool {
-        if child.as_bytes() == ancestor.as_bytes() {
+    fn descends_from(&self, child: SymbolId, ancestor: SymbolId) -> bool {
+        if child == ancestor {
             return true;
         }
 
-        let mut current = child.as_bytes().to_vec();
+        let mut current = child;
         while let Some(parent) = self.edges.get(&current) {
-            if parent.as_slice() == ancestor.as_bytes() {
+            if *parent == ancestor {
                 return true;
             }
 
-            current.clone_from(parent);
+            current = *parent;
         }
 
         false
     }
 
-    fn uses_trait(&self, _class: Name<'_>, _trait_name: Name<'_>) -> bool {
+    fn uses_trait(&self, _class: SymbolId, _trait_name: SymbolId) -> bool {
         false
     }
 
-    fn template_parameter_arity(&self, _class: Name<'_>) -> usize {
+    fn template_parameter_arity(&self, _class: SymbolId) -> usize {
         0
     }
 
-    fn template_parameter_at(&self, _class: Name<'_>, _position: usize) -> Option<TemplateParameter<'arena>> {
+    fn template_parameter_at(&self, _class: SymbolId, _position: usize) -> Option<TemplateParameter<'arena>> {
         None
     }
 
-    fn template_parameter_index(&self, _class: Name<'_>, _name: Name<'_>) -> Option<usize> {
+    fn template_parameter_index(&self, _class: SymbolId, _name: &[u8]) -> Option<usize> {
         None
     }
 
     fn inherited_template_argument(
         &self,
-        _child: Name<'_>,
-        _ancestor: Name<'_>,
+        _child: SymbolId,
+        _ancestor: SymbolId,
         _position: usize,
     ) -> Option<Type<'arena>> {
         None
@@ -83,75 +90,75 @@ impl<'world: 'arena, 'arena> World<'arena> for StubCodebase<'world> {
 
     fn template_parameter_forwards_to(
         &self,
-        from_class: Name<'_>,
-        from_parameter: Name<'_>,
-        to_class: Name<'_>,
-        to_parameter: Name<'_>,
+        from_class: SymbolId,
+        from_parameter: &[u8],
+        to_class: SymbolId,
+        to_parameter: &[u8],
     ) -> bool {
-        from_class.as_bytes() == to_class.as_bytes() && from_parameter.as_bytes() == to_parameter.as_bytes()
+        from_class == to_class && from_parameter == to_parameter
     }
 
-    fn class_has_method(&self, _class: Name<'_>, _method: Name<'_>) -> bool {
+    fn class_has_method(&self, _class: SymbolId, _method: &[u8]) -> bool {
         false
     }
 
-    fn class_property_type(&self, _class: Name<'_>, _property: Name<'_>) -> Option<Type<'arena>> {
+    fn class_property_type(&self, _class: SymbolId, _property: &[u8]) -> Option<Type<'arena>> {
         None
     }
 
-    fn class_has_property(&self, _class: Name<'_>, _property: Name<'_>) -> bool {
+    fn class_has_property(&self, _class: SymbolId, _property: &[u8]) -> bool {
         false
     }
 
-    fn enum_backing(&self, _enum_name: Name<'_>) -> Option<EnumBacking<'arena>> {
+    fn enum_backing(&self, _enum_name: SymbolId) -> Option<EnumBacking<'arena>> {
         None
     }
 
-    fn class_like_kind(&self, name: Name<'_>) -> Option<ClassLikeKind> {
-        if self.edges.contains_key(name.as_bytes()) {
+    fn class_like_kind(&self, name: SymbolId) -> Option<ClassLikeKind> {
+        if self.edges.contains_key(&name) {
             return Some(ClassLikeKind::Class);
         }
 
         None
     }
 
-    fn is_final(&self, _name: Name<'_>) -> bool {
+    fn is_final(&self, _name: SymbolId) -> bool {
         false
     }
 
-    fn alias_body(&self, _class: Name<'_>, _alias: Name<'_>) -> Option<Type<'arena>> {
+    fn alias_body(&self, _class: SymbolId, _alias: &[u8]) -> Option<Type<'arena>> {
         None
     }
 
-    fn class_constant_type(&self, _class: Name<'_>, _constant: Name<'_>) -> Option<Type<'arena>> {
+    fn class_constant_type(&self, _class: SymbolId, _constant: &[u8]) -> Option<Type<'arena>> {
         None
     }
 
-    fn class_constants(&self, _class: Name<'_>) -> &[ClassConstant<'arena>] {
+    fn class_constants(&self, _class: SymbolId) -> &[ClassLikeConstantMember<'arena>] {
         &[]
     }
 
-    fn enum_cases(&self, _enum_name: Name<'_>) -> &[Name<'arena>] {
+    fn enum_cases(&self, _enum_name: SymbolId) -> &[EnumCaseMember<'arena>] {
         &[]
     }
 
-    fn global_constant_type(&self, name: Name<'_>) -> Option<Type<'arena>> {
-        self.return_types.get(name.as_bytes()).copied()
+    fn global_constant_type(&self, name: SymbolId) -> Option<Type<'arena>> {
+        self.return_types.get(&name).copied()
     }
 
-    fn class_property_count(&self, _class: Name<'_>) -> usize {
+    fn class_property_count(&self, _class: SymbolId) -> usize {
         0
     }
 
-    fn class_property_at(&self, _class: Name<'_>, _position: usize) -> Option<ClassProperty<'arena>> {
+    fn class_property_at(&self, _class: SymbolId, _position: usize) -> Option<ClassProperty<'arena>> {
         None
     }
 
-    fn sealed_direct_inheritors(&self, _class_like: Name<'_>) -> Option<&[Name<'arena>]> {
+    fn sealed_direct_inheritors(&self, _class_like: SymbolId) -> Option<&[InheritedType<'arena>]> {
         None
     }
 
-    fn sealed_parent_of(&self, _child: Name<'_>) -> Option<Name<'arena>> {
+    fn sealed_parent_of(&self, _child: SymbolId) -> Option<Path<'arena>> {
         None
     }
 }

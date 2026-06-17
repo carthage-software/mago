@@ -14,7 +14,6 @@
 
 use mago_flags::U8Flags;
 
-use crate::name::Name;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::array::ArrayAtom;
@@ -122,7 +121,7 @@ pub const NON_EMPTY_LITERAL_STRING: Atom<'static> = Atom::String(&StringAtom {
     flags: NON_EMPTY_FLAGS,
 });
 pub const EMPTY_STRING: Atom<'static> = Atom::String(&StringAtom {
-    literal: StringLiteral::Value(Name::new(b"")),
+    literal: StringLiteral::Value(b""),
     casing: StringCasing::Unspecified,
     flags: NO_STRING_FLAGS,
 });

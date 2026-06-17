@@ -64,7 +64,7 @@ where
         hir_type::TypeKind::Array => vec![well_known::ARRAY_KEY_MIXED],
         hir_type::TypeKind::Callable => vec![well_known::CALLABLE],
         hir_type::TypeKind::Static(identifier) => {
-            let name = builder.name(identifier.value);
+            let name = builder.intern_class_like_path(identifier.value);
 
             vec![builder.object(ObjectAtom {
                 name,

@@ -122,7 +122,7 @@ where
         StringLiteral::None => atom,
         StringLiteral::Unspecified => builder.string(StringAtom { literal: StringLiteral::None, ..*payload }),
         StringLiteral::Value(value) => {
-            let bytes = value.as_bytes();
+            let bytes = value;
             let is_numeric = string_is_numeric(bytes);
             let is_non_empty = is_numeric || !bytes.is_empty();
             let is_truthy = is_non_empty && bytes != b"0";

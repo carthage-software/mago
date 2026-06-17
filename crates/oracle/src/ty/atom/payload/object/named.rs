@@ -10,14 +10,14 @@ use mago_allocator::copy::CopyInto;
 use mago_allocator::copy::copy_slice_into;
 use mago_flags::U8Flags;
 
-use crate::name::Name;
+use crate::path::Path;
 use crate::ty::Type;
 
 /// A named object type: `Foo`, `Foo<int, string>`, `static`, `$this`.
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ObjectAtom<'arena> {
-    pub name: Name<'arena>,
+    pub name: Path<'arena>,
     pub type_arguments: Option<&'arena [Type<'arena>]>,
     pub flags: U8Flags<ObjectFlag>,
 }
@@ -44,7 +44,7 @@ impl Display for ObjectAtom<'_> {
             f.write_str("$this(")?;
         }
 
-        f.write_str(&self.name.as_str_lossy())?;
+        self.name.fmt(f)?;
         if let Some(type_arguments) = self.type_arguments {
             f.write_str("<")?;
             for (index, argument) in type_arguments.iter().enumerate() {

@@ -2,10 +2,10 @@ mod common;
 
 use common::*;
 
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 
 fn t_param_with_constraint<'arena>(
     f: &mut Fixture<'_, 'arena>,

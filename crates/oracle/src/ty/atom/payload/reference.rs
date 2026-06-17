@@ -9,7 +9,7 @@ use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 use mago_allocator::copy::copy_slice_into;
 
-use crate::name::Name;
+use crate::path::Path;
 use crate::ty::Type;
 
 /// `Foo`, `Foo<int>`: an unresolved symbol reference. Expansion resolves it
@@ -17,7 +17,7 @@ use crate::ty::Type;
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SymbolReferenceAtom<'arena> {
-    pub name: Name<'arena>,
+    pub name: Path<'arena>,
     pub type_arguments: Option<&'arena [Type<'arena>]>,
 }
 
@@ -25,7 +25,7 @@ pub struct SymbolReferenceAtom<'arena> {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MemberReferenceAtom<'arena> {
-    pub class_like_name: Name<'arena>,
+    pub class_like_name: Path<'arena>,
     pub selector: NameSelector<'arena>,
 }
 
@@ -40,10 +40,10 @@ pub struct GlobalReferenceAtom<'arena> {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum NameSelector<'arena> {
-    Identifier(Name<'arena>),
-    StartsWith(Name<'arena>),
-    EndsWith(Name<'arena>),
-    Contains(Name<'arena>),
+    Identifier(&'arena [u8]),
+    StartsWith(&'arena [u8]),
+    EndsWith(&'arena [u8]),
+    Contains(&'arena [u8]),
     Wildcard,
 }
 
@@ -51,10 +51,10 @@ impl Display for NameSelector<'_> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            NameSelector::Identifier(name) => f.write_str(&name.as_str_lossy()),
-            NameSelector::StartsWith(name) => write!(f, "{}*", name.as_str_lossy()),
-            NameSelector::EndsWith(name) => write!(f, "*{}", name.as_str_lossy()),
-            NameSelector::Contains(name) => write!(f, "*{}*", name.as_str_lossy()),
+            NameSelector::Identifier(name) => f.write_str(&String::from_utf8_lossy(name)),
+            NameSelector::StartsWith(name) => write!(f, "{}*", String::from_utf8_lossy(name)),
+            NameSelector::EndsWith(name) => write!(f, "*{}", String::from_utf8_lossy(name)),
+            NameSelector::Contains(name) => write!(f, "*{}*", String::from_utf8_lossy(name)),
             NameSelector::Wildcard => f.write_str("*"),
         }
     }
@@ -63,7 +63,7 @@ impl Display for NameSelector<'_> {
 impl Display for SymbolReferenceAtom<'_> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.write_str(&self.name.as_str_lossy())?;
+        self.name.fmt(f)?;
         if let Some(type_arguments) = self.type_arguments {
             f.write_str("<")?;
             for (index, argument) in type_arguments.iter().enumerate() {
@@ -84,7 +84,7 @@ impl Display for SymbolReferenceAtom<'_> {
 impl Display for MemberReferenceAtom<'_> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}::{}", self.class_like_name.as_str_lossy(), self.selector)
+        write!(f, "{}::{}", self.class_like_name, self.selector)
     }
 }
 
@@ -103,10 +103,10 @@ impl CopyInto for NameSelector<'_> {
         A: Arena,
     {
         match *self {
-            NameSelector::Identifier(name) => NameSelector::Identifier(name.copy_into(arena)),
-            NameSelector::StartsWith(name) => NameSelector::StartsWith(name.copy_into(arena)),
-            NameSelector::EndsWith(name) => NameSelector::EndsWith(name.copy_into(arena)),
-            NameSelector::Contains(name) => NameSelector::Contains(name.copy_into(arena)),
+            NameSelector::Identifier(name) => NameSelector::Identifier(arena.alloc_slice_copy(name)),
+            NameSelector::StartsWith(name) => NameSelector::StartsWith(arena.alloc_slice_copy(name)),
+            NameSelector::EndsWith(name) => NameSelector::EndsWith(arena.alloc_slice_copy(name)),
+            NameSelector::Contains(name) => NameSelector::Contains(arena.alloc_slice_copy(name)),
             NameSelector::Wildcard => NameSelector::Wildcard,
         }
     }
