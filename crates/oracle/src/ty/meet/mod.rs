@@ -769,7 +769,7 @@ where
     A: Arena,
 {
     if let StringLiteral::Value(value) = payload.literal {
-        let bytes = value.as_bytes();
+        let bytes = value;
         if bytes.is_empty() || bytes == b"0" {
             return well_known::NEVER;
         }
@@ -794,7 +794,7 @@ fn narrow_string_falsy<'scratch, 'arena, S, A>(
     A: Arena,
 {
     if let StringLiteral::Value(value) = payload.literal {
-        let bytes = value.as_bytes();
+        let bytes = value;
         if bytes.is_empty() || bytes == b"0" {
             out.push(Atom::String(payload));
         }
@@ -839,8 +839,8 @@ fn string_falsy_piece_retained(casing: StringCasing, numeric: bool, piece: Atom<
         return true;
     };
 
-    casing_compatible(casing, piece_value.as_bytes())
-        && (!numeric || core::str::from_utf8(piece_value.as_bytes()).is_ok_and(|text| text.parse::<i64>().is_ok()))
+    casing_compatible(casing, piece_value)
+        && (!numeric || core::str::from_utf8(piece_value).is_ok_and(|text| text.parse::<i64>().is_ok()))
 }
 
 #[inline]

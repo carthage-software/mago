@@ -11,7 +11,7 @@ use mago_oracle::ty::well_known;
 
 fn t_alias<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, alias: &str) -> Atom<'arena> {
     let class_name = f.name(class);
-    let alias_name = f.name(alias);
+    let alias_name = f.builder.intern(alias.as_bytes());
     f.builder.alias(AliasAtom { class_name, alias_name })
 }
 

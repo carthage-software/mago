@@ -43,7 +43,7 @@ where
         match *removed_payload.head {
             Atom::Object(removed_head_payload) => {
                 let descends = input_payload.name != removed_head_payload.name
-                    && world.descends_from(removed_head_payload.name, input_payload.name)
+                    && world.descends_from(removed_head_payload.name.id, input_payload.name.id)
                     && removed_head_payload.type_arguments.is_none();
 
                 let atom = if descends { builder.object(*removed_head_payload) } else { removed };
@@ -53,8 +53,8 @@ where
             _ => (None, removed),
         }
     } else if let Atom::Object(removed_payload) = removed {
-        let descends =
-            input_payload.name != removed_payload.name && world.descends_from(removed_payload.name, input_payload.name);
+        let descends = input_payload.name != removed_payload.name
+            && world.descends_from(removed_payload.name.id, input_payload.name.id);
 
         let atom = if descends && removed_payload.type_arguments.is_none() {
             builder.object(*removed_payload)

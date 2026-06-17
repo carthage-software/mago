@@ -13,9 +13,10 @@ use mago_oracle::ty::atom::payload::reference::NameSelector;
 use mago_oracle::ty::atom::payload::reference::SymbolReferenceAtom;
 use mago_oracle::ty::atom::payload::variable::VariableAtom;
 use mago_oracle::ty::well_known;
+use mago_oracle::var::Var;
 
 fn t_variable<'arena>(f: &mut Fixture<'_, 'arena>, name: &str) -> Atom<'arena> {
-    let name = f.name(name);
+    let name = Var::new(f.builder.intern(name.as_bytes()));
     Atom::Variable(VariableAtom { name })
 }
 
@@ -26,18 +27,18 @@ fn t_reference<'arena>(f: &mut Fixture<'_, 'arena>, name: &str) -> Atom<'arena> 
 
 fn t_member_reference<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, member: &str) -> Atom<'arena> {
     let class_like_name = f.name(class);
-    let member_name = f.name(member);
+    let member_name = f.builder.intern(member.as_bytes());
     f.builder.member_reference(MemberReferenceAtom { class_like_name, selector: NameSelector::Identifier(member_name) })
 }
 
 fn t_global_reference<'arena>(f: &mut Fixture<'_, 'arena>, name: &str) -> Atom<'arena> {
-    let name = f.name(name);
+    let name = f.builder.intern(name.as_bytes());
     f.builder.global_reference(GlobalReferenceAtom { selector: NameSelector::Identifier(name) })
 }
 
 fn t_alias<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, alias: &str) -> Atom<'arena> {
     let class_name = f.name(class);
-    let alias_name = f.name(alias);
+    let alias_name = f.builder.intern(alias.as_bytes());
     f.builder.alias(AliasAtom { class_name, alias_name })
 }
 

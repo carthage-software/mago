@@ -12,7 +12,7 @@ use mago_allocator::copy::copy_slice_into;
 use mago_flags::U8Flags;
 use mago_span::Span;
 
-use crate::name::Name;
+use crate::path::Path;
 use crate::ty::Type;
 
 /// `callable`, `callable(int): string`, `Closure(int): string`, or a
@@ -48,7 +48,7 @@ pub struct Signature<'arena> {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Parameter<'arena> {
-    pub name: Name<'arena>,
+    pub name: &'arena [u8],
     pub r#type: Type<'arena>,
     pub flags: U8Flags<ParameterFlag>,
 }
@@ -57,8 +57,8 @@ pub struct Parameter<'arena> {
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CallableAlias<'arena> {
-    Function(Name<'arena>),
-    Method { class: Name<'arena>, method: Name<'arena> },
+    Function(Path<'arena>),
+    Method { class: Path<'arena>, method: &'arena [u8] },
     Closure(Span),
 }
 
@@ -135,9 +135,9 @@ impl Display for CallableAlias<'_> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            CallableAlias::Function(name) => write!(f, "Closure<{}>(...)", name.as_str_lossy()),
+            CallableAlias::Function(name) => write!(f, "Closure<{}>(...)", name),
             CallableAlias::Method { class, method } => {
-                write!(f, "Closure<{}::{}>(...)", class.as_str_lossy(), method.as_str_lossy())
+                write!(f, "Closure<{}::{}>(...)", class, String::from_utf8_lossy(method))
             }
             CallableAlias::Closure(span) => {
                 write!(f, "Closure<anonymous@{}::{}>(...)", span.file_id.as_u64(), span.start.offset)
@@ -185,7 +185,7 @@ impl CopyInto for Parameter<'_> {
     where
         A: Arena,
     {
-        Parameter { name: self.name.copy_into(arena), r#type: self.r#type.copy_into(arena), flags: self.flags }
+        Parameter { name: arena.alloc_slice_copy(self.name), r#type: self.r#type.copy_into(arena), flags: self.flags }
     }
 }
 
@@ -199,7 +199,7 @@ impl CopyInto for CallableAlias<'_> {
         match *self {
             CallableAlias::Function(name) => CallableAlias::Function(name.copy_into(arena)),
             CallableAlias::Method { class, method } => {
-                CallableAlias::Method { class: class.copy_into(arena), method: method.copy_into(arena) }
+                CallableAlias::Method { class: class.copy_into(arena), method: arena.alloc_slice_copy(method) }
             }
             CallableAlias::Closure(span) => CallableAlias::Closure(span),
         }

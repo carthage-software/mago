@@ -4,17 +4,17 @@ use std::collections::BTreeMap;
 
 use common::*;
 
+use mago_oracle::symbol::class_like::part::visibility::Visibility;
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::alias::AliasAtom;
 use mago_oracle::ty::atom::payload::derived::DerivedAtom;
-use mago_oracle::ty::atom::payload::derived::Visibility;
 use mago_oracle::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 use mago_oracle::ty::atom::payload::scalar::class_like_string::ClassLikeStringAtom;
 use mago_oracle::ty::atom::payload::scalar::class_like_string::ClassLikeStringSpecifier;
 use mago_oracle::ty::expand;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 
 fn t_properties_of<'arena>(
     f: &mut Fixture<'_, 'arena>,
@@ -37,7 +37,7 @@ fn t_class_string_generic<'arena>(f: &mut Fixture<'_, 'arena>, constraint: Type<
 
 fn t_alias_elem<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, alias: &str) -> Atom<'arena> {
     let class_name = f.name(class);
-    let alias_name = f.name(alias);
+    let alias_name = f.builder.intern(alias.as_bytes());
     f.builder.alias(AliasAtom { class_name, alias_name })
 }
 

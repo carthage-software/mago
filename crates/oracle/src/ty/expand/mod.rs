@@ -33,7 +33,9 @@ use std::collections::BTreeSet;
 use mago_allocator::Arena;
 use mago_flags::U8Flags;
 
-use crate::name::Name;
+use crate::id::SymbolId;
+use crate::path::Path;
+use crate::symbol::class_like::part::visibility::Visibility;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::alias::AliasAtom;
@@ -42,7 +44,6 @@ use crate::ty::atom::payload::array::ArrayKey;
 use crate::ty::atom::payload::array::KnownItem;
 use crate::ty::atom::payload::conditional::ConditionalAtom;
 use crate::ty::atom::payload::derived::DerivedAtom;
-use crate::ty::atom::payload::derived::Visibility;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use crate::ty::atom::payload::object::named::ObjectAtom;
 use crate::ty::atom::payload::object::named::ObjectFlag;
@@ -143,7 +144,7 @@ where
         return vec![atom];
     }
 
-    let Some(body) = world.alias_body(payload.class_name, payload.alias_name) else {
+    let Some(body) = world.alias_body(payload.class_name.id, payload.alias_name) else {
         return vec![atom];
     };
 
@@ -173,12 +174,12 @@ where
         ObjectAtom { name: resolved_name, type_arguments: payload.type_arguments, flags: U8Flags::empty() };
 
     if context.fill_template_defaults && object.type_arguments.is_none() {
-        let arity = world.template_parameter_arity(object.name);
+        let arity = world.template_parameter_arity(object.name.id);
         if arity > 0 {
             let filled: Vec<Type<'arena>> = (0..arity)
                 .map(|position| {
                     world
-                        .template_parameter_at(object.name, position)
+                        .template_parameter_at(object.name.id, position)
                         .and_then(|parameter| parameter.upper_bound)
                         .unwrap_or(well_known::TYPE_MIXED)
                 })
@@ -239,7 +240,7 @@ where
     let class = payload.class_like_name;
 
     if let NameSelector::Identifier(constant) = payload.selector {
-        let Some(body) = world.class_constant_type(class, constant) else {
+        let Some(body) = world.class_constant_type(class.id, constant) else {
             return vec![atom];
         };
 
@@ -249,17 +250,20 @@ where
     let selector = payload.selector;
 
     let mut constant_bodies: Vec<Type<'arena>> = Vec::new();
-    for constant in world.class_constants(class) {
-        if selector_matches(selector, constant.name) {
-            constant_bodies.push(constant.r#type);
+    for constant in world.class_constants(class.id) {
+        if selector_matches(selector, constant.name.as_bytes())
+            && let Some(body) = constant.ty.effective()
+        {
+            constant_bodies.push(body);
         }
     }
 
-    let mut case_names: Vec<Name<'arena>> = Vec::new();
-    if world.class_like_kind(class) == Some(ClassLikeKind::Enum) {
-        for case in world.enum_cases(class) {
-            if selector_matches(selector, *case) {
-                case_names.push(*case);
+    let mut case_names: Vec<&'arena [u8]> = Vec::new();
+    if world.class_like_kind(class.id) == Some(ClassLikeKind::Enum) {
+        for case in world.enum_cases(class.id) {
+            let name = case.name.as_bytes();
+            if selector_matches(selector, name) {
+                case_names.push(name);
             }
         }
     }
@@ -275,7 +279,7 @@ where
     }
 
     for case in case_names {
-        resolved.push(builder.enum_case(class.as_bytes(), case.as_bytes()));
+        resolved.push(builder.enum_case(class.as_bytes(), case));
     }
 
     resolved
@@ -285,13 +289,13 @@ where
 /// `StartsWith` / `EndsWith` / `Contains` are byte-substring tests; `Wildcard`
 /// matches everything.
 #[inline]
-fn selector_matches(selector: NameSelector<'_>, name: Name<'_>) -> bool {
-    let bytes = name.as_bytes();
+fn selector_matches(selector: NameSelector<'_>, name: &[u8]) -> bool {
+    let bytes = name;
     match selector {
-        NameSelector::Identifier(target) => bytes == target.as_bytes(),
-        NameSelector::StartsWith(prefix) => bytes.starts_with(prefix.as_bytes()),
-        NameSelector::EndsWith(suffix) => bytes.ends_with(suffix.as_bytes()),
-        NameSelector::Contains(needle) => contains_subslice(bytes, needle.as_bytes()),
+        NameSelector::Identifier(target) => bytes == target,
+        NameSelector::StartsWith(prefix) => bytes.starts_with(prefix),
+        NameSelector::EndsWith(suffix) => bytes.ends_with(suffix),
+        NameSelector::Contains(needle) => contains_subslice(bytes, needle),
         NameSelector::Wildcard => true,
     }
 }
@@ -334,7 +338,7 @@ where
         return vec![atom];
     };
 
-    let Some(body) = world.global_constant_type(name) else {
+    let Some(body) = world.global_constant_type(SymbolId::constant(name)) else {
         return vec![atom];
     };
 
@@ -463,12 +467,12 @@ where
     }
 
     if context.fill_template_defaults && object.type_arguments.is_none() {
-        let arity = world.template_parameter_arity(object.name);
+        let arity = world.template_parameter_arity(object.name.id);
         if arity > 0 {
             let filled: Vec<Type<'arena>> = (0..arity)
                 .map(|position| {
                     world
-                        .template_parameter_at(object.name, position)
+                        .template_parameter_at(object.name.id, position)
                         .and_then(|parameter| parameter.upper_bound)
                         .unwrap_or(well_known::TYPE_MIXED)
                 })
@@ -487,10 +491,10 @@ where
 /// `Named(C)`) or when the context lacks the required entry.
 #[inline]
 fn resolve_keyword_name<'arena>(
-    name: Name<'arena>,
+    name: Path<'arena>,
     flags: U8Flags<ObjectFlag>,
     context: &ExpansionContext<'arena>,
-) -> Option<Name<'arena>> {
+) -> Option<Path<'arena>> {
     let bytes = name.as_bytes();
     if flags.contains(ObjectFlag::IsThis) || flags.contains(ObjectFlag::IsStatic) || bytes == b"static" {
         context.static_class
@@ -558,8 +562,7 @@ where
                 return well_known::TYPE_NEVER;
             };
 
-            let keys: Vec<Atom<'arena>> =
-                entries.iter().map(|entry| builder.string_literal(entry.name.as_bytes())).collect();
+            let keys: Vec<Atom<'arena>> = entries.iter().map(|entry| builder.string_literal(entry.name)).collect();
 
             if keys.is_empty() { well_known::TYPE_NEVER } else { builder.union_of(&keys) }
         }
@@ -693,7 +696,7 @@ where
 }
 
 #[inline]
-fn string_literal_value(atom: Atom<'_>) -> Option<Name<'_>> {
+fn string_literal_value(atom: Atom<'_>) -> Option<&'_ [u8]> {
     let Atom::String(payload) = atom else {
         return None;
     };
@@ -803,13 +806,13 @@ where
 {
     let class = single_object_or_reference_name(class_name)?;
     let template = single_string_literal_value(template_name)?;
-    let position = world.template_parameter_index(class, template)?;
+    let position = world.template_parameter_index(class.id, template)?;
 
     if let Some(binding) = template_binding_from_object(object, class, position, world) {
         return Some(expand_with(binding, world, context, builder));
     }
 
-    let parameter = world.template_parameter_at(class, position)?;
+    let parameter = world.template_parameter_at(class.id, position)?;
 
     Some(expand_with(parameter.upper_bound.unwrap_or(well_known::TYPE_MIXED), world, context, builder))
 }
@@ -824,7 +827,7 @@ where
 #[inline]
 fn template_binding_from_object<'arena, W>(
     object: Type<'arena>,
-    class: Name<'_>,
+    class: Path<'_>,
     position: usize,
     world: &W,
 ) -> Option<Type<'arena>>
@@ -845,8 +848,8 @@ where
         return type_arguments.and_then(|arguments| arguments.get(position).copied());
     }
 
-    if world.descends_from(object_name, class) {
-        return world.inherited_template_argument(object_name, class, position);
+    if world.descends_from(object_name.id, class.id) {
+        return world.inherited_template_argument(object_name.id, class.id, position);
     }
 
     None
@@ -870,10 +873,10 @@ where
 {
     let class = single_object_or_reference_name(target)?;
 
-    let count = world.class_property_count(class);
+    let count = world.class_property_count(class.id);
     let mut entries: Vec<KnownItem<'arena>> = Vec::with_capacity(count);
     for position in 0..count {
-        let Some(property) = world.class_property_at(class, position) else {
+        let Some(property) = world.class_property_at(class.id, position) else {
             continue;
         };
 
@@ -946,7 +949,7 @@ where
 /// declares with its upper bound (or `mixed` when unbounded).
 #[inline]
 fn instantiate_named_class<'arena, S, A, W>(
-    class: Name<'arena>,
+    class: Path<'arena>,
     world: &W,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Type<'arena>
@@ -955,14 +958,14 @@ where
     A: Arena,
     W: World<'arena>,
 {
-    let arity = world.template_parameter_arity(class);
+    let arity = world.template_parameter_arity(class.id);
     let object = if arity == 0 {
         ObjectAtom { name: class, type_arguments: None, flags: U8Flags::empty() }
     } else {
         let arguments: Vec<Type<'arena>> = (0..arity)
             .map(|position| {
                 world
-                    .template_parameter_at(class, position)
+                    .template_parameter_at(class.id, position)
                     .and_then(|parameter| parameter.upper_bound)
                     .unwrap_or(well_known::TYPE_MIXED)
             })
@@ -976,7 +979,7 @@ where
 }
 
 #[inline]
-fn single_object_or_reference_name(ty: Type<'_>) -> Option<Name<'_>> {
+fn single_object_or_reference_name(ty: Type<'_>) -> Option<Path<'_>> {
     let [only] = ty.atoms else {
         return None;
     };
@@ -989,7 +992,7 @@ fn single_object_or_reference_name(ty: Type<'_>) -> Option<Name<'_>> {
 }
 
 #[inline]
-fn single_string_literal_value(ty: Type<'_>) -> Option<Name<'_>> {
+fn single_string_literal_value(ty: Type<'_>) -> Option<&'_ [u8]> {
     let [only] = ty.atoms else {
         return None;
     };
@@ -1008,7 +1011,7 @@ where
 {
     match key {
         ArrayKey::Int(value) => Some(Atom::int_literal(value)),
-        ArrayKey::String(name) => Some(builder.string_literal(name.as_bytes())),
+        ArrayKey::String(name) => Some(builder.string_literal(name)),
         ArrayKey::Const { .. } => None,
     }
 }

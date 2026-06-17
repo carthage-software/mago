@@ -24,7 +24,7 @@ use std::collections::BTreeSet;
 
 use mago_allocator::Arena;
 
-use crate::name::Name;
+use crate::path::Path;
 use crate::ty::Type;
 use crate::ty::atom::payload::generic_parameter::DefiningEntity;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
@@ -35,7 +35,7 @@ use crate::world::World;
 /// Builder collecting direct parent edges before transitive composition.
 #[derive(Debug, Default, Clone)]
 pub struct HierarchyBuilder<'arena> {
-    edges: BTreeMap<(Name<'arena>, Name<'arena>), Vec<Type<'arena>>>,
+    edges: BTreeMap<(Path<'arena>, Path<'arena>), Vec<Type<'arena>>>,
 }
 
 impl<'arena> HierarchyBuilder<'arena> {
@@ -49,7 +49,7 @@ impl<'arena> HierarchyBuilder<'arena> {
     /// expressed in `child`'s template namespace. Idempotent on
     /// `(child, parent)`; the latest call wins.
     #[inline]
-    pub fn add_edge(&mut self, child: Name<'arena>, parent: Name<'arena>, arguments: Vec<Type<'arena>>) {
+    pub fn add_edge(&mut self, child: Path<'arena>, parent: Path<'arena>, arguments: Vec<Type<'arena>>) {
         self.edges.insert((child, parent), arguments);
     }
 
@@ -64,16 +64,16 @@ impl<'arena> HierarchyBuilder<'arena> {
         A: Arena,
         W: World<'arena>,
     {
-        let mut parents_of: BTreeMap<Name<'arena>, Vec<Name<'arena>>> = BTreeMap::new();
+        let mut parents_of: BTreeMap<Path<'arena>, Vec<Path<'arena>>> = BTreeMap::new();
         for &(child, parent) in self.edges.keys() {
             parents_of.entry(child).or_default().push(parent);
         }
 
-        let mut composed: BTreeMap<(Name<'arena>, Name<'arena>), Vec<Type<'arena>>> = self.edges.clone();
+        let mut composed: BTreeMap<(Path<'arena>, Path<'arena>), Vec<Type<'arena>>> = self.edges.clone();
 
-        let children: Vec<Name<'arena>> = parents_of.keys().copied().collect();
+        let children: Vec<Path<'arena>> = parents_of.keys().copied().collect();
         for child in children {
-            let mut visiting: BTreeSet<Name<'arena>> = BTreeSet::new();
+            let mut visiting: BTreeSet<Path<'arena>> = BTreeSet::new();
             walk(child, &self.edges, &parents_of, &mut composed, &mut visiting, world, builder);
         }
 
@@ -83,11 +83,11 @@ impl<'arena> HierarchyBuilder<'arena> {
 
 #[inline]
 fn walk<'arena, S, A, W>(
-    child: Name<'arena>,
-    edges: &BTreeMap<(Name<'arena>, Name<'arena>), Vec<Type<'arena>>>,
-    parents_of: &BTreeMap<Name<'arena>, Vec<Name<'arena>>>,
-    composed: &mut BTreeMap<(Name<'arena>, Name<'arena>), Vec<Type<'arena>>>,
-    visiting: &mut BTreeSet<Name<'arena>>,
+    child: Path<'arena>,
+    edges: &BTreeMap<(Path<'arena>, Path<'arena>), Vec<Type<'arena>>>,
+    parents_of: &BTreeMap<Path<'arena>, Vec<Path<'arena>>>,
+    composed: &mut BTreeMap<(Path<'arena>, Path<'arena>), Vec<Type<'arena>>>,
+    visiting: &mut BTreeSet<Path<'arena>>,
     world: &W,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) where
@@ -113,7 +113,7 @@ fn walk<'arena, S, A, W>(
 
         let parent_entity = DefiningEntity::ClassLike(parent);
 
-        let grandparents: Vec<Name<'arena>> = composed
+        let grandparents: Vec<Path<'arena>> = composed
             .keys()
             .filter(|(parent_child, _)| *parent_child == parent)
             .map(|(_, ancestor)| *ancestor)
@@ -142,7 +142,7 @@ fn walk<'arena, S, A, W>(
                                 return None;
                             }
 
-                            let position = world.template_parameter_index(parent, parameter.name)?;
+                            let position = world.template_parameter_index(parent.id, parameter.name)?;
                             child_to_parent.get(position).copied()
                         },
                         builder,
@@ -161,7 +161,7 @@ fn walk<'arena, S, A, W>(
 /// O(1) lookup keyed on `(child, ancestor)`.
 #[derive(Debug, Clone, Default)]
 pub struct Hierarchy<'arena> {
-    composed: BTreeMap<(Name<'arena>, Name<'arena>), Vec<Type<'arena>>>,
+    composed: BTreeMap<(Path<'arena>, Path<'arena>), Vec<Type<'arena>>>,
 }
 
 impl<'arena> Hierarchy<'arena> {
@@ -170,7 +170,7 @@ impl<'arena> Hierarchy<'arena> {
     /// namespace. `None` when `child` does not descend from `ancestor` or
     /// no edges were registered along the path.
     #[inline]
-    pub fn args(&self, child: Name<'arena>, ancestor: Name<'arena>) -> Option<&[Type<'arena>]> {
+    pub fn args(&self, child: Path<'arena>, ancestor: Path<'arena>) -> Option<&[Type<'arena>]> {
         self.composed.get(&(child, ancestor)).map(Vec::as_slice)
     }
 
@@ -178,7 +178,7 @@ impl<'arena> Hierarchy<'arena> {
     /// followed by `[position]`.
     #[inline]
     #[must_use]
-    pub fn arg(&self, child: Name<'arena>, ancestor: Name<'arena>, position: usize) -> Option<Type<'arena>> {
+    pub fn arg(&self, child: Path<'arena>, ancestor: Path<'arena>, position: usize) -> Option<Type<'arena>> {
         self.args(child, ancestor).and_then(|arguments| arguments.get(position).copied())
     }
 
@@ -187,7 +187,7 @@ impl<'arena> Hierarchy<'arena> {
     /// [`World`] that delegates
     /// [`descends_from`](World::descends_from).
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = ((Name<'arena>, Name<'arena>), &[Type<'arena>])> {
+    pub fn iter(&self) -> impl Iterator<Item = ((Path<'arena>, Path<'arena>), &[Type<'arena>])> {
         self.composed.iter().map(|(&pair, arguments)| (pair, arguments.as_slice()))
     }
 }

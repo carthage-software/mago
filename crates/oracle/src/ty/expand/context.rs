@@ -2,7 +2,7 @@
 //! class names (`self` / `static` / `parent`) and per-stage feature
 //! toggles that control which atom-resolution rules fire.
 
-use crate::name::Name;
+use crate::path::Path;
 
 /// Caller-controlled options for [`expand_with`](super::expand_with).
 ///
@@ -35,9 +35,9 @@ use crate::name::Name;
 ///   binding (the function is `final`, so `static` cannot widen).
 #[derive(Debug, Clone, Copy)]
 pub struct ExpansionContext<'arena> {
-    pub self_class: Option<Name<'arena>>,
-    pub static_class: Option<Name<'arena>>,
-    pub parent_class: Option<Name<'arena>>,
+    pub self_class: Option<Path<'arena>>,
+    pub static_class: Option<Path<'arena>>,
+    pub parent_class: Option<Path<'arena>>,
     pub evaluate_class_constants: bool,
     pub evaluate_global_constants: bool,
     pub evaluate_aliases: bool,
@@ -68,21 +68,21 @@ impl Default for ExpansionContext<'_> {
 impl<'arena> ExpansionContext<'arena> {
     #[must_use]
     #[inline]
-    pub const fn with_self_class(mut self, class: Name<'arena>) -> Self {
+    pub const fn with_self_class(mut self, class: Path<'arena>) -> Self {
         self.self_class = Some(class);
         self
     }
 
     #[must_use]
     #[inline]
-    pub const fn with_static_class(mut self, class: Name<'arena>) -> Self {
+    pub const fn with_static_class(mut self, class: Path<'arena>) -> Self {
         self.static_class = Some(class);
         self
     }
 
     #[must_use]
     #[inline]
-    pub const fn with_parent_class(mut self, class: Name<'arena>) -> Self {
+    pub const fn with_parent_class(mut self, class: Path<'arena>) -> Self {
         self.parent_class = Some(class);
         self
     }

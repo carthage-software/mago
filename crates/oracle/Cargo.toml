@@ -14,11 +14,20 @@ workspace = true
 
 [features]
 default = []
-serde = ["dep:serde", "ordered-float/serde", "mago-flags/serde", "mago-span/serde"]
+serde = [
+    "dep:serde",
+    "ordered-float/serde",
+    "mago-flags/serde",
+    "mago-span/serde",
+    "mago-hir/serde",
+    "mago-php-version/serde",
+]
 
 [dependencies]
+foldhash = { workspace = true }
 mago-allocator = { workspace = true }
 mago-flags = { workspace = true }
+mago-php-version = { workspace = true }
 mago-span = { workspace = true }
 mago-hir = { workspace = true }
 ordered-float = { workspace = true }

@@ -61,7 +61,7 @@ pub(crate) fn is_truthy(atom: Atom<'_>) -> bool {
 
             match payload.literal {
                 StringLiteral::Value(value) => {
-                    let bytes = value.as_bytes();
+                    let bytes = value;
                     !bytes.is_empty() && bytes != b"0"
                 }
                 StringLiteral::None | StringLiteral::Unspecified => false,

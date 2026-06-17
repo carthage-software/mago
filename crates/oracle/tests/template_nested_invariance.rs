@@ -2,19 +2,24 @@ mod common;
 
 use common::*;
 
-use mago_oracle::name::Name;
+use mago_oracle::path::Path;
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::template;
 use mago_oracle::ty::template::StandinOptions;
 use mago_oracle::ty::template::TemplateState;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 
-fn marker_for<'arena>(state: &TemplateState<'arena>, class: &'static str, name: &'static str) -> Option<Name<'arena>> {
+fn marker_for<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    state: &TemplateState<'arena>,
+    class: &'static str,
+    name: &'static str,
+) -> Option<Path<'arena>> {
     let key = mago_oracle::ty::template::TemplateKey {
-        defining_entity: mago_oracle::ty::atom::payload::generic_parameter::DefiningEntity::ClassLike(Name::new(
-            class.as_bytes(),
-        )),
-        name: Name::new(name.as_bytes()),
+        defining_entity: mago_oracle::ty::atom::payload::generic_parameter::DefiningEntity::ClassLike(
+            f.builder.intern_class_like_path(class.as_bytes()),
+        ),
+        name: name.as_bytes(),
     };
     let bounds = state.bounds_for(key);
     assert_eq!(bounds.len(), 1, "expected exactly one bound for {class}::{name}");
@@ -45,9 +50,11 @@ fn invariance_propagates_through_nested_covariant_position() {
         let options = StandinOptions::default();
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
 
+        let marked = marker_for(f, &state, "Box", "T");
+        let expected = f.name("Cell");
         assert_eq!(
-            marker_for(&state, "Box", "T"),
-            Some(Name::new(b"Cell")),
+            marked,
+            Some(expected),
             "invariance introduced at Cell must mark the bound on T even though Box's position is covariant"
         );
     });
@@ -76,11 +83,8 @@ fn pure_covariant_nesting_records_no_marker() {
         let options = StandinOptions::default();
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
 
-        assert_eq!(
-            marker_for(&state, "Box", "T"),
-            None,
-            "no invariant position is crossed, so the bound must carry no invariant marker"
-        );
+        let marked = marker_for(f, &state, "Box", "T");
+        assert_eq!(marked, None, "no invariant position is crossed, so the bound must carry no invariant marker");
     });
 }
 
@@ -101,6 +105,8 @@ fn invariance_at_outer_position_marks_direct_template() {
         let options = StandinOptions::default();
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
 
-        assert_eq!(marker_for(&state, "Cell", "V"), Some(Name::new(b"Cell")));
+        let marked = marker_for(f, &state, "Cell", "V");
+        let expected = f.name("Cell");
+        assert_eq!(marked, Some(expected));
     });
 }

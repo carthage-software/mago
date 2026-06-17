@@ -35,7 +35,8 @@
 use mago_allocator::Arena;
 use mago_flags::U8Flags;
 
-use crate::name::Name;
+use crate::path::Path;
+use crate::symbol::part::generic::Variance;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
@@ -57,7 +58,6 @@ use crate::ty::lattice::refines as type_refines;
 use crate::ty::template::substitute;
 use crate::ty::well_known;
 use crate::world::EnumBacking;
-use crate::world::Variance;
 use crate::world::World;
 
 /// Container is `object` (`ObjectAny`): accept anything in the object
@@ -124,27 +124,27 @@ fn is_closure_class(container: ObjectAtom<'_>) -> bool {
 }
 
 #[inline]
-fn refines_has_method<'arena, W>(input: Atom<'arena>, method: Name<'arena>, world: &W) -> bool
+fn refines_has_method<'arena, W>(input: Atom<'arena>, method: &'arena [u8], world: &W) -> bool
 where
     W: World<'arena>,
 {
     match input {
         Atom::HasMethod(input_payload) => input_payload.method_name == method,
-        Atom::Object(input_payload) => world.class_has_method(input_payload.name, method),
-        Atom::Enum(input_payload) => world.class_has_method(input_payload.name, method),
+        Atom::Object(input_payload) => world.class_has_method(input_payload.name.id, method),
+        Atom::Enum(input_payload) => world.class_has_method(input_payload.name.id, method),
         Atom::ObjectShape(_) => false,
         _ => false,
     }
 }
 
 #[inline]
-fn refines_has_property<'arena, W>(input: Atom<'arena>, property: Name<'arena>, world: &W) -> bool
+fn refines_has_property<'arena, W>(input: Atom<'arena>, property: &'arena [u8], world: &W) -> bool
 where
     W: World<'arena>,
 {
     match input {
         Atom::HasProperty(input_payload) => input_payload.property_name == property,
-        Atom::Object(input_payload) => world.class_has_property(input_payload.name, property),
+        Atom::Object(input_payload) => world.class_has_property(input_payload.name.id, property),
         Atom::Enum(input_payload) => enum_property_present(input_payload.name, property, world),
         Atom::ObjectShape(input_payload) => input_payload
             .known_properties
@@ -156,16 +156,16 @@ where
 /// Built-in enum properties: `name` is always present (any enum case has
 /// one); `value` is present only on backed enums.
 #[inline]
-fn enum_property_present<'arena, W>(enum_name: Name<'arena>, property: Name<'arena>, world: &W) -> bool
+fn enum_property_present<'arena, W>(enum_name: Path<'arena>, property: &'arena [u8], world: &W) -> bool
 where
     W: World<'arena>,
 {
-    if property.as_bytes() == b"name" {
+    if property == b"name" {
         return true;
     }
 
-    if property.as_bytes() == b"value" {
-        return matches!(world.enum_backing(enum_name), Some(EnumBacking::Backed(_)));
+    if property == b"value" {
+        return matches!(world.enum_backing(enum_name.id), Some(EnumBacking::Backed(_)));
     }
 
     false
@@ -218,11 +218,11 @@ where
     A: Arena,
     W: World<'arena>,
 {
-    let backing = world.enum_backing(payload.name)?;
+    let backing = world.enum_backing(payload.name.id)?;
 
     let name_type = match payload.case {
         Some(case_name) => {
-            let literal = builder.string_literal(case_name.as_bytes());
+            let literal = builder.string_literal(case_name);
 
             builder.union_of(&[literal])
         }
@@ -230,9 +230,9 @@ where
     };
 
     let mut properties = builder.scratch_vec_with(2);
-    properties.push(KnownProperty { name: builder.name(b"name"), value: name_type, optional: false });
+    properties.push(KnownProperty { name: builder.intern(b"name"), value: name_type, optional: false });
     if let EnumBacking::Backed(value_type) = backing {
-        properties.push(KnownProperty { name: builder.name(b"value"), value: value_type, optional: false });
+        properties.push(KnownProperty { name: builder.intern(b"value"), value: value_type, optional: false });
     }
 
     Some(ObjectShapeAtom {
@@ -303,7 +303,7 @@ where
 /// requirement when missing on `C`.
 #[inline]
 fn named_refines_shape<'arena, S, A, W>(
-    class: Name<'arena>,
+    class: Path<'arena>,
     container: ObjectShapeAtom<'arena>,
     world: &W,
     options: LatticeOptions,
@@ -318,7 +318,7 @@ where
     let container_properties = container.known_properties.unwrap_or_default();
 
     for container_entry in container_properties {
-        match world.class_property_type(class, container_entry.name) {
+        match world.class_property_type(class.id, container_entry.name) {
             Some(declared) => {
                 if !type_refines(declared, container_entry.value, world, options, report, builder) {
                     return false;
@@ -367,7 +367,7 @@ where
     A: Arena,
     W: World<'arena>,
 {
-    if !world.descends_from(input.name, container.name) {
+    if !world.descends_from(input.name.id, container.name.id) {
         return false;
     }
 
@@ -375,7 +375,7 @@ where
         return false;
     }
 
-    let arity = world.template_parameter_arity(container.name);
+    let arity = world.template_parameter_arity(container.name.id);
     if arity == 0 {
         return true;
     }
@@ -403,7 +403,7 @@ where
         };
 
         let variance = world
-            .template_parameter_at(container.name, position)
+            .template_parameter_at(container.name.id, position)
             .map(|parameter| parameter.variance)
             .unwrap_or_default();
 
@@ -441,9 +441,9 @@ where
 /// references that name the input's own templates.
 #[inline]
 fn input_argument_for_container_position<'arena, S, A, W>(
-    input_name: Name<'arena>,
+    input_name: Path<'arena>,
     input_actual_arguments: &[Type<'arena>],
-    container_name: Name<'arena>,
+    container_name: Path<'arena>,
     position: usize,
     same_class: bool,
     world: &W,
@@ -462,7 +462,7 @@ where
         return Some((default_template_argument(input_name, position, world), true));
     }
 
-    let inherited = world.inherited_template_argument(input_name, container_name, position)?;
+    let inherited = world.inherited_template_argument(input_name.id, container_name.id, position)?;
     let input_entity = DefiningEntity::ClassLike(input_name);
 
     let substituted = substitute(
@@ -472,7 +472,7 @@ where
                 return None;
             }
 
-            let parameter_position = world.template_parameter_index(input_name, payload.name)?;
+            let parameter_position = world.template_parameter_index(input_name.id, payload.name)?;
 
             input_actual_arguments.get(parameter_position).copied()
         },
@@ -534,12 +534,12 @@ where
 /// default-filled provenance out of band, since [`Type`] carries no flow
 /// flags.
 #[inline]
-fn default_template_argument<'arena, W>(class: Name<'_>, position: usize, world: &W) -> Type<'arena>
+fn default_template_argument<'arena, W>(class: Path<'_>, position: usize, world: &W) -> Type<'arena>
 where
     W: World<'arena>,
 {
     world
-        .template_parameter_at(class, position)
+        .template_parameter_at(class.id, position)
         .and_then(|parameter| parameter.upper_bound)
         .unwrap_or(well_known::TYPE_MIXED)
 }

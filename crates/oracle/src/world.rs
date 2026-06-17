@@ -14,14 +14,26 @@
 //! ` World` so the type system can ask whatever it needs without knowing
 //! how the analyzer stores it.
 //!
+//! Class-like, function, and global-constant identities are passed as
+//! [`SymbolId`] - the normalized, case-folded hash that the analyzer keys its
+//! storage by. Member names (methods, properties, class constants, template
+//! parameters, enum cases) are passed and returned as raw `&[u8]`, since they
+//! are not standalone symbols. Class-name returns are [`Fqn`] so the caller can
+//! both re-query and display them.
+//!
 //! The `'arena` parameter is the lifetime of the types the world hands back.
 //! A long-lived world storing `Type<'world>` answers queries for shorter
 //! file lifetimes covariantly: implement `World<'arena>` for every `'arena`
 //! that `'world` outlives, and the returned types coerce.
 
-use crate::name::Name;
+use crate::id::SymbolId;
+use crate::path::Path;
+use crate::symbol::class_like::part::constant::ClassLikeConstantMember;
+use crate::symbol::class_like::part::enum_case::EnumCaseMember;
+use crate::symbol::class_like::part::inheritance::InheritedType;
+use crate::symbol::class_like::part::visibility::Visibility;
+use crate::symbol::part::generic::Variance;
 use crate::ty::Type;
-use crate::ty::atom::payload::derived::Visibility;
 use crate::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 
 /// What the type system needs to know about the world being analyzed.
@@ -40,7 +52,7 @@ use crate::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 pub trait World<'arena> {
     /// `true` iff `child` is the same class-like as `ancestor`, or extends /
     /// implements / uses-trait it transitively.
-    fn descends_from(&self, child: Name<'_>, ancestor: Name<'_>) -> bool;
+    fn descends_from(&self, child: SymbolId, ancestor: SymbolId) -> bool;
 
     /// `true` iff `class` directly `use`s `trait_name` (the trait appears in
     /// `class`'s body as `use TraitName;`).
@@ -48,19 +60,19 @@ pub trait World<'arena> {
     /// Asymmetric vs [`descends_from`](Self::descends_from), which closes
     /// over inheritance: `descends_from` returns `true` for any trait in the
     /// chain, but `uses_trait` only for direct usage.
-    fn uses_trait(&self, class: Name<'_>, trait_name: Name<'_>) -> bool;
+    fn uses_trait(&self, class: SymbolId, trait_name: SymbolId) -> bool;
 
     /// How many type parameters `class` declares. `0` for unknown or
     /// non-generic classes.
-    fn template_parameter_arity(&self, class: Name<'_>) -> usize;
+    fn template_parameter_arity(&self, class: SymbolId) -> usize;
 
     /// The type parameter at `position` in `class`'s declaration, or `None`
     /// if `position >= template_parameter_arity(class)`.
-    fn template_parameter_at(&self, class: Name<'_>, position: usize) -> Option<TemplateParameter<'arena>>;
+    fn template_parameter_at(&self, class: SymbolId, position: usize) -> Option<TemplateParameter<'arena>>;
 
     /// The position of `class`'s type parameter named `name`, or `None` if
     /// no such parameter exists.
-    fn template_parameter_index(&self, class: Name<'_>, name: Name<'_>) -> Option<usize>;
+    fn template_parameter_index(&self, class: SymbolId, name: &[u8]) -> Option<usize>;
 
     /// The type `child` passes to `ancestor`'s `position`-th type parameter,
     /// expressed in `child`'s template namespace.
@@ -72,7 +84,7 @@ pub trait World<'arena> {
     ///
     /// Returns `None` when `child` does not descend from `ancestor`, or when
     /// `position >= template_parameter_arity(ancestor)`.
-    fn inherited_template_argument(&self, child: Name<'_>, ancestor: Name<'_>, position: usize)
+    fn inherited_template_argument(&self, child: SymbolId, ancestor: SymbolId, position: usize)
     -> Option<Type<'arena>>;
 
     /// `true` iff the template parameter `(from_class, from_parameter)` is the
@@ -91,49 +103,49 @@ pub trait World<'arena> {
     /// to `E::TE`. Without this, the derived subtyping would not be transitive.
     fn template_parameter_forwards_to(
         &self,
-        from_class: Name<'_>,
-        from_parameter: Name<'_>,
-        to_class: Name<'_>,
-        to_parameter: Name<'_>,
+        from_class: SymbolId,
+        from_parameter: &[u8],
+        to_class: SymbolId,
+        to_parameter: &[u8],
     ) -> bool;
 
     /// `true` iff `class` declares or inherits a method named `method`.
     /// Mirrors PHP's `method_exists()` semantics: walks the inheritance
     /// closure (parent classes, implemented interfaces, used traits).
-    fn class_has_method(&self, class: Name<'_>, method: Name<'_>) -> bool;
+    fn class_has_method(&self, class: SymbolId, method: &[u8]) -> bool;
 
     /// The declared type of `property` on `class`, walking the inheritance
     /// closure. `None` when the property is absent or its type is unknown.
-    fn class_property_type(&self, class: Name<'_>, property: Name<'_>) -> Option<Type<'arena>>;
+    fn class_property_type(&self, class: SymbolId, property: &[u8]) -> Option<Type<'arena>>;
 
     /// `true` iff `class` declares or inherits a property named `property`.
     /// Mirrors PHP's `property_exists()` semantics.
-    fn class_has_property(&self, class: Name<'_>, property: Name<'_>) -> bool;
+    fn class_has_property(&self, class: SymbolId, property: &[u8]) -> bool;
 
     /// What kind of enum `enum_name` is.
     ///
     /// Returns `None` when the enum is unknown (or `enum_name` does not name
     /// an enum). The lattice treats `None` conservatively: a structural
     /// narrowing that depends on the backing is rejected.
-    fn enum_backing(&self, enum_name: Name<'_>) -> Option<EnumBacking<'arena>>;
+    fn enum_backing(&self, enum_name: SymbolId) -> Option<EnumBacking<'arena>>;
 
     /// What kind of class-like `name` declares (class, interface, enum, or
     /// trait), or `None` when the world doesn't know `name`.
-    fn class_like_kind(&self, name: Name<'_>) -> Option<ClassLikeKind>;
+    fn class_like_kind(&self, name: SymbolId) -> Option<ClassLikeKind>;
 
     /// `true` iff `name` cannot be extended (PHP `final class` declaration,
     /// or any enum; enums are implicitly final).
-    fn is_final(&self, name: Name<'_>) -> bool;
+    fn is_final(&self, name: SymbolId) -> bool;
 
     /// The recorded body of `class::alias` (a `@type` alias declared on the
     /// class), or `None` when the alias is unknown. Used by expansion to
     /// substitute alias bodies in place of `Alias` atoms.
-    fn alias_body(&self, class: Name<'_>, alias: Name<'_>) -> Option<Type<'arena>>;
+    fn alias_body(&self, class: SymbolId, alias: &[u8]) -> Option<Type<'arena>>;
 
     /// The declared or inferred type of `class::constant`. `None` when the
     /// constant is unknown. Used by expansion to resolve `MemberReference`
     /// atoms with an `Identifier` selector.
-    fn class_constant_type(&self, class: Name<'_>, constant: Name<'_>) -> Option<Type<'arena>>;
+    fn class_constant_type(&self, class: SymbolId, constant: &[u8]) -> Option<Type<'arena>>;
 
     /// Every constant visible from `class`'s scope (its own and those it
     /// inherits), as a borrowed slice into the world's storage - no
@@ -142,27 +154,27 @@ pub trait World<'arena> {
     /// selector (`Foo::*`, `Foo::STATUS_*`): the resolver filters this slice by
     /// the selector and unions the matching constant types. Empty when `class`
     /// is unknown or declares no constants.
-    fn class_constants(&self, class: Name<'_>) -> &[ClassConstant<'arena>];
+    fn class_constants(&self, class: SymbolId) -> &[ClassLikeConstantMember<'arena>];
 
     /// Every case `enum_name` declares, as a borrowed slice into the world's
     /// storage - no allocation. Used by expansion to resolve a wildcard member
     /// reference against an enum (`Suit::*`, `Suit::HEART_*`) into the union of
     /// the matching cases. Empty for non-enums or unknown names.
-    fn enum_cases(&self, enum_name: Name<'_>) -> &[Name<'arena>];
+    fn enum_cases(&self, enum_name: SymbolId) -> &[EnumCaseMember<'arena>];
 
     /// The declared or inferred type of a global constant or function
     /// signature. `None` when the name is unknown. Used by expansion to
     /// resolve `GlobalReference` atoms.
-    fn global_constant_type(&self, name: Name<'_>) -> Option<Type<'arena>>;
+    fn global_constant_type(&self, name: SymbolId) -> Option<Type<'arena>>;
 
     /// How many properties `class` declares or inherits (visible from
     /// `class`'s scope).
-    fn class_property_count(&self, class: Name<'_>) -> usize;
+    fn class_property_count(&self, class: SymbolId) -> usize;
 
     /// The `position`-th property of `class`, walking the inheritance
     /// closure in declaration order. Used by expansion to build the shape
     /// returned by `properties-of<C>`.
-    fn class_property_at(&self, class: Name<'_>, position: usize) -> Option<ClassProperty<'arena>>;
+    fn class_property_at(&self, class: SymbolId, position: usize) -> Option<ClassProperty<'arena>>;
 
     /// The closed list of *direct* inheritors of `class_like` when the world
     /// treats it as sealed; `None` when the world considers `class_like`
@@ -174,11 +186,11 @@ pub trait World<'arena> {
     /// Contract: the inheritors returned must each `descends_from` the
     /// queried class. Inconsistent worlds produce wrong lattice answers the
     /// same way an inconsistent `descends_from` does.
-    fn sealed_direct_inheritors(&self, class_like: Name<'_>) -> Option<&[Name<'arena>]>;
+    fn sealed_direct_inheritors(&self, class_like: SymbolId) -> Option<&[InheritedType<'arena>]>;
 
     /// If `child` is a direct inheritor of a sealed class, returns that
     /// sealed parent. `None` otherwise.
-    fn sealed_parent_of(&self, child: Name<'_>) -> Option<Name<'arena>>;
+    fn sealed_parent_of(&self, child: SymbolId) -> Option<Path<'arena>>;
 }
 
 /// One template parameter of a generic class-like or function.
@@ -188,55 +200,18 @@ pub trait World<'arena> {
 /// Foo` constraint, if any; `None` means unbounded (`mixed`-equivalent).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TemplateParameter<'arena> {
-    pub name: Name<'arena>,
+    pub name: &'arena [u8],
     pub variance: Variance,
     pub upper_bound: Option<Type<'arena>>,
-}
-
-/// How a template parameter behaves in the value position when comparing
-/// generic types.
-///
-/// **The default is [`Invariant`](Variance::Invariant)** - the only sound
-/// default for a class whose template usage is not analysed: a generic
-/// mutable container (read AND write of `T`) is invariant, and defaulting to
-/// anything looser is unsound. A library author who has audited their class
-/// for covariant-only or contravariant-only usage opts in explicitly.
-///
-/// - [`Covariant`](Variance::Covariant): `Box<int> <: Box<scalar>` when
-///   `int <: scalar`. Sound only when `T` appears exclusively in producer
-///   (return / read-only) positions.
-/// - [`Contravariant`](Variance::Contravariant): `Sink<scalar> <: Sink<int>`
-///   when `int <: scalar`. Sound only when `T` appears exclusively in
-///   consumer (parameter / write-only) positions.
-/// - [`Invariant`](Variance::Invariant): the type argument must match
-///   exactly (mutual subtyping).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub enum Variance {
-    Covariant,
-    Contravariant,
-    #[default]
-    Invariant,
 }
 
 /// One declared property of a class-like, returned by
 /// [`World::class_property_at`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClassProperty<'arena> {
-    pub name: Name<'arena>,
+    pub name: &'arena [u8],
     pub r#type: Type<'arena>,
     pub visibility: Visibility,
-}
-
-/// One constant of a class-like, returned by [`World::class_constants`].
-///
-/// Carries the constant's name and its declared or inferred type. Unlike
-/// [`ClassProperty`], no visibility is tracked: wildcard constant references
-/// (`Foo::*`) union every matching constant regardless of visibility, since
-/// expansion carries no accessing scope to filter against.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ClassConstant<'arena> {
-    pub name: Name<'arena>,
-    pub r#type: Type<'arena>,
 }
 
 /// What an enum case carries beyond its `name`. PHP enums are either pure
@@ -261,35 +236,35 @@ pub struct NullWorld;
 
 impl<'arena> World<'arena> for NullWorld {
     #[inline]
-    fn descends_from(&self, _child: Name<'_>, _ancestor: Name<'_>) -> bool {
+    fn descends_from(&self, _child: SymbolId, _ancestor: SymbolId) -> bool {
         false
     }
 
     #[inline]
-    fn uses_trait(&self, _class: Name<'_>, _trait_name: Name<'_>) -> bool {
+    fn uses_trait(&self, _class: SymbolId, _trait_name: SymbolId) -> bool {
         false
     }
 
     #[inline]
-    fn template_parameter_arity(&self, _class: Name<'_>) -> usize {
+    fn template_parameter_arity(&self, _class: SymbolId) -> usize {
         0
     }
 
     #[inline]
-    fn template_parameter_at(&self, _class: Name<'_>, _position: usize) -> Option<TemplateParameter<'arena>> {
+    fn template_parameter_at(&self, _class: SymbolId, _position: usize) -> Option<TemplateParameter<'arena>> {
         None
     }
 
     #[inline]
-    fn template_parameter_index(&self, _class: Name<'_>, _name: Name<'_>) -> Option<usize> {
+    fn template_parameter_index(&self, _class: SymbolId, _name: &[u8]) -> Option<usize> {
         None
     }
 
     #[inline]
     fn inherited_template_argument(
         &self,
-        _child: Name<'_>,
-        _ancestor: Name<'_>,
+        _child: SymbolId,
+        _ancestor: SymbolId,
         _position: usize,
     ) -> Option<Type<'arena>> {
         None
@@ -298,86 +273,86 @@ impl<'arena> World<'arena> for NullWorld {
     #[inline]
     fn template_parameter_forwards_to(
         &self,
-        from_class: Name<'_>,
-        from_parameter: Name<'_>,
-        to_class: Name<'_>,
-        to_parameter: Name<'_>,
+        from_class: SymbolId,
+        from_parameter: &[u8],
+        to_class: SymbolId,
+        to_parameter: &[u8],
     ) -> bool {
-        from_class.as_bytes() == to_class.as_bytes() && from_parameter.as_bytes() == to_parameter.as_bytes()
+        from_class == to_class && from_parameter == to_parameter
     }
 
     #[inline]
-    fn class_has_method(&self, _class: Name<'_>, _method: Name<'_>) -> bool {
+    fn class_has_method(&self, _class: SymbolId, _method: &[u8]) -> bool {
         false
     }
 
     #[inline]
-    fn class_property_type(&self, _class: Name<'_>, _property: Name<'_>) -> Option<Type<'arena>> {
+    fn class_property_type(&self, _class: SymbolId, _property: &[u8]) -> Option<Type<'arena>> {
         None
     }
 
     #[inline]
-    fn class_has_property(&self, _class: Name<'_>, _property: Name<'_>) -> bool {
+    fn class_has_property(&self, _class: SymbolId, _property: &[u8]) -> bool {
         false
     }
 
     #[inline]
-    fn enum_backing(&self, _enum_name: Name<'_>) -> Option<EnumBacking<'arena>> {
+    fn enum_backing(&self, _enum_name: SymbolId) -> Option<EnumBacking<'arena>> {
         None
     }
 
     #[inline]
-    fn class_like_kind(&self, _name: Name<'_>) -> Option<ClassLikeKind> {
+    fn class_like_kind(&self, _name: SymbolId) -> Option<ClassLikeKind> {
         None
     }
 
     #[inline]
-    fn is_final(&self, _name: Name<'_>) -> bool {
+    fn is_final(&self, _name: SymbolId) -> bool {
         false
     }
 
     #[inline]
-    fn alias_body(&self, _class: Name<'_>, _alias: Name<'_>) -> Option<Type<'arena>> {
+    fn alias_body(&self, _class: SymbolId, _alias: &[u8]) -> Option<Type<'arena>> {
         None
     }
 
     #[inline]
-    fn class_constant_type(&self, _class: Name<'_>, _constant: Name<'_>) -> Option<Type<'arena>> {
+    fn class_constant_type(&self, _class: SymbolId, _constant: &[u8]) -> Option<Type<'arena>> {
         None
     }
 
     #[inline]
-    fn class_constants(&self, _class: Name<'_>) -> &[ClassConstant<'arena>] {
+    fn class_constants(&self, _class: SymbolId) -> &[ClassLikeConstantMember<'arena>] {
         &[]
     }
 
     #[inline]
-    fn enum_cases(&self, _enum_name: Name<'_>) -> &[Name<'arena>] {
+    fn enum_cases(&self, _enum_name: SymbolId) -> &[EnumCaseMember<'arena>] {
         &[]
     }
 
     #[inline]
-    fn global_constant_type(&self, _name: Name<'_>) -> Option<Type<'arena>> {
+    fn global_constant_type(&self, _name: SymbolId) -> Option<Type<'arena>> {
         None
     }
 
     #[inline]
-    fn class_property_count(&self, _class: Name<'_>) -> usize {
+    fn class_property_count(&self, _class: SymbolId) -> usize {
         0
     }
 
     #[inline]
-    fn class_property_at(&self, _class: Name<'_>, _position: usize) -> Option<ClassProperty<'arena>> {
+    fn class_property_at(&self, _class: SymbolId, _position: usize) -> Option<ClassProperty<'arena>> {
         None
     }
 
     #[inline]
-    fn sealed_direct_inheritors(&self, _class_like: Name<'_>) -> Option<&[Name<'arena>]> {
+    fn sealed_direct_inheritors(&self, _class_like: SymbolId) -> Option<&[InheritedType<'arena>]> {
         None
     }
 
     #[inline]
-    fn sealed_parent_of(&self, _child: Name<'_>) -> Option<Name<'arena>> {
+    fn sealed_parent_of(&self, _child: SymbolId) -> Option<Path<'arena>> {
         None
     }
 }

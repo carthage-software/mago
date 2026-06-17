@@ -2,6 +2,7 @@ mod common;
 
 use common::*;
 
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::lattice;
 use mago_oracle::ty::lattice::LatticeOptions;
@@ -9,7 +10,6 @@ use mago_oracle::ty::lattice::LatticeReport;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::subtract;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 use mago_oracle::world::World;
 
 fn lattice_meet<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, world: &W) -> Type<'arena>

@@ -2,6 +2,7 @@ mod common;
 
 use common::*;
 
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::array::ArrayFlag;
@@ -15,7 +16,6 @@ use mago_oracle::ty::lattice::refines;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::subtract;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 use mago_oracle::world::World;
 
 fn t_sealed_list<'arena>(f: &mut Fixture<'_, 'arena>, elements: &[Type<'arena>]) -> Atom<'arena> {
@@ -749,7 +749,7 @@ fn sealed_invariant_generic_with_unsatisfiable_argument_is_uninhabited() {
 
         w.with_extended("A", "C", vec![well_known::TYPE_MIXED]);
         w.with_extended("B", "C", vec![well_known::TYPE_MIXED]);
-        w.with_sealed("C", &["A", "B"]);
+        w.with_sealed(&mut f.builder, "C", &["A", "B"]);
 
         let zero = f.ui(0);
         let c_zero = f.t_generic_named("C", vec![zero]);
@@ -817,7 +817,7 @@ fn partition_holds_for_sealed_class_extending_its_arguments() {
         w.with_extended("C", "E", vec![well_known::TYPE_MIXED]);
         w.with_extended("A", "C", vec![well_known::TYPE_MIXED]);
         w.with_extended("B", "C", vec![well_known::TYPE_MIXED]);
-        w.with_sealed("C", &["A", "B"]);
+        w.with_sealed(&mut f.builder, "C", &["A", "B"]);
 
         let e = f.t_named("E");
         let c_and_e = f.t_named_intersected("C", &[e]);

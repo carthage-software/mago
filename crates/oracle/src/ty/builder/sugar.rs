@@ -62,7 +62,7 @@ where
         flags.set_value(StringRefinementFlag::Truthy, is_truthy);
         flags.set_value(StringRefinementFlag::NonEmpty, is_non_empty);
 
-        let literal = StringLiteral::Value(self.name(value));
+        let literal = StringLiteral::Value(self.intern(value));
 
         self.string(StringAtom { literal, casing, flags })
     }
@@ -70,7 +70,7 @@ where
     /// Intern a named object atom with no type arguments and default flags.
     #[must_use]
     pub fn object_named(&mut self, name: &[u8]) -> Atom<'arena> {
-        let name = self.name(name);
+        let name = self.intern_class_like_path(name);
 
         self.object(ObjectAtom { name, type_arguments: None, flags: U8Flags::empty() })
     }
@@ -78,7 +78,7 @@ where
     /// Intern an enum atom ("any case of enum `name`").
     #[must_use]
     pub fn enum_any(&mut self, name: &[u8]) -> Atom<'arena> {
-        let name = self.name(name);
+        let name = self.intern_class_like_path(name);
 
         self.enumeration(EnumAtom { name, case: None })
     }
@@ -86,8 +86,8 @@ where
     /// Intern an enum-case atom (`name::case`).
     #[must_use]
     pub fn enum_case(&mut self, name: &[u8], case: &[u8]) -> Atom<'arena> {
-        let name = self.name(name);
-        let case = self.name(case);
+        let name = self.intern_class_like_path(name);
+        let case = self.intern(case);
 
         self.enumeration(EnumAtom { name, case: Some(case) })
     }
@@ -96,7 +96,7 @@ where
     /// name).
     #[must_use]
     pub fn class_string_literal(&mut self, name: &[u8]) -> Atom<'arena> {
-        let value = self.name(name);
+        let value = self.intern_class_like_path(name);
 
         self.class_like_string(ClassLikeStringAtom {
             kind: ClassLikeKind::Class,

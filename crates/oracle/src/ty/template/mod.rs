@@ -7,10 +7,10 @@
 
 use mago_span::Span;
 
-use crate::name::Name;
+use crate::path::Path;
+use crate::symbol::part::generic::Variance;
 use crate::ty::Type;
 use crate::ty::atom::payload::generic_parameter::DefiningEntity;
-use crate::world::Variance;
 
 pub use self::reconcile::reconcile;
 pub use self::standin::GenericTemplate;
@@ -29,7 +29,7 @@ mod substitute;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct TemplateKey<'arena> {
     pub defining_entity: DefiningEntity<'arena>,
-    pub name: Name<'arena>,
+    pub name: &'arena [u8],
 }
 
 /// What kind of constraint a [`Bound`] places on its template parameter.
@@ -62,7 +62,7 @@ pub struct Bound<'arena> {
     /// parameter declaration introduced the equality (the class whose
     /// type-argument position is invariant). `None` for non-equality
     /// bounds and for equality bounds collected outside any class context.
-    pub equality_bound_classlike: Option<Name<'arena>>,
+    pub equality_bound_classlike: Option<Path<'arena>>,
     /// Source location of the binding site. `None` when the caller did not
     /// supply one; span propagation is opt-in via
     /// [`StandinOptions::span`].

@@ -87,14 +87,14 @@ fn satisfies_casing(input: StringAtom<'_>, container_casing: StringCasing) -> bo
         StringCasing::Lowercase => match input.casing {
             StringCasing::Lowercase => true,
             _ => match input.literal {
-                StringLiteral::Value(value) => value.as_bytes().iter().all(|byte| !byte.is_ascii_uppercase()),
+                StringLiteral::Value(value) => value.iter().all(|byte| !byte.is_ascii_uppercase()),
                 _ => false,
             },
         },
         StringCasing::Uppercase => match input.casing {
             StringCasing::Uppercase => true,
             _ => match input.literal {
-                StringLiteral::Value(value) => value.as_bytes().iter().all(|byte| !byte.is_ascii_lowercase()),
+                StringLiteral::Value(value) => value.iter().all(|byte| !byte.is_ascii_lowercase()),
                 _ => false,
             },
         },
@@ -146,7 +146,7 @@ fn input_is_truthy(input: StringAtom<'_>) -> bool {
 
     match input.literal {
         StringLiteral::Value(value) => {
-            let bytes = value.as_bytes();
+            let bytes = value;
             !bytes.is_empty() && bytes != b"0"
         }
         _ => false,
@@ -159,7 +159,7 @@ pub(super) fn input_is_numeric(input: StringAtom<'_>) -> bool {
     }
 
     match input.literal {
-        StringLiteral::Value(value) => match core::str::from_utf8(value.as_bytes()) {
+        StringLiteral::Value(value) => match core::str::from_utf8(value) {
             Ok(text) => text.parse::<i64>().is_ok() || text.parse::<f64>().is_ok(),
             Err(_) => false,
         },

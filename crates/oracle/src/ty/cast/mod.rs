@@ -31,7 +31,6 @@
 use mago_allocator::Arena;
 use mago_flags::U8Flags;
 
-use crate::name::Name;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::array::KnownElement;
@@ -168,7 +167,7 @@ where
         },
         Atom::String(payload) => match payload.literal {
             StringLiteral::Value(value) => {
-                if let Some(parsed) = parse_php_int(value.as_bytes()) {
+                if let Some(parsed) = parse_php_int(value) {
                     CastResult::lossless(builder.union_of(&[Atom::int_literal(parsed)]))
                 } else {
                     CastResult::lossy(builder.union_of(&[well_known::INT_ZERO]))
@@ -204,7 +203,7 @@ where
         Atom::False | Atom::Null | Atom::Void => CastResult::lossless(builder.union_of(&[Atom::float_literal(0.0)])),
         Atom::Bool => CastResult::lossless(well_known::TYPE_FLOAT),
         Atom::String(payload) => match payload.literal {
-            StringLiteral::Value(value) => match parse_php_float(value.as_bytes()) {
+            StringLiteral::Value(value) => match parse_php_float(value) {
                 Some(parsed) => CastResult::lossless(builder.union_of(&[Atom::float_literal(parsed)])),
                 None => CastResult::lossy(builder.union_of(&[Atom::float_literal(0.0)])),
             },
@@ -258,10 +257,10 @@ where
         }
         Atom::False | Atom::Null | Atom::Void => CastResult::lossless(builder.union_of(&[well_known::EMPTY_STRING])),
         Atom::Bool | Atom::Resource(_) => CastResult::lossless(well_known::TYPE_STRING),
-        Atom::Object(payload) if world.class_has_method(payload.name, Name::new(b"__toString")) => {
+        Atom::Object(payload) if world.class_has_method(payload.name.id, b"__toString") => {
             CastResult::lossless(well_known::TYPE_STRING)
         }
-        Atom::HasMethod(payload) if payload.method_name.as_bytes() == b"__toString" => {
+        Atom::HasMethod(payload) if payload.method_name == b"__toString" => {
             CastResult::lossless(well_known::TYPE_STRING)
         }
         Atom::Object(_)
@@ -300,7 +299,7 @@ where
         },
         Atom::String(payload) => match payload.literal {
             StringLiteral::Value(value) => {
-                let bytes = value.as_bytes();
+                let bytes = value;
                 if bytes.is_empty() || bytes == b"0" {
                     CastResult::lossless(builder.union_of(&[well_known::FALSE]))
                 } else {

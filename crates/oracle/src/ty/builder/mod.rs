@@ -24,8 +24,9 @@ use core::hash::Hash;
 
 use mago_allocator::Arena;
 use mago_allocator::collections::HashSet;
+use mago_allocator::copy::CopyInto;
 
-use crate::name::Name;
+use crate::path::Path;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::alias::AliasAtom;
@@ -61,6 +62,7 @@ use crate::ty::atom::payload::scalar::int::IntRange;
 use crate::ty::atom::payload::scalar::string::StringAtom;
 use crate::ty::atom::payload::scalar::string::StringLiteral;
 use crate::ty::well_known;
+use crate::var::Var;
 
 pub mod union_buffer;
 
@@ -265,8 +267,55 @@ where
     /// Intern a name. Within one builder, equal byte sequences share one
     /// allocation.
     #[must_use]
-    pub fn name(&mut self, bytes: &[u8]) -> Name<'arena> {
-        Name::new(cons_slice(&mut self.names, self.arena, bytes))
+    pub fn intern(&mut self, bytes: &[u8]) -> &'arena [u8] {
+        cons_slice(&mut self.names, self.arena, bytes)
+    }
+
+    /// Re-intern a [`Path`] from any arena into this builder, deep-copying its
+    /// parts and preserving its precomputed [`SymbolId`](crate::id::SymbolId).
+    #[must_use]
+    pub fn intern_fqn(&mut self, fqn: Path<'_>) -> Path<'arena> {
+        fqn.copy_into(self.arena)
+    }
+
+    /// Intern `name` and build a class-like [`Path`] in this builder's arena.
+    #[must_use]
+    pub fn intern_class_like_path(&mut self, name: &[u8]) -> Path<'arena> {
+        let interned = self.intern(name);
+
+        Path::class_like(self.arena, interned)
+    }
+
+    /// Intern `name` and build a function-like [`Path`] in this builder's arena.
+    #[must_use]
+    pub fn intern_function_like_path(&mut self, name: &[u8]) -> Path<'arena> {
+        let interned = self.intern(name);
+
+        Path::function_like(self.arena, interned)
+    }
+
+    /// Intern a class-like constant `class::name` as a [`Path`] in this builder's arena.
+    #[must_use]
+    pub fn intern_class_like_constant_path(&mut self, class: &[u8], name: &[u8]) -> Path<'arena> {
+        let class = self.intern(class);
+        let name = self.intern(name);
+
+        Path::class_like_constant(self.arena, class, name)
+    }
+
+    /// Intern an enum case `enum::name` as a [`Path`] in this builder's arena.
+    #[must_use]
+    pub fn intern_enum_case_path(&mut self, enum_name: &[u8], name: &[u8]) -> Path<'arena> {
+        let enum_name = self.intern(enum_name);
+        let name = self.intern(name);
+
+        Path::enum_case(self.arena, enum_name, name)
+    }
+
+    /// Re-intern a [`Var`] from any arena into this builder.
+    #[must_use]
+    pub fn intern_var(&mut self, var: Var<'_>) -> Var<'arena> {
+        Var::new(self.intern(var.as_bytes()))
     }
 
     /// `int<lower, upper>` with either bound open when `None`.
@@ -538,7 +587,7 @@ where
                 let literal = match payload.literal {
                     StringLiteral::None => StringLiteral::None,
                     StringLiteral::Unspecified => StringLiteral::Unspecified,
-                    StringLiteral::Value(value) => StringLiteral::Value(self.name(value.as_bytes())),
+                    StringLiteral::Value(value) => StringLiteral::Value(self.intern(value)),
                 };
 
                 self.string(StringAtom { literal, casing: payload.casing, flags: payload.flags })
@@ -547,7 +596,7 @@ where
                 let specifier = match payload.specifier {
                     ClassLikeStringSpecifier::Any => ClassLikeStringSpecifier::Any,
                     ClassLikeStringSpecifier::Literal { value } => {
-                        ClassLikeStringSpecifier::Literal { value: self.name(value.as_bytes()) }
+                        ClassLikeStringSpecifier::Literal { value: self.intern_fqn(value) }
                     }
                     ClassLikeStringSpecifier::OfType { constraint } => {
                         ClassLikeStringSpecifier::OfType { constraint: self.import(constraint) }
@@ -563,14 +612,14 @@ where
             Atom::Numeric => Atom::Numeric,
             Atom::ArrayKey => Atom::ArrayKey,
             Atom::Object(payload) => {
-                let name = self.name(payload.name.as_bytes());
+                let name = self.intern_fqn(payload.name);
                 let type_arguments = payload.type_arguments.map(|type_arguments| self.import_types(type_arguments));
 
                 self.object(ObjectAtom { name, type_arguments, flags: payload.flags })
             }
             Atom::Enum(payload) => {
-                let name = self.name(payload.name.as_bytes());
-                let case = payload.case.map(|case| self.name(case.as_bytes()));
+                let name = self.intern_fqn(payload.name);
+                let case = payload.case.map(|case| self.intern(case));
 
                 self.enumeration(EnumAtom { name, case })
             }
@@ -580,7 +629,7 @@ where
                         let mut imported = self.scratch_vec_with(entries.len());
                         for entry in entries {
                             imported.push(KnownProperty {
-                                name: self.name(entry.name.as_bytes()),
+                                name: self.intern(entry.name),
                                 value: self.import(entry.value),
                                 optional: entry.optional,
                             });
@@ -594,10 +643,10 @@ where
                 self.object_shape(ObjectShapeAtom { known_properties, flags: payload.flags })
             }
             Atom::HasMethod(payload) => {
-                Atom::HasMethod(HasMethodAtom { method_name: self.name(payload.method_name.as_bytes()) })
+                Atom::HasMethod(HasMethodAtom { method_name: self.intern(payload.method_name) })
             }
             Atom::HasProperty(payload) => {
-                Atom::HasProperty(HasPropertyAtom { property_name: self.name(payload.property_name.as_bytes()) })
+                Atom::HasProperty(HasPropertyAtom { property_name: self.intern(payload.property_name) })
             }
             Atom::Array(payload) => {
                 let key_param = payload.key_param.map(|key_param| self.import(key_param));
@@ -663,32 +712,29 @@ where
             },
             Atom::Resource(payload) => Atom::Resource(payload),
             Atom::GenericParameter(payload) => {
-                let name = self.name(payload.name.as_bytes());
+                let name = self.intern(payload.name);
                 let defining_entity = match payload.defining_entity {
-                    DefiningEntity::ClassLike(class_like) => {
-                        DefiningEntity::ClassLike(self.name(class_like.as_bytes()))
+                    DefiningEntity::ClassLike(class_like) => DefiningEntity::ClassLike(self.intern_fqn(class_like)),
+                    DefiningEntity::Method { class, method } => {
+                        DefiningEntity::Method { class: self.intern_fqn(class), method: self.intern(method) }
                     }
-                    DefiningEntity::Method { class, method } => DefiningEntity::Method {
-                        class: self.name(class.as_bytes()),
-                        method: self.name(method.as_bytes()),
-                    },
-                    DefiningEntity::Function(function) => DefiningEntity::Function(self.name(function.as_bytes())),
+                    DefiningEntity::Function(function) => DefiningEntity::Function(self.intern_fqn(function)),
                 };
                 let constraint = self.import(payload.constraint);
 
                 self.generic_parameter(GenericParameterAtom { name, defining_entity, constraint })
             }
-            Atom::Variable(payload) => Atom::Variable(crate::ty::atom::payload::variable::VariableAtom {
-                name: self.name(payload.name.as_bytes()),
-            }),
+            Atom::Variable(payload) => {
+                Atom::Variable(crate::ty::atom::payload::variable::VariableAtom { name: self.intern_var(payload.name) })
+            }
             Atom::Reference(payload) => {
-                let name = self.name(payload.name.as_bytes());
+                let name = self.intern_fqn(payload.name);
                 let type_arguments = payload.type_arguments.map(|type_arguments| self.import_types(type_arguments));
 
                 self.reference(SymbolReferenceAtom { name, type_arguments })
             }
             Atom::MemberReference(payload) => {
-                let class_like_name = self.name(payload.class_like_name.as_bytes());
+                let class_like_name = self.intern_fqn(payload.class_like_name);
                 let selector = self.import_name_selector(payload.selector);
 
                 self.member_reference(MemberReferenceAtom { class_like_name, selector })
@@ -699,8 +745,8 @@ where
                 self.global_reference(GlobalReferenceAtom { selector })
             }
             Atom::Alias(payload) => {
-                let class_name = self.name(payload.class_name.as_bytes());
-                let alias_name = self.name(payload.alias_name.as_bytes());
+                let class_name = self.intern_fqn(payload.class_name);
+                let alias_name = self.intern(payload.alias_name);
 
                 self.alias(AliasAtom { class_name, alias_name })
             }
@@ -764,9 +810,9 @@ where
     fn import_array_key(&mut self, key: ArrayKey<'_>) -> ArrayKey<'arena> {
         match key {
             ArrayKey::Int(value) => ArrayKey::Int(value),
-            ArrayKey::String(name) => ArrayKey::String(self.name(name.as_bytes())),
+            ArrayKey::String(name) => ArrayKey::String(self.intern(name)),
             ArrayKey::Const { class, name } => {
-                ArrayKey::Const { class: self.name(class.as_bytes()), name: self.name(name.as_bytes()) }
+                ArrayKey::Const { class: self.intern_fqn(class), name: self.intern(name) }
             }
         }
     }
@@ -777,7 +823,7 @@ where
                 let mut imported = self.scratch_vec_with(parameters.len());
                 for parameter in parameters {
                     imported.push(Parameter {
-                        name: self.name(parameter.name.as_bytes()),
+                        name: self.intern(parameter.name),
                         r#type: self.import(parameter.r#type),
                         flags: parameter.flags,
                     });
@@ -795,9 +841,9 @@ where
 
     fn import_callable_alias(&mut self, alias: &CallableAlias<'_>) -> &'arena CallableAlias<'arena> {
         let imported = match *alias {
-            CallableAlias::Function(function) => CallableAlias::Function(self.name(function.as_bytes())),
+            CallableAlias::Function(function) => CallableAlias::Function(self.intern_fqn(function)),
             CallableAlias::Method { class, method } => {
-                CallableAlias::Method { class: self.name(class.as_bytes()), method: self.name(method.as_bytes()) }
+                CallableAlias::Method { class: self.intern_fqn(class), method: self.intern(method) }
             }
             CallableAlias::Closure(span) => CallableAlias::Closure(span),
         };
@@ -807,10 +853,10 @@ where
 
     fn import_name_selector(&mut self, selector: NameSelector<'_>) -> NameSelector<'arena> {
         match selector {
-            NameSelector::Identifier(name) => NameSelector::Identifier(self.name(name.as_bytes())),
-            NameSelector::StartsWith(name) => NameSelector::StartsWith(self.name(name.as_bytes())),
-            NameSelector::EndsWith(name) => NameSelector::EndsWith(self.name(name.as_bytes())),
-            NameSelector::Contains(name) => NameSelector::Contains(self.name(name.as_bytes())),
+            NameSelector::Identifier(name) => NameSelector::Identifier(self.intern(name)),
+            NameSelector::StartsWith(name) => NameSelector::StartsWith(self.intern(name)),
+            NameSelector::EndsWith(name) => NameSelector::EndsWith(self.intern(name)),
+            NameSelector::Contains(name) => NameSelector::Contains(self.intern(name)),
             NameSelector::Wildcard => NameSelector::Wildcard,
         }
     }

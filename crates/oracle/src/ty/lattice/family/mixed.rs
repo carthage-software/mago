@@ -144,7 +144,7 @@ pub(crate) fn truthiness_of(input: Atom<'_>) -> Truthiness {
 
             match payload.literal {
                 StringLiteral::Value(value) => {
-                    let bytes = value.as_bytes();
+                    let bytes = value;
                     if bytes.is_empty() || bytes == b"0" { Truthiness::Falsy } else { Truthiness::Truthy }
                 }
                 _ => Truthiness::Undetermined,

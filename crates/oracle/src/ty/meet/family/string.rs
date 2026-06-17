@@ -82,7 +82,7 @@ where
 
     if opposite_casings
         && let StringLiteral::Value(value) = merged.literal
-        && value.as_bytes().iter().any(u8::is_ascii_alphabetic)
+        && value.iter().any(u8::is_ascii_alphabetic)
     {
         return None;
     }
@@ -127,7 +127,7 @@ fn literal_satisfies_flags(literal: StringLiteral<'_>, flags: U8Flags<StringRefi
         return true;
     };
 
-    let bytes = value.as_bytes();
+    let bytes = value;
     if flags.contains(StringRefinementFlag::NonEmpty) && bytes.is_empty() {
         return false;
     }
@@ -151,7 +151,7 @@ fn literal_satisfies_casing(literal: StringLiteral<'_>, casing: StringCasing) ->
         return true;
     };
 
-    let bytes = value.as_bytes();
+    let bytes = value;
     match casing {
         StringCasing::Unspecified => true,
         StringCasing::Lowercase => !bytes.iter().any(u8::is_ascii_uppercase),

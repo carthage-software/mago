@@ -427,7 +427,7 @@ fn contains_template_anywhere_finds_nested() {
 fn contains_unresolved_anywhere_finds_alias_in_list() {
     fixture(|f| {
         let class_name = f.name("Foo");
-        let alias_name = f.name("Id");
+        let alias_name = f.builder.intern(b"Id");
         let alias = f.builder.alias(AliasAtom { class_name, alias_name });
         let alias_type = f.u(alias);
         let list = f.t_list(alias_type, false);

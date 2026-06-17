@@ -12,14 +12,14 @@ use mago_oracle::ty::subtract;
 use mago_oracle::ty::well_known;
 use mago_oracle::world::World;
 
-fn create_sealed_world<'arena>() -> MockWorld<'arena> {
+fn create_sealed_world<'arena>(f: &mut Fixture<'_, 'arena>) -> MockWorld<'arena> {
     let mut world = MockWorld::new();
     world
         .add_edge("Error", "Throwable")
         .add_edge("Exception", "Throwable")
         .add_edge("RuntimeException", "Exception")
         .add_edge("LogicException", "Exception")
-        .with_sealed("Throwable", &["Error", "Exception"]);
+        .with_sealed(&mut f.builder, "Throwable", &["Error", "Exception"]);
     world
 }
 
@@ -50,7 +50,7 @@ where
 #[test]
 fn throwable_minus_exception_refines_error() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let throwable = f.t_named("Throwable");
         let exception = f.t_named("Exception");
         let error = f.t_named("Error");
@@ -68,7 +68,7 @@ fn throwable_minus_exception_refines_error() {
 #[test]
 fn error_refines_throwable_minus_exception() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let throwable = f.t_named("Throwable");
         let exception = f.t_named("Exception");
         let error = f.t_named("Error");
@@ -86,7 +86,7 @@ fn error_refines_throwable_minus_exception() {
 #[test]
 fn throwable_refines_error_or_exception_union() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let throwable = f.t_named("Throwable");
         let error = f.t_named("Error");
         let exception = f.t_named("Exception");
@@ -100,7 +100,7 @@ fn throwable_refines_error_or_exception_union() {
 #[test]
 fn error_or_exception_union_refines_throwable() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let throwable = f.t_named("Throwable");
         let error = f.t_named("Error");
         let exception = f.t_named("Exception");
@@ -114,7 +114,7 @@ fn error_or_exception_union_refines_throwable() {
 #[test]
 fn throwable_with_full_negations_is_uninhabited() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let throwable = f.t_named("Throwable");
         let error = f.t_named("Error");
         let exception = f.t_named("Exception");
@@ -132,7 +132,7 @@ fn throwable_with_full_negations_is_uninhabited() {
 #[test]
 fn throwable_with_full_negations_meet_anything_is_never() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let throwable = f.t_named("Throwable");
         let error = f.t_named("Error");
         let exception = f.t_named("Exception");
@@ -151,7 +151,7 @@ fn throwable_with_full_negations_meet_anything_is_never() {
 #[test]
 fn subtract_throwable_by_error_or_exception_is_never() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let throwable = f.t_named("Throwable");
         let error = f.t_named("Error");
         let exception = f.t_named("Exception");
@@ -162,19 +162,20 @@ fn subtract_throwable_by_error_or_exception_is_never() {
     });
 }
 
-fn create_traversable_world<'arena>() -> MockWorld<'arena> {
+fn create_traversable_world<'arena>(f: &mut Fixture<'_, 'arena>) -> MockWorld<'arena> {
     let mut world = MockWorld::new();
-    world
-        .add_edge("Iterator", "Traversable")
-        .add_edge("IteratorAggregate", "Traversable")
-        .with_sealed("Traversable", &["Iterator", "IteratorAggregate"]);
+    world.add_edge("Iterator", "Traversable").add_edge("IteratorAggregate", "Traversable").with_sealed(
+        &mut f.builder,
+        "Traversable",
+        &["Iterator", "IteratorAggregate"],
+    );
     world
 }
 
 #[test]
 fn traversable_refines_iterator_or_iterator_aggregate() {
     fixture(|f| {
-        let world = create_traversable_world();
+        let world = create_traversable_world(f);
         let traversable = f.t_named("Traversable");
         let iterator = f.t_named("Iterator");
         let iterator_aggregate = f.t_named("IteratorAggregate");
@@ -188,7 +189,7 @@ fn traversable_refines_iterator_or_iterator_aggregate() {
 #[test]
 fn traversable_with_full_negations_is_uninhabited() {
     fixture(|f| {
-        let world = create_traversable_world();
+        let world = create_traversable_world(f);
         let traversable = f.t_named("Traversable");
         let iterator = f.t_named("Iterator");
         let iterator_aggregate = f.t_named("IteratorAggregate");
@@ -207,7 +208,7 @@ fn traversable_with_full_negations_is_uninhabited() {
 #[test]
 fn partial_cover_does_not_collapse_when_residual_has_multiple() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let throwable = f.t_named("Throwable");
         let exception = f.t_named("Exception");
 
@@ -225,7 +226,7 @@ fn partial_cover_does_not_collapse_when_residual_has_multiple() {
 #[test]
 fn transitive_negation_via_descendant() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let throwable = f.t_named("Throwable");
         let exception = f.t_named("Exception");
         let runtime_exception = f.t_named("RuntimeException");
@@ -251,8 +252,8 @@ fn transitive_sealing_collapses_to_never() {
             .add_edge("Baz", "Foo")
             .add_edge("Bar1", "Bar")
             .add_edge("Bar2", "Bar")
-            .with_sealed("Foo", &["Bar", "Baz"])
-            .with_sealed("Bar", &["Bar1", "Bar2"]);
+            .with_sealed(&mut f.builder, "Foo", &["Bar", "Baz"])
+            .with_sealed(&mut f.builder, "Bar", &["Bar1", "Bar2"]);
 
         let foo = f.t_named("Foo");
         let bar1 = f.t_named("Bar1");
@@ -274,7 +275,7 @@ fn transitive_sealing_collapses_to_never() {
 #[test]
 fn unrelated_negation_does_not_affect_cover() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let throwable = f.t_named("Throwable");
 
         let negated_int = f.builder.negated(well_known::TYPE_INT);
@@ -290,7 +291,7 @@ fn unrelated_negation_does_not_affect_cover() {
 #[test]
 fn non_class_head_skips_sealed_logic() {
     fixture(|f| {
-        let world = create_sealed_world();
+        let world = create_sealed_world(f);
         let exception = f.t_named("Exception");
         let exception_type = f.u(exception);
         let negated_exception = f.builder.negated(exception_type);

@@ -27,20 +27,20 @@ where
     subtract::compute(a, b, world, LatticeOptions::default(), &mut report, &mut f.builder)
 }
 
-fn sealed_throwable_world<'arena>() -> MockWorld<'arena> {
+fn sealed_throwable_world<'arena>(f: &mut Fixture<'_, 'arena>) -> MockWorld<'arena> {
     let mut world = MockWorld::new();
     world
         .add_edge("Error", "Throwable")
         .add_edge("Exception", "Throwable")
         .add_edge("RuntimeException", "Exception")
-        .with_sealed("Throwable", &["Error", "Exception"]);
+        .with_sealed(&mut f.builder, "Throwable", &["Error", "Exception"]);
     world
 }
 
 #[test]
 fn subtract_throwable_by_exception_canonicalises_to_error() {
     fixture(|f| {
-        let world = sealed_throwable_world();
+        let world = sealed_throwable_world(f);
         let throwable = f.t_named("Throwable");
         let exception = f.t_named("Exception");
         let error = f.t_named("Error");
@@ -56,7 +56,7 @@ fn subtract_throwable_by_exception_canonicalises_to_error() {
 #[test]
 fn subtract_throwable_by_error_canonicalises_to_exception() {
     fixture(|f| {
-        let world = sealed_throwable_world();
+        let world = sealed_throwable_world(f);
         let throwable = f.t_named("Throwable");
         let error = f.t_named("Error");
         let exception = f.t_named("Exception");
@@ -72,7 +72,7 @@ fn subtract_throwable_by_error_canonicalises_to_exception() {
 #[test]
 fn meet_throwable_with_negated_exception_canonicalises_to_error() {
     fixture(|f| {
-        let world = sealed_throwable_world();
+        let world = sealed_throwable_world(f);
         let throwable = f.t_named("Throwable");
         let exception = f.t_named("Exception");
         let error = f.t_named("Error");
@@ -90,7 +90,7 @@ fn meet_throwable_with_negated_exception_canonicalises_to_error() {
 #[test]
 fn subtract_throwable_by_error_or_exception_is_never() {
     fixture(|f| {
-        let world = sealed_throwable_world();
+        let world = sealed_throwable_world(f);
         let throwable = f.t_named("Throwable");
         let error = f.t_named("Error");
         let exception = f.t_named("Exception");
@@ -105,10 +105,11 @@ fn subtract_throwable_by_error_or_exception_is_never() {
 fn traversable_minus_iterator_minus_iterator_aggregate_is_never() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world
-            .add_edge("Iterator", "Traversable")
-            .add_edge("IteratorAggregate", "Traversable")
-            .with_sealed("Traversable", &["Iterator", "IteratorAggregate"]);
+        world.add_edge("Iterator", "Traversable").add_edge("IteratorAggregate", "Traversable").with_sealed(
+            &mut f.builder,
+            "Traversable",
+            &["Iterator", "IteratorAggregate"],
+        );
 
         let traversable = f.t_named("Traversable");
         let iterator = f.t_named("Iterator");
@@ -127,7 +128,11 @@ fn traversable_minus_iterator_minus_iterator_aggregate_is_never() {
 fn partial_cover_does_not_collapse_when_residual_has_multiple() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.add_edge("A", "Foo").add_edge("B", "Foo").add_edge("C", "Foo").with_sealed("Foo", &["A", "B", "C"]);
+        world.add_edge("A", "Foo").add_edge("B", "Foo").add_edge("C", "Foo").with_sealed(
+            &mut f.builder,
+            "Foo",
+            &["A", "B", "C"],
+        );
 
         let foo = f.t_named("Foo");
         let inheritor = f.t_named("A");
@@ -143,7 +148,11 @@ fn partial_cover_does_not_collapse_when_residual_has_multiple() {
 fn cycle_with_direct_coverage_collapses() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.add_edge("B", "A").add_edge("A", "B").with_sealed("A", &["B"]).with_sealed("B", &["A"]);
+        world.add_edge("B", "A").add_edge("A", "B").with_sealed(&mut f.builder, "A", &["B"]).with_sealed(
+            &mut f.builder,
+            "B",
+            &["A"],
+        );
 
         let head = f.t_named("A");
         let inheritor = f.t_named("B");
@@ -159,7 +168,11 @@ fn cycle_with_direct_coverage_collapses() {
 fn cycle_without_direct_coverage_terminates() {
     fixture(|f| {
         let mut world = MockWorld::new();
-        world.add_edge("B", "A").add_edge("A", "B").with_sealed("A", &["B"]).with_sealed("B", &["A"]);
+        world.add_edge("B", "A").add_edge("A", "B").with_sealed(&mut f.builder, "A", &["B"]).with_sealed(
+            &mut f.builder,
+            "B",
+            &["A"],
+        );
 
         let head = f.t_named("A");
         let unrelated = f.t_named("Unrelated");
@@ -180,7 +193,7 @@ fn depth_cap_does_not_overflow() {
             let child = format!("S{}", index + 1);
             world.add_edge(&child, &parent);
         }
-        world.with_sealed("S0", &["S1"]);
+        world.with_sealed(&mut f.builder, "S0", &["S1"]);
 
         let root = f.t_named("S0");
         let deepest = f.t_named("S21");
@@ -206,7 +219,7 @@ fn final_class_with_negated_self_is_never() {
 #[test]
 fn non_class_head_skips_sealed_logic() {
     fixture(|f| {
-        let world = sealed_throwable_world();
+        let world = sealed_throwable_world(f);
         let exception = f.t_named("Exception");
         let exception_type = f.u(exception);
         let negated_exception = f.builder.negated(exception_type);

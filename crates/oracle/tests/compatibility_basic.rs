@@ -2,12 +2,12 @@ mod common;
 
 use common::*;
 
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::compatibility::runtime_compatible;
 use mago_oracle::ty::compatibility::statically_compatible;
 use mago_oracle::ty::lattice::LatticeOptions;
 use mago_oracle::ty::lattice::LatticeReport;
-use mago_oracle::world::Variance;
 use mago_oracle::world::World;
 
 fn statically<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, world: &W) -> bool

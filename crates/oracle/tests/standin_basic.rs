@@ -2,9 +2,11 @@ mod common;
 
 use common::*;
 
+use mago_allocator::LocalArena;
 use mago_span::Span;
 
-use mago_oracle::name::Name;
+use mago_oracle::path::Path;
+use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::atom::payload::generic_parameter::DefiningEntity;
 use mago_oracle::ty::atom::payload::reference::SymbolReferenceAtom;
 use mago_oracle::ty::template;
@@ -14,12 +16,11 @@ use mago_oracle::ty::template::StandinOptions;
 use mago_oracle::ty::template::TemplateKey;
 use mago_oracle::ty::template::TemplateState;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::Variance;
 
-fn key_for(class: &'static str, name: &'static str) -> TemplateKey<'static> {
+fn key_for<'arena>(arena: &'arena LocalArena, class: &'static str, name: &'static str) -> TemplateKey<'arena> {
     TemplateKey {
-        defining_entity: DefiningEntity::ClassLike(Name::new(class.as_bytes())),
-        name: Name::new(name.as_bytes()),
+        defining_entity: DefiningEntity::ClassLike(Path::class_like(arena, class.as_bytes())),
+        name: name.as_bytes(),
     }
 }
 
@@ -33,7 +34,7 @@ fn top_level_template_records_invariant_bound() {
         let ty = f.u(template);
         let result = template::standin(ty, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
         assert_eq!(result, well_known::TYPE_MIXED, "the refined parameter is T's constraint (mixed by default)");
-        let key = key_for("Box", "T");
+        let key = key_for(f.arena, "Box", "T");
         let bounds = state.bounds_for(key);
         assert_eq!(bounds.len(), 1);
         assert_eq!(
@@ -73,7 +74,7 @@ fn covariant_default_records_lower_bound() {
         let template = f.t_template("Box", "T");
         let ty = f.u(template);
         template::standin(ty, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Box", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Box", "T"));
         assert_eq!(bounds[0].kind, BoundKind::Lower);
     });
 }
@@ -87,7 +88,7 @@ fn contravariant_default_records_upper_bound() {
         let template = f.t_template("Box", "T");
         let ty = f.u(template);
         template::standin(ty, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Box", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Box", "T"));
         assert_eq!(bounds[0].kind, BoundKind::Upper);
     });
 }
@@ -101,7 +102,7 @@ fn argument_offset_is_recorded() {
         let template = f.t_template("Box", "T");
         let ty = f.u(template);
         template::standin(ty, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Box", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Box", "T"));
         assert_eq!(bounds[0].argument_offset, 3);
     });
 }
@@ -122,7 +123,7 @@ fn template_inside_list_records_lower_bound_at_depth_one() {
         let expected_atom = f.t_list(well_known::TYPE_MIXED, false);
         let expected = f.u(expected_atom);
         assert_eq!(result, expected);
-        let bounds = state.bounds_for(key_for("Box", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Box", "T"));
         assert_eq!(
             bounds[0],
             Bound {
@@ -150,7 +151,7 @@ fn template_inside_list_against_iterable_arg_walks_value() {
         let argument_atom = f.t_iterable(well_known::TYPE_INT, well_known::TYPE_STRING);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Box", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Box", "T"));
         assert_eq!(bounds[0].ty, well_known::TYPE_STRING);
     });
 }
@@ -170,8 +171,8 @@ fn template_inside_iterable_records_both_key_and_value() {
         let argument_atom = f.t_iterable(well_known::TYPE_STRING, well_known::TYPE_INT);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let key_bound = state.bounds_for(key_for("M", "K"));
-        let value_bound = state.bounds_for(key_for("M", "V"));
+        let key_bound = state.bounds_for(key_for(f.arena, "M", "K"));
+        let value_bound = state.bounds_for(key_for(f.arena, "M", "V"));
         assert_eq!(key_bound[0].ty, well_known::TYPE_STRING);
         assert_eq!(value_bound[0].ty, well_known::TYPE_INT);
     });
@@ -191,7 +192,7 @@ fn template_inside_object_uses_world_variance() {
         let argument_atom = f.t_generic_named("Container", vec![well_known::TYPE_INT]);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Container", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Container", "T"));
         assert_eq!(bounds[0].kind, BoundKind::Lower);
         assert_eq!(bounds[0].ty, well_known::TYPE_INT);
     });
@@ -211,7 +212,7 @@ fn template_inside_object_with_invariant_records_equality_bound() {
         let argument_atom = f.t_generic_named("Cell", vec![well_known::TYPE_INT]);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Cell", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Cell", "T"));
         assert_eq!(bounds[0].kind, BoundKind::Equality);
     });
 }
@@ -231,7 +232,7 @@ fn object_with_unrelated_arg_passes_parameter_through() {
         let argument = f.u(argument_atom);
         let result = template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
         assert_eq!(result, parameter, "an unrelated argument class drives no inference");
-        assert!(state.bounds_for(key_for("Box", "T")).is_empty());
+        assert!(state.bounds_for(key_for(f.arena, "Box", "T")).is_empty());
     });
 }
 
@@ -253,7 +254,7 @@ fn nested_object_template_records_at_correct_depth() {
         let argument_atom = f.t_generic_named("Box", vec![inner_argument]);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Box", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Box", "T"));
         assert_eq!(bounds[0].depth, 2, "object args walk at depth 1; list element walk at depth 2");
         assert_eq!(bounds[0].ty, well_known::TYPE_INT);
     });
@@ -286,9 +287,9 @@ fn invariant_object_walk_records_introducing_class_on_equality_bound() {
         let argument_atom = f.t_generic_named("Cell", vec![well_known::TYPE_INT]);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Cell", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Cell", "T"));
         assert_eq!(bounds[0].kind, BoundKind::Equality);
-        assert_eq!(bounds[0].equality_bound_classlike, Some(Name::new(b"Cell")));
+        assert_eq!(bounds[0].equality_bound_classlike, Some(Path::class_like(f.arena, b"Cell")));
     });
 }
 
@@ -306,7 +307,7 @@ fn covariant_object_walk_does_not_set_equality_classlike() {
         let argument_atom = f.t_generic_named("Container", vec![well_known::TYPE_INT]);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Container", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Container", "T"));
         assert_eq!(bounds[0].kind, BoundKind::Lower);
         assert_eq!(bounds[0].equality_bound_classlike, None);
     });
@@ -321,7 +322,7 @@ fn top_level_invariant_walk_outside_class_has_no_classlike() {
         let template = f.t_template("Free", "T");
         let ty = f.u(template);
         template::standin(ty, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Free", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Free", "T"));
         assert_eq!(bounds[0].kind, BoundKind::Equality);
         assert_eq!(bounds[0].equality_bound_classlike, None);
     });
@@ -337,7 +338,7 @@ fn span_from_options_propagates_to_recorded_bound() {
         let template = f.t_template("Box", "T");
         let ty = f.u(template);
         template::standin(ty, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Box", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Box", "T"));
         assert_eq!(bounds[0].span, Some(span));
     });
 }
@@ -351,7 +352,7 @@ fn walk_auto_declares_encountered_template() {
         let template = f.t_template("Box", "T");
         let ty = f.u(template);
         template::standin(ty, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
-        let key = key_for("Box", "T");
+        let key = key_for(f.arena, "Box", "T");
         assert!(state.is_declared(key));
         let Some(declaration) = state.declaration(key) else { panic!("the walk must auto-declare T") };
         assert_eq!(declaration.constraint, well_known::TYPE_MIXED);
@@ -363,7 +364,7 @@ fn walk_preserves_existing_declaration_constraint() {
     fixture(|f| {
         let world = empty_world();
         let mut state = TemplateState::new();
-        let key = key_for("Box", "T");
+        let key = key_for(f.arena, "Box", "T");
         state.declare(key, well_known::TYPE_INT);
         let options = StandinOptions::default();
         let template = f.t_template("Box", "T");
@@ -376,11 +377,11 @@ fn walk_preserves_existing_declaration_constraint() {
 
 #[test]
 fn declared_but_unbound_distinguishable_from_undeclared() {
-    fixture(|_| {
+    fixture(|f| {
         let mut state = TemplateState::new();
-        let bound_key = key_for("Box", "T");
-        let unbound_key = key_for("Box", "U");
-        let absent_key = key_for("Box", "Z");
+        let bound_key = key_for(f.arena, "Box", "T");
+        let unbound_key = key_for(f.arena, "Box", "U");
+        let absent_key = key_for(f.arena, "Box", "Z");
 
         state.declare(bound_key, well_known::TYPE_MIXED);
         state.declare(unbound_key, well_known::TYPE_MIXED);
@@ -407,21 +408,21 @@ fn bounds_in_scope_filters_by_defining_entity() {
         template::standin(foo_t, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
         template::standin(bar_u, well_known::TYPE_STRING, &world, &mut state, &options, &mut f.builder);
 
-        let foo_entity = key_for("Foo", "T").defining_entity;
+        let foo_entity = key_for(f.arena, "Foo", "T").defining_entity;
         let scoped: Vec<_> = state.bounds_in_scope(foo_entity).map(|(key, _)| key.name).collect();
-        assert_eq!(scoped, vec![Name::new(b"T")]);
+        assert_eq!(scoped, vec![b"T".as_slice()]);
     });
 }
 
 #[test]
 fn declarations_in_scope_filters_by_defining_entity() {
-    fixture(|_| {
+    fixture(|f| {
         let mut state = TemplateState::new();
-        state.declare(key_for("Foo", "T"), well_known::TYPE_MIXED);
-        state.declare(key_for("Bar", "U"), well_known::TYPE_INT);
-        let foo_entity = key_for("Foo", "T").defining_entity;
+        state.declare(key_for(f.arena, "Foo", "T"), well_known::TYPE_MIXED);
+        state.declare(key_for(f.arena, "Bar", "U"), well_known::TYPE_INT);
+        let foo_entity = key_for(f.arena, "Foo", "T").defining_entity;
         let scoped: Vec<_> = state.declarations_in_scope(foo_entity).map(|(key, _)| key.name).collect();
-        assert_eq!(scoped, vec![Name::new(b"T")]);
+        assert_eq!(scoped, vec![b"T".as_slice()]);
     });
 }
 
@@ -436,12 +437,12 @@ fn merge_scope_re_keys_declarations_and_bounds() {
         let foo_t = f.u(foo_template);
         template::standin(foo_t, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
 
-        let foo_entity = key_for("Foo", "T").defining_entity;
-        let bar_entity = key_for("Bar", "Z").defining_entity;
+        let foo_entity = key_for(f.arena, "Foo", "T").defining_entity;
+        let bar_entity = key_for(f.arena, "Bar", "Z").defining_entity;
 
         state.merge_scope(foo_entity, bar_entity);
 
-        let bar_t_key = TemplateKey { defining_entity: bar_entity, name: Name::new(b"T") };
+        let bar_t_key = TemplateKey { defining_entity: bar_entity, name: b"T" };
         assert!(state.is_declared(bar_t_key), "after merge, T's declaration lives under Bar");
         assert_eq!(state.bounds_for(bar_t_key).len(), 1);
 
@@ -464,12 +465,12 @@ fn merge_scope_appends_when_target_already_has_bounds_for_same_name() {
         let bar_t = f.u(bar_template);
         template::standin(bar_t, well_known::TYPE_STRING, &world, &mut state, &options, &mut f.builder);
 
-        let foo_entity = key_for("Foo", "T").defining_entity;
-        let bar_entity = key_for("Bar", "T").defining_entity;
+        let foo_entity = key_for(f.arena, "Foo", "T").defining_entity;
+        let bar_entity = key_for(f.arena, "Bar", "T").defining_entity;
 
         state.merge_scope(foo_entity, bar_entity);
 
-        let bar_t_key = TemplateKey { defining_entity: bar_entity, name: Name::new(b"T") };
+        let bar_t_key = TemplateKey { defining_entity: bar_entity, name: b"T" };
         assert_eq!(state.bounds_for(bar_t_key).len(), 2);
     });
 }
@@ -483,10 +484,10 @@ fn freeze_preserves_declarations_bounds_and_anti_bounds() {
         let foo_template = f.t_template("Foo", "T");
         let foo_t = f.u(foo_template);
         template::standin(foo_t, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
-        state.add_anti_bound(key_for("Foo", "T"), well_known::TYPE_STRING);
+        state.add_anti_bound(key_for(f.arena, "Foo", "T"), well_known::TYPE_STRING);
 
         let result = state.freeze();
-        let key = key_for("Foo", "T");
+        let key = key_for(f.arena, "Foo", "T");
         assert!(result.is_declared(key));
         assert_eq!(result.bounds_for(key).len(), 1);
         assert_eq!(result.anti_bounds_for(key), &[well_known::TYPE_STRING]);
@@ -501,13 +502,13 @@ fn freeze_consumes_state() {
 
 #[test]
 fn frozen_result_supports_scope_filtered_queries() {
-    fixture(|_| {
+    fixture(|f| {
         let mut state = TemplateState::new();
-        state.declare(key_for("Foo", "T"), well_known::TYPE_MIXED);
-        state.declare(key_for("Bar", "U"), well_known::TYPE_INT);
-        state.add_anti_bound(key_for("Foo", "T"), well_known::TYPE_STRING);
+        state.declare(key_for(f.arena, "Foo", "T"), well_known::TYPE_MIXED);
+        state.declare(key_for(f.arena, "Bar", "U"), well_known::TYPE_INT);
+        state.add_anti_bound(key_for(f.arena, "Foo", "T"), well_known::TYPE_STRING);
         let result = state.freeze();
-        let foo_entity = key_for("Foo", "T").defining_entity;
+        let foo_entity = key_for(f.arena, "Foo", "T").defining_entity;
         assert_eq!(result.declarations_in_scope(foo_entity).count(), 1);
         assert_eq!(result.anti_bounds_in_scope(foo_entity).count(), 1);
     });
@@ -515,9 +516,9 @@ fn frozen_result_supports_scope_filtered_queries() {
 
 #[test]
 fn anti_bound_recorded_and_queryable() {
-    fixture(|_| {
+    fixture(|f| {
         let mut state = TemplateState::new();
-        let key = key_for("Foo", "T");
+        let key = key_for(f.arena, "Foo", "T");
         state.add_anti_bound(key, well_known::TYPE_INT);
         state.add_anti_bound(key, well_known::TYPE_STRING);
         let anti_bounds = state.anti_bounds_for(key);
@@ -529,35 +530,35 @@ fn anti_bound_recorded_and_queryable() {
 
 #[test]
 fn anti_bound_unset_returns_empty_slice() {
-    fixture(|_| {
+    fixture(|f| {
         let state = TemplateState::new();
-        assert!(state.anti_bounds_for(key_for("Foo", "T")).is_empty());
+        assert!(state.anti_bounds_for(key_for(f.arena, "Foo", "T")).is_empty());
     });
 }
 
 #[test]
 fn anti_bounds_in_scope_filters_by_defining_entity() {
-    fixture(|_| {
+    fixture(|f| {
         let mut state = TemplateState::new();
-        state.add_anti_bound(key_for("Foo", "T"), well_known::TYPE_INT);
-        state.add_anti_bound(key_for("Bar", "U"), well_known::TYPE_STRING);
-        let foo_entity = key_for("Foo", "T").defining_entity;
+        state.add_anti_bound(key_for(f.arena, "Foo", "T"), well_known::TYPE_INT);
+        state.add_anti_bound(key_for(f.arena, "Bar", "U"), well_known::TYPE_STRING);
+        let foo_entity = key_for(f.arena, "Foo", "T").defining_entity;
         let scoped: Vec<_> = state.anti_bounds_in_scope(foo_entity).map(|(key, _)| key.name).collect();
-        assert_eq!(scoped, vec![Name::new(b"T")]);
+        assert_eq!(scoped, vec![b"T".as_slice()]);
     });
 }
 
 #[test]
 fn merge_scope_re_keys_anti_bounds() {
-    fixture(|_| {
+    fixture(|f| {
         let mut state = TemplateState::new();
-        state.add_anti_bound(key_for("Foo", "T"), well_known::TYPE_INT);
-        let foo_entity = key_for("Foo", "T").defining_entity;
-        let bar_entity = key_for("Bar", "Z").defining_entity;
+        state.add_anti_bound(key_for(f.arena, "Foo", "T"), well_known::TYPE_INT);
+        let foo_entity = key_for(f.arena, "Foo", "T").defining_entity;
+        let bar_entity = key_for(f.arena, "Bar", "Z").defining_entity;
         state.merge_scope(foo_entity, bar_entity);
-        let bar_t_key = TemplateKey { defining_entity: bar_entity, name: Name::new(b"T") };
+        let bar_t_key = TemplateKey { defining_entity: bar_entity, name: b"T" };
         assert_eq!(state.anti_bounds_for(bar_t_key), &[well_known::TYPE_INT]);
-        assert!(state.anti_bounds_for(key_for("Foo", "T")).is_empty());
+        assert!(state.anti_bounds_for(key_for(f.arena, "Foo", "T")).is_empty());
     });
 }
 
@@ -571,23 +572,23 @@ fn merge_scope_into_self_is_noop() {
         let foo_t = f.u(foo_template);
         template::standin(foo_t, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
 
-        let foo_entity = key_for("Foo", "T").defining_entity;
+        let foo_entity = key_for(f.arena, "Foo", "T").defining_entity;
         state.merge_scope(foo_entity, foo_entity);
 
-        assert_eq!(state.bounds_for(key_for("Foo", "T")).len(), 1);
-        assert!(state.is_declared(key_for("Foo", "T")));
+        assert_eq!(state.bounds_for(key_for(f.arena, "Foo", "T")).len(), 1);
+        assert!(state.is_declared(key_for(f.arena, "Foo", "T")));
     });
 }
 
 #[test]
 fn declarations_iter_yields_every_declared_template() {
-    fixture(|_| {
+    fixture(|f| {
         let mut state = TemplateState::new();
-        state.declare(key_for("Foo", "T"), well_known::TYPE_MIXED);
-        state.declare(key_for("Bar", "U"), well_known::TYPE_INT);
+        state.declare(key_for(f.arena, "Foo", "T"), well_known::TYPE_MIXED);
+        state.declare(key_for(f.arena, "Bar", "U"), well_known::TYPE_INT);
         let names: Vec<_> = state.declarations().map(|(key, _)| key.name).collect();
-        assert!(names.contains(&Name::new(b"T")));
-        assert!(names.contains(&Name::new(b"U")));
+        assert!(names.contains(&b"T".as_slice()));
+        assert!(names.contains(&b"U".as_slice()));
     });
 }
 
@@ -610,7 +611,7 @@ fn span_threads_through_nested_walk() {
         let argument_atom = f.t_generic_named("Box", vec![int_list]);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Box", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Box", "T"));
         assert_eq!(bounds[0].span, Some(span));
         assert_eq!(bounds[0].depth, 2);
     });
@@ -650,7 +651,7 @@ fn multiple_arguments_share_state_and_accumulate_bounds() {
         let options1 = StandinOptions::default().with_argument_offset(1).with_default_variance(Variance::Covariant);
         template::standin(parameter, well_known::TYPE_STRING, &world, &mut state, &options1, &mut f.builder);
 
-        let bounds = state.bounds_for(key_for("F", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "F", "T"));
         assert_eq!(bounds.len(), 2);
         assert_eq!(bounds[0].argument_offset, 0);
         assert_eq!(bounds[0].ty, well_known::TYPE_INT);
@@ -675,8 +676,8 @@ fn distinct_template_parameters_recorded_separately() {
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
 
-        let t_bounds = state.bounds_for(key_for("F", "T"));
-        let u_bounds = state.bounds_for(key_for("F", "U"));
+        let t_bounds = state.bounds_for(key_for(f.arena, "F", "T"));
+        let u_bounds = state.bounds_for(key_for(f.arena, "F", "U"));
         assert_eq!(t_bounds.len(), 1);
         assert_eq!(u_bounds.len(), 1);
         assert_eq!(t_bounds[0].ty, well_known::TYPE_STRING);
@@ -721,7 +722,7 @@ fn template_inside_reference_binds_like_object() {
         let argument_atom = f.t_generic_named("Box", vec![well_known::TYPE_INT]);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Box", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Box", "T"));
         assert_eq!(bounds.len(), 1, "an un-expanded Foo<T> reference still drives inference");
         assert_eq!(bounds[0].kind, BoundKind::Lower);
         assert_eq!(bounds[0].ty, well_known::TYPE_INT);
@@ -743,7 +744,7 @@ fn template_inside_class_string_binds_from_literal_argument() {
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
         let foo = f.t_named("Foo");
         let foo_type = f.u(foo);
-        let bounds = state.bounds_for(key_for("Factory", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Factory", "T"));
         assert_eq!(bounds.len(), 1, "class-string<T> vs Foo::class binds T");
         assert_eq!(bounds[0].kind, BoundKind::Lower);
         assert_eq!(bounds[0].ty, foo_type, "T is bound to the Foo instance type");
@@ -765,7 +766,7 @@ fn template_inside_class_string_binds_from_of_type_argument() {
         let argument_atom = f.t_class_string_of(foo_type);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Factory", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Factory", "T"));
         assert_eq!(bounds.len(), 1);
         assert_eq!(bounds[0].ty, foo_type, "class-string<T> vs class-string<Foo> binds T = Foo");
     });
@@ -784,7 +785,7 @@ fn template_inside_object_shape_binds_per_property() {
         let argument_atom = f.t_object_shape(&[("x", well_known::TYPE_INT, false)], true);
         let argument = f.u(argument_atom);
         template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        let bounds = state.bounds_for(key_for("Wrap", "T"));
+        let bounds = state.bounds_for(key_for(f.arena, "Wrap", "T"));
         assert_eq!(bounds.len(), 1, "object{{x: T}} vs object{{x: int}} binds T per property");
         assert_eq!(bounds[0].kind, BoundKind::Lower);
         assert_eq!(bounds[0].ty, well_known::TYPE_INT);

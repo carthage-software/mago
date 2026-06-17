@@ -73,7 +73,7 @@ fn string_literal_renders_quoted() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let value = builder.name(b"hello");
+    let value = builder.intern(b"hello");
     let literal = builder.string(StringAtom {
         literal: StringLiteral::Value(value),
         casing: StringCasing::Unspecified,
@@ -111,7 +111,7 @@ fn named_object_renders() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let name = builder.name(b"Foo");
+    let name = builder.intern_class_like_path(b"Foo");
     let foo = builder.object(ObjectAtom { name, type_arguments: None, flags: U8Flags::empty() });
 
     assert_eq!(foo.to_string(), "Foo");
@@ -123,7 +123,7 @@ fn generic_object_renders_with_args() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let name = builder.name(b"Box");
+    let name = builder.intern_class_like_path(b"Box");
     let arguments = builder.types(&[well_known::TYPE_INT]);
     let boxed = builder.object(ObjectAtom { name, type_arguments: Some(arguments), flags: U8Flags::empty() });
 
@@ -136,8 +136,8 @@ fn intersected_object_renders_with_amp() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let foo_name = builder.name(b"Foo");
-    let bar_name = builder.name(b"Bar");
+    let foo_name = builder.intern_class_like_path(b"Foo");
+    let bar_name = builder.intern_class_like_path(b"Bar");
     let foo = builder.object(ObjectAtom { name: foo_name, type_arguments: None, flags: U8Flags::empty() });
     let bar = builder.object(ObjectAtom { name: bar_name, type_arguments: None, flags: U8Flags::empty() });
     let intersected = builder.intersected(foo, &[bar]);
@@ -235,7 +235,7 @@ fn callable_signature_renders() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let parameter_name = builder.name(b"value");
+    let parameter_name = builder.intern(b"value");
     let parameters = builder.parameters(&[Parameter {
         name: parameter_name,
         r#type: well_known::TYPE_INT,
@@ -276,8 +276,8 @@ fn intersection_queries_dispatch_on_atoms() {
     assert!(!well_known::INT.has_intersection_types());
     assert!(well_known::INT.intersection_types().is_empty());
 
-    let foo_name = builder.name(b"Foo");
-    let bar_name = builder.name(b"Bar");
+    let foo_name = builder.intern_class_like_path(b"Foo");
+    let bar_name = builder.intern_class_like_path(b"Bar");
     let foo = builder.object(ObjectAtom { name: foo_name, type_arguments: None, flags: U8Flags::empty() });
     let bar = builder.object(ObjectAtom { name: bar_name, type_arguments: None, flags: U8Flags::empty() });
 
