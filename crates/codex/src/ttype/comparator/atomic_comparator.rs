@@ -357,19 +357,31 @@ pub fn is_contained_by(
                 {
                     let property_name = concat_word!(b"$", container_property_name);
 
-                    let Some(declaring_class) = class_like_metadata.declaring_property_ids.get(&property_name) else {
+                    let real_property = class_like_metadata
+                        .declaring_property_ids
+                        .get(&property_name)
+                        .and_then(|declaring_class| codebase.get_class_like(declaring_class.as_bytes()))
+                        .and_then(|declaring_metadata| declaring_metadata.properties.get(&property_name));
+
+                    // Structural containment is an external view: a publicly readable real
+                    // property governs; otherwise a magic `@property*` tag documents the
+                    // `__get` interface and applies instead.  A non-public real property
+                    // without a tag is still accepted, as it always was here.
+                    let declared_property = match real_property {
+                        Some(real) if real.read_visibility.is_public() => Some(real),
+                        real => class_like_metadata
+                            .magic_property_ids
+                            .get(&property_name)
+                            .and_then(|tag_class| codebase.get_class_like(tag_class.as_bytes()))
+                            .and_then(|tag_metadata| tag_metadata.magic_properties.get(&property_name))
+                            .or(real),
+                    };
+
+                    let Some(declared_property) = declared_property else {
                         if *container_property_indefinite {
                             continue;
                         }
                         return false;
-                    };
-
-                    let Some(declaring_class_metadata) = codebase.get_class_like(declaring_class.as_bytes()) else {
-                        return false; // should not happen
-                    };
-
-                    let Some(declared_property) = declaring_class_metadata.properties.get(&property_name) else {
-                        return false; // should not happen
                     };
 
                     match declared_property.type_metadata.as_ref() {

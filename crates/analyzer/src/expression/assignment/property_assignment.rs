@@ -69,7 +69,11 @@ where
     let mut matched_all_properties = true;
     let mut widened_assigned_type: Option<TUnion> = None;
     for resolved_property in resolution_result.properties {
-        if let Some(declaring_class_id) = resolved_property.declaring_class_id {
+        // A magic-governed write goes through `__set()`, never through the real property of the
+        // same name that may exist on the declaring class (e.g. a `readonly` backing property).
+        if !resolved_property.is_magic
+            && let Some(declaring_class_id) = resolved_property.declaring_class_id
+        {
             crate::readonly::check_property_write(
                 context,
                 block_context,

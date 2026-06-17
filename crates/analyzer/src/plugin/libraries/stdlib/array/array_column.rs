@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -22,6 +23,7 @@ use crate::plugin::provider::Provider;
 use crate::plugin::provider::ProviderMeta;
 use crate::plugin::provider::function::FunctionReturnTypeProvider;
 use crate::plugin::provider::function::FunctionTarget;
+use crate::resolver::property::resolve_property_for_external_access;
 
 static META: ProviderMeta = ProviderMeta::new(
     "php::array::array_column",
@@ -82,7 +84,7 @@ fn try_resolve_from_named_object(
     element_type: &TUnion,
     column_key_type: &TUnion,
     index_key_type: Option<&TUnion>,
-    codebase: &mago_codex::metadata::CodebaseMetadata,
+    codebase: &CodebaseMetadata,
 ) -> Option<TUnion> {
     let obj = element_type.get_single_named_object()?;
     let class_like = codebase.get_class_like(obj.name.as_bytes())?;
@@ -91,11 +93,11 @@ fn try_resolve_from_named_object(
         TUnion::from_atomic(TAtomic::Object(TObject::Named(obj.clone())))
     } else {
         let prop_name = column_key_type.get_single_literal_string_value()?;
-        let prop = class_like.properties.get(&concat_word!(b"$", prop_name))?;
-        prop.type_metadata.as_ref()?.type_union.clone()
+        let prop_key = concat_word!(b"$", prop_name);
+        resolve_property_for_external_access(codebase, class_like, prop_key)?.declared_type(codebase)
     };
 
-    let index_type = resolve_index_type_from_property(index_key_type, class_like);
+    let index_type = resolve_index_type_from_property(index_key_type, class_like, codebase);
 
     Some(build_result(column_type, index_type))
 }
@@ -131,7 +133,7 @@ fn try_resolve_from_keyed_array(
         } else {
             let key_str = index_key_type.get_single_literal_string_value()?;
             let (_, value_type) = known_items.get(&ArrayKey::String(word(key_str)))?;
-            extract_scalar_for_key(value_type)
+            extract_scalar_for_key(value_type).cloned()
         }
     } else {
         None
@@ -154,26 +156,27 @@ fn extract_scalar_for_key(value_type: &TUnion) -> Option<&TScalar> {
     }
 }
 
-fn resolve_index_type_from_property<'meta>(
+fn resolve_index_type_from_property(
     index_key_type: Option<&TUnion>,
-    class_like: &'meta ClassLikeMetadata,
-) -> Option<&'meta TScalar> {
+    class_like: &ClassLikeMetadata,
+    codebase: &CodebaseMetadata,
+) -> Option<TScalar> {
     let index_key_type = index_key_type?;
     if index_key_type.is_null() {
         return None;
     }
 
     let prop_name = index_key_type.get_single_literal_string_value()?;
-    let prop = class_like.properties.get(&concat_word!("$", prop_name))?;
-    let prop_type = &prop.type_metadata.as_ref()?.type_union;
+    let prop_key = concat_word!(b"$", prop_name);
+    let prop_type = resolve_property_for_external_access(codebase, class_like, prop_key)?.declared_type(codebase);
 
-    extract_scalar_for_key(prop_type)
+    extract_scalar_for_key(&prop_type).cloned()
 }
 
-fn build_result(column_type: TUnion, index_type: Option<&TScalar>) -> TUnion {
+fn build_result(column_type: TUnion, index_type: Option<TScalar>) -> TUnion {
     if let Some(index_scalar) = index_type {
         let keyed_array = TKeyedArray::new_with_parameters(
-            Arc::new(TUnion::from_atomic(TAtomic::Scalar(index_scalar.clone()))),
+            Arc::new(TUnion::from_atomic(TAtomic::Scalar(index_scalar))),
             Arc::new(column_type),
         );
 

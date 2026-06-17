@@ -49,6 +49,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::var_has_root;
+use crate::resolver::property::resolve_declared_property;
 use mago_bytes::BytesDisplay;
 
 pub mod assertion_reconciler;
@@ -635,7 +636,13 @@ fn adjust_object_property_type<A>(
                 {
                     None
                 } else {
-                    get_property_type(context, named.get_name(), &property_name)
+                    get_property_type(
+                        context,
+                        named.get_name(),
+                        &property_name,
+                        true, // `instance_access`: assertions on `$obj->prop`
+                        block_context.scope.get_class_like_name(),
+                    )
                 }
             }
             _ => None,
@@ -1215,7 +1222,13 @@ where
                         {
                             class_property_type = get_mixed();
                         } else {
-                            class_property_type = get_property_type(context, fq_class_name, &property_name)?;
+                            class_property_type = get_property_type(
+                                context,
+                                fq_class_name,
+                                &property_name,
+                                divider == b"->",
+                                block_context.scope.get_class_like_name(),
+                            )?;
                         }
                     } else {
                         class_property_type = get_mixed();
@@ -1242,33 +1255,34 @@ where
     block_context.locals.get(&base_key_atom).map(|t| (**t).clone())
 }
 
-fn get_property_type<A>(context: &Context<'_, '_, A>, classlike_name: Word, property_name_str: &[u8]) -> Option<TUnion>
+fn get_property_type<A>(
+    context: &Context<'_, '_, A>,
+    classlike_name: Word,
+    property_name_str: &[u8],
+    instance_access: bool,
+    scope: Option<Word>,
+) -> Option<TUnion>
 where
     A: Arena,
 {
     // Add `$` prefix
     let property_name = concat_word!(b"$", property_name_str);
 
-    let declaring_property_class =
-        context.codebase.get_declaring_property_class(classlike_name.as_bytes(), property_name.as_bytes())?;
-    let property_metadata = context.codebase.get_property(classlike_name.as_bytes(), property_name.as_bytes())?;
-    let property_type = property_metadata.type_metadata.as_ref().map(|metadata| metadata.type_union.clone());
+    let class_metadata = context.codebase.get_class_like(classlike_name.as_bytes())?;
+    let resolution =
+        resolve_declared_property(context.codebase, class_metadata, property_name, instance_access, scope)?;
+    let declaring_property_class = resolution.declaring_class.name;
 
-    let property_type = if let Some(mut property_type) = property_type {
-        expander::expand_union(
-            context.codebase,
-            &mut property_type,
-            &TypeExpansionOptions {
-                self_class: Some(declaring_property_class),
-                static_class_type: StaticClassType::Name(declaring_property_class),
-                ..Default::default()
-            },
-        );
-
-        property_type
-    } else {
-        get_mixed()
-    };
+    let mut property_type = resolution.declared_type(context.codebase);
+    expander::expand_union(
+        context.codebase,
+        &mut property_type,
+        &TypeExpansionOptions {
+            self_class: Some(declaring_property_class),
+            static_class_type: StaticClassType::Name(declaring_property_class),
+            ..Default::default()
+        },
+    );
 
     Some(property_type)
 }

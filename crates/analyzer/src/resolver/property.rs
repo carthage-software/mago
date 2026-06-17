@@ -3,7 +3,9 @@ use indexmap::IndexMap;
 use mago_allocator::Arena;
 
 use mago_codex::identifier::method::MethodIdentifier;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -12,6 +14,8 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -41,8 +45,9 @@ use crate::resolver::class_name::report_non_existent_class_like;
 use crate::resolver::selector::resolve_member_selector;
 use crate::utils::names::display_class_like_name;
 use crate::utils::template::get_template_types_for_class_member;
-use crate::visibility::check_property_read_visibility;
-use crate::visibility::check_property_write_visibility;
+use crate::visibility::check_resolved_property_read_visibility;
+use crate::visibility::check_resolved_property_write_visibility;
+use crate::visibility::is_visible_from_scope;
 use mago_bytes::trim_start_byte;
 
 /// Represents a successfully resolved instance property.
@@ -447,6 +452,160 @@ fn is_backing_store_access(object_expr: &Expression, prop_name: Word, block_cont
     is_this && block_context.scope.get_property_hook().is_some_and(|(hook_prop_name, _)| hook_prop_name == prop_name)
 }
 
+/// How a declared property resolved at a given call site: through its real declaration, or
+/// through a magic `@property`/`@property-read`/`@property-write` annotation.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum DeclaredPropertyKind<'ctx> {
+    /// A real declaration governs the access.  The annotation of the same name on the accessed
+    /// class, when one exists, may refine the declared type (see [`DeclaredProperty::declared_type`]).
+    Real { annotation: Option<&'ctx PropertyMetadata> },
+    /// A magic annotation governs the access, which goes through `__get`/`__set`.
+    Magic,
+}
+
+/// The declaration governing a property access, as resolved by [`resolve_declared_property`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct DeclaredProperty<'ctx> {
+    /// The class holding the governing declaration: the real property's declaring class, or
+    /// the class whose docblock carries the `@property*` tag.
+    pub declaring_class: &'ctx ClassLikeMetadata,
+    pub property: &'ctx PropertyMetadata,
+    pub kind: DeclaredPropertyKind<'ctx>,
+}
+
+impl DeclaredProperty<'_> {
+    pub(crate) fn is_magic(&self) -> bool {
+        matches!(self.kind, DeclaredPropertyKind::Magic)
+    }
+
+    /// The type the governing declaration gives the property: for a real declaration whose
+    /// annotation narrows the declared type (a wide inherited `public $db` narrowed by
+    /// `@property` on a subclass), the annotation's type; otherwise the declared type, or
+    /// `mixed` when untyped.  A conflicting (non-narrowing) annotation type is ignored.
+    pub(crate) fn declared_type(&self, codebase: &CodebaseMetadata) -> TUnion {
+        if let DeclaredPropertyKind::Real { annotation: Some(annotation) } = self.kind
+            && let Some(annotation_type) = annotation.type_metadata.as_ref().map(|tm| &tm.type_union)
+        {
+            let narrows = match self.property.type_metadata.as_ref().map(|tm| &tm.type_union) {
+                None => true,
+                Some(real_type) => {
+                    real_type.is_mixed()
+                        || union_comparator::is_contained_by(
+                            codebase,
+                            annotation_type,
+                            real_type,
+                            false,
+                            false,
+                            false,
+                            &mut ComparisonResult::default(),
+                        )
+                }
+            };
+
+            if narrows {
+                return annotation_type.clone();
+            }
+        }
+
+        self.property
+            .type_metadata
+            .as_ref()
+            .or(self.property.type_declaration_metadata.as_ref())
+            .map(|tm| tm.type_union.clone())
+            .unwrap_or_else(get_mixed)
+    }
+}
+
+/// Resolves which declaration governs an access to `$obj->prop` (or `Class::$prop` with
+/// `instance_access` false) on `class_metadata` from `scope`, mirroring PHP's runtime rule for
+/// magic properties: a real property applies whenever the access can reach it — for instance
+/// access, when it is non-static and visible at the call site; static properties and
+/// annotations are irrelevant to static access.  Everywhere else `__get`/`__set` fire, so a
+/// magic `@property*` annotation (documenting exactly that interface) applies when present.  A
+/// real property that governs no access path still resolves as `Real` so the caller's
+/// visibility check reports the inaccessible access.  Returns `None` when the name has neither
+/// a real declaration nor an annotation.
+pub(crate) fn resolve_declared_property<'ctx>(
+    codebase: &'ctx CodebaseMetadata,
+    class_metadata: &'ctx ClassLikeMetadata,
+    prop_name: Word,
+    instance_access: bool,
+    scope: Option<Word>,
+) -> Option<DeclaredProperty<'ctx>> {
+    let annotation = if instance_access {
+        class_metadata.magic_property_ids.get(&prop_name).copied().and_then(|tag_class| {
+            let tag_metadata = if tag_class == class_metadata.name {
+                class_metadata
+            } else {
+                codebase.get_class_like(tag_class.as_bytes())?
+            };
+
+            Some((tag_metadata, tag_metadata.magic_properties.get(&prop_name)?))
+        })
+    } else {
+        None
+    };
+
+    let Some((declaring_metadata, real_property)) =
+        class_metadata.declaring_property_ids.get(&prop_name).copied().and_then(|declaring_class| {
+            let declaring_metadata = codebase.get_class_like(declaring_class.as_bytes())?;
+            let real_property = declaring_metadata.properties.get(&prop_name)?;
+
+            Some((declaring_metadata, real_property))
+        })
+    else {
+        return annotation.map(|(tag_metadata, annotation)| DeclaredProperty {
+            declaring_class: tag_metadata,
+            property: annotation,
+            kind: DeclaredPropertyKind::Magic,
+        });
+    };
+
+    // `->` never reaches a static property, whatever its visibility; otherwise the real
+    // property governs exactly where it is visible.  Visibility here means the main (get)
+    // visibility for writes as well: PHP calls `__set()` only for a property that is entirely
+    // inaccessible in the current scope — writing to one that is readable but not writable
+    // (asymmetric visibility, e.g. `public private(set)`) throws instead of falling through.
+    let real_property_reachable = || {
+        !real_property.flags.is_static()
+            && is_visible_from_scope(codebase, real_property.read_visibility, declaring_metadata.name.as_bytes(), scope)
+    };
+
+    if let Some((tag_metadata, annotation)) = annotation
+        && !real_property_reachable()
+    {
+        return Some(DeclaredProperty {
+            declaring_class: tag_metadata,
+            property: annotation,
+            kind: DeclaredPropertyKind::Magic,
+        });
+    }
+
+    Some(DeclaredProperty {
+        declaring_class: declaring_metadata,
+        property: real_property,
+        kind: DeclaredPropertyKind::Real { annotation: annotation.map(|(_, annotation)| annotation) },
+    })
+}
+
+/// Resolves external access to a property of `class_metadata` where the accessing scope is not
+/// a class scope but is certainly outside the class (mixins, intersection members,
+/// `array_column()`): a real property governs when it is publicly visible, a magic
+/// `@property*` annotation otherwise.  Returns `None` when neither reaches a declaration.
+pub(crate) fn resolve_property_for_external_access<'ctx>(
+    codebase: &'ctx CodebaseMetadata,
+    class_metadata: &'ctx ClassLikeMetadata,
+    prop_name: Word,
+) -> Option<DeclaredProperty<'ctx>> {
+    let resolution = resolve_declared_property(codebase, class_metadata, prop_name, true, None)?;
+
+    match resolution.kind {
+        DeclaredPropertyKind::Magic => Some(resolution),
+        DeclaredPropertyKind::Real { .. } if resolution.property.read_visibility.is_public() => Some(resolution),
+        DeclaredPropertyKind::Real { .. } => None,
+    }
+}
+
 /// Finds a property in a class, gets its type, and handles template localization.
 fn find_property_in_class<'ctx, 'ast, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
@@ -464,71 +623,70 @@ fn find_property_in_class<'ctx, 'ast, 'arena, A>(
 where
     A: Arena,
 {
-    let declaring_class_id =
-        context.codebase.get_declaring_property_class(class_id.as_bytes(), prop_name.as_bytes()).unwrap_or(class_id);
-
-    let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_id.as_bytes()) else {
-        report_non_existent_class_like(context, object_expr.span(), declaring_class_id);
+    let Some(class_metadata) = context.codebase.get_class_like(class_id.as_bytes()) else {
+        report_non_existent_class_like(context, object_expr.span(), class_id);
 
         return None;
     };
 
-    let Some(property_metadata) = declaring_class_metadata.properties.get(&prop_name) else {
-        for required_class in
-            declaring_class_metadata.require_extends.iter().chain(declaring_class_metadata.require_implements.iter())
-        {
+    let resolution = resolve_declared_property(
+        context.codebase,
+        class_metadata,
+        prop_name,
+        true, // `instance_access`
+        block_context.scope.get_class_like_name(),
+    );
+
+    let Some(resolution) = resolution else {
+        for required_class in class_metadata.require_extends.iter().chain(class_metadata.require_implements.iter()) {
             let Some(required_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
                 continue;
             };
 
-            let required_declaring_class_id = context
-                .codebase
-                .get_declaring_property_class(required_class.as_bytes(), prop_name.as_bytes())
-                .unwrap_or(*required_class);
-            let required_declaring_metadata =
-                context.codebase.get_class_like(required_declaring_class_id.as_bytes()).unwrap_or(required_metadata);
-
-            if let Some(prop_meta) = required_declaring_metadata.properties.get(&prop_name) {
-                let property_type = prop_meta
-                    .type_metadata
-                    .as_ref()
-                    .or(prop_meta.type_declaration_metadata.as_ref())
-                    .map(|type_metadata| type_metadata.type_union.clone())
-                    .unwrap_or_else(get_mixed);
+            // `$this` here is an instance of the required class-like, so the call-site rule
+            // applies there.  The required class also provides `__get`/`__set` at runtime,
+            // which cannot be checked from here — hence `is_magic: false`.
+            if let Some(required_resolution) = resolve_declared_property(
+                context.codebase,
+                required_metadata,
+                prop_name,
+                true, // `instance_access`
+                block_context.scope.get_class_like_name(),
+            ) {
+                let prop_meta = required_resolution.property;
 
                 return Some(ResolvedProperty {
                     property_span: prop_meta.name_span.or(prop_meta.span),
                     property_name: prop_name,
-                    declaring_class_id: Some(required_declaring_class_id),
-                    property_type,
+                    declaring_class_id: Some(required_resolution.declaring_class.name),
+                    property_type: required_resolution.declared_type(context.codebase),
                     is_magic: false,
                 });
             }
         }
 
         // Check mixins.
-        if !declaring_class_metadata.mixins.is_empty() {
+        if !class_metadata.mixins.is_empty() {
             // Try to find property in mixin types
-            if let Some(resolved) = find_property_in_mixins(
-                context,
-                declaring_class_metadata,
-                object,
-                &declaring_class_metadata.mixins,
-                prop_name,
-            ) {
-                if has_magic_method {
+            if let Some(resolved) =
+                find_property_in_mixins(context, class_metadata, object, &class_metadata.mixins, prop_name)
+            {
+                // For an annotation-governed mixin property, the caller reports a missing
+                // `__get`/`__set` on the accessed class; the mixin-specific warnings below
+                // cover real mixin properties only.
+                if has_magic_method || resolved.is_magic {
                     return Some(resolved);
                 }
 
                 let magic_method_name = if for_assignment { "__set" } else { "__get" };
-                if declaring_class_metadata.flags.is_final() {
+                if class_metadata.flags.is_final() {
                     report_non_existent_mixin_property(
                         context,
                         object_expr.span(),
                         selector.span(),
-                        declaring_class_id,
+                        class_id,
                         prop_name,
-                        resolved.declaring_class_id.unwrap_or(declaring_class_id),
+                        resolved.declaring_class_id.unwrap_or(class_id),
                         magic_method_name,
                     );
                     result.has_invalid_path = true;
@@ -537,9 +695,9 @@ where
                         context,
                         object_expr.span(),
                         selector.span(),
-                        declaring_class_id,
+                        class_id,
                         prop_name,
-                        resolved.declaring_class_id.unwrap_or(declaring_class_id),
+                        resolved.declaring_class_id.unwrap_or(class_id),
                         magic_method_name,
                     );
                 }
@@ -559,7 +717,7 @@ where
                 context,
                 object_expr.span(),
                 selector.span(),
-                declaring_class_id,
+                class_id,
                 prop_name,
                 for_assignment,
             );
@@ -567,7 +725,7 @@ where
             return Some(ResolvedProperty {
                 property_span: None,
                 property_name: prop_name,
-                declaring_class_id: Some(declaring_class_id),
+                declaring_class_id: Some(class_id),
                 property_type: get_mixed(),
                 is_magic: true,
             });
@@ -592,16 +750,16 @@ where
 
         result.has_invalid_path = true;
 
-        if !declaring_class_metadata.flags.is_final()
-            || declaring_class_metadata.kind.is_interface()
-            || declaring_class_metadata.kind.is_trait()
-        {
+        if !class_metadata.flags.is_final() || class_metadata.kind.is_interface() || class_metadata.kind.is_trait() {
             result.has_possibly_defined_property = true;
         }
 
         report_non_existent_property(context, class_id, prop_name, selector.span(), object_expr.span(), false);
         return None;
     };
+
+    let DeclaredProperty { declaring_class: declaring_class_metadata, property: property_metadata, .. } = resolution;
+    let declaring_class_id = declaring_class_metadata.name;
 
     let property_display_name = format!("{}::{}", declaring_class_metadata.original_name, prop_name);
     crate::utils::availability::check_property_availability(
@@ -620,20 +778,10 @@ where
         {
             param_type.type_union.clone()
         } else {
-            property_metadata
-                .type_metadata
-                .as_ref()
-                .map(|type_metadata| &type_metadata.type_union)
-                .cloned()
-                .unwrap_or_else(get_mixed)
+            resolution.declared_type(context.codebase)
         }
     } else {
-        property_metadata
-            .type_metadata
-            .as_ref()
-            .map(|type_metadata| &type_metadata.type_union)
-            .cloned()
-            .unwrap_or_else(get_mixed)
+        resolution.declared_type(context.codebase)
     };
 
     expander::expand_union(
@@ -673,23 +821,15 @@ where
     }
 
     let is_visible = if for_assignment {
-        check_property_write_visibility(
+        check_resolved_property_write_visibility(
             context,
             block_context,
-            declaring_class_id.as_bytes(),
-            prop_name.as_bytes(),
+            &resolution,
             access_span,
             Some(selector.span()),
         )
     } else {
-        check_property_read_visibility(
-            context,
-            block_context,
-            declaring_class_id.as_bytes(),
-            prop_name.as_bytes(),
-            access_span,
-            Some(selector.span()),
-        )
+        check_resolved_property_read_visibility(context, block_context, &resolution, access_span, Some(selector.span()))
     };
 
     if !is_visible {
@@ -703,7 +843,7 @@ where
         property_name: prop_name,
         declaring_class_id: Some(declaring_class_id),
         property_type,
-        is_magic: property_metadata.flags.is_magic_property(),
+        is_magic: resolution.is_magic(),
     })
 }
 
@@ -1256,25 +1396,17 @@ where
     A: Arena,
 {
     let mixin_metadata = context.codebase.get_class_like(mixin_class_name.as_bytes())?;
-    let property_metadata = mixin_metadata.properties.get(&prop_name)?;
-
-    if !property_metadata.read_visibility.is_public() {
-        return None;
-    }
-
-    let property_type = property_metadata
-        .type_metadata
-        .as_ref()
-        .or(property_metadata.type_declaration_metadata.as_ref())
-        .map(|type_metadata| type_metadata.type_union.clone())
-        .unwrap_or_else(get_mixed);
+    // Mixin access is always external, so a non-public real property defers to a magic
+    // `@property*` annotation when the mixin class documents one.
+    let resolution = resolve_property_for_external_access(context.codebase, mixin_metadata, prop_name)?;
+    let property_metadata = resolution.property;
 
     Some(ResolvedProperty {
         property_span: property_metadata.name_span.or(property_metadata.span),
         property_name: prop_name,
-        declaring_class_id: Some(mixin_class_name),
-        property_type,
-        is_magic: false,
+        declaring_class_id: Some(resolution.declaring_class.name),
+        property_type: resolution.declared_type(context.codebase),
+        is_magic: resolution.is_magic(),
     })
 }
 
@@ -1292,72 +1424,27 @@ where
 
     for atomic in intersection_types {
         match atomic {
-            TAtomic::Object(TObject::Named(named)) => {
-                let class_name = named.name;
-                let declaring_class_id = context
-                    .codebase
-                    .get_declaring_property_class(class_name.as_bytes(), prop_name.as_bytes())
-                    .unwrap_or(class_name);
-
-                let Some(class_metadata) = context.codebase.get_class_like(declaring_class_id.as_bytes()) else {
+            TAtomic::Object(TObject::Named(TNamedObject { name, .. }) | TObject::Enum(TEnum { name, .. })) => {
+                let Some(class_metadata) = context.codebase.get_class_like(name.as_bytes()) else {
                     continue;
                 };
 
-                let Some(property_metadata) = class_metadata.properties.get(&prop_name) else {
+                // Intersection-member access is external, so a non-public real property defers
+                // to a magic `@property*` annotation when one is documented.
+                let Some(resolution) =
+                    resolve_property_for_external_access(context.codebase, class_metadata, prop_name)
+                else {
                     continue;
                 };
 
-                if !property_metadata.read_visibility.is_public() {
-                    continue;
-                }
-
-                let property_type = property_metadata
-                    .type_metadata
-                    .as_ref()
-                    .or(property_metadata.type_declaration_metadata.as_ref())
-                    .map(|type_metadata| type_metadata.type_union.clone())
-                    .unwrap_or_else(get_mixed);
+                let property_metadata = resolution.property;
 
                 return Some(ResolvedProperty {
                     property_span: property_metadata.name_span.or(property_metadata.span),
                     property_name: prop_name,
-                    declaring_class_id: Some(declaring_class_id),
-                    property_type,
-                    is_magic: false,
-                });
-            }
-            TAtomic::Object(TObject::Enum(enum_type)) => {
-                let class_name = enum_type.name;
-                let declaring_class_id = context
-                    .codebase
-                    .get_declaring_property_class(class_name.as_bytes(), prop_name.as_bytes())
-                    .unwrap_or(class_name);
-
-                let Some(class_metadata) = context.codebase.get_class_like(declaring_class_id.as_bytes()) else {
-                    continue;
-                };
-
-                let Some(property_metadata) = class_metadata.properties.get(&prop_name) else {
-                    continue;
-                };
-
-                if !property_metadata.read_visibility.is_public() {
-                    continue;
-                }
-
-                let property_type = property_metadata
-                    .type_metadata
-                    .as_ref()
-                    .or(property_metadata.type_declaration_metadata.as_ref())
-                    .map(|type_metadata| type_metadata.type_union.clone())
-                    .unwrap_or_else(get_mixed);
-
-                return Some(ResolvedProperty {
-                    property_span: property_metadata.name_span.or(property_metadata.span),
-                    property_name: prop_name,
-                    declaring_class_id: Some(declaring_class_id),
-                    property_type,
-                    is_magic: false,
+                    declaring_class_id: Some(resolution.declaring_class.name),
+                    property_type: resolution.declared_type(context.codebase),
+                    is_magic: resolution.is_magic(),
                 });
             }
             TAtomic::Object(TObject::WithProperties(shaped)) => {

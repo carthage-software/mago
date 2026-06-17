@@ -88,6 +88,13 @@ where
             continue;
         }
 
+        // A magic `@property*` annotation of the same name exposes this property through
+        // `__get`/`__set`, so it can be reached from outside the class (and typically via
+        // dynamic access inside the magic methods) where this analysis cannot see it.
+        if class_like_metadata.magic_property_ids.contains_key(property_name) {
+            continue;
+        }
+
         if !property.read_visibility.is_private()
             && class_like_metadata.overridden_property_ids.contains_key(property_name)
         {
@@ -286,6 +293,13 @@ pub fn check_write_only_properties<A>(
         }
 
         if !property.hooks.is_empty() {
+            continue;
+        }
+
+        // A magic `@property*` annotation of the same name exposes this property through
+        // `__get`, so reads can occur outside the class (and typically via dynamic access
+        // inside `__get`) where this analysis cannot see them.
+        if class_like_metadata.magic_property_ids.contains_key(property_name) {
             continue;
         }
 

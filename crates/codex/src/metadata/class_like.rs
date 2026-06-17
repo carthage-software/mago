@@ -72,6 +72,19 @@ pub struct ClassLikeMetadata {
     pub inheritable_method_ids: WordMap<MethodIdentifier>,
     pub overridden_method_ids: WordMap<IndexMap<Word, MethodIdentifier, RandomState>>,
     pub properties: WordMap<PropertyMetadata>,
+    /// Magic properties documented via `@property`/`@property-read`/`@property-write` in this
+    /// class-like's own docblock.
+    ///
+    /// These describe the external `__get`/`__set` interface and are kept separate from the
+    /// real declarations in `properties`; which of the two governs a given access is decided
+    /// at resolution time from the call site's scope.  Inherited tags are reachable through
+    /// `magic_property_ids`, mirroring how `declaring_property_ids` works for real properties.
+    pub magic_properties: WordMap<PropertyMetadata>,
+    /// Maps every magic property name reachable on this class-like (own or inherited) to the
+    /// class-like whose docblock declares the tag.  An own tag beats inherited ones; between
+    /// tags inherited from unrelated parents, the first-populated parent wins (as with real
+    /// property inheritance).
+    pub magic_property_ids: WordMap<Word>,
     pub appearing_property_ids: WordMap<Word>,
     pub declaring_property_ids: WordMap<Word>,
     pub inheritable_property_ids: WordMap<Word>,
@@ -137,6 +150,8 @@ impl ClassLikeMetadata {
             overridden_method_ids: WordMap::default(),
             overridden_property_ids: WordMap::default(),
             properties: WordMap::default(),
+            magic_properties: WordMap::default(),
+            magic_property_ids: WordMap::default(),
             template_variance: Vec::new(),
             template_type_extends_count: WordMap::default(),
             template_extended_parameters: WordMap::default(),
@@ -799,8 +814,6 @@ impl ClassLikeMetadata {
 
                 slot.type_declaration_metadata.clone_from(&prop_metadata.type_declaration_metadata);
                 slot.type_metadata.clone_from(&prop_metadata.type_metadata);
-            } else if prop_metadata.flags.is_magic_property() {
-                self.add_property(*name, prop_metadata.clone());
             } else {
                 patch.issues.push(
                     Issue::error(format!(
@@ -817,6 +830,13 @@ impl ClassLikeMetadata {
                     )),
                 );
             }
+        }
+
+        // Magic `@property*` annotations carry no runtime existence claim: a patch may both
+        // refine an existing annotation and introduce a new one.
+        for (name, prop_metadata) in &patch.magic_properties {
+            self.magic_properties.insert(*name, prop_metadata.clone());
+            self.magic_property_ids.insert(*name, self.name);
         }
     }
 
@@ -901,6 +921,8 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.properties.shrink_to_fit();
+        self.magic_properties.shrink_to_fit();
+        self.magic_property_ids.shrink_to_fit();
         self.initialized_properties.shrink_to_fit();
         self.appearing_property_ids.shrink_to_fit();
         self.declaring_property_ids.shrink_to_fit();
@@ -1063,15 +1085,15 @@ mod tests {
 
         let mut patch = make("VendorClass");
         let prop_magic = word("$magic");
-        patch.properties.insert(
-            prop_magic,
-            PropertyMetadata::new(VariableIdentifier(prop_magic), MetadataFlags::PATCH | MetadataFlags::MAGIC_PROPERTY),
-        );
+        patch
+            .magic_properties
+            .insert(prop_magic, PropertyMetadata::new(VariableIdentifier(prop_magic), MetadataFlags::PATCH));
 
         vendored.apply_patch(&mut patch, &WordSet::default());
         let issues = patch.issues;
 
-        assert!(vendored.properties.contains_key(&prop_magic));
+        assert!(vendored.magic_properties.contains_key(&prop_magic));
+        assert_eq!(vendored.magic_property_ids.get(&prop_magic), Some(&vendored.name));
         assert!(issues.is_empty());
     }
 

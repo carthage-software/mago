@@ -35,7 +35,8 @@ impl MetadataFlags {
     pub const ASYMMETRIC_PROPERTY: MetadataFlags = MetadataFlags(1 << 31);
     pub const STATIC: MetadataFlags = MetadataFlags(1 << 32);
     pub const WRITEONLY: MetadataFlags = MetadataFlags(1 << 33);
-    pub const MAGIC_PROPERTY: MetadataFlags = MetadataFlags(1 << 34);
+    // Bit 34 was MAGIC_PROPERTY; magic properties are now identified by their entry in
+    // `ClassLikeMetadata::magic_properties` instead of a flag.
     pub const MAGIC_METHOD: MetadataFlags = MetadataFlags(1 << 35);
     pub const API: MetadataFlags = MetadataFlags(1 << 36);
     pub const MUTATION_FREE: MetadataFlags = MetadataFlags(1 << 37);
@@ -264,12 +265,6 @@ impl MetadataFlags {
     #[must_use]
     pub const fn is_virtual_property(self) -> bool {
         self.contains(Self::VIRTUAL_PROPERTY)
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_magic_property(self) -> bool {
-        self.contains(Self::MAGIC_PROPERTY)
     }
 
     #[inline]
