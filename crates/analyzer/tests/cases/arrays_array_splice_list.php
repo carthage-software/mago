@@ -10,10 +10,6 @@ final class ArraySpliceItem {}
 function array_splice_consume(ArraySpliceItem ...$items): void {}
 
 /**
- * The canonical reproduction: array_splice() returns the removed elements, and
- * spreading them into a typed variadic must not report a false-positive
- * `mixed-argument`.
- *
  * @param list<ArraySpliceItem> $items
  */
 function array_splice_spread(array $items): void
