@@ -325,7 +325,7 @@ where
         || has_own_line_comment_in_left_chain(f, left)
         || (is_original_right_parenthesized && has_placed_leading_comment_in_leftmost(f, original_right))
         || (f.settings.preserve_breaking_binary_expression
-            && misc::has_new_line_in_range(f.source_text, left.span().end.offset, right.span().start.offset));
+            && misc::has_new_line_in_range(f.source_text, left.end_offset(), right.start_offset()));
 
     let rhs_is_parenthesized_lassoc_subchain = match right {
         Expression::Binary(binary) => {
