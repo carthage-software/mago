@@ -2,6 +2,27 @@
 
 declare(strict_types=1);
 
+final class ArraySpliceItem {}
+
+/**
+ * @param ArraySpliceItem ...$items
+ */
+function array_splice_consume(ArraySpliceItem ...$items): void {}
+
+/**
+ * The canonical reproduction: array_splice() returns the removed elements, and
+ * spreading them into a typed variadic must not report a false-positive
+ * `mixed-argument`.
+ *
+ * @param list<ArraySpliceItem> $items
+ */
+function array_splice_spread(array $items): void
+{
+    $removed = array_splice($items, 0, 1);
+
+    array_splice_consume(...$removed);
+}
+
 /**
  * @param list<int> $xs
  * @return list<int>
