@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 /**
- * Iterating `(array) $fn` where `$fn` is `string|array<string>` is NOT guaranteed
- * to enter the loop: if `$fn` is an empty array the body never runs, so `$cols`
- * can still be empty afterwards. The `if (!$cols)` check must not be flagged as an
- * impossible condition.
+ * `(array) $fn` with `$fn: string|array<string>` is not guaranteed to enter the
+ * loop (an empty array skips the body), so `if (!$cols)` is reachable.
  *
  * @param string|array<string> $fn
  */
@@ -25,7 +23,7 @@ function foreach_union_cast(array|string $fn): string
 }
 
 /**
- * A generic `iterable` may be empty too, so the loop is not guaranteed to enter.
+ * A generic `iterable` may be empty, so the loop is not guaranteed to enter.
  *
  * @param iterable<int> $items
  */
@@ -44,10 +42,8 @@ function foreach_iterable_may_be_empty(iterable $items): string
 }
 
 /**
- * Regression guard for the opposite direction: casting a *pure* `string` to array
- * always yields a one-element array, so the loop genuinely always runs and `$cols`
- * is truly non-empty afterwards. The `impossible-condition` warning must still fire
- * here — the fix must not over-suppress legitimate cases.
+ * Opposite direction: a *pure* string cast always yields a one-element array, so
+ * the loop always runs — `impossible-condition` must still fire (no over-suppression).
  */
 function foreach_pure_string_cast_always_enters(string $fn): string
 {
