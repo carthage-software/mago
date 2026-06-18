@@ -120,6 +120,7 @@ use crate::ir::statement::Switch;
 use crate::ir::statement::SwitchCase;
 use crate::ir::statement::Try;
 use crate::ir::statement::TryCatchClause;
+use crate::ir::statement::UseItem;
 use crate::ir::statement::While;
 use crate::ir::statement::annotation::VariableBindingAnnotation;
 use crate::ir::r#type::Type;
@@ -312,6 +313,11 @@ generate_walker! {
                     walker.walk_expression(value, context);
                 }
             }
+            StatementKind::Use(items) => {
+                for item in items.iter() {
+                    walker.walk_use_item(item, context);
+                }
+            }
             StatementKind::Global(items) => {
                 for item in items.iter() {
                     walker.walk_global_item(item, context);
@@ -446,6 +452,10 @@ generate_walker! {
         if let Some(type_annotation) = global_item.type_annotation {
             walker.walk_type_annotation(type_annotation, context);
         }
+    }
+
+    arena UseItem as use_item => {
+        walker.walk_identifier(&use_item.item, context);
     }
 
     arena VariableBindingAnnotation as variable_binding_annotation => {

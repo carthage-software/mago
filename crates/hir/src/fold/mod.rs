@@ -624,6 +624,9 @@ generate_fold! {
             StatementKind::Echo(values) => StatementKind::Echo(
                 folder.arena().alloc_slice_fill_iter(values.iter().map(|value| folder.fold_expression(value))),
             ),
+            StatementKind::Use(items) => StatementKind::Use(
+                folder.arena().alloc_slice_fill_iter(items.iter().map(|item| item.copy_into(folder.arena()))),
+            ),
             StatementKind::Global(items) => StatementKind::Global(
                 folder.arena().alloc_slice_fill_iter(items.iter().map(|item| folder.fold_global_item(item))),
             ),

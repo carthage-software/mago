@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_allocator::copy::copy_slice_into;
 use mago_allocator::vec::Vec;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -26,6 +27,8 @@ use crate::ir::statement::Switch;
 use crate::ir::statement::SwitchCase;
 use crate::ir::statement::Try;
 use crate::ir::statement::TryCatchClause;
+use crate::ir::statement::UseItem;
+use crate::ir::statement::UseItemKind;
 use crate::ir::statement::While;
 use crate::ir::statement::annotation::VariableBindingAnnotation;
 use crate::ir::variable::Variable;
@@ -220,9 +223,12 @@ where
             cst::Statement::Foreach(foreach) => StatementKind::Foreach(self.lower_foreach(foreach)),
             cst::Statement::Namespace(namespace) => StatementKind::Namespace(self.lower_namespace(namespace)),
             cst::Statement::Use(r#use) => {
-                self.namespace_resolution.populate_from_use(r#use);
+                let items = self.lower_use(r#use);
+                for item in items.iter() {
+                    self.namespace_resolution.add_import(item.kind, item.item.value, item.alias);
+                }
 
-                StatementKind::Noop
+                StatementKind::Use(copy_slice_into(items, self.arena))
             }
             cst::Statement::Inline(inline) => StatementKind::Inline(self.interner.intern(inline.value)),
             cst::Statement::Class(class) => StatementKind::Item(self.arena.alloc(ItemStatement {
@@ -559,6 +565,76 @@ where
         self.arena.alloc(Namespace { span: namespace.span(), name, statement })
     }
 
+    pub(crate) fn lower_use(&self, r#use: &'scratch cst::Use<'scratch>) -> &'scratch [UseItem<'scratch>] {
+        let mut items = Vec::new_in(self.scratch);
+
+        match &r#use.items {
+            cst::UseItems::Sequence(sequence) => {
+                for item in sequence.items.iter() {
+                    items.push(self.lower_use_item(item, UseItemKind::Default, None));
+                }
+            }
+            cst::UseItems::TypedSequence(sequence) => {
+                let kind = lower_use_type(&sequence.r#type);
+                for item in sequence.items.iter() {
+                    items.push(self.lower_use_item(item, kind, None));
+                }
+            }
+            cst::UseItems::TypedList(list) => {
+                let kind = lower_use_type(&list.r#type);
+                for item in list.items.iter() {
+                    items.push(self.lower_use_item(item, kind, Some(&list.namespace)));
+                }
+            }
+            cst::UseItems::MixedList(list) => {
+                for maybe in list.items.iter() {
+                    let kind = maybe.r#type.as_ref().map(lower_use_type).unwrap_or(UseItemKind::Default);
+                    items.push(self.lower_use_item(&maybe.item, kind, Some(&list.namespace)));
+                }
+            }
+        }
+
+        items.leak()
+    }
+
+    fn lower_use_item(
+        &self,
+        item: &'scratch cst::UseItem<'scratch>,
+        kind: UseItemKind,
+        prefix: Option<&'scratch cst::Identifier<'scratch>>,
+    ) -> UseItem<'scratch> {
+        let (mut value, identifier_kind) = match prefix {
+            Some(prefix) => {
+                let mut joined = Vec::new_in(self.scratch);
+                joined.extend_from_slice(prefix.value());
+                joined.push(b'\\');
+                joined.extend_from_slice(item.name.value());
+
+                let identifier_kind = if prefix.is_fully_qualified() {
+                    IdentifierKind::FullyQualified
+                } else {
+                    IdentifierKind::Qualified
+                };
+
+                (&*joined.leak(), identifier_kind)
+            }
+            None => (item.name.value(), use_identifier_kind(&item.name)),
+        };
+
+        if let [b'\\', rest @ ..] = value {
+            value = rest;
+        }
+
+        let alias = item.alias.as_ref().map(|alias| alias.identifier.value);
+
+        UseItem {
+            span: item.span(),
+            kind,
+            item: Identifier { span: item.name.span(), value, kind: identifier_kind },
+            alias,
+        }
+    }
+
     pub(crate) fn lower_declare(
         &mut self,
         declare: &'scratch cst::Declare<'scratch>,
@@ -634,5 +710,20 @@ where
             variable: clause.variable.as_ref().map(|variable| self.lower_direct_variable(variable)),
             statement: self.statements_to_statement(clause.block.statements.as_slice(), clause.block.span()),
         }
+    }
+}
+
+fn lower_use_type(r#type: &cst::UseType<'_>) -> UseItemKind {
+    match r#type {
+        cst::UseType::Function(_) => UseItemKind::Function,
+        cst::UseType::Const(_) => UseItemKind::Const,
+    }
+}
+
+fn use_identifier_kind(identifier: &cst::Identifier<'_>) -> IdentifierKind {
+    match identifier {
+        cst::Identifier::Local(_) => IdentifierKind::Local,
+        cst::Identifier::Qualified(_) => IdentifierKind::Qualified,
+        cst::Identifier::FullyQualified(_) => IdentifierKind::FullyQualified,
     }
 }

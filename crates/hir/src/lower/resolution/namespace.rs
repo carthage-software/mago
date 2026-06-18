@@ -1,6 +1,7 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
-use mago_syntax::cst;
+
+use crate::ir::statement::UseItemKind;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum NameResolutionKind {
@@ -57,33 +58,21 @@ where
         self.constant_aliases.clear();
     }
 
-    pub fn populate_from_use(&mut self, r#use: &'scratch cst::Use<'scratch>) {
-        match &r#use.items {
-            cst::UseItems::Sequence(sequence) => {
-                for item in sequence.items.iter() {
-                    self.add_use_alias(NameResolutionKind::Default, item);
-                }
-            }
-            cst::UseItems::TypedSequence(sequence) => {
-                let kind = use_type_kind(&sequence.r#type);
-                for item in sequence.items.iter() {
-                    self.add_use_alias(kind, item);
-                }
-            }
-            cst::UseItems::TypedList(list) => {
-                let kind = use_type_kind(&list.r#type);
-                let prefix = trim_leading_backslash(list.namespace.value());
-                for item in list.items.iter() {
-                    self.add_grouped_use_alias(kind, prefix, item);
-                }
-            }
-            cst::UseItems::MixedList(list) => {
-                let prefix = trim_leading_backslash(list.namespace.value());
-                for item in list.items.iter() {
-                    let kind = item.r#type.as_ref().map_or(NameResolutionKind::Default, use_type_kind);
-                    self.add_grouped_use_alias(kind, prefix, &item.item);
-                }
-            }
+    pub fn add_import(
+        &mut self,
+        kind: UseItemKind,
+        fully_qualified_name: &'scratch [u8],
+        alias: Option<&'scratch [u8]>,
+    ) {
+        let alias = alias.unwrap_or_else(|| match memchr::memrchr(b'\\', fully_qualified_name) {
+            Some(position) => &fully_qualified_name[position + 1..],
+            None => fully_qualified_name,
+        });
+
+        match kind {
+            UseItemKind::Default => self.default_aliases.push((alias, fully_qualified_name)),
+            UseItemKind::Function => self.function_aliases.push((alias, fully_qualified_name)),
+            UseItemKind::Const => self.constant_aliases.push((alias, fully_qualified_name)),
         }
     }
 
@@ -142,57 +131,5 @@ where
         buffer.extend_from_slice(suffix);
 
         buffer.leak()
-    }
-
-    fn add_use_alias(&mut self, kind: NameResolutionKind, item: &'scratch cst::UseItem<'scratch>) {
-        let name = trim_leading_backslash(item.name.value());
-        let alias = match &item.alias {
-            Some(alias) => alias.identifier.value,
-            None => last_segment(name),
-        };
-
-        self.push_alias(kind, alias, name);
-    }
-
-    fn add_grouped_use_alias(
-        &mut self,
-        kind: NameResolutionKind,
-        prefix: &'scratch [u8],
-        item: &'scratch cst::UseItem<'scratch>,
-    ) {
-        let name_part = item.name.value();
-        let fully_qualified_name = self.concat(prefix, name_part);
-        let alias = match &item.alias {
-            Some(alias) => alias.identifier.value,
-            None => last_segment(name_part),
-        };
-
-        self.push_alias(kind, alias, fully_qualified_name);
-    }
-
-    fn push_alias(&mut self, kind: NameResolutionKind, alias: &'scratch [u8], fully_qualified_name: &'scratch [u8]) {
-        match kind {
-            NameResolutionKind::Default => self.default_aliases.push((alias, fully_qualified_name)),
-            NameResolutionKind::Function => self.function_aliases.push((alias, fully_qualified_name)),
-            NameResolutionKind::Constant => self.constant_aliases.push((alias, fully_qualified_name)),
-        }
-    }
-}
-
-fn use_type_kind(use_type: &cst::UseType<'_>) -> NameResolutionKind {
-    match use_type {
-        cst::UseType::Function(_) => NameResolutionKind::Function,
-        cst::UseType::Const(_) => NameResolutionKind::Constant,
-    }
-}
-
-fn trim_leading_backslash(name: &[u8]) -> &[u8] {
-    if let [b'\\', rest @ ..] = name { rest } else { name }
-}
-
-fn last_segment(name: &[u8]) -> &[u8] {
-    match memchr::memrchr(b'\\', name) {
-        Some(position) => &name[position + 1..],
-        None => name,
     }
 }

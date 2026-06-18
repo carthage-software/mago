@@ -2,6 +2,9 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -15,9 +18,6 @@ use crate::ir::r#type::Type;
 use crate::ir::r#type::annotation::TypeAnnotation;
 use crate::ir::variable::DirectVariable;
 use crate::ir::variable::Variable;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_ref_into;
-use mago_allocator::copy::copy_slice_into;
 
 pub mod annotation;
 
@@ -35,6 +35,7 @@ pub struct Statement<'arena, I, S, E> {
 pub enum StatementKind<'arena, I, S, E> {
     Inline(&'arena [u8]),
     Namespace(&'arena Namespace<'arena, I, S, E>),
+    Use(&'arena [UseItem<'arena>]),
     Sequence(&'arena [Statement<'arena, I, S, E>]),
     Item(&'arena ItemStatement<'arena, I, S, E>),
     Declare(&'arena Declare<'arena, I, S, E>),
@@ -58,6 +59,54 @@ pub enum StatementKind<'arena, I, S, E> {
     HaltCompiler,
     Unset(Delimited<'arena, Expression<'arena, I, S, E>>),
     Noop,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct UseItem<'arena> {
+    pub span: Span,
+    pub kind: UseItemKind,
+    pub item: Identifier<'arena>,
+    pub alias: Option<&'arena [u8]>,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "kind"))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum UseItemKind {
+    Default,
+    Function,
+    Const,
+}
+
+impl UseItemKind {
+    #[inline]
+    #[must_use]
+    pub const fn is_case_sensitive(self) -> bool {
+        matches!(self, UseItemKind::Const)
+    }
+}
+
+impl HasSpan for UseItem<'_> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl CopyInto for UseItem<'_> {
+    type Output<'arena> = UseItem<'arena>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        UseItem {
+            span: self.span,
+            kind: self.kind,
+            item: self.item.copy_into(arena),
+            alias: self.alias.map(|alias| &*arena.alloc_slice_copy(alias)),
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -210,6 +259,7 @@ where
         match self {
             StatementKind::Inline(bytes) => StatementKind::Inline(arena.alloc_slice_copy(bytes)),
             StatementKind::Namespace(node) => StatementKind::Namespace(copy_ref_into(*node, arena)),
+            StatementKind::Use(items) => StatementKind::Use(copy_slice_into(items, arena)),
             StatementKind::Sequence(statements) => StatementKind::Sequence(copy_slice_into(statements, arena)),
             StatementKind::Item(node) => StatementKind::Item(copy_ref_into(*node, arena)),
             StatementKind::Declare(node) => StatementKind::Declare(copy_ref_into(*node, arena)),
