@@ -838,7 +838,7 @@ generate_ast_walker! {
 
         walker.walk_keyword(&trait_use_alias_adaptation.r#as, context);
 
-        if let Some(modifier) = &trait_use_alias_adaptation.visibility {
+        if let Some(modifier) = &trait_use_alias_adaptation.modifier {
             walker.walk_modifier(modifier, context);
         }
 

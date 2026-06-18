@@ -1,7 +1,6 @@
 use mago_allocator::Arena;
 use mago_allocator::CollectIn;
 use mago_allocator::vec::Vec as BumpVec;
-
 use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
@@ -525,21 +524,6 @@ where
         }
 
         lines
-    }
-
-    #[inline]
-    fn skip_leading_whitespace_up_to(s: &'arena [u8], indent: usize) -> &'arena [u8] {
-        let mut position = 0;
-        for (count, (i, &b)) in s.iter().enumerate().enumerate() {
-            // Check if the current byte represents whitespace
-            if !b.is_ascii_whitespace() || count >= indent {
-                break;
-            }
-
-            position = i + 1;
-        }
-
-        &s[position..]
     }
 
     /// Returns the ignore region that contains this offset, if any.

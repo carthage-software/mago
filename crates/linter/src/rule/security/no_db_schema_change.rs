@@ -182,7 +182,7 @@ fn contains_schema_change_keywords(expr: &Expression) -> bool {
                     continue;
                 };
 
-                if str_contains_schema_change_keywords(literal_string_part.value) {
+                if str_contains_schema_change_keywords(literal_string_part.raw) {
                     return true;
                 }
             }

@@ -1286,8 +1286,8 @@ where
                                     class_like_metadata.add_trait_alias(method_name, alias);
                                 }
 
-                                if let Some(visibility) = &adaptation.visibility {
-                                    let visibility = match visibility {
+                                if let Some(modifier) = &adaptation.modifier {
+                                    let visibility = match modifier {
                                         Modifier::Public(_) => Visibility::Public,
                                         Modifier::Protected(_) => Visibility::Protected,
                                         Modifier::Private(_) => Visibility::Private,

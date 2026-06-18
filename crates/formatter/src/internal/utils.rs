@@ -292,7 +292,7 @@ where
         }
         Expression::CompositeString(composite_string) => composite_string.parts().iter().any(|part| match part {
             StringPart::Literal(literal_string) => {
-                literal_string.value.contains(&b'\n') || literal_string.value.contains(&b'\r')
+                literal_string.raw.contains(&b'\n') || literal_string.raw.contains(&b'\r')
             }
             _ => false,
         }),
@@ -413,11 +413,11 @@ fn get_composite_string_width(composite_string: &CompositeString<'_>) -> Option<
     for part in composite_string.parts() {
         width += match part {
             StringPart::Literal(literal) => {
-                if literal.value.contains(&b'\n') || literal.value.contains(&b'\r') {
+                if literal.raw.contains(&b'\n') || literal.raw.contains(&b'\r') {
                     return None;
                 }
 
-                bytes_width(literal.value)
+                bytes_width(literal.raw)
             }
             StringPart::Expression(expression) => get_expression_width(expression)?,
             StringPart::BracedExpression(braced) => get_expression_width(braced.expression)? + 2,

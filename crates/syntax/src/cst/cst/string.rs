@@ -76,7 +76,8 @@ pub enum StringPart<'arena> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct LiteralStringPart<'arena> {
     pub span: Span,
-    pub value: &'arena [u8],
+    pub raw: &'arena [u8],
+    pub value: Option<&'arena [u8]>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]

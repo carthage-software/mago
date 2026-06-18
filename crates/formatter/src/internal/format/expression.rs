@@ -1,7 +1,6 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec as BumpVec;
 use mago_allocator::vec_in;
-use std::borrow::Cow;
 use std::collections::VecDeque;
 
 use mago_allocator::vec::Vec;
@@ -1542,6 +1541,13 @@ where
     }
 }
 
+/// The leading run of spaces and tabs of `line`, as a sub-slice (no allocation).
+fn leading_whitespace(line: &[u8]) -> &[u8] {
+    let width = line.iter().take_while(|&&byte| byte == b' ' || byte == b'\t').count();
+
+    &line[..width]
+}
+
 impl<'arena, A> Format<'arena, A> for DocumentString<'arena>
 where
     A: Arena,
@@ -1552,6 +1558,7 @@ where
             if let Some(prefix) = &self.prefix {
                 contents.push(Document::String(prefix.value));
             }
+
             contents.push(Document::String(b"<<<"));
             match self.kind {
                 DocumentKind::Heredoc => {
@@ -1564,32 +1571,18 @@ where
                 }
             }
 
-            let indent = match self.indentation {
-                DocumentIndentation::None => 0,
-                DocumentIndentation::Whitespace(n) => n,
-                DocumentIndentation::Tab(n) => n,
-                DocumentIndentation::Mixed(t, w) => t + w,
-            };
-
             let mut inner = vec_in![f.arena; Document::Line(Line::hard())];
 
             // Track the indentation from the last line of the previous literal part
-            let mut last_part_indentation = Cow::Borrowed("");
+            let mut last_part_indentation: &[u8] = b"";
 
             for part in &self.parts {
                 let formatted = if let StringPart::Literal(l) = part {
-                    let content = l.value;
+                    let content = l.raw;
                     let mut part_contents = vec_in![f.arena;];
-                    let own_line = f.has_newline(l.span.start.offset, true);
                     let lines = f.split_lines(content);
 
                     for line in &lines {
-                        let mut current = *line;
-                        if own_line {
-                            current = FormatterState::<'_, 'arena, A>::skip_leading_whitespace_up_to(current, indent);
-                        }
-                        let line = current;
-
                         let mut line_content = vec_in![f.arena; Document::String(line)];
                         if !line.is_empty() {
                             line_content.push(Document::DoNotTrim);
@@ -1605,82 +1598,48 @@ where
                         part_contents.push(Document::Line(Line::hard()));
                     }
 
-                    // Calculate indentation from the last line of this literal part
-                    // We need to use the stripped line (after removing heredoc indent)
                     if let Some(last_line) = lines.last() {
-                        let stripped_line = if own_line {
-                            FormatterState::<'_, 'arena, A>::skip_leading_whitespace_up_to(last_line, indent)
-                        } else {
-                            *last_line
-                        };
-
-                        let mut tabs = 0;
-                        let mut spaces = 0;
-                        for &b in stripped_line.iter() {
-                            match b {
-                                b'\t' => tabs += 1,
-                                b' ' => spaces += 1,
-                                _ => break,
-                            }
-                        }
-
-                        if tabs > 0 || spaces > 0 {
-                            last_part_indentation = if tabs > 0 {
-                                Cow::Owned(format!("{}{}", "\t".repeat(tabs), " ".repeat(spaces)))
-                            } else {
-                                Cow::Owned(" ".repeat(spaces))
-                            };
-                        } else {
-                            last_part_indentation = Cow::Borrowed("");
-                        }
+                        last_part_indentation = leading_whitespace(last_line);
                     }
 
                     Document::Array(part_contents)
                 } else {
-                    let (base_alignment, adjusted_last_part) = if f.settings.indent_heredoc {
-                        let scope = if f.settings.use_tabs {
-                            Cow::Borrowed("\t")
-                        } else {
-                            Cow::Owned(" ".repeat(f.settings.tab_width))
-                        };
+                    let alignment: &[u8] = if f.settings.indent_heredoc {
+                        let (scope_byte, scope_width) =
+                            if f.settings.use_tabs { (b'\t', 1) } else { (b' ', f.settings.tab_width) };
 
-                        let adjusted = if !last_part_indentation.is_empty() {
-                            Cow::Owned(format!("{scope}{last_part_indentation}"))
+                        if last_part_indentation.is_empty() {
+                            f.arena.alloc_slice_fill_copy(scope_width, scope_byte)
                         } else {
-                            Cow::Borrowed("")
-                        };
-
-                        (scope, adjusted)
+                            f.arena.alloc_slice_fill_iter(
+                                std::iter::repeat(scope_byte)
+                                    .take(scope_width * 2)
+                                    .chain(last_part_indentation.iter().copied()),
+                            )
+                        }
                     } else {
-                        let base = match self.indentation {
-                            DocumentIndentation::None => Cow::Borrowed(""),
-                            DocumentIndentation::Whitespace(n) => Cow::Owned(" ".repeat(n)),
-                            DocumentIndentation::Tab(n) => Cow::Owned("\t".repeat(n)),
-                            DocumentIndentation::Mixed(t, w) => {
-                                Cow::Owned(format!("{}{}", "\t".repeat(t), " ".repeat(w)))
-                            }
+                        let (tabs, spaces) = match self.indentation {
+                            DocumentIndentation::None => (0, 0),
+                            DocumentIndentation::Whitespace(n) => (0, n),
+                            DocumentIndentation::Tab(n) => (n, 0),
+                            DocumentIndentation::Mixed(t, w) => (t, w),
                         };
 
-                        (base, last_part_indentation.clone())
+                        f.arena.alloc_slice_fill_iter(
+                            std::iter::repeat(b'\t')
+                                .take(tabs)
+                                .chain(std::iter::repeat(b' ').take(spaces))
+                                .chain(last_part_indentation.iter().copied()),
+                        )
                     };
 
-                    let combined_alignment = if !base_alignment.is_empty() || !adjusted_last_part.is_empty() {
-                        Cow::Owned(format!("{base_alignment}{adjusted_last_part}"))
-                    } else {
-                        Cow::Borrowed("")
-                    };
-
-                    Document::Align(Align {
-                        alignment: f.as_str(&combined_alignment),
-                        contents: vec_in![f.arena;
-                            part.format(f)
-                        ],
-                    })
+                    Document::Align(Align { alignment, contents: vec_in![f.arena; part.format(f)] })
                 };
 
                 inner.push(formatted);
             }
 
+            inner.push(Document::Line(Line::hard()));
             inner.push(Document::String(self.label));
 
             if f.settings.indent_heredoc {
@@ -1705,31 +1664,14 @@ where
                 parts.push(Document::String(prefix.value));
             }
             parts.push(Document::String(b"\""));
-            let mut last_part_indentation = Cow::Borrowed("");
+            let mut last_part_indentation: &[u8] = b"";
 
             for part in &self.parts {
                 let formatted = match part {
                     StringPart::Literal(l) => {
-                        let lines = f.split_lines(l.value);
+                        let lines = f.split_lines(l.raw);
                         if let Some(last_line) = lines.last() {
-                            let mut tabs = 0;
-                            let mut spaces = 0;
-                            for &b in last_line.iter() {
-                                match b {
-                                    b'\t' => tabs += 1,
-                                    b' ' => spaces += 1,
-                                    _ => break,
-                                }
-                            }
-                            if tabs > 0 || spaces > 0 {
-                                last_part_indentation = if tabs > 0 {
-                                    Cow::Owned(format!("{}{}", "\t".repeat(tabs), " ".repeat(spaces)))
-                                } else {
-                                    Cow::Owned(" ".repeat(spaces))
-                                };
-                            } else {
-                                last_part_indentation = Cow::Borrowed("");
-                            }
+                            last_part_indentation = leading_whitespace(last_line);
                         }
                         part.format(f)
                     }
@@ -1738,7 +1680,7 @@ where
                             part.format(f)
                         } else {
                             Document::Align(Align {
-                                alignment: f.as_str(&last_part_indentation),
+                                alignment: last_part_indentation,
                                 contents: vec_in![f.arena; part.format(f)],
                             })
                         }
@@ -1761,31 +1703,14 @@ where
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, ShellExecuteString, {
             let mut parts = vec_in![f.arena; Document::String(b"`")];
-            let mut last_part_indentation = Cow::Borrowed("");
+            let mut last_part_indentation: &[u8] = b"";
 
             for part in &self.parts {
                 let formatted = match part {
                     StringPart::Literal(l) => {
-                        let lines = f.split_lines(l.value);
+                        let lines = f.split_lines(l.raw);
                         if let Some(last_line) = lines.last() {
-                            let mut tabs = 0;
-                            let mut spaces = 0;
-                            for &b in last_line.iter() {
-                                match b {
-                                    b'\t' => tabs += 1,
-                                    b' ' => spaces += 1,
-                                    _ => break,
-                                }
-                            }
-                            if tabs > 0 || spaces > 0 {
-                                last_part_indentation = if tabs > 0 {
-                                    Cow::Owned(format!("{}{}", "\t".repeat(tabs), " ".repeat(spaces)))
-                                } else {
-                                    Cow::Owned(" ".repeat(spaces))
-                                };
-                            } else {
-                                last_part_indentation = Cow::Borrowed("");
-                            }
+                            last_part_indentation = leading_whitespace(last_line);
                         }
                         part.format(f)
                     }
@@ -1794,7 +1719,7 @@ where
                             part.format(f)
                         } else {
                             Document::Align(Align {
-                                alignment: f.as_str(&last_part_indentation),
+                                alignment: last_part_indentation,
                                 contents: vec_in![f.arena; part.format(f)],
                             })
                         }
@@ -1832,7 +1757,7 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, LiteralStringPart, {
-            utils::replace_end_of_line(f, Document::String(self.value), Separator::LiteralLine, false)
+            utils::replace_end_of_line(f, Document::String(self.raw), Separator::LiteralLine, false)
         })
     }
 }

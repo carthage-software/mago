@@ -1,8 +1,9 @@
-use mago_allocator::prelude::*;
 use std::vec::Vec;
 
+use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::Span;
+use mago_syntax_core::utils::parse_literal_string_in;
 
 use crate::T;
 use crate::cst::cst::ArrayAccess;
@@ -23,6 +24,15 @@ use crate::error::ParseError;
 use crate::parser::Parser;
 use crate::token::DocumentKind;
 use crate::token::TokenKind;
+
+/// How the literal bytes of a string part should be turned into their decoded value.
+#[derive(Clone, Copy)]
+pub(crate) enum LiteralPartDecoding {
+    /// Apply the double-quoted escape rules (interpolated strings, shell-execute, heredoc).
+    DoubleQuoted,
+    /// Keep the bytes verbatim, with no escape decoding (nowdoc).
+    Verbatim,
+}
 
 impl<'arena, A> Parser<'_, 'arena, A>
 where
@@ -63,7 +73,7 @@ where
             if has_prefix { Span { start: token_span.start.forward(1), ..token_span } } else { token_span };
 
         let mut parts = self.new_vec();
-        while let Some(part) = self.parse_optional_string_part(T!["\""])? {
+        while let Some(part) = self.parse_optional_string_part(T!["\""], LiteralPartDecoding::DoubleQuoted)? {
             parts.push(part);
         }
 
@@ -75,7 +85,7 @@ where
     pub(crate) fn parse_shell_execute_string(&mut self) -> Result<ShellExecuteString<'arena>, ParseError> {
         let left_backtick = self.stream.eat_span(T!["`"])?;
         let mut parts = self.new_vec();
-        while let Some(part) = self.parse_optional_string_part(T!["`"])? {
+        while let Some(part) = self.parse_optional_string_part(T!["`"], LiteralPartDecoding::DoubleQuoted)? {
             parts.push(part);
         }
 
@@ -97,9 +107,13 @@ where
         };
         let open_span =
             if has_prefix { Span { start: current_span.start.forward(1), ..current_span } } else { current_span };
-        let (open, kind) = match current.kind {
-            TokenKind::DocumentStart(DocumentKind::Heredoc) => (open_span, AstDocumentKind::Heredoc),
-            TokenKind::DocumentStart(DocumentKind::Nowdoc) => (open_span, AstDocumentKind::Nowdoc),
+        let (open, kind, decoding) = match current.kind {
+            TokenKind::DocumentStart(DocumentKind::Heredoc) => {
+                (open_span, AstDocumentKind::Heredoc, LiteralPartDecoding::DoubleQuoted)
+            }
+            TokenKind::DocumentStart(DocumentKind::Nowdoc) => {
+                (open_span, AstDocumentKind::Nowdoc, LiteralPartDecoding::Verbatim)
+            }
             _ => {
                 return Err(self.stream.unexpected(
                     Some(current),
@@ -109,7 +123,7 @@ where
         };
 
         let mut parts = self.new_vec();
-        while let Some(part) = self.parse_optional_string_part(T![DocumentEnd])? {
+        while let Some(part) = self.parse_optional_string_part(T![DocumentEnd], decoding)? {
             parts.push(part);
         }
 
@@ -156,15 +170,24 @@ where
     pub(crate) fn parse_optional_string_part(
         &mut self,
         closing_kind: TokenKind,
+        decoding: LiteralPartDecoding,
     ) -> Result<Option<StringPart<'arena>>, ParseError> {
         let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
         Ok(match token.kind {
             T!["{"] => Some(StringPart::BracedExpression(self.parse_braced_expression_string_part()?)),
             T![StringPart] => {
                 let token = self.stream.consume()?;
+                let value = match decoding {
+                    LiteralPartDecoding::DoubleQuoted => {
+                        parse_literal_string_in(self.arena, token.value, Some(b'"'), false)
+                    }
+                    LiteralPartDecoding::Verbatim => Some(token.value),
+                };
+
                 Some(StringPart::Literal(LiteralStringPart {
                     span: token.span_for(self.stream.file_id()),
-                    value: token.value,
+                    raw: token.value,
+                    value,
                 }))
             }
             kind if kind == closing_kind => None,

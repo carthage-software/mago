@@ -61,7 +61,7 @@ pub struct TraitUsePrecedenceAdaptation<'arena> {
 pub struct TraitUseAliasAdaptation<'arena> {
     pub method_reference: TraitUseMethodReference<'arena>,
     pub r#as: Keyword<'arena>,
-    pub visibility: Option<Modifier<'arena>>,
+    pub modifier: Option<Modifier<'arena>>,
     pub alias: Option<LocalIdentifier<'arena>>,
     pub terminator: Terminator<'arena>,
 }

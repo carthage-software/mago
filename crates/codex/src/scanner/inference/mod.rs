@@ -287,7 +287,7 @@ where
             let mut contains_content = false;
             for part in composite_string.parts() {
                 if let StringPart::Literal(literal_string_part) = part
-                    && !literal_string_part.value.is_empty()
+                    && !literal_string_part.raw.is_empty()
                 {
                     contains_content = true;
                     break;

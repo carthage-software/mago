@@ -188,7 +188,7 @@ impl Fingerprintable for TraitUseAdaptation<'_> {
             TraitUseAdaptation::Alias(adaptation) => {
                 "alias".hash(hasher);
                 adaptation.method_reference.fingerprint_with_hasher(hasher, resolved_names, options);
-                adaptation.visibility.fingerprint_with_hasher(hasher, resolved_names, options);
+                adaptation.modifier.fingerprint_with_hasher(hasher, resolved_names, options);
                 adaptation.alias.fingerprint_with_hasher(hasher, resolved_names, options);
                 adaptation.terminator.fingerprint_with_hasher(hasher, resolved_names, options);
             }

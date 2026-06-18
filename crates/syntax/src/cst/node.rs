@@ -1368,7 +1368,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                     f(Node::TraitUseMethodReference(&adaptation.method_reference));
                     f(Node::Keyword(&adaptation.r#as));
 
-                    if let Some(visibility) = &adaptation.visibility {
+                    if let Some(visibility) = &adaptation.modifier {
                         f(Node::Modifier(visibility));
                     }
 
@@ -1383,7 +1383,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 f(Node::TraitUseMethodReference(&node.method_reference));
                 f(Node::Keyword(&node.r#as));
 
-                if let Some(visibility) = &node.visibility {
+                if let Some(visibility) = &node.modifier {
                     f(Node::Modifier(visibility));
                 }
 

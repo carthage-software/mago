@@ -70,11 +70,13 @@ pub enum LexerMode<'src> {
     ///
     /// - `DocumentKind` specifies whether it's a heredoc or nowdoc (e.g., `Heredoc`, `Nowdoc`).
     /// - `&'a [u8]` is a reference to the label used to terminate the document string.
+    /// - `usize` is the closing-marker indentation width, measured up front so each body
+    ///   line can have its leading indentation stripped and surfaced as `Whitespace` trivia.
     /// - `Interpolation` specifies whether interpolation is allowed and, if so, where it ends.
     ///
     /// In this mode, the lexer reads until it encounters the closing label that matches the provided label,
     /// typically at the start of a line. Heredocs allow interpolation, whereas nowdocs do not.
-    DocumentString(DocumentKind, &'src [u8], Interpolation),
+    DocumentString(DocumentKind, &'src [u8], usize, Interpolation),
 
     /// **Halt Mode**
     ///

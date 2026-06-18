@@ -42,9 +42,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
         for part in self.parts().as_slice() {
             let (part_type, part_expression_id) = match part {
                 StringPart::Literal(literal_string_part) => {
-                    non_empty = non_empty || !literal_string_part.value.is_empty();
+                    non_empty = non_empty || !literal_string_part.raw.is_empty();
                     if let Some(strings) = resulting_strings.as_mut() {
-                        if let Ok(part_str) = std::str::from_utf8(literal_string_part.value) {
+                        if let Some(Ok(part_str)) = literal_string_part.value.map(str::from_utf8) {
                             for s in strings.iter_mut() {
                                 s.push_str(part_str);
                             }

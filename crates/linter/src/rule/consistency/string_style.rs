@@ -251,7 +251,7 @@ impl StringStyleRule {
         let parts: Vec<&StringPart<'arena>> = interpolated_string
             .parts
             .iter()
-            .filter(|part| !matches!(part, StringPart::Literal(literal) if literal.value.is_empty()))
+            .filter(|part| !matches!(part, StringPart::Literal(literal) if literal.raw.is_empty()))
             .collect();
         if parts.is_empty() {
             ctx.collector.report(issue);

@@ -164,7 +164,7 @@ impl Fingerprintable for LiteralStringPart<'_> {
         H: std::hash::Hasher,
     {
         "string_literal".hash(hasher);
-        self.value.hash(hasher);
+        self.raw.hash(hasher);
     }
 }
 

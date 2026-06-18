@@ -566,7 +566,7 @@ fn is_simple_composite_string_argument(composite_string: &CompositeString<'_>, d
     }
 
     composite_string.parts().iter().all(|part| match part {
-        StringPart::Literal(literal) => !literal.value.contains(&b'\n') && !literal.value.contains(&b'\r'),
+        StringPart::Literal(literal) => !literal.raw.contains(&b'\n') && !literal.raw.contains(&b'\r'),
         StringPart::Expression(expression) => is_simple_call_argument(expression, depth),
         StringPart::BracedExpression(braced) => is_simple_call_argument(braced.expression, depth),
     })

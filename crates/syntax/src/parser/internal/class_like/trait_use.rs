@@ -78,7 +78,7 @@ where
                     T!["as"] => TraitUseAdaptation::Alias(TraitUseAliasAdaptation {
                         method_reference: TraitUseMethodReference::Absolute(reference),
                         r#as: self.expect_keyword(T!["as"])?,
-                        visibility: self.parse_optional_read_visibility_modifier()?,
+                        modifier: self.parse_optional_modifier()?,
                         alias: match self.stream.peek_kind(0)? {
                             Some(T![";" | "?>"]) => None,
                             _ => Some(self.parse_local_identifier()?),
@@ -119,7 +119,7 @@ where
                 TraitUseAdaptation::Alias(TraitUseAliasAdaptation {
                     method_reference,
                     r#as: self.expect_keyword(T!["as"])?,
-                    visibility: self.parse_optional_read_visibility_modifier()?,
+                    modifier: self.parse_optional_read_visibility_modifier()?,
                     alias: match self.stream.peek_kind(0)? {
                         Some(T![";" | "?>"]) => None,
                         _ => Some(self.parse_local_identifier()?),

@@ -848,7 +848,7 @@ where
         wrap!(f, self, TraitUseAliasAdaptation, {
             let mut parts = vec_in![f.arena; self.method_reference.format(f), Document::space(), self.r#as.format(f)];
 
-            if let Some(v) = &self.visibility {
+            if let Some(v) = &self.modifier {
                 parts.push(Document::space());
                 parts.push(v.format(f));
             }

@@ -1265,6 +1265,7 @@ pub struct SortUses(pub SortOrder);
 #[derive(JsonSchema)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 #[serde(untagged)]
+#[allow(unused, reason = "This is used for deserialization of SortUses, when the serde feature is enabled.")]
 enum SortUsesWire {
     Bool(bool),
     Order(SortOrder),
@@ -1430,18 +1431,22 @@ impl NullTypeHint {
     }
 }
 
+#[cfg(feature = "serde")]
 fn default_print_width() -> usize {
     120
 }
 
+#[cfg(feature = "serde")]
 fn default_tab_width() -> usize {
     4
 }
 
+#[cfg(feature = "serde")]
 fn default_false() -> bool {
     false
 }
 
+#[cfg(feature = "serde")]
 fn default_true() -> bool {
     true
 }
