@@ -42,3 +42,24 @@ function foreach_iterable_may_be_empty(iterable $items): string
 
     return (string) count($seen);
 }
+
+/**
+ * Regression guard for the opposite direction: casting a *pure* `string` to array
+ * always yields a one-element array, so the loop genuinely always runs and `$cols`
+ * is truly non-empty afterwards. The `impossible-condition` warning must still fire
+ * here — the fix must not over-suppress legitimate cases.
+ */
+function foreach_pure_string_cast_always_enters(string $fn): string
+{
+    $cols = [];
+    foreach ((array) $fn as $f) {
+        $cols[] = $f;
+    }
+
+    /** @mago-expect analysis:impossible-condition */
+    if (!$cols) {
+        return '';
+    }
+
+    return implode(',', $cols);
+}
