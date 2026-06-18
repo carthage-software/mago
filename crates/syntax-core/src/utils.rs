@@ -112,6 +112,61 @@ where
                     result.push(b'x');
                 }
             }
+            b'u' if quote_char == Some(b'"') && content.get(i + 2) == Some(&b'{') => {
+                let mut code_point = 0u32;
+                let mut hex_len = 0;
+                let mut overflowed = false;
+                let mut j = i + 3;
+                while j < content.len() {
+                    let c = content[j];
+                    let digit = if c.is_ascii_digit() {
+                        c - b'0'
+                    } else if (b'a'..=b'f').contains(&c) {
+                        c - b'a' + 10
+                    } else if (b'A'..=b'F').contains(&c) {
+                        c - b'A' + 10
+                    } else {
+                        break;
+                    };
+
+                    match code_point.checked_mul(16).and_then(|value| value.checked_add(u32::from(digit))) {
+                        Some(value) => code_point = value,
+                        None => {
+                            overflowed = true;
+                            break;
+                        }
+                    }
+
+                    hex_len += 1;
+                    j += 1;
+                }
+
+                if hex_len > 0 && !overflowed && content.get(j) == Some(&b'}') && code_point <= 0x10_FFFF {
+                    match code_point {
+                        0x0000..=0x007F => result.push(code_point as u8),
+                        0x0080..=0x07FF => {
+                            result.push(0xC0 | (code_point >> 6) as u8);
+                            result.push(0x80 | (code_point & 0x3F) as u8);
+                        }
+                        0x0800..=0xFFFF => {
+                            result.push(0xE0 | (code_point >> 12) as u8);
+                            result.push(0x80 | ((code_point >> 6) & 0x3F) as u8);
+                            result.push(0x80 | (code_point & 0x3F) as u8);
+                        }
+                        _ => {
+                            result.push(0xF0 | (code_point >> 18) as u8);
+                            result.push(0x80 | ((code_point >> 12) & 0x3F) as u8);
+                            result.push(0x80 | ((code_point >> 6) & 0x3F) as u8);
+                            result.push(0x80 | (code_point & 0x3F) as u8);
+                        }
+                    }
+
+                    consumed = (j + 1) - i;
+                } else {
+                    // Invalid `\u{...}` sequence, return None to indicate failure to parse.
+                    return None;
+                }
+            }
             c if quote_char == Some(b'"') && c.is_ascii_digit() => {
                 let mut octal_val = 0u16;
                 let mut octal_len = 0;
@@ -364,12 +419,32 @@ where
 
 #[cfg(test)]
 mod tests {
+    use mago_allocator::LocalArena;
+
     use super::*;
 
     macro_rules! parse_int {
         ($input:expr, $expected:expr) => {
             assert_eq!(parse_literal_integer($input), $expected);
         };
+    }
+
+    #[test]
+    fn test_unicode_escape_in_double_quoted() {
+        let arena = LocalArena::new();
+
+        assert_eq!(parse_literal_string_in(&arena, b"A\\u{1F600}", Some(b'"'), false), Some(&b"A\xF0\x9F\x98\x80"[..]),);
+        assert_eq!(parse_literal_string_in(&arena, b"\\u{41}", Some(b'"'), false), Some(&b"A"[..]));
+        assert_eq!(parse_literal_string_in(&arena, b"\\u{E9}", Some(b'"'), false), Some(&b"\xC3\xA9"[..]));
+        assert_eq!(parse_literal_string_in(&arena, b"\\u{D800}", Some(b'"'), false), Some(&b"\xED\xA0\x80"[..]));
+        assert_eq!(parse_literal_string_in(&arena, b"\\u{}", Some(b'"'), false), None);
+        assert_eq!(parse_literal_string_in(&arena, b"\\u{12", Some(b'"'), false), None);
+        assert_eq!(parse_literal_string_in(&arena, b"\\u{ZZ}", Some(b'"'), false), None);
+        assert_eq!(parse_literal_string_in(&arena, b"\\u{110000}", Some(b'"'), false), None);
+        assert_eq!(parse_literal_string_in(&arena, b"\\uABC", Some(b'"'), false), Some(&b"\\uABC"[..]));
+        assert_eq!(parse_literal_string_in(&arena, b"\\u{41}", Some(b'\''), false), Some(&b"\\u{41}"[..]));
+        assert_eq!(parse_literal_string_in(&arena, b"\\x", Some(b'"'), false), Some(&b"\\x"[..]));
+        assert_eq!(parse_literal_string_in(&arena, b"\\q", Some(b'"'), false), Some(&b"\\q"[..]));
     }
 
     #[test]
