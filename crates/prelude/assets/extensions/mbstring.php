@@ -402,6 +402,8 @@ function mb_ereg_search_setpos(int $offset): bool {}
 
 /**
  * @pure
+ *
+ * @ignore-falsable-return
  */
 function mb_chr(int $codepoint, ?string $encoding = null): string|false {}
 
@@ -409,6 +411,8 @@ function mb_chr(int $codepoint, ?string $encoding = null): string|false {}
  * @return int<0, max>|false
  *
  * @pure
+ *
+ * @ignore-falsable-return
  */
 function mb_ord(string $string, ?string $encoding = null): int|false {}
 
