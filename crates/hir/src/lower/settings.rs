@@ -36,6 +36,10 @@ pub struct LowerSettings {
     /// assertions and whose body is a single boolean `return` (or arrow expression) over a parameter,
     /// e.g. `return $x !== null;` or `return $x instanceof Foo;`. Matches the established scanner.
     pub infer_assertions: bool,
+
+    /// Whether to process annotations in doc comments and attributes. If `false`, annotations are
+    /// ignored and not included in the IR.
+    pub process_annotations: bool,
 }
 
 /// Controls whether (and how) a `define('NAME', value)` call is normalized into a `const`
@@ -62,6 +66,7 @@ impl Default for LowerSettings {
             lower_availability_attributes: true,
             define_constant_lowering: DefineConstantLowering::Statement,
             infer_assertions: true,
+            process_annotations: true,
         }
     }
 }

@@ -2,6 +2,9 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -19,9 +22,6 @@ use crate::ir::identifier::Identifier;
 use crate::ir::item::expression::ItemExpression;
 use crate::ir::literal::Literal;
 use crate::ir::variable::Variable;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_ref_into;
-use mago_allocator::copy::copy_slice_into;
 
 pub mod annotation;
 pub mod operator;
@@ -39,6 +39,7 @@ pub struct Expression<'arena, I, S, E> {
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum ExpressionKind<'arena, I, S, E> {
+    Parenthesized(&'arena Expression<'arena, I, S, E>),
     Binary(&'arena Binary<'arena, I, S, E>),
     UnaryPrefix(&'arena UnaryPrefix<'arena, I, S, E>),
     UnaryPostfix(&'arena UnaryPostfix<'arena, I, S, E>),
@@ -262,16 +263,12 @@ pub enum ArrayElementKind<'arena, I, S, E> {
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct CompositeStringPart<'arena, I, S, E> {
-    pub span: Span,
-    pub kind: CompositeStringPartKind<'arena, I, S, E>,
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize))]
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
-pub enum CompositeStringPartKind<'arena, I, S, E> {
+pub enum CompositeStringPart<'arena, I, S, E> {
+    /// A literal run, already decoded to its final runtime bytes (escapes
+    /// resolved, heredoc indentation stripped, trailing newline removed).
     Literal(&'arena [u8]),
+    /// An interpolated expression.
     Expression(&'arena Expression<'arena, I, S, E>),
 }
 
@@ -304,6 +301,7 @@ where
         A: Arena,
     {
         match self {
+            ExpressionKind::Parenthesized(node) => ExpressionKind::Parenthesized(copy_ref_into(*node, arena)),
             ExpressionKind::Binary(node) => ExpressionKind::Binary(copy_ref_into(*node, arena)),
             ExpressionKind::UnaryPrefix(node) => ExpressionKind::UnaryPrefix(copy_ref_into(*node, arena)),
             ExpressionKind::UnaryPostfix(node) => ExpressionKind::UnaryPostfix(copy_ref_into(*node, arena)),
@@ -753,26 +751,10 @@ where
     where
         A: Arena,
     {
-        CompositeStringPart { span: self.span, kind: self.kind.copy_into(arena) }
-    }
-}
-
-impl<I, S, E> CopyInto for CompositeStringPartKind<'_, I, S, E>
-where
-    I: CopyInto,
-    S: CopyInto,
-    E: CopyInto,
-{
-    type Output<'arena> = CompositeStringPartKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
-
-    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
-    where
-        A: Arena,
-    {
         match self {
-            CompositeStringPartKind::Literal(bytes) => CompositeStringPartKind::Literal(arena.alloc_slice_copy(bytes)),
-            CompositeStringPartKind::Expression(expression) => {
-                CompositeStringPartKind::Expression(copy_ref_into(*expression, arena))
+            CompositeStringPart::Literal(bytes) => CompositeStringPart::Literal(arena.alloc_slice_copy(bytes)),
+            CompositeStringPart::Expression(expression) => {
+                CompositeStringPart::Expression(copy_ref_into(*expression, arena))
             }
         }
     }
@@ -863,12 +845,6 @@ impl<I, S, E> HasSpan for MatchArm<'_, I, S, E> {
 }
 
 impl<I, S, E> HasSpan for ArrayElement<'_, I, S, E> {
-    fn span(&self) -> Span {
-        self.span
-    }
-}
-
-impl<I, S, E> HasSpan for CompositeStringPart<'_, I, S, E> {
     fn span(&self) -> Span {
         self.span
     }

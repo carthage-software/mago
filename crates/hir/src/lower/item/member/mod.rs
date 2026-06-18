@@ -27,32 +27,49 @@ where
         members: &'scratch cst::Sequence<'scratch, cst::ClassLikeMember<'scratch>>,
         owner: Identifier<'arena>,
     ) -> Delimited<'arena, MemberItem<'arena, (), (), ()>> {
-        let items = self.arena.alloc_slice_fill_iter(members.iter().map(|member| {
-            let span = member.span();
-            let kind = match member {
+        // Constant and plain-property declarations can declare several members at once
+        // (`const A = 1, B = 2;` / `public $a, $b;`); each declarator becomes its own
+        // member node, in source order, so the result expands one CST member into many.
+        let mut collected: Vec<MemberItem<'arena, (), (), ()>> = Vec::with_capacity(members.len());
+        for member in members.iter() {
+            match member {
                 cst::ClassLikeMember::Method(method) => {
-                    MemberItemKind::Method(self.arena.alloc(self.lower_method(method, owner)))
+                    let node = self.arena.alloc(self.lower_method(method, owner));
+                    collected.push(MemberItem { meta: (), span: member.span(), kind: MemberItemKind::Method(node) });
                 }
                 cst::ClassLikeMember::Property(cst::Property::Plain(property)) => {
-                    MemberItemKind::Property(self.arena.alloc(self.lower_plain_property(property)))
+                    for lowered in self.lower_plain_property(property) {
+                        let span = lowered.span;
+                        let node = self.arena.alloc(lowered);
+                        collected.push(MemberItem { meta: (), span, kind: MemberItemKind::Property(node) });
+                    }
                 }
                 cst::ClassLikeMember::Property(cst::Property::Hooked(property)) => {
-                    MemberItemKind::HookedProperty(self.arena.alloc(self.lower_hooked_property(property)))
+                    let node = self.arena.alloc(self.lower_hooked_property(property));
+                    collected.push(MemberItem {
+                        meta: (),
+                        span: member.span(),
+                        kind: MemberItemKind::HookedProperty(node),
+                    });
                 }
                 cst::ClassLikeMember::Constant(constant) => {
-                    MemberItemKind::Constant(self.arena.alloc(self.lower_class_like_constant(constant)))
+                    for lowered in self.lower_class_like_constant(constant) {
+                        let span = lowered.span;
+                        let node = self.arena.alloc(lowered);
+                        collected.push(MemberItem { meta: (), span, kind: MemberItemKind::Constant(node) });
+                    }
                 }
                 cst::ClassLikeMember::EnumCase(enum_case) => {
-                    MemberItemKind::EnumCase(self.arena.alloc(self.lower_enum_case(enum_case)))
+                    let node = self.arena.alloc(self.lower_enum_case(enum_case));
+                    collected.push(MemberItem { meta: (), span: member.span(), kind: MemberItemKind::EnumCase(node) });
                 }
                 cst::ClassLikeMember::TraitUse(trait_use) => {
-                    MemberItemKind::TraitUse(self.arena.alloc(self.lower_trait_use(trait_use)))
+                    let node = self.arena.alloc(self.lower_trait_use(trait_use));
+                    collected.push(MemberItem { meta: (), span: member.span(), kind: MemberItemKind::TraitUse(node) });
                 }
-            };
+            }
+        }
 
-            MemberItem { meta: (), span, kind }
-        }));
-
-        Delimited { span, items }
+        Delimited { span, items: self.arena.alloc_slice_copy(&collected) }
     }
 }

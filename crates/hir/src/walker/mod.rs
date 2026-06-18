@@ -15,7 +15,6 @@ use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
 use crate::ir::expression::CalleeKind;
 use crate::ir::expression::CompositeStringPart;
-use crate::ir::expression::CompositeStringPartKind;
 use crate::ir::expression::Conditional;
 use crate::ir::expression::Expression;
 use crate::ir::expression::ExpressionKind;
@@ -75,7 +74,6 @@ use crate::ir::item::inheritance::Implements;
 use crate::ir::item::member::MemberItem;
 use crate::ir::item::member::MemberItemKind;
 use crate::ir::item::member::constant::ClassLikeConstant;
-use crate::ir::item::member::constant::ClassLikeConstantItem;
 use crate::ir::item::member::enum_case::EnumCase;
 use crate::ir::item::member::hook::Hook;
 use crate::ir::item::member::hook::HookBody;
@@ -83,7 +81,6 @@ use crate::ir::item::member::hook::HookBodyKind;
 use crate::ir::item::member::method::Method;
 use crate::ir::item::member::property::HookedProperty;
 use crate::ir::item::member::property::Property;
-use crate::ir::item::member::property::PropertyItem;
 use crate::ir::item::member::trait_use::TraitUse;
 use crate::ir::item::member::trait_use::TraitUseAdaptation;
 use crate::ir::item::modifier::Modifier;
@@ -95,7 +92,6 @@ use crate::ir::item::statement::ItemStatement;
 use crate::ir::item::statement::ItemStatementKind;
 use crate::ir::item::statement::class::Class;
 use crate::ir::item::statement::constant::Constant;
-use crate::ir::item::statement::constant::ConstantItem;
 use crate::ir::item::statement::r#enum::Enum;
 use crate::ir::item::statement::r#enum::EnumBackingType;
 use crate::ir::item::statement::r#enum::EnumBackingTypeKind;
@@ -565,14 +561,8 @@ generate_walker! {
             walker.walk_attribute(attribute, context);
         }
 
-        for item in constant.items {
-            walker.walk_constant_item(item, context);
-        }
-    }
-
-    generic ConstantItem as constant_item => {
-        walker.walk_identifier(&constant_item.name, context);
-        walker.walk_expression(constant_item.value, context);
+        walker.walk_identifier(&constant.name, context);
+        walker.walk_expression(constant.value, context);
     }
 
     generic Function as function => {
@@ -655,14 +645,8 @@ generate_walker! {
             walker.walk_type(r#type, context);
         }
 
-        for item in property.items {
-            walker.walk_property_item(item, context);
-        }
-    }
-
-    generic PropertyItem as property_item => {
-        walker.walk_direct_variable(&property_item.variable, context);
-        if let Some(default_value) = property_item.default_value {
+        walker.walk_direct_variable(&property.variable, context);
+        if let Some(default_value) = property.default_value {
             walker.walk_expression(default_value, context);
         }
     }
@@ -684,7 +668,10 @@ generate_walker! {
             walker.walk_type(r#type, context);
         }
 
-        walker.walk_property_item(&hooked_property.item, context);
+        walker.walk_direct_variable(&hooked_property.variable, context);
+        if let Some(default_value) = hooked_property.default_value {
+            walker.walk_expression(default_value, context);
+        }
         for hook in hooked_property.hooks.iter() {
             walker.walk_hook(hook, context);
         }
@@ -707,14 +694,8 @@ generate_walker! {
             walker.walk_type(r#type, context);
         }
 
-        for item in class_like_constant.items {
-            walker.walk_class_like_constant_item(item, context);
-        }
-    }
-
-    generic ClassLikeConstantItem as class_like_constant_item => {
-        walker.walk_name(&class_like_constant_item.name, context);
-        walker.walk_expression(class_like_constant_item.value, context);
+        walker.walk_name(&class_like_constant.name, context);
+        walker.walk_expression(class_like_constant.value, context);
     }
 
     generic EnumCase as enum_case => {
@@ -798,8 +779,8 @@ generate_walker! {
                     walker.walk_identifier(r#trait, context);
                 }
                 walker.walk_name(&adaptation.method, context);
-                if let Some(visibility) = &adaptation.visibility {
-                    walker.walk_modifier(visibility, context);
+                if let Some(modifier) = &adaptation.modifier {
+                    walker.walk_modifier(modifier, context);
                 }
                 walker.walk_name(&adaptation.alias, context);
             }
@@ -1026,6 +1007,7 @@ generate_walker! {
 
     generic ExpressionKind as expression_kind => {
         match expression_kind {
+            ExpressionKind::Parenthesized(node) => walker.walk_expression(node, context),
             ExpressionKind::Binary(node) => walker.walk_binary(node, context),
             ExpressionKind::UnaryPrefix(node) => walker.walk_unary_prefix(node, context),
             ExpressionKind::UnaryPostfix(node) => walker.walk_unary_postfix(node, context),
@@ -1130,13 +1112,9 @@ generate_walker! {
     }
 
     generic CompositeStringPart as composite_string_part => {
-        walker.walk_composite_string_part_kind(&composite_string_part.kind, context);
-    }
-
-    generic CompositeStringPartKind as composite_string_part_kind => {
-        match composite_string_part_kind {
-            CompositeStringPartKind::Literal(_) => {}
-            CompositeStringPartKind::Expression(expression) => walker.walk_expression(expression, context),
+        match composite_string_part {
+            CompositeStringPart::Literal(_) => {}
+            CompositeStringPart::Expression(expression) => walker.walk_expression(expression, context),
         }
     }
 
@@ -1562,6 +1540,8 @@ generate_walker! {
 
     arena TypeKind as type_kind => {
         match type_kind {
+            TypeKind::Parenthesized(ty) => walker.walk_type(ty, context),
+            TypeKind::Nullable(ty) => walker.walk_type(ty, context),
             TypeKind::Named(identifier)
             | TypeKind::Static(identifier)
             | TypeKind::Self_(identifier)

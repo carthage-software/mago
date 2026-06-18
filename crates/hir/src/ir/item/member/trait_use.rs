@@ -46,7 +46,7 @@ pub struct TraitUseAliasAdaptation<'arena> {
     pub span: Span,
     pub r#trait: Option<Identifier<'arena>>,
     pub method: Name<'arena>,
-    pub visibility: Option<Modifier>,
+    pub modifier: Option<Modifier>,
     pub alias: Name<'arena>,
 }
 
@@ -112,7 +112,7 @@ impl CopyInto for TraitUseAliasAdaptation<'_> {
             span: self.span,
             r#trait: self.r#trait.map(|r#trait| r#trait.copy_into(arena)),
             method: self.method.copy_into(arena),
-            visibility: self.visibility,
+            modifier: self.modifier,
             alias: self.alias.copy_into(arena),
         }
     }

@@ -2,12 +2,13 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 use mago_span::HasSpan;
 use mago_span::Span;
 
 use crate::ir::identifier::Identifier;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_slice_into;
 
 pub mod annotation;
 
@@ -22,6 +23,8 @@ pub struct Type<'arena> {
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum TypeKind<'arena> {
+    Parenthesized(&'arena Type<'arena>),
+    Nullable(&'arena Type<'arena>),
     Named(Identifier<'arena>),
     Union(&'arena [Type<'arena>]),
     Intersection(&'arena [Type<'arena>]),
@@ -61,6 +64,8 @@ impl CopyInto for TypeKind<'_> {
         A: Arena,
     {
         match *self {
+            TypeKind::Parenthesized(inner) => TypeKind::Parenthesized(copy_ref_into(inner, arena)),
+            TypeKind::Nullable(inner) => TypeKind::Nullable(copy_ref_into(inner, arena)),
             TypeKind::Named(identifier) => TypeKind::Named(identifier.copy_into(arena)),
             TypeKind::Union(kinds) => TypeKind::Union(copy_slice_into(kinds, arena)),
             TypeKind::Intersection(kinds) => TypeKind::Intersection(copy_slice_into(kinds, arena)),

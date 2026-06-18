@@ -15,7 +15,6 @@ use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
 use crate::ir::expression::CalleeKind;
 use crate::ir::expression::CompositeStringPart;
-use crate::ir::expression::CompositeStringPartKind;
 use crate::ir::expression::Conditional;
 use crate::ir::expression::Expression;
 use crate::ir::expression::ExpressionKind;
@@ -45,7 +44,6 @@ use crate::ir::item::expression::closure::Closure;
 use crate::ir::item::member::MemberItem;
 use crate::ir::item::member::MemberItemKind;
 use crate::ir::item::member::constant::ClassLikeConstant;
-use crate::ir::item::member::constant::ClassLikeConstantItem;
 use crate::ir::item::member::enum_case::EnumCase;
 use crate::ir::item::member::hook::Hook;
 use crate::ir::item::member::hook::HookBody;
@@ -53,14 +51,12 @@ use crate::ir::item::member::hook::HookBodyKind;
 use crate::ir::item::member::method::Method;
 use crate::ir::item::member::property::HookedProperty;
 use crate::ir::item::member::property::Property;
-use crate::ir::item::member::property::PropertyItem;
 use crate::ir::item::member::trait_use::TraitUse;
 use crate::ir::item::parameter::Parameter;
 use crate::ir::item::statement::ItemStatement;
 use crate::ir::item::statement::ItemStatementKind;
 use crate::ir::item::statement::class::Class;
 use crate::ir::item::statement::constant::Constant;
-use crate::ir::item::statement::constant::ConstantItem;
 use crate::ir::item::statement::r#enum::Enum;
 use crate::ir::item::statement::function::Function;
 use crate::ir::item::statement::interface::Interface;
@@ -859,7 +855,7 @@ generate_fold! {
             ),
             version_constraint: folder.arena().alloc_slice_copy(enum_definition.version_constraint),
             name: enum_definition.name.copy_into(folder.arena()),
-            backing_type: enum_definition.backing_type,
+            backing_type: enum_definition.backing_type.map(|backing_type| backing_type.copy_into(folder.arena())),
             implements: enum_definition.implements.map(|implements| copy_ref_into(implements, folder.arena())),
             members: fold_delimited(folder.arena(), &enum_definition.members, |member| folder.fold_member_item(member)),
         }
@@ -873,15 +869,8 @@ generate_fold! {
                 .arena()
                 .alloc_slice_fill_iter(constant.attributes.iter().map(|attribute| folder.fold_attribute(attribute))),
             version_constraint: folder.arena().alloc_slice_copy(constant.version_constraint),
-            items: folder.arena().alloc_slice_fill_iter(constant.items.iter().map(|item| folder.fold_constant_item(item))),
-        }
-    }
-
-    ConstantItem as constant_item => {
-        ConstantItem {
-            span: constant_item.span,
-            name: constant_item.name.copy_into(folder.arena()),
-            value: folder.arena().alloc(folder.fold_expression(constant_item.value)),
+            name: constant.name.copy_into(folder.arena()),
+            value: folder.arena().alloc(folder.fold_expression(constant.value)),
         }
     }
 
@@ -945,15 +934,8 @@ generate_fold! {
             version_constraint: folder.arena().alloc_slice_copy(property.version_constraint),
             modifiers: folder.arena().alloc_slice_copy(property.modifiers),
             r#type: property.r#type.map(|r#type| copy_ref_into(r#type, folder.arena())),
-            items: folder.arena().alloc_slice_fill_iter(property.items.iter().map(|item| folder.fold_property_item(item))),
-        }
-    }
-
-    PropertyItem as property_item => {
-        PropertyItem {
-            span: property_item.span,
-            variable: property_item.variable.copy_into(folder.arena()),
-            default_value: property_item.default_value.map(|value| &*folder.arena().alloc(folder.fold_expression(value))),
+            variable: property.variable.copy_into(folder.arena()),
+            default_value: property.default_value.map(|value| &*folder.arena().alloc(folder.fold_expression(value))),
         }
     }
 
@@ -967,7 +949,8 @@ generate_fold! {
             version_constraint: folder.arena().alloc_slice_copy(hooked_property.version_constraint),
             modifiers: folder.arena().alloc_slice_copy(hooked_property.modifiers),
             r#type: hooked_property.r#type.map(|r#type| copy_ref_into(r#type, folder.arena())),
-            item: folder.fold_property_item(&hooked_property.item),
+            variable: hooked_property.variable.copy_into(folder.arena()),
+            default_value: hooked_property.default_value.map(|value| &*folder.arena().alloc(folder.fold_expression(value))),
             hooks: fold_delimited(folder.arena(), &hooked_property.hooks, |hook| folder.fold_hook(hook)),
         }
     }
@@ -982,17 +965,8 @@ generate_fold! {
             version_constraint: folder.arena().alloc_slice_copy(class_like_constant.version_constraint),
             modifiers: folder.arena().alloc_slice_copy(class_like_constant.modifiers),
             r#type: class_like_constant.r#type.map(|r#type| copy_ref_into(r#type, folder.arena())),
-            items: folder.arena().alloc_slice_fill_iter(
-                class_like_constant.items.iter().map(|item| folder.fold_class_like_constant_item(item)),
-            ),
-        }
-    }
-
-    ClassLikeConstantItem as class_like_constant_item => {
-        ClassLikeConstantItem {
-            span: class_like_constant_item.span,
-            name: class_like_constant_item.name.copy_into(folder.arena()),
-            value: folder.arena().alloc(folder.fold_expression(class_like_constant_item.value)),
+            name: class_like_constant.name.copy_into(folder.arena()),
+            value: folder.arena().alloc(folder.fold_expression(class_like_constant.value)),
         }
     }
 
@@ -1183,6 +1157,9 @@ generate_fold! {
 
     ExpressionKind as expression_kind => {
         match expression_kind {
+            ExpressionKind::Parenthesized(node) => {
+                ExpressionKind::Parenthesized(folder.arena().alloc(folder.fold_expression(node)))
+            }
             ExpressionKind::Binary(node) => ExpressionKind::Binary(folder.arena().alloc(folder.fold_binary(node))),
             ExpressionKind::UnaryPrefix(node) => {
                 ExpressionKind::UnaryPrefix(folder.arena().alloc(folder.fold_unary_prefix(node)))
@@ -1337,19 +1314,12 @@ generate_fold! {
     }
 
     CompositeStringPart as composite_string_part => {
-        CompositeStringPart {
-            span: composite_string_part.span,
-            kind: folder.fold_composite_string_part_kind(&composite_string_part.kind),
-        }
-    }
-
-    CompositeStringPartKind as composite_string_part_kind => {
-        match composite_string_part_kind {
-            CompositeStringPartKind::Literal(value) => {
-                CompositeStringPartKind::Literal(folder.arena().alloc_slice_copy(value))
+        match composite_string_part {
+            CompositeStringPart::Literal(value) => {
+                CompositeStringPart::Literal(folder.arena().alloc_slice_copy(value))
             }
-            CompositeStringPartKind::Expression(expression) => {
-                CompositeStringPartKind::Expression(folder.arena().alloc(folder.fold_expression(expression)))
+            CompositeStringPart::Expression(expression) => {
+                CompositeStringPart::Expression(folder.arena().alloc(folder.fold_expression(expression)))
             }
         }
     }

@@ -2,6 +2,9 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 use mago_php_version::PHPVersionRange;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -13,9 +16,7 @@ use crate::ir::item::annotation::ItemAnnotation;
 use crate::ir::item::attribute::Attribute;
 use crate::ir::item::inheritance::Implements;
 use crate::ir::item::member::MemberItem;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_ref_into;
-use mago_allocator::copy::copy_slice_into;
+use crate::ir::r#type::Type;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -25,23 +26,24 @@ pub struct Enum<'arena, I, S, E> {
     pub attributes: &'arena [Attribute<'arena, I, S, E>],
     pub version_constraint: &'arena [PHPVersionRange],
     pub name: Identifier<'arena>,
-    pub backing_type: Option<EnumBackingType>,
+    pub backing_type: Option<EnumBackingType<'arena>>,
     pub implements: Option<&'arena Implements<'arena>>,
     pub members: Delimited<'arena, MemberItem<'arena, I, S, E>>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct EnumBackingType {
+pub struct EnumBackingType<'arena> {
     pub span: Span,
-    pub kind: EnumBackingTypeKind,
+    pub kind: EnumBackingTypeKind<'arena>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub enum EnumBackingTypeKind {
+pub enum EnumBackingTypeKind<'arena> {
     Int,
     String,
+    Invalid(&'arena Type<'arena>),
 }
 
 impl<I, S, E> CopyInto for Enum<'_, I, S, E>
@@ -69,25 +71,29 @@ where
     }
 }
 
-impl CopyInto for EnumBackingType {
-    type Output<'arena> = EnumBackingType;
+impl CopyInto for EnumBackingType<'_> {
+    type Output<'arena> = EnumBackingType<'arena>;
 
-    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
     where
         A: Arena,
     {
-        EnumBackingType { span: self.span, kind: self.kind }
+        EnumBackingType { span: self.span, kind: self.kind.copy_into(arena) }
     }
 }
 
-impl CopyInto for EnumBackingTypeKind {
-    type Output<'arena> = EnumBackingTypeKind;
+impl CopyInto for EnumBackingTypeKind<'_> {
+    type Output<'arena> = EnumBackingTypeKind<'arena>;
 
-    fn copy_into<'arena, A>(&self, _arena: &'arena A) -> Self::Output<'arena>
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
     where
         A: Arena,
     {
-        *self
+        match *self {
+            EnumBackingTypeKind::Int => EnumBackingTypeKind::Int,
+            EnumBackingTypeKind::String => EnumBackingTypeKind::String,
+            EnumBackingTypeKind::Invalid(ty) => EnumBackingTypeKind::Invalid(copy_ref_into(ty, arena)),
+        }
     }
 }
 
@@ -109,7 +115,7 @@ impl<I, S, E> HasSpan for Enum<'_, I, S, E> {
     }
 }
 
-impl HasSpan for EnumBackingType {
+impl HasSpan for EnumBackingType<'_> {
     fn span(&self) -> Span {
         self.span
     }

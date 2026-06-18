@@ -13,10 +13,11 @@ where
     S: Arena,
     A: Arena,
 {
-    fn lower_enum_backing_type_kind(&self, hint: &cst::Hint<'scratch>) -> EnumBackingTypeKind {
+    fn lower_enum_backing_type_kind(&mut self, hint: &'scratch cst::Hint<'scratch>) -> EnumBackingTypeKind<'arena> {
         match hint {
             cst::Hint::String(_) => EnumBackingTypeKind::String,
-            _ => EnumBackingTypeKind::Int,
+            cst::Hint::Integer(_) => EnumBackingTypeKind::Int,
+            other => EnumBackingTypeKind::Invalid(self.lower_type(other)),
         }
     }
 
@@ -28,6 +29,7 @@ where
             .backing_type_hint
             .as_ref()
             .map(|hint| EnumBackingType { span: hint.span(), kind: self.lower_enum_backing_type_kind(&hint.hint) });
+
         let implements = r#enum.implements.as_ref().map(|implements| self.lower_implements(implements));
 
         let document = self.phpdoc_resolution.get(r#enum.span());

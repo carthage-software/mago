@@ -90,7 +90,7 @@ where
             program,
             settings,
             namespace_resolution: NamespaceResolution::new_in(scratch),
-            phpdoc_resolution: PHPDocResolution::new(scratch, program.trivia.as_slice()),
+            phpdoc_resolution: PHPDocResolution::new(scratch, program.trivia.as_slice(), settings.process_annotations),
             type_resolution: TypeResolution::new_in(scratch),
             body_effects: BodyEffects::new(arena),
             interner: Interner::new(arena, scratch),

@@ -11,7 +11,6 @@ use crate::ir::identifier::IdentifierKind;
 use crate::ir::item::statement::ItemStatement;
 use crate::ir::item::statement::ItemStatementKind;
 use crate::ir::item::statement::constant::Constant;
-use crate::ir::item::statement::constant::ConstantItem;
 use crate::ir::statement::Declare;
 use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
@@ -159,15 +158,12 @@ where
             attributes: &[],
             version_constraint: &[],
             annotation,
-            items: self.arena.alloc_slice_copy(&[ConstantItem {
-                span: name_string.span().join(value.span()),
-                name: Identifier {
-                    span: name_string.span(),
-                    value: self.interner.intern(name_value),
-                    kind: IdentifierKind::Local,
-                },
-                value,
-            }]),
+            name: Identifier {
+                span: name_string.span(),
+                value: self.interner.intern(name_value),
+                kind: IdentifierKind::Local,
+            },
+            value,
         });
 
         let definition = StatementKind::Item(self.arena.alloc(ItemStatement {
@@ -248,11 +244,36 @@ where
                 span: r#enum.span(),
                 kind: ItemStatementKind::Enum(self.lower_enum(r#enum)),
             })),
-            cst::Statement::Constant(constant) => StatementKind::Item(self.arena.alloc(ItemStatement {
-                meta: (),
-                span: constant.span(),
-                kind: ItemStatementKind::Constant(self.lower_constant(constant)),
-            })),
+            cst::Statement::Constant(constant) => {
+                // A `const A = 1, B = 2;` declaration lowers to one item-statement per
+                // declared constant. A single declarator stays a plain item; multiple
+                // declarators become a sequence, preserving source order.
+                let arena = self.arena;
+                let item_statements: std::vec::Vec<&'arena ItemStatement<'arena, (), (), ()>> = self
+                    .lower_constant(constant)
+                    .into_iter()
+                    .map(|constant| {
+                        let span = constant.span;
+                        &*arena.alloc(ItemStatement {
+                            meta: (),
+                            span,
+                            kind: ItemStatementKind::Constant(arena.alloc(constant)),
+                        })
+                    })
+                    .collect();
+
+                if let [single] = item_statements.as_slice() {
+                    StatementKind::Item(single)
+                } else {
+                    StatementKind::Sequence(arena.alloc_slice_fill_iter(
+                        item_statements.iter().map(|&item| Statement {
+                            meta: (),
+                            span: item.span,
+                            kind: StatementKind::Item(item),
+                        }),
+                    ))
+                }
+            }
             cst::Statement::Function(function) => StatementKind::Item(self.arena.alloc(ItemStatement {
                 meta: (),
                 span: function.span(),

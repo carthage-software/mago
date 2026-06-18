@@ -17,7 +17,6 @@ use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
 use crate::ir::expression::CalleeKind;
 use crate::ir::expression::CompositeStringPart;
-use crate::ir::expression::CompositeStringPartKind;
 use crate::ir::expression::Conditional;
 use crate::ir::expression::Expression;
 use crate::ir::expression::ExpressionKind;
@@ -60,14 +59,13 @@ where
         &mut self,
         expression: &'scratch cst::Expression<'scratch>,
     ) -> Expression<'arena, (), (), ()> {
-        if let cst::Expression::Parenthesized(parenthesized) = expression {
-            return self.lower_expression(parenthesized.expression);
-        }
-
         Expression {
             meta: (),
             span: expression.span(),
             kind: match expression {
+                cst::Expression::Parenthesized(parenthesized) => {
+                    ExpressionKind::Parenthesized(self.arena.alloc(self.lower_expression(parenthesized.expression)))
+                }
                 cst::Expression::Literal(literal) => ExpressionKind::Literal(self.lower_literal(literal)),
                 cst::Expression::Binary(expression) => ExpressionKind::Binary(self.lower_binary(expression)),
                 cst::Expression::Pipe(pipe) => ExpressionKind::Binary(self.lower_pipe(pipe)),
@@ -457,30 +455,64 @@ where
         &mut self,
         string: &'scratch cst::CompositeString<'scratch>,
     ) -> ExpressionKind<'arena, (), (), ()> {
-        let parts = self.arena.alloc_slice_fill_iter(string.parts().iter().map(|part| self.lower_string_part(part)));
+        let arena = self.arena;
 
-        match string {
-            cst::CompositeString::ShellExecute(_) => ExpressionKind::ShellExecute(parts),
-            _ => ExpressionKind::CompositeString(parts),
+        // Literal parts carry their already-decoded `value` (escapes resolved, heredoc
+        // indentation stripped, trailing newline removed); fall back to the raw bytes only
+        // if the parser left it unset. Heredoc/nowdoc need no special handling here: their
+        // parts are fully resolved, so they lower exactly like a double-quoted string.
+        let mut parts = mago_allocator::vec::Vec::new_in(arena);
+        for part in string.parts().iter() {
+            let lowered = match part {
+                cst::StringPart::Literal(literal) => {
+                    CompositeStringPart::Literal(self.interner.intern(literal.value.unwrap_or(literal.raw)))
+                }
+                cst::StringPart::Expression(expression) => {
+                    CompositeStringPart::Expression(arena.alloc(self.lower_expression(expression)))
+                }
+                cst::StringPart::BracedExpression(braced) => {
+                    CompositeStringPart::Expression(arena.alloc(self.lower_expression(braced.expression)))
+                }
+            };
+
+            parts.push(lowered);
         }
-    }
 
-    fn lower_string_part(
-        &mut self,
-        part: &'scratch cst::StringPart<'scratch>,
-    ) -> CompositeStringPart<'arena, (), (), ()> {
-        let span = part.span();
-        let kind = match part {
-            cst::StringPart::Literal(literal) => CompositeStringPartKind::Literal(self.interner.intern(literal.value)),
-            cst::StringPart::Expression(expression) => {
-                CompositeStringPartKind::Expression(self.arena.alloc(self.lower_expression(expression)))
-            }
-            cst::StringPart::BracedExpression(braced) => {
-                CompositeStringPartKind::Expression(self.arena.alloc(self.lower_expression(braced.expression)))
-            }
-        };
+        // A shell-execute string is a distinct operation (`shell_exec`), never a string value.
+        if let cst::CompositeString::ShellExecute(_) = string {
+            return ExpressionKind::ShellExecute(parts.leak());
+        }
 
-        CompositeStringPart { span, kind }
+        // A string with no interpolation is just a plain literal.
+        if parts.iter().all(|part| matches!(part, CompositeStringPart::Literal(_))) {
+            let value = match parts.as_slice() {
+                [CompositeStringPart::Literal(bytes)] => *bytes,
+                _ => {
+                    let mut buffer = mago_allocator::vec::Vec::new_in(arena);
+                    for part in parts.iter() {
+                        if let CompositeStringPart::Literal(bytes) = part {
+                            buffer.extend_from_slice(bytes);
+                        }
+                    }
+
+                    buffer.leak()
+                }
+            };
+
+            let span = string.span();
+
+            return ExpressionKind::Literal(arena.alloc(Literal {
+                span,
+                kind: LiteralKind::String(LiteralString {
+                    span,
+                    kind: LiteralStringKind::DoubleQuoted,
+                    raw: value,
+                    value: Some(value),
+                }),
+            }));
+        }
+
+        ExpressionKind::CompositeString(parts.leak())
     }
 
     fn lower_magic_constant(&self, magic_constant: &'scratch cst::MagicConstant<'scratch>) -> MagicConstant {

@@ -79,7 +79,7 @@ function f(?string $a, int|null $b, bool $flag): void {}
 ";
 
 #[test]
-fn union_members_carry_their_own_spans() {
+fn type_hints_carry_their_own_spans() {
     let arena = LocalArena::new();
     let scratch = LocalArena::new();
     let file = File::ephemeral(Cow::Borrowed(b"types.php"), Cow::Owned(TYPES.as_bytes().to_vec()));
@@ -102,23 +102,38 @@ fn union_members_carry_their_own_spans() {
         panic!("the fixture must lower to a function");
     };
 
-    let mut native_member_texts = Vec::new();
-    for parameter in function.parameters.iter().take(2) {
-        let Some(r#type) = parameter.r#type else {
-            panic!("the first two parameters must carry native type hints");
-        };
-        let TypeKind::Union(members) = r#type.kind else {
-            panic!("the first two parameter hints must lower to unions, got {:?}", r#type.kind);
-        };
+    let mut parameters = function.parameters.iter();
 
-        native_member_texts.push(members.iter().map(|member| slice_of(TYPES, member.span)).collect::<Vec<_>>());
-    }
-
+    // `?string` lowers to a nullable wrapping `string`: the `?` lives in the outer
+    // span, the inner type spans just `string`. It is no longer expanded to `string|null`.
+    let Some(first) = parameters.next() else {
+        panic!("the fixture must have a first parameter");
+    };
+    let Some(first_type) = first.r#type else {
+        panic!("the first parameter must carry a native type hint");
+    };
+    let TypeKind::Nullable(inner) = first_type.kind else {
+        panic!("`?string` must lower to a nullable, got {:?}", first_type.kind);
+    };
     assert_eq!(
-        native_member_texts,
-        vec![vec!["string", "?"], vec!["int", "null"]],
-        "native union members must carry their own spans, with `?` spanning the implied null",
+        slice_of(TYPES, first_type.span),
+        "?string",
+        "the nullable must span the leading `?` and its inner type"
     );
+    assert_eq!(slice_of(TYPES, inner.span), "string", "the nullable's inner type must span `string`");
+
+    // `int|null` is an explicit union and stays one; each member carries its own span.
+    let Some(second) = parameters.next() else {
+        panic!("the fixture must have a second parameter");
+    };
+    let Some(second_type) = second.r#type else {
+        panic!("the second parameter must carry a native type hint");
+    };
+    let TypeKind::Union(members) = second_type.kind else {
+        panic!("`int|null` must lower to a union, got {:?}", second_type.kind);
+    };
+    let member_texts = members.iter().map(|member| slice_of(TYPES, member.span)).collect::<Vec<_>>();
+    assert_eq!(member_texts, vec!["int", "null"], "explicit union members must carry their own spans");
 
     let Some(annotation) = function.annotation else {
         panic!("the fixture docblock must lower to an annotation");

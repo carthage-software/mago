@@ -22,13 +22,6 @@ pub struct Constant<'arena, I, S, E> {
     pub annotation: Option<&'arena ItemAnnotation<'arena, I, S, E>>,
     pub attributes: &'arena [Attribute<'arena, I, S, E>],
     pub version_constraint: &'arena [PHPVersionRange],
-    pub items: &'arena [ConstantItem<'arena, I, S, E>],
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize))]
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct ConstantItem<'arena, I, S, E> {
-    pub span: Span,
     pub name: Identifier<'arena>,
     pub value: &'arena Expression<'arena, I, S, E>,
 }
@@ -50,24 +43,9 @@ where
             annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
             attributes: copy_slice_into(self.attributes, arena),
             version_constraint: arena.alloc_slice_copy(self.version_constraint),
-            items: copy_slice_into(self.items, arena),
+            name: self.name.copy_into(arena),
+            value: copy_ref_into(self.value, arena),
         }
-    }
-}
-
-impl<I, S, E> CopyInto for ConstantItem<'_, I, S, E>
-where
-    I: CopyInto,
-    S: CopyInto,
-    E: CopyInto,
-{
-    type Output<'arena> = ConstantItem<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
-
-    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
-    where
-        A: Arena,
-    {
-        ConstantItem { span: self.span, name: self.name.copy_into(arena), value: copy_ref_into(self.value, arena) }
     }
 }
 
@@ -80,12 +58,6 @@ impl<'arena, I, S, E> Item<'arena, I, S, E> for Constant<'arena, I, S, E> {
     }
     fn version_constraint(&self) -> &'arena [PHPVersionRange] {
         self.version_constraint
-    }
-}
-
-impl<I, S, E> HasSpan for ConstantItem<'_, I, S, E> {
-    fn span(&self) -> Span {
-        self.span
     }
 }
 

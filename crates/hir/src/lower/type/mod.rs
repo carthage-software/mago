@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst;
@@ -31,24 +32,19 @@ where
 
     fn lower_type_kind(&mut self, hint: &'scratch cst::Hint<'scratch>) -> TypeKind<'arena> {
         match hint {
+            cst::Hint::Parenthesized(parenthesized) => TypeKind::Parenthesized(self.lower_type(parenthesized.hint)),
             cst::Hint::Identifier(identifier) => {
                 TypeKind::Named(self.lower_identifier(identifier, Some(NameResolutionKind::Default)))
             }
-            cst::Hint::Parenthesized(parenthesized) => self.lower_type_kind(parenthesized.hint),
-            cst::Hint::Nullable(nullable) => {
-                let inner = Type { span: nullable.hint.span(), kind: self.lower_type_kind(nullable.hint) };
-                let null = Type { span: nullable.question_mark, kind: TypeKind::Null };
-
-                TypeKind::Union(self.arena.alloc_slice_copy(&[inner, null]))
-            }
+            cst::Hint::Nullable(nullable) => TypeKind::Nullable(self.lower_type(nullable.hint)),
             cst::Hint::Union(_) => {
-                let mut members = mago_allocator::vec::Vec::new_in(self.arena);
+                let mut members = Vec::new_in(self.arena);
                 self.collect_union(hint, &mut members);
 
                 TypeKind::Union(members.leak())
             }
             cst::Hint::Intersection(_) => {
-                let mut members = mago_allocator::vec::Vec::new_in(self.arena);
+                let mut members = Vec::new_in(self.arena);
                 self.collect_intersection(hint, &mut members);
 
                 TypeKind::Intersection(members.leak())
@@ -75,17 +71,12 @@ where
         }
     }
 
-    fn collect_union(
-        &mut self,
-        hint: &'scratch cst::Hint<'scratch>,
-        members: &mut mago_allocator::vec::Vec<'arena, Type<'arena>, A>,
-    ) {
+    fn collect_union(&mut self, hint: &'scratch cst::Hint<'scratch>, members: &mut Vec<'arena, Type<'arena>, A>) {
         match hint {
             cst::Hint::Union(union) => {
                 self.collect_union(union.left, members);
                 self.collect_union(union.right, members);
             }
-            cst::Hint::Parenthesized(parenthesized) => self.collect_union(parenthesized.hint, members),
             _ => members.push(Type { span: hint.span(), kind: self.lower_type_kind(hint) }),
         }
     }
@@ -93,14 +84,13 @@ where
     fn collect_intersection(
         &mut self,
         hint: &'scratch cst::Hint<'scratch>,
-        members: &mut mago_allocator::vec::Vec<'arena, Type<'arena>, A>,
+        members: &mut Vec<'arena, Type<'arena>, A>,
     ) {
         match hint {
             cst::Hint::Intersection(intersection) => {
                 self.collect_intersection(intersection.left, members);
                 self.collect_intersection(intersection.right, members);
             }
-            cst::Hint::Parenthesized(parenthesized) => self.collect_intersection(parenthesized.hint, members),
             _ => members.push(Type { span: hint.span(), kind: self.lower_type_kind(hint) }),
         }
     }

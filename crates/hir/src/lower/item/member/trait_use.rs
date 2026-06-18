@@ -62,7 +62,7 @@ where
                         self.lower_name(&absolute.method_name),
                     ),
                 };
-                let visibility = alias.visibility.as_ref().map(|modifier| self.lower_modifier(modifier));
+                let modifier = alias.modifier.as_ref().map(|modifier| self.lower_modifier(modifier));
                 let new_alias = match &alias.alias {
                     Some(identifier) => self.lower_name(identifier),
                     None => method,
@@ -72,7 +72,7 @@ where
                     span: alias.span(),
                     r#trait,
                     method,
-                    visibility,
+                    modifier,
                     alias: new_alias,
                 })
             }
