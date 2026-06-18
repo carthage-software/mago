@@ -24,6 +24,7 @@ use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
 use crate::internal::format::format_token;
+use crate::internal::format::misc;
 use crate::internal::utils::is_at_call_like_expression;
 use crate::internal::utils::is_at_callee;
 use crate::internal::utils::unwrap_parenthesized;
@@ -322,7 +323,9 @@ where
         || f.has_placed_trailing_line_comment(right.span())
         || f.has_placed_leading_own_line_comment(right.span())
         || has_own_line_comment_in_left_chain(f, left)
-        || (is_original_right_parenthesized && has_placed_leading_comment_in_leftmost(f, original_right));
+        || (is_original_right_parenthesized && has_placed_leading_comment_in_leftmost(f, original_right))
+        || (f.settings.preserve_breaking_binary_expression
+            && misc::has_new_line_in_range(f.source_text, left.end_offset(), right.start_offset()));
 
     let rhs_is_parenthesized_lassoc_subchain = match right {
         Expression::Binary(binary) => {
