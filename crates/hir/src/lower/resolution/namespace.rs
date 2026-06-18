@@ -58,21 +58,11 @@ where
         self.constant_aliases.clear();
     }
 
-    pub fn add_import(
-        &mut self,
-        kind: UseItemKind,
-        fully_qualified_name: &'scratch [u8],
-        alias: Option<&'scratch [u8]>,
-    ) {
-        let alias = alias.unwrap_or_else(|| match memchr::memrchr(b'\\', fully_qualified_name) {
-            Some(position) => &fully_qualified_name[position + 1..],
-            None => fully_qualified_name,
-        });
-
+    pub fn add_import(&mut self, kind: UseItemKind, fully_qualified_name: &'scratch [u8], r#as: &'scratch [u8]) {
         match kind {
-            UseItemKind::Default => self.default_aliases.push((alias, fully_qualified_name)),
-            UseItemKind::Function => self.function_aliases.push((alias, fully_qualified_name)),
-            UseItemKind::Const => self.constant_aliases.push((alias, fully_qualified_name)),
+            UseItemKind::Default => self.default_aliases.push((r#as, fully_qualified_name)),
+            UseItemKind::Function => self.function_aliases.push((r#as, fully_qualified_name)),
+            UseItemKind::Const => self.constant_aliases.push((r#as, fully_qualified_name)),
         }
     }
 

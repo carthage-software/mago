@@ -225,7 +225,7 @@ where
             cst::Statement::Use(r#use) => {
                 let items = self.lower_use(r#use);
                 for item in items.iter() {
-                    self.namespace_resolution.add_import(item.kind, item.item.value, item.alias);
+                    self.namespace_resolution.add_import(item.kind, item.item.value, item.r#as);
                 }
 
                 StatementKind::Use(copy_slice_into(items, self.arena))
@@ -625,13 +625,17 @@ where
             value = rest;
         }
 
-        let alias = item.alias.as_ref().map(|alias| alias.identifier.value);
-
         UseItem {
             span: item.span(),
             kind,
             item: Identifier { span: item.name.span(), value, kind: identifier_kind },
-            alias,
+            r#as: item.alias.as_ref().map(|alias| alias.identifier.value).unwrap_or_else(|| {
+                match memchr::memrchr(b'\\', value) {
+                    Some(position) => &value[position + 1..],
+                    None => value,
+                }
+            }),
+            aliased: item.alias.is_some(),
         }
     }
 

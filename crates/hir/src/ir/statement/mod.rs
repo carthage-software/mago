@@ -67,7 +67,8 @@ pub struct UseItem<'arena> {
     pub span: Span,
     pub kind: UseItemKind,
     pub item: Identifier<'arena>,
-    pub alias: Option<&'arena [u8]>,
+    pub r#as: &'arena [u8],
+    pub aliased: bool,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -104,7 +105,8 @@ impl CopyInto for UseItem<'_> {
             span: self.span,
             kind: self.kind,
             item: self.item.copy_into(arena),
-            alias: self.alias.map(|alias| &*arena.alloc_slice_copy(alias)),
+            r#as: arena.alloc_slice_copy(self.r#as),
+            aliased: self.aliased,
         }
     }
 }
