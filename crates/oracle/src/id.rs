@@ -5,6 +5,8 @@ use foldhash::fast::FixedState;
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
+use mago_span::Span;
+
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct SymbolId(u64);
@@ -22,6 +24,7 @@ const TAG_METHOD_PARAMETER: u8 = 9;
 const TAG_PROPERTY_HOOK_PARAMETER: u8 = 10;
 const TAG_NAMESPACE: u8 = 11;
 const TAG_TYPE_ALIAS: u8 = 12;
+const TAG_POSITIONAL: u8 = 13;
 
 impl SymbolId {
     /// Identifies a class-like type alias (`@type`). The class name is
@@ -32,6 +35,19 @@ impl SymbolId {
         hasher.write_u8(TAG_TYPE_ALIAS);
         write_folded(&mut hasher, strip_leading_separator(class_name));
         write_verbatim(&mut hasher, alias_name);
+
+        SymbolId(hasher.finish())
+    }
+
+    /// Identifies a node by its source position. Used for structural members
+    /// that have no name of their own (e.g. a `use` of a trait inside a class).
+    #[must_use]
+    pub fn positional(span: Span) -> Self {
+        let mut hasher = FixedState::default().build_hasher();
+        hasher.write_u8(TAG_POSITIONAL);
+        hasher.write_u64(span.file_id.as_u64());
+        hasher.write_u32(span.start.offset);
+        hasher.write_u32(span.end.offset);
 
         SymbolId(hasher.finish())
     }
@@ -208,5 +224,47 @@ fn write_namespace_folded(hasher: &mut impl Hasher, bytes: &[u8]) {
     hasher.write_usize(bytes.len());
     for (index, &byte) in bytes.iter().enumerate() {
         hasher.write_u8(if index < boundary { byte.to_ascii_lowercase() } else { byte });
+    }
+}
+
+/// A [`BuildHasher`] for [`SymbolId`] keys that forwards the id verbatim.
+///
+/// A `SymbolId` is already a well-distributed 64-bit hash, so re-hashing it in a
+/// map would be wasted work; this hasher just returns the id it was given.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SymbolIdBuildHasher;
+
+impl BuildHasher for SymbolIdBuildHasher {
+    type Hasher = SymbolIdHasher;
+
+    #[inline]
+    fn build_hasher(&self) -> SymbolIdHasher {
+        SymbolIdHasher(0)
+    }
+}
+
+/// The [`Hasher`] produced by [`SymbolIdBuildHasher`]. It only ever sees a single
+/// `write_u64` (the hash of a [`SymbolId`]) and returns it unchanged.
+#[derive(Debug, Default)]
+pub struct SymbolIdHasher(u64);
+
+impl Hasher for SymbolIdHasher {
+    #[inline]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    #[inline]
+    fn write_u64(&mut self, value: u64) {
+        self.0 = value;
+    }
+
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        // `SymbolId` hashes itself through `write_u64`, so this path is unused for
+        // its keys; fold any stray bytes anyway so the hasher stays well-defined.
+        for &byte in bytes {
+            self.0 = self.0.rotate_left(8) ^ u64::from(byte);
+        }
     }
 }
