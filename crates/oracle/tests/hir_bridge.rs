@@ -39,6 +39,13 @@ where
     A: Arena,
 {
     match kind {
+        hir_type::TypeKind::Parenthesized(inner) => lower_hir_kind(&inner.kind, builder),
+        hir_type::TypeKind::Nullable(inner) => {
+            let mut atoms = lower_hir_kind(&inner.kind, builder);
+            atoms.push(well_known::NULL);
+
+            atoms
+        }
         hir_type::TypeKind::Named(identifier) => vec![builder.object_named(identifier.value)],
         hir_type::TypeKind::Union(members) => {
             let mut atoms = Vec::with_capacity(members.len());
