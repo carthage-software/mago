@@ -321,7 +321,7 @@ impl<'config> Database<'config> {
     #[inline]
     pub fn commit(&mut self, change_log: ChangeLog, write_to_disk: bool) -> Result<(), DatabaseError> {
         let changes = change_log.into_inner()?;
-        let mut fs_operations = if write_to_disk { Vec::new() } else { Vec::new() };
+        let mut fs_operations = Vec::new();
 
         for change in changes {
             match change {
