@@ -1,6 +1,5 @@
 use mago_allocator::Arena;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_slice_into;
+use mago_allocator::collections::HashMap;
 use mago_hir::ir::item::expression::anonymous_class::AnonymousClass;
 use mago_hir::ir::item::expression::arrow_function::ArrowFunction;
 use mago_hir::ir::item::expression::closure::Closure;
@@ -11,44 +10,53 @@ use mago_hir::ir::item::statement::function::Function;
 use mago_hir::ir::item::statement::interface::Interface;
 use mago_hir::ir::item::statement::r#trait::Trait;
 
-pub mod scanner;
+use crate::id::SymbolId;
+use crate::id::SymbolIdBuildHasher;
 
-/// A definition table is a collection of all the definitions in a program.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DefinitionTable<'arena, I, S, E> {
-    pub constants: &'arena [Constant<'arena, I, S, E>],
-    pub functions: &'arena [Function<'arena, I, S, E>],
-    pub classes: &'arena [Class<'arena, I, S, E>],
-    pub interfaces: &'arena [Interface<'arena, I, S, E>],
-    pub traits: &'arena [Trait<'arena, I, S, E>],
-    pub enums: &'arena [Enum<'arena, I, S, E>],
-    pub anonymous_classes: &'arena [AnonymousClass<'arena, I, S, E>],
-    pub closures: &'arena [Closure<'arena, I, S, E>],
-    pub arrow_functions: &'arena [ArrowFunction<'arena, I, S, E>],
+pub mod binder;
+
+/// A map from a [`SymbolId`] to the definition it identifies, allocated in the
+/// arena and keyed without re-hashing (a `SymbolId` is already a hash).
+pub type DefinitionMap<'arena, A, T> = HashMap<'arena, SymbolId, T, A, SymbolIdBuildHasher>;
+
+/// A definition table indexes every definition in a program by its [`SymbolId`].
+///
+/// Members (methods, properties, class constants, enum cases) are not indexed
+/// here; they live inside their class-like definition. Only top-level and
+/// expression-level definitions get their own entry.
+#[derive(Debug)]
+pub struct DefinitionTable<'arena, A, S, E>
+where
+    A: Arena,
+{
+    pub constants: DefinitionMap<'arena, A, Constant<'arena, SymbolId, S, E>>,
+    pub functions: DefinitionMap<'arena, A, Function<'arena, SymbolId, S, E>>,
+    pub classes: DefinitionMap<'arena, A, Class<'arena, SymbolId, S, E>>,
+    pub interfaces: DefinitionMap<'arena, A, Interface<'arena, SymbolId, S, E>>,
+    pub traits: DefinitionMap<'arena, A, Trait<'arena, SymbolId, S, E>>,
+    pub enums: DefinitionMap<'arena, A, Enum<'arena, SymbolId, S, E>>,
+    pub anonymous_classes: DefinitionMap<'arena, A, AnonymousClass<'arena, SymbolId, S, E>>,
+    pub closures: DefinitionMap<'arena, A, Closure<'arena, SymbolId, S, E>>,
+    pub arrow_functions: DefinitionMap<'arena, A, ArrowFunction<'arena, SymbolId, S, E>>,
 }
 
-impl<I, S, E> CopyInto for DefinitionTable<'_, I, S, E>
+impl<'arena, A, S, E> DefinitionTable<'arena, A, S, E>
 where
-    I: CopyInto,
-    S: CopyInto,
-    E: CopyInto,
+    A: Arena,
 {
-    type Output<'arena> = DefinitionTable<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
-
-    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
-    where
-        A: Arena,
-    {
+    /// Creates an empty definition table with every map allocated in `arena`.
+    #[must_use]
+    pub fn new_in(arena: &'arena A) -> Self {
         DefinitionTable {
-            constants: copy_slice_into(self.constants, arena),
-            functions: copy_slice_into(self.functions, arena),
-            classes: copy_slice_into(self.classes, arena),
-            interfaces: copy_slice_into(self.interfaces, arena),
-            traits: copy_slice_into(self.traits, arena),
-            enums: copy_slice_into(self.enums, arena),
-            anonymous_classes: copy_slice_into(self.anonymous_classes, arena),
-            closures: copy_slice_into(self.closures, arena),
-            arrow_functions: copy_slice_into(self.arrow_functions, arena),
+            constants: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
+            functions: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
+            classes: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
+            interfaces: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
+            traits: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
+            enums: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
+            anonymous_classes: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
+            closures: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
+            arrow_functions: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
         }
     }
 }
