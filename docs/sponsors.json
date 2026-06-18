@@ -32,9 +32,9 @@
             "size": 64,
             "sponsors": [
                 {
-                    "name": "HeySora",
-                    "url": "https://heysora.net/",
-                    "avatar": "https://avatars.githubusercontent.com/u/17962248?u=3cd88b4479a0dd018738612569d0954c81cdd25f&v=4"
+                    "name": "TicketSwap",
+                    "url": "https://www.ticketswap.com",
+                    "avatar": "https://avatars.githubusercontent.com/u/5766233?v=4"
                 },
                 {
                     "name": "Bohuslav \u0160imek",
@@ -42,9 +42,9 @@
                     "avatar": "https://avatars.githubusercontent.com/u/6493048?u=5eddf1eb923810745d8bdd62496d245238833d07&v=4"
                 },
                 {
-                    "name": "TicketSwap",
-                    "url": "https://www.ticketswap.com",
-                    "avatar": "https://avatars.githubusercontent.com/u/5766233?v=4"
+                    "name": "HeySora",
+                    "url": "https://heysora.net/",
+                    "avatar": "https://avatars.githubusercontent.com/u/17962248?u=3cd88b4479a0dd018738612569d0954c81cdd25f&v=4"
                 }
             ]
         },
@@ -54,9 +54,9 @@
             "dense": true,
             "sponsors": [
                 {
-                    "name": "Julian Schramm",
-                    "url": "http://julian.center",
-                    "avatar": "https://avatars.githubusercontent.com/u/79840527?u=2e15d0ec9e6d0bf6554ef69af6b1dba32a051417&v=4"
+                    "name": "ddanielou",
+                    "url": "https://github.com/ddanielou",
+                    "avatar": "https://avatars.githubusercontent.com/u/1174337?v=4"
                 },
                 {
                     "name": "Rasmus Bertell",
@@ -64,9 +64,9 @@
                     "avatar": "https://avatars.githubusercontent.com/u/57398362?u=f9bb382310c9552de2a7a82193c86fb94750e971&v=4"
                 },
                 {
-                    "name": "ddanielou",
-                    "url": "https://github.com/ddanielou",
-                    "avatar": "https://avatars.githubusercontent.com/u/1174337?v=4"
+                    "name": "Julian Schramm",
+                    "url": "http://julian.center",
+                    "avatar": "https://avatars.githubusercontent.com/u/79840527?u=2e15d0ec9e6d0bf6554ef69af6b1dba32a051417&v=4"
                 },
                 {
                     "name": "Anna Filina",
@@ -79,64 +79,14 @@
                     "avatar": "https://avatars.githubusercontent.com/u/5824820?u=d3439ac38ac78e5bb6255ef434b38f441dd27959&v=4"
                 },
                 {
-                    "name": "Zuruh",
-                    "url": "https://github.com/Zuruuh",
-                    "avatar": "https://avatars.githubusercontent.com/u/77583853?u=568441a6191e891cf4c9f52c9c230c45930bed86&v=4"
+                    "name": "Woody Gilk",
+                    "url": "https://www.shadowhand.com/",
+                    "avatar": "https://avatars.githubusercontent.com/u/38203?u=2e3f25fc95a44429c23a3450e515b2191073fd00&v=4"
                 },
                 {
-                    "name": "Yigit Cukuren",
-                    "url": "http://yigit.dev",
-                    "avatar": "https://avatars.githubusercontent.com/u/42731194?u=bb0fb4e3635f7fcab7ff91ff4b311fd5a99cb009&v=4"
-                },
-                {
-                    "name": "Giorgio Pogliani",
-                    "url": "https://performingdigital.com",
-                    "avatar": "https://avatars.githubusercontent.com/u/28866565?v=4"
-                },
-                {
-                    "name": "Uwe Ohse",
-                    "url": "https://www.ohse.de/uwe/",
-                    "avatar": "https://avatars.githubusercontent.com/u/18497839?u=16f2321844720dd97a3031b5034be318078efba7&v=4"
-                },
-                {
-                    "name": "Sebastian Drewer-Gutland",
-                    "url": "https://github.com/sdrewergutland",
-                    "avatar": "https://avatars.githubusercontent.com/u/16477894?u=fd958b1c5c1ddc9259a5dd7dfa6dadc9ace88a11&v=4"
-                },
-                {
-                    "name": "Enzo Innocenzi",
-                    "url": "https://innocenzi.dev",
-                    "avatar": "https://avatars.githubusercontent.com/u/16060559?u=4c0ac72d014627d9dce1fa42e530b9491dc9cfae&v=4"
-                },
-                {
-                    "name": "rio (\ub9ac\uc624)",
-                    "url": "https://varietn.tistory.com/",
-                    "avatar": "https://avatars.githubusercontent.com/u/7542987?u=6354c067bae9101bb2d4cf80bfb0efb2751768f1&v=4"
-                },
-                {
-                    "name": "Adriaan",
-                    "url": "https://adriaan.dev",
-                    "avatar": "https://avatars.githubusercontent.com/u/4326420?v=4"
-                },
-                {
-                    "name": "Daniel Weaver",
-                    "url": "https://danielweaver.dev",
-                    "avatar": "https://avatars.githubusercontent.com/u/3847288?u=717dd9991e86a001567e197fe3ba5d618a300118&v=4"
-                },
-                {
-                    "name": "Pablo Largo Mohedano",
-                    "url": "https://devnix.dev/",
-                    "avatar": "https://avatars.githubusercontent.com/u/1777519?v=4"
-                },
-                {
-                    "name": "Matheus Martins",
-                    "url": "https://github.com/math3usmartins",
-                    "avatar": "https://avatars.githubusercontent.com/u/585688?u=5af32a41b0781fade43c4a45ac4fe74c5bee4b97&v=4"
-                },
-                {
-                    "name": "Jacer OMRI",
-                    "url": "https://github.com/JacerOmri",
-                    "avatar": "https://avatars.githubusercontent.com/u/537996?u=6d425f3166884ff0c0da4ffc252d6388c9940714&v=4"
+                    "name": "Alexandru P\u0103tr\u0103nescu",
+                    "url": "http://alexandru.patranescu.ro",
+                    "avatar": "https://avatars.githubusercontent.com/u/209984?v=4"
                 },
                 {
                     "name": "still-dreaming-1",
@@ -144,9 +94,64 @@
                     "avatar": "https://avatars.githubusercontent.com/u/354296?u=6e36d88516d121e132ec49cac38ac16df8471b17&v=4"
                 },
                 {
-                    "name": "Alexandru P\u0103tr\u0103nescu",
-                    "url": "http://alexandru.patranescu.ro",
-                    "avatar": "https://avatars.githubusercontent.com/u/209984?v=4"
+                    "name": "Jacer OMRI",
+                    "url": "https://github.com/JacerOmri",
+                    "avatar": "https://avatars.githubusercontent.com/u/537996?u=6d425f3166884ff0c0da4ffc252d6388c9940714&v=4"
+                },
+                {
+                    "name": "Matheus Martins",
+                    "url": "https://github.com/math3usmartins",
+                    "avatar": "https://avatars.githubusercontent.com/u/585688?u=5af32a41b0781fade43c4a45ac4fe74c5bee4b97&v=4"
+                },
+                {
+                    "name": "Pablo Largo Mohedano",
+                    "url": "https://devnix.dev/",
+                    "avatar": "https://avatars.githubusercontent.com/u/1777519?v=4"
+                },
+                {
+                    "name": "Daniel Weaver",
+                    "url": "https://danielweaver.dev",
+                    "avatar": "https://avatars.githubusercontent.com/u/3847288?u=717dd9991e86a001567e197fe3ba5d618a300118&v=4"
+                },
+                {
+                    "name": "Adriaan",
+                    "url": "https://adriaan.dev",
+                    "avatar": "https://avatars.githubusercontent.com/u/4326420?v=4"
+                },
+                {
+                    "name": "rio (\ub9ac\uc624)",
+                    "url": "https://varietn.tistory.com/",
+                    "avatar": "https://avatars.githubusercontent.com/u/7542987?u=6354c067bae9101bb2d4cf80bfb0efb2751768f1&v=4"
+                },
+                {
+                    "name": "Enzo Innocenzi",
+                    "url": "https://innocenzi.dev",
+                    "avatar": "https://avatars.githubusercontent.com/u/16060559?u=4c0ac72d014627d9dce1fa42e530b9491dc9cfae&v=4"
+                },
+                {
+                    "name": "Sebastian Drewer-Gutland",
+                    "url": "https://github.com/sdrewergutland",
+                    "avatar": "https://avatars.githubusercontent.com/u/16477894?u=fd958b1c5c1ddc9259a5dd7dfa6dadc9ace88a11&v=4"
+                },
+                {
+                    "name": "Uwe Ohse",
+                    "url": "https://www.ohse.de/uwe/",
+                    "avatar": "https://avatars.githubusercontent.com/u/18497839?u=16f2321844720dd97a3031b5034be318078efba7&v=4"
+                },
+                {
+                    "name": "Giorgio Pogliani",
+                    "url": "https://performingdigital.com",
+                    "avatar": "https://avatars.githubusercontent.com/u/28866565?v=4"
+                },
+                {
+                    "name": "Yigit Cukuren",
+                    "url": "http://yigit.dev",
+                    "avatar": "https://avatars.githubusercontent.com/u/42731194?u=bb0fb4e3635f7fcab7ff91ff4b311fd5a99cb009&v=4"
+                },
+                {
+                    "name": "Zuruh",
+                    "url": "https://github.com/Zuruuh",
+                    "avatar": "https://avatars.githubusercontent.com/u/77583853?u=568441a6191e891cf4c9f52c9c230c45930bed86&v=4"
                 }
             ]
         }
