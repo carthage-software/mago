@@ -871,6 +871,7 @@ generate_fold! {
             version_constraint: folder.arena().alloc_slice_copy(constant.version_constraint),
             name: constant.name.copy_into(folder.arena()),
             value: folder.arena().alloc(folder.fold_expression(constant.value)),
+            flattened: constant.flattened,
         }
     }
 
@@ -936,6 +937,7 @@ generate_fold! {
             r#type: property.r#type.map(|r#type| copy_ref_into(r#type, folder.arena())),
             variable: property.variable.copy_into(folder.arena()),
             default_value: property.default_value.map(|value| &*folder.arena().alloc(folder.fold_expression(value))),
+            flattened: property.flattened,
         }
     }
 
@@ -967,6 +969,7 @@ generate_fold! {
             r#type: class_like_constant.r#type.map(|r#type| copy_ref_into(r#type, folder.arena())),
             name: class_like_constant.name.copy_into(folder.arena()),
             value: folder.arena().alloc(folder.fold_expression(class_like_constant.value)),
+            flattened: class_like_constant.flattened,
         }
     }
 

@@ -25,6 +25,7 @@ where
         let version_constraint = self.lower_version_constraint(&property.attribute_lists);
         let document = self.phpdoc_resolution.get(property.span());
         let annotation = self.lower_item_annotation(document.as_ref(), None);
+        let flattened = property.items.len() > 1;
 
         property
             .items
@@ -41,6 +42,7 @@ where
                     r#type,
                     variable,
                     default_value,
+                    flattened,
                 }
             })
             .collect()

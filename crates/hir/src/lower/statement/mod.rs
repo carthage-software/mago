@@ -164,6 +164,7 @@ where
                 kind: IdentifierKind::Local,
             },
             value,
+            flattened: false,
         });
 
         let definition = StatementKind::Item(self.arena.alloc(ItemStatement {

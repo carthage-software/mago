@@ -24,6 +24,7 @@ pub struct Constant<'arena, I, S, E> {
     pub version_constraint: &'arena [PHPVersionRange],
     pub name: Identifier<'arena>,
     pub value: &'arena Expression<'arena, I, S, E>,
+    pub flattened: bool,
 }
 
 impl<I, S, E> CopyInto for Constant<'_, I, S, E>
@@ -45,6 +46,7 @@ where
             version_constraint: arena.alloc_slice_copy(self.version_constraint),
             name: self.name.copy_into(arena),
             value: copy_ref_into(self.value, arena),
+            flattened: self.flattened,
         }
     }
 }

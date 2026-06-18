@@ -30,6 +30,7 @@ pub struct Property<'arena, I, S, E> {
     pub r#type: Option<&'arena Type<'arena>>,
     pub variable: DirectVariable<'arena>,
     pub default_value: Option<&'arena Expression<'arena, I, S, E>>,
+    pub flattened: bool,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -67,6 +68,7 @@ where
             r#type: self.r#type.map(|node| copy_ref_into(node, arena)),
             variable: self.variable.copy_into(arena),
             default_value: self.default_value.map(|node| copy_ref_into(node, arena)),
+            flattened: self.flattened,
         }
     }
 }

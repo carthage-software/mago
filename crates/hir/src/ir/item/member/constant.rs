@@ -28,6 +28,7 @@ pub struct ClassLikeConstant<'arena, I, S, E> {
     pub r#type: Option<&'arena Type<'arena>>,
     pub name: Name<'arena>,
     pub value: &'arena Expression<'arena, I, S, E>,
+    pub flattened: bool,
 }
 
 impl<I, S, E> CopyInto for ClassLikeConstant<'_, I, S, E>
@@ -51,6 +52,7 @@ where
             r#type: self.r#type.map(|node| copy_ref_into(node, arena)),
             name: self.name.copy_into(arena),
             value: copy_ref_into(self.value, arena),
+            flattened: self.flattened,
         }
     }
 }

@@ -22,6 +22,7 @@ where
         let r#type = constant.hint.as_ref().map(|hint| self.lower_type(hint));
         let document = self.phpdoc_resolution.get(constant.span());
         let annotation = self.lower_item_annotation(document.as_ref(), None);
+        let flattened = constant.items.len() > 1;
 
         constant
             .items
@@ -39,6 +40,7 @@ where
                     r#type,
                     name,
                     value,
+                    flattened,
                 }
             })
             .collect()
