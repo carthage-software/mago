@@ -1612,8 +1612,7 @@ where
                             f.arena.alloc_slice_fill_copy(scope_width, scope_byte)
                         } else {
                             f.arena.alloc_slice_fill_iter(
-                                std::iter::repeat(scope_byte)
-                                    .take(scope_width * 2)
+                                std::iter::repeat_n(scope_byte, scope_width * 2)
                                     .chain(last_part_indentation.iter().copied()),
                             )
                         }
@@ -1626,9 +1625,8 @@ where
                         };
 
                         f.arena.alloc_slice_fill_iter(
-                            std::iter::repeat(b'\t')
-                                .take(tabs)
-                                .chain(std::iter::repeat(b' ').take(spaces))
+                            std::iter::repeat_n(b'\t', tabs)
+                                .chain(std::iter::repeat_n(b' ', spaces))
                                 .chain(last_part_indentation.iter().copied()),
                         )
                     };

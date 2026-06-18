@@ -648,7 +648,7 @@ impl Issue {
     /// Take the edits from this issue.
     #[must_use]
     pub fn take_edits(&mut self) -> HashMap<FileId, IssueEdits> {
-        std::mem::replace(&mut self.edits, HashMap::with_capacity(0))
+        std::mem::replace(&mut self.edits, HashMap::new())
     }
 }
 

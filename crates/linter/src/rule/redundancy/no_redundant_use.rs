@@ -130,8 +130,7 @@ impl LintRule for NoRedundantUseRule {
 
         let used_fqns = utils::build_used_fqn_set(ctx, &use_declarations);
         let docblocks = utils::get_docblocks(program);
-        let inline_contents =
-            if check_inline_mentions { utils::get_inline_contents(program) } else { Vec::with_capacity(0) };
+        let inline_contents = if check_inline_mentions { utils::get_inline_contents(program) } else { Vec::new() };
 
         // First, check for same-namespace imports (redundant even if used)
         let mut same_namespace_spans: HashSet<Span> = HashSet::new();
