@@ -7730,6 +7730,11 @@
           "type": "boolean",
           "default": false
         },
+        "preserve-breaking-binary-expression": {
+          "description": "Whether to preserve intentional line breaks before binary operators (`&&`, `||`, `and`, `or`, `??`, `.`, etc.).\n\nWhen enabled, if the original source has a newline before a binary operator's right-hand\noperand, the formatter keeps the expression broken rather than collapsing it onto one line.\nThis is useful when integrating Mago alongside tools like PHP-CS-Fixer that intentionally\nplace each operand on its own line.\n\nWhen disabled (the default), the formatter always collapses binary expressions that fit\nwithin `print-width` onto a single line.\n\nDefault: false",
+          "type": "boolean",
+          "default": false
+        },
         "break-promoted-properties-list": {
           "description": "Whether to break a parameter list with one or more promoted properties into multiple lines.\n\nWhen enabled, parameter lists with promoted properties are always multi-line:\n```php\nclass User {\n    public function __construct(\n        public string $name,\n        public string $email,\n    ) {}\n}\n```\n\nWhen disabled, they may be kept on a single line if space allows:\n```php\nclass User {\n    public function __construct(public string $name, public string $email) {}\n}\n```\n\nDefault: true",
           "type": "boolean",
