@@ -12,7 +12,9 @@ use mago_hir::ir::literal::LiteralKind;
 use crate::linker::lower::Lowerer;
 use crate::ty::Atom;
 use crate::ty::Type;
+use crate::ty::atom::payload::array::ArrayKey;
 use crate::ty::atom::payload::scalar::int::IntAtom;
+use crate::ty::atom::payload::scalar::string::StringLiteral;
 use crate::ty::well_known;
 
 impl<'arena, S, A> Lowerer<'_, '_, 'arena, S, A>
@@ -36,7 +38,7 @@ where
                 },
                 LiteralKind::Float(_) => well_known::TYPE_FLOAT,
                 LiteralKind::String(string) => match string.value {
-                    Some(value) if value.is_empty() => self.atom_type(well_known::EMPTY_STRING),
+                    Some([]) => self.atom_type(well_known::EMPTY_STRING),
                     Some(value) => {
                         let atom = self.builder.string_literal(value);
                         self.atom_type(atom)
@@ -234,10 +236,7 @@ fn single_int(ty: Type<'_>) -> Option<i64> {
 }
 
 /// The array key for a single-atom literal int or string type, if it is one.
-fn array_key<'arena>(ty: Type<'arena>) -> Option<crate::ty::atom::payload::array::ArrayKey<'arena>> {
-    use crate::ty::atom::payload::array::ArrayKey;
-    use crate::ty::atom::payload::scalar::string::StringLiteral;
-
+fn array_key(ty: Type<'_>) -> Option<ArrayKey<'_>> {
     match ty.atoms {
         [Atom::Int(IntAtom::Literal(value))] => Some(ArrayKey::Int(*value)),
         [Atom::String(string)] => match string.literal {

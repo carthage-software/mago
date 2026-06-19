@@ -353,7 +353,7 @@ where
 
 /// Whether `method` from `source_trait` is excluded from the using class by an
 /// `A::method insteadof B` precedence rule. Read directly from the IR.
-fn method_excluded<'arena, St, Ex>(members: &Members<'arena, St, Ex>, source_trait: SymbolId, method: &[u8]) -> bool {
+fn method_excluded<St, Ex>(members: &Members<'_, St, Ex>, source_trait: SymbolId, method: &[u8]) -> bool {
     members.iter().any(|member| {
         let MemberItemKind::TraitUse(trait_use) = &member.kind else {
             return false;
@@ -562,7 +562,7 @@ fn class_id_of(symbol: &ClassLikeSymbol<'_>) -> SymbolId {
 }
 
 /// The last path segment's bytes - a member's short name without its owner.
-fn last_segment<'arena>(path: Path<'arena>) -> &'arena [u8] {
+fn last_segment(path: Path<'_>) -> &[u8] {
     path.segments.last().map_or(&[][..], |segment| segment.as_bytes())
 }
 

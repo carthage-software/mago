@@ -72,7 +72,7 @@ where
 
     /// Lowers each applied attribute to its name path.
     pub(crate) fn attributes<I, St, Ex>(
-        &mut self,
+        &self,
         attributes: &[Attribute<'arena, I, St, Ex>],
     ) -> &'arena [AppliedAttribute<'arena>] {
         let arena = self.arena;

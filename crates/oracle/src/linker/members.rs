@@ -167,8 +167,7 @@ where
         origin: Origin,
     ) -> MethodMember<'arena> {
         let name = method.name.value;
-        let mut flags = U32Flags::<crate::symbol::class_like::part::method::MethodFlag>::empty();
-        use crate::symbol::class_like::part::method::MethodFlag;
+        let mut flags = U32Flags::<MethodFlag>::empty();
         if has_modifier(method.modifiers, ModifierKind::Static) {
             flags = flags.with(MethodFlag::Static);
         }
@@ -594,12 +593,7 @@ where
     }
 }
 
-fn property_flags(
-    modifiers: &[Modifier],
-    has_default: bool,
-    has_hooks: bool,
-) -> U16Flags<crate::symbol::class_like::part::property::PropertyFlag> {
-    use crate::symbol::class_like::part::property::PropertyFlag;
+fn property_flags(modifiers: &[Modifier], has_default: bool, has_hooks: bool) -> U16Flags<PropertyFlag> {
     let mut flags = U16Flags::<PropertyFlag>::empty();
     if has_modifier(modifiers, ModifierKind::Static) {
         flags = flags.with(PropertyFlag::Static);
