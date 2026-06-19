@@ -181,7 +181,7 @@ impl<'arena> Argument<'arena> {
     }
 }
 
-impl PartialArgument<'_> {
+impl<'arena> PartialArgument<'arena> {
     #[inline]
     #[must_use]
     pub const fn is_positional(&self) -> bool {
@@ -210,6 +210,16 @@ impl PartialArgument<'_> {
     #[must_use]
     pub const fn is_variadic_placeholder(&self) -> bool {
         matches!(self, PartialArgument::VariadicPlaceholder(_))
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn value(&self) -> Option<&Expression<'arena>> {
+        match self {
+            PartialArgument::Positional(arg) => Some(arg.value),
+            PartialArgument::Named(arg) => Some(arg.value),
+            _ => None,
+        }
     }
 }
 

@@ -8,7 +8,7 @@ use mago_allocator::copy::copy_slice_into;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::ir::argument::Argument;
+use crate::ir::argument::PartialArgument;
 use crate::ir::delimited::Delimited;
 use crate::ir::item::Item;
 use crate::ir::item::annotation::ItemAnnotation;
@@ -26,7 +26,7 @@ pub struct AnonymousClass<'arena, I, S, E> {
     pub name: &'arena [u8],
     pub annotation: Option<&'arena ItemAnnotation<'arena, I, S, E>>,
     pub attributes: &'arena [Attribute<'arena, I, S, E>],
-    pub arguments: Option<Delimited<'arena, Argument<'arena, I, S, E>>>,
+    pub arguments: Option<Delimited<'arena, PartialArgument<'arena, I, S, E>>>,
     pub extends: Option<&'arena Extends<'arena>>,
     pub implements: Option<&'arena Implements<'arena>>,
     pub members: Delimited<'arena, MemberItem<'arena, I, S, E>>,

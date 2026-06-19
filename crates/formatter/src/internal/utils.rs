@@ -29,6 +29,7 @@ use crate::document::Document;
 use crate::document::IndentIfBreak;
 use crate::document::Separator;
 use crate::internal::FormatterState;
+use crate::internal::format::call_arguments::promote_argument_list_to_partial;
 use crate::internal::format::call_arguments::should_break_all_arguments;
 use crate::internal::format::misc::is_breaking_expression;
 use crate::internal::format::misc::is_simple_single_line_expression;
@@ -283,9 +284,10 @@ where
                 return could_expand_value(f, first_arg.value(), true);
             }
 
-            should_break_all_arguments(f, arguments, false)
-                || should_expand_first_arg(f, arguments, true)
-                || should_expand_last_arg(f, arguments, true)
+            let partial_arguments = promote_argument_list_to_partial(f.arena, arguments);
+            should_break_all_arguments(f, partial_arguments, false)
+                || should_expand_first_arg(f, partial_arguments, true)
+                || should_expand_last_arg(f, partial_arguments, true)
         }
         Expression::Literal(Literal::String(literal_string)) => {
             literal_string.raw.contains(&b'\n') || literal_string.raw.contains(&b'\r')
@@ -305,9 +307,10 @@ where
                 return could_expand_value(f, first_arg.value(), true);
             }
 
-            should_break_all_arguments(f, argument_list, false)
-                || should_expand_first_arg(f, argument_list, true)
-                || should_expand_last_arg(f, argument_list, true)
+            let partial_arguments = promote_argument_list_to_partial(f.arena, argument_list);
+            should_break_all_arguments(f, partial_arguments, false)
+                || should_expand_first_arg(f, partial_arguments, true)
+                || should_expand_last_arg(f, partial_arguments, true)
         }
         _ => false,
     }

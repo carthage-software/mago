@@ -40,6 +40,7 @@ use crate::document::Separator;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
+use crate::internal::format::call_arguments::promote_argument_list_to_partial;
 use crate::internal::format::call_arguments::should_break_all_arguments;
 use crate::internal::format::format_token;
 use crate::internal::format::member_access::collect_member_access_chain;
@@ -260,13 +261,13 @@ where
     }
 
     if let Expression::Instantiation(Instantiation { argument_list: Some(args), .. }) = node
-        && should_break_all_arguments(f, args, false)
+        && should_break_all_arguments(f, promote_argument_list_to_partial(f.arena, args), false)
     {
         return true;
     }
 
     if let Expression::Call(call) = node
-        && should_break_all_arguments(f, call.get_argument_list(), false)
+        && should_break_all_arguments(f, promote_argument_list_to_partial(f.arena, call.get_argument_list()), false)
     {
         return true;
     }

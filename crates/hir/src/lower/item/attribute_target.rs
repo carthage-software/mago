@@ -34,7 +34,11 @@ where
                 return Some(all_targets());
             };
 
-            return Some(self.fold_attribute_target(first_argument.value()).unwrap_or_else(all_targets_repeatable));
+            let Some(value) = first_argument.value() else {
+                return None; // Semantically invalid, but we don't want to panic here.
+            };
+
+            return Some(self.fold_attribute_target(value).unwrap_or_else(all_targets_repeatable));
         }
 
         None

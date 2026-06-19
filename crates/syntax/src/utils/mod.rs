@@ -27,7 +27,7 @@ pub mod reference;
 
 #[inline]
 #[must_use]
-pub fn find_returns_in_block<'ast, 'arena>(block: &'ast Block<'arena>) -> Vec<&'ast Return<'arena>> {
+pub fn find_returns_in_block<'arena>(block: &'arena Block<'arena>) -> Vec<&'arena Return<'arena>> {
     let mut returns = vec![];
     for control_flow in control_flow::find_control_flows_in_block(block) {
         if let ControlFlow::Return(r#return) = control_flow {
@@ -40,7 +40,7 @@ pub fn find_returns_in_block<'ast, 'arena>(block: &'ast Block<'arena>) -> Vec<&'
 
 #[inline]
 #[must_use]
-pub fn find_returns_in_statement<'ast, 'arena>(statement: &'ast Statement<'arena>) -> Vec<&'ast Return<'arena>> {
+pub fn find_returns_in_statement<'arena>(statement: &'arena Statement<'arena>) -> Vec<&'arena Return<'arena>> {
     let mut returns = vec![];
     for control_flow in control_flow::find_control_flows_in_statement(statement) {
         if let ControlFlow::Return(r#return) = control_flow {

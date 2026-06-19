@@ -1,5 +1,7 @@
 use mago_allocator::Arena;
 use mago_syntax::cst::ArgumentList;
+use mago_syntax::cst::PartialArgument;
+use mago_syntax::cst::PartialArgumentList;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -25,6 +27,41 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArgumentList<'arena> {
 
         for argument in &self.arguments {
             argument.value().analyze(context, block_context, artifacts)?;
+        }
+
+        block_context.flags.set_inside_call(was_inside_call);
+        block_context.flags.set_inside_general_use(was_inside_general_use);
+
+        Ok(())
+    }
+}
+
+impl<'ast, 'arena> Analyzable<'ast, 'arena> for PartialArgumentList<'arena> {
+    fn analyze<'ctx, A>(
+        &'ast self,
+        context: &mut Context<'ctx, 'arena, A>,
+        block_context: &mut BlockContext<'ctx>,
+        artifacts: &mut AnalysisArtifacts,
+    ) -> Result<(), AnalysisError>
+    where
+        A: Arena,
+    {
+        let was_inside_call = block_context.flags.inside_call();
+        let was_inside_general_use = block_context.flags.inside_general_use();
+
+        block_context.flags.set_inside_call(true);
+        block_context.flags.set_inside_general_use(true);
+
+        for argument in &self.arguments {
+            match argument {
+                PartialArgument::Positional(positional_argument) => {
+                    positional_argument.value.analyze(context, block_context, artifacts)?;
+                }
+                PartialArgument::Named(named_argument) => {
+                    named_argument.value.analyze(context, block_context, artifacts)?;
+                }
+                _ => { /* Do nothing for other argument types */ }
+            }
         }
 
         block_context.flags.set_inside_call(was_inside_call);

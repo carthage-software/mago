@@ -2,13 +2,13 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::ir::argument::Argument;
+use crate::ir::argument::PartialArgument;
 use crate::ir::delimited::Delimited;
 use crate::ir::identifier::Identifier;
-use mago_allocator::copy::CopyInto;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
@@ -30,7 +30,7 @@ pub enum AttributeTarget {
 pub struct Attribute<'arena, I, S, E> {
     pub span: Span,
     pub class: Identifier<'arena>,
-    pub arguments: Option<Delimited<'arena, Argument<'arena, I, S, E>>>,
+    pub arguments: Option<Delimited<'arena, PartialArgument<'arena, I, S, E>>>,
 }
 
 impl CopyInto for AttributeTarget {

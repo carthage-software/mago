@@ -9,7 +9,9 @@ use mago_syntax::cst::ArgumentList;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Node;
+use mago_syntax::cst::PartialArgument;
 use mago_syntax::cst::PartialArgumentList;
+use mago_syntax::cst::TokenSeparatedSequence;
 
 use crate::document::BreakMode;
 use crate::document::Document;
@@ -38,6 +40,8 @@ use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
 use crate::internal::utils::will_break;
 
+use super::call_node::CallLikeArgumentListNode;
+
 pub(super) fn print_call_arguments<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     expression: CallLikeNode<'arena>,
@@ -45,37 +49,56 @@ pub(super) fn print_call_arguments<'arena, A>(
 where
     A: Arena,
 {
-    let Some(argument_list) = expression.arguments() else {
-        return if (expression.is_instantiation()
-            && (f.settings.parentheses_in_new_expression || instantiation_needs_inline_new_parens(f, expression)))
-            || (expression.is_exit_or_die_construct() && f.settings.parentheses_in_exit_and_die)
-            || (expression.is_attribute() && f.settings.parentheses_in_attribute)
-        {
-            Document::String(b"()")
-        } else {
-            Document::empty()
-        };
-    };
-
-    if argument_list.arguments.is_empty()
-        && ((expression.is_instantiation()
-            && !f.settings.parentheses_in_new_expression
-            && !instantiation_needs_inline_new_parens(f, expression))
-            || (expression.is_exit_or_die_construct() && !f.settings.parentheses_in_exit_and_die)
-            || (expression.is_attribute() && !f.settings.parentheses_in_attribute))
-    {
-        return if let Some(inner_comments) = f.print_inner_comment(argument_list.span(), true) {
-            Document::Array(vec_in![f.arena;
-                Document::String(b"("),
-                inner_comments,
-                Document::String(b")"),
-            ])
-        } else {
-            Document::empty()
-        };
+    match expression.arguments() {
+        CallLikeArgumentListNode::None => {
+            if (expression.is_instantiation()
+                && (f.settings.parentheses_in_new_expression || instantiation_needs_inline_new_parens(f, expression)))
+                || (expression.is_exit_or_die_construct() && f.settings.parentheses_in_exit_and_die)
+                || (expression.is_attribute() && f.settings.parentheses_in_attribute)
+            {
+                Document::String(b"()")
+            } else {
+                Document::empty()
+            }
+        }
+        CallLikeArgumentListNode::ArgumentList(argument_list) => {
+            if argument_list.arguments.is_empty()
+                && ((expression.is_instantiation()
+                    && !f.settings.parentheses_in_new_expression
+                    && !instantiation_needs_inline_new_parens(f, expression))
+                    || (expression.is_exit_or_die_construct() && !f.settings.parentheses_in_exit_and_die))
+            {
+                if let Some(inner_comments) = f.print_inner_comment(argument_list.span(), true) {
+                    Document::Array(vec_in![f.arena;
+                        Document::String(b"("),
+                        inner_comments,
+                        Document::String(b")"),
+                    ])
+                } else {
+                    Document::empty()
+                }
+            } else {
+                print_argument_list(f, argument_list, !expression.is_phpunit_assertion_call())
+            }
+        }
+        CallLikeArgumentListNode::PartialArgumentList(partial_argument_list) => {
+            if partial_argument_list.arguments.is_empty()
+                && (expression.is_attribute() && !f.settings.parentheses_in_attribute)
+            {
+                if let Some(inner_comments) = f.print_inner_comment(partial_argument_list.span(), true) {
+                    Document::Array(vec_in![f.arena;
+                        Document::String(b"("),
+                        inner_comments,
+                        Document::String(b")"),
+                    ])
+                } else {
+                    Document::empty()
+                }
+            } else {
+                print_partial_argument_list(f, partial_argument_list, expression.is_attribute())
+            }
+        }
     }
-
-    print_argument_list(f, argument_list, expression.is_attribute(), !expression.is_phpunit_assertion_call())
 }
 
 fn instantiation_needs_inline_new_parens<'arena, A>(
@@ -125,6 +148,41 @@ where
 pub(super) fn print_argument_list<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     argument_list: &'arena ArgumentList<'arena>,
+    can_expand_first_or_last: bool,
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    let partial_argument_list = promote_argument_list_to_partial(f.arena, argument_list);
+
+    format_argument_list(f, partial_argument_list, false, can_expand_first_or_last)
+}
+
+pub(crate) fn promote_argument_list_to_partial<'arena, A>(
+    arena: &'arena A,
+    argument_list: &ArgumentList<'arena>,
+) -> &'arena PartialArgumentList<'arena>
+where
+    A: Arena,
+{
+    let mut nodes = Vec::with_capacity_in(argument_list.arguments.len(), arena);
+    for argument in argument_list.arguments.iter() {
+        nodes.push(match argument {
+            Argument::Positional(positional) => PartialArgument::Positional(positional.clone()),
+            Argument::Named(named) => PartialArgument::Named(named.clone()),
+        });
+    }
+
+    arena.alloc(PartialArgumentList {
+        left_parenthesis: argument_list.left_parenthesis,
+        arguments: TokenSeparatedSequence::from_slices(nodes.leak(), argument_list.arguments.tokens),
+        right_parenthesis: argument_list.right_parenthesis,
+    })
+}
+
+fn format_argument_list<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    argument_list: &'arena PartialArgumentList<'arena>,
     for_attribute: bool,
     can_expand_first_or_last: bool,
 ) -> Document<'arena, A>
@@ -163,8 +221,10 @@ where
         }
     }
 
-    if !force_break && let Some(argument) = argument_list.arguments.first() {
-        let argument_expr = argument.value();
+    if !force_break
+        && let Some(argument) = argument_list.arguments.first()
+        && let Some(argument_expr) = argument.value()
+    {
         let leading_bound = deepest_leading_token_offset(argument_expr);
         if f.has_inner_line_comment_in_range(argument_list.left_parenthesis.end_offset(), leading_bound) {
             force_break = true;
@@ -203,7 +263,7 @@ where
     let previous_named_argument_padding = f.argument_state.named_argument_padding;
     for (i, arg) in argument_list.arguments.iter().enumerate() {
         f.argument_state.named_argument_padding = match (named_argument_width, arg) {
-            (Some(max_width), Argument::Named(argument)) => {
+            (Some(max_width), PartialArgument::Named(argument)) => {
                 Some(max_width.saturating_sub(string_width(argument.name.value)))
             }
             _ => None,
@@ -428,7 +488,7 @@ where
 
 fn should_align_named_arguments<A>(
     f: &FormatterState<'_, '_, A>,
-    argument_list: &ArgumentList<'_>,
+    argument_list: &PartialArgumentList<'_>,
     should_break_all: bool,
     should_inline: bool,
 ) -> bool
@@ -439,7 +499,7 @@ where
         return false;
     }
 
-    if !argument_list.arguments.iter().all(|arg| matches!(arg, Argument::Named(_))) {
+    if !argument_list.arguments.iter().all(|arg| matches!(arg, PartialArgument::Named(_))) {
         return false;
     }
 
@@ -451,12 +511,12 @@ where
         )
 }
 
-fn get_max_named_argument_width(argument_list: &ArgumentList<'_>) -> usize {
+fn get_max_named_argument_width(argument_list: &PartialArgumentList<'_>) -> usize {
     argument_list
         .arguments
         .iter()
         .filter_map(|arg| match arg {
-            Argument::Named(argument) => Some(string_width(argument.name.value)),
+            PartialArgument::Named(argument) => Some(string_width(argument.name.value)),
             _ => None,
         })
         .max()
@@ -494,7 +554,7 @@ where
 }
 
 #[inline]
-fn argument_has_surrounding_comments<A>(f: &FormatterState<'_, '_, A>, argument: &Argument) -> bool
+fn argument_has_surrounding_comments<A>(f: &FormatterState<'_, '_, A>, argument: &PartialArgument) -> bool
 where
     A: Arena,
 {
@@ -505,6 +565,7 @@ where
 pub(super) fn print_partial_argument_list<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     argument_list: &'arena PartialArgumentList<'arena>,
+    for_attribute: bool,
 ) -> Document<'arena, A>
 where
     A: Arena,
@@ -513,54 +574,7 @@ where
         return Document::String(b"(...)");
     }
 
-    let left_parenthesis = Document::String(b"(");
-    let mut contents = vec_in![f.arena; left_parenthesis];
-
-    let arguments_count = argument_list.arguments.len();
-    let mut formatted_arguments: Vec<'arena, Document<'arena, A>, A> = Vec::with_capacity_in(arguments_count, f.arena);
-    for arg in &argument_list.arguments {
-        formatted_arguments.push(arg.format(f));
-    }
-
-    let dangling_comments = f.print_dangling_comments(argument_list.span(), true);
-    let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
-
-    if arguments_count == 0 {
-        // Technically, this is impossible, but just in case..
-        contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(false)));
-        return Document::Array(contents);
-    }
-
-    let get_printed_arguments = |f: &mut FormatterState<'_, 'arena, A>, should_break: bool| {
-        let mut printed_arguments = vec_in![f.arena];
-
-        for (i, arg_idx) in (0..arguments_count).enumerate() {
-            let element = &argument_list.arguments.as_slice()[arg_idx];
-            let mut argument = vec_in![f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
-            if i < (arguments_count - 1) {
-                argument.push(Document::String(b","));
-
-                if f.is_next_line_empty(element.span()) {
-                    argument.push(Document::Line(Line::hard()));
-                    argument.push(Document::Line(Line::hard()));
-                } else if should_break {
-                    argument.push(Document::Line(Line::hard()));
-                } else {
-                    argument.push(Document::Line(Line::default()));
-                }
-            }
-
-            printed_arguments.push(Document::Array(argument));
-        }
-
-        printed_arguments
-    };
-
-    let printed_args = get_printed_arguments(f, false);
-    contents.push(Document::Group(Group::new(printed_args)));
-    contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None));
-
-    Document::Group(Group::new(contents))
+    format_argument_list(f, argument_list, for_attribute, true)
 }
 
 /// Checks if an expression is a concatenation chain (3+ operands) that exceeds print width.
@@ -583,7 +597,7 @@ where
 #[inline]
 pub fn should_break_all_arguments<A>(
     f: &FormatterState<'_, '_, A>,
-    argument_list: &ArgumentList,
+    argument_list: &PartialArgumentList,
     for_attributes: bool,
 ) -> bool
 where
@@ -592,7 +606,7 @@ where
     if f.settings.always_break_named_arguments_list
         && (!for_attributes || f.settings.always_break_attribute_named_argument_lists)
         && argument_list.arguments.len() >= 2
-        && argument_list.arguments.iter().all(|a| matches!(a, Argument::Named(_)))
+        && argument_list.arguments.iter().all(|a| matches!(a, PartialArgument::Named(_)))
     {
         return true;
     }
@@ -609,14 +623,18 @@ where
     }
 
     if argument_list.arguments.len() >= 2
-        && argument_list.arguments.iter().any(|a| is_call_with_wrapping_arrow_function(a.value()))
+        && argument_list
+            .arguments
+            .iter()
+            .any(|a| a.value().is_some_and(|value| is_call_with_wrapping_arrow_function(value)))
     {
         return true;
     }
 
     if argument_list.arguments.len() == 1
         && let Some(arg) = argument_list.arguments.first()
-        && is_breaking_binary(f, arg.value())
+        && let Some(value) = arg.value()
+        && is_breaking_binary(f, value)
     {
         return true;
     }
@@ -627,7 +645,7 @@ where
 #[inline]
 fn is_single_late_breaking_argument<'arena, A>(
     f: &FormatterState<'_, 'arena, A>,
-    argument_list: &'arena ArgumentList<'arena>,
+    argument_list: &'arena PartialArgumentList<'arena>,
 ) -> bool
 where
     A: Arena,
@@ -642,7 +660,7 @@ where
         return false;
     }
 
-    let Expression::ArrowFunction(arrow_function) = argument.value() else {
+    let Some(Expression::ArrowFunction(arrow_function)) = argument.value() else {
         return false;
     };
 
@@ -665,7 +683,7 @@ where
 #[inline]
 fn should_inline_single_value_argument<'arena, A>(
     f: &FormatterState<'_, 'arena, A>,
-    argument_list: &'arena ArgumentList<'arena>,
+    argument_list: &'arena PartialArgumentList<'arena>,
 ) -> bool
 where
     A: Arena,
@@ -684,13 +702,13 @@ where
         return false;
     }
 
-    is_simple_expression(argument.value())
+    argument.value().is_some_and(|value| is_simple_expression(value))
 }
 
 #[inline]
 fn should_inline_breaking_arguments<'arena, A>(
     f: &FormatterState<'_, 'arena, A>,
-    argument_list: &'arena ArgumentList<'arena>,
+    argument_list: &'arena PartialArgumentList<'arena>,
 ) -> bool
 where
     A: Arena,
@@ -700,7 +718,7 @@ where
     match arguments.len() {
         1 => {
             !argument_has_surrounding_comments(f, &arguments[0])
-                && should_hug_expression(f, arguments[0].value(), false)
+                && arguments[0].value().is_some_and(|value| should_hug_expression(f, value, false))
         }
         2 => {
             let Some(first_argument) = arguments.first() else {
@@ -717,8 +735,10 @@ where
                 return false;
             }
 
-            let first_expression = first_argument.value();
-            let second_expression = second_argument.value();
+            let (Some(first_expression), Some(second_expression)) = (first_argument.value(), second_argument.value())
+            else {
+                return false;
+            };
 
             let is_first_breaking = is_breaking_expression(f, first_expression, false);
             let is_second_breaking = is_breaking_expression(f, second_expression, false);
@@ -778,7 +798,7 @@ fn is_call_with_wrapping_arrow_function<'arena>(expr: &'arena Expression<'arena>
 /// * Reference <https://github.com/prettier/prettier/blob/3.3.3/src/language-js/print/call-arguments.js#L247-L272>
 pub fn should_expand_first_arg<'arena, A>(
     f: &FormatterState<'_, 'arena, A>,
-    argument_list: &'arena ArgumentList<'arena>,
+    argument_list: &'arena PartialArgumentList<'arena>,
     nested_args: bool,
 ) -> bool
 where
@@ -798,15 +818,19 @@ where
         return false;
     }
 
-    could_expand_value(f, first_argument.value(), nested_args)
-        && is_hopefully_short_call_argument(second_argument.value())
-        && !could_expand_value(f, second_argument.value(), nested_args)
+    let (Some(first_value), Some(second_value)) = (first_argument.value(), second_argument.value()) else {
+        return false;
+    };
+
+    could_expand_value(f, first_value, nested_args)
+        && is_hopefully_short_call_argument(second_value)
+        && !could_expand_value(f, second_value, nested_args)
 }
 
 /// * Reference <https://github.com/prettier/prettier/blob/52829385bcc4d785e58ae2602c0b098a643523c9/src/language-js/print/call-arguments.js#L234-L258>
 pub fn should_expand_last_arg<'arena, A>(
     f: &FormatterState<'_, 'arena, A>,
-    argument_list: &'arena ArgumentList<'arena>,
+    argument_list: &'arena PartialArgumentList<'arena>,
     nested_args: bool,
 ) -> bool
 where
@@ -817,7 +841,7 @@ where
         return false;
     }
 
-    let last_argument_value = last_argument.value();
+    let Some(last_argument_value) = last_argument.value() else { return false };
     let penultimate_argument = if argument_list.arguments.len() >= 2 {
         argument_list.arguments.get(argument_list.arguments.len() - 2)
     } else {
@@ -826,20 +850,21 @@ where
 
     let penultimate_argument_comments =
         penultimate_argument.is_some_and(|a| f.has_comment(a.span(), CommentFlags::LEADING | CommentFlags::TRAILING));
+    let penultimate_argument_value = penultimate_argument.and_then(|argument| argument.value());
 
     could_expand_value(f, last_argument_value, nested_args)
         // If the last two arguments are of the same type,
         // disable last element expansion.
         && (penultimate_argument.is_none()
             || penultimate_argument_comments
-            || matches!(penultimate_argument, Some(argument) if argument.value().node_kind() != last_argument_value.node_kind()))
+            || penultimate_argument_value.is_some_and(|value| value.node_kind() != last_argument_value.node_kind()))
         && (argument_list.arguments.len() != 2
             || penultimate_argument_comments
             || !matches!(last_argument_value, Expression::Array(_) | Expression::LegacyArray(_))
-            || !matches!(penultimate_argument.map(Argument::value), Some(Expression::Closure(c)) if c.use_clause.is_none()))
+            || !matches!(penultimate_argument_value, Some(Expression::Closure(c)) if c.use_clause.is_none()))
         && (argument_list.arguments.len() != 2
             || penultimate_argument_comments
-            || !matches!(penultimate_argument.map(Argument::value), Some(Expression::Array(_) | Expression::LegacyArray(_)))
+            || !matches!(penultimate_argument_value, Some(Expression::Array(_) | Expression::LegacyArray(_)))
             || !matches!(last_argument_value, Expression::Closure(c) if c.use_clause.is_none())
         )
 }

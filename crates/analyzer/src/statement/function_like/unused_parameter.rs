@@ -663,7 +663,7 @@ pub mod utils {
                 A: Arena,
             {
                 if let Some(argument_list) = anonymous_class.argument_list.as_ref() {
-                    self.walk_argument_list(argument_list, context);
+                    self.walk_partial_argument_list(argument_list, context);
                 }
             }
 

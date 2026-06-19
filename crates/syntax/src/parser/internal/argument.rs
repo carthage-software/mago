@@ -43,6 +43,16 @@ where
         }))
     }
 
+    pub(crate) fn parse_optional_partial_argument_list(
+        &mut self,
+    ) -> Result<Option<PartialArgumentList<'arena>>, ParseError> {
+        if let Some(T!["("]) = self.stream.peek_kind(0)? {
+            Ok(Some(self.parse_partial_argument_list()?))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub(crate) fn parse_partial_argument_list(&mut self) -> Result<PartialArgumentList<'arena>, ParseError> {
         let result = self.parse_comma_separated_sequence(T!["("], T![")"], |p| p.parse_partial_argument())?;
 

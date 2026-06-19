@@ -1,7 +1,6 @@
+use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
-
-use mago_allocator::Arena;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -809,7 +808,7 @@ where
         parts.push(selector.format(f));
         last_element_end = selector.span().end;
         if let Some(argument_list) = chain_link.get_arguments_list() {
-            let mut formatted_argument_list = vec_in![f.arena; print_argument_list(f, argument_list, false, true)];
+            let mut formatted_argument_list = vec_in![f.arena; print_argument_list(f, argument_list, true)];
             if let Some(comments) = f.print_trailing_comments(argument_list.span()) {
                 formatted_argument_list.push(comments);
             }
@@ -846,7 +845,7 @@ where
         last_element_end = selector.span().end;
         contents.push(selector.format(f));
         if let Some(argument_list) = chain_link.get_arguments_list() {
-            let mut formatted_argument_list = vec_in![f.arena; print_argument_list(f, argument_list, false, true)];
+            let mut formatted_argument_list = vec_in![f.arena; print_argument_list(f, argument_list, true)];
             if let Some(comments) = f.print_trailing_comments(argument_list.span()) {
                 formatted_argument_list.push(comments);
             }

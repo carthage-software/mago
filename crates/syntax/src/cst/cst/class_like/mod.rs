@@ -1,7 +1,7 @@
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::cst::cst::argument::ArgumentList;
+use crate::cst::cst::argument::PartialArgumentList;
 use crate::cst::cst::attribute::AttributeList;
 use crate::cst::cst::class_like::inheritance::Extends;
 use crate::cst::cst::class_like::inheritance::Implements;
@@ -90,7 +90,7 @@ pub struct AnonymousClass<'arena> {
     pub attribute_lists: Sequence<'arena, AttributeList<'arena>>,
     pub modifiers: Sequence<'arena, Modifier<'arena>>,
     pub class: Keyword<'arena>,
-    pub argument_list: Option<ArgumentList<'arena>>,
+    pub argument_list: Option<PartialArgumentList<'arena>>,
     pub extends: Option<Extends<'arena>>,
     pub implements: Option<Implements<'arena>>,
     pub left_brace: Span,

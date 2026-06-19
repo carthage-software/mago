@@ -20,7 +20,7 @@ where
     ) -> &'arena AnonymousClass<'arena, (), (), ()> {
         let attributes = self.lower_attribute_lists(&anonymous_class.attribute_lists);
         let arguments =
-            anonymous_class.argument_list.as_ref().map(|argument_list| self.lower_argument_list(argument_list));
+            anonymous_class.argument_list.as_ref().map(|argument_list| self.lower_partial_argument_list(argument_list));
 
         let extends = anonymous_class.extends.as_ref().map(|extends| self.lower_extends(extends));
         let implements = anonymous_class.implements.as_ref().map(|implements| self.lower_implements(implements));

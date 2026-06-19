@@ -981,7 +981,7 @@ generate_walker! {
     generic Attribute as attribute => {
         walker.walk_identifier(&attribute.class, context);
         for argument in attribute.arguments.iter().flatten() {
-            walker.walk_argument(argument, context);
+            walker.walk_partial_argument(argument, context);
         }
     }
 
@@ -1279,7 +1279,7 @@ generate_walker! {
         }
 
         for argument in anonymous_class.arguments.iter().flatten() {
-            walker.walk_argument(argument, context);
+            walker.walk_partial_argument(argument, context);
         }
 
         if let Some(extends) = anonymous_class.extends {

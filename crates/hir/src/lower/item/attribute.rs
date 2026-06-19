@@ -33,7 +33,10 @@ where
         Attribute {
             span: attribute.span(),
             class: self.lower_identifier(&attribute.name, Some(NameResolutionKind::Default)),
-            arguments: attribute.argument_list.as_ref().map(|argument_list| self.lower_argument_list(argument_list)),
+            arguments: attribute
+                .argument_list
+                .as_ref()
+                .map(|argument_list| self.lower_partial_argument_list(argument_list)),
         }
     }
 }

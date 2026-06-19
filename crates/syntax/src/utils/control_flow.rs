@@ -33,14 +33,14 @@ use crate::cst::WhileBody;
 use crate::cst::Yield;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ControlFlow<'ast, 'arena> {
-    Return(&'ast Return<'arena>),
-    Throw(&'ast Throw<'arena>),
-    Continue(&'ast Continue<'arena>),
-    Break(&'ast Break<'arena>),
+pub enum ControlFlow<'arena> {
+    Return(&'arena Return<'arena>),
+    Throw(&'arena Throw<'arena>),
+    Continue(&'arena Continue<'arena>),
+    Break(&'arena Break<'arena>),
 }
 
-impl HasSpan for ControlFlow<'_, '_> {
+impl HasSpan for ControlFlow<'_> {
     fn span(&self) -> Span {
         match self {
             ControlFlow::Return(r#return) => r#return.span(),
@@ -53,7 +53,7 @@ impl HasSpan for ControlFlow<'_, '_> {
 
 #[inline]
 #[must_use]
-pub fn find_control_flows_in_block<'ast, 'arena>(block: &'ast Block<'arena>) -> Vec<ControlFlow<'ast, 'arena>> {
+pub fn find_control_flows_in_block<'arena>(block: &'arena Block<'arena>) -> Vec<ControlFlow<'arena>> {
     let mut controls = vec![];
 
     for statement in &block.statements {
@@ -65,9 +65,7 @@ pub fn find_control_flows_in_block<'ast, 'arena>(block: &'ast Block<'arena>) -> 
 
 #[inline]
 #[must_use]
-pub fn find_control_flows_in_statement<'ast, 'arena>(
-    statement: &'ast Statement<'arena>,
-) -> Vec<ControlFlow<'ast, 'arena>> {
+pub fn find_control_flows_in_statement<'arena>(statement: &'arena Statement<'arena>) -> Vec<ControlFlow<'arena>> {
     let mut controls = vec![];
 
     match statement {
@@ -270,9 +268,7 @@ pub fn find_control_flows_in_statement<'ast, 'arena>(
 
 #[inline]
 #[must_use]
-pub fn find_control_flows_in_expression<'ast, 'arena>(
-    expression: &'ast Expression<'arena>,
-) -> Vec<ControlFlow<'ast, 'arena>> {
+pub fn find_control_flows_in_expression<'arena>(expression: &'arena Expression<'arena>) -> Vec<ControlFlow<'arena>> {
     let mut controls = vec![];
 
     match expression {
@@ -343,7 +339,11 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
         Expression::AnonymousClass(anonymous_class) => {
             if let Some(arguments) = &anonymous_class.argument_list {
                 for argument in &arguments.arguments {
-                    controls.extend(find_control_flows_in_expression(argument.value()));
+                    let Some(value) = argument.value() else {
+                        continue;
+                    };
+
+                    controls.extend(find_control_flows_in_expression(value));
                 }
             }
         }
@@ -573,7 +573,7 @@ pub fn find_control_flows_in_expression<'ast, 'arena>(
     controls
 }
 
-fn find_control_flows_in_variable<'ast, 'arena>(variable: &'ast Variable<'arena>) -> Vec<ControlFlow<'ast, 'arena>> {
+fn find_control_flows_in_variable<'arena>(variable: &'arena Variable<'arena>) -> Vec<ControlFlow<'arena>> {
     match variable {
         Variable::Indirect(indirect_variable) => find_control_flows_in_expression(indirect_variable.expression),
         Variable::Nested(nested_variable) => find_control_flows_in_variable(nested_variable.variable),

@@ -115,7 +115,6 @@ use crate::internal::format::assignment::print_assignment;
 use crate::internal::format::assignment::print_assignment_with_alignment;
 use crate::internal::format::binaryish;
 use crate::internal::format::binaryish::BinaryishOperator;
-use crate::internal::format::call_arguments::print_argument_list;
 use crate::internal::format::call_arguments::print_partial_argument_list;
 use crate::internal::format::call_node::CallLikeNode;
 use crate::internal::format::call_node::print_call_like_node;
@@ -768,7 +767,7 @@ where
     A: Arena,
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
-        wrap!(f, self, PartialArgumentList, { print_partial_argument_list(f, self) })
+        wrap!(f, self, PartialArgumentList, { print_partial_argument_list(f, self, false) })
     }
 }
 
@@ -1959,7 +1958,7 @@ where
 
             signature.push(self.class.format(f));
             if let Some(argument_list) = &self.argument_list {
-                signature.push(print_argument_list(f, argument_list, false, false));
+                signature.push(print_partial_argument_list(f, argument_list, false));
             }
 
             if let Some(extends) = &self.extends {

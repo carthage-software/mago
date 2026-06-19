@@ -1,7 +1,7 @@
 use mago_span::HasSpan;
 use mago_span::Span;
 
-use crate::cst::cst::argument::ArgumentList;
+use crate::cst::cst::argument::PartialArgumentList;
 use crate::cst::cst::identifier::Identifier;
 use crate::cst::sequence::TokenSeparatedSequence;
 
@@ -23,7 +23,7 @@ pub struct AttributeList<'arena> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Attribute<'arena> {
     pub name: Identifier<'arena>,
-    pub argument_list: Option<ArgumentList<'arena>>,
+    pub argument_list: Option<PartialArgumentList<'arena>>,
 }
 
 impl HasSpan for AttributeList<'_> {

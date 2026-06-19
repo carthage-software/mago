@@ -1,11 +1,8 @@
 use indexmap::IndexMap;
-use mago_allocator::Arena;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
-use mago_word::WordSet;
-use mago_word::word;
-
+use mago_allocator::Arena;
 use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_named_object;
 use mago_codex::ttype::get_never;
@@ -15,6 +12,8 @@ use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Parenthesized;
+use mago_word::WordSet;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;

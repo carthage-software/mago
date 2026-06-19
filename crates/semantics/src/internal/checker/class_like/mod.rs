@@ -21,6 +21,7 @@ use mago_syntax::cst::PropertyItem;
 use mago_syntax::cst::Sequence;
 use mago_syntax::cst::Trait;
 
+use crate::internal::checker::partial_application;
 use crate::internal::consts::ANONYMOUS_CLASS_NAME;
 use crate::internal::consts::CONSTRUCTOR_MAGIC_METHOD;
 use crate::internal::consts::MAGIC_METHODS;
@@ -1093,6 +1094,18 @@ pub fn check_anonymous_class<'ast, 'arena>(
             false,
             context,
         );
+    }
+
+    if let Some(argument_list) = &anonymous_class.argument_list {
+        for argument in &argument_list.arguments {
+            partial_application::report_disallowed_partial_argument(
+                argument,
+                "an anonymous class expression",
+                anonymous_class.span(),
+                format!("Anonymous class `{anonymous_class_name}` instantiated here."),
+                context,
+            );
+        }
     }
 
     check_members(

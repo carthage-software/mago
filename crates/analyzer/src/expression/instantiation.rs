@@ -1,4 +1,6 @@
 use mago_allocator::Arena;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_syntax::cst::PartialArgumentList;
 use std::borrow::Cow;
 use std::sync::Arc;
 
@@ -539,8 +541,8 @@ pub fn analyze_anonymous_class_constructor<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    class_like_metadata: &'ctx mago_codex::metadata::class_like::ClassLikeMetadata,
-    argument_list: Option<&mago_syntax::cst::ArgumentList<'arena>>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    argument_list: Option<&PartialArgumentList<'arena>>,
     instantiation_span: Span,
 ) -> Result<(), AnalysisError>
 where
@@ -572,7 +574,7 @@ where
                 span: instantiation_span,
             },
             arguments_source: match argument_list {
-                Some(arg_list) => InvocationArgumentsSource::ArgumentList(arg_list),
+                Some(arg_list) => InvocationArgumentsSource::PartialArgumentList(arg_list),
                 None => InvocationArgumentsSource::None(instantiation_span),
             },
             span: instantiation_span,

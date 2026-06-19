@@ -429,6 +429,8 @@ test_case!(issue_897_closure_brace_always_next_line);
 test_case!(issue_897_anonymous_class_brace_same_line);
 test_case!(issue_897_anonymous_class_brace_next_line);
 test_case!(issue_897_anonymous_class_brace_always_next_line);
+test_case!(partial_args_in_attribute);
+test_case!(partial_args_in_anonymous_class);
 test_case!(issue_974);
 test_case!(issue_993_print_width_with_indentation);
 test_case!(issue_994);

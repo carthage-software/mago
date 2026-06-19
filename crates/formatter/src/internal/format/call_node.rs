@@ -11,6 +11,7 @@ use mago_syntax::cst::ExitConstruct;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Instantiation;
 use mago_syntax::cst::MethodCall;
+use mago_syntax::cst::PartialArgumentList;
 use mago_syntax::cst::StaticMethodCall;
 use mago_syntax::cst::Variable;
 
@@ -23,6 +24,13 @@ use crate::internal::format::call_arguments::print_call_arguments;
 
 use super::member_access::format_access_operator;
 use super::misc;
+
+#[derive(Copy, Clone)]
+pub(super) enum CallLikeArgumentListNode<'arena> {
+    None,
+    ArgumentList(&'arena ArgumentList<'arena>),
+    PartialArgumentList(&'arena PartialArgumentList<'arena>),
+}
 
 #[derive(Copy, Clone)]
 pub(super) enum CallLikeNode<'arena> {
@@ -77,18 +85,34 @@ impl<'arena> CallLikeNode<'arena> {
         matches!(self, CallLikeNode::Attribute(_))
     }
 
-    pub fn arguments(&self) -> Option<&'arena ArgumentList<'arena>> {
+    pub fn arguments(&self) -> CallLikeArgumentListNode<'arena> {
         match self {
-            CallLikeNode::Call(call) => Some(match call {
+            CallLikeNode::Call(call) => CallLikeArgumentListNode::ArgumentList(match call {
                 Call::Function(c) => &c.argument_list,
                 Call::Method(c) => &c.argument_list,
                 Call::NullSafeMethod(c) => &c.argument_list,
                 Call::StaticMethod(c) => &c.argument_list,
             }),
-            CallLikeNode::Instantiation(new) => new.argument_list.as_ref(),
-            CallLikeNode::Attribute(attr) => attr.argument_list.as_ref(),
-            CallLikeNode::DieConstruct(die) => die.arguments.as_ref(),
-            CallLikeNode::ExitConstruct(exit) => exit.arguments.as_ref(),
+            CallLikeNode::Instantiation(new) => new
+                .argument_list
+                .as_ref()
+                .map(CallLikeArgumentListNode::ArgumentList)
+                .unwrap_or(CallLikeArgumentListNode::None),
+            CallLikeNode::DieConstruct(die) => die
+                .arguments
+                .as_ref()
+                .map(CallLikeArgumentListNode::ArgumentList)
+                .unwrap_or(CallLikeArgumentListNode::None),
+            CallLikeNode::ExitConstruct(exit) => exit
+                .arguments
+                .as_ref()
+                .map(CallLikeArgumentListNode::ArgumentList)
+                .unwrap_or(CallLikeArgumentListNode::None),
+            CallLikeNode::Attribute(attr) => attr
+                .argument_list
+                .as_ref()
+                .map(CallLikeArgumentListNode::PartialArgumentList)
+                .unwrap_or(CallLikeArgumentListNode::None),
         }
     }
 }

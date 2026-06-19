@@ -19,6 +19,8 @@ use crate::cst::MatchArm;
 use crate::cst::MethodCall;
 use crate::cst::MethodPartialApplication;
 use crate::cst::PartialApplication;
+use crate::cst::PartialArgument;
+use crate::cst::PartialArgumentList;
 use crate::cst::Statement;
 use crate::cst::StaticMethodCall;
 use crate::cst::StaticMethodPartialApplication;
@@ -27,16 +29,16 @@ use crate::cst::WhileBody;
 use crate::cst::Yield;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub enum MethodReference<'ast, 'arena> {
-    MethodCall(&'ast MethodCall<'arena>),
-    StaticMethodCall(&'ast StaticMethodCall<'arena>),
-    MethodPartialApplication(&'ast MethodPartialApplication<'arena>),
-    StaticMethodPartialApplication(&'ast StaticMethodPartialApplication<'arena>),
+pub enum MethodReference<'arena> {
+    MethodCall(&'arena MethodCall<'arena>),
+    StaticMethodCall(&'arena StaticMethodCall<'arena>),
+    MethodPartialApplication(&'arena MethodPartialApplication<'arena>),
+    StaticMethodPartialApplication(&'arena StaticMethodPartialApplication<'arena>),
 }
 
-impl<'ast, 'arena> MethodReference<'ast, 'arena> {
+impl<'arena> MethodReference<'arena> {
     #[must_use]
-    pub fn get_class_or_object(&self) -> &'ast Expression<'arena> {
+    pub fn get_class_or_object(&self) -> &'arena Expression<'arena> {
         match self {
             MethodReference::MethodCall(call) => call.object,
             MethodReference::StaticMethodCall(call) => call.class,
@@ -46,7 +48,7 @@ impl<'ast, 'arena> MethodReference<'ast, 'arena> {
     }
 
     #[must_use]
-    pub fn get_selector(&self) -> &'ast ClassLikeMemberSelector<'arena> {
+    pub fn get_selector(&self) -> &'arena ClassLikeMemberSelector<'arena> {
         match self {
             MethodReference::MethodCall(call) => &call.method,
             MethodReference::StaticMethodCall(call) => &call.method,
@@ -56,7 +58,7 @@ impl<'ast, 'arena> MethodReference<'ast, 'arena> {
     }
 
     #[must_use]
-    pub fn get_argument_list(&self) -> Option<&'ast ArgumentList<'arena>> {
+    pub fn get_argument_list(&self) -> Option<&'arena ArgumentList<'arena>> {
         match self {
             MethodReference::MethodCall(call) => Some(&call.argument_list),
             MethodReference::StaticMethodCall(call) => Some(&call.argument_list),
@@ -66,7 +68,7 @@ impl<'ast, 'arena> MethodReference<'ast, 'arena> {
     }
 }
 
-impl HasSpan for MethodReference<'_, '_> {
+impl HasSpan for MethodReference<'_> {
     fn span(&self) -> Span {
         match self {
             MethodReference::MethodCall(call) => call.span(),
@@ -77,12 +79,12 @@ impl HasSpan for MethodReference<'_, '_> {
     }
 }
 
-pub fn find_method_references_in_block<'ast, 'arena, F>(
-    block: &'ast Block<'arena>,
+pub fn find_method_references_in_block<'arena, F>(
+    block: &'arena Block<'arena>,
     predicate: &F,
-) -> Vec<MethodReference<'ast, 'arena>>
+) -> Vec<MethodReference<'arena>>
 where
-    F: Fn(&MethodReference<'ast, 'arena>) -> bool,
+    F: Fn(&MethodReference<'arena>) -> bool,
 {
     let mut method_references = vec![];
     for statement in &block.statements {
@@ -92,12 +94,12 @@ where
     method_references
 }
 
-pub fn find_method_references_in_statement<'ast, 'arena, F>(
-    statement: &'ast Statement<'arena>,
+pub fn find_method_references_in_statement<'arena, F>(
+    statement: &'arena Statement<'arena>,
     predicate: &F,
-) -> Vec<MethodReference<'ast, 'arena>>
+) -> Vec<MethodReference<'arena>>
 where
-    F: Fn(&MethodReference<'ast, 'arena>) -> bool,
+    F: Fn(&MethodReference<'arena>) -> bool,
 {
     match statement {
         Statement::Block(block) => {
@@ -294,12 +296,12 @@ where
     }
 }
 
-pub fn find_method_references_in_expression<'ast, 'arena, F>(
-    expression: &'ast Expression<'arena>,
+pub fn find_method_references_in_expression<'arena, F>(
+    expression: &'arena Expression<'arena>,
     predicate: &F,
-) -> Vec<MethodReference<'ast, 'arena>>
+) -> Vec<MethodReference<'arena>>
 where
-    F: Fn(&MethodReference<'ast, 'arena>) -> bool,
+    F: Fn(&MethodReference<'arena>) -> bool,
 {
     match expression {
         Expression::Binary(binary) => {
@@ -365,7 +367,7 @@ where
         Expression::ArrayAppend(array_append) => find_method_references_in_expression(array_append.array, predicate),
         Expression::AnonymousClass(anonymous_class) => {
             if let Some(argument_list) = &anonymous_class.argument_list {
-                find_references_in_argument_list(argument_list, predicate)
+                find_references_in_partial_argument_list(argument_list, predicate)
             } else {
                 vec![]
             }
@@ -442,22 +444,29 @@ where
             }
         },
         Expression::PartialApplication(partial_application) => match partial_application {
-            PartialApplication::Method(method_partial_application) => {
-                let reference = MethodReference::MethodPartialApplication(method_partial_application);
+            PartialApplication::Method(m) => {
+                let reference = MethodReference::MethodPartialApplication(m);
                 let mut references = if predicate(&reference) { vec![reference] } else { vec![] };
 
-                references.extend(find_method_references_in_expression(method_partial_application.object, predicate));
+                references.extend(find_method_references_in_expression(m.object, predicate));
+                references.extend(find_references_in_partial_argument_list(&m.argument_list, predicate));
                 references
             }
-            PartialApplication::StaticMethod(static_method_partial_application) => {
-                let reference = MethodReference::StaticMethodPartialApplication(static_method_partial_application);
+            PartialApplication::StaticMethod(s) => {
+                let reference = MethodReference::StaticMethodPartialApplication(s);
                 let mut references = if predicate(&reference) { vec![reference] } else { vec![] };
 
-                references
-                    .extend(find_method_references_in_expression(static_method_partial_application.class, predicate));
+                references.extend(find_method_references_in_expression(s.class, predicate));
+                references.extend(find_references_in_partial_argument_list(&s.argument_list, predicate));
                 references
             }
-            PartialApplication::Function(_) => vec![],
+            PartialApplication::Function(f) => {
+                let mut references = vec![];
+
+                references.extend(find_method_references_in_expression(f.function, predicate));
+                references.extend(find_references_in_partial_argument_list(&f.argument_list, predicate));
+                references
+            }
         },
         Expression::Instantiation(instantiation) => {
             if let Some(argument_list) = &instantiation.argument_list {
@@ -472,12 +481,12 @@ where
     }
 }
 
-fn find_references_in_argument_list<'ast, 'arena, F>(
-    argument_list: &'ast ArgumentList<'arena>,
+fn find_references_in_argument_list<'arena, F>(
+    argument_list: &'arena ArgumentList<'arena>,
     predicate: &F,
-) -> Vec<MethodReference<'ast, 'arena>>
+) -> Vec<MethodReference<'arena>>
 where
-    F: Fn(&MethodReference<'ast, 'arena>) -> bool,
+    F: Fn(&MethodReference<'arena>) -> bool,
 {
     let mut references = vec![];
     for argument in &argument_list.arguments {
@@ -488,6 +497,29 @@ where
             Argument::Named(named_argument) => {
                 references.extend(find_method_references_in_expression(named_argument.value, predicate));
             }
+        }
+    }
+
+    references
+}
+
+fn find_references_in_partial_argument_list<'arena, F>(
+    argument_list: &'arena PartialArgumentList<'arena>,
+    predicate: &F,
+) -> Vec<MethodReference<'arena>>
+where
+    F: Fn(&MethodReference<'arena>) -> bool,
+{
+    let mut references = vec![];
+    for argument in &argument_list.arguments {
+        match argument {
+            PartialArgument::Positional(positional_argument) => {
+                references.extend(find_method_references_in_expression(positional_argument.value, predicate));
+            }
+            PartialArgument::Named(named_argument) => {
+                references.extend(find_method_references_in_expression(named_argument.value, predicate));
+            }
+            _ => {}
         }
     }
 

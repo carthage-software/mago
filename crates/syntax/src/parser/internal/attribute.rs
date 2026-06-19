@@ -28,6 +28,6 @@ where
     }
 
     pub(crate) fn parse_attribute(&mut self) -> Result<Attribute<'arena>, ParseError> {
-        Ok(Attribute { name: self.parse_identifier()?, argument_list: self.parse_optional_argument_list()? })
+        Ok(Attribute { name: self.parse_identifier()?, argument_list: self.parse_optional_partial_argument_list()? })
     }
 }

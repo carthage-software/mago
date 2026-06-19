@@ -1,11 +1,12 @@
 use mago_allocator::Arena;
 use mago_php_version::PHPVersion;
-use mago_syntax::cst::ArgumentList;
 use mago_syntax::cst::AttributeList;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Literal;
 use mago_syntax::cst::LiteralInteger;
 use mago_syntax::cst::LiteralString;
+use mago_syntax::cst::PartialArgument;
+use mago_syntax::cst::PartialArgumentList;
 use mago_syntax::cst::Sequence;
 use mago_syntax::cst::UnaryPrefix;
 use mago_syntax::cst::UnaryPrefixOperator;
@@ -160,7 +161,7 @@ fn recognize(resolved_name: &[u8]) -> Option<ClaimKind> {
 #[allow(clippy::too_many_arguments)]
 fn apply_claim<'arena>(
     kind: ClaimKind,
-    argument_list: &'arena ArgumentList<'arena>,
+    argument_list: &'arena PartialArgumentList<'arena>,
     version: PHPVersion,
     verdict: &mut VersionVerdict,
     optional_latest: &mut PHPVersion,
@@ -168,8 +169,11 @@ fn apply_claim<'arena>(
     type_latest: &mut PHPVersion,
     have_type: &mut bool,
 ) {
-    let positional: Vec<&Expression<'_>> =
-        argument_list.arguments.iter().map(mago_syntax::cst::Argument::value).collect();
+    let Some(positional): Option<Vec<&Expression<'_>>> =
+        argument_list.arguments.iter().map(PartialArgument::value).collect()
+    else {
+        return;
+    };
 
     let parse_version = |expr: &Expression<'_>| literal_u32(expr).map(decode_decimal_version_id);
 

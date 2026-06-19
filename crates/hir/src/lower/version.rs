@@ -75,10 +75,11 @@ fn recognize_availability_claim(resolved_name: &[u8]) -> Option<AvailabilityClai
     }
 }
 
-fn first_version_argument<'scratch>(argument_list: &'scratch cst::ArgumentList<'scratch>) -> Option<PHPVersion> {
+fn first_version_argument<'scratch>(argument_list: &'scratch cst::PartialArgumentList<'scratch>) -> Option<PHPVersion> {
     let argument = argument_list.arguments.iter().next()?;
+    let value = argument.value()?;
 
-    literal_u32(argument.value()).map(decode_decimal_version_id)
+    literal_u32(value).map(decode_decimal_version_id)
 }
 
 fn literal_u32(expression: &cst::Expression<'_>) -> Option<u32> {

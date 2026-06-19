@@ -1124,7 +1124,7 @@ generate_fold! {
             arguments: attribute
                 .arguments
                 .as_ref()
-                .map(|arguments| fold_delimited(folder.arena(), arguments, |argument| folder.fold_argument(argument))),
+                .map(|arguments| fold_delimited(folder.arena(), arguments, |argument| folder.fold_partial_argument(argument))),
         }
     }
 
@@ -1510,7 +1510,7 @@ generate_fold! {
             arguments: anonymous_class
                 .arguments
                 .as_ref()
-                .map(|arguments| fold_delimited(folder.arena(), arguments, |argument| folder.fold_argument(argument))),
+                .map(|arguments| fold_delimited(folder.arena(), arguments, |argument| folder.fold_partial_argument(argument))),
             extends: anonymous_class.extends.map(|extends| copy_ref_into(extends, folder.arena())),
             implements: anonymous_class.implements.map(|implements| copy_ref_into(implements, folder.arena())),
             members: fold_delimited(folder.arena(), &anonymous_class.members, |member| folder.fold_member_item(member)),

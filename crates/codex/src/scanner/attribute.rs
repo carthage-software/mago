@@ -61,7 +61,11 @@ where
             return Some(AttributeFlags::TARGET_ALL);
         };
 
-        let inferred_type = infer(context, scope, first_argument.value(), classname);
+        let Some(value) = first_argument.value() else {
+            return None; // Semantically invalid, but we don't want to panic here.
+        };
+
+        let inferred_type = infer(context, scope, value, classname);
         let bits = inferred_type.and_then(|i| i.get_single_literal_int_value()).and_then(|value| {
             if !(0..=255).contains(&value) {
                 return None;

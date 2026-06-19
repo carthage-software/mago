@@ -124,7 +124,7 @@ where
             attribute_lists: self.parse_attribute_list_sequence()?,
             modifiers: self.parse_modifier_sequence()?,
             class: self.expect_keyword(T!["class"])?,
-            argument_list: self.parse_optional_argument_list()?,
+            argument_list: self.parse_optional_partial_argument_list()?,
             extends: self.parse_optional_extends()?,
             implements: self.parse_optional_implements()?,
             left_brace: self.stream.eat_span(T!["{"])?,

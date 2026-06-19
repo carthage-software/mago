@@ -575,7 +575,7 @@ generate_ast_walker! {
         walker.walk_identifier(&attribute.name, context);
 
         if let Some(argument_list) = &attribute.argument_list {
-            walker.walk_argument_list(argument_list, context);
+            walker.walk_partial_argument_list(argument_list, context);
         }
     }
 
@@ -1851,7 +1851,7 @@ generate_ast_walker! {
         walker.walk_keyword(&anonymous_class.new, context);
         walker.walk_keyword(&anonymous_class.class, context);
         if let Some(argument_list) = &anonymous_class.argument_list {
-            walker.walk_argument_list(argument_list, context);
+            walker.walk_partial_argument_list(argument_list, context);
         }
 
         if let Some(extends) = &anonymous_class.extends {

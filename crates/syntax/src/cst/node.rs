@@ -1114,7 +1114,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::Attribute(node) => {
                 f(Node::Identifier(&node.name));
                 if let Some(arguments) = &node.argument_list {
-                    f(Node::ArgumentList(arguments));
+                    f(Node::PartialArgumentList(arguments));
                 }
             }
             Node::AttributeList(node) => {
@@ -1433,7 +1433,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 }
                 f(Node::Keyword(&node.class));
                 if let Some(argument_list) = &node.argument_list {
-                    f(Node::ArgumentList(argument_list));
+                    f(Node::PartialArgumentList(argument_list));
                 }
                 for item in node.extends.iter() {
                     f(Node::Extends(item));
