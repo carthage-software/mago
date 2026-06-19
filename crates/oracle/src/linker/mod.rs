@@ -130,7 +130,7 @@ where
 
 /// Records every namespace prefix of a fully-qualified `name` as containing a
 /// symbol, so the checker can tell a missing class apart from a namespace.
-fn register_namespaces<'arena, A>(name: &[u8], table: &mut SymbolTable<'arena, A>)
+fn register_namespaces<A>(name: &[u8], table: &mut SymbolTable<'_, A>)
 where
     A: Arena,
 {
