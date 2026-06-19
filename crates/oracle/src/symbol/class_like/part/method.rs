@@ -69,8 +69,12 @@ pub struct MethodMember<'arena> {
     pub generics: &'arena [GenericParameter<'arena>],
     /// The parameters of the method.
     pub params: &'arena [SignatureParameter<'arena>],
+    /// The parameters that determine if the method is pure.
+    pub pure_unless_impure_params: &'arena [u32],
     /// The return type of the method.
     pub ret: TypeSlot<'arena>,
+    /// The type `$this` becomes after this method is invoked.
+    pub self_out: Option<TypeSlot<'arena>>,
     /// The where constraints of the method.
     pub where_constraints: &'arena [WhereConstraint<'arena>],
     /// The types that the method can throw.

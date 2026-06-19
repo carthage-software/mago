@@ -36,25 +36,27 @@ pub enum ArrowFunctionFlag {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[non_exhaustive]
 pub struct ArrowFunctionSymbol<'arena> {
-    /// The span of the ArrowFunction symbol.
+    /// The span of the arrow function symbol.
     pub span: Span,
-    /// The synthesized name of the ArrowFunction symbol.
+    /// The synthesized name of the arrow function symbol.
     pub name: Path<'arena>,
-    /// The flags of the ArrowFunction symbol.
+    /// The flags of the arrow function symbol.
     pub flags: U16Flags<ArrowFunctionFlag>,
-    /// The constraint of the ArrowFunction symbol.
+    /// The constraint of the arrow function symbol.
     pub constraint: SymbolConstraint<'arena>,
-    /// The attributes of the ArrowFunction symbol.
+    /// The attributes of the arrow function symbol.
     pub attributes: &'arena [AppliedAttribute<'arena>],
-    /// The generic parameters of the ArrowFunction symbol.
+    /// The generic parameters of the arrow function symbol.
     pub generics: &'arena [GenericParameter<'arena>],
-    /// The parameters of the ArrowFunction symbol.
+    /// The parameters of the arrow function symbol.
     pub params: &'arena [SignatureParameter<'arena>],
-    /// The return type of the ArrowFunction symbol.
+    /// The parameters that determine if the function is pure.
+    pub pure_unless_impure_params: &'arena [u32],
+    /// The return type of the arrow function symbol.
     pub ret: TypeSlot<'arena>,
-    /// The types that the ArrowFunction symbol can throw.
+    /// The types that the arrow function symbol can throw.
     pub throws: &'arena [Type<'arena>],
-    /// The assertions that the ArrowFunction makes about its parameters.
+    /// The assertions that the arrow function makes about its parameters.
     pub assertions: &'arena [FunctionLikeAssertion<'arena>],
     /// The origin of the symbol.
     pub origin: Origin,

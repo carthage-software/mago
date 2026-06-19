@@ -3,6 +3,7 @@
 pub mod assertion;
 pub mod definition;
 pub mod id;
+pub mod linker;
 pub mod path;
 pub mod reference;
 pub mod symbol;
