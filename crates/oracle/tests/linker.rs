@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+
 use std::borrow::Cow;
 
 use mago_allocator::Arena;

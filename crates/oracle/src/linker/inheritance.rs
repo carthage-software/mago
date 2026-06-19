@@ -243,7 +243,7 @@ where
 /// Expands the forwarding relation to its transitive closure: if `C` forwards
 /// `TC` into `D::TD` and `D` forwards `TD` into `E::TE`, then `C` forwards `TC`
 /// into `E::TE`.
-fn close_forwardings<'scratch, 'arena, S>(scratch: &'scratch S, forwardings: &mut ForwardingMap<'scratch, 'arena, S>)
+fn close_forwardings<'scratch, S>(scratch: &'scratch S, forwardings: &mut ForwardingMap<'scratch, '_, S>)
 where
     S: Arena,
 {

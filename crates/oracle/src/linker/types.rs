@@ -68,8 +68,8 @@ use crate::var::Var;
 /// Bridges a HIR native type into an oracle [`Type`], interning every atom
 /// through the builder. The atom list is gathered on the builder's scratch
 /// arena. Returns `None` only for the empty union (no atoms).
-pub(crate) fn lower_hir_type<'scratch, 'arena, S, A>(
-    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+pub(crate) fn lower_hir_type<'arena, S, A>(
+    builder: &mut TypeBuilder<'_, 'arena, S, A>,
     hir: &HirType<'arena>,
 ) -> Option<Type<'arena>>
 where
@@ -87,8 +87,8 @@ where
 
 /// Bridges a phpdoc type annotation into an oracle [`Type`], interning every
 /// atom through the builder on its scratch arena.
-pub(crate) fn lower_type_annotation<'scratch, 'arena, S, A>(
-    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+pub(crate) fn lower_type_annotation<'arena, S, A>(
+    builder: &mut TypeBuilder<'_, 'arena, S, A>,
     annotation: &TypeAnnotation<'arena>,
 ) -> Option<Type<'arena>>
 where
