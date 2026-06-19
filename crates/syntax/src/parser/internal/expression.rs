@@ -15,6 +15,7 @@ use crate::cst::cst::Call;
 use crate::cst::cst::ClassConstantAccess;
 use crate::cst::cst::ClassLikeConstantSelector;
 use crate::cst::cst::ClassLikeMemberSelector;
+use crate::cst::cst::Clone;
 use crate::cst::cst::Conditional;
 use crate::cst::cst::ConstantAccess;
 use crate::cst::cst::Expression;
@@ -844,6 +845,14 @@ where
                 then: conditional.then,
                 colon: conditional.colon,
                 r#else: self.create_assignment_expression(conditional.r#else, operator, rhs),
+            })),
+            // `clone` is the highest-precedence prefix construct, but assignment's
+            // LHS is grammatically a variable, so `clone $b = 1` binds as
+            // `clone ($b = 1)` (the `=` shifts into clone's operand), not
+            // `(clone $b) = 1`.
+            Expression::Clone(cloned) => self.arena.alloc(Expression::Clone(Clone {
+                clone: cloned.clone,
+                object: self.create_assignment_expression(cloned.object, operator, rhs),
             })),
             _ => self.arena.alloc(Expression::Assignment(Assignment { lhs, operator, rhs })),
         }

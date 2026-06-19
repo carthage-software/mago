@@ -566,7 +566,15 @@ mod parser {
         "($a = (($b instanceof C) && ($d instanceof E)))"
     );
     test_expression!(complex_not_and_instanceof, "$a = !$b instanceof C", "($a = (! ($b instanceof C)))");
+    test_expression!(
+        complex_cast_and_instanceof,
+        "(object) 1 instanceof stdClass",
+        "(((object) 1) instanceof stdClass)"
+    );
+    test_expression!(complex_bitwise_not_and_instanceof, "~$a instanceof C", "((~ $a) instanceof C)");
+    test_expression!(complex_unary_minus_and_instanceof, "-$a instanceof C", "((- $a) instanceof C)");
     test_expression!(complex_clone_and_arrow, "$a = clone $b * $c", "($a = ((clone $b) * $c))");
+    test_expression!(complex_clone_and_assignment, "clone $b = 1", "(clone ($b = 1))");
     test_expression!(complex_error_control_on_ternary, "$a = @$b ? $c : $d - $e", "($a = ( (@ $b) ? $c : ($d - $e) ))");
     test_expression!(
         complex_long_arithmetic_chain,

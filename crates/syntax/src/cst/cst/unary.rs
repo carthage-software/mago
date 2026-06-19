@@ -184,9 +184,14 @@ impl GetPrecedence for UnaryPrefixOperator<'_> {
     fn precedence(&self) -> Precedence {
         match self {
             Self::Reference(_) => Precedence::Reference,
-            Self::ErrorControl(_) => Precedence::ErrorControl,
             Self::PreIncrement(_) | Self::PreDecrement(_) => Precedence::IncDec,
-            _ => Precedence::Unary,
+            // `!` is the only prefix operator that binds *looser* than `instanceof`
+            // (PHP precedence level just below it), so it keeps `Unary`.
+            Self::Not(_) => Precedence::Unary,
+            // Casts, `~`, unary `+`/`-`, and `@` share one PHP precedence level
+            // that sits *above* `instanceof` and below `**`; `ErrorControl` is
+            // that level. (`(object)1 instanceof X` is `((object)1) instanceof X`.)
+            _ => Precedence::ErrorControl,
         }
     }
 }
