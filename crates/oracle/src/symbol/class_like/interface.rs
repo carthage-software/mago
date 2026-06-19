@@ -154,3 +154,10 @@ impl HasSpan for InterfaceSymbol<'_> {
         self.span
     }
 }
+
+impl From<InterfaceFlag> for u16 {
+    #[inline]
+    fn from(flag: InterfaceFlag) -> Self {
+        flag as u16
+    }
+}

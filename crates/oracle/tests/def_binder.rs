@@ -11,6 +11,7 @@ use mago_hir::lower::Lowering;
 use mago_oracle::definition::DefinitionTable;
 use mago_oracle::definition::binder::bind;
 use mago_oracle::id::SymbolId;
+use mago_oracle::symbol::part::origin::Origin;
 use mago_syntax::parser::parse_file;
 
 /// Parse and lower `code` to an untyped IR, fold it into a symbol-keyed IR plus a
@@ -27,7 +28,7 @@ fn with_bind<'arena>(
     let ir: IR<'arena, (), (), ()> = Lowering::new(arena, &scratch, &file, program, LowerSettings::default()).lower();
     let ir = arena.alloc(ir);
 
-    let (typed, table) = bind(arena, ir);
+    let (typed, table) = bind(arena, Origin::Project, ir);
 
     check(&typed, &table);
 }

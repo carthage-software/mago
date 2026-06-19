@@ -10,6 +10,7 @@ use mago_span::Span;
 
 use crate::definition::DefinitionTable;
 use crate::id::SymbolId;
+use crate::symbol::part::origin::Origin;
 
 /// Binds an untyped IR: assigns a [`SymbolId`] to every definition's item-meta
 /// slot and indexing each top-level/expression-level definition by that id.
@@ -20,6 +21,7 @@ use crate::id::SymbolId;
 /// tree but are not indexed in the table; they live inside their class.
 pub fn bind<'arena, A, S, E>(
     arena: &'arena A,
+    origin: Origin,
     ir: &'arena IR<'arena, (), S, E>,
 ) -> (IR<'arena, SymbolId, S, E>, DefinitionTable<'arena, A, S, E>)
 where
@@ -27,7 +29,7 @@ where
     S: Copy,
     E: Copy,
 {
-    let mut binder = Binder { arena, current_class: None, table: DefinitionTable::new_in(arena) };
+    let mut binder = Binder { arena, current_class: None, table: DefinitionTable::new_in(arena, origin) };
     let ir = binder.fold_ir(ir);
 
     (ir, binder.table)

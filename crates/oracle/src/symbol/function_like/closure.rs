@@ -51,6 +51,8 @@ pub struct ClosureSymbol<'arena> {
     pub generics: &'arena [GenericParameter<'arena>],
     /// The parameters of the closure symbol.
     pub params: &'arena [SignatureParameter<'arena>],
+    /// The parameters that determine if the closure is pure.
+    pub pure_unless_impure_params: &'arena [u32],
     /// The return type of the closure symbol.
     pub ret: TypeSlot<'arena>,
     /// The types that the closure symbol can throw.
