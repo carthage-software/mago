@@ -356,3 +356,298 @@ impl<'arena> World<'arena> for NullWorld {
         None
     }
 }
+
+use mago_allocator::Arena;
+
+use crate::symbol::Symbol;
+use crate::symbol::SymbolTable;
+use crate::symbol::class_like::ClassLikeSymbol;
+use crate::symbol::class_like::r#enum::EnumBackingType;
+use crate::symbol::class_like::part::inheritance::InheritedTypeList;
+use crate::symbol::part::generic::GenericParameter;
+use crate::ty::well_known;
+
+impl<'arena, A: Arena> World<'arena> for SymbolTable<'arena, A> {
+    fn descends_from(&self, child: SymbolId, ancestor: SymbolId) -> bool {
+        self.is_descendant(ancestor, child)
+    }
+
+    fn uses_trait(&self, class: SymbolId, trait_name: SymbolId) -> bool {
+        self.get_class_like(class).is_some_and(|symbol| class_uses(&symbol).contains(trait_name))
+    }
+
+    fn template_parameter_arity(&self, class: SymbolId) -> usize {
+        self.get_class_like(class).map_or(0, |symbol| class_generics(&symbol).len())
+    }
+
+    fn template_parameter_at(&self, class: SymbolId, position: usize) -> Option<TemplateParameter<'arena>> {
+        let symbol = self.get_class_like(class)?;
+        let parameter = class_generics(&symbol).get(position)?;
+
+        Some(TemplateParameter {
+            name: parameter.name,
+            variance: parameter.variance,
+            upper_bound: Some(parameter.constraint),
+        })
+    }
+
+    fn template_parameter_index(&self, class: SymbolId, name: &[u8]) -> Option<usize> {
+        let symbol = self.get_class_like(class)?;
+
+        class_generics(&symbol).iter().position(|parameter| parameter.name == name)
+    }
+
+    fn inherited_template_argument(
+        &self,
+        child: SymbolId,
+        ancestor: SymbolId,
+        position: usize,
+    ) -> Option<Type<'arena>> {
+        let child_symbol = self.get_class_like(child)?;
+        let edge = inheritance_edge_to(&child_symbol, ancestor)?;
+
+        let ancestor_symbol = self.get_class_like(ancestor)?;
+        let parameter = class_generics(&ancestor_symbol).get(position)?;
+
+        edge.arguments.iter().find(|argument| argument.parameter == parameter.name).map(|argument| argument.ty)
+    }
+
+    fn template_parameter_forwards_to(
+        &self,
+        from_class: SymbolId,
+        from_parameter: &[u8],
+        to_class: SymbolId,
+        to_parameter: &[u8],
+    ) -> bool {
+        if from_class == to_class && from_parameter == to_parameter {
+            return true;
+        }
+
+        let Some(symbol) = self.get_class_like(from_class) else {
+            return false;
+        };
+
+        class_forwardings(&symbol).iter().any(|forwarding| {
+            forwarding.parameter == from_parameter
+                && forwarding.target.defining_entity == to_class
+                && forwarding.target.name == to_parameter
+        })
+    }
+
+    fn class_has_method(&self, class: SymbolId, method: &[u8]) -> bool {
+        let Some(symbol) = self.get_class_like(class) else {
+            return false;
+        };
+        let target = SymbolId::method(class_name(&symbol), method);
+
+        symbol.methods().members.iter().any(|member| member.name.id == target)
+    }
+
+    fn class_property_type(&self, class: SymbolId, property: &[u8]) -> Option<Type<'arena>> {
+        let symbol = self.get_class_like(class)?;
+        let target = SymbolId::property(class_name(&symbol), property);
+
+        symbol
+            .properties()?
+            .members
+            .iter()
+            .find(|member| member.name.id == target)
+            .and_then(|member| member.ty.effective())
+    }
+
+    fn class_has_property(&self, class: SymbolId, property: &[u8]) -> bool {
+        let Some(symbol) = self.get_class_like(class) else {
+            return false;
+        };
+        let Some(properties) = symbol.properties() else {
+            return false;
+        };
+        let target = SymbolId::property(class_name(&symbol), property);
+
+        properties.members.iter().any(|member| member.name.id == target)
+    }
+
+    fn enum_backing(&self, enum_name: SymbolId) -> Option<EnumBacking<'arena>> {
+        match self.get_class_like(enum_name)? {
+            ClassLikeSymbol::Enum(symbol) => Some(match symbol.backing_type {
+                None => EnumBacking::Pure,
+                Some(EnumBackingType::Int) => EnumBacking::Backed(well_known::TYPE_INT),
+                Some(EnumBackingType::String) => EnumBacking::Backed(well_known::TYPE_STRING),
+            }),
+            _ => None,
+        }
+    }
+
+    fn class_like_kind(&self, name: SymbolId) -> Option<ClassLikeKind> {
+        Some(match self.get_class_like(name)? {
+            ClassLikeSymbol::Class(_) | ClassLikeSymbol::AnonymousClass(_) => ClassLikeKind::Class,
+            ClassLikeSymbol::Interface(_) => ClassLikeKind::Interface,
+            ClassLikeSymbol::Trait(_) => ClassLikeKind::Trait,
+            ClassLikeSymbol::Enum(_) => ClassLikeKind::Enum,
+        })
+    }
+
+    fn is_final(&self, name: SymbolId) -> bool {
+        match self.get_class_like(name) {
+            Some(ClassLikeSymbol::Class(class)) => class.is_final(),
+            Some(ClassLikeSymbol::Enum(_) | ClassLikeSymbol::AnonymousClass(_)) => true,
+            _ => false,
+        }
+    }
+
+    fn alias_body(&self, class: SymbolId, alias: &[u8]) -> Option<Type<'arena>> {
+        let symbol = self.get_class_like(class)?;
+        let target = SymbolId::type_alias(class_name(&symbol), alias);
+
+        class_aliases(&symbol)
+            .members
+            .iter()
+            .find(|member| member.name.id == target)
+            .and_then(|member| member.ty.effective())
+    }
+
+    fn class_constant_type(&self, class: SymbolId, constant: &[u8]) -> Option<Type<'arena>> {
+        let symbol = self.get_class_like(class)?;
+        let target = SymbolId::class_like_constant(class_name(&symbol), constant);
+
+        symbol
+            .constants()
+            .members
+            .iter()
+            .find(|member| member.name.id == target)
+            .and_then(|member| member.ty.effective())
+    }
+
+    fn class_constants(&self, class: SymbolId) -> &[ClassLikeConstantMember<'arena>] {
+        self.get_class_like(class).map_or(&[], |symbol| symbol.constants().members)
+    }
+
+    fn enum_cases(&self, enum_name: SymbolId) -> &[EnumCaseMember<'arena>] {
+        match self.get_class_like(enum_name) {
+            Some(ClassLikeSymbol::Enum(symbol)) => symbol.cases.members,
+            _ => &[],
+        }
+    }
+
+    fn global_constant_type(&self, name: SymbolId) -> Option<Type<'arena>> {
+        self.get_constant(name).and_then(|constant| constant.ty.effective())
+    }
+
+    fn class_property_count(&self, class: SymbolId) -> usize {
+        self.get_class_like(class)
+            .and_then(|symbol| symbol.properties())
+            .map_or(0, |properties| properties.members.len())
+    }
+
+    fn class_property_at(&self, class: SymbolId, position: usize) -> Option<ClassProperty<'arena>> {
+        let symbol = self.get_class_like(class)?;
+        let property = symbol.properties()?.members.get(position)?;
+
+        Some(ClassProperty {
+            name: property.name.segments.last().map_or(&[][..], |segment| segment.as_bytes()),
+            r#type: property.ty.effective().unwrap_or(well_known::TYPE_MIXED),
+            visibility: property.visibility.read,
+        })
+    }
+
+    fn sealed_direct_inheritors(&self, class_like: SymbolId) -> Option<&[InheritedType<'arena>]> {
+        let permitted = match self.get_class_like(class_like)? {
+            ClassLikeSymbol::Class(class) => class.permitted_inheritors,
+            ClassLikeSymbol::Interface(interface) => interface.permitted_inheritors,
+            _ => return None,
+        };
+
+        if permitted.is_empty() { None } else { Some(permitted) }
+    }
+
+    fn sealed_parent_of(&self, child: SymbolId) -> Option<Path<'arena>> {
+        let symbol = self.get_class_like(child)?;
+        let sealed_parents = class_sealed_parents(&symbol);
+
+        sealed_parents.first().and_then(|&parent| self.get_class_like(parent)).map(|parent| parent.path())
+    }
+}
+
+fn class_name<'arena>(symbol: &ClassLikeSymbol<'arena>) -> &'arena [u8] {
+    symbol.path().segments.first().map_or(&[][..], |segment| segment.as_bytes())
+}
+
+fn class_generics<'arena>(symbol: &ClassLikeSymbol<'arena>) -> &'arena [GenericParameter<'arena>] {
+    match symbol {
+        ClassLikeSymbol::Class(class) => class.generics,
+        ClassLikeSymbol::Interface(interface) => interface.generics,
+        ClassLikeSymbol::Trait(r#trait) => r#trait.generics,
+        ClassLikeSymbol::Enum(_) | ClassLikeSymbol::AnonymousClass(_) => &[],
+    }
+}
+
+fn class_forwardings<'arena>(
+    symbol: &ClassLikeSymbol<'arena>,
+) -> &'arena [crate::symbol::part::generic::GenericParameterForwarding<'arena>] {
+    match symbol {
+        ClassLikeSymbol::Class(class) => class.forwardings,
+        ClassLikeSymbol::Interface(interface) => interface.forwardings,
+        ClassLikeSymbol::Trait(r#trait) => r#trait.forwardings,
+        ClassLikeSymbol::Enum(_) | ClassLikeSymbol::AnonymousClass(_) => &[],
+    }
+}
+
+fn class_uses<'arena>(symbol: &ClassLikeSymbol<'arena>) -> InheritedTypeList<'arena> {
+    match symbol {
+        ClassLikeSymbol::Class(class) => class.uses,
+        ClassLikeSymbol::Trait(r#trait) => r#trait.uses,
+        ClassLikeSymbol::Enum(r#enum) => r#enum.uses,
+        ClassLikeSymbol::AnonymousClass(anonymous_class) => anonymous_class.uses,
+        ClassLikeSymbol::Interface(_) => InheritedTypeList { edges: &[], index: &[] },
+    }
+}
+
+fn class_aliases<'arena>(
+    symbol: &ClassLikeSymbol<'arena>,
+) -> crate::symbol::class_like::part::alias::TypeAliasMemberList<'arena> {
+    match symbol {
+        ClassLikeSymbol::Class(class) => class.aliases,
+        ClassLikeSymbol::Interface(interface) => interface.aliases,
+        ClassLikeSymbol::Trait(r#trait) => r#trait.aliases,
+        ClassLikeSymbol::Enum(r#enum) => r#enum.aliases,
+        ClassLikeSymbol::AnonymousClass(_) => {
+            crate::symbol::class_like::part::alias::TypeAliasMemberList { members: &[], index: &[] }
+        }
+    }
+}
+
+/// The inheritance edge from `symbol` to `ancestor`, searched across its
+/// superclass, interfaces, and used traits without allocating. The list lookups
+/// binary-search their `target.id` index.
+fn inheritance_edge_to<'arena>(symbol: &ClassLikeSymbol<'arena>, ancestor: SymbolId) -> Option<InheritedType<'arena>> {
+    let superclass = match symbol {
+        ClassLikeSymbol::Class(class) => class.extends,
+        ClassLikeSymbol::AnonymousClass(anonymous_class) => anonymous_class.extends,
+        _ => None,
+    };
+    if let Some(extends) = superclass {
+        if extends.target.id == ancestor {
+            return Some(extends);
+        }
+    }
+
+    let lists: [InheritedTypeList<'arena>; 2] = match symbol {
+        ClassLikeSymbol::Class(class) => [class.implements, class.uses],
+        ClassLikeSymbol::Interface(interface) => [interface.extends, InheritedTypeList { edges: &[], index: &[] }],
+        ClassLikeSymbol::Trait(r#trait) => [r#trait.uses, InheritedTypeList { edges: &[], index: &[] }],
+        ClassLikeSymbol::Enum(r#enum) => [r#enum.implements, r#enum.uses],
+        ClassLikeSymbol::AnonymousClass(anonymous_class) => [anonymous_class.implements, anonymous_class.uses],
+    };
+
+    lists.iter().find_map(|list| list.get(ancestor).copied())
+}
+
+fn class_sealed_parents<'arena>(symbol: &ClassLikeSymbol<'arena>) -> &'arena [SymbolId] {
+    match symbol {
+        ClassLikeSymbol::Class(class) => class.sealed_parents,
+        ClassLikeSymbol::Interface(interface) => interface.sealed_parents,
+        ClassLikeSymbol::Enum(r#enum) => r#enum.sealed_parents,
+        ClassLikeSymbol::AnonymousClass(anonymous_class) => anonymous_class.sealed_parents,
+        ClassLikeSymbol::Trait(_) => &[],
+    }
+}

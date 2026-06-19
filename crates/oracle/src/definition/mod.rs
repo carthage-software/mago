@@ -12,6 +12,7 @@ use mago_hir::ir::item::statement::r#trait::Trait;
 
 use crate::id::SymbolId;
 use crate::id::SymbolIdBuildHasher;
+use crate::symbol::part::origin::Origin;
 
 pub mod binder;
 
@@ -29,6 +30,7 @@ pub struct DefinitionTable<'arena, A, S, E>
 where
     A: Arena,
 {
+    pub origin: Origin,
     pub constants: DefinitionMap<'arena, A, Constant<'arena, SymbolId, S, E>>,
     pub functions: DefinitionMap<'arena, A, Function<'arena, SymbolId, S, E>>,
     pub classes: DefinitionMap<'arena, A, Class<'arena, SymbolId, S, E>>,
@@ -46,8 +48,9 @@ where
 {
     /// Creates an empty definition table with every map allocated in `arena`.
     #[must_use]
-    pub fn new_in(arena: &'arena A) -> Self {
+    pub fn new_in(arena: &'arena A, origin: Origin) -> Self {
         DefinitionTable {
+            origin,
             constants: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
             functions: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),
             classes: HashMap::with_hasher_in(SymbolIdBuildHasher, arena),

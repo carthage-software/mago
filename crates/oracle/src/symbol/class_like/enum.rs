@@ -123,3 +123,10 @@ impl HasSpan for EnumSymbol<'_> {
         self.span
     }
 }
+
+impl From<EnumFlag> for u8 {
+    #[inline]
+    fn from(flag: EnumFlag) -> Self {
+        flag as u8
+    }
+}
