@@ -1266,6 +1266,10 @@ generate_walker! {
     }
 
     generic AnonymousClass as anonymous_class => {
+        for modifier in anonymous_class.modifiers {
+            walker.walk_modifier(modifier, context);
+        }
+
         if let Some(annotation) = anonymous_class.annotation {
             walker.walk_item_annotation(annotation, context);
         }

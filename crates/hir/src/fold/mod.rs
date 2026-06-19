@@ -1501,6 +1501,7 @@ generate_fold! {
     AnonymousClass as anonymous_class => {
         AnonymousClass {
             span: anonymous_class.span,
+            modifiers: folder.arena().alloc_slice_copy(anonymous_class.modifiers),
             name: folder.arena().alloc_slice_copy(anonymous_class.name),
             annotation: anonymous_class.annotation.map(|annotation| &*folder.arena().alloc(folder.fold_item_annotation(annotation))),
             attributes: folder.arena().alloc_slice_fill_iter(

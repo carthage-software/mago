@@ -2,6 +2,9 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 use mago_flags::U8Flags;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -14,9 +17,6 @@ use crate::ir::item::parameter::Parameter;
 use crate::ir::statement::Statement;
 use crate::ir::r#type::Type;
 use crate::ir::variable::DirectVariable;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_ref_into;
-use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]

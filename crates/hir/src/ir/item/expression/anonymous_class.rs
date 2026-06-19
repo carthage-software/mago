@@ -16,11 +16,13 @@ use crate::ir::item::attribute::Attribute;
 use crate::ir::item::inheritance::Extends;
 use crate::ir::item::inheritance::Implements;
 use crate::ir::item::member::MemberItem;
+use crate::ir::item::modifier::Modifier;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct AnonymousClass<'arena, I, S, E> {
     pub span: Span,
+    pub modifiers: &'arena [Modifier],
     pub name: &'arena [u8],
     pub annotation: Option<&'arena ItemAnnotation<'arena, I, S, E>>,
     pub attributes: &'arena [Attribute<'arena, I, S, E>],
@@ -44,6 +46,7 @@ where
     {
         AnonymousClass {
             span: self.span,
+            modifiers: arena.alloc_slice_copy(self.modifiers),
             name: arena.alloc_slice_copy(self.name),
             annotation: self.annotation.map(|node| copy_ref_into(node, arena)),
             attributes: copy_slice_into(self.attributes, arena),

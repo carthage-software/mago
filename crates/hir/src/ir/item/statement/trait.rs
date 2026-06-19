@@ -2,6 +2,9 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 use mago_php_version::PHPVersionRange;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -12,9 +15,6 @@ use crate::ir::item::Item;
 use crate::ir::item::annotation::ItemAnnotation;
 use crate::ir::item::attribute::Attribute;
 use crate::ir::item::member::MemberItem;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_ref_into;
-use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]

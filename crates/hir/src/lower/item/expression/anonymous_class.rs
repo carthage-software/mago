@@ -26,6 +26,7 @@ where
         let implements = anonymous_class.implements.as_ref().map(|implements| self.lower_implements(implements));
 
         let span = anonymous_class.span();
+        let modifiers = self.lower_modifiers(&anonymous_class.modifiers);
         let name = self.build_synthetic_name(b"anonymous-class", span);
         let owner = Identifier { span, value: name, kind: IdentifierKind::Local };
         let document = self.phpdoc_resolution.get(anonymous_class.span());
@@ -39,6 +40,16 @@ where
 
         self.type_resolution.leave_scope();
 
-        self.arena.alloc(AnonymousClass { span, name, annotation, attributes, arguments, extends, implements, members })
+        self.arena.alloc(AnonymousClass {
+            span,
+            modifiers,
+            name,
+            annotation,
+            attributes,
+            arguments,
+            extends,
+            implements,
+            members,
+        })
     }
 }
