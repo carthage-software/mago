@@ -12,6 +12,7 @@ use mago_oracle::definition::DefinitionTable;
 use mago_oracle::definition::binder::bind;
 use mago_oracle::id::SymbolId;
 use mago_oracle::linker::link;
+use mago_oracle::linker::link_with;
 use mago_oracle::symbol::Symbol;
 use mago_oracle::symbol::SymbolTable;
 use mago_oracle::symbol::part::origin::Origin;
@@ -130,6 +131,121 @@ fn flattens_inherited_members_queryable_through_symbols() {
         let handle = table.class_constants(base);
         let _ = handle;
         assert!(matches!(table.class_like_kind(contract), Some(kind) if format!("{kind:?}") == "Interface"));
+    });
+}
+
+/// Links `base_sources` into a base table, then links `slice_sources` on top of
+/// it with [`link_with`], and runs `check` with both the merged table and the
+/// untouched base so a test can assert the base is not mutated.
+fn with_layered_link(
+    base_sources: &[(Origin, &str)],
+    slice_sources: &[(Origin, &str)],
+    check: impl FnOnce(&SymbolTable<'_, LocalArena>, &SymbolTable<'_, LocalArena>),
+) {
+    let arena = LocalArena::new();
+    let scratch = LocalArena::new();
+
+    let base_tables: std::vec::Vec<_> =
+        base_sources.iter().map(|(origin, source)| define(&arena, *origin, source)).collect();
+    let base = link(&arena, &scratch, &base_tables);
+
+    let slice_tables: std::vec::Vec<_> =
+        slice_sources.iter().map(|(origin, source)| define(&arena, *origin, source)).collect();
+    let merged = link_with(&arena, &scratch, &base, &slice_tables);
+
+    check(&merged, &base);
+}
+
+#[test]
+fn links_slice_on_top_of_a_base_table() {
+    let base = [(Origin::Runtime, "<?php class Builtin {} interface Stringable {}")];
+    let slice = [(Origin::Project, "<?php class UserModel extends Builtin implements Stringable {}")];
+
+    with_layered_link(&base, &slice, |merged, _base| {
+        let builtin = SymbolId::class_like(b"Builtin");
+        let stringable = SymbolId::class_like(b"Stringable");
+        let user_model = SymbolId::class_like(b"UserModel");
+
+        assert!(merged.get_class_like(builtin).is_some(), "the base class is carried into the merged table");
+        assert!(merged.get_class_like(user_model).is_some(), "the slice class is linked");
+        assert!(merged.descends_from(user_model, builtin), "the slice class extends the base class");
+        assert!(merged.descends_from(user_model, stringable), "the slice class implements the base interface");
+        assert!(merged.is_descendant(builtin, user_model), "the base class records the slice descendant");
+    });
+}
+
+#[test]
+fn slice_inherits_members_declared_in_the_base() {
+    let base =
+        [(Origin::Runtime, "<?php class Collection { public function count(): int { return 0; } const SIZE = 0; }")];
+    let slice = [(Origin::Project, "<?php class UserList extends Collection { public function first(): mixed {} }")];
+
+    with_layered_link(&base, &slice, |merged, _base| {
+        let user_list = SymbolId::class_like(b"UserList");
+
+        assert!(merged.class_has_method(user_list, b"first"), "the slice class declares its own member");
+        assert!(merged.class_has_method(user_list, b"count"), "the slice class inherits the base method");
+        assert!(
+            merged
+                .class_constants(user_list)
+                .iter()
+                .any(|member| member.name.id == SymbolId::class_like_constant(b"UserList", b"SIZE")),
+            "the slice class inherits the base constant",
+        );
+    });
+}
+
+#[test]
+fn link_with_does_not_mutate_the_base_table() {
+    let base = [(Origin::Runtime, "<?php class Builtin {}")];
+    let slice = [(Origin::Project, "<?php class UserModel extends Builtin {}")];
+
+    with_layered_link(&base, &slice, |merged, base| {
+        let builtin = SymbolId::class_like(b"Builtin");
+        let user_model = SymbolId::class_like(b"UserModel");
+
+        assert!(base.get_class_like(user_model).is_none(), "the slice class never leaks into the base");
+        assert!(!base.is_descendant(builtin, user_model), "the base descendant index is left untouched");
+        assert!(merged.is_descendant(builtin, user_model), "the merged descendant index sees the new edge");
+    });
+}
+
+#[test]
+fn slice_keeps_base_symbol_when_it_loses_origin_priority() {
+    let base = [(Origin::Project, "<?php class Widget { public function fromBase(): void {} }")];
+    let slice = [(Origin::Dependency, "<?php class Widget { public function fromSlice(): void {} }")];
+
+    with_layered_link(&base, &slice, |merged, _base| {
+        let widget = SymbolId::class_like(b"Widget");
+
+        assert!(merged.class_has_method(widget, b"fromBase"), "the higher-origin base declaration is kept");
+        assert!(!merged.class_has_method(widget, b"fromSlice"), "the lower-origin slice declaration loses");
+    });
+}
+
+#[test]
+fn slice_replaces_base_symbol_when_it_wins_origin_priority() {
+    let base = [(Origin::Dependency, "<?php class Widget { public function fromBase(): void {} }")];
+    let slice = [(Origin::Project, "<?php class Widget { public function fromSlice(): void {} }")];
+
+    with_layered_link(&base, &slice, |merged, _base| {
+        let widget = SymbolId::class_like(b"Widget");
+
+        assert!(merged.class_has_method(widget, b"fromSlice"), "the higher-origin slice declaration wins");
+        assert!(!merged.class_has_method(widget, b"fromBase"), "the lower-origin base declaration is replaced");
+    });
+}
+
+#[test]
+fn links_slice_functions_and_constants_alongside_the_base() {
+    let base = [(Origin::Runtime, "<?php function builtin_fn(): void {} const BUILTIN_CONST = 1;")];
+    let slice = [(Origin::Project, "<?php function user_fn(): void {} const USER_CONST = 2;")];
+
+    with_layered_link(&base, &slice, |merged, _base| {
+        assert!(merged.get_function_like(SymbolId::function_like(b"builtin_fn")).is_some(), "base function carried");
+        assert!(merged.get_function_like(SymbolId::function_like(b"user_fn")).is_some(), "slice function linked");
+        assert!(merged.get_constant(SymbolId::constant(b"BUILTIN_CONST")).is_some(), "base constant carried");
+        assert!(merged.get_constant(SymbolId::constant(b"USER_CONST")).is_some(), "slice constant linked");
     });
 }
 

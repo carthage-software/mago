@@ -19,6 +19,7 @@ use mago_oracle::definition::DefinitionTable;
 use mago_oracle::definition::binder::bind;
 use mago_oracle::id::SymbolId;
 use mago_oracle::linker::link;
+use mago_oracle::linker::link_with;
 use mago_oracle::path::Path;
 use mago_oracle::symbol::SymbolTable;
 use mago_oracle::symbol::class_like::ClassLikeKind;
@@ -93,6 +94,18 @@ pub fn symbol_table<'arena>(arena: &'arena LocalArena, source: &str) -> SymbolTa
     let scratch = LocalArena::new();
     let definition = define(arena, source);
     link(arena, &scratch, std::slice::from_ref(&definition))
+}
+
+/// Link one PHP source on top of an existing `base` symbol table, returning the
+/// merged table in `arena`.
+pub fn symbol_table_onto<'arena>(
+    arena: &'arena LocalArena,
+    base: &SymbolTable<'arena, LocalArena>,
+    source: &str,
+) -> SymbolTable<'arena, LocalArena> {
+    let scratch = LocalArena::new();
+    let definition = define(arena, source);
+    link_with(arena, &scratch, base, std::slice::from_ref(&definition))
 }
 
 /// Assert that two atom slices are multiset-equal (order-insensitive).
