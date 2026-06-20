@@ -133,7 +133,7 @@ impl<'arena> Recorder<'arena> for RedundantRecorder<'arena> {
 #[derive(Default)]
 pub struct DeadStoreVarInfo {
     pub do_not_flag: bool,
-    pub pending_write: Option<(Span, u32)>,
+    pub pending: Vec<(Span, Box<[u32]>)>,
     pub dead_stores: Vec<Span>,
 }
 
@@ -151,9 +151,13 @@ impl<'arena> DeadStoreRecorder<'arena> {
         self.info.entry(name).or_default()
     }
 
-    fn current_arm(&self) -> u32 {
-        self.arm_stack.last().copied().unwrap_or(0)
+    fn current_path(&self) -> Box<[u32]> {
+        self.arm_stack.iter().copied().collect()
     }
+}
+
+fn write_overwrites(path: &[u32], pending: &[u32]) -> bool {
+    pending.starts_with(path)
 }
 
 impl<'arena> Recorder<'arena> for DeadStoreRecorder<'arena> {
@@ -165,28 +169,39 @@ impl<'arena> Recorder<'arena> for DeadStoreRecorder<'arena> {
         self.record_write(name, span);
         let info = self.entry(name);
         info.do_not_flag = true;
-        info.pending_write = None;
+        info.pending.clear();
     }
 
     fn record_write(&mut self, name: &'arena [u8], span: Span) {
-        let arm = self.current_arm();
+        let path = self.current_path();
         let info = self.entry(name);
-        let prev = info.pending_write.replace((span, arm));
-        if let Some((prev_span, prev_arm)) = prev
-            && prev_arm == arm
-            && !info.do_not_flag
-        {
-            info.dead_stores.push(prev_span);
+        let flag = !info.do_not_flag;
+
+        let mut index = 0;
+        while index < info.pending.len() {
+            if write_overwrites(&path, &info.pending[index].1) {
+                let (dead_span, _) = info.pending.swap_remove(index);
+                if flag {
+                    info.dead_stores.push(dead_span);
+                }
+            } else {
+                index += 1;
+            }
         }
+
+        info.pending.push((span, path));
     }
 
     fn record_read(&mut self, name: &'arena [u8]) {
-        self.entry(name).pending_write = None;
+        self.entry(name).pending.clear();
     }
 
     fn record_read_then_write(&mut self, name: &'arena [u8], span: Span) {
-        let arm = self.current_arm();
-        self.entry(name).pending_write = Some((span, arm));
+        let path = self.current_path();
+        let info = self.entry(name);
+
+        info.pending.clear();
+        info.pending.push((span, path));
     }
 
     fn record_call_argument(&mut self, name: &'arena [u8], span: Span) {

@@ -387,4 +387,81 @@ mod tests {
             }
         "#}
     }
+
+    test_lint_failure! {
+        name = conditional_write_does_not_hide_outer_dead_store,
+        rule = NoDeadStoreRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            function getint(): int
+            {
+                return mt_rand(0, max: 1);
+            }
+
+            function test(): int
+            {
+                $x = 42;
+                if (0 === getint()) {
+                    $x = getint();
+                }
+
+                $x = getint();
+                $x += getint();
+                return $x;
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = outer_store_dead_across_conditional_overwrite,
+        rule = NoDeadStoreRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            function f(bool $cond): int {
+                $x = 1;
+                if ($cond) {
+                    $x = 2;
+                }
+                $x = 3;
+                return $x;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = outer_store_read_inside_branch_is_not_dead,
+        rule = NoDeadStoreRule,
+        code = indoc! {r#"
+            <?php
+
+            function f(bool $cond): int {
+                $x = 1;
+                if ($cond) {
+                    echo $x;
+                }
+                $x = 3;
+                return $x;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = conditional_only_store_read_after_branch,
+        rule = NoDeadStoreRule,
+        code = indoc! {r#"
+            <?php
+
+            function f(bool $cond): int {
+                $x = 1;
+                if ($cond) {
+                    $x = 2;
+                }
+                return $x;
+            }
+        "#}
+    }
 }
