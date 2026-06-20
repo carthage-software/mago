@@ -22,6 +22,7 @@ use mago_hir::ir::r#type::annotation::StringTypeAnnotation;
 use mago_hir::ir::r#type::annotation::TypeAnnotation;
 use mago_hir::ir::r#type::annotation::TypeAnnotationKind;
 
+use crate::symbol::class_like::ClassLikeKind;
 use crate::symbol::class_like::part::visibility::Visibility;
 use crate::ty::Atom;
 use crate::ty::Type;
@@ -51,7 +52,6 @@ use crate::ty::atom::payload::object::shape::ObjectShapeFlag;
 use crate::ty::atom::payload::reference::GlobalReferenceAtom;
 use crate::ty::atom::payload::reference::MemberReferenceAtom;
 use crate::ty::atom::payload::reference::NameSelector;
-use crate::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 use crate::ty::atom::payload::scalar::class_like_string::ClassLikeStringAtom;
 use crate::ty::atom::payload::scalar::class_like_string::ClassLikeStringSpecifier;
 use crate::ty::atom::payload::scalar::float::FloatAtom;

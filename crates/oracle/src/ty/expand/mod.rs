@@ -35,6 +35,8 @@ use mago_flags::U8Flags;
 
 use crate::id::SymbolId;
 use crate::path::Path;
+use crate::symbol::SymbolTable;
+use crate::symbol::class_like::ClassLikeKind;
 use crate::symbol::class_like::part::visibility::Visibility;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
@@ -51,7 +53,6 @@ use crate::ty::atom::payload::reference::GlobalReferenceAtom;
 use crate::ty::atom::payload::reference::MemberReferenceAtom;
 use crate::ty::atom::payload::reference::NameSelector;
 use crate::ty::atom::payload::reference::SymbolReferenceAtom;
-use crate::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 use crate::ty::atom::payload::scalar::class_like_string::ClassLikeStringSpecifier;
 use crate::ty::atom::payload::scalar::int::IntAtom;
 use crate::ty::atom::payload::scalar::string::StringLiteral;
@@ -62,40 +63,42 @@ use crate::ty::lattice::overlaps;
 use crate::ty::lattice::refines;
 use crate::ty::transform;
 use crate::ty::well_known;
-use crate::world::World;
+use crate::ty::well_known::TYPE_MIXED;
 
 mod context;
 
 pub use self::context::ExpansionContext;
 
-/// Resolve every expandable atom inside `ty` against `world`, with the
+/// Resolve every expandable atom inside `ty` against `symbols`, with the
 /// default expansion context (no contextual class names, conditionals
 /// preserved).
 #[inline]
-pub fn expand<'arena, S, A, W>(ty: Type<'arena>, world: &W, builder: &mut TypeBuilder<'_, 'arena, S, A>) -> Type<'arena>
+pub fn expand<'arena, S, A>(
+    ty: Type<'arena>,
+    symbols: &SymbolTable<'arena, A>,
+    builder: &mut TypeBuilder<'_, 'arena, S, A>,
+) -> Type<'arena>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    expand_with(ty, world, &ExpansionContext::default(), builder)
+    expand_with(ty, symbols, &ExpansionContext::default(), builder)
 }
 
 /// Like [`expand`] but with a caller-supplied [`ExpansionContext`].
 /// Returns the same [`Type`] when nothing changed.
 #[inline]
-pub fn expand_with<'arena, S, A, W>(
+pub fn expand_with<'arena, S, A>(
     ty: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Type<'arena>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    transform::flat_map_with_builder(ty, |atom, builder| resolve_atom(atom, world, context, builder), builder)
+    transform::flat_map_with_builder(ty, |atom, builder| resolve_atom(atom, symbols, context, builder), builder)
 }
 
 /// Per-atom resolution. By the time this fires, [`crate::transform`]
@@ -103,52 +106,50 @@ where
 /// atom's payload; the closure receives an atom whose children are
 /// fully expanded.
 #[inline]
-fn resolve_atom<'arena, S, A, W>(
+fn resolve_atom<'arena, S, A>(
     atom: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Vec<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match atom {
-        Atom::Alias(payload) => resolve_alias(atom, payload, world, context, builder),
-        Atom::Reference(payload) => resolve_reference(payload, world, context, builder),
-        Atom::MemberReference(payload) => resolve_member_reference(atom, payload, world, context, builder),
-        Atom::GlobalReference(payload) => resolve_global_reference(atom, payload, world, context, builder),
-        Atom::Derived(payload) => resolve_derived(atom, payload, world, context, builder),
-        Atom::Conditional(payload) => resolve_conditional(atom, payload, world, context, builder),
-        Atom::Object(payload) => resolve_object(atom, payload, world, context, builder),
+        Atom::Alias(payload) => resolve_alias(atom, payload, symbols, context, builder),
+        Atom::Reference(payload) => resolve_reference(payload, symbols, context, builder),
+        Atom::MemberReference(payload) => resolve_member_reference(atom, payload, symbols, context, builder),
+        Atom::GlobalReference(payload) => resolve_global_reference(atom, payload, symbols, context, builder),
+        Atom::Derived(payload) => resolve_derived(atom, payload, symbols, context, builder),
+        Atom::Conditional(payload) => resolve_conditional(atom, payload, symbols, context, builder),
+        Atom::Object(payload) => resolve_object(atom, payload, symbols, context, builder),
         Atom::GenericParameter(payload) => resolve_generic_parameter(atom, payload, context),
         _ => vec![atom],
     }
 }
 
 #[inline]
-fn resolve_alias<'arena, S, A, W>(
+fn resolve_alias<'arena, S, A>(
     atom: Atom<'arena>,
     payload: &AliasAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Vec<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if !context.evaluate_aliases {
         return vec![atom];
     }
 
-    let Some(body) = world.alias_body(payload.class_name.id, payload.alias_name) else {
+    let Some(body) = symbols.alias_body(payload.class_name.id, payload.alias_name) else {
         return vec![atom];
     };
 
-    expand_with(body, world, context, builder).atoms.to_vec()
+    expand_with(body, symbols, context, builder).atoms.to_vec()
 }
 
 /// `SymbolReference("Foo", type_arguments)` is, semantically, the same
@@ -158,29 +159,28 @@ where
 /// (a `self` / `static` / `parent` reference picks up the corresponding
 /// context entry).
 #[inline]
-fn resolve_reference<'arena, S, A, W>(
+fn resolve_reference<'arena, S, A>(
     payload: &SymbolReferenceAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Vec<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let resolved_name = resolve_keyword_name(payload.name, U8Flags::empty(), context).unwrap_or(payload.name);
     let mut object =
         ObjectAtom { name: resolved_name, type_arguments: payload.type_arguments, flags: U8Flags::empty() };
 
     if context.fill_template_defaults && object.type_arguments.is_none() {
-        let arity = world.template_parameter_arity(object.name.id);
+        let arity = symbols.template_parameter_arity(object.name.id);
         if arity > 0 {
             let filled: Vec<Type<'arena>> = (0..arity)
                 .map(|position| {
-                    world
+                    symbols
                         .template_parameter_at(object.name.id, position)
-                        .and_then(|parameter| parameter.upper_bound)
+                        .map(|parameter| parameter.constraint)
                         .unwrap_or(well_known::TYPE_MIXED)
                 })
                 .collect();
@@ -211,27 +211,26 @@ fn resolve_generic_parameter<'arena>(
 /// Resolve a class-like constant reference.
 ///
 /// `Foo::CONST` (an `Identifier` selector) resolves to the constant's declared
-/// type via [`World::class_constant_type`], recursively expanded.
+/// type via [`SymbolTable::class_constant_type`], recursively expanded.
 ///
 /// A wildcard / prefix / suffix selector (`Foo::*`, `Foo::STATUS_*`,
 /// `Foo::*_FLAG`, `Foo::*PART*`) resolves to the union of every constant whose
 /// name matches the selector - and, when `Foo` is an enum, every matching case
 /// as well. Each matched constant body is itself expanded; each matched enum
 /// case contributes its singleton case type. When nothing matches (or the
-/// world knows no constants for the class-like), the reference is preserved
+/// the symbol table knows no constants for the class-like), the reference is preserved
 /// unchanged.
 #[inline]
-fn resolve_member_reference<'arena, S, A, W>(
+fn resolve_member_reference<'arena, S, A>(
     atom: Atom<'arena>,
     payload: &MemberReferenceAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Vec<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if !context.evaluate_class_constants {
         return vec![atom];
@@ -240,27 +239,27 @@ where
     let class = payload.class_like_name;
 
     if let NameSelector::Identifier(constant) = payload.selector {
-        let Some(body) = world.class_constant_type(class.id, constant) else {
+        let Some(body) = symbols.class_constant_type(class.id, constant) else {
             return vec![atom];
         };
 
-        return expand_with(body, world, context, builder).atoms.to_vec();
+        return expand_with(body, symbols, context, builder).atoms.to_vec();
     }
 
     let selector = payload.selector;
 
     let mut constant_bodies: Vec<Type<'arena>> = Vec::new();
-    for constant in world.class_constants(class.id) {
+    for constant in symbols.class_constants(class.id) {
         if selector_matches(selector, constant.name.as_bytes())
-            && let Some(body) = constant.ty.effective()
+            && let Some(body) = constant.ty.effective(true)
         {
             constant_bodies.push(body);
         }
     }
 
     let mut case_names: Vec<&'arena [u8]> = Vec::new();
-    if world.class_like_kind(class.id) == Some(ClassLikeKind::Enum) {
-        for case in world.enum_cases(class.id) {
+    if symbols.class_like_kind(class.id) == Some(ClassLikeKind::Enum) {
+        for case in symbols.enum_cases(class.id) {
             let name = case.name.as_bytes();
             if selector_matches(selector, name) {
                 case_names.push(name);
@@ -274,7 +273,7 @@ where
 
     let mut resolved: Vec<Atom<'arena>> = Vec::new();
     for body in constant_bodies {
-        let expanded = expand_with(body, world, context, builder);
+        let expanded = expand_with(body, symbols, context, builder);
         resolved.extend_from_slice(expanded.atoms);
     }
 
@@ -316,19 +315,18 @@ fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
 }
 
 /// A global constant reference resolves through
-/// [`World::global_constant_type`]. Wildcard selectors pass through.
+/// [`SymbolTable::global_constant_type`]. Wildcard selectors pass through.
 #[inline]
-fn resolve_global_reference<'arena, S, A, W>(
+fn resolve_global_reference<'arena, S, A>(
     atom: Atom<'arena>,
     payload: &GlobalReferenceAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Vec<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if !context.evaluate_global_constants {
         return vec![atom];
@@ -338,25 +336,24 @@ where
         return vec![atom];
     };
 
-    let Some(body) = world.global_constant_type(SymbolId::constant(name)) else {
+    let Some(body) = symbols.global_constant_type(SymbolId::constant(name)) else {
         return vec![atom];
     };
 
-    expand_with(body, world, context, builder).atoms.to_vec()
+    expand_with(body, symbols, context, builder).atoms.to_vec()
 }
 
 #[inline]
-fn resolve_derived<'arena, S, A, W>(
+fn resolve_derived<'arena, S, A>(
     atom: Atom<'arena>,
     payload: &DerivedAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Vec<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let evaluated = match *payload {
         DerivedAtom::KeyOf(target) => Some(evaluate_key_of(target, builder)),
@@ -365,10 +362,10 @@ where
         DerivedAtom::IntMask(members) => Some(evaluate_int_mask(members, builder)),
         DerivedAtom::IntMaskOf(target) => Some(evaluate_int_mask_of(target, builder)),
         DerivedAtom::TemplateType { object, class_name, template_name } => {
-            evaluate_template_type(object, class_name, template_name, world, context, builder)
+            evaluate_template_type(object, class_name, template_name, symbols, context, builder)
         }
-        DerivedAtom::PropertiesOf { target, visibility } => evaluate_properties_of(target, visibility, world, builder),
-        DerivedAtom::New(target) => evaluate_new(target, world, context, builder),
+        DerivedAtom::PropertiesOf { target, visibility } => evaluate_properties_of(target, visibility, symbols, builder),
+        DerivedAtom::New(target) => evaluate_new(target, symbols, context, builder),
     };
 
     match evaluated {
@@ -389,17 +386,16 @@ where
 /// preserved unchanged - its operands have already been walked by the
 /// enclosing transform call.
 #[inline]
-fn resolve_conditional<'arena, S, A, W>(
+fn resolve_conditional<'arena, S, A>(
     atom: Atom<'arena>,
     payload: &ConditionalAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Vec<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if !context.evaluate_conditional {
         return vec![atom];
@@ -407,8 +403,8 @@ where
 
     let mut report = LatticeReport::new();
     let options = LatticeOptions::default();
-    let test_passes = refines(payload.subject, payload.target, world, options, &mut report, builder);
-    let test_disjoint = !overlaps(payload.subject, payload.target, world, options, &mut report, builder);
+    let test_passes = refines(payload.subject, payload.target, symbols, options, &mut report, builder);
+    let test_disjoint = !overlaps(payload.subject, payload.target, symbols, options, &mut report, builder);
 
     let (chosen_then, chosen_otherwise) =
         if payload.negated { (payload.otherwise, payload.then) } else { (payload.then, payload.otherwise) };
@@ -438,17 +434,16 @@ where
 /// - Default-fill of unfilled generic positions when
 ///   [`ExpansionContext::fill_template_defaults`] is on.
 #[inline]
-fn resolve_object<'arena, S, A, W>(
+fn resolve_object<'arena, S, A>(
     atom: Atom<'arena>,
     payload: &ObjectAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Vec<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let mut object = *payload;
     let mut changed = false;
@@ -467,13 +462,13 @@ where
     }
 
     if context.fill_template_defaults && object.type_arguments.is_none() {
-        let arity = world.template_parameter_arity(object.name.id);
+        let arity = symbols.template_parameter_arity(object.name.id);
         if arity > 0 {
             let filled: Vec<Type<'arena>> = (0..arity)
                 .map(|position| {
-                    world
+                    symbols
                         .template_parameter_at(object.name.id, position)
-                        .and_then(|parameter| parameter.upper_bound)
+                        .map(|parameter| parameter.constraint)
                         .unwrap_or(well_known::TYPE_MIXED)
                 })
                 .collect();
@@ -789,32 +784,31 @@ where
 /// where `Sub extends ClassName<int>`) - that binding is the result. Otherwise
 /// the declared upper bound of `T` (or `mixed` when unbounded) stands in as the
 /// widest sound type. Returns `None` (the atom passes through) only when the
-/// world knows nothing about `ClassName` or `T`.
+/// the symbol table knows nothing about `ClassName` or `T`.
 #[inline]
-fn evaluate_template_type<'arena, S, A, W>(
+fn evaluate_template_type<'arena, S, A>(
     object: Type<'arena>,
     class_name: Type<'arena>,
     template_name: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Option<Type<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let class = single_object_or_reference_name(class_name)?;
     let template = single_string_literal_value(template_name)?;
-    let position = world.template_parameter_index(class.id, template)?;
+    let position = symbols.template_parameter_index(class.id, template)?;
 
-    if let Some(binding) = template_binding_from_object(object, class, position, world) {
-        return Some(expand_with(binding, world, context, builder));
+    if let Some(binding) = template_binding_from_object(object, class, position, symbols) {
+        return Some(expand_with(binding, symbols, context, builder));
     }
 
-    let parameter = world.template_parameter_at(class.id, position)?;
+    let parameter = symbols.template_parameter_at(class.id, position)?;
 
-    Some(expand_with(parameter.upper_bound.unwrap_or(well_known::TYPE_MIXED), world, context, builder))
+    Some(expand_with(parameter.constraint, symbols, context, builder))
 }
 
 /// Read the type `object` binds to `class`'s template at `position`, if any.
@@ -822,17 +816,17 @@ where
 /// `object` is the already-expanded type of the value operand. A single object
 /// atom that *is* `class` exposes the binding through its own type arguments; a
 /// single object atom that *descends from* `class` exposes it through the
-/// inheritance edge ([`World::inherited_template_argument`]). Anything else -
+/// inheritance edge ([`SymbolTable::inherited_template_argument`]). Anything else -
 /// a union, a non-object, a raw `class` with no arguments - yields `None`.
 #[inline]
-fn template_binding_from_object<'arena, W>(
+fn template_binding_from_object<'arena, A>(
     object: Type<'arena>,
     class: Path<'_>,
     position: usize,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
 ) -> Option<Type<'arena>>
 where
-    W: World<'arena>,
+    A: Arena,
 {
     let [only] = object.atoms else {
         return None;
@@ -848,8 +842,8 @@ where
         return type_arguments.and_then(|arguments| arguments.get(position).copied());
     }
 
-    if world.descends_from(object_name.id, class.id) {
-        return world.inherited_template_argument(object_name.id, class.id, position);
+    if symbols.descends_from(object_name.id, class.id) {
+        return symbols.inherited_template_argument(object_name.id, class.id, position);
     }
 
     None
@@ -860,33 +854,36 @@ where
 /// `visibility` filters the enumeration; `None` keeps every visible
 /// property.
 #[inline]
-fn evaluate_properties_of<'arena, S, A, W>(
+fn evaluate_properties_of<'arena, S, A>(
     target: Type<'arena>,
     visibility: Option<Visibility>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Option<Type<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let class = single_object_or_reference_name(target)?;
 
-    let count = world.class_property_count(class.id);
+    let count = symbols.class_property_count(class.id);
     let mut entries: Vec<KnownItem<'arena>> = Vec::with_capacity(count);
     for position in 0..count {
-        let Some(property) = world.class_property_at(class.id, position) else {
+        let Some(property) = symbols.class_property_at(class.id, position) else {
             continue;
         };
 
         if let Some(required) = visibility
-            && property.visibility != required
+            && property.visibility.read != required
         {
             continue;
         }
 
-        entries.push(KnownItem { key: ArrayKey::String(property.name), value: property.r#type, optional: false });
+        entries.push(KnownItem {
+            key: ArrayKey::String(property.name.as_bytes()),
+            value: property.ty.effective(false).unwrap_or(TYPE_MIXED),
+            optional: false,
+        });
     }
 
     entries.sort_by_key(|entry| entry.key);
@@ -916,28 +913,27 @@ where
 /// result obtainable from the type alone; argument-driven inference belongs to
 /// the call-site analyzer, not type expansion.
 #[inline]
-fn evaluate_new<'arena, S, A, W>(
+fn evaluate_new<'arena, S, A>(
     target: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     context: &ExpansionContext<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Option<Type<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let [only] = target.atoms else {
         return None;
     };
 
     match only {
-        Atom::Object(payload) => Some(instantiate_named_class(payload.name, world, builder)),
-        Atom::Reference(payload) => Some(instantiate_named_class(payload.name, world, builder)),
+        Atom::Object(payload) => Some(instantiate_named_class(payload.name, symbols, builder)),
+        Atom::Reference(payload) => Some(instantiate_named_class(payload.name, symbols, builder)),
         Atom::ClassLikeString(payload) => match payload.specifier {
-            ClassLikeStringSpecifier::Literal { value } => Some(instantiate_named_class(value, world, builder)),
+            ClassLikeStringSpecifier::Literal { value } => Some(instantiate_named_class(value, symbols, builder)),
             ClassLikeStringSpecifier::OfType { constraint } | ClassLikeStringSpecifier::Generic { constraint } => {
-                Some(expand_with(constraint, world, context, builder))
+                Some(expand_with(constraint, symbols, context, builder))
             }
             ClassLikeStringSpecifier::Any => Some(well_known::TYPE_OBJECT),
         },
@@ -948,25 +944,24 @@ where
 /// Build the instance type of `class`, filling each template position `class`
 /// declares with its upper bound (or `mixed` when unbounded).
 #[inline]
-fn instantiate_named_class<'arena, S, A, W>(
+fn instantiate_named_class<'arena, S, A>(
     class: Path<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Type<'arena>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    let arity = world.template_parameter_arity(class.id);
+    let arity = symbols.template_parameter_arity(class.id);
     let object = if arity == 0 {
         ObjectAtom { name: class, type_arguments: None, flags: U8Flags::empty() }
     } else {
         let arguments: Vec<Type<'arena>> = (0..arity)
             .map(|position| {
-                world
+                symbols
                     .template_parameter_at(class.id, position)
-                    .and_then(|parameter| parameter.upper_bound)
+                    .map(|parameter| parameter.constraint)
                     .unwrap_or(well_known::TYPE_MIXED)
             })
             .collect();

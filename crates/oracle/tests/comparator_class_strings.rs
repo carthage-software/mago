@@ -189,83 +189,80 @@ fn lit_class_string_in_class_string_of_self() {
 #[test]
 fn lit_class_string_in_class_string_of_ancestor() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.add_edge("Bar", "Foo");
+        let symbols = symbol_table(f.arena, "<?php class Foo {} class Bar extends Foo {}");
         let named = f.t_named("Foo");
         let named_type = f.u(named);
         let foo = f.t_class_string_of(named_type);
         let literal = f.t_lit_class_string("Bar");
-        assert!(atomic_is_contained(f, literal, foo, &world));
+        assert!(atomic_is_contained(f, literal, foo, &symbols));
     });
 }
 
 #[test]
 fn lit_class_string_not_in_class_string_of_unrelated() {
     fixture(|f| {
-        let world = MockWorld::new();
+        let symbols = empty_symbol_table(f.arena);
         let named = f.t_named("Foo");
         let named_type = f.u(named);
         let foo = f.t_class_string_of(named_type);
         let literal = f.t_lit_class_string("Bar");
-        assert!(!atomic_is_contained(f, literal, foo, &world));
+        assert!(!atomic_is_contained(f, literal, foo, &symbols));
     });
 }
 
 #[test]
 fn class_string_of_child_in_class_string_of_parent() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.add_edge("Bar", "Foo");
+        let symbols = symbol_table(f.arena, "<?php class Foo {} class Bar extends Foo {}");
         let foo = f.t_named("Foo");
         let foo_type = f.u(foo);
         let parent = f.t_class_string_of(foo_type);
         let bar = f.t_named("Bar");
         let bar_type = f.u(bar);
         let child = f.t_class_string_of(bar_type);
-        assert!(atomic_is_contained(f, child, parent, &world));
+        assert!(atomic_is_contained(f, child, parent, &symbols));
     });
 }
 
 #[test]
 fn class_string_of_parent_not_in_class_string_of_child() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.add_edge("Bar", "Foo");
+        let symbols = symbol_table(f.arena, "<?php class Foo {} class Bar extends Foo {}");
         let foo = f.t_named("Foo");
         let foo_type = f.u(foo);
         let parent = f.t_class_string_of(foo_type);
         let bar = f.t_named("Bar");
         let bar_type = f.u(bar);
         let child = f.t_class_string_of(bar_type);
-        assert!(!atomic_is_contained(f, parent, child, &world));
+        assert!(!atomic_is_contained(f, parent, child, &symbols));
     });
 }
 
 #[test]
 fn class_string_of_unrelated_classes_disjoint() {
     fixture(|f| {
-        let world = MockWorld::new();
+        let symbols = empty_symbol_table(f.arena);
         let foo_named = f.t_named("Foo");
         let foo_type = f.u(foo_named);
         let foo = f.t_class_string_of(foo_type);
         let bar_named = f.t_named("Bar");
         let bar_type = f.u(bar_named);
         let bar = f.t_class_string_of(bar_type);
-        assert!(!atomic_is_contained(f, foo, bar, &world));
-        assert!(!atomic_is_contained(f, bar, foo, &world));
+        assert!(!atomic_is_contained(f, foo, bar, &symbols));
+        assert!(!atomic_is_contained(f, bar, foo, &symbols));
     });
 }
 
 #[test]
 fn class_string_kinds_disjoint() {
     fixture(|f| {
-        let world = MockWorld::new();
+        let symbols = empty_symbol_table(f.arena);
         let named = f.t_named("Foo");
         let named_type = f.u(named);
         let class_of_foo = f.t_class_string_of(named_type);
         let interface_of_foo = f.t_interface_string_of(named_type);
-        assert!(!atomic_is_contained(f, class_of_foo, interface_of_foo, &world));
-        assert!(!atomic_is_contained(f, interface_of_foo, class_of_foo, &world));
+        assert!(!atomic_is_contained(f, class_of_foo, interface_of_foo, &symbols));
+        assert!(!atomic_is_contained(f, interface_of_foo, class_of_foo, &symbols));
     });
 }
 
@@ -294,46 +291,43 @@ fn lit_string_of_invalid_class_name_does_not_fit_class_string() {
 #[test]
 fn lit_string_in_class_string_of_matching_class() {
     fixture(|f| {
-        let world = MockWorld::new();
+        let symbols = empty_symbol_table(f.arena);
         let named = f.t_named("Foo");
         let named_type = f.u(named);
         let foo = f.t_class_string_of(named_type);
         let literal = f.t_lit_string("Foo");
-        assert!(atomic_is_contained(f, literal, foo, &world));
+        assert!(atomic_is_contained(f, literal, foo, &symbols));
     });
 }
 
 #[test]
 fn lit_string_of_descendant_in_class_string_of_parent() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.add_edge("Bar", "Foo");
+        let symbols = symbol_table(f.arena, "<?php class Foo {} class Bar extends Foo {}");
         let named = f.t_named("Foo");
         let named_type = f.u(named);
         let foo = f.t_class_string_of(named_type);
         let literal = f.t_lit_string("Bar");
-        assert!(atomic_is_contained(f, literal, foo, &world));
+        assert!(atomic_is_contained(f, literal, foo, &symbols));
     });
 }
 
 #[test]
 fn lit_string_of_pure_enum_routes_through_enum_kind() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_pure_enum("Color");
+        let symbols = symbol_table(f.arena, "<?php enum Color {}");
         let any_enum = f.t_enum_string();
         let literal = f.t_lit_string("Color");
-        assert!(atomic_is_contained(f, literal, any_enum, &world));
+        assert!(atomic_is_contained(f, literal, any_enum, &symbols));
     });
 }
 
 #[test]
 fn lit_string_of_class_does_not_fit_enum_string_container() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.declare("Foo");
+        let symbols = symbol_table(f.arena, "<?php class Foo {}");
         let any_enum = f.t_enum_string();
         let literal = f.t_lit_string("Foo");
-        assert!(!atomic_is_contained(f, literal, any_enum, &world));
+        assert!(!atomic_is_contained(f, literal, any_enum, &symbols));
     });
 }

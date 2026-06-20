@@ -5,6 +5,7 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 
+use crate::symbol::SymbolTable;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
 use crate::ty::builder::TypeBuilder;
@@ -18,7 +19,6 @@ use crate::ty::well_known::NUMERIC;
 use crate::ty::well_known::NUMERIC_STRING;
 use crate::ty::well_known::SCALAR;
 use crate::ty::well_known::STRING;
-use crate::world::World;
 
 /// Fan out a true-union dominator (`scalar`, `numeric`, `array-key`)
 /// when the right-hand side is a member of one of its sub-families.
@@ -33,10 +33,10 @@ use crate::world::World;
 /// `scalar = bool | int | float | string`,
 /// `numeric = int | float | numeric-string`,
 /// `array-key = int | string`.
-pub(in crate::ty::subtract) fn true_union_minus<'scratch, 'arena, S, A, W>(
+pub(in crate::ty::subtract) fn true_union_minus<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -45,7 +45,6 @@ pub(in crate::ty::subtract) fn true_union_minus<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let members: &[Atom<'arena>] = if input == SCALAR {
         &[BOOL, INT, FLOAT, STRING]
@@ -62,7 +61,7 @@ where
     }
 
     for &member in members {
-        crate::ty::subtract::atom_minus(member, removed, world, options, report, builder, out);
+        crate::ty::subtract::atom_minus(member, removed, symbols, options, report, builder, out);
     }
 
     true

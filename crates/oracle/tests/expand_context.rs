@@ -41,54 +41,54 @@ fn t_conditional<'arena>(
 #[test]
 fn self_keyword_substitutes_with_self_class() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let self_atom = f.t_named("self");
         let self_object = f.u(self_atom);
         let foo = f.name("Foo");
         let context = ExpansionContext::default().with_self_class(foo);
         let foo_atom = f.t_named("Foo");
         let expected = f.u(foo_atom);
-        assert_eq!(expand::expand_with(self_object, &world, &context, &mut f.builder), expected);
+        assert_eq!(expand::expand_with(self_object, &symbols, &context, &mut f.builder), expected);
     });
 }
 
 #[test]
 fn static_keyword_substitutes_with_static_class() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let static_atom = f.t_named("static");
         let static_object = f.u(static_atom);
         let foo = f.name("Foo");
         let context = ExpansionContext::default().with_static_class(foo);
         let foo_atom = f.t_named("Foo");
         let expected = f.u(foo_atom);
-        assert_eq!(expand::expand_with(static_object, &world, &context, &mut f.builder), expected);
+        assert_eq!(expand::expand_with(static_object, &symbols, &context, &mut f.builder), expected);
     });
 }
 
 #[test]
 fn parent_keyword_substitutes_with_parent_class() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let parent_atom = f.t_named("parent");
         let parent_object = f.u(parent_atom);
         let animal = f.name("Animal");
         let context = ExpansionContext::default().with_parent_class(animal);
         let animal_atom = f.t_named("Animal");
         let expected = f.u(animal_atom);
-        assert_eq!(expand::expand_with(parent_object, &world, &context, &mut f.builder), expected);
+        assert_eq!(expand::expand_with(parent_object, &symbols, &context, &mut f.builder), expected);
     });
 }
 
 #[test]
 fn is_static_flag_resolved_with_static_class() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let element = t_object_with_flags(f, "Foo", true, false);
         let ty = f.u(element);
         let sub = f.name("Sub");
         let context = ExpansionContext::default().with_static_class(sub);
-        let result = expand::expand_with(ty, &world, &context, &mut f.builder);
+        let result = expand::expand_with(ty, &symbols, &context, &mut f.builder);
         let sub_atom = f.t_named("Sub");
         let expected = f.u(sub_atom);
         assert_eq!(result, expected);
@@ -98,12 +98,12 @@ fn is_static_flag_resolved_with_static_class() {
 #[test]
 fn is_this_flag_resolved_with_static_class() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let element = t_object_with_flags(f, "Foo", false, true);
         let ty = f.u(element);
         let sub = f.name("Sub");
         let context = ExpansionContext::default().with_static_class(sub);
-        let result = expand::expand_with(ty, &world, &context, &mut f.builder);
+        let result = expand::expand_with(ty, &symbols, &context, &mut f.builder);
         let sub_atom = f.t_named("Sub");
         let expected = f.u(sub_atom);
         assert_eq!(result, expected);
@@ -113,37 +113,37 @@ fn is_this_flag_resolved_with_static_class() {
 #[test]
 fn keyword_without_context_passes_through() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let self_atom = f.t_named("self");
         let self_object = f.u(self_atom);
         let context = ExpansionContext::default();
-        assert_eq!(expand::expand_with(self_object, &world, &context, &mut f.builder), self_object);
+        assert_eq!(expand::expand_with(self_object, &symbols, &context, &mut f.builder), self_object);
     });
 }
 
 #[test]
 fn plain_named_object_unaffected_by_context() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let foo_atom = f.t_named("Foo");
         let foo = f.u(foo_atom);
         let bar = f.name("Bar");
         let context = ExpansionContext::default().with_self_class(bar);
-        assert_eq!(expand::expand_with(foo, &world, &context, &mut f.builder), foo);
+        assert_eq!(expand::expand_with(foo, &symbols, &context, &mut f.builder), foo);
     });
 }
 
 #[test]
 fn keyword_inside_list_resolves() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let self_atom = f.t_named("self");
         let self_object = f.u(self_atom);
         let list_atom = f.t_list(self_object, false);
         let list = f.u(list_atom);
         let foo = f.name("Foo");
         let context = ExpansionContext::default().with_self_class(foo);
-        let result = expand::expand_with(list, &world, &context, &mut f.builder);
+        let result = expand::expand_with(list, &symbols, &context, &mut f.builder);
         let foo_atom = f.t_named("Foo");
         let foo_type = f.u(foo_atom);
         let expected_atom = f.t_list(foo_type, false);
@@ -155,7 +155,7 @@ fn keyword_inside_list_resolves() {
 #[test]
 fn conditional_passes_through_when_eval_off() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let conditional = t_conditional(
             f,
             well_known::TYPE_INT,
@@ -166,14 +166,14 @@ fn conditional_passes_through_when_eval_off() {
         );
         let ty = f.u(conditional);
         let context = ExpansionContext::default();
-        assert_eq!(expand::expand_with(ty, &world, &context, &mut f.builder), ty);
+        assert_eq!(expand::expand_with(ty, &symbols, &context, &mut f.builder), ty);
     });
 }
 
 #[test]
 fn conditional_picks_then_branch_when_test_passes() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let conditional = t_conditional(
             f,
             well_known::TYPE_INT,
@@ -185,7 +185,7 @@ fn conditional_picks_then_branch_when_test_passes() {
         let ty = f.u(conditional);
         let context = ExpansionContext::default().with_evaluate_conditional(true);
         assert_eq!(
-            expand::expand_with(ty, &world, &context, &mut f.builder),
+            expand::expand_with(ty, &symbols, &context, &mut f.builder),
             well_known::TYPE_STRING,
             "(int <: int) ? string : float picks string"
         );
@@ -195,7 +195,7 @@ fn conditional_picks_then_branch_when_test_passes() {
 #[test]
 fn conditional_picks_otherwise_when_test_disjoint() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let conditional = t_conditional(
             f,
             well_known::TYPE_INT,
@@ -207,7 +207,7 @@ fn conditional_picks_otherwise_when_test_disjoint() {
         let ty = f.u(conditional);
         let context = ExpansionContext::default().with_evaluate_conditional(true);
         assert_eq!(
-            expand::expand_with(ty, &world, &context, &mut f.builder),
+            expand::expand_with(ty, &symbols, &context, &mut f.builder),
             well_known::TYPE_FLOAT,
             "int and string are disjoint so the otherwise branch wins"
         );
@@ -217,7 +217,7 @@ fn conditional_picks_otherwise_when_test_disjoint() {
 #[test]
 fn conditional_widens_to_union_when_undecidable() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let int = f.t_int();
         let string = f.t_string();
         let mixed_input = f.u_many(vec![int, string]);
@@ -225,7 +225,7 @@ fn conditional_widens_to_union_when_undecidable() {
             t_conditional(f, mixed_input, well_known::TYPE_INT, well_known::TYPE_FLOAT, well_known::TYPE_BOOL, false);
         let ty = f.u(conditional);
         let context = ExpansionContext::default().with_evaluate_conditional(true);
-        let result = expand::expand_with(ty, &world, &context, &mut f.builder);
+        let result = expand::expand_with(ty, &symbols, &context, &mut f.builder);
         let expected = f.u_many(vec![well_known::FLOAT, well_known::BOOL]);
         assert_eq!(result, expected, "int|string neither refines int nor is disjoint from it");
     });
@@ -234,7 +234,7 @@ fn conditional_widens_to_union_when_undecidable() {
 #[test]
 fn negated_conditional_swaps_branches_on_pass() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let conditional = t_conditional(
             f,
             well_known::TYPE_INT,
@@ -246,7 +246,7 @@ fn negated_conditional_swaps_branches_on_pass() {
         let ty = f.u(conditional);
         let context = ExpansionContext::default().with_evaluate_conditional(true);
         assert_eq!(
-            expand::expand_with(ty, &world, &context, &mut f.builder),
+            expand::expand_with(ty, &symbols, &context, &mut f.builder),
             well_known::TYPE_FLOAT,
             "(int is not int) fails so the otherwise branch wins"
         );
@@ -256,7 +256,7 @@ fn negated_conditional_swaps_branches_on_pass() {
 #[test]
 fn negated_conditional_swaps_branches_on_disjoint() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let conditional = t_conditional(
             f,
             well_known::TYPE_INT,
@@ -268,7 +268,7 @@ fn negated_conditional_swaps_branches_on_disjoint() {
         let ty = f.u(conditional);
         let context = ExpansionContext::default().with_evaluate_conditional(true);
         assert_eq!(
-            expand::expand_with(ty, &world, &context, &mut f.builder),
+            expand::expand_with(ty, &symbols, &context, &mut f.builder),
             well_known::TYPE_STRING,
             "(int is not string) holds so the then branch wins"
         );
@@ -278,8 +278,7 @@ fn negated_conditional_swaps_branches_on_disjoint() {
 #[test]
 fn conditional_with_alias_inside_branch_resolves_after_pick() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_alias("Foo", "Result", well_known::TYPE_STRING);
+        let symbols = symbol_table(f.arena, "<?php /** @type Result = string */ class Foo {}");
         let class_name = f.name("Foo");
         let alias_name = f.builder.intern(b"Result");
         let alias = f.builder.alias(AliasAtom { class_name, alias_name });
@@ -288,14 +287,14 @@ fn conditional_with_alias_inside_branch_resolves_after_pick() {
             t_conditional(f, well_known::TYPE_INT, well_known::TYPE_INT, alias_type, well_known::TYPE_FLOAT, false);
         let ty = f.u(conditional);
         let context = ExpansionContext::default().with_evaluate_conditional(true);
-        assert_eq!(expand::expand_with(ty, &world, &context, &mut f.builder), well_known::TYPE_STRING);
+        assert_eq!(expand::expand_with(ty, &symbols, &context, &mut f.builder), well_known::TYPE_STRING);
     });
 }
 
 #[test]
 fn expand_default_wrapper_uses_default_context() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let conditional = t_conditional(
             f,
             well_known::TYPE_INT,
@@ -306,7 +305,7 @@ fn expand_default_wrapper_uses_default_context() {
         );
         let ty = f.u(conditional);
         assert_eq!(
-            expand::expand(ty, &world, &mut f.builder),
+            expand::expand(ty, &symbols, &mut f.builder),
             ty,
             "without an explicit context, conditionals do not evaluate"
         );
@@ -316,14 +315,14 @@ fn expand_default_wrapper_uses_default_context() {
 #[test]
 fn keyword_inside_generic_object_args_resolves() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let self_atom = f.t_named("self");
         let self_object = f.u(self_atom);
         let box_of_self_atom = f.t_generic_named("Box", vec![self_object]);
         let box_of_self = f.u(box_of_self_atom);
         let foo = f.name("Foo");
         let context = ExpansionContext::default().with_self_class(foo);
-        let result = expand::expand_with(box_of_self, &world, &context, &mut f.builder);
+        let result = expand::expand_with(box_of_self, &symbols, &context, &mut f.builder);
         let foo_atom = f.t_named("Foo");
         let foo_type = f.u(foo_atom);
         let expected_atom = f.t_generic_named("Box", vec![foo_type]);
@@ -335,7 +334,7 @@ fn keyword_inside_generic_object_args_resolves() {
 #[test]
 fn keyword_in_conditional_branch_resolves() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let self_atom = f.t_named("self");
         let self_object = f.u(self_atom);
         let conditional =
@@ -345,6 +344,6 @@ fn keyword_in_conditional_branch_resolves() {
         let context = ExpansionContext::default().with_evaluate_conditional(true).with_self_class(bar);
         let bar_atom = f.t_named("Bar");
         let expected = f.u(bar_atom);
-        assert_eq!(expand::expand_with(ty, &world, &context, &mut f.builder), expected);
+        assert_eq!(expand::expand_with(ty, &symbols, &context, &mut f.builder), expected);
     });
 }

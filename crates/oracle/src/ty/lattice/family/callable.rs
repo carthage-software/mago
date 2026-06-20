@@ -26,6 +26,7 @@
 
 use mago_allocator::Arena;
 
+use crate::symbol::SymbolTable;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::callable::CallableAtom;
@@ -38,13 +39,12 @@ use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::lattice::refines as type_refines;
-use crate::world::World;
 
 #[inline]
-pub fn refines<'arena, S, A, W>(
+pub fn refines<'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -52,7 +52,6 @@ pub fn refines<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if let Atom::String(input_payload) = input
         && input_payload.flags.contains(StringRefinementFlag::Callable)
@@ -74,7 +73,7 @@ where
         (CallableAtom::Signature(input_signature), CallableAtom::Signature(container_signature))
         | (CallableAtom::Closure(input_signature), CallableAtom::Signature(container_signature))
         | (CallableAtom::Closure(input_signature), CallableAtom::Closure(container_signature)) => {
-            signature_refines(input_signature, container_signature, world, options, report, builder)
+            signature_refines(input_signature, container_signature, symbols, options, report, builder)
         }
         (CallableAtom::Signature(_), CallableAtom::Closure(_)) => false,
         (CallableAtom::Alias(input_alias), CallableAtom::Alias(container_alias)) => input_alias == container_alias,
@@ -83,10 +82,10 @@ where
 }
 
 #[inline]
-fn signature_refines<'arena, S, A, W>(
+fn signature_refines<'arena, S, A>(
     input_signature: &Signature<'arena>,
     container_signature: &Signature<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -94,13 +93,12 @@ fn signature_refines<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if input_signature == container_signature {
         return true;
     }
 
-    if !type_refines(input_signature.return_type, container_signature.return_type, world, options, report, builder) {
+    if !type_refines(input_signature.return_type, container_signature.return_type, symbols, options, report, builder) {
         return false;
     }
 
@@ -110,11 +108,11 @@ where
         return false;
     }
 
-    if !throws_refines(input_signature.throws, container_signature.throws, world, options, report, builder) {
+    if !throws_refines(input_signature.throws, container_signature.throws, symbols, options, report, builder) {
         return false;
     }
 
-    parameters_refine(input_signature, container_signature, world, options, report, builder)
+    parameters_refine(input_signature, container_signature, symbols, options, report, builder)
 }
 
 /// Container's `throws` constrains input's: input's exceptions must fit
@@ -122,10 +120,10 @@ where
 /// constraint; `None` on the input means "throws anything", which is too
 /// loose for any constrained container.
 #[inline]
-fn throws_refines<'arena, S, A, W>(
+fn throws_refines<'arena, S, A>(
     input: Option<Type<'arena>>,
     container: Option<Type<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -133,22 +131,21 @@ fn throws_refines<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match (input, container) {
         (_, None) => true,
         (None, Some(_)) => false,
         (Some(input_throws), Some(container_throws)) => {
-            type_refines(input_throws, container_throws, world, options, report, builder)
+            type_refines(input_throws, container_throws, symbols, options, report, builder)
         }
     }
 }
 
 #[inline]
-fn parameters_refine<'arena, S, A, W>(
+fn parameters_refine<'arena, S, A>(
     input_signature: &Signature<'arena>,
     container_signature: &Signature<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -156,7 +153,6 @@ fn parameters_refine<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Some(container_parameters) = container_signature.parameters else {
         return true;
@@ -190,7 +186,7 @@ where
             },
         };
 
-        if !type_refines(container_parameter.r#type, input_type, world, options, report, builder) {
+        if !type_refines(container_parameter.r#type, input_type, symbols, options, report, builder) {
             return false;
         }
     }

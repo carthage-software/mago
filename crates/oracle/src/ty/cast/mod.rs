@@ -19,7 +19,7 @@
 //! to `false` under `(bool)`, and float literals truncate exactly under
 //! `(int)`. `(array)` of a scalar or resource produces the single-element list
 //! `list{T}` it actually yields, and `(string)` of an object consults the
-//! world for a `__toString` method - present means a lossless `string`, absent
+//! symbol table for a `__toString` method - present means a lossless `string`, absent
 //! means the cast may throw.
 //!
 //! Two cases stay at their sound limit rather than guessing: `(object)` of a
@@ -31,6 +31,7 @@
 use mago_allocator::Arena;
 use mago_flags::U8Flags;
 
+use crate::symbol::SymbolTable;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::array::KnownElement;
@@ -39,7 +40,6 @@ use crate::ty::atom::payload::scalar::int::IntAtom;
 use crate::ty::atom::payload::scalar::string::StringLiteral;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::well_known;
-use crate::world::World;
 
 /// One of PHP's six explicit cast operators.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -102,21 +102,20 @@ impl From<CastFlag> for u8 {
 /// cast individually, the resulting types are unioned, and the per-atom
 /// flags are bit-or'd into a single flag set.
 #[inline]
-pub fn cast<'arena, S, A, W>(
+pub fn cast<'arena, S, A>(
     input: Type<'arena>,
     target: CastTarget,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> CastResult<'arena>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let mut combined: Vec<Atom<'arena>> = Vec::new();
     let mut flags = U8Flags::empty();
     for atom in input.atoms {
-        let outcome = cast_atom(*atom, target, world, builder);
+        let outcome = cast_atom(*atom, target, symbols, builder);
         flags |= outcome.flags;
         combined.extend_from_slice(outcome.ty.atoms);
     }
@@ -125,21 +124,20 @@ where
 }
 
 #[inline]
-fn cast_atom<'arena, S, A, W>(
+fn cast_atom<'arena, S, A>(
     atom: Atom<'arena>,
     target: CastTarget,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> CastResult<'arena>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match target {
         CastTarget::Int => cast_to_int(atom, builder),
         CastTarget::Float => cast_to_float(atom, builder),
-        CastTarget::String => cast_to_string(atom, world, builder),
+        CastTarget::String => cast_to_string(atom, symbols, builder),
         CastTarget::Bool => cast_to_bool(atom, builder),
         CastTarget::Array => cast_to_array(atom, builder),
         CastTarget::Object => cast_to_object(atom, builder),
@@ -222,15 +220,14 @@ where
 }
 
 #[inline]
-fn cast_to_string<'arena, S, A, W>(
+fn cast_to_string<'arena, S, A>(
     atom: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> CastResult<'arena>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match atom {
         Atom::String(_) => CastResult::lossless(builder.union_of(&[atom])),
@@ -257,7 +254,7 @@ where
         }
         Atom::False | Atom::Null | Atom::Void => CastResult::lossless(builder.union_of(&[well_known::EMPTY_STRING])),
         Atom::Bool | Atom::Resource(_) => CastResult::lossless(well_known::TYPE_STRING),
-        Atom::Object(payload) if world.class_has_method(payload.name.id, b"__toString") => {
+        Atom::Object(payload) if symbols.class_has_method(payload.name.id, b"__toString") => {
             CastResult::lossless(well_known::TYPE_STRING)
         }
         Atom::HasMethod(payload) if payload.method_name == b"__toString" => {

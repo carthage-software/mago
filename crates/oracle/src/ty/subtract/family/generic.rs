@@ -4,13 +4,13 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 
+use crate::symbol::SymbolTable;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
-use crate::world::World;
 
 /// `(T of X) \ Y`: narrow `T`'s constraint by removing `Y` from its
 /// bound. When the new constraint is empty (every value of `T` was in
@@ -18,10 +18,10 @@ use crate::world::World;
 /// (`(T of X) \ (T of Y) → T of (X \ Y)`), both sides agree on the
 /// parameter identity. Otherwise the rhs is treated as a plain type
 /// the constraint must shed.
-pub(in crate::ty::subtract) fn generic_parameter_minus<'scratch, 'arena, S, A, W>(
+pub(in crate::ty::subtract) fn generic_parameter_minus<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -30,7 +30,6 @@ pub(in crate::ty::subtract) fn generic_parameter_minus<'scratch, 'arena, S, A, W
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::GenericParameter(input_payload) = input else {
         return false;
@@ -49,7 +48,7 @@ where
     };
 
     let new_constraint =
-        crate::ty::subtract::compute(input_payload.constraint, other_constraint, world, options, report, builder);
+        crate::ty::subtract::compute(input_payload.constraint, other_constraint, symbols, options, report, builder);
     if new_constraint.is_never() {
         return true;
     }

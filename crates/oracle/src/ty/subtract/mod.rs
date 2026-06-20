@@ -46,6 +46,7 @@ mod family;
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 
+use crate::symbol::SymbolTable;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
@@ -80,7 +81,6 @@ use crate::ty::well_known::NEVER;
 use crate::ty::well_known::NON_NULL_MIXED;
 use crate::ty::well_known::NULL;
 use crate::ty::well_known::TRUE;
-use crate::world::World;
 
 /// Outcome of [`narrow`], classifying an assertion-driven difference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -122,10 +122,10 @@ impl<'arena> SubtractOutcome<'arena> {
 /// `result <: input` always; `result ∧ narrowing ≡ ⊥` when the family
 /// rules cover every surviving atom precisely.
 #[inline]
-pub fn narrow<'scratch, 'arena, S, A, W>(
+pub fn narrow<'scratch, 'arena, S, A>(
     input: Type<'arena>,
     narrowing: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -133,7 +133,6 @@ pub fn narrow<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if input == narrowing {
         return SubtractOutcome::Impossible;
@@ -145,7 +144,7 @@ where
     let mut next_scratch: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
     for &atom in input.atoms {
         let pieces =
-            subtract_all(atom, narrowing, world, options, report, builder, &mut current_scratch, &mut next_scratch);
+            subtract_all(atom, narrowing, symbols, options, report, builder, &mut current_scratch, &mut next_scratch);
 
         atoms.extend(pieces.iter().copied());
     }
@@ -154,7 +153,7 @@ where
         return SubtractOutcome::Impossible;
     }
 
-    canonicalise_sealed_residuals(&mut atoms, world, options, report, builder);
+    canonicalise_sealed_residuals(&mut atoms, symbols, options, report, builder);
 
     let result = builder.union_of(&atoms);
 
@@ -162,16 +161,15 @@ where
 }
 
 #[inline]
-fn canonicalise_sealed_residuals<'scratch, 'arena, S, A, W>(
+fn canonicalise_sealed_residuals<'scratch, 'arena, S, A>(
     atoms: &mut ScratchVec<'scratch, Atom<'arena>, S>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if atoms.is_empty() {
         return;
@@ -194,7 +192,7 @@ fn canonicalise_sealed_residuals<'scratch, 'arena, S, A, W>(
         for &conjunct in conjuncts {
             if let Atom::Negated(inner) = conjunct {
                 if let Some(head_type) = head_type
-                    && !overlaps(head_type, *inner, world, options, report, builder)
+                    && !overlaps(head_type, *inner, symbols, options, report, builder)
                 {
                     continue;
                 }
@@ -210,7 +208,7 @@ fn canonicalise_sealed_residuals<'scratch, 'arena, S, A, W>(
         }
 
         if matches!(head, Atom::Object(_)) && !negated_inners.is_empty() {
-            let residual = sealed::compute_residual(head, &negated_inners, world, options, report, builder);
+            let residual = sealed::compute_residual(head, &negated_inners, symbols, options, report, builder);
             match residual {
                 SealedResidual::FullyCovered => {
                     atoms.remove(index);
@@ -225,7 +223,7 @@ fn canonicalise_sealed_residuals<'scratch, 'arena, S, A, W>(
                         for &conjunct in &kept {
                             let still_applies = match conjunct {
                                 Atom::Negated(inner) => {
-                                    overlaps(survivor_type, *inner, world, options, report, builder)
+                                    overlaps(survivor_type, *inner, symbols, options, report, builder)
                                 }
                                 _ => true,
                             };
@@ -260,10 +258,10 @@ fn canonicalise_sealed_residuals<'scratch, 'arena, S, A, W>(
 /// values are in `input` but not in `removed`. Thin wrapper over
 /// [`narrow`] for callers that don't need the assertion classification.
 #[inline]
-pub fn compute<'arena, S, A, W>(
+pub fn compute<'arena, S, A>(
     input: Type<'arena>,
     removed: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -271,9 +269,8 @@ pub fn compute<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    narrow(input, removed, world, options, report, builder).into_type()
+    narrow(input, removed, symbols, options, report, builder).into_type()
 }
 
 /// Apply `α \ β₁ \ β₂ \ … \ βₙ` by folding over the atoms of
@@ -285,10 +282,10 @@ where
 /// function clears and refills them, returning a borrowed view into
 /// `current_scratch` for the caller to copy out.
 #[inline]
-fn subtract_all<'buffer, 'scratch, 'arena, S, A, W>(
+fn subtract_all<'buffer, 'scratch, 'arena, S, A>(
     atom: Atom<'arena>,
     narrowing: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -298,7 +295,6 @@ fn subtract_all<'buffer, 'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     current_scratch.clear();
     current_scratch.push(atom);
@@ -309,7 +305,7 @@ where
 
         next_scratch.clear();
         for &surviving in current_scratch.iter() {
-            atom_minus(surviving, removed, world, options, report, builder, next_scratch);
+            atom_minus(surviving, removed, symbols, options, report, builder, next_scratch);
         }
 
         core::mem::swap(current_scratch, next_scratch);
@@ -317,7 +313,7 @@ where
 
     if !current_scratch.is_empty() {
         let current_type = builder.union_of(current_scratch);
-        if refines(current_type, narrowing, world, options, report, builder) {
+        if refines(current_type, narrowing, symbols, options, report, builder) {
             current_scratch.clear();
         }
     }
@@ -329,10 +325,10 @@ where
 /// [module documentation](self). Negation routes through the duality
 /// with the meet: `subtract(X, !T)` ≡ `meet(X, T)` and
 /// `subtract(!T, X)` ≡ `!(T ∪ X)`.
-pub(in crate::ty::subtract) fn atom_minus<'scratch, 'arena, S, A, W>(
+pub(in crate::ty::subtract) fn atom_minus<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -340,7 +336,6 @@ pub(in crate::ty::subtract) fn atom_minus<'scratch, 'arena, S, A, W>(
 ) where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if input == removed || input == NEVER {
         return;
@@ -355,29 +350,29 @@ pub(in crate::ty::subtract) fn atom_minus<'scratch, 'arena, S, A, W>(
         return;
     }
 
-    if is_uninhabited(removed, world, builder) {
+    if is_uninhabited(removed, symbols, builder) {
         out.push(input);
         return;
     }
 
-    if is_uninhabited(input, world, builder) {
+    if is_uninhabited(input, symbols, builder) {
         return;
     }
 
     if let Atom::Intersected(payload) = input {
         let input_type = builder.union_of(&[input]);
         let removed_type = builder.union_of(&[removed]);
-        if refines(input_type, removed_type, world, options, report, builder) {
+        if refines(input_type, removed_type, symbols, options, report, builder) {
             return;
         }
 
-        if !overlaps(input_type, removed_type, world, options, report, builder) {
+        if !overlaps(input_type, removed_type, symbols, options, report, builder) {
             out.push(input);
             return;
         }
 
         let mut head_pieces = builder.scratch_vec();
-        atom_minus(*payload.head, removed, world, options, report, builder, &mut head_pieces);
+        atom_minus(*payload.head, removed, symbols, options, report, builder, &mut head_pieces);
         for head in head_pieces {
             let intersected = builder.intersected(head, payload.conjuncts);
             out.push(intersected);
@@ -388,7 +383,7 @@ pub(in crate::ty::subtract) fn atom_minus<'scratch, 'arena, S, A, W>(
 
     if let Atom::Negated(inner) = removed {
         let input_type = builder.union_of(&[input]);
-        let kept = meet::compute(input_type, *inner, world, options, report, builder);
+        let kept = meet::compute(input_type, *inner, symbols, options, report, builder);
         out.extend_from_slice(kept.atoms);
         return;
     }
@@ -424,34 +419,34 @@ pub(in crate::ty::subtract) fn atom_minus<'scratch, 'arena, S, A, W>(
         return;
     }
 
-    if list::sealed_list_residue(input, removed, world, options, report, builder, out) {
+    if list::sealed_list_residue(input, removed, symbols, options, report, builder, out) {
         return;
     }
 
     let input_type = builder.union_of(&[input]);
     let removed_type = builder.union_of(&[removed]);
 
-    if refines(input_type, removed_type, world, options, report, builder) {
+    if refines(input_type, removed_type, symbols, options, report, builder) {
         return;
     }
 
-    if !overlaps(input_type, removed_type, world, options, report, builder) {
+    if !overlaps(input_type, removed_type, symbols, options, report, builder) {
         out.push(input);
         return;
     }
 
     if matches!(input, Atom::GenericParameter(_)) {
-        if !generic::generic_parameter_minus(input, removed, world, options, report, builder, out) {
+        if !generic::generic_parameter_minus(input, removed, symbols, options, report, builder, out) {
             out.push(input);
         }
         return;
     }
 
-    if dominator::true_union_minus(input, removed, world, options, report, builder, out) {
+    if dominator::true_union_minus(input, removed, symbols, options, report, builder, out) {
         return;
     }
 
-    if object::object_descendant_minus(input, removed, world, builder, out) {
+    if object::object_descendant_minus(input, removed, symbols, builder, out) {
         return;
     }
 

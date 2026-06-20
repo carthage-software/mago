@@ -4,6 +4,7 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 
+use crate::symbol::SymbolTable;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
@@ -25,7 +26,6 @@ use crate::ty::lattice::family;
 use crate::ty::lattice::overlaps::type_is_value_never;
 use crate::ty::lattice::sealed::SealedResidual;
 use crate::ty::well_known;
-use crate::world::World;
 
 /// `true` iff `a <: b`: every runtime value of type `a` is also a value of
 /// type `b` (i.e. `a` is a refinement / narrowing of `b`).
@@ -34,23 +34,22 @@ use crate::world::World;
 /// dispatch (Union-L / Union-R), and the structural scalar lattice
 /// (bool / int / float / string / class-like-string / resource /
 /// array-key / numeric / scalar / object-any). Object hierarchy
-/// queries flow through `world`; callable variance, array shape
+/// queries flow through `symbols`; callable variance, array shape
 /// rules, mixed-axis refinements, and template machinery layer in
 /// family by family; what isn't implemented returns `false`
 /// conservatively.
 #[inline]
-pub fn refines<'scratch, 'arena, S, A, W>(
+pub fn refines<'arena, S, A>(
     input: Type<'arena>,
     container: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if input == container && !options.ignore_null && !options.ignore_false {
         return true;
@@ -72,11 +71,11 @@ where
                 return true;
             }
 
-            if atom_is_empty_container(*atom, world, builder) && union_admits_empty_container(container.atoms) {
+            if atom_is_empty_container(*atom, symbols, builder) && union_admits_empty_container(container.atoms) {
                 return true;
             }
 
-            if container.atoms.iter().any(|candidate| atom_refines(*atom, *candidate, world, options, report, builder))
+            if container.atoms.iter().any(|candidate| atom_refines(*atom, *candidate, symbols, options, report, builder))
             {
                 return true;
             }
@@ -97,31 +96,31 @@ where
                 return true;
             }
 
-            if list_union_covers(*atom, container.atoms, world, options, report, builder) {
+            if list_union_covers(*atom, container.atoms, symbols, options, report, builder) {
                 return true;
             }
 
-            if array_union_covers(*atom, container.atoms, world, options, report, builder) {
+            if array_union_covers(*atom, container.atoms, symbols, options, report, builder) {
                 return true;
             }
 
-            if intersected_partition_covers(*atom, container.atoms, world, options, report, builder) {
+            if intersected_partition_covers(*atom, container.atoms, symbols, options, report, builder) {
                 return true;
             }
 
-            if negation_partition_covers(*atom, container.atoms, world, options, report, builder) {
+            if negation_partition_covers(*atom, container.atoms, symbols, options, report, builder) {
                 return true;
             }
 
-            if generic_parameter_union_covers(*atom, container.atoms, world, options, report, builder) {
+            if generic_parameter_union_covers(*atom, container.atoms, symbols, options, report, builder) {
                 return true;
             }
 
-            if sealed_survivors_cover(*atom, container.atoms, world, options, report, builder) {
+            if sealed_survivors_cover(*atom, container.atoms, symbols, options, report, builder) {
                 return true;
             }
 
-            if sealed_intersected_union_cover(*atom, container.atoms, world, options, report, builder) {
+            if sealed_intersected_union_cover(*atom, container.atoms, symbols, options, report, builder) {
                 return true;
             }
 
@@ -133,10 +132,10 @@ where
 /// container has a `Negated(Y)` atom whose inner `Y` is covered by
 /// some other container atom, making the union `mixed`.
 #[inline]
-fn negation_partition_covers<'scratch, 'arena, S, A, W>(
+fn negation_partition_covers<'scratch, 'arena, S, A>(
     _input: Atom<'arena>,
     containers: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -144,7 +143,6 @@ fn negation_partition_covers<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if !containers.iter().any(|atom| matches!(atom, Atom::Negated(_))) {
         return false;
@@ -162,7 +160,7 @@ where
         }
 
         let others_type = builder.union_of(&others);
-        if refines(*inner, others_type, world, options, report, builder) {
+        if refines(*inner, others_type, symbols, options, report, builder) {
             return true;
         }
     }
@@ -183,10 +181,10 @@ where
 /// Intersected narrowed by `X` refines `Y`). The partition `!X | X` covers
 /// everything, so the Intersected is again replaced by its head.
 #[inline]
-fn intersected_partition_covers<'scratch, 'arena, S, A, W>(
+fn intersected_partition_covers<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     containers: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -194,7 +192,6 @@ fn intersected_partition_covers<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if !containers.iter().any(|atom| matches!(atom, Atom::Intersected(_))) {
         return false;
@@ -237,7 +234,7 @@ where
         reduced[index] = *payload.head;
         let input_type = builder.union_of(&[input]);
         let reduced_type = builder.union_of(&reduced);
-        if refines(input_type, reduced_type, world, options, report, builder) {
+        if refines(input_type, reduced_type, symbols, options, report, builder) {
             return true;
         }
     }
@@ -263,7 +260,7 @@ where
             };
 
             let positive_type = builder.union_of(&[positive_atom]);
-            let positive_meet_inner = crate::ty::meet::compute(positive_type, *inner, world, options, report, builder);
+            let positive_meet_inner = crate::ty::meet::compute(positive_type, *inner, symbols, options, report, builder);
 
             let has_matching = containers.iter().enumerate().any(|(other_index, &other)| {
                 if other_index == index {
@@ -281,7 +278,7 @@ where
                 }
 
                 let other_type = builder.union_of(&[other]);
-                refines(positive_meet_inner, other_type, world, options, report, builder)
+                refines(positive_meet_inner, other_type, symbols, options, report, builder)
             });
 
             if has_matching {
@@ -289,7 +286,7 @@ where
                 reduced[index] = *payload.head;
                 let input_type = builder.union_of(&[input]);
                 let reduced_type = builder.union_of(&reduced);
-                if refines(input_type, reduced_type, world, options, report, builder) {
+                if refines(input_type, reduced_type, symbols, options, report, builder) {
                     return true;
                 }
             }
@@ -306,18 +303,17 @@ where
 /// covered by any union admitting the empty container - which a pointwise
 /// key/value refinement would miss, since e.g. `array<0, A&D>` (with `A&D`
 /// uninhabited) has key `0` that does not refine the empty array's `never`
-/// key. Requires the world to judge the parameter uninhabited, so this lives
+/// key. Requires the symbol table to judge the parameter uninhabited, so this lives
 /// in the comparison layer rather than in builder canonicalization.
 #[inline]
-pub(crate) fn atom_is_empty_container<'arena, S, A, W>(
+pub(crate) fn atom_is_empty_container<'arena, S, A>(
     atom: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match atom {
         Atom::Array(payload) => {
@@ -325,15 +321,15 @@ where
                 return false;
             }
 
-            payload.key_param.is_some_and(|ty| type_is_value_never(ty, world, builder))
-                || payload.value_param.is_some_and(|ty| type_is_value_never(ty, world, builder))
+            payload.key_param.is_some_and(|ty| type_is_value_never(ty, symbols, builder))
+                || payload.value_param.is_some_and(|ty| type_is_value_never(ty, symbols, builder))
         }
         Atom::List(payload) => {
             if payload.flags.contains(ListFlag::NonEmpty) || payload.known_elements.is_some() {
                 return false;
             }
 
-            type_is_value_never(payload.element_type, world, builder)
+            type_is_value_never(payload.element_type, symbols, builder)
         }
         _ => false,
     }
@@ -385,10 +381,10 @@ pub(crate) fn atom_admits_empty_container(atom: Atom<'_>) -> bool {
 /// neither member. A non-empty input needs no split and is left to the
 /// caller's single-container `atom_refines` checks (recursing here would loop).
 #[inline]
-fn array_union_covers<'arena, S, A, W>(
+fn array_union_covers<'arena, S, A>(
     input: Atom<'arena>,
     containers: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -396,7 +392,6 @@ fn array_union_covers<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Array(input_payload) = input else {
         return false;
@@ -418,7 +413,7 @@ where
     let non_empty_type = builder.union_of(&[non_empty]);
     let containers_type = builder.union_of(containers);
 
-    refines(non_empty_type, containers_type, world, options, report, builder)
+    refines(non_empty_type, containers_type, symbols, options, report, builder)
 }
 
 /// True iff a possibly-empty `list<E>` input is covered by the union of
@@ -428,10 +423,10 @@ where
 /// pointwise element union (`list<A | B>` does not refine `list<A> | list<B>`,
 /// since `[a, b]` inhabits neither).
 #[inline]
-fn list_union_covers<'arena, S, A, W>(
+fn list_union_covers<'arena, S, A>(
     input: Atom<'arena>,
     containers: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -439,7 +434,6 @@ fn list_union_covers<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::List(input_payload) = input else {
         return false;
@@ -457,7 +451,7 @@ where
     let non_empty_type = builder.union_of(&[non_empty]);
     let containers_type = builder.union_of(containers);
 
-    refines(non_empty_type, containers_type, world, options, report, builder)
+    refines(non_empty_type, containers_type, symbols, options, report, builder)
 }
 
 /// Expand `!!X` atom shapes inside a union to `X`'s atoms.
@@ -505,10 +499,10 @@ fn is_double_negation(atom: Atom<'_>) -> bool {
 /// atom contributes its constraint; if their union covers `X`, the input
 /// is in the container (just split across same-template narrowings).
 #[inline]
-fn generic_parameter_union_covers<'scratch, 'arena, S, A, W>(
+fn generic_parameter_union_covers<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     containers: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -516,7 +510,6 @@ fn generic_parameter_union_covers<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::GenericParameter(input_payload) = input else {
         return false;
@@ -542,7 +535,7 @@ where
     }
 
     let combined = builder.union_of(&container_constraints);
-    refines(input_payload.constraint, combined, world, options, report, builder)
+    refines(input_payload.constraint, combined, symbols, options, report, builder)
 }
 
 /// True iff a sealed named class `input` is covered by the union of
@@ -550,10 +543,10 @@ where
 /// inheritors `[Bar, Baz]`, `Foo <: containers` when `Bar <: containers`
 /// and `Baz <: containers`.
 #[inline]
-fn sealed_survivors_cover<'arena, S, A, W>(
+fn sealed_survivors_cover<'arena, S, A>(
     input: Atom<'arena>,
     containers: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -561,13 +554,12 @@ fn sealed_survivors_cover<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if !matches!(input, Atom::Object(_)) {
         return false;
     }
 
-    let residual = lattice::sealed::compute_residual(input, &[], world, options, report, builder);
+    let residual = lattice::sealed::compute_residual(input, &[], symbols, options, report, builder);
     let surviving = match residual {
         SealedResidual::Surviving(surviving) => surviving,
         SealedResidual::FullyCovered => return true,
@@ -577,7 +569,7 @@ where
     let containers_type = builder.union_of(containers);
     surviving.iter().all(|survivor| {
         let survivor_type = builder.union_of(&[*survivor]);
-        refines(survivor_type, containers_type, world, options, report, builder)
+        refines(survivor_type, containers_type, symbols, options, report, builder)
     })
 }
 
@@ -782,12 +774,12 @@ fn int_bounds_of(payload: IntAtom<'_>) -> (Option<i64>, Option<i64>) {
 
 /// `true` iff `a :> b`: every value of type `b` is also a value of type `a`
 /// (`a` generalizes `b`). Equivalent to
-/// `refines(b, a, world, options, report, builder)`.
+/// `refines(b, a, symbols, options, report, builder)`.
 #[inline]
-pub fn generalizes<'arena, S, A, W>(
+pub fn generalizes<'arena, S, A>(
     a: Type<'arena>,
     b: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -795,9 +787,8 @@ pub fn generalizes<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    refines(b, a, world, options, report, builder)
+    refines(b, a, symbols, options, report, builder)
 }
 
 /// Decide whether one atom refines another.
@@ -812,16 +803,16 @@ where
 /// inputs additionally record [`CoercionCause::ObjectAnyDown`].
 ///
 /// The input-side `is_uninhabited` axiom deliberately has no
-/// container-side short-circuit: an open-world `Foo & Bar` container can
+/// container-side short-circuit: an open `Foo & Bar` container can
 /// pick up a common subclass via interfaces / traits, and the
 /// container-intersection rule handles it via per-conjunct refinement.
 /// The subtraction's atom-minus uses the symmetric check because subtract
 /// has the inverse soundness needs.
 #[inline]
-pub(crate) fn atom_refines<'arena, S, A, W>(
+pub(crate) fn atom_refines<'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -829,7 +820,6 @@ pub(crate) fn atom_refines<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if input == container {
         return true;
@@ -839,7 +829,7 @@ where
         return true;
     }
 
-    if lattice::is_uninhabited(input, world, builder) {
+    if lattice::is_uninhabited(input, symbols, builder) {
         return true;
     }
 
@@ -858,7 +848,7 @@ where
     {
         let constraint = input_payload.constraint;
         let container_type = builder.union_of(&[container]);
-        let result = refines(constraint, container_type, world, options, report, builder);
+        let result = refines(constraint, container_type, symbols, options, report, builder);
         if !result && container != well_known::MIXED && constraint.atoms.contains(&well_known::MIXED) {
             report.causes.unset(CoercionCause::NestedMixed);
             report.add_cause(CoercionCause::TrueUnionNarrow);
@@ -869,7 +859,7 @@ where
     }
 
     if matches!(container, Atom::Intersected(_)) {
-        return refines_container_intersected(input, container, world, options, report, builder);
+        return refines_container_intersected(input, container, symbols, options, report, builder);
     }
 
     if matches!(input, Atom::Intersected(_)) {
@@ -877,10 +867,10 @@ where
             return family::mixed::refines(input, container);
         }
 
-        return refines_input_intersected(input, container, world, options, report, builder);
+        return refines_input_intersected(input, container, symbols, options, report, builder);
     }
 
-    let result = dispatch_refines(input, container, world, options, report, builder);
+    let result = dispatch_refines(input, container, symbols, options, report, builder);
 
     if result {
         if input.kind() == AtomKind::Int && container.kind() == AtomKind::Float {
@@ -899,10 +889,10 @@ where
 }
 
 #[inline]
-fn refines_container_intersected<'arena, S, A, W>(
+fn refines_container_intersected<'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -910,18 +900,17 @@ fn refines_container_intersected<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Intersected(payload) = container else {
         return false;
     };
 
-    if !atom_refines(input, *payload.head, world, options, report, builder) {
+    if !atom_refines(input, *payload.head, symbols, options, report, builder) {
         return false;
     }
 
     for &conjunct in payload.conjuncts {
-        if !atom_refines(input, conjunct, world, options, report, builder) {
+        if !atom_refines(input, conjunct, symbols, options, report, builder) {
             return false;
         }
     }
@@ -930,10 +919,10 @@ where
 }
 
 #[inline]
-fn refines_input_intersected<'arena, S, A, W>(
+fn refines_input_intersected<'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -941,23 +930,22 @@ fn refines_input_intersected<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Intersected(payload) = input else {
         return false;
     };
 
-    if atom_refines(*payload.head, container, world, options, report, builder) {
+    if atom_refines(*payload.head, container, symbols, options, report, builder) {
         return true;
     }
 
     for &conjunct in payload.conjuncts {
-        if atom_refines(conjunct, container, world, options, report, builder) {
+        if atom_refines(conjunct, container, symbols, options, report, builder) {
             return true;
         }
     }
 
-    if sealed_intersected_cover(input, container, world, options, report, builder) {
+    if sealed_intersected_cover(input, container, symbols, options, report, builder) {
         return true;
     }
 
@@ -976,10 +964,10 @@ where
 /// separate union members). The conjuncts are carried onto each survivor so a
 /// positive constraint like `& E` is not silently dropped.
 #[inline]
-fn sealed_intersected_union_cover<'scratch, 'arena, S, A, W>(
+fn sealed_intersected_union_cover<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     containers: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -987,7 +975,6 @@ fn sealed_intersected_union_cover<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Intersected(payload) = input else {
         return false;
@@ -1004,7 +991,7 @@ where
         }
     }
 
-    let residual = lattice::sealed::compute_residual(*payload.head, &negated_inners, world, options, report, builder);
+    let residual = lattice::sealed::compute_residual(*payload.head, &negated_inners, symbols, options, report, builder);
     let surviving = match residual {
         SealedResidual::Surviving(surviving) => surviving,
         SealedResidual::FullyCovered => return true,
@@ -1015,17 +1002,17 @@ where
     surviving.iter().all(|&survivor| {
         let survivor_atom = builder.intersected(survivor, payload.conjuncts);
         let survivor_type = builder.union_of(&[survivor_atom]);
-        refines(survivor_type, containers_type, world, options, report, builder)
+        refines(survivor_type, containers_type, symbols, options, report, builder)
     })
 }
 
 /// Sealed-cover: `Intersected(H sealed, conjuncts) <: container` when
 /// `H`'s surviving inheritors each refine `container`.
 #[inline]
-fn sealed_intersected_cover<'scratch, 'arena, S, A, W>(
+fn sealed_intersected_cover<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -1033,7 +1020,6 @@ fn sealed_intersected_cover<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Intersected(payload) = input else {
         return false;
@@ -1050,7 +1036,7 @@ where
         }
     }
 
-    let residual = lattice::sealed::compute_residual(*payload.head, &negated_inners, world, options, report, builder);
+    let residual = lattice::sealed::compute_residual(*payload.head, &negated_inners, symbols, options, report, builder);
     let surviving = match residual {
         SealedResidual::Surviving(surviving) => surviving,
         SealedResidual::FullyCovered => return true,
@@ -1060,7 +1046,7 @@ where
     let container_type = builder.union_of(&[container]);
     surviving.iter().all(|survivor| {
         let survivor_type = builder.union_of(&[*survivor]);
-        refines(survivor_type, container_type, world, options, report, builder)
+        refines(survivor_type, container_type, symbols, options, report, builder)
     })
 }
 
@@ -1089,10 +1075,10 @@ const fn is_true_union_kind(kind: AtomKind) -> bool {
 /// already ruled the input out, so it answers `false` alongside the other
 /// kinds with no widening container semantics.
 #[inline]
-fn dispatch_refines<'arena, S, A, W>(
+fn dispatch_refines<'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -1100,14 +1086,13 @@ fn dispatch_refines<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if input.kind() == AtomKind::Negated {
-        return family::negated::refines_input_negated(input, container, world, options, report, builder);
+        return family::negated::refines_input_negated(input, container, symbols, options, report, builder);
     }
 
     if container.kind() == AtomKind::Negated {
-        return family::negated::refines_container_negated(input, container, world, options, report, builder);
+        return family::negated::refines_container_negated(input, container, symbols, options, report, builder);
     }
 
     match container.kind() {
@@ -1117,20 +1102,20 @@ where
         AtomKind::Float => family::float::refines(input, container),
         AtomKind::String => family::string::refines(input, container),
         AtomKind::ClassLikeString => {
-            family::class_like_string::refines(input, container, world, options, report, builder)
+            family::class_like_string::refines(input, container, symbols, options, report, builder)
         }
         AtomKind::ArrayKey => family::array_key::refines(input, container),
         AtomKind::Numeric => family::numeric::refines(input, container),
         AtomKind::Scalar => family::scalar::refines(input, container),
         AtomKind::ObjectAny => family::object::refines_object_any(input, container),
         AtomKind::Object | AtomKind::Enum | AtomKind::ObjectShape | AtomKind::HasMethod | AtomKind::HasProperty => {
-            family::object::refines(input, container, world, options, report, builder)
+            family::object::refines(input, container, symbols, options, report, builder)
         }
-        AtomKind::Array | AtomKind::List => family::array::refines(input, container, world, options, report, builder),
-        AtomKind::Iterable => family::iterable::refines(input, container, world, options, report, builder),
-        AtomKind::Callable => family::callable::refines(input, container, world, options, report, builder),
+        AtomKind::Array | AtomKind::List => family::array::refines(input, container, symbols, options, report, builder),
+        AtomKind::Iterable => family::iterable::refines(input, container, symbols, options, report, builder),
+        AtomKind::Callable => family::callable::refines(input, container, symbols, options, report, builder),
         AtomKind::Mixed => family::mixed::refines(input, container),
-        AtomKind::GenericParameter => family::generic::refines(input, container, world, options, report, builder),
+        AtomKind::GenericParameter => family::generic::refines(input, container, symbols, options, report, builder),
         AtomKind::Variable
         | AtomKind::Reference
         | AtomKind::MemberReference

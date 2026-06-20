@@ -16,7 +16,7 @@
 //!   carrier.
 //!
 //! All predicates are pure functions of the [`Type`] (no
-//! [`World`](crate::world::World), no options). Kind-family checks are
+//! [`SymbolTable`](crate::symbol::SymbolTable), no options). Kind-family checks are
 //! single mask tests against the precomputed [`AtomKindSet`].
 
 pub(crate) mod atom;

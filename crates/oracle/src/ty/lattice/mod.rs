@@ -10,7 +10,7 @@
 //!   `b`). The boolean overlap question; the type-returning meet (greatest
 //!   lower bound) lives in [`crate::ty::meet`].
 //!
-//! Each takes a [`World`](crate::world::World) (class hierarchy lookups,
+//! Each takes a [`SymbolTable`](crate::symbol::SymbolTable) (class hierarchy lookups,
 //! member existence checks, template metadata), a [`LatticeOptions`] value
 //! (caller-set knobs like `ignore_null`), a `&mut LatticeReport`
 //! (diagnostics: the [`CoercionCause`] set and optional replacements), and

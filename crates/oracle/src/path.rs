@@ -164,7 +164,7 @@ impl<'arena> Path<'arena> {
             SymbolId::property(class_name, name),
             arena.alloc_slice_copy(&[
                 PathSegment::QualifiedInsensative(strip_leading_separator(class_name)),
-                PathSegment::Name(name),
+                PathSegment::Name(name.strip_prefix(b"$").unwrap_or(name)),
             ]),
         )
     }
@@ -183,7 +183,7 @@ impl<'arena> Path<'arena> {
             SymbolId::property_hook(class_name, property_name, name),
             arena.alloc_slice_copy(&[
                 PathSegment::QualifiedInsensative(strip_leading_separator(class_name)),
-                PathSegment::Name(property_name),
+                PathSegment::Name(property_name.strip_prefix(b"$").unwrap_or(property_name)),
                 PathSegment::QualifiedInsensative(name),
             ]),
         )

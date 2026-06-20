@@ -127,7 +127,7 @@ impl SymbolId {
         let mut hasher = FixedState::default().build_hasher();
         hasher.write_u8(TAG_PROPERTY);
         write_folded(&mut hasher, strip_leading_separator(class_name));
-        write_verbatim(&mut hasher, property_name);
+        write_verbatim(&mut hasher, strip_property_sigil(property_name));
 
         SymbolId(hasher.finish())
     }
@@ -139,7 +139,7 @@ impl SymbolId {
         let mut hasher = FixedState::default().build_hasher();
         hasher.write_u8(TAG_PROPERTY_HOOK);
         write_folded(&mut hasher, strip_leading_separator(class_name));
-        write_verbatim(&mut hasher, property_name);
+        write_verbatim(&mut hasher, strip_property_sigil(property_name));
         write_folded(&mut hasher, hook_name);
 
         SymbolId(hasher.finish())
@@ -195,7 +195,7 @@ impl SymbolId {
         let mut hasher = FixedState::default().build_hasher();
         hasher.write_u8(TAG_PROPERTY_HOOK_PARAMETER);
         write_folded(&mut hasher, strip_leading_separator(class_name));
-        write_verbatim(&mut hasher, property_name);
+        write_verbatim(&mut hasher, strip_property_sigil(property_name));
         write_folded(&mut hasher, hook_name);
         write_verbatim(&mut hasher, parameter);
 
@@ -205,6 +205,12 @@ impl SymbolId {
 
 fn strip_leading_separator(name: &[u8]) -> &[u8] {
     name.strip_prefix(b"\\").unwrap_or(name)
+}
+
+/// Property names are keyed by their bare identifier; the `$` sigil that the
+/// syntax tree carries on a property variable is not part of the identity.
+fn strip_property_sigil(name: &[u8]) -> &[u8] {
+    name.strip_prefix(b"$").unwrap_or(name)
 }
 
 fn write_folded(hasher: &mut impl Hasher, bytes: &[u8]) {

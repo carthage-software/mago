@@ -7,6 +7,7 @@ use std::num::NonZeroU32;
 use mago_allocator::Arena;
 use mago_flags::U8Flags;
 
+use crate::symbol::class_like::ClassLikeKind;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::array::ArrayAtom;
@@ -19,7 +20,6 @@ use crate::ty::atom::payload::callable::CallableAtom;
 use crate::ty::atom::payload::callable::Signature;
 use crate::ty::atom::payload::object::enumeration::EnumAtom;
 use crate::ty::atom::payload::object::named::ObjectAtom;
-use crate::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 use crate::ty::atom::payload::scalar::class_like_string::ClassLikeStringAtom;
 use crate::ty::atom::payload::scalar::class_like_string::ClassLikeStringSpecifier;
 use crate::ty::atom::payload::scalar::string::StringAtom;

@@ -12,23 +12,23 @@
 //!   (vacuously true: empty has no entries)
 //!
 //! `iterable` does NOT accept generic `\Traversable` named-objects yet
-//! because that requires world-driven hierarchy queries.
+//! because that requires symbol-table-driven hierarchy queries.
 
 use mago_allocator::Arena;
 
+use crate::symbol::SymbolTable;
 use crate::ty::atom::Atom;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::lattice::refines as type_refines;
 use crate::ty::well_known;
-use crate::world::World;
 
 #[inline]
-pub fn refines<'arena, S, A, W>(
+pub fn refines<'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -36,7 +36,6 @@ pub fn refines<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Iterable(container_payload) = container else {
         return false;
@@ -48,15 +47,15 @@ where
 
     match input {
         Atom::Iterable(input_payload) => {
-            type_refines(input_payload.key_type, container_payload.key_type, world, options, report, builder)
-                && type_refines(input_payload.value_type, container_payload.value_type, world, options, report, builder)
+            type_refines(input_payload.key_type, container_payload.key_type, symbols, options, report, builder)
+                && type_refines(input_payload.value_type, container_payload.value_type, symbols, options, report, builder)
         }
         Atom::List(input_payload) => {
-            type_refines(well_known::TYPE_INT, container_payload.key_type, world, options, report, builder)
+            type_refines(well_known::TYPE_INT, container_payload.key_type, symbols, options, report, builder)
                 && type_refines(
                     input_payload.element_type,
                     container_payload.value_type,
-                    world,
+                    symbols,
                     options,
                     report,
                     builder,
@@ -66,8 +65,8 @@ where
             let key = input_payload.key_param.unwrap_or(well_known::TYPE_ARRAY_KEY);
             let value = input_payload.value_param.unwrap_or(container_payload.value_type);
 
-            type_refines(key, container_payload.key_type, world, options, report, builder)
-                && type_refines(value, container_payload.value_type, world, options, report, builder)
+            type_refines(key, container_payload.key_type, symbols, options, report, builder)
+                && type_refines(value, container_payload.value_type, symbols, options, report, builder)
         }
         _ => false,
     }

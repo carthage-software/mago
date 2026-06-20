@@ -49,6 +49,7 @@ mod family;
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 
+use crate::symbol::SymbolTable;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
 use crate::ty::builder::TypeBuilder;
@@ -71,7 +72,6 @@ use crate::ty::well_known::RESOURCE;
 use crate::ty::well_known::STRING;
 use crate::ty::well_known::TRUE;
 use crate::ty::well_known::VOID;
-use crate::world::NullWorld;
 
 /// Compute the join (least upper bound) of a slice of atoms with the
 /// canonical preset.
@@ -383,7 +383,7 @@ impl JoinOptions {
 
 /// Drop any atom absorbed by another structurally-larger atom in the
 /// same multiset (`a <: b` ⇒ drop `a`). Uses the lattice's atom
-/// refinement check with [`NullWorld`], so only purely-structural rules
+/// refinement check with an empty symbol table, so only purely-structural rules
 /// fire. Coercion-driven refinements (e.g. `int <: float` via PHP's
 /// runtime int-to-float coercion) do **not** drive absorption: keeping
 /// `int|float` distinct preserves the information that the value was
@@ -400,7 +400,7 @@ fn apply_subtype_absorption<'scratch, 'arena, S, A>(
         return;
     }
 
-    let world = NullWorld;
+    let symbols = SymbolTable::new_in(builder.arena());
     let options = LatticeOptions::default();
     let mut absorbed: ScratchVec<'scratch, bool, S> = builder.scratch_vec_with(atoms.len());
     absorbed.resize(atoms.len(), false);
@@ -416,7 +416,7 @@ fn apply_subtype_absorption<'scratch, 'arena, S, A>(
             }
 
             let mut report = LatticeReport::new();
-            if atom_refines(atoms[input_index], atoms[container_index], &world, options, &mut report, builder)
+            if atom_refines(atoms[input_index], atoms[container_index], &symbols, options, &mut report, builder)
                 && !report.causes.contains(CoercionCause::PhpRuntimeCoerce)
             {
                 absorbed[input_index] = true;

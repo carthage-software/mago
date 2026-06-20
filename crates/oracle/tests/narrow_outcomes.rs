@@ -16,7 +16,7 @@ fn meet_narrow<'arena>(
     input: Type<'arena>,
     narrowing: Type<'arena>,
 ) -> MeetOutcome<'arena> {
-    let cb = empty_world();
+    let cb = empty_symbol_table(f.arena);
     let mut report = LatticeReport::new();
     meet::narrow(input, narrowing, &cb, LatticeOptions::default(), &mut report, &mut f.builder)
 }
@@ -26,7 +26,7 @@ fn subtract_narrow<'arena>(
     input: Type<'arena>,
     narrowing: Type<'arena>,
 ) -> SubtractOutcome<'arena> {
-    let cb = empty_world();
+    let cb = empty_symbol_table(f.arena);
     let mut report = LatticeReport::new();
     subtract::narrow(input, narrowing, &cb, LatticeOptions::default(), &mut report, &mut f.builder)
 }
@@ -79,7 +79,7 @@ fn meet_narrow_impossible_when_disjoint() {
 #[test]
 fn meet_narrow_impossible_for_unrelated_named_objects_with_no_descend() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let mut report = LatticeReport::new();
         let list_atom = f.t_list(well_known::TYPE_INT, false);
         let list_ty = f.u(list_atom);
@@ -120,7 +120,7 @@ fn meet_compute_returns_never_when_impossible() {
         let r = meet::compute(
             well_known::TYPE_INT,
             well_known::TYPE_STRING,
-            &empty_world(),
+            &empty_symbol_table(f.arena),
             LatticeOptions::default(),
             &mut LatticeReport::new(),
             &mut f.builder,
@@ -135,7 +135,7 @@ fn meet_compute_unwraps_redundant() {
         let r = meet::compute(
             well_known::TYPE_INT,
             well_known::TYPE_INT,
-            &empty_world(),
+            &empty_symbol_table(f.arena),
             LatticeOptions::default(),
             &mut LatticeReport::new(),
             &mut f.builder,
@@ -223,7 +223,7 @@ fn subtract_compute_returns_never_when_impossible() {
         let r = subtract::compute(
             well_known::TYPE_INT,
             well_known::TYPE_INT,
-            &empty_world(),
+            &empty_symbol_table(f.arena),
             LatticeOptions::default(),
             &mut LatticeReport::new(),
             &mut f.builder,
@@ -238,7 +238,7 @@ fn subtract_compute_unwraps_redundant() {
         let r = subtract::compute(
             well_known::TYPE_INT,
             well_known::TYPE_STRING,
-            &empty_world(),
+            &empty_symbol_table(f.arena),
             LatticeOptions::default(),
             &mut LatticeReport::new(),
             &mut f.builder,
@@ -250,9 +250,7 @@ fn subtract_compute_unwraps_redundant() {
 #[test]
 fn meet_narrow_unrelated_final_objects_are_impossible() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.with_final("Foo");
-        w.with_final("Bar");
+        let w = symbol_table(f.arena, "<?php final class Foo {} final class Bar {}");
         let foo_atom = f.t_named("Foo");
         let foo = f.u(foo_atom);
         let bar_atom = f.t_named("Bar");

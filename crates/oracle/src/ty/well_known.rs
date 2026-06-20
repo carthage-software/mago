@@ -14,13 +14,13 @@
 
 use mago_flags::U8Flags;
 
+use crate::symbol::class_like::ClassLikeKind;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::array::ArrayAtom;
 use crate::ty::atom::payload::callable::CallableAtom;
 use crate::ty::atom::payload::iterable::IterableAtom;
 use crate::ty::atom::payload::resource::ResourceAtom;
-use crate::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 use crate::ty::atom::payload::scalar::class_like_string::ClassLikeStringAtom;
 use crate::ty::atom::payload::scalar::class_like_string::ClassLikeStringSpecifier;
 use crate::ty::atom::payload::scalar::float::FloatAtom;

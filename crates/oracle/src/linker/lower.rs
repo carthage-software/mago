@@ -381,6 +381,8 @@ where
         let attributes = self.attributes(constant.attributes);
         let mut ty = TypeSlot::new();
         ty.inferred = self.infer(constant.value);
+        ty.annotation = crate::linker::members::var_annotation(constant.annotation)
+            .and_then(|annotation| self.lower_type_annotation(annotation));
 
         ConstantSymbol {
             span: constant.span,

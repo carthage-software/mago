@@ -6,9 +6,9 @@ use common::*;
 fn singleton_union_reflexive() {
     fixture(|f| {
         for atom in [f.t_int(), f.t_string(), f.t_bool(), f.t_float(), f.null(), f.mixed(), f.t_object_any()] {
-            let world = empty_world();
+            let symbols = empty_symbol_table(f.arena);
             let union = f.u(atom);
-            assert!(is_contained(f, union, union, &world));
+            assert!(is_contained(f, union, union, &symbols));
         }
     });
 }
@@ -244,26 +244,26 @@ fn union_string_lits_subtypes_string() {
 #[test]
 fn ignore_null_flag_skips_null_in_input() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let int = f.t_int();
         let null = f.null();
         let nullable_int = f.u_many(vec![int, null]);
         let int_only = f.u(int);
-        assert!(!is_contained_with(f, nullable_int, int_only, &world, false, false, false));
-        assert!(is_contained_with(f, nullable_int, int_only, &world, true, false, false));
+        assert!(!is_contained_with(f, nullable_int, int_only, &symbols, false, false, false));
+        assert!(is_contained_with(f, nullable_int, int_only, &symbols, true, false, false));
     });
 }
 
 #[test]
 fn ignore_false_flag_skips_false_in_input() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let int = f.t_int();
         let false_atom = f.t_false();
         let int_or_false = f.u_many(vec![int, false_atom]);
         let int_only = f.u(int);
-        assert!(!is_contained_with(f, int_or_false, int_only, &world, false, false, false));
-        assert!(is_contained_with(f, int_or_false, int_only, &world, false, true, false));
+        assert!(!is_contained_with(f, int_or_false, int_only, &symbols, false, false, false));
+        assert!(is_contained_with(f, int_or_false, int_only, &symbols, false, true, false));
     });
 }
 

@@ -15,8 +15,8 @@
 //! setup phase and builds the pool against them. The pool cannot own the
 //! arenas (that borrow would be self-referential), so it holds only the
 //! arena-backed [`Type`]s; benches that need a
-//! [`World`](mago_oracle::world::World) construct
-//! [`NullWorld`](mago_oracle::world::NullWorld) directly.
+//! a [`SymbolTable`](mago_oracle::symbol::SymbolTable) construct
+//! an empty [`SymbolTable`] directly.
 
 use mago_allocator::Arena;
 
