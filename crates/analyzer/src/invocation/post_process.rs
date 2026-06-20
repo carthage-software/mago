@@ -619,12 +619,25 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
         return;
     }
 
+    let preserved: WordSet = block_context
+        .locals
+        .keys()
+        .copied()
+        .filter(|var_id| {
+            is_property_or_index_key(*var_id) && property_root_is_immutable(context, block_context, *var_id)
+        })
+        .collect();
+
     let should_wipe = |var_id: Word| -> bool {
         if !is_property_or_index_key(var_id) {
             return false;
         }
 
         if !this_escapes && var_id.as_bytes().starts_with(b"$this->") {
+            return false;
+        }
+
+        if preserved.contains(&var_id) {
             return false;
         }
 
@@ -642,6 +655,55 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
 fn is_property_or_index_key(var_id: Word) -> bool {
     let s = var_id.as_bytes();
     memchr::memmem::find(s, b"->").is_some() || (s.starts_with(b"$") && s.contains(&b'['))
+}
+
+fn property_root_is_immutable<A>(context: &Context<'_, '_, A>, block_context: &BlockContext<'_>, var_id: Word) -> bool
+where
+    A: Arena,
+{
+    let bytes = var_id.as_bytes();
+    let Some(arrow) = memchr::memmem::find(bytes, b"->") else {
+        return false;
+    };
+
+    let root = &bytes[..arrow];
+    let property = &bytes[arrow + 2..];
+    if memchr::memmem::find(property, b"->").is_some() || property.contains(&b'[') {
+        return false;
+    }
+
+    let Some(root_type) = block_context.locals.get(&Word::new(root)) else {
+        return false;
+    };
+
+    !root_type.types.is_empty()
+        && root_type.types.iter().all(|atom| atom_property_is_immutable(context, atom, property))
+}
+
+fn atom_property_is_immutable<A>(context: &Context<'_, '_, A>, atom: &TAtomic, property: &[u8]) -> bool
+where
+    A: Arena,
+{
+    let TAtomic::Object(object) = atom else {
+        return false;
+    };
+
+    let Some(class_name) = object.get_name() else {
+        return false;
+    };
+
+    let Some(class_metadata) = context.codebase.get_class_like(class_name.as_bytes()) else {
+        return false;
+    };
+
+    if class_metadata.flags.is_readonly() || class_metadata.flags.is_mutation_free() {
+        return true;
+    }
+
+    class_metadata
+        .properties
+        .get(&Word::new(property))
+        .is_some_and(|property_metadata| property_metadata.flags.is_readonly())
 }
 
 /// A variable ID like `$_SESSION['user_id']` - an index access rooted at a PHP
