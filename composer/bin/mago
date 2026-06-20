@@ -10,6 +10,7 @@ use RuntimeException;
 
 use function array_shift;
 use function class_exists;
+use function dirname;
 use function fwrite;
 
 use const STDERR;
@@ -45,6 +46,8 @@ use const STDERR;
 
         $extension = namespace\get_archive_extension($platform['os'], $platform['suffix']);
         $executable = namespace\ensure_binary($version, $triple, $platform['extension'], $extension, __DIR__);
+
+        namespace\ensure_schema($executable, dirname(__DIR__, 2));
 
         $args = $_SERVER['argv'];
         array_shift($args);

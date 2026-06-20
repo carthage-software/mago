@@ -7,6 +7,7 @@ namespace Mago\Internal;
 use Composer\InstalledVersions;
 use PharData;
 use RuntimeException;
+use Throwable;
 use ZipArchive;
 
 use function array_map;
@@ -41,7 +42,9 @@ use function proc_open;
 use function shell_exec;
 use function str_contains;
 use function stream_context_create;
+use function stream_get_contents;
 use function strtolower;
+use function sys_get_temp_dir;
 use function trim;
 use function unlink;
 use function usleep;
@@ -588,6 +591,127 @@ function ensure_binary(
 
         return $executablePath;
     });
+}
+
+/**
+ * Ensure the editor JSON schema is available next to the package.
+ *
+ * Writes `schema.json` to the package root (`vendor/carthage-software/mago/schema.json`
+ * once installed) so a project can reference a local, version-matched schema instead of a
+ * version-pinned URL:
+ *
+ *     #:schema vendor/carthage-software/mago/schema.json
+ *
+ * The schema is produced by the just-installed binary, so it always matches the version in
+ * use. Generation is best-effort: any failure (read-only vendor dir, binary error, ...) is
+ * swallowed so it never breaks the user's actual command. Each installed version ships in its
+ * own package directory, so a plain existence check is enough - no version marker is needed.
+ *
+ * @param string $executablePath Path to the mago binary.
+ * @param string $packageRoot The package root directory.
+ *
+ * @mago-expect lint:no-empty-catch-clause
+ *
+ * @internal
+ */
+function ensure_schema(string $executablePath, string $packageRoot): void
+{
+    $schemaPath = "{$packageRoot}/schema.json";
+    if (file_exists($schemaPath)) {
+        return;
+    }
+
+    try {
+        $lockFile = "{$packageRoot}/.mago-schema.lock";
+
+        namespace\locked($lockFile, static function () use ($executablePath, $schemaPath): void {
+            // Re-check after acquiring the lock: another process may have written it, somehow.
+            if (file_exists($schemaPath)) {
+                return;
+            }
+
+            $schema = namespace\capture_schema($executablePath);
+            if ($schema !== null) {
+                file_put_contents($schemaPath, $schema);
+            }
+        });
+    } catch (Throwable) {
+        // Best-effort: a missing local schema must never block running mago.
+    }
+}
+
+/**
+ * Run `mago config --schema` and capture its JSON output.
+ *
+ * Runs from the system temp directory so the project's own (possibly invalid) `mago.toml` is
+ * not sourced - the schema is static, so it does not depend on any configuration. Standard
+ * error (debug logs) is discarded; only stdout carries the schema.
+ *
+ * @param string $executablePath Path to the mago binary.
+ *
+ * @return null|non-empty-string The schema JSON, or null when generation fails.
+ *
+ * @internal
+ */
+function capture_schema(string $executablePath): ?string
+{
+    [$process, $stdout] = namespace\open_schema_process($executablePath);
+    if ($process === null || $stdout === null) {
+        return null;
+    }
+
+    $schema = stream_get_contents($stdout);
+    fclose($stdout);
+
+    if (proc_close($process) !== 0) {
+        return null;
+    }
+
+    if (!is_string($schema) || $schema === '') {
+        return null;
+    }
+
+    return $schema;
+}
+
+/**
+ * Spawn `mago config --schema` from the system temp directory with stdout piped.
+ *
+ * @param string $executablePath Path to the mago binary.
+ *
+ * @return array{0: resource|null, 1: resource|null} The process handle and its stdout pipe, or
+ *   `[null, null]` when the process could not be started.
+ *
+ * @internal
+ */
+function open_schema_process(string $executablePath): array
+{
+    $nullDevice = DIRECTORY_SEPARATOR === '\\' ? 'NUL' : '/dev/null';
+
+    $pipes = [];
+    $process = proc_open(
+        escapeshellarg($executablePath) . ' config --schema',
+        [
+            0 => ['file', $nullDevice, 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['file', $nullDevice, 'w'],
+        ],
+        $pipes,
+        sys_get_temp_dir(),
+    );
+
+    if (!is_resource($process)) {
+        return [null, null];
+    }
+
+    $stdout = $pipes[1] ?? null;
+    if (!is_resource($stdout)) {
+        proc_close($process);
+
+        return [null, null];
+    }
+
+    return [$process, $stdout];
 }
 
 /**

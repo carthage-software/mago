@@ -59,6 +59,16 @@ For TOML the comment is read by the [Taplo](https://taplo.tamasfe.dev/) language
 
 If you regenerate the schema in CI (for example, to validate config files programmatically), `mago config --schema` prints it to stdout.
 
+### Local schema with Composer
+
+When you install Mago through Composer (`carthage-software/mago`), a version-matched schema is written to `vendor/carthage-software/mago/schema.json` the first time you run `mago`. Reference it with a relative path so it always tracks the installed version — no manual URL bump when a Composer update bumps Mago:
+
+```toml
+#:schema vendor/carthage-software/mago/schema.json
+version = "1"
+php-version = "8.3"
+```
+
 ## Sharing configuration with `extends`
 
 > Available since Mago 1.25. Earlier versions silently ignore the directive.
