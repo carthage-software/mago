@@ -664,8 +664,15 @@ where
         return existing_type;
     }
 
-    let updated_type =
-        if existing_type.eq(&old_type) { get_mixed() } else { subtract_union_types(context, existing_type, old_type) };
+    if existing_type.eq(&old_type) {
+        let Some(new_type) = new_type else {
+            return existing_type;
+        };
+
+        return add_optional_union_type(get_mixed(), Some(new_type), context.codebase);
+    }
+
+    let updated_type = subtract_union_types(context, existing_type, old_type);
 
     add_optional_union_type(updated_type, new_type, context.codebase)
 }
