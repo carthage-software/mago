@@ -97,13 +97,13 @@ where
         .parameter_list
         .parameters
         .iter()
-        .filter_map(|p| scan_function_like_parameter(p, Some(class_like_metadata.name), context, scope))
+        .filter_map(|p| scan_function_like_parameter(p, Some(class_like_metadata.original_name), context, scope))
         .collect();
 
     if let Some(return_hint) = method.return_type_hint.as_ref() {
         metadata.set_return_type_declaration_metadata(Some(get_type_metadata_from_hint(
             &return_hint.hint,
-            Some(class_like_metadata.name),
+            Some(class_like_metadata.original_name),
             context,
         )));
     }
@@ -139,7 +139,14 @@ where
 
     metadata.method_metadata = Some(method_metadata);
 
-    scan_function_like_docblock(span, functionlike_id, &mut metadata, Some(class_like_metadata.name), context, scope);
+    scan_function_like_docblock(
+        span,
+        functionlike_id,
+        &mut metadata,
+        Some(class_like_metadata.original_name),
+        context,
+        scope,
+    );
 
     if let MethodBody::Concrete(block) = &method.body {
         infer_assertions_from_block_body(block, &mut metadata, context.resolved_names);

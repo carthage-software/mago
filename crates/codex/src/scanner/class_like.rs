@@ -351,7 +351,8 @@ where
     };
 
     if kind.is_class() {
-        class_like_metadata.attribute_flags = get_attribute_flags(name, attribute_lists, context, scope, Some(name));
+        class_like_metadata.attribute_flags =
+            get_attribute_flags(name, attribute_lists, context, scope, Some(original_name));
     }
 
     class_like_metadata.kind = kind;
@@ -533,7 +534,7 @@ where
 
             let template_name = word(template.name.value);
             let template_as_type = if let Some(bound) = &template.bound {
-                match builder::get_union_from_type(bound.r#type, scope, &type_context, Some(name)) {
+                match builder::get_union_from_type(bound.r#type, scope, &type_context, Some(original_name)) {
                     Ok(tunion) => tunion,
                     Err(typing_error) => {
                         class_like_metadata.issues.push(
@@ -554,7 +555,7 @@ where
             };
 
             let template_default = if let Some(default) = &template.default {
-                match builder::get_union_from_type(default.r#type, scope, &type_context, Some(name)) {
+                match builder::get_union_from_type(default.r#type, scope, &type_context, Some(original_name)) {
                     Ok(tunion) => Some(tunion),
                     Err(typing_error) => {
                         class_like_metadata.issues.push(
@@ -625,7 +626,7 @@ where
             };
 
             let alias_name = word(type_alias.alias.value);
-            match get_type_metadata_from_type(type_alias.r#type, Some(name), &type_context, scope) {
+            match get_type_metadata_from_type(type_alias.r#type, Some(original_name), &type_context, scope) {
                 Ok(type_metadata) => {
                     class_like_metadata.type_aliases.insert(alias_name, type_metadata);
                 }
@@ -649,7 +650,7 @@ where
             };
 
             let extended_union =
-                match builder::get_union_from_type(extended_type.r#type, scope, &type_context, Some(name)) {
+                match builder::get_union_from_type(extended_type.r#type, scope, &type_context, Some(original_name)) {
                     Ok(tunion) => tunion,
                     Err(typing_error) => {
                         class_like_metadata.issues.push(
@@ -738,23 +739,27 @@ where
                 continue;
             };
 
-            let implemented_union =
-                match builder::get_union_from_type(implemented_type.r#type, scope, &type_context, Some(name)) {
-                    Ok(tunion) => tunion,
-                    Err(typing_error) => {
-                        class_like_metadata.issues.push(
-                            Issue::error("Could not resolve the interface name in the `@implements` tag.")
-                                .with_code(ScanningIssueKind::InvalidImplementsTag)
-                                .with_annotation(
-                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                )
-                                .with_note(typing_error.note())
-                                .with_help(typing_error.help()),
-                        );
+            let implemented_union = match builder::get_union_from_type(
+                implemented_type.r#type,
+                scope,
+                &type_context,
+                Some(original_name),
+            ) {
+                Ok(tunion) => tunion,
+                Err(typing_error) => {
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the interface name in the `@implements` tag.")
+                            .with_code(ScanningIssueKind::InvalidImplementsTag)
+                            .with_annotation(
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                            )
+                            .with_note(typing_error.note())
+                            .with_help(typing_error.help()),
+                    );
 
-                        continue;
-                    }
-                };
+                    continue;
+                }
+            };
 
             if !implemented_union.is_single() {
                 class_like_metadata.issues.push(
@@ -822,7 +827,7 @@ where
             };
 
             let required_union =
-                match builder::get_union_from_type(require_extend.r#type, scope, &type_context, Some(name)) {
+                match builder::get_union_from_type(require_extend.r#type, scope, &type_context, Some(original_name)) {
                     Ok(tunion) => tunion,
                     Err(typing_error) => {
                         class_like_metadata.issues.push(
@@ -902,23 +907,27 @@ where
                 continue;
             };
 
-            let required_union =
-                match builder::get_union_from_type(require_implements.r#type, scope, &type_context, Some(name)) {
-                    Ok(tunion) => tunion,
-                    Err(typing_error) => {
-                        class_like_metadata.issues.push(
-                            Issue::error("Could not resolve the interface name in the `@require-implements` tag.")
-                                .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
-                                .with_annotation(
-                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                )
-                                .with_note(typing_error.note())
-                                .with_help(typing_error.help()),
-                        );
+            let required_union = match builder::get_union_from_type(
+                require_implements.r#type,
+                scope,
+                &type_context,
+                Some(original_name),
+            ) {
+                Ok(tunion) => tunion,
+                Err(typing_error) => {
+                    class_like_metadata.issues.push(
+                        Issue::error("Could not resolve the interface name in the `@require-implements` tag.")
+                            .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
+                            .with_annotation(
+                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                            )
+                            .with_note(typing_error.note())
+                            .with_help(typing_error.help()),
+                    );
 
-                        continue;
-                    }
-                };
+                    continue;
+                }
+            };
 
             if !required_union.is_single() {
                 class_like_metadata.issues.push(
@@ -986,7 +995,7 @@ where
         }
 
         if let Some(inheritors) = inheritors {
-            match builder::get_union_from_type(inheritors.r#type, scope, &type_context, Some(name)) {
+            match builder::get_union_from_type(inheritors.r#type, scope, &type_context, Some(original_name)) {
                 Ok(inheritors_union) => {
                     for inheritor in inheritors_union.types.as_ref() {
                         match inheritor {
@@ -1028,7 +1037,7 @@ where
                 continue;
             };
 
-            match builder::get_union_from_type(mixin.r#type, scope, &type_context, Some(name)) {
+            match builder::get_union_from_type(mixin.r#type, scope, &type_context, Some(original_name)) {
                 Ok(mixin_type) => {
                     class_like_metadata.mixins.push(mixin_type);
                 }
@@ -1092,7 +1101,7 @@ where
 
                 if let Some(parameter_type) = argument.r#type {
                     function_parameter_metadata.set_type_declaration_metadata(
-                        get_type_metadata_from_type(parameter_type, Some(name), &type_context, scope).ok(),
+                        get_type_metadata_from_type(parameter_type, Some(original_name), &type_context, scope).ok(),
                     );
                 }
 
@@ -1112,7 +1121,7 @@ where
             }
 
             function_like_metadata.return_type_metadata = method_tag.return_type.and_then(|return_type| {
-                get_type_metadata_from_type(return_type, Some(name), &type_context, scope).ok()
+                get_type_metadata_from_type(return_type, Some(original_name), &type_context, scope).ok()
             });
 
             codebase.function_likes.insert(method_id, function_like_metadata);
@@ -1128,7 +1137,7 @@ where
 
             let property_name = word(property.variable.value);
             let type_metadata = if let Some(property_type) = property.r#type {
-                match get_type_metadata_from_type(property_type, Some(name), &type_context, scope) {
+                match get_type_metadata_from_type(property_type, Some(original_name), &type_context, scope) {
                     Ok(type_metadata) => Some(type_metadata),
                     Err(typing_error) => {
                         class_like_metadata.issues.push(
@@ -1179,7 +1188,7 @@ where
                 for constant_metadata in scan_class_like_constants(
                     &mut class_like_metadata,
                     constant,
-                    Some(name),
+                    Some(original_name),
                     &type_context,
                     context,
                     scope,
@@ -1337,24 +1346,27 @@ where
                         continue;
                     };
 
-                    let template_use_type =
-                        match builder::get_union_from_type(template_use.r#type, scope, &type_context, Some(name)) {
-                            Ok(template_use_type) => template_use_type,
-                            Err(typing_error) => {
-                                class_like_metadata.issues.push(
-                                    Issue::error("Could not resolve the trait type in the `@use` tag.")
-                                        .with_code(ScanningIssueKind::InvalidUseTag)
-                                        .with_annotation(
-                                            Annotation::primary(typing_error.span())
-                                                .with_message(typing_error.to_string()),
-                                        )
-                                        .with_note(typing_error.note())
-                                        .with_help(typing_error.help()),
-                                );
+                    let template_use_type = match builder::get_union_from_type(
+                        template_use.r#type,
+                        scope,
+                        &type_context,
+                        Some(original_name),
+                    ) {
+                        Ok(template_use_type) => template_use_type,
+                        Err(typing_error) => {
+                            class_like_metadata.issues.push(
+                                Issue::error("Could not resolve the trait type in the `@use` tag.")
+                                    .with_code(ScanningIssueKind::InvalidUseTag)
+                                    .with_annotation(
+                                        Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                                    )
+                                    .with_note(typing_error.note())
+                                    .with_help(typing_error.help()),
+                            );
 
-                                continue;
-                            }
-                        };
+                            continue;
+                        }
+                    };
 
                     if !template_use_type.is_single() {
                         class_like_metadata.issues.push(
