@@ -15,13 +15,13 @@ use criterion::criterion_group;
 use criterion::criterion_main;
 
 use mago_allocator::LocalArena;
+use mago_oracle::symbol::SymbolTable;
 use mago_oracle::ty::TypeBuilder;
 use mago_oracle::ty::lattice::LatticeOptions;
 use mago_oracle::ty::lattice::LatticeReport;
 use mago_oracle::ty::lattice::generalizes;
 use mago_oracle::ty::lattice::overlaps;
 use mago_oracle::ty::lattice::refines;
-use mago_oracle::world::NullWorld;
 
 mod common;
 
@@ -39,7 +39,7 @@ fn workload(c: &mut Criterion) {
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
     let pool = TypePool::new(SEED, &mut builder);
-    let world = NullWorld;
+    let symbols = SymbolTable::new_in(&arena);
     let options = LatticeOptions::default();
 
     let mut rng = Rng::new(SEED);
@@ -55,13 +55,13 @@ fn workload(c: &mut Criterion) {
             for &(left_index, right_index) in &pairs {
                 let left = pool.weighted[left_index];
                 let right = pool.weighted[right_index];
-                if refines(black_box(left), black_box(right), &world, options, &mut report, &mut builder) {
+                if refines(black_box(left), black_box(right), &symbols, options, &mut report, &mut builder) {
                     hits = hits.wrapping_add(1);
                 }
-                if generalizes(black_box(left), black_box(right), &world, options, &mut report, &mut builder) {
+                if generalizes(black_box(left), black_box(right), &symbols, options, &mut report, &mut builder) {
                     hits = hits.wrapping_add(1);
                 }
-                if overlaps(black_box(left), black_box(right), &world, options, &mut report, &mut builder) {
+                if overlaps(black_box(left), black_box(right), &symbols, options, &mut report, &mut builder) {
                     hits = hits.wrapping_add(1);
                 }
             }

@@ -9,6 +9,7 @@ use mago_allocator::Arena;
 use mago_allocator::copy::CopyInto;
 
 use crate::path::Path;
+use crate::symbol::class_like::ClassLikeKind;
 use crate::ty::Type;
 
 /// `class-string`, `interface-string<T>`, `enum-string`, `trait-string`,
@@ -21,16 +22,6 @@ use crate::ty::Type;
 pub struct ClassLikeStringAtom<'arena> {
     pub kind: ClassLikeKind,
     pub specifier: ClassLikeStringSpecifier<'arena>,
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize))]
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum ClassLikeKind {
-    Class,
-    Interface,
-    Enum,
-    Trait,
 }
 
 /// What is known about the value of this class-like-string beyond its kind.

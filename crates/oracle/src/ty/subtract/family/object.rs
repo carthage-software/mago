@@ -5,9 +5,9 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 
+use crate::symbol::SymbolTable;
 use crate::ty::atom::Atom;
 use crate::ty::builder::TypeBuilder;
-use crate::world::World;
 
 /// `Object \ B` records the removed side as a `Negated` conjunct of the
 /// input. The removed side may be another `Object` (descendant,
@@ -15,17 +15,16 @@ use crate::world::World;
 /// (`HasMethod` / `HasProperty` / `ObjectShape`). For the strict
 /// bare-descendant case the exclusion binds to the bare descendant
 /// class so the whole nominal subtree is excluded.
-pub(in crate::ty::subtract) fn object_descendant_minus<'scratch, 'arena, S, A, W>(
+pub(in crate::ty::subtract) fn object_descendant_minus<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
     out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Object(input_payload) = input else {
         return false;
@@ -43,7 +42,7 @@ where
         match *removed_payload.head {
             Atom::Object(removed_head_payload) => {
                 let descends = input_payload.name != removed_head_payload.name
-                    && world.descends_from(removed_head_payload.name.id, input_payload.name.id)
+                    && symbols.descends_from(removed_head_payload.name.id, input_payload.name.id)
                     && removed_head_payload.type_arguments.is_none();
 
                 let atom = if descends { builder.object(*removed_head_payload) } else { removed };
@@ -54,7 +53,7 @@ where
         }
     } else if let Atom::Object(removed_payload) = removed {
         let descends = input_payload.name != removed_payload.name
-            && world.descends_from(removed_payload.name.id, input_payload.name.id);
+            && symbols.descends_from(removed_payload.name.id, input_payload.name.id);
 
         let atom = if descends && removed_payload.type_arguments.is_none() {
             builder.object(*removed_payload)

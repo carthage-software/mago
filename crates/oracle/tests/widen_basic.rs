@@ -3,9 +3,9 @@ mod common;
 use common::*;
 
 use mago_flags::U8Flags;
+use mago_oracle::symbol::class_like::ClassLikeKind;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
-use mago_oracle::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 use mago_oracle::ty::atom::payload::scalar::class_like_string::ClassLikeStringAtom;
 use mago_oracle::ty::atom::payload::scalar::class_like_string::ClassLikeStringSpecifier;
 use mago_oracle::ty::atom::payload::scalar::string::StringAtom;

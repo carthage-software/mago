@@ -10,7 +10,7 @@
 //! container expects". A literal class-string and a refined
 //! `class-string<C>` therefore both reduce to "compare the named
 //! object against the constraint", which routes through the regular
-//! object-family lattice (so all the world's ancestry / generic-arg
+//! object-family lattice (so all the symbol table's ancestry / generic-arg
 //! / variance rules apply).
 //!
 //! Cross-kind: a regular `String` input whose literal value is a valid
@@ -23,23 +23,23 @@ use mago_flags::U8Flags;
 
 use crate::id::SymbolId;
 use crate::path::Path;
+use crate::symbol::SymbolTable;
+use crate::symbol::class_like::ClassLikeKind;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::object::named::ObjectAtom;
-use crate::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 use crate::ty::atom::payload::scalar::class_like_string::ClassLikeStringAtom;
 use crate::ty::atom::payload::scalar::class_like_string::ClassLikeStringSpecifier;
 use crate::ty::atom::payload::scalar::string::StringLiteral;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
-use crate::world::World;
 
 #[inline]
-pub fn refines<'arena, S, A, W>(
+pub fn refines<'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -47,39 +47,38 @@ pub fn refines<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::ClassLikeString(container_payload) = container else {
         return false;
     };
 
     if matches!(container_payload.specifier, ClassLikeStringSpecifier::Any) {
-        return matches_kind(input, container_payload.kind, world);
+        return matches_kind(input, container_payload.kind, symbols);
     }
 
-    if !matches_kind(input, container_payload.kind, world) {
+    if !matches_kind(input, container_payload.kind, symbols) {
         return false;
     }
 
-    let Some(container_target) = represented_type(container_payload, world, builder) else {
+    let Some(container_target) = represented_type(container_payload, symbols, builder) else {
         return false;
     };
 
-    let Some(input_target) = input_represented_type(input, world, builder) else {
+    let Some(input_target) = input_represented_type(input, symbols, builder) else {
         return false;
     };
 
-    crate::ty::lattice::refines(input_target, container_target, world, options, report, builder)
+    crate::ty::lattice::refines(input_target, container_target, symbols, options, report, builder)
 }
 
 /// String-literal inputs must name a syntactically valid class. When the
-/// world classifies the name, an exact kind match is required; when the
-/// world is silent, the name is accepted - an unknown name stays
-/// permissive (open-world).
+/// symbol table classifies the name, an exact kind match is required; when the
+/// symbol table is silent, the name is accepted - an unknown name stays
+/// permissive (the hierarchy is open).
 #[inline]
-fn matches_kind<'arena, W>(input: Atom<'arena>, container_kind: ClassLikeKind, world: &W) -> bool
+fn matches_kind<'arena, A>(input: Atom<'arena>, container_kind: ClassLikeKind, symbols: &SymbolTable<'arena, A>) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     if let Atom::String(input_payload) = input {
         let StringLiteral::Value(value) = input_payload.literal else {
@@ -90,7 +89,7 @@ where
             return false;
         }
 
-        return match world.class_like_kind(SymbolId::class_like(value)) {
+        return match symbols.class_like_kind(SymbolId::class_like(value)) {
             Some(kind) => kind == container_kind,
             None => true,
         };
@@ -104,19 +103,18 @@ where
 }
 
 #[inline]
-fn represented_type<'arena, S, A, W>(
+fn represented_type<'arena, S, A>(
     payload: &ClassLikeStringAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Option<Type<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match payload.specifier {
         ClassLikeStringSpecifier::Any => None,
-        ClassLikeStringSpecifier::Literal { value } => Some(name_as_object_type(value, payload.kind, world, builder)),
+        ClassLikeStringSpecifier::Literal { value } => Some(name_as_object_type(value, payload.kind, symbols, builder)),
         ClassLikeStringSpecifier::OfType { constraint } | ClassLikeStringSpecifier::Generic { constraint } => {
             Some(constraint)
         }
@@ -124,18 +122,17 @@ where
 }
 
 #[inline]
-fn input_represented_type<'arena, S, A, W>(
+fn input_represented_type<'arena, S, A>(
     input: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Option<Type<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if let Atom::ClassLikeString(input_payload) = input {
-        return represented_type(input_payload, world, builder);
+        return represented_type(input_payload, symbols, builder);
     }
 
     let Atom::String(input_payload) = input else {
@@ -151,22 +148,21 @@ where
     }
 
     let name = builder.intern_class_like_path(value);
-    let kind = kind_from_world(name, world);
+    let kind = kind_from_symbols(name, symbols);
 
-    Some(name_as_object_type(name, kind, world, builder))
+    Some(name_as_object_type(name, kind, symbols, builder))
 }
 
 #[inline]
-fn name_as_object_type<'arena, S, A, W>(
+fn name_as_object_type<'arena, S, A>(
     name: Path<'arena>,
     kind: ClassLikeKind,
-    _world: &W,
+    _symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Type<'arena>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let atom = match kind {
         ClassLikeKind::Enum => builder.enum_any(name.as_bytes()),
@@ -179,11 +175,11 @@ where
 }
 
 #[inline]
-fn kind_from_world<'arena, W>(name: Path<'_>, world: &W) -> ClassLikeKind
+fn kind_from_symbols<A>(name: Path<'_>, symbols: &SymbolTable<'_, A>) -> ClassLikeKind
 where
-    W: World<'arena>,
+    A: Arena,
 {
-    world.class_like_kind(name.id).unwrap_or(ClassLikeKind::Class)
+    symbols.class_like_kind(name.id).unwrap_or(ClassLikeKind::Class)
 }
 
 /// Validate that `bytes` is a syntactically well-formed PHP class name

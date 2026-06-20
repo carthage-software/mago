@@ -2,68 +2,68 @@ mod common;
 
 use common::*;
 
-use mago_oracle::world::World as _;
+use mago_allocator::LocalArena;
+use mago_oracle::symbol::SymbolTable;
 
-fn animal_hierarchy<'arena>() -> MockWorld<'arena> {
-    let mut world = MockWorld::from_edges(&[
-        ("Mammal", "Animal"),
-        ("Dog", "Mammal"),
-        ("Cat", "Mammal"),
-        ("Cocker", "Dog"),
-        ("Poodle", "Dog"),
-        ("Sloth", "Mammal"),
-        ("Sloth", "Sleepable"),
-    ]);
-    world.declare("Standalone");
-    world
+fn animal_hierarchy(arena: &LocalArena) -> SymbolTable<'_, LocalArena> {
+    symbol_table(
+        arena,
+        "<?php
+class Animal {}
+class Mammal extends Animal {}
+class Dog extends Mammal {}
+class Cat extends Mammal {}
+class Cocker extends Dog {}
+class Poodle extends Dog {}
+interface Sleepable {}
+class Sloth extends Mammal implements Sleepable {}
+class Standalone {}",
+    )
 }
 
-fn enums_hierarchy<'arena>() -> MockWorld<'arena> {
-    let mut world = MockWorld::new();
-    world.declare("Status");
-    world.declare("Color");
-    world
+fn enums_hierarchy(arena: &LocalArena) -> SymbolTable<'_, LocalArena> {
+    symbol_table(arena, "<?php enum Status {} enum Color {}")
 }
 
 #[test]
 fn object_any_reflexive() {
     fixture(|f| {
         let object = f.t_object_any();
-        assert!(atomic_is_contained(f, object, object, &empty_world()));
+        assert!(atomic_is_contained(f, object, object, &empty_symbol_table(f.arena)));
     });
 }
 
 #[test]
 fn named_in_object_any() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let object = f.t_object_any();
         let dog = f.t_named("Dog");
         let cat = f.t_named("Cat");
         let standalone = f.t_named("Standalone");
-        assert!(atomic_is_contained(f, dog, object, &world));
-        assert!(atomic_is_contained(f, cat, object, &world));
-        assert!(atomic_is_contained(f, standalone, object, &world));
+        assert!(atomic_is_contained(f, dog, object, &symbols));
+        assert!(atomic_is_contained(f, cat, object, &symbols));
+        assert!(atomic_is_contained(f, standalone, object, &symbols));
     });
 }
 
 #[test]
 fn object_any_not_in_named() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let object = f.t_object_any();
         let dog = f.t_named("Dog");
-        assert!(!atomic_is_contained(f, object, dog, &world));
+        assert!(!atomic_is_contained(f, object, dog, &symbols));
     });
 }
 
 #[test]
 fn class_reflexive() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         for n in ["Dog", "Cat", "Cocker", "Animal", "Standalone"] {
             let named = f.t_named(n);
-            assert!(atomic_is_contained(f, named, named, &world));
+            assert!(atomic_is_contained(f, named, named, &symbols));
         }
     });
 }
@@ -71,248 +71,248 @@ fn class_reflexive() {
 #[test]
 fn subclass_in_superclass() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let cocker = f.t_named("Cocker");
         let poodle = f.t_named("Poodle");
         let dog = f.t_named("Dog");
-        assert!(atomic_is_contained(f, cocker, dog, &world));
-        assert!(atomic_is_contained(f, poodle, dog, &world));
+        assert!(atomic_is_contained(f, cocker, dog, &symbols));
+        assert!(atomic_is_contained(f, poodle, dog, &symbols));
     });
 }
 
 #[test]
 fn superclass_not_in_subclass() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let dog = f.t_named("Dog");
         let cocker = f.t_named("Cocker");
-        assert!(!atomic_is_contained(f, dog, cocker, &world));
+        assert!(!atomic_is_contained(f, dog, cocker, &symbols));
     });
 }
 
 #[test]
 fn class_not_in_sibling() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let cocker = f.t_named("Cocker");
         let cat = f.t_named("Cat");
         let poodle = f.t_named("Poodle");
         let dog = f.t_named("Dog");
-        assert!(!atomic_is_contained(f, cocker, cat, &world));
-        assert!(!atomic_is_contained(f, cocker, poodle, &world));
-        assert!(!atomic_is_contained(f, dog, cat, &world));
+        assert!(!atomic_is_contained(f, cocker, cat, &symbols));
+        assert!(!atomic_is_contained(f, cocker, poodle, &symbols));
+        assert!(!atomic_is_contained(f, dog, cat, &symbols));
     });
 }
 
 #[test]
 fn class_implements_interface() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let dog = f.t_named("Dog");
         let cat = f.t_named("Cat");
         let mammal = f.t_named("Mammal");
-        assert!(atomic_is_contained(f, dog, mammal, &world));
-        assert!(atomic_is_contained(f, cat, mammal, &world));
+        assert!(atomic_is_contained(f, dog, mammal, &symbols));
+        assert!(atomic_is_contained(f, cat, mammal, &symbols));
     });
 }
 
 #[test]
 fn class_implements_inherited_interface() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let dog = f.t_named("Dog");
         let cocker = f.t_named("Cocker");
         let animal = f.t_named("Animal");
-        assert!(atomic_is_contained(f, dog, animal, &world));
-        assert!(atomic_is_contained(f, cocker, animal, &world));
+        assert!(atomic_is_contained(f, dog, animal, &symbols));
+        assert!(atomic_is_contained(f, cocker, animal, &symbols));
     });
 }
 
 #[test]
 fn interface_in_parent_interface() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let mammal = f.t_named("Mammal");
         let animal = f.t_named("Animal");
-        assert!(atomic_is_contained(f, mammal, animal, &world));
+        assert!(atomic_is_contained(f, mammal, animal, &symbols));
     });
 }
 
 #[test]
 fn class_implements_multiple_interfaces() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let sloth = f.t_named("Sloth");
         let mammal = f.t_named("Mammal");
         let sleepable = f.t_named("Sleepable");
         let animal = f.t_named("Animal");
-        assert!(atomic_is_contained(f, sloth, mammal, &world));
-        assert!(atomic_is_contained(f, sloth, sleepable, &world));
-        assert!(atomic_is_contained(f, sloth, animal, &world));
+        assert!(atomic_is_contained(f, sloth, mammal, &symbols));
+        assert!(atomic_is_contained(f, sloth, sleepable, &symbols));
+        assert!(atomic_is_contained(f, sloth, animal, &symbols));
     });
 }
 
 #[test]
 fn class_does_not_implement_unrelated_interface() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let dog = f.t_named("Dog");
         let cat = f.t_named("Cat");
         let standalone = f.t_named("Standalone");
         let sleepable = f.t_named("Sleepable");
         let animal = f.t_named("Animal");
-        assert!(!atomic_is_contained(f, dog, sleepable, &world));
-        assert!(!atomic_is_contained(f, cat, sleepable, &world));
-        assert!(!atomic_is_contained(f, standalone, animal, &world));
+        assert!(!atomic_is_contained(f, dog, sleepable, &symbols));
+        assert!(!atomic_is_contained(f, cat, sleepable, &symbols));
+        assert!(!atomic_is_contained(f, standalone, animal, &symbols));
     });
 }
 
 #[test]
 fn parent_interface_not_in_child() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let animal = f.t_named("Animal");
         let mammal = f.t_named("Mammal");
-        assert!(!atomic_is_contained(f, animal, mammal, &world));
+        assert!(!atomic_is_contained(f, animal, mammal, &symbols));
     });
 }
 
 #[test]
 fn interface_not_in_class() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let mammal = f.t_named("Mammal");
         let animal = f.t_named("Animal");
         let dog = f.t_named("Dog");
-        assert!(!atomic_is_contained(f, mammal, dog, &world));
-        assert!(!atomic_is_contained(f, animal, dog, &world));
+        assert!(!atomic_is_contained(f, mammal, dog, &symbols));
+        assert!(!atomic_is_contained(f, animal, dog, &symbols));
     });
 }
 
 #[test]
 fn unrelated_classes_disjoint() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let dog = f.t_named("Dog");
         let standalone = f.t_named("Standalone");
-        assert!(!atomic_is_contained(f, dog, standalone, &world));
-        assert!(!atomic_is_contained(f, standalone, dog, &world));
+        assert!(!atomic_is_contained(f, dog, standalone, &symbols));
+        assert!(!atomic_is_contained(f, standalone, dog, &symbols));
     });
 }
 
 #[test]
 fn class_not_in_object_when_not_a_subtype() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let cat = f.t_named("Cat");
         let cocker = f.t_named("Cocker");
-        assert!(!atomic_is_contained(f, cat, cocker, &world));
+        assert!(!atomic_is_contained(f, cat, cocker, &symbols));
     });
 }
 
 #[test]
 fn enum_reflexive() {
     fixture(|f| {
-        let world = enums_hierarchy();
+        let symbols = enums_hierarchy(f.arena);
         let status = f.t_enum("Status");
         let color = f.t_enum("Color");
-        assert!(atomic_is_contained(f, status, status, &world));
-        assert!(atomic_is_contained(f, color, color, &world));
+        assert!(atomic_is_contained(f, status, status, &symbols));
+        assert!(atomic_is_contained(f, color, color, &symbols));
     });
 }
 
 #[test]
 fn enum_case_in_enum() {
     fixture(|f| {
-        let world = enums_hierarchy();
+        let symbols = enums_hierarchy(f.arena);
         let status = f.t_enum("Status");
         let color = f.t_enum("Color");
         let active = f.t_enum_case("Status", "Active");
         let inactive = f.t_enum_case("Status", "Inactive");
         let red = f.t_enum_case("Color", "Red");
-        assert!(atomic_is_contained(f, active, status, &world));
-        assert!(atomic_is_contained(f, inactive, status, &world));
-        assert!(atomic_is_contained(f, red, color, &world));
+        assert!(atomic_is_contained(f, active, status, &symbols));
+        assert!(atomic_is_contained(f, inactive, status, &symbols));
+        assert!(atomic_is_contained(f, red, color, &symbols));
     });
 }
 
 #[test]
 fn enum_not_in_enum_case() {
     fixture(|f| {
-        let world = enums_hierarchy();
+        let symbols = enums_hierarchy(f.arena);
         let status = f.t_enum("Status");
         let active = f.t_enum_case("Status", "Active");
-        assert!(!atomic_is_contained(f, status, active, &world));
+        assert!(!atomic_is_contained(f, status, active, &symbols));
     });
 }
 
 #[test]
 fn enum_case_reflexive() {
     fixture(|f| {
-        let world = enums_hierarchy();
+        let symbols = enums_hierarchy(f.arena);
         let active = f.t_enum_case("Status", "Active");
-        assert!(atomic_is_contained(f, active, active, &world));
+        assert!(atomic_is_contained(f, active, active, &symbols));
     });
 }
 
 #[test]
 fn enum_cases_disjoint() {
     fixture(|f| {
-        let world = enums_hierarchy();
+        let symbols = enums_hierarchy(f.arena);
         let active = f.t_enum_case("Status", "Active");
         let inactive = f.t_enum_case("Status", "Inactive");
-        assert!(!atomic_is_contained(f, active, inactive, &world));
+        assert!(!atomic_is_contained(f, active, inactive, &symbols));
     });
 }
 
 #[test]
 fn distinct_enums_disjoint() {
     fixture(|f| {
-        let world = enums_hierarchy();
+        let symbols = enums_hierarchy(f.arena);
         let status = f.t_enum("Status");
         let color = f.t_enum("Color");
         let active = f.t_enum_case("Status", "Active");
-        assert!(!atomic_is_contained(f, status, color, &world));
-        assert!(!atomic_is_contained(f, active, color, &world));
+        assert!(!atomic_is_contained(f, status, color, &symbols));
+        assert!(!atomic_is_contained(f, active, color, &symbols));
     });
 }
 
 #[test]
 fn class_not_in_int() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let dog = f.t_named("Dog");
         let int = f.t_int();
-        assert!(!atomic_is_contained(f, dog, int, &world));
+        assert!(!atomic_is_contained(f, dog, int, &symbols));
     });
 }
 
 #[test]
 fn class_not_in_string() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let dog = f.t_named("Dog");
         let string = f.t_string();
-        assert!(!atomic_is_contained(f, dog, string, &world));
+        assert!(!atomic_is_contained(f, dog, string, &symbols));
     });
 }
 
 #[test]
 fn class_in_mixed() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let dog = f.t_named("Dog");
         let object = f.t_object_any();
         let mixed = f.mixed();
-        assert!(atomic_is_contained(f, dog, mixed, &world));
-        assert!(atomic_is_contained(f, object, mixed, &world));
+        assert!(atomic_is_contained(f, dog, mixed, &symbols));
+        assert!(atomic_is_contained(f, object, mixed, &symbols));
     });
 }
 
 #[test]
 fn many_class_hierarchy_relations() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let pairs_subtype = [
             ("Cocker", "Dog"),
             ("Cocker", "Animal"),
@@ -328,7 +328,7 @@ fn many_class_hierarchy_relations() {
         for (sub, sup) in pairs_subtype {
             let input = f.t_named(sub);
             let container = f.t_named(sup);
-            assert!(atomic_is_contained(f, input, container, &world), "{sub} should be a subtype of {sup}");
+            assert!(atomic_is_contained(f, input, container, &symbols), "{sub} should be a subtype of {sup}");
         }
     });
 }
@@ -336,7 +336,7 @@ fn many_class_hierarchy_relations() {
 #[test]
 fn many_class_hierarchy_non_relations() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let pairs_not_subtype = [
             ("Dog", "Cat"),
             ("Cocker", "Cat"),
@@ -353,25 +353,25 @@ fn many_class_hierarchy_non_relations() {
         for (sub, sup) in pairs_not_subtype {
             let input = f.t_named(sub);
             let container = f.t_named(sup);
-            assert!(!atomic_is_contained(f, input, container, &world), "{sub} should NOT be a subtype of {sup}");
+            assert!(!atomic_is_contained(f, input, container, &symbols), "{sub} should NOT be a subtype of {sup}");
         }
     });
 }
 
 #[test]
-fn mock_world_transitive_closure() {
+fn symbol_table_transitive_closure() {
     fixture(|f| {
-        let world = animal_hierarchy();
+        let symbols = animal_hierarchy(f.arena);
         let cocker = f.name("Cocker");
         let animal = f.name("Animal");
         let mammal = f.name("Mammal");
         let sloth = f.name("Sloth");
         let cat = f.name("Cat");
-        assert!(world.descends_from(cocker.id, animal.id));
-        assert!(world.descends_from(cocker.id, mammal.id));
-        assert!(world.descends_from(sloth.id, animal.id));
-        assert!(world.descends_from(mammal.id, animal.id));
-        assert!(!world.descends_from(animal.id, mammal.id));
-        assert!(!world.descends_from(cocker.id, cat.id));
+        assert!(symbols.descends_from(cocker.id, animal.id));
+        assert!(symbols.descends_from(cocker.id, mammal.id));
+        assert!(symbols.descends_from(sloth.id, animal.id));
+        assert!(symbols.descends_from(mammal.id, animal.id));
+        assert!(!symbols.descends_from(animal.id, mammal.id));
+        assert!(!symbols.descends_from(cocker.id, cat.id));
     });
 }

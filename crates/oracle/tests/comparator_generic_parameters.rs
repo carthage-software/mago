@@ -2,7 +2,6 @@ mod common;
 
 use common::*;
 
-use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known;
@@ -21,7 +20,7 @@ fn same_t_reflexive_under_same_defining_entity() {
     fixture(|f| {
         let t1 = f.t_template("Box", "T");
         let t2 = f.t_template("Box", "T");
-        assert!(atomic_is_contained(f, t1, t2, &empty_world()));
+        assert!(atomic_is_contained(f, t1, t2, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -30,7 +29,7 @@ fn different_defining_entities_not_same_t() {
     fixture(|f| {
         let box_t = f.t_template("Box", "T");
         let bag_t = f.t_template("Bag", "T");
-        assert!(!atomic_is_contained(f, box_t, bag_t, &empty_world()));
+        assert!(!atomic_is_contained(f, box_t, bag_t, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -39,7 +38,7 @@ fn different_parameter_names_same_class_not_same_t() {
     fixture(|f| {
         let box_t = f.t_template("Box", "T");
         let box_u = f.t_template("Box", "U");
-        assert!(!atomic_is_contained(f, box_t, box_u, &empty_world()));
+        assert!(!atomic_is_contained(f, box_t, box_u, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -48,7 +47,7 @@ fn template_with_mixed_constraint_refines_mixed() {
     fixture(|f| {
         let t = f.t_template("Box", "T");
         let mixed = f.mixed();
-        assert!(atomic_is_contained(f, t, mixed, &empty_world()));
+        assert!(atomic_is_contained(f, t, mixed, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -58,7 +57,7 @@ fn template_with_int_constraint_refines_int() {
         let int_type = f.u(f.t_int());
         let t = t_param_with_constraint(f, "Box", "T", int_type);
         let int = f.t_int();
-        assert!(atomic_is_contained(f, t, int, &empty_world()));
+        assert!(atomic_is_contained(f, t, int, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -68,7 +67,7 @@ fn template_with_int_constraint_refines_array_key() {
         let int_type = f.u(f.t_int());
         let t = t_param_with_constraint(f, "Box", "T", int_type);
         let array_key = f.t_array_key();
-        assert!(atomic_is_contained(f, t, array_key, &empty_world()));
+        assert!(atomic_is_contained(f, t, array_key, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -78,7 +77,7 @@ fn template_with_int_constraint_does_not_refine_string() {
         let int_type = f.u(f.t_int());
         let t = t_param_with_constraint(f, "Box", "T", int_type);
         let string = f.t_string();
-        assert!(!atomic_is_contained(f, t, string, &empty_world()));
+        assert!(!atomic_is_contained(f, t, string, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -88,8 +87,8 @@ fn concrete_value_does_not_refine_template_parameter() {
         let t = f.t_template("Box", "T");
         let int = f.t_int();
         let string = f.t_string();
-        assert!(!atomic_is_contained(f, int, t, &empty_world()));
-        assert!(!atomic_is_contained(f, string, t, &empty_world()));
+        assert!(!atomic_is_contained(f, int, t, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, string, t, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -98,22 +97,22 @@ fn template_self_refines_via_mixed_top() {
     fixture(|f| {
         let t = f.t_template("Box", "T");
         let mixed = f.mixed();
-        assert!(atomic_is_contained(f, t, t, &empty_world()));
-        assert!(atomic_is_contained(f, t, mixed, &empty_world()));
+        assert!(atomic_is_contained(f, t, t, &empty_symbol_table(f.arena)));
+        assert!(atomic_is_contained(f, t, mixed, &empty_symbol_table(f.arena)));
     });
 }
 
 #[test]
 fn template_with_named_constraint_refines_ancestor() {
     fixture(|f| {
-        let world = MockWorld::from_edges(&[("Dog", "Animal")]);
+        let symbols = symbol_table(f.arena, "<?php class Animal {} class Dog extends Animal {}");
         let dog = f.t_named("Dog");
         let dog_type = f.u(dog);
         let t = t_param_with_constraint(f, "Owner", "T", dog_type);
         let animal = f.t_named("Animal");
         let cat = f.t_named("Cat");
-        assert!(atomic_is_contained(f, t, animal, &world));
-        assert!(!atomic_is_contained(f, t, cat, &world));
+        assert!(atomic_is_contained(f, t, animal, &symbols));
+        assert!(!atomic_is_contained(f, t, cat, &symbols));
     });
 }
 
@@ -122,22 +121,28 @@ fn never_refines_any_template() {
     fixture(|f| {
         let t = f.t_template("Box", "T");
         let t_type = f.u(t);
-        assert!(is_contained(f, well_known::TYPE_NEVER, t_type, &empty_world()));
+        assert!(is_contained(f, well_known::TYPE_NEVER, t_type, &empty_symbol_table(f.arena)));
     });
 }
 
 #[test]
 fn inherited_t_refines_transferred_parameter() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("D", &[("TD", Variance::Invariant)]);
-        world.with_templates("C", &[("TC", Variance::Invariant)]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php
+/** @template TD */
+class D {}
+/**
+ * @template TC
+ * @extends D<TC>
+ */
+class C extends D {}",
+        );
         let child_param = f.t_template("C", "TC");
-        let child_param_type = f.u(child_param);
-        world.with_extended("C", "D", vec![child_param_type]);
         let parent_param = f.t_template("D", "TD");
         assert!(
-            atomic_is_contained(f, child_param, parent_param, &world),
+            atomic_is_contained(f, child_param, parent_param, &symbols),
             "C extends D<TC>, so a TC value is the same variable as D's TD"
         );
     });
@@ -146,35 +151,49 @@ fn inherited_t_refines_transferred_parameter() {
 #[test]
 fn inherited_t_is_transitive_across_three_levels() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("E", &[("TE", Variance::Invariant)]);
-        world.with_templates("D", &[("TD", Variance::Invariant)]);
-        world.with_templates("C", &[("TC", Variance::Invariant)]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php
+/** @template TE */
+class E {}
+/**
+ * @template TD
+ * @extends E<TD>
+ */
+class D extends E {}
+/**
+ * @template TC
+ * @extends D<TC>
+ */
+class C extends D {}",
+        );
         let c_param = f.t_template("C", "TC");
-        let c_param_type = f.u(c_param);
-        world.with_extended("C", "D", vec![c_param_type]);
         let d_param = f.t_template("D", "TD");
-        let d_param_type = f.u(d_param);
-        world.with_extended("D", "E", vec![d_param_type]);
         let e_param = f.t_template("E", "TE");
-        assert!(atomic_is_contained(f, c_param, d_param, &world), "TC <: TD (C extends D<TC>)");
-        assert!(atomic_is_contained(f, d_param, e_param, &world), "TD <: TE (D extends E<TD>)");
-        assert!(atomic_is_contained(f, c_param, e_param, &world), "transitivity: TC <: TD and TD <: TE imply TC <: TE");
+        assert!(atomic_is_contained(f, c_param, d_param, &symbols), "TC <: TD (C extends D<TC>)");
+        assert!(atomic_is_contained(f, d_param, e_param, &symbols), "TD <: TE (D extends E<TD>)");
+        assert!(atomic_is_contained(f, c_param, e_param, &symbols), "transitivity: TC <: TD and TD <: TE imply TC <: TE");
     });
 }
 
 #[test]
 fn inherited_t_relation_is_one_way() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("D", &[("TD", Variance::Invariant)]);
-        world.with_templates("C", &[("TC", Variance::Invariant)]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php
+/** @template TD */
+class D {}
+/**
+ * @template TC
+ * @extends D<TC>
+ */
+class C extends D {}",
+        );
         let child_param = f.t_template("C", "TC");
-        let child_param_type = f.u(child_param);
-        world.with_extended("C", "D", vec![child_param_type]);
         let parent_param = f.t_template("D", "TD");
         assert!(
-            !atomic_is_contained(f, parent_param, child_param, &world),
+            !atomic_is_contained(f, parent_param, child_param, &symbols),
             "a bare D's TD could be specialised to anything, so TD does not refine C's TC"
         );
     });
@@ -183,14 +202,21 @@ fn inherited_t_relation_is_one_way() {
 #[test]
 fn inherited_t_requires_actual_transfer() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("D", &[("TD", Variance::Invariant)]);
-        world.with_templates("C", &[("TC", Variance::Invariant)]);
-        world.with_extended("C", "D", vec![well_known::TYPE_INT]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php
+/** @template TD */
+class D {}
+/**
+ * @template TC
+ * @extends D<int>
+ */
+class C extends D {}",
+        );
         let child_param = f.t_template("C", "TC");
         let parent_param = f.t_template("D", "TD");
         assert!(
-            !atomic_is_contained(f, child_param, parent_param, &world),
+            !atomic_is_contained(f, child_param, parent_param, &symbols),
             "C extends D<int>, not D<TC>, so TC and TD are unrelated"
         );
     });
@@ -199,16 +225,22 @@ fn inherited_t_requires_actual_transfer() {
 #[test]
 fn inherited_t_refines_implies_overlap() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("D", &[("TD", Variance::Invariant)]);
-        world.with_templates("C", &[("TC", Variance::Invariant)]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php
+/** @template TD */
+class D {}
+/**
+ * @template TC
+ * @extends D<TC>
+ */
+class C extends D {}",
+        );
         let child_param = f.t_template("C", "TC");
-        let child_param_type = f.u(child_param);
-        world.with_extended("C", "D", vec![child_param_type]);
         let parent_param = f.t_template("D", "TD");
-        assert!(atomic_is_contained(f, child_param, parent_param, &world));
+        assert!(atomic_is_contained(f, child_param, parent_param, &symbols));
         assert!(
-            atomic_overlaps(f, child_param, parent_param, &world),
+            atomic_overlaps(f, child_param, parent_param, &symbols),
             "TC <: TD must imply they overlap (refines/overlap consistency)"
         );
     });

@@ -2,6 +2,9 @@ mod common;
 
 use common::*;
 
+use mago_allocator::LocalArena;
+use mago_oracle::symbol::SymbolTable;
+
 use mago_flags::U8Flags;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::scalar::string::StringAtom;
@@ -13,38 +16,43 @@ use mago_oracle::ty::lattice::LatticeReport;
 use mago_oracle::ty::lattice::refines;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::World;
 
-fn meet_of<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, world: &W) -> Type<'arena>
-where
-    W: World<'arena>,
-{
+fn meet_of<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    a: Type<'arena>,
+    b: Type<'arena>,
+    symbols: &SymbolTable<'arena, LocalArena>,
+) -> Type<'arena> {
     let mut report = LatticeReport::new();
-    meet::compute(a, b, world, LatticeOptions::default(), &mut report, &mut f.builder)
+    meet::compute(a, b, symbols, LatticeOptions::default(), &mut report, &mut f.builder)
 }
 
-fn refines_of<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, world: &W) -> bool
-where
-    W: World<'arena>,
-{
+fn refines_of<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    a: Type<'arena>,
+    b: Type<'arena>,
+    symbols: &SymbolTable<'arena, LocalArena>,
+) -> bool {
     let mut report = LatticeReport::new();
-    refines(a, b, world, LatticeOptions::default(), &mut report, &mut f.builder)
+    refines(a, b, symbols, LatticeOptions::default(), &mut report, &mut f.builder)
 }
 
 #[track_caller]
-fn assert_lower_bound<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, world: &W)
-where
-    W: World<'arena>,
-{
-    let m = meet_of(f, a, b, world);
-    assert!(refines_of(f, m, a, world), "meet({a:?}, {b:?}) = {m:?} does not refine {a:?}");
-    assert!(refines_of(f, m, b, world), "meet({a:?}, {b:?}) = {m:?} does not refine {b:?}");
+fn assert_lower_bound<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    a: Type<'arena>,
+    b: Type<'arena>,
+    symbols: &SymbolTable<'arena, LocalArena>,
+) {
+    let m = meet_of(f, a, b, symbols);
+    assert!(refines_of(f, m, a, symbols), "meet({a:?}, {b:?}) = {m:?} does not refine {a:?}");
+    assert!(refines_of(f, m, b, symbols), "meet({a:?}, {b:?}) = {m:?} does not refine {b:?}");
 }
 
 #[test]
 fn reflexive_meet() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         assert_eq!(meet_of(f, well_known::TYPE_INT, well_known::TYPE_INT, &cb), well_known::TYPE_INT);
     });
 }
@@ -52,7 +60,7 @@ fn reflexive_meet() {
 #[test]
 fn meet_with_mixed_yields_other() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         assert_eq!(meet_of(f, well_known::TYPE_MIXED, well_known::TYPE_INT, &cb), well_known::TYPE_INT);
         assert_eq!(meet_of(f, well_known::TYPE_INT, well_known::TYPE_MIXED, &cb), well_known::TYPE_INT);
     });
@@ -61,7 +69,7 @@ fn meet_with_mixed_yields_other() {
 #[test]
 fn meet_with_never_yields_never() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         assert_eq!(meet_of(f, well_known::TYPE_NEVER, well_known::TYPE_INT, &cb), well_known::TYPE_NEVER);
         assert_eq!(meet_of(f, well_known::TYPE_INT, well_known::TYPE_NEVER, &cb), well_known::TYPE_NEVER);
     });
@@ -70,7 +78,7 @@ fn meet_with_never_yields_never() {
 #[test]
 fn subsumption_picks_more_specific_side() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let lit = f.ui(42);
         let int = well_known::TYPE_INT;
         assert_eq!(meet_of(f, lit, int, &cb), lit);
@@ -81,7 +89,7 @@ fn subsumption_picks_more_specific_side() {
 #[test]
 fn distinct_kinds_meet_to_never() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         assert_eq!(meet_of(f, well_known::TYPE_INT, well_known::TYPE_STRING, &cb), well_known::TYPE_NEVER);
         assert_eq!(meet_of(f, well_known::TYPE_INT, well_known::TYPE_NULL, &cb), well_known::TYPE_NEVER);
     });
@@ -90,7 +98,7 @@ fn distinct_kinds_meet_to_never() {
 #[test]
 fn overlapping_int_ranges_meet_to_intersection() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let range_a = f.t_int_range(0, 10);
         let a = f.u(range_a);
         let range_b = f.t_int_range(5, 15);
@@ -106,7 +114,7 @@ fn overlapping_int_ranges_meet_to_intersection() {
 #[test]
 fn touching_int_ranges_collapse_to_literal() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let range_a = f.t_int_range(0, 10);
         let a = f.u(range_a);
         let range_b = f.t_int_range(10, 20);
@@ -120,7 +128,7 @@ fn touching_int_ranges_collapse_to_literal() {
 #[test]
 fn disjoint_int_ranges_meet_to_never() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let range_a = f.t_int_range(0, 10);
         let a = f.u(range_a);
         let range_b = f.t_int_range(20, 30);
@@ -132,7 +140,7 @@ fn disjoint_int_ranges_meet_to_never() {
 #[test]
 fn lit_int_in_range_meets_to_lit() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let lit = f.ui(5);
         let range = f.t_int_range(0, 10);
         let r = f.u(range);
@@ -143,7 +151,7 @@ fn lit_int_in_range_meets_to_lit() {
 #[test]
 fn lit_int_outside_range_meets_to_never() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let lit = f.ui(20);
         let range = f.t_int_range(0, 10);
         let r = f.u(range);
@@ -154,7 +162,7 @@ fn lit_int_outside_range_meets_to_never() {
 #[test]
 fn distinct_int_literals_meet_to_never() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let a = f.ui(1);
         let b = f.ui(2);
         assert_eq!(meet_of(f, a, b, &cb), well_known::TYPE_NEVER);
@@ -164,7 +172,7 @@ fn distinct_int_literals_meet_to_never() {
 #[test]
 fn open_lower_meets_open_upper_into_bounded_range() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let from_zero_atom = f.t_int_from(0);
         let from_zero = f.u(from_zero_atom);
         let to_ten_atom = f.t_int_to(10);
@@ -179,7 +187,7 @@ fn open_lower_meets_open_upper_into_bounded_range() {
 #[test]
 fn nominal_subsumption_meet_picks_descendant() {
     fixture(|f| {
-        let cb = MockWorld::from_edges(&[("Dog", "Animal")]);
+        let cb = symbol_table(f.arena, "<?php class Animal {} class Dog extends Animal {}");
         let dog_atom = f.t_named("Dog");
         let dog = f.u(dog_atom);
         let animal_atom = f.t_named("Animal");
@@ -192,9 +200,7 @@ fn nominal_subsumption_meet_picks_descendant() {
 #[test]
 fn unrelated_interfaces_compose_intersection() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.declare_interface("Foo");
-        w.declare_interface("Bar");
+        let w = symbol_table(f.arena, "<?php interface Foo {} interface Bar {}");
         let foo_atom = f.t_named("Foo");
         let foo = f.u(foo_atom);
         let bar_atom = f.t_named("Bar");
@@ -210,9 +216,7 @@ fn unrelated_interfaces_compose_intersection() {
 #[test]
 fn unrelated_concrete_classes_meet_is_never() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.declare("Foo");
-        w.declare("Bar");
+        let w = symbol_table(f.arena, "<?php class Foo {} class Bar {}");
         let foo_atom = f.t_named("Foo");
         let foo = f.u(foo_atom);
         let bar_atom = f.t_named("Bar");
@@ -225,7 +229,7 @@ fn unrelated_concrete_classes_meet_is_never() {
 #[test]
 fn union_meet_distributes() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let string = f.t_string();
         let null = f.null();
@@ -238,7 +242,7 @@ fn union_meet_distributes() {
 #[test]
 fn union_meet_yields_union_when_multiple_pairs_survive() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let string = f.t_string();
         let int_or_string = f.u_many(vec![int, string]);
@@ -250,7 +254,7 @@ fn union_meet_yields_union_when_multiple_pairs_survive() {
 #[test]
 fn nullable_int_meet_int_drops_null() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let null = f.null();
         let int_atom = f.t_int();
         let nullable_int = f.u_many(vec![null, int_atom]);
@@ -262,7 +266,7 @@ fn nullable_int_meet_int_drops_null() {
 #[test]
 fn class_like_string_meet_string_picks_class_like_string() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let cls_atom = f.t_class_string();
         let cls = f.u(cls_atom);
         let s = well_known::TYPE_STRING;
@@ -273,7 +277,7 @@ fn class_like_string_meet_string_picks_class_like_string() {
 #[test]
 fn non_empty_lowercase_meet_non_empty_uppercase_is_never() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let nel = f.builder.string(StringAtom {
             literal: StringLiteral::None,
             casing: StringCasing::Lowercase,
@@ -294,7 +298,7 @@ fn non_empty_lowercase_meet_non_empty_uppercase_is_never() {
 #[test]
 fn plain_lowercase_meet_uppercase_is_empty_string() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let a = f.u(well_known::LOWERCASE_STRING);
         let b = f.u(well_known::UPPERCASE_STRING);
         let m = meet_of(f, a, b, &cb);
@@ -321,7 +325,7 @@ fn intersected_partition_cover_with_shared_head() {
         let union = f.u_many(vec![s, a_d_e]);
 
         let probe = f.u(a_d);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         assert!(refines_of(f, probe, union, &w), "A&D should refine (A&D & !(A&E)) | (A&D&E)");
     });
 }

@@ -18,7 +18,11 @@ impl<'arena> TypeSlot<'arena> {
     }
 
     #[must_use]
-    pub fn effective(&self) -> Option<Type<'arena>> {
-        self.annotation.or(self.hint).or(self.inferred)
+    pub fn effective(&self, with_inference: bool) -> Option<Type<'arena>> {
+        if with_inference {
+            return self.annotation.or(self.hint).or(self.inferred);
+        }
+
+        self.annotation.or(self.hint)
     }
 }

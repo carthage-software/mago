@@ -36,6 +36,7 @@
 
 use mago_allocator::Arena;
 
+use crate::symbol::SymbolTable;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::array::ArrayAtom;
@@ -48,13 +49,12 @@ use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::lattice::refines as type_refines;
 use crate::ty::well_known;
-use crate::world::World;
 
 #[inline]
-pub fn refines<'arena, S, A, W>(
+pub fn refines<'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -62,20 +62,19 @@ pub fn refines<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match container {
-        Atom::List(container_payload) => refines_list(input, container_payload, world, options, report, builder),
-        Atom::Array(container_payload) => refines_keyed(input, container_payload, world, options, report, builder),
+        Atom::List(container_payload) => refines_list(input, container_payload, symbols, options, report, builder),
+        Atom::Array(container_payload) => refines_keyed(input, container_payload, symbols, options, report, builder),
         _ => false,
     }
 }
 
 #[inline]
-fn refines_list<'arena, S, A, W>(
+fn refines_list<'arena, S, A>(
     input: Atom<'arena>,
     container: &ListAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -83,23 +82,22 @@ fn refines_list<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if input == well_known::EMPTY_ARRAY {
         return !container.flags.contains(ListFlag::NonEmpty);
     }
 
     match input {
-        Atom::List(input_payload) => list_refines_list(input_payload, container, world, options, report, builder),
+        Atom::List(input_payload) => list_refines_list(input_payload, container, symbols, options, report, builder),
         _ => false,
     }
 }
 
 #[inline]
-fn refines_keyed<'arena, S, A, W>(
+fn refines_keyed<'arena, S, A>(
     input: Atom<'arena>,
     container: &ArrayAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -107,14 +105,13 @@ fn refines_keyed<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if input == well_known::EMPTY_ARRAY {
         return !container.flags.contains(ArrayFlag::NonEmpty);
     }
 
     match input {
-        Atom::Array(input_payload) => keyed_refines_keyed(input_payload, container, world, options, report, builder),
+        Atom::Array(input_payload) => keyed_refines_keyed(input_payload, container, symbols, options, report, builder),
         Atom::List(input_payload) => {
             let (Some(key_param), Some(value_param)) = (container.key_param, container.value_param) else {
                 return false;
@@ -124,18 +121,18 @@ where
                 return false;
             }
 
-            type_refines(well_known::TYPE_INT, key_param, world, options, report, builder)
-                && type_refines(input_payload.element_type, value_param, world, options, report, builder)
+            type_refines(well_known::TYPE_INT, key_param, symbols, options, report, builder)
+                && type_refines(input_payload.element_type, value_param, symbols, options, report, builder)
         }
         _ => false,
     }
 }
 
 #[inline]
-fn list_refines_list<'arena, S, A, W>(
+fn list_refines_list<'arena, S, A>(
     input: &ListAtom<'arena>,
     container: &ListAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -143,7 +140,6 @@ fn list_refines_list<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if container.flags.contains(ListFlag::NonEmpty)
         && !input.flags.contains(ListFlag::NonEmpty)
@@ -155,13 +151,13 @@ where
     let Some(container_elements) = container.known_elements else {
         if let Some(input_elements) = input.known_elements {
             for input_element in input_elements {
-                if !type_refines(input_element.value, container.element_type, world, options, report, builder) {
+                if !type_refines(input_element.value, container.element_type, symbols, options, report, builder) {
                     return false;
                 }
             }
         }
 
-        return type_refines(input.element_type, container.element_type, world, options, report, builder);
+        return type_refines(input.element_type, container.element_type, symbols, options, report, builder);
     };
 
     let Some(input_elements) = input.known_elements else {
@@ -171,12 +167,12 @@ where
     for input_element in input_elements {
         match container_elements.iter().find(|element| element.index == input_element.index) {
             Some(container_element) => {
-                if !type_refines(input_element.value, container_element.value, world, options, report, builder) {
+                if !type_refines(input_element.value, container_element.value, symbols, options, report, builder) {
                     return false;
                 }
             }
             None => {
-                if !type_refines(input_element.value, container.element_type, world, options, report, builder) {
+                if !type_refines(input_element.value, container.element_type, symbols, options, report, builder) {
                     return false;
                 }
             }
@@ -198,7 +194,7 @@ where
         }
     }
 
-    type_refines(input.element_type, container.element_type, world, options, report, builder)
+    type_refines(input.element_type, container.element_type, symbols, options, report, builder)
 }
 
 #[inline]
@@ -207,10 +203,10 @@ fn has_required_known_element(payload: &ListAtom<'_>) -> bool {
 }
 
 #[inline]
-fn keyed_refines_keyed<'arena, S, A, W>(
+fn keyed_refines_keyed<'arena, S, A>(
     input: &ArrayAtom<'arena>,
     container: &ArrayAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -218,7 +214,6 @@ fn keyed_refines_keyed<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if container.flags.contains(ArrayFlag::NonEmpty)
         && !input.flags.contains(ArrayFlag::NonEmpty)
@@ -228,7 +223,7 @@ where
     }
 
     if container.is_sealed() {
-        return sealed_refines_sealed(input, container, world, options, report, builder);
+        return sealed_refines_sealed(input, container, symbols, options, report, builder);
     }
 
     let (Some(container_key), Some(container_value)) = (container.key_param, container.value_param) else {
@@ -238,22 +233,22 @@ where
     if let Some(items) = input.known_items {
         for item in items {
             let key_type = key_to_type(item.key, builder);
-            if !type_refines(key_type, container_key, world, options, report, builder) {
+            if !type_refines(key_type, container_key, symbols, options, report, builder) {
                 return false;
             }
 
-            if !type_refines(item.value, container_value, world, options, report, builder) {
+            if !type_refines(item.value, container_value, symbols, options, report, builder) {
                 return false;
             }
         }
     }
 
     if let (Some(input_key), Some(input_value)) = (input.key_param, input.value_param) {
-        if !type_refines(input_key, container_key, world, options, report, builder) {
+        if !type_refines(input_key, container_key, symbols, options, report, builder) {
             return false;
         }
 
-        if !type_refines(input_value, container_value, world, options, report, builder) {
+        if !type_refines(input_value, container_value, symbols, options, report, builder) {
             return false;
         }
     }
@@ -262,10 +257,10 @@ where
 }
 
 #[inline]
-fn sealed_refines_sealed<'arena, S, A, W>(
+fn sealed_refines_sealed<'arena, S, A>(
     input: &ArrayAtom<'arena>,
     container: &ArrayAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -273,7 +268,6 @@ fn sealed_refines_sealed<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if input.key_param.is_some() || input.value_param.is_some() {
         return false;
@@ -296,7 +290,7 @@ where
                     return false;
                 }
 
-                if !type_refines(input_item.value, container_item.value, world, options, report, builder) {
+                if !type_refines(input_item.value, container_item.value, symbols, options, report, builder) {
                     return false;
                 }
             }

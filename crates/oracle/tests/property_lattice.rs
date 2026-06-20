@@ -1,6 +1,8 @@
 mod common;
 
-use common::MockWorld;
+use common::symbol_table;
+use std::fmt::Write as _;
+use mago_oracle::symbol::SymbolTable;
 
 use proptest::prelude::*;
 
@@ -24,7 +26,6 @@ use mago_oracle::ty::lattice::refines;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::subtract;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::World;
 
 const CLASSES: &[&str] = &["A", "B", "C", "D", "E"];
 const ENUMS: &[&str] = &["Color"];
@@ -33,7 +34,7 @@ const PROPERTIES: &[&str] = &["id", "name"];
 const TEMPLATES: &[&str] = &["T", "U"];
 
 #[derive(Debug, Clone)]
-struct WorldRecipe {
+struct SymbolsRecipe {
     templates: Vec<Vec<Variance>>,
     edges: Vec<bool>,
     methods: Vec<bool>,
@@ -138,7 +139,7 @@ fn arb_variance() -> impl Strategy<Value = Variance> {
     prop_oneof![Just(Variance::Invariant), Just(Variance::Covariant), Just(Variance::Contravariant)]
 }
 
-fn arb_world() -> impl Strategy<Value = WorldRecipe> {
+fn arb_symbols() -> impl Strategy<Value = SymbolsRecipe> {
     let class_templates = CLASSES.iter().map(|_| proptest::collection::vec(arb_variance(), 1)).collect::<Vec<_>>();
     let edge_count = CLASSES.len() * (CLASSES.len() - 1) / 2;
     let edges = proptest::collection::vec(any::<bool>(), edge_count);
@@ -148,7 +149,7 @@ fn arb_world() -> impl Strategy<Value = WorldRecipe> {
     let sealed = proptest::collection::vec(proptest::option::weighted(0.999, any::<u8>()), CLASSES.len());
 
     (class_templates, edges, methods, properties, finals, sealed).prop_map(
-        |(templates, edges, methods, properties, finals, sealed_markers)| WorldRecipe {
+        |(templates, edges, methods, properties, finals, sealed_markers)| SymbolsRecipe {
             templates,
             edges,
             methods,
@@ -159,119 +160,126 @@ fn arb_world() -> impl Strategy<Value = WorldRecipe> {
     )
 }
 
-fn build_world<'arena>(
-    recipe: &WorldRecipe,
-    builder: &mut TypeBuilder<'_, 'arena, LocalArena, LocalArena>,
-) -> MockWorld<'arena> {
-    let mut world = MockWorld::new();
+fn build_symbol_table<'arena>(recipe: &SymbolsRecipe, arena: &'arena LocalArena) -> SymbolTable<'arena, LocalArena> {
+    let count = CLASSES.len();
 
-    for (index, class) in CLASSES.iter().enumerate() {
-        let variances = &recipe.templates[index];
-        if variances.is_empty() {
-            world.declare(class);
-        } else {
-            let templates: Vec<(&'static str, Variance)> =
-                variances.iter().enumerate().map(|(position, variance)| (TEMPLATES[position], *variance)).collect();
-            world.with_templates(class, &templates);
-        }
-    }
-
-    // PHP classes are single-inheritance: a class extends at most one class.
-    // The recipe's edge bits are an arbitrary relation, so honour only the
-    // first parent chosen for each child and skip the rest. This keeps the
-    // generated hierarchies to valid single-inheritance forests, where two
-    // unrelated classes genuinely share no descendant.
+    // PHP classes are single-inheritance: honour only the first parent chosen
+    // for each child (the recipe's edge bits are an arbitrary relation).
+    let mut parent: Vec<Option<usize>> = vec![None; count];
     let mut edge_index = 0;
-    for (i, child) in CLASSES.iter().enumerate() {
-        let mut child_has_parent = false;
-        for (j, parent) in CLASSES.iter().enumerate().skip(i + 1) {
-            if recipe.edges[edge_index] && !child_has_parent {
-                let parent_arity = recipe.templates[j].len();
-                let parent_arguments: Vec<Type<'arena>> =
-                    std::iter::repeat_n(well_known::TYPE_MIXED, parent_arity).collect();
-                world.with_extended(child, parent, parent_arguments);
-                child_has_parent = true;
+    for (i, slot) in parent.iter_mut().enumerate() {
+        for j in (i + 1)..count {
+            if recipe.edges[edge_index] && slot.is_none() {
+                *slot = Some(j);
             }
-
             edge_index += 1;
         }
     }
 
-    for (i, class) in CLASSES.iter().enumerate() {
-        for (j, method) in METHODS.iter().enumerate() {
-            if recipe.methods[i * METHODS.len() + j] {
-                world.with_method(class, method);
+    let descends = |mut a: usize, b: usize| -> bool {
+        if a == b {
+            return true;
+        }
+        while let Some(p) = parent[a] {
+            if p == b {
+                return true;
             }
+            a = p;
         }
-    }
+        false
+    };
 
-    for (i, class) in CLASSES.iter().enumerate() {
-        for (j, property) in PROPERTIES.iter().enumerate() {
-            if recipe.properties[i * PROPERTIES.len() + j] {
-                world.with_property(class, property, well_known::TYPE_MIXED);
-            }
-        }
-    }
-
-    for enumeration in ENUMS {
-        world.with_pure_enum(enumeration);
-    }
-
-    for (i, class) in CLASSES.iter().enumerate() {
-        if !recipe.finals[i] {
-            continue;
-        }
-
-        let class_name = SymbolId::class_like(class.as_bytes());
-        let has_descendants = CLASSES
-            .iter()
-            .any(|other| *other != *class && world.descends_from(SymbolId::class_like(other.as_bytes()), class_name));
-        if !has_descendants {
-            world.with_final(class);
-        }
-    }
-
-    for (i, class) in CLASSES.iter().enumerate() {
+    let mut sealed: Vec<Vec<usize>> = vec![Vec::new(); count];
+    for (i, slot) in sealed.iter_mut().enumerate() {
         let marker = match recipe.sealed_markers[i] {
             Some(value) if value < 64 => value,
             _ => continue,
         };
-
-        let class_name = SymbolId::class_like(class.as_bytes());
-        let direct_children: Vec<&'static str> = CLASSES
-            .iter()
-            .filter(|&&candidate| {
-                if candidate == *class {
-                    return false;
-                }
-
-                let candidate_name = SymbolId::class_like(candidate.as_bytes());
-                if !world.descends_from(candidate_name, class_name) {
-                    return false;
-                }
-
-                !CLASSES.iter().any(|&intermediate| {
-                    intermediate != *class
-                        && intermediate != candidate
-                        && world.descends_from(candidate_name, SymbolId::class_like(intermediate.as_bytes()))
-                        && world.descends_from(SymbolId::class_like(intermediate.as_bytes()), class_name)
-                })
+        let direct: Vec<usize> = (0..count)
+            .filter(|&c| {
+                c != i && descends(c, i) && !(0..count).any(|m| m != i && m != c && descends(c, m) && descends(m, i))
             })
-            .copied()
             .collect();
-        if direct_children.len() < 2 {
+        if direct.len() < 2 {
             continue;
         }
-
-        let count = (marker as usize % 3) + 1;
-        let inheritors: Vec<&'static str> =
-            direct_children.iter().take(count.min(direct_children.len())).copied().collect();
+        let take = (marker as usize % 3) + 1;
+        let inheritors: Vec<usize> = direct.into_iter().take(take).collect();
         if inheritors.len() >= 2 {
-            world.with_sealed(builder, class, &inheritors);
+            *slot = inheritors;
         }
     }
 
-    world
+    let mut source = String::from("<?php");
+    for i in 0..count {
+        let class = CLASSES[i];
+        let mut tags: Vec<String> = Vec::new();
+        for (position, variance) in recipe.templates[i].iter().enumerate() {
+            let tag = match variance {
+                Variance::Covariant => "@template-covariant",
+                Variance::Contravariant => "@template-contravariant",
+                Variance::Invariant => "@template",
+            };
+            tags.push(format!("{tag} {}", TEMPLATES[position]));
+        }
+        if let Some(p) = parent[i] {
+            let parity = recipe.templates[p].len();
+            if parity > 0 {
+                let args = std::iter::repeat_n("mixed", parity).collect::<Vec<_>>().join(", ");
+                tags.push(format!("@extends {}<{}>", CLASSES[p], args));
+            }
+        }
+        if !sealed[i].is_empty() {
+            let names = sealed[i].iter().map(|&k| CLASSES[k]).collect::<Vec<_>>().join("|");
+            tags.push(format!("@inheritors {names}"));
+        }
+
+        if !tags.is_empty() {
+            source.push_str(
+                "
+/**
+",
+            );
+            for tag in &tags {
+                let _ = writeln!(source, " * {tag}");
+            }
+            source.push_str(" */");
+        }
+
+        source.push('\n');
+        let is_final = recipe.finals[i] && !(0..count).any(|o| o != i && descends(o, i));
+        if is_final {
+            source.push_str("final ");
+        }
+        let _ = write!(source, "class {class}");
+        if let Some(p) = parent[i] {
+            let _ = write!(source, " extends {}", CLASSES[p]);
+        }
+        source.push_str(
+            " {
+",
+        );
+        for (j, method) in METHODS.iter().enumerate() {
+            if recipe.methods[i * METHODS.len() + j] {
+                let _ = writeln!(source, "    public function {method}() {{}}");
+            }
+        }
+        for (j, property) in PROPERTIES.iter().enumerate() {
+            if recipe.properties[i * PROPERTIES.len() + j] {
+                let _ = writeln!(source, "    public mixed ${property};");
+            }
+        }
+        source.push_str(
+            "}
+",
+        );
+    }
+
+    for enumeration in ENUMS {
+        let _ = writeln!(source, "enum {enumeration} {{}}");
+    }
+
+    symbol_table(arena, &source)
 }
 
 fn primitive_recipe() -> impl Strategy<Value = TypeRecipe> {
@@ -460,33 +468,33 @@ fn arb_type() -> impl Strategy<Value = TypeRecipe> {
     })
 }
 
-fn arb_world_and_type() -> impl Strategy<Value = (WorldRecipe, TypeRecipe)> {
-    (arb_world(), arb_type())
+fn arb_symbols_and_type() -> impl Strategy<Value = (SymbolsRecipe, TypeRecipe)> {
+    (arb_symbols(), arb_type())
 }
 
-fn arb_world_and_pair() -> impl Strategy<Value = (WorldRecipe, TypeRecipe, TypeRecipe)> {
-    (arb_world(), arb_type(), arb_type())
+fn arb_symbols_and_pair() -> impl Strategy<Value = (SymbolsRecipe, TypeRecipe, TypeRecipe)> {
+    (arb_symbols(), arb_type(), arb_type())
 }
 
-fn arb_world_and_triple() -> impl Strategy<Value = (WorldRecipe, TypeRecipe, TypeRecipe, TypeRecipe)> {
-    (arb_world(), arb_type(), arb_type(), arb_type())
+fn arb_symbols_and_triple() -> impl Strategy<Value = (SymbolsRecipe, TypeRecipe, TypeRecipe, TypeRecipe)> {
+    (arb_symbols(), arb_type(), arb_type(), arb_type())
 }
 
 struct Probe<'scratch, 'arena> {
     builder: TypeBuilder<'scratch, 'arena, LocalArena, LocalArena>,
-    world: MockWorld<'arena>,
+    symbols: SymbolTable<'arena, LocalArena>,
 }
 
 impl<'scratch, 'arena> Probe<'scratch, 'arena> {
     fn new(
         output: &'arena LocalArena,
         scratch: &'scratch LocalArena,
-        world_recipe: &WorldRecipe,
+        symbols_recipe: &SymbolsRecipe,
     ) -> Probe<'scratch, 'arena> {
-        let mut builder = TypeBuilder::new(output, scratch);
-        let world = build_world(world_recipe, &mut builder);
+        let builder = TypeBuilder::new(output, scratch);
+        let symbols = build_symbol_table(symbols_recipe, output);
 
-        Probe { builder, world }
+        Probe { builder, symbols }
     }
 
     fn build(&mut self, recipe: &TypeRecipe) -> Type<'arena> {
@@ -704,25 +712,25 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
     fn refines(&mut self, input: Type<'arena>, container: Type<'arena>) -> bool {
         let mut report = LatticeReport::new();
 
-        refines(input, container, &self.world, LatticeOptions::default(), &mut report, &mut self.builder)
+        refines(input, container, &self.symbols, LatticeOptions::default(), &mut report, &mut self.builder)
     }
 
     fn overlaps(&mut self, a: Type<'arena>, b: Type<'arena>) -> bool {
         let mut report = LatticeReport::new();
 
-        overlaps(a, b, &self.world, LatticeOptions::default(), &mut report, &mut self.builder)
+        overlaps(a, b, &self.symbols, LatticeOptions::default(), &mut report, &mut self.builder)
     }
 
     fn meet(&mut self, a: Type<'arena>, b: Type<'arena>) -> Type<'arena> {
         let mut report = LatticeReport::new();
 
-        meet::compute(a, b, &self.world, LatticeOptions::default(), &mut report, &mut self.builder)
+        meet::compute(a, b, &self.symbols, LatticeOptions::default(), &mut report, &mut self.builder)
     }
 
     fn subtract(&mut self, a: Type<'arena>, b: Type<'arena>) -> Type<'arena> {
         let mut report = LatticeReport::new();
 
-        subtract::compute(a, b, &self.world, LatticeOptions::default(), &mut report, &mut self.builder)
+        subtract::compute(a, b, &self.symbols, LatticeOptions::default(), &mut report, &mut self.builder)
     }
 
     fn join(&mut self, a: Type<'arena>, b: Type<'arena>) -> Type<'arena> {
@@ -784,7 +792,7 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
                     continue;
                 }
 
-                if !self.world.descends_from(left.id, right.id) && !self.world.descends_from(right.id, left.id) {
+                if !self.symbols.descends_from(left.id, right.id) && !self.symbols.descends_from(right.id, left.id) {
                     return true;
                 }
             }
@@ -916,13 +924,13 @@ fn env_max_global_rejects(cases: u32) -> u32 {
         .unwrap_or_else(|| 1024.max(cases.saturating_mul(4)))
 }
 
-fn with_probe<F>(world_recipe: &WorldRecipe, run: F) -> Result<(), TestCaseError>
+fn with_probe<F>(symbols_recipe: &SymbolsRecipe, run: F) -> Result<(), TestCaseError>
 where
     F: for<'scratch, 'arena> FnOnce(&mut Probe<'scratch, 'arena>) -> Result<(), TestCaseError>,
 {
     let output = LocalArena::new();
     let scratch = LocalArena::new();
-    let mut probe = Probe::new(&output, &scratch, world_recipe);
+    let mut probe = Probe::new(&output, &scratch, symbols_recipe);
 
     run(&mut probe)
 }
@@ -940,8 +948,8 @@ proptest! {
     })]
 
     #[test]
-    fn refines_is_reflexive((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn refines_is_reflexive((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             prop_assert!(probe.refines(a, a), "refines(a, a) should be true");
             Ok(())
@@ -949,8 +957,8 @@ proptest! {
     }
 
     #[test]
-    fn refines_bottom_axiom((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn refines_bottom_axiom((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             prop_assert!(probe.refines(well_known::TYPE_NEVER, a), "NEVER must refine a");
             Ok(())
@@ -958,8 +966,8 @@ proptest! {
     }
 
     #[test]
-    fn refines_top_axiom((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn refines_top_axiom((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             prop_assert!(probe.refines(a, well_known::TYPE_MIXED), "a must refine MIXED");
             Ok(())
@@ -967,8 +975,8 @@ proptest! {
     }
 
     #[test]
-    fn refines_is_transitive((world, a, b, c) in arb_world_and_triple()) {
-        with_probe(&world, |probe| {
+    fn refines_is_transitive((symbols, a, b, c) in arb_symbols_and_triple()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let c = probe.build(&c);
@@ -980,8 +988,8 @@ proptest! {
     }
 
     #[test]
-    fn overlaps_is_symmetric((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn overlaps_is_symmetric((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             prop_assert_eq!(probe.overlaps(a, b), probe.overlaps(b, a), "overlaps should be symmetric");
@@ -990,8 +998,8 @@ proptest! {
     }
 
     #[test]
-    fn overlaps_is_reflexive_for_non_bottom((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn overlaps_is_reflexive_for_non_bottom((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             if !a.is_never() {
                 let atoms = a.atoms.to_vec();
@@ -1010,8 +1018,8 @@ proptest! {
     }
 
     #[test]
-    fn refines_implies_overlaps((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn refines_implies_overlaps((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.type_is_value_never(a) {
@@ -1025,8 +1033,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_is_idempotent((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn meet_is_idempotent((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let m = probe.meet(a, a);
             prop_assert!(probe.refines(m, a), "meet(a, a) should refine a");
@@ -1036,8 +1044,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_is_commutative((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn meet_is_commutative((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.type_has_imprecise_atom(a) || probe.type_has_imprecise_atom(b) {
@@ -1052,8 +1060,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_is_lower_bound((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn meet_is_lower_bound((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let m = probe.meet(a, b);
@@ -1064,8 +1072,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_with_mixed_is_identity((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn meet_with_mixed_is_identity((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             if probe.type_is_value_never(a) {
                 return Ok(());
@@ -1078,8 +1086,8 @@ proptest! {
     }
 
     #[test]
-    fn subtract_with_never_is_identity((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn subtract_with_never_is_identity((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let s = probe.subtract(a, well_known::TYPE_NEVER);
             prop_assert!(probe.refines(s, a));
@@ -1089,8 +1097,8 @@ proptest! {
     }
 
     #[test]
-    fn subtract_self_is_never((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn subtract_self_is_never((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let s = probe.subtract(a, a);
             prop_assert!(probe.refines(s, well_known::TYPE_NEVER));
@@ -1099,8 +1107,8 @@ proptest! {
     }
 
     #[test]
-    fn subtract_is_sound((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn subtract_is_sound((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let s = probe.subtract(a, b);
@@ -1110,8 +1118,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_when_overlapping_is_non_empty((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn meet_when_overlapping_is_non_empty((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if !probe.overlaps(a, b) {
@@ -1128,8 +1136,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_subtract_partition((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn meet_subtract_partition((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.type_has_imprecise_atom(a) || probe.type_has_imprecise_atom(b) {
@@ -1146,8 +1154,8 @@ proptest! {
     }
 
     #[test]
-    fn subtract_disjoint_is_identity((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn subtract_disjoint_is_identity((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if !a.is_never() && !probe.overlaps(a, a) {
@@ -1163,8 +1171,8 @@ proptest! {
     }
 
     #[test]
-    fn subtract_when_subset_is_empty((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn subtract_when_subset_is_empty((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if a.is_never() || !probe.refines(a, b) {
@@ -1177,8 +1185,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_then_subtract_same_is_empty((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn meet_then_subtract_same_is_empty((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let m = probe.meet(a, b);
@@ -1192,8 +1200,8 @@ proptest! {
     }
 
     #[test]
-    fn structural_join_is_idempotent_at_atom_level((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn structural_join_is_idempotent_at_atom_level((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let atoms = a.atoms.to_vec();
             let options = JoinOptions::structural();
@@ -1206,8 +1214,8 @@ proptest! {
     }
 
     #[test]
-    fn canonical_join_widens_or_preserves((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn canonical_join_widens_or_preserves((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let atoms = a.atoms.to_vec();
             let canonical = join::compute(&atoms, &mut probe.builder);
@@ -1218,8 +1226,8 @@ proptest! {
     }
 
     #[test]
-    fn join_with_mixed_absorbs((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn join_with_mixed_absorbs((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let mut atoms: Vec<Atom<'_>> = a.atoms.to_vec();
             atoms.push(well_known::MIXED);
@@ -1230,8 +1238,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_with_never_is_never((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn meet_with_never_is_never((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let left = probe.meet(a, well_known::TYPE_NEVER);
             prop_assert!(left.is_never(), "meet(a, NEVER) should be NEVER");
@@ -1242,8 +1250,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_is_associative_lower_bound((world, a, b, c) in arb_world_and_triple()) {
-        with_probe(&world, |probe| {
+    fn meet_is_associative_lower_bound((symbols, a, b, c) in arb_symbols_and_triple()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let c = probe.build(&c);
@@ -1265,8 +1273,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_monotonic_in_rhs((world, a, b, c) in arb_world_and_triple()) {
-        with_probe(&world, |probe| {
+    fn meet_monotonic_in_rhs((symbols, a, b, c) in arb_symbols_and_triple()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let c = probe.build(&c);
@@ -1284,8 +1292,8 @@ proptest! {
     }
 
     #[test]
-    fn subtract_monotonic_in_rhs((world, a, b, c) in arb_world_and_triple()) {
-        with_probe(&world, |probe| {
+    fn subtract_monotonic_in_rhs((symbols, a, b, c) in arb_symbols_and_triple()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let c = probe.build(&c);
@@ -1300,8 +1308,8 @@ proptest! {
     }
 
     #[test]
-    fn subtract_is_idempotent((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn subtract_is_idempotent((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let s1 = probe.subtract(a, b);
@@ -1313,8 +1321,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_idempotent_left((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn meet_idempotent_left((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.type_has_imprecise_atom(a) || probe.type_has_imprecise_atom(b) {
@@ -1329,8 +1337,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_implies_refines_both((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn meet_implies_refines_both((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let m = probe.meet(a, b);
@@ -1343,8 +1351,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_overlaps_iff_non_never((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn meet_overlaps_iff_non_never((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if !a.is_never() && !probe.overlaps(a, a) {
@@ -1362,8 +1370,8 @@ proptest! {
     }
 
     #[test]
-    fn refines_implies_meet_is_input((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn refines_implies_meet_is_input((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if !probe.refines(a, b) {
@@ -1376,8 +1384,8 @@ proptest! {
     }
 
     #[test]
-    fn join_is_upper_bound((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn join_is_upper_bound((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let joined = probe.join(a, b);
@@ -1388,8 +1396,8 @@ proptest! {
     }
 
     #[test]
-    fn join_with_never_is_identity((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn join_with_never_is_identity((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let mut atoms: Vec<Atom<'_>> = a.atoms.to_vec();
             atoms.push(well_known::NEVER);
@@ -1403,8 +1411,8 @@ proptest! {
     }
 
     #[test]
-    fn refines_is_antisymmetric_modulo_equivalence((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn refines_is_antisymmetric_modulo_equivalence((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.refines(a, b) && probe.refines(b, a) {
@@ -1419,8 +1427,8 @@ proptest! {
     }
 
     #[test]
-    fn overlaps_with_never_is_false((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn overlaps_with_never_is_false((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             prop_assert!(!probe.overlaps(a, well_known::TYPE_NEVER), "nothing overlaps NEVER");
             prop_assert!(!probe.overlaps(well_known::TYPE_NEVER, a), "NEVER overlaps nothing");
@@ -1429,8 +1437,8 @@ proptest! {
     }
 
     #[test]
-    fn disjoint_implies_meet_never((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn disjoint_implies_meet_never((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.type_is_value_never(a) || probe.type_is_value_never(b) {
@@ -1446,8 +1454,8 @@ proptest! {
     }
 
     #[test]
-    fn double_subtract_with_swapped_args_equivalent((world, a, b, c) in arb_world_and_triple()) {
-        with_probe(&world, |probe| {
+    fn double_subtract_with_swapped_args_equivalent((symbols, a, b, c) in arb_symbols_and_triple()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let c = probe.build(&c);
@@ -1465,8 +1473,8 @@ proptest! {
     }
 
     #[test]
-    fn meet_refines_join((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn meet_refines_join((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.type_has_imprecise_atom(a) || probe.type_has_imprecise_atom(b) {
@@ -1480,8 +1488,8 @@ proptest! {
     }
 
     #[test]
-    fn subtract_anti_monotonic_in_lhs((world, a, b, c) in arb_world_and_triple()) {
-        with_probe(&world, |probe| {
+    fn subtract_anti_monotonic_in_lhs((symbols, a, b, c) in arb_symbols_and_triple()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let c = probe.build(&c);
@@ -1499,8 +1507,8 @@ proptest! {
     }
 
     #[test]
-    fn join_with_self_widens_to_at_least_a((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn join_with_self_widens_to_at_least_a((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let joined = probe.join(a, a);
             prop_assert!(probe.refines(a, joined), "a <: join(a,a)");
@@ -1509,8 +1517,8 @@ proptest! {
     }
 
     #[test]
-    fn join_is_commutative((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn join_is_commutative((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.type_has_imprecise_atom(a) || probe.type_has_imprecise_atom(b) {
@@ -1525,8 +1533,8 @@ proptest! {
     }
 
     #[test]
-    fn subtract_with_mixed_is_never((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn subtract_with_mixed_is_never((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let r = probe.subtract(a, well_known::TYPE_MIXED);
             prop_assert!(r.is_never(), "a \\ mixed should be NEVER");
@@ -1535,8 +1543,8 @@ proptest! {
     }
 
     #[test]
-    fn refines_implies_meet_value_equivalent((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn refines_implies_meet_value_equivalent((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if !probe.refines(a, b) {
@@ -1555,8 +1563,8 @@ proptest! {
     }
 
     #[test]
-    fn refines_implies_subtract_outcome_impossible((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn refines_implies_subtract_outcome_impossible((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if !probe.refines(a, b) {
@@ -1566,7 +1574,7 @@ proptest! {
                 return Ok(());
             }
             let mut report = LatticeReport::new();
-            let outcome = subtract::narrow(a, b, &probe.world, LatticeOptions::default(), &mut report, &mut probe.builder);
+            let outcome = subtract::narrow(a, b, &probe.symbols, LatticeOptions::default(), &mut report, &mut probe.builder);
             prop_assert!(
                 matches!(outcome, subtract::SubtractOutcome::Impossible),
                 "a<:b implies subtract::narrow Impossible"
@@ -1576,8 +1584,8 @@ proptest! {
     }
 
     #[test]
-    fn disjoint_implies_subtract_value_equivalent((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn disjoint_implies_subtract_value_equivalent((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if a.is_never() || probe.type_is_value_never(a) {
@@ -1599,8 +1607,8 @@ proptest! {
     }
 
     #[test]
-    fn negated_meet_with_self_is_never((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn negated_meet_with_self_is_never((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             if probe.type_has_imprecise_atom(a) || probe.type_is_value_never(a) {
                 return Ok(());
@@ -1613,8 +1621,8 @@ proptest! {
     }
 
     #[test]
-    fn negated_meet_equals_subtract((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn negated_meet_equals_subtract((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.type_has_imprecise_atom(a) || probe.type_has_imprecise_atom(b) {
@@ -1629,8 +1637,8 @@ proptest! {
     }
 
     #[test]
-    fn negated_subtract_equals_meet((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn negated_subtract_equals_meet((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.type_has_imprecise_atom(a) || probe.type_has_imprecise_atom(b) {
@@ -1645,8 +1653,8 @@ proptest! {
     }
 
     #[test]
-    fn double_negation_value_equal((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn double_negation_value_equal((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             if probe.type_has_imprecise_atom(a) {
                 return Ok(());
@@ -1659,8 +1667,8 @@ proptest! {
     }
 
     #[test]
-    fn negated_refines_iff_no_overlap((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn negated_refines_iff_no_overlap((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if probe.type_has_imprecise_atom(a) || probe.type_has_imprecise_atom(b) || probe.type_is_value_never(a) {
@@ -1675,8 +1683,8 @@ proptest! {
     }
 
     #[test]
-    fn copy_into_preserves_refines_verdict((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn copy_into_preserves_refines_verdict((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let original = probe.refines(a, b);
@@ -1698,8 +1706,8 @@ proptest! {
     }
 
     #[test]
-    fn import_is_idempotent((world, a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn import_is_idempotent((symbols, a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
 
             let second_arena = LocalArena::new();
@@ -1714,8 +1722,8 @@ proptest! {
     }
 
     #[test]
-    fn lattice_pair_laws_hold((world, a, b) in arb_world_and_pair()) {
-        with_probe(&world, |probe| {
+    fn lattice_pair_laws_hold((symbols, a, b) in arb_symbols_and_pair()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             if let Err(violation) = check_lattice_pair_laws(probe, a, b) {
@@ -1726,8 +1734,8 @@ proptest! {
     }
 
     #[test]
-    fn lattice_triple_laws_hold((world, a, b, c) in arb_world_and_triple()) {
-        with_probe(&world, |probe| {
+    fn lattice_triple_laws_hold((symbols, a, b, c) in arb_symbols_and_triple()) {
+        with_probe(&symbols, |probe| {
             let a = probe.build(&a);
             let b = probe.build(&b);
             let c = probe.build(&c);
@@ -1739,11 +1747,11 @@ proptest! {
     }
 
     #[test]
-    fn sealed_full_cover_subtract_is_never((world, _a) in arb_world_and_type()) {
-        with_probe(&world, |probe| {
+    fn sealed_full_cover_subtract_is_never((symbols, _a) in arb_symbols_and_type()) {
+        with_probe(&symbols, |probe| {
             for &class_name in CLASSES {
                 let name = SymbolId::class_like(class_name.as_bytes());
-                let inheritors = match probe.world.sealed_direct_inheritors(name) {
+                let inheritors = match probe.symbols.sealed_direct_inheritors(name) {
                     Some(list) => list.iter().map(|inheritor| inheritor.target.as_bytes().to_vec()).collect::<Vec<_>>(),
                     None => continue,
                 };

@@ -9,6 +9,9 @@ use core::num::NonZeroU32;
 
 use common::*;
 
+use mago_allocator::LocalArena;
+use mago_oracle::symbol::SymbolTable;
+
 use mago_flags::U8Flags;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::AtomKind;
@@ -26,25 +29,28 @@ use mago_oracle::ty::lattice::LatticeReport;
 use mago_oracle::ty::lattice::refines;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::World;
 
-fn lattice_meet<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, w: &W) -> Type<'arena>
-where
-    W: World<'arena>,
-{
+fn lattice_meet<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    a: Type<'arena>,
+    b: Type<'arena>,
+    w: &SymbolTable<'arena, LocalArena>,
+) -> Type<'arena> {
     meet::compute(a, b, w, LatticeOptions::default(), &mut LatticeReport::new(), &mut f.builder)
 }
 
-fn does_refine<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, w: &W) -> bool
-where
-    W: World<'arena>,
-{
+fn does_refine<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    a: Type<'arena>,
+    b: Type<'arena>,
+    w: &SymbolTable<'arena, LocalArena>,
+) -> bool {
     refines(a, b, w, LatticeOptions::default(), &mut LatticeReport::new(), &mut f.builder)
 }
 
 #[track_caller]
 fn assert_meet_is_subset<'arena>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>) {
-    let w = empty_world();
+    let w = empty_symbol_table(f.arena);
     let m = lattice_meet(f, a, b, &w);
     assert!(does_refine(f, m, a, &w), "meet({a}, {b}) = {m} must refine {a}");
     assert!(does_refine(f, m, b, &w), "meet({a}, {b}) = {m} must refine {b}");
@@ -58,7 +64,7 @@ fn truthy_mixed_meet_literal_zero_string_is_never() {
         let zero = f.t_lit_string("0");
         let rhs = f.u(zero);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER, "truthy ∩ string('0') must be never (got {m})");
     });
 }
@@ -71,7 +77,7 @@ fn truthy_mixed_meet_literal_empty_string_is_never() {
         let empty = f.t_lit_string("");
         let rhs = f.u(empty);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER, "truthy ∩ string('') must be never (got {m})");
     });
 }
@@ -89,9 +95,9 @@ fn falsy_mixed_meet_non_empty_string_excludes_empty_literal() {
         let rhs = f.u(non_empty);
         assert_meet_is_subset(f, lhs, rhs);
         let empty_lit = f.us("");
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert!(
-            !does_refine(f, empty_lit, m, &empty_world()),
+            !does_refine(f, empty_lit, m, &empty_symbol_table(f.arena)),
             "string('') is empty so cannot be in falsy ∩ non-empty-string (got meet {m})"
         );
     });
@@ -109,7 +115,7 @@ fn falsy_mixed_meet_truthy_string_is_never() {
         let lhs = f.u(falsy);
         let rhs = f.u(truthy_string);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER, "falsy ∩ truthy-string must be never (got {m})");
     });
 }
@@ -124,9 +130,9 @@ fn falsy_mixed_meet_list_is_empty_list_only() {
         assert_meet_is_subset(f, lhs, rhs);
         let non_empty_atom = f.t_list(well_known::TYPE_INT, true);
         let non_empty = f.u(non_empty_atom);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert!(
-            !does_refine(f, non_empty, m, &empty_world()),
+            !does_refine(f, non_empty, m, &empty_symbol_table(f.arena)),
             "non-empty-list<int> values are truthy so cannot be in falsy ∩ list<int> (got meet {m})"
         );
     });
@@ -140,7 +146,7 @@ fn falsy_mixed_meet_non_empty_list_is_never() {
         let list_atom = f.t_list(well_known::TYPE_INT, true);
         let rhs = f.u(list_atom);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER, "non-empty-list is always truthy ; falsy meet must be never (got {m})");
     });
 }
@@ -155,9 +161,9 @@ fn falsy_mixed_meet_unsealed_array_is_empty_array_only() {
         assert_meet_is_subset(f, lhs, rhs);
         let non_empty_atom = f.t_keyed_unsealed(well_known::TYPE_ARRAY_KEY, well_known::TYPE_MIXED, true);
         let non_empty = f.u(non_empty_atom);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert!(
-            !does_refine(f, non_empty, m, &empty_world()),
+            !does_refine(f, non_empty, m, &empty_symbol_table(f.arena)),
             "non-empty arrays are truthy so cannot be in falsy ∩ array (got meet {m})"
         );
     });
@@ -171,7 +177,7 @@ fn falsy_mixed_meet_iterable_is_never() {
         let iterable_atom = f.t_iterable(well_known::TYPE_ARRAY_KEY, well_known::TYPE_MIXED);
         let rhs = f.u(iterable_atom);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER, "iterable is conservatively truthy ; falsy meet must be never (got {m})");
     });
 }
@@ -184,7 +190,7 @@ fn falsy_mixed_meet_class_like_string_is_never() {
         let class_string = f.t_class_string();
         let rhs = f.u(class_string);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(
             m,
             well_known::TYPE_NEVER,
@@ -201,7 +207,7 @@ fn falsy_mixed_meet_callable_is_never() {
         let callable = f.t_callable_any();
         let rhs = f.u(callable);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER, "callable is always truthy ; falsy meet must be never (got {m})");
     });
 }
@@ -214,7 +220,7 @@ fn falsy_mixed_meet_resource_is_never() {
         let resource = f.t_resource();
         let rhs = f.u(resource);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER, "resource is always truthy ; falsy meet must be never (got {m})");
     });
 }
@@ -227,7 +233,7 @@ fn falsy_mixed_meet_object_is_never() {
         let object = f.t_object_any();
         let rhs = f.u(object);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER, "objects are always truthy ; falsy meet must be never (got {m})");
     });
 }
@@ -240,7 +246,7 @@ fn mixed_meet_preserves_is_empty_flag() {
         let lhs = f.u(empty_mixed);
         let rhs = f.u(non_null_mixed);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         let m_atom = m.atoms[0];
         assert_eq!(m_atom.kind(), AtomKind::Mixed);
         let Atom::Mixed(m_info) = m_atom else {
@@ -259,7 +265,7 @@ fn mixed_meet_preserves_is_isset_from_loop_flag() {
         let lhs = f.u(isset_mixed);
         let rhs = f.u(non_null_mixed);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         let m_atom = m.atoms[0];
         let Atom::Mixed(m_info) = m_atom else {
             panic!("meet of mixed atoms must stay mixed, got {m_atom:?}");
@@ -276,7 +282,7 @@ fn truthy_mixed_meet_truthy_mixed_is_truthy() {
         let lhs = f.u(truthy);
         let rhs = f.u(truthy);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         let m_atom = m.atoms[0];
         let Atom::Mixed(m_info) = m_atom else {
             panic!("meet of mixed atoms must stay mixed, got {m_atom:?}");
@@ -293,7 +299,7 @@ fn truthy_mixed_meet_non_null_mixed_is_truthy_non_null() {
         let nonnull = f.mixed_nonnull();
         let rhs = f.u(nonnull);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         let m_atom = m.atoms[0];
         let Atom::Mixed(m_info) = m_atom else {
             panic!("meet of mixed atoms must stay mixed, got {m_atom:?}");
@@ -311,7 +317,7 @@ fn truthy_mixed_meet_object_passes_through() {
         let object = f.t_object_any();
         let rhs = f.u(object);
         assert_meet_is_subset(f, lhs, rhs);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let m = lattice_meet(f, lhs, rhs, &w);
         assert!(does_refine(f, rhs, m, &w), "objects are truthy so truthy ∩ object should equal object");
     });
@@ -325,7 +331,7 @@ fn falsy_mixed_meet_int_is_zero_only() {
         let int = f.t_int();
         let rhs = f.u(int);
         assert_meet_is_subset(f, lhs, rhs);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let m = lattice_meet(f, lhs, rhs, &w);
         let one = f.ui(1);
         assert!(!does_refine(f, one, m, &w), "int(1) is truthy so cannot be in falsy ∩ int (got meet {m})");
@@ -342,7 +348,7 @@ fn truthy_mixed_meet_int_excludes_zero() {
         let int = f.t_int();
         let rhs = f.u(int);
         assert_meet_is_subset(f, lhs, rhs);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let m = lattice_meet(f, lhs, rhs, &w);
         let zero = f.ui(0);
         assert!(!does_refine(f, zero, m, &w), "int(0) is falsy so cannot be in truthy ∩ int (got meet {m})");
@@ -359,7 +365,7 @@ fn falsy_mixed_meet_float_is_zero_only() {
         let float = f.t_float();
         let rhs = f.u(float);
         assert_meet_is_subset(f, lhs, rhs);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let m = lattice_meet(f, lhs, rhs, &w);
         let one_float = f.u(Atom::float_literal(1.5));
         assert!(!does_refine(f, one_float, m, &w), "float(1.5) is truthy so cannot be in falsy ∩ float (got meet {m})");
@@ -374,7 +380,7 @@ fn truthy_mixed_meet_bool_is_true() {
         let bool_atom = f.t_bool();
         let rhs = f.u(bool_atom);
         assert_meet_is_subset(f, lhs, rhs);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let m = lattice_meet(f, lhs, rhs, &w);
         let true_atom = f.t_true();
         let truevalue = f.u(true_atom);
@@ -393,7 +399,7 @@ fn falsy_mixed_meet_bool_is_false() {
         let bool_atom = f.t_bool();
         let rhs = f.u(bool_atom);
         assert_meet_is_subset(f, lhs, rhs);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let m = lattice_meet(f, lhs, rhs, &w);
         let false_atom = f.t_false();
         let falsevalue = f.u(false_atom);
@@ -416,7 +422,7 @@ fn falsy_mixed_meet_uppercase_string_excludes_truthy_uppercase_literals() {
         let lhs = f.u(falsy);
         let rhs = f.u(upper_string);
         assert_meet_is_subset(f, lhs, rhs);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let m = lattice_meet(f, lhs, rhs, &w);
         let abc = f.us("ABC");
         assert!(
@@ -438,7 +444,7 @@ fn truthy_mixed_meet_lowercase_string_excludes_falsy_literals() {
         let lhs = f.u(truthy);
         let rhs = f.u(lower_string);
         assert_meet_is_subset(f, lhs, rhs);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let m = lattice_meet(f, lhs, rhs, &w);
         let empty_lit = f.us("");
         let zero_lit = f.us("0");
@@ -459,7 +465,7 @@ fn falsy_mixed_meet_numeric_string_includes_zero_excludes_one() {
         let lhs = f.u(falsy);
         let rhs = f.u(numeric_string);
         assert_meet_is_subset(f, lhs, rhs);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let m = lattice_meet(f, lhs, rhs, &w);
         let one_lit = f.us("1");
         assert!(!does_refine(f, one_lit, m, &w), "'1' is truthy ; falsy ∩ numeric-string excludes it (got {m})");
@@ -474,7 +480,7 @@ fn nonnull_mixed_meet_null_is_never() {
         let null = f.null();
         let rhs = f.u(null);
         assert_meet_is_subset(f, lhs, rhs);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER);
     });
 }
@@ -494,7 +500,7 @@ fn sealed_list_with_required_never_is_uninhabited() {
         let bad_t = f.u(bad);
         let other_atom = f.t_list(well_known::TYPE_INT, false);
         let other = f.u(other_atom);
-        let m = lattice_meet(f, bad_t, other, &empty_world());
+        let m = lattice_meet(f, bad_t, other, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER, "list with required never element is uninhabited (got {m})");
     });
 }
@@ -509,7 +515,7 @@ fn intersected_int_excluding_zero_refines_truthy_mixed() {
         let truthy_atom = f.mixed_truthy();
         let truthy = f.u(truthy_atom);
         assert!(
-            does_refine(f, nonzero_t, truthy, &empty_world()),
+            does_refine(f, nonzero_t, truthy, &empty_symbol_table(f.arena)),
             "int & !int(0) is non-zero int, all values truthy ; must refine truthy-mixed (got {nonzero_t})"
         );
     });
@@ -529,7 +535,7 @@ fn empty_list_singleton_refines_falsy_mixed() {
         let falsy_atom = f.mixed_falsy();
         let falsy = f.u(falsy_atom);
         assert!(
-            does_refine(f, empty_t, falsy, &empty_world()),
+            does_refine(f, empty_t, falsy, &empty_symbol_table(f.arena)),
             "empty list is falsy ; must refine falsy-mixed (got {empty_t})"
         );
     });
@@ -542,7 +548,10 @@ fn empty_array_refines_falsy_mixed() {
         let empty_t = f.u(empty_array);
         let falsy_atom = f.mixed_falsy();
         let falsy = f.u(falsy_atom);
-        assert!(does_refine(f, empty_t, falsy, &empty_world()), "empty array is falsy ; must refine falsy-mixed");
+        assert!(
+            does_refine(f, empty_t, falsy, &empty_symbol_table(f.arena)),
+            "empty array is falsy ; must refine falsy-mixed"
+        );
     });
 }
 
@@ -554,7 +563,7 @@ fn mixed_with_is_empty_implies_falsy_truthiness() {
         let falsy_atom = f.mixed_falsy();
         let falsy = f.u(falsy_atom);
         assert!(
-            does_refine(f, empty_t, falsy, &empty_world()),
+            does_refine(f, empty_t, falsy, &empty_symbol_table(f.arena)),
             "mixed with is_empty is by definition falsy ; must refine falsy-mixed (got {empty_t})"
         );
     });
@@ -568,7 +577,7 @@ fn class_string_refines_truthy_mixed() {
         let truthy_atom = f.mixed_truthy();
         let truthy = f.u(truthy_atom);
         assert!(
-            does_refine(f, cs, truthy, &empty_world()),
+            does_refine(f, cs, truthy, &empty_symbol_table(f.arena)),
             "class-strings are non-empty/non-zero ; must refine truthy-mixed"
         );
     });
@@ -581,7 +590,7 @@ fn callable_refines_truthy_mixed() {
         let c = f.u(callable);
         let truthy_atom = f.mixed_truthy();
         let truthy = f.u(truthy_atom);
-        assert!(does_refine(f, c, truthy, &empty_world()), "callables are objects/closures, always truthy");
+        assert!(does_refine(f, c, truthy, &empty_symbol_table(f.arena)), "callables are objects/closures, always truthy");
     });
 }
 
@@ -592,7 +601,7 @@ fn resource_refines_truthy_mixed() {
         let r = f.u(resource);
         let truthy_atom = f.mixed_truthy();
         let truthy = f.u(truthy_atom);
-        assert!(does_refine(f, r, truthy, &empty_world()), "resources are always truthy");
+        assert!(does_refine(f, r, truthy, &empty_symbol_table(f.arena)), "resources are always truthy");
     });
 }
 
@@ -604,7 +613,7 @@ fn intersected_mixed_meet_drops_no_constraint_axis() {
         );
 
         let target = f.u(truthy_nonnull_empty);
-        let m = lattice_meet(f, target, target, &empty_world());
+        let m = lattice_meet(f, target, target, &empty_symbol_table(f.arena));
         assert_eq!(m, target, "self-meet should be identity (got {m})");
     });
 }
@@ -618,7 +627,7 @@ fn intersected_truthy_int_in_falsy_mixed_meet_is_never() {
         let falsy = f.mixed_falsy();
         let lhs = f.u(falsy);
         let rhs = f.u(nonzero_int);
-        let m = lattice_meet(f, lhs, rhs, &empty_world());
+        let m = lattice_meet(f, lhs, rhs, &empty_symbol_table(f.arena));
         assert_eq!(m, well_known::TYPE_NEVER, "falsy ∩ (int & !int(0)) must be never (got {m})");
     });
 }

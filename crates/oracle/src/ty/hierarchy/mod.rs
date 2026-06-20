@@ -8,8 +8,8 @@
 //!
 //! This module precomputes the closure once and exposes it through
 //! [`Hierarchy::arg`] / [`Hierarchy::args`]. Plug it into a
-//! [`World`] implementation's
-//! [`inherited_template_argument`](crate::world::World::inherited_template_argument)
+//! [`SymbolTable`] implementation's
+//! [`inherited_template_argument`](crate::symbol::SymbolTable::inherited_template_argument)
 //! and the O(depth × arity) cost vanishes from every query.
 //!
 //! Construction is two-step: register direct edges on a
@@ -25,12 +25,12 @@ use std::collections::BTreeSet;
 use mago_allocator::Arena;
 
 use crate::path::Path;
+use crate::symbol::SymbolTable;
 use crate::ty::Type;
 use crate::ty::atom::payload::generic_parameter::DefiningEntity;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::template::substitute;
-use crate::world::World;
 
 /// Builder collecting direct parent edges before transitive composition.
 #[derive(Debug, Default, Clone)]
@@ -54,15 +54,18 @@ impl<'arena> HierarchyBuilder<'arena> {
     }
 
     /// Compute the transitive closure of inherited template arguments.
-    /// `world` supplies template-name-to-position lookups for each
+    /// `symbols` supplies template-name-to-position lookups for each
     /// intermediate class via
-    /// [`template_parameter_index`](World::template_parameter_index).
+    /// [`template_parameter_index`](crate::symbol::SymbolTable::template_parameter_index).
     #[inline]
-    pub fn build<S, A, W>(self, world: &W, builder: &mut TypeBuilder<'_, 'arena, S, A>) -> Hierarchy<'arena>
+    pub fn build<S, A>(
+        self,
+        symbols: &SymbolTable<'arena, A>,
+        builder: &mut TypeBuilder<'_, 'arena, S, A>,
+    ) -> Hierarchy<'arena>
     where
         S: Arena,
         A: Arena,
-        W: World<'arena>,
     {
         let mut parents_of: BTreeMap<Path<'arena>, Vec<Path<'arena>>> = BTreeMap::new();
         for &(child, parent) in self.edges.keys() {
@@ -74,7 +77,7 @@ impl<'arena> HierarchyBuilder<'arena> {
         let children: Vec<Path<'arena>> = parents_of.keys().copied().collect();
         for child in children {
             let mut visiting: BTreeSet<Path<'arena>> = BTreeSet::new();
-            walk(child, &self.edges, &parents_of, &mut composed, &mut visiting, world, builder);
+            walk(child, &self.edges, &parents_of, &mut composed, &mut visiting, symbols, builder);
         }
 
         Hierarchy { composed }
@@ -82,18 +85,17 @@ impl<'arena> HierarchyBuilder<'arena> {
 }
 
 #[inline]
-fn walk<'arena, S, A, W>(
+fn walk<'arena, S, A>(
     child: Path<'arena>,
     edges: &BTreeMap<(Path<'arena>, Path<'arena>), Vec<Type<'arena>>>,
     parents_of: &BTreeMap<Path<'arena>, Vec<Path<'arena>>>,
     composed: &mut BTreeMap<(Path<'arena>, Path<'arena>), Vec<Type<'arena>>>,
     visiting: &mut BTreeSet<Path<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if !visiting.insert(child) {
         return;
@@ -105,7 +107,7 @@ fn walk<'arena, S, A, W>(
     };
 
     for &parent in parents.clone().iter() {
-        walk(parent, edges, parents_of, composed, visiting, world, builder);
+        walk(parent, edges, parents_of, composed, visiting, symbols, builder);
 
         let Some(child_to_parent) = edges.get(&(child, parent)).cloned() else {
             continue;
@@ -142,7 +144,7 @@ fn walk<'arena, S, A, W>(
                                 return None;
                             }
 
-                            let position = world.template_parameter_index(parent.id, parameter.name)?;
+                            let position = symbols.template_parameter_index(parent.id, parameter.name)?;
                             child_to_parent.get(position).copied()
                         },
                         builder,
@@ -184,8 +186,8 @@ impl<'arena> Hierarchy<'arena> {
 
     /// Iterate every `((child, ancestor), args)` triple recorded in the
     /// closure. Useful for building reverse indexes or for a wrapper
-    /// [`World`] that delegates
-    /// [`descends_from`](World::descends_from).
+    /// [`SymbolTable`] that delegates
+    /// [`descends_from`](crate::symbol::SymbolTable::descends_from).
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = ((Path<'arena>, Path<'arena>), &[Type<'arena>])> {
         self.composed.iter().map(|(&pair, arguments)| (pair, arguments.as_slice()))

@@ -746,7 +746,7 @@ fn list_string_lits_in_list_string() {
 #[test]
 fn keyed_with_value_subtypes_for_many_combos() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         for outer_value in [f.t_int(), f.t_string(), f.t_bool()] {
             for inner_value in [f.t_lit_int(5), f.t_lit_string("hi")] {
                 let string = f.t_string();
@@ -755,8 +755,8 @@ fn keyed_with_value_subtypes_for_many_combos() {
                 let outer_type = f.u(outer_value);
                 let outer_uniform = f.t_keyed_unsealed(string_type, outer_type, false);
                 let inner_keyed = f.t_keyed_unsealed(string_type, inner_in_outer, false);
-                let result = atomic_is_contained(f, inner_keyed, outer_uniform, &world);
-                let expected = atomic_is_contained(f, inner_value, outer_value, &world);
+                let result = atomic_is_contained(f, inner_keyed, outer_uniform, &symbols);
+                let expected = atomic_is_contained(f, inner_value, outer_value, &symbols);
                 assert_eq!(result, expected, "keyed<string,{inner_value:?}> <: keyed<string,{outer_value:?}>");
             }
         }

@@ -7,6 +7,7 @@ use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
+use crate::symbol::SymbolTable;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
 use crate::ty::atom::payload::array::ArrayAtom;
@@ -22,16 +23,15 @@ use crate::ty::lattice::LatticeReport;
 use crate::ty::lattice::is_uninhabited;
 use crate::ty::meet;
 use crate::ty::well_known;
-use crate::world::World;
 
 /// `list<A> ∧ list<B>` is `list<A ∧ B>` (covariant). When either side
 /// is non-empty the result is non-empty too. Sealed × sealed lists
 /// merge index-wise; sealed × unsealed treats the unsealed side as
 /// the rest type for indices beyond the sealed prefix.
-pub(in crate::ty::meet) fn list_meet<'arena, S, A, W>(
+pub(in crate::ty::meet) fn list_meet<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -39,17 +39,16 @@ pub(in crate::ty::meet) fn list_meet<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (Atom::List(a_payload), Atom::List(b_payload)) = (a, b) else {
         return None;
     };
 
     if a_payload.known_elements.is_some() || b_payload.known_elements.is_some() {
-        return sealed_list_meet(*a_payload, *b_payload, world, options, report, builder);
+        return sealed_list_meet(*a_payload, *b_payload, symbols, options, report, builder);
     }
 
-    let element_type = meet::compute(a_payload.element_type, b_payload.element_type, world, options, report, builder);
+    let element_type = meet::compute(a_payload.element_type, b_payload.element_type, symbols, options, report, builder);
     let non_empty = a_payload.flags.contains(ListFlag::NonEmpty) || b_payload.flags.contains(ListFlag::NonEmpty);
     if non_empty && element_type.is_never() {
         return None;
@@ -61,14 +60,14 @@ where
 
     let result = builder.list(merged);
 
-    if is_uninhabited(result, world, builder) { None } else { Some(result) }
+    if is_uninhabited(result, symbols, builder) { None } else { Some(result) }
 }
 
 #[inline]
-fn sealed_list_meet<'scratch, 'arena, S, A, W>(
+fn sealed_list_meet<'scratch, 'arena, S, A>(
     a_payload: ListAtom<'arena>,
     b_payload: ListAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -76,7 +75,6 @@ fn sealed_list_meet<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let a_entries: &[KnownElement<'arena>] = a_payload.known_elements.unwrap_or(&[]);
     let b_entries: &[KnownElement<'arena>] = b_payload.known_elements.unwrap_or(&[]);
@@ -87,15 +85,15 @@ where
         let b_entry = b_entries.get(index).copied();
         let (value, optional) = match (a_entry, b_entry) {
             (Some(a_element), Some(b_element)) => (
-                meet::compute(a_element.value, b_element.value, world, options, report, builder),
+                meet::compute(a_element.value, b_element.value, symbols, options, report, builder),
                 a_element.optional && b_element.optional,
             ),
             (Some(a_element), None) => (
-                meet::compute(a_element.value, b_payload.element_type, world, options, report, builder),
+                meet::compute(a_element.value, b_payload.element_type, symbols, options, report, builder),
                 a_element.optional,
             ),
             (None, Some(b_element)) => (
-                meet::compute(a_payload.element_type, b_element.value, world, options, report, builder),
+                meet::compute(a_payload.element_type, b_element.value, symbols, options, report, builder),
                 b_element.optional,
             ),
             (None, None) => continue,
@@ -111,24 +109,24 @@ where
     let known_elements = if merged.is_empty() { None } else { Some(builder.known_elements(&merged)) };
     let non_empty = a_payload.flags.contains(ListFlag::NonEmpty) || b_payload.flags.contains(ListFlag::NonEmpty);
     let known_count = NonZeroU32::new(merged.len() as u32);
-    let element_type = meet::compute(a_payload.element_type, b_payload.element_type, world, options, report, builder);
+    let element_type = meet::compute(a_payload.element_type, b_payload.element_type, symbols, options, report, builder);
     let mut flags = U8Flags::empty();
     flags.set_value(ListFlag::NonEmpty, non_empty);
     let merged_payload = ListAtom { element_type, known_elements, known_count, flags };
 
     let result = builder.list(merged_payload);
 
-    if is_uninhabited(result, world, builder) { None } else { Some(result) }
+    if is_uninhabited(result, symbols, builder) { None } else { Some(result) }
 }
 
 /// `array{...} ∧ array{...}` for two sealed shapes: the result has the
 /// union of keys; values at shared keys are met. Optional flags AND-merge
 /// (a key is required iff it's required on both sides). Unsealed × unsealed
 /// composes the open key/value parameters pointwise.
-pub(in crate::ty::meet) fn keyed_array_meet<'scratch, 'arena, S, A, W>(
+pub(in crate::ty::meet) fn keyed_array_meet<'scratch, 'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -136,7 +134,6 @@ pub(in crate::ty::meet) fn keyed_array_meet<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (Atom::Array(a_payload), Atom::Array(b_payload)) = (a, b) else {
         return None;
@@ -144,10 +141,10 @@ where
 
     let (Some(a_entries), Some(b_entries)) = (a_payload.known_items, b_payload.known_items) else {
         if a_payload.known_items.is_some() || b_payload.known_items.is_some() {
-            return sealed_unsealed_array_meet(*a_payload, *b_payload, world, options, report, builder);
+            return sealed_unsealed_array_meet(*a_payload, *b_payload, symbols, options, report, builder);
         }
 
-        return unsealed_keyed_array_meet(*a_payload, *b_payload, world, options, report, builder);
+        return unsealed_keyed_array_meet(*a_payload, *b_payload, symbols, options, report, builder);
     };
 
     let mut merged: BTreeMap<ArrayKey<'arena>, KnownItem<'arena>> = BTreeMap::default();
@@ -159,7 +156,7 @@ where
         merged
             .entry(b_entry.key)
             .and_modify(|existing| {
-                existing.value = meet::compute(existing.value, b_entry.value, world, options, report, builder);
+                existing.value = meet::compute(existing.value, b_entry.value, symbols, options, report, builder);
                 existing.optional = existing.optional && b_entry.optional;
             })
             .or_insert(*b_entry);
@@ -175,7 +172,7 @@ where
 
     let result = builder.array(merged_payload);
 
-    if is_uninhabited(result, world, builder) { None } else { Some(result) }
+    if is_uninhabited(result, symbols, builder) { None } else { Some(result) }
 }
 
 /// `array{...} ∧ array<K, V>`: each known item's value gets met
@@ -183,10 +180,10 @@ where
 /// makes that item's value `never`, dropping or contradicting the
 /// item depending on `optional`).
 #[inline]
-fn sealed_unsealed_array_meet<'scratch, 'arena, S, A, W>(
+fn sealed_unsealed_array_meet<'scratch, 'arena, S, A>(
     a_payload: ArrayAtom<'arena>,
     b_payload: ArrayAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -194,7 +191,6 @@ fn sealed_unsealed_array_meet<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (sealed, unsealed) =
         if a_payload.known_items.is_some() { (a_payload, b_payload) } else { (b_payload, a_payload) };
@@ -211,10 +207,10 @@ where
 
         let key_type = builder.union_of(&[key_atom]);
         let key_compatible = key_param.is_none_or(|key_constraint| {
-            crate::ty::lattice::refines(key_type, key_constraint, world, options, report, builder)
+            crate::ty::lattice::refines(key_type, key_constraint, symbols, options, report, builder)
         });
         let value = if let Some(value_constraint) = value_param {
-            meet::compute(entry.value, value_constraint, world, options, report, builder)
+            meet::compute(entry.value, value_constraint, symbols, options, report, builder)
         } else {
             entry.value
         };
@@ -236,7 +232,7 @@ where
     flags.set_value(ArrayFlag::NonEmpty, non_empty);
     let result = builder.array(ArrayAtom { key_param: None, value_param: None, known_items, flags });
 
-    if is_uninhabited(result, world, builder) { None } else { Some(result) }
+    if is_uninhabited(result, symbols, builder) { None } else { Some(result) }
 }
 
 /// `list<E> ∧ array<K, V>`: a list is an int-keyed array, so the meet
@@ -245,10 +241,10 @@ where
 /// (e.g. `string`), the intersection is empty. The non-empty flag
 /// OR-merges; an empty result on either axis collapses to `None`
 /// when the result is forced non-empty.
-pub(in crate::ty::meet) fn list_array_meet<'arena, S, A, W>(
+pub(in crate::ty::meet) fn list_array_meet<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -256,7 +252,6 @@ pub(in crate::ty::meet) fn list_array_meet<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (list_atom, array_atom) = if a.kind() == AtomKind::List { (a, b) } else { (b, a) };
     let (Atom::List(list_payload), Atom::Array(array_payload)) = (list_atom, array_atom) else {
@@ -277,7 +272,7 @@ where
     }
 
     let key_compatible = array_payload.key_param.is_none_or(|key_constraint| {
-        crate::ty::lattice::refines(well_known::TYPE_INT, key_constraint, world, options, report, builder)
+        crate::ty::lattice::refines(well_known::TYPE_INT, key_constraint, symbols, options, report, builder)
     });
 
     if non_empty && !key_compatible {
@@ -285,7 +280,7 @@ where
     }
 
     let array_value_param = array_payload.value_param.unwrap_or(well_known::TYPE_MIXED);
-    let element_type = meet::compute(list_payload.element_type, array_value_param, world, options, report, builder);
+    let element_type = meet::compute(list_payload.element_type, array_value_param, symbols, options, report, builder);
 
     if non_empty && element_type.is_never() {
         return None;
@@ -306,10 +301,10 @@ where
 /// array shape (the array is the more refined family member); the
 /// iterable side is consumed entirely. `known_items` value types
 /// also narrow against the iterable's value type.
-pub(in crate::ty::meet) fn iterable_array_meet<'scratch, 'arena, S, A, W>(
+pub(in crate::ty::meet) fn iterable_array_meet<'scratch, 'arena, S, A>(
     iterable: Atom<'arena>,
     array: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -317,20 +312,19 @@ pub(in crate::ty::meet) fn iterable_array_meet<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (Atom::Iterable(iterable_payload), Atom::Array(array_payload)) = (iterable, array) else {
         return None;
     };
 
     let key_param = match array_payload.key_param {
-        Some(array_key) => Some(meet::compute(array_key, iterable_payload.key_type, world, options, report, builder)),
+        Some(array_key) => Some(meet::compute(array_key, iterable_payload.key_type, symbols, options, report, builder)),
         None => Some(iterable_payload.key_type),
     };
 
     let value_param = match array_payload.value_param {
         Some(array_value) => {
-            Some(meet::compute(array_value, iterable_payload.value_type, world, options, report, builder))
+            Some(meet::compute(array_value, iterable_payload.value_type, symbols, options, report, builder))
         }
         None => Some(iterable_payload.value_type),
     };
@@ -340,7 +334,7 @@ where
         Some(entries) => {
             let mut narrowed: ScratchVec<'scratch, KnownItem<'arena>, S> = builder.scratch_vec_with(entries.len());
             for entry in entries {
-                let value = meet::compute(entry.value, iterable_payload.value_type, world, options, report, builder);
+                let value = meet::compute(entry.value, iterable_payload.value_type, symbols, options, report, builder);
                 if value.is_never() && !entry.optional {
                     return None;
                 }
@@ -371,10 +365,10 @@ where
 /// empty list `list<never>`, while a non-empty list has no shared value and
 /// the meet is `None`. The matching overlap rule reports the same to keep
 /// the lattice consistent.
-pub(in crate::ty::meet) fn iterable_list_meet<'arena, S, A, W>(
+pub(in crate::ty::meet) fn iterable_list_meet<'arena, S, A>(
     iterable: Atom<'arena>,
     list: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -382,13 +376,12 @@ pub(in crate::ty::meet) fn iterable_list_meet<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (Atom::Iterable(iterable_payload), Atom::List(list_payload)) = (iterable, list) else {
         return None;
     };
 
-    if !crate::ty::lattice::refines(well_known::TYPE_INT, iterable_payload.key_type, world, options, report, builder) {
+    if !crate::ty::lattice::refines(well_known::TYPE_INT, iterable_payload.key_type, symbols, options, report, builder) {
         if list_payload.flags.contains(ListFlag::NonEmpty) {
             return None;
         }
@@ -402,7 +395,7 @@ where
     }
 
     let element_type =
-        meet::compute(list_payload.element_type, iterable_payload.value_type, world, options, report, builder);
+        meet::compute(list_payload.element_type, iterable_payload.value_type, symbols, options, report, builder);
     if list_payload.flags.contains(ListFlag::NonEmpty) && element_type.is_never() {
         return None;
     }
@@ -415,10 +408,10 @@ where
 /// meeting it with a non-empty side is `None` and with anything else is
 /// exactly `array{}` regardless of the other side's open parameters.
 #[inline]
-fn unsealed_keyed_array_meet<'arena, S, A, W>(
+fn unsealed_keyed_array_meet<'arena, S, A>(
     a_payload: ArrayAtom<'arena>,
     b_payload: ArrayAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -426,7 +419,6 @@ fn unsealed_keyed_array_meet<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let non_empty = a_payload.flags.contains(ArrayFlag::NonEmpty) || b_payload.flags.contains(ArrayFlag::NonEmpty);
 
@@ -437,13 +429,13 @@ where
     }
 
     let key_param = match (a_payload.key_param, b_payload.key_param) {
-        (Some(a_key), Some(b_key)) => Some(meet::compute(a_key, b_key, world, options, report, builder)),
+        (Some(a_key), Some(b_key)) => Some(meet::compute(a_key, b_key, symbols, options, report, builder)),
         (Some(key), None) | (None, Some(key)) => Some(key),
         (None, None) => None,
     };
 
     let value_param = match (a_payload.value_param, b_payload.value_param) {
-        (Some(a_value), Some(b_value)) => Some(meet::compute(a_value, b_value, world, options, report, builder)),
+        (Some(a_value), Some(b_value)) => Some(meet::compute(a_value, b_value, symbols, options, report, builder)),
         (Some(value), None) | (None, Some(value)) => Some(value),
         (None, None) => None,
     };

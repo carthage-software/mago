@@ -2,7 +2,9 @@ mod common;
 
 use common::*;
 
-use mago_oracle::symbol::part::generic::Variance;
+use mago_allocator::LocalArena;
+use mago_oracle::symbol::SymbolTable;
+
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::array::ArrayFlag;
@@ -16,7 +18,6 @@ use mago_oracle::ty::lattice::refines;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::subtract;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::World;
 
 fn t_sealed_list<'arena>(f: &mut Fixture<'_, 'arena>, elements: &[Type<'arena>]) -> Atom<'arena> {
     let entries: Vec<KnownElement<'arena>> = elements
@@ -28,12 +29,14 @@ fn t_sealed_list<'arena>(f: &mut Fixture<'_, 'arena>, elements: &[Type<'arena>])
     f.builder.sealed_list(&entries, true)
 }
 
-fn meet_of<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, world: &W) -> Type<'arena>
-where
-    W: World<'arena>,
-{
+fn meet_of<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    a: Type<'arena>,
+    b: Type<'arena>,
+    symbols: &SymbolTable<'arena, LocalArena>,
+) -> Type<'arena> {
     let mut report = LatticeReport::new();
-    meet::compute(a, b, world, LatticeOptions::default(), &mut report, &mut f.builder)
+    meet::compute(a, b, symbols, LatticeOptions::default(), &mut report, &mut f.builder)
 }
 
 fn join_of<'arena>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>) -> Type<'arena> {
@@ -44,45 +47,53 @@ fn join_of<'arena>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>
 }
 
 #[track_caller]
-fn assert_partition<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, world: &W)
-where
-    W: World<'arena>,
-{
-    let inside = meet_of(f, a, b, world);
-    let outside = subtract_of(f, a, b, world);
+fn assert_partition<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    a: Type<'arena>,
+    b: Type<'arena>,
+    symbols: &SymbolTable<'arena, LocalArena>,
+) {
+    let inside = meet_of(f, a, b, symbols);
+    let outside = subtract_of(f, a, b, symbols);
     let rejoined = join_of(f, inside, outside);
     assert_eq!(rejoined, a, "partition law: join(meet(a,b), subtract(a,b)) must reconstruct a");
 }
 
-fn subtract_of<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, world: &W) -> Type<'arena>
-where
-    W: World<'arena>,
-{
+fn subtract_of<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    a: Type<'arena>,
+    b: Type<'arena>,
+    symbols: &SymbolTable<'arena, LocalArena>,
+) -> Type<'arena> {
     let mut report = LatticeReport::new();
-    subtract::compute(a, b, world, LatticeOptions::default(), &mut report, &mut f.builder)
+    subtract::compute(a, b, symbols, LatticeOptions::default(), &mut report, &mut f.builder)
 }
 
-fn refines_of<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, world: &W) -> bool
-where
-    W: World<'arena>,
-{
+fn refines_of<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    a: Type<'arena>,
+    b: Type<'arena>,
+    symbols: &SymbolTable<'arena, LocalArena>,
+) -> bool {
     let mut report = LatticeReport::new();
-    refines(a, b, world, LatticeOptions::default(), &mut report, &mut f.builder)
+    refines(a, b, symbols, LatticeOptions::default(), &mut report, &mut f.builder)
 }
 
 #[track_caller]
-fn assert_upper_bound<'arena, W>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, world: &W)
-where
-    W: World<'arena>,
-{
-    let r = subtract_of(f, a, b, world);
-    assert!(refines_of(f, r, a, world), "subtract({a:?}, {b:?}) = {r:?} does not refine {a:?}");
+fn assert_upper_bound<'arena>(
+    f: &mut Fixture<'_, 'arena>,
+    a: Type<'arena>,
+    b: Type<'arena>,
+    symbols: &SymbolTable<'arena, LocalArena>,
+) {
+    let r = subtract_of(f, a, b, symbols);
+    assert!(refines_of(f, r, a, symbols), "subtract({a:?}, {b:?}) = {r:?} does not refine {a:?}");
 }
 
 #[test]
 fn reflexive_subtract_yields_never() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         assert_eq!(subtract_of(f, well_known::TYPE_INT, well_known::TYPE_INT, &cb), well_known::TYPE_NEVER);
     });
 }
@@ -90,7 +101,7 @@ fn reflexive_subtract_yields_never() {
 #[test]
 fn subtract_never_is_identity() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         assert_eq!(subtract_of(f, well_known::TYPE_INT, well_known::TYPE_NEVER, &cb), well_known::TYPE_INT);
     });
 }
@@ -98,7 +109,7 @@ fn subtract_never_is_identity() {
 #[test]
 fn subtract_from_never_yields_never() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         assert_eq!(subtract_of(f, well_known::TYPE_NEVER, well_known::TYPE_INT, &cb), well_known::TYPE_NEVER);
     });
 }
@@ -106,7 +117,7 @@ fn subtract_from_never_yields_never() {
 #[test]
 fn subtract_mixed_yields_never() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         assert_eq!(subtract_of(f, well_known::TYPE_INT, well_known::TYPE_MIXED, &cb), well_known::TYPE_NEVER);
         assert_eq!(subtract_of(f, well_known::TYPE_STRING, well_known::TYPE_MIXED, &cb), well_known::TYPE_NEVER);
     });
@@ -115,7 +126,7 @@ fn subtract_mixed_yields_never() {
 #[test]
 fn subsumption_collapses_to_never() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let lit = f.ui(42);
         assert_eq!(subtract_of(f, lit, well_known::TYPE_INT, &cb), well_known::TYPE_NEVER);
     });
@@ -124,7 +135,7 @@ fn subsumption_collapses_to_never() {
 #[test]
 fn disjoint_kinds_subtract_is_identity() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         assert_eq!(subtract_of(f, well_known::TYPE_INT, well_known::TYPE_STRING, &cb), well_known::TYPE_INT);
         assert_eq!(subtract_of(f, well_known::TYPE_STRING, well_known::TYPE_NULL, &cb), well_known::TYPE_STRING);
     });
@@ -133,7 +144,7 @@ fn disjoint_kinds_subtract_is_identity() {
 #[test]
 fn nullable_int_minus_null_is_int() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let null = f.null();
         let int = f.t_int();
         let nullable_int = f.u_many(vec![null, int]);
@@ -144,7 +155,7 @@ fn nullable_int_minus_null_is_int() {
 #[test]
 fn union_minus_union_distributes() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let string = f.t_string();
         let null = f.null();
@@ -157,7 +168,7 @@ fn union_minus_union_distributes() {
 #[test]
 fn int_range_minus_literal_in_middle_splits() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let range = f.t_int_range(0, 10);
         let r = f.u(range);
         let lit = f.ui(5);
@@ -172,7 +183,7 @@ fn int_range_minus_literal_in_middle_splits() {
 #[test]
 fn int_range_minus_overlapping_range_keeps_outer_pieces() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let outer_range = f.t_int_range(0, 20);
         let outer = f.u(outer_range);
         let inner_range = f.t_int_range(5, 15);
@@ -188,7 +199,7 @@ fn int_range_minus_overlapping_range_keeps_outer_pieces() {
 #[test]
 fn int_range_minus_overlapping_left_keeps_right() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let range = f.t_int_range(0, 10);
         let r = f.u(range);
         let cut_range = f.t_int_range(-5, 5);
@@ -203,7 +214,7 @@ fn int_range_minus_overlapping_left_keeps_right() {
 #[test]
 fn int_range_minus_overlapping_right_keeps_left() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let range = f.t_int_range(0, 10);
         let r = f.u(range);
         let cut_range = f.t_int_range(5, 15);
@@ -218,7 +229,7 @@ fn int_range_minus_overlapping_right_keeps_left() {
 #[test]
 fn int_range_minus_endpoint_collapses_to_literal_piece() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let range = f.t_int_range(0, 1);
         let r = f.u(range);
         let zero = f.ui(0);
@@ -231,7 +242,7 @@ fn int_range_minus_endpoint_collapses_to_literal_piece() {
 #[test]
 fn int_range_minus_disjoint_range_is_identity() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let range_a = f.t_int_range(0, 10);
         let a = f.u(range_a);
         let range_b = f.t_int_range(20, 30);
@@ -243,7 +254,7 @@ fn int_range_minus_disjoint_range_is_identity() {
 #[test]
 fn open_int_minus_bounded_range_splits_unbounded_pieces() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = well_known::TYPE_INT;
         let middle_range = f.t_int_range(0, 10);
         let middle = f.u(middle_range);
@@ -258,7 +269,7 @@ fn open_int_minus_bounded_range_splits_unbounded_pieces() {
 #[test]
 fn bool_minus_true_is_false() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let bool_t = well_known::TYPE_BOOL;
         let true_t = well_known::TYPE_TRUE;
         assert_eq!(subtract_of(f, bool_t, true_t, &cb), well_known::TYPE_FALSE);
@@ -268,7 +279,7 @@ fn bool_minus_true_is_false() {
 #[test]
 fn bool_minus_false_is_true() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let bool_t = well_known::TYPE_BOOL;
         let false_t = well_known::TYPE_FALSE;
         assert_eq!(subtract_of(f, bool_t, false_t, &cb), well_known::TYPE_TRUE);
@@ -278,7 +289,7 @@ fn bool_minus_false_is_true() {
 #[test]
 fn nullable_bool_minus_null_is_bool() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let null = f.null();
         let bool_atom = f.t_bool();
         let nullable_bool = f.u_many(vec![null, bool_atom]);
@@ -289,7 +300,7 @@ fn nullable_bool_minus_null_is_bool() {
 #[test]
 fn mixed_minus_null_is_value_equal_to_non_null_mixed() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let result = subtract_of(f, well_known::TYPE_MIXED, well_known::TYPE_NULL, &cb);
         let nonnull = f.mixed_nonnull();
         let expected = f.u(nonnull);
@@ -303,7 +314,7 @@ fn mixed_minus_null_is_value_equal_to_non_null_mixed() {
 #[test]
 fn multi_step_subtraction_chains() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let string = f.t_string();
         let null = f.null();
@@ -316,7 +327,7 @@ fn multi_step_subtraction_chains() {
 #[test]
 fn upper_bound_invariant_int_split() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let range = f.t_int_range(0, 10);
         let r = f.u(range);
         let mid = f.ui(5);
@@ -327,7 +338,7 @@ fn upper_bound_invariant_int_split() {
 #[test]
 fn upper_bound_invariant_nullable_int_minus_null() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let null = f.null();
         let int = f.t_int();
         let nullable_int = f.u_many(vec![null, int]);
@@ -336,11 +347,9 @@ fn upper_bound_invariant_nullable_int_minus_null() {
 }
 
 #[test]
-fn unrelated_named_objects_subtract_records_exclusion_open_world() {
+fn unrelated_named_objects_subtract_records_exclusion_open_symbols() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.declare("Foo");
-        w.declare("Bar");
+        let w = symbol_table(f.arena, "<?php class Foo {} class Bar {}");
         let foo_atom = f.t_named("Foo");
         let foo = f.u(foo_atom);
         let bar_atom = f.t_named("Bar");
@@ -355,7 +364,7 @@ fn unrelated_named_objects_subtract_records_exclusion_open_world() {
 #[test]
 fn descendant_minus_ancestor_is_never() {
     fixture(|f| {
-        let cb = MockWorld::from_edges(&[("Dog", "Animal")]);
+        let cb = symbol_table(f.arena, "<?php class Animal {} class Dog extends Animal {}");
         let dog_atom = f.t_named("Dog");
         let dog = f.u(dog_atom);
         let animal_atom = f.t_named("Animal");
@@ -367,7 +376,7 @@ fn descendant_minus_ancestor_is_never() {
 #[test]
 fn ancestor_minus_descendant_records_exclusion() {
     fixture(|f| {
-        let cb = MockWorld::from_edges(&[("Dog", "Animal")]);
+        let cb = symbol_table(f.arena, "<?php class Animal {} class Dog extends Animal {}");
         let dog_atom = f.t_named("Dog");
         let dog = f.u(dog_atom);
         let animal_atom = f.t_named("Animal");
@@ -382,7 +391,7 @@ fn ancestor_minus_descendant_records_exclusion() {
 #[test]
 fn subtract_then_meet_is_disjoint_for_int_range() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let range = f.t_int_range(0, 10);
         let r = f.u(range);
         let mid_range = f.t_int_range(5, 7);
@@ -395,7 +404,7 @@ fn subtract_then_meet_is_disjoint_for_int_range() {
 #[test]
 fn template_with_int_or_string_minus_int_narrows_constraint_to_string() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let string = f.t_string();
         let int_or_string = f.u_many(vec![int, string]);
@@ -411,7 +420,7 @@ fn template_with_int_or_string_minus_int_narrows_constraint_to_string() {
 #[test]
 fn template_with_int_or_string_minus_string_narrows_constraint_to_int() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let string = f.t_string();
         let int_or_string = f.u_many(vec![int, string]);
@@ -427,7 +436,7 @@ fn template_with_int_or_string_minus_string_narrows_constraint_to_int() {
 #[test]
 fn template_with_int_minus_int_is_impossible() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let int_ty = f.u(int);
         let lhs_atom = f.t_template_of("C", "T", int_ty);
@@ -439,7 +448,7 @@ fn template_with_int_minus_int_is_impossible() {
 #[test]
 fn template_with_int_minus_string_is_redundant_keeps_template() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let int_ty = f.u(int);
         let lhs_atom = f.t_template_of("C", "T", int_ty);
@@ -451,7 +460,7 @@ fn template_with_int_minus_string_is_redundant_keeps_template() {
 #[test]
 fn same_template_minus_same_template_with_disjoint_constraint_is_identity() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let int_ty = f.u(int);
         let lhs_atom = f.t_template_of("C", "T", int_ty);
@@ -467,7 +476,7 @@ fn same_template_minus_same_template_with_disjoint_constraint_is_identity() {
 #[test]
 fn same_template_minus_same_template_with_subset_constraint_is_impossible() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let int_ty = f.u(int);
         let lhs_atom = f.t_template_of("C", "T", int_ty);
@@ -481,7 +490,7 @@ fn same_template_minus_same_template_with_subset_constraint_is_impossible() {
 #[test]
 fn class_string_minus_interface_string_narrows_to_intersected() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let a = f.u_many(vec![well_known::CLASS_STRING, well_known::INT]);
         let c = f.u(well_known::INTERFACE_STRING);
 
@@ -495,7 +504,7 @@ fn class_string_minus_interface_string_narrows_to_intersected() {
 #[test]
 fn array_minus_list_removes_empty_array() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let arr = f.builder.keyed_unsealed(well_known::TYPE_INT, well_known::TYPE_INT, false);
         let lst = f.builder.list_of(well_known::TYPE_NULL, false);
         let a = f.u(arr);
@@ -516,7 +525,7 @@ fn array_minus_list_removes_empty_array() {
 #[test]
 fn list_minus_array_removes_empty_when_array_allows_empty() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let lst = f.builder.list_of(well_known::TYPE_NULL, false);
         let arr = f.builder.keyed_unsealed(well_known::TYPE_INT, well_known::TYPE_INT, false);
         let a = f.u(lst);
@@ -537,7 +546,7 @@ fn list_minus_array_removes_empty_when_array_allows_empty() {
 #[test]
 fn uninhabited_array_lhs_subtract_is_never() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let obj = f.t_named("A");
         let key_type = f.u(obj);
         let arr = f.builder.keyed_unsealed(key_type, well_known::TYPE_INT, true);
@@ -552,7 +561,7 @@ fn uninhabited_array_lhs_subtract_is_never() {
 #[test]
 fn sealed_list_minus_narrows_single_element() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let int_or_string = f.u_many(vec![well_known::INT, well_known::STRING]);
         let input_atom = t_sealed_list(f, &[int_or_string]);
         let input = f.u(input_atom);
@@ -571,7 +580,7 @@ fn sealed_list_minus_narrows_single_element() {
 #[test]
 fn sealed_list_partition_holds_single_element() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let int_or_string = f.u_many(vec![well_known::INT, well_known::STRING]);
         let input_atom = t_sealed_list(f, &[int_or_string]);
         let input = f.u(input_atom);
@@ -584,7 +593,7 @@ fn sealed_list_partition_holds_single_element() {
 #[test]
 fn sealed_list_partition_holds_two_positions() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let int_or_string = f.u_many(vec![well_known::INT, well_known::STRING]);
         let input_atom = t_sealed_list(f, &[int_or_string, int_or_string]);
         let input = f.u(input_atom);
@@ -597,7 +606,7 @@ fn sealed_list_partition_holds_two_positions() {
 #[test]
 fn sealed_list_partition_holds_three_positions() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let int_or_string = f.u_many(vec![well_known::INT, well_known::STRING]);
         let input_atom = t_sealed_list(f, &[int_or_string, int_or_string, int_or_string]);
         let input = f.u(input_atom);
@@ -610,7 +619,7 @@ fn sealed_list_partition_holds_three_positions() {
 #[test]
 fn sealed_list_residue_refines_input_and_avoids_removed() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let int_or_string = f.u_many(vec![well_known::INT, well_known::STRING]);
         let input_atom = t_sealed_list(f, &[int_or_string]);
         let input = f.u(input_atom);
@@ -626,7 +635,7 @@ fn sealed_list_residue_refines_input_and_avoids_removed() {
 #[test]
 fn sealed_lists_of_different_length_keep_input() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let input_atom = t_sealed_list(f, &[well_known::TYPE_INT]);
         let input = f.u(input_atom);
         let removed_atom = t_sealed_list(f, &[well_known::TYPE_INT, well_known::TYPE_STRING]);
@@ -681,7 +690,7 @@ fn join_keeps_two_position_diff_tuples_distinct() {
 #[test]
 fn array_minus_list_partition_covers_a() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let zero_float = f.t_lit_float(0.0);
         let zero_float_type = f.u(zero_float);
         let arr = f.t_keyed_unsealed(well_known::TYPE_INT, zero_float_type, false);
@@ -700,10 +709,15 @@ fn array_minus_list_partition_covers_a() {
 #[test]
 fn possibly_empty_array_with_uninhabited_value_is_the_empty_container() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        for class in ["A", "B", "C", "D", "E"] {
-            w.with_templates(class, &[("T", Variance::Invariant)]);
-        }
+        let w = symbol_table(
+            f.arena,
+            "<?php
+/** @template T */ class A {}
+/** @template T */ class B {}
+/** @template T */ class C {}
+/** @template T */ class D {}
+/** @template T */ class E {}",
+        );
 
         let d = f.t_named("D");
         let a_and_d = f.t_named_intersected("A", &[d]);
@@ -742,14 +756,27 @@ fn possibly_empty_array_with_uninhabited_value_is_the_empty_container() {
 #[test]
 fn sealed_invariant_generic_with_unsatisfiable_argument_is_uninhabited() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        for class in ["A", "B", "C", "D", "E"] {
-            w.with_templates(class, &[("T", Variance::Invariant)]);
-        }
-
-        w.with_extended("A", "C", vec![well_known::TYPE_MIXED]);
-        w.with_extended("B", "C", vec![well_known::TYPE_MIXED]);
-        w.with_sealed(&mut f.builder, "C", &["A", "B"]);
+        let w = symbol_table(
+            f.arena,
+            "<?php
+/** @template T */ class D {}
+/** @template T */ class E {}
+/**
+ * @template T
+ * @inheritors A|B
+ */
+class C {}
+/**
+ * @template T
+ * @extends C<mixed>
+ */
+class A extends C {}
+/**
+ * @template T
+ * @extends C<mixed>
+ */
+class B extends C {}",
+        );
 
         let zero = f.ui(0);
         let c_zero = f.t_generic_named("C", vec![zero]);
@@ -774,12 +801,19 @@ fn sealed_invariant_generic_with_unsatisfiable_argument_is_uninhabited() {
 #[test]
 fn subtract_list_by_iterable_removes_the_empty_list() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        for class in ["A", "B", "C", "D", "E"] {
-            w.with_templates(class, &[("T", Variance::Invariant)]);
-        }
-
-        w.with_extended("A", "C", vec![well_known::TYPE_MIXED]);
+        let w = symbol_table(
+            f.arena,
+            "<?php
+/** @template T */ class B {}
+/** @template T */ class C {}
+/** @template T */ class D {}
+/** @template T */ class E {}
+/**
+ * @template T
+ * @extends C<mixed>
+ */
+class A extends C {}",
+        );
 
         let int_t = well_known::TYPE_INT;
         let list_int = f.t_list(int_t, false);
@@ -809,15 +843,28 @@ fn subtract_list_by_iterable_removes_the_empty_list() {
 #[test]
 fn partition_holds_for_sealed_class_extending_its_arguments() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        for class in ["A", "B", "C", "D", "E"] {
-            w.with_templates(class, &[("T", Variance::Invariant)]);
-        }
-
-        w.with_extended("C", "E", vec![well_known::TYPE_MIXED]);
-        w.with_extended("A", "C", vec![well_known::TYPE_MIXED]);
-        w.with_extended("B", "C", vec![well_known::TYPE_MIXED]);
-        w.with_sealed(&mut f.builder, "C", &["A", "B"]);
+        let w = symbol_table(
+            f.arena,
+            "<?php
+/** @template T */ class D {}
+/** @template T */ class E {}
+/**
+ * @template T
+ * @extends E<mixed>
+ * @inheritors A|B
+ */
+class C extends E {}
+/**
+ * @template T
+ * @extends C<mixed>
+ */
+class A extends C {}
+/**
+ * @template T
+ * @extends C<mixed>
+ */
+class B extends C {}",
+        );
 
         let e = f.t_named("E");
         let c_and_e = f.t_named_intersected("C", &[e]);

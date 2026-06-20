@@ -91,9 +91,7 @@ fn resolves_collisions_by_origin_priority() {
 }
 
 #[test]
-fn flattens_inherited_members_queryable_through_world() {
-    use mago_oracle::world::World;
-
+fn flattens_inherited_members_queryable_through_symbols() {
     let sources = [(
         Origin::Project,
         "<?php
@@ -137,8 +135,6 @@ fn flattens_inherited_members_queryable_through_world() {
 
 #[test]
 fn flattens_trait_methods_into_users() {
-    use mago_oracle::world::World;
-
     let sources = [(
         Origin::Project,
         "<?php
@@ -188,7 +184,6 @@ fn records_override_edges() {
 #[test]
 fn bridges_native_member_types() {
     use mago_oracle::ty::well_known;
-    use mago_oracle::world::World;
 
     let sources = [(Origin::Project, "<?php class Box { public int $value = 0; const LIMIT = 1; }")];
 
@@ -208,8 +203,6 @@ fn bridges_native_member_types() {
 
 #[test]
 fn lowers_template_parameters() {
-    use mago_oracle::world::World;
-
     let sources = [(
         Origin::Project,
         "<?php
@@ -234,7 +227,6 @@ fn lowers_template_parameters() {
 #[test]
 fn bridges_phpdoc_member_types() {
     use mago_oracle::ty::well_known;
-    use mago_oracle::world::World;
 
     let sources = [(
         Origin::Project,
@@ -259,7 +251,6 @@ fn bridges_phpdoc_member_types() {
 #[test]
 fn bridges_structured_phpdoc_types_faithfully() {
     use mago_oracle::ty::AtomKind;
-    use mago_oracle::world::World;
 
     let sources = [(
         Origin::Project,
@@ -317,7 +308,6 @@ fn bridges_structured_phpdoc_types_faithfully() {
 fn maps_annotation_tags_to_flags() {
     use mago_oracle::symbol::class_like::ClassLikeSymbol;
     use mago_oracle::symbol::class_like::class::ClassFlag;
-    use mago_oracle::world::World;
 
     let sources = [(
         Origin::Project,
@@ -344,7 +334,6 @@ fn maps_annotation_tags_to_flags() {
 #[test]
 fn resolves_inherited_template_arguments() {
     use mago_oracle::ty::well_known;
-    use mago_oracle::world::World;
 
     let sources = [(
         Origin::Project,
@@ -371,8 +360,6 @@ fn resolves_inherited_template_arguments() {
 
 #[test]
 fn forwards_template_parameters_transitively() {
-    use mago_oracle::world::World;
-
     let sources = [(
         Origin::Project,
         "<?php
@@ -411,8 +398,6 @@ fn forwards_template_parameters_transitively() {
 
 #[test]
 fn records_sealed_inheritors() {
-    use mago_oracle::world::World;
-
     let sources = [(
         Origin::Project,
         "<?php
@@ -439,8 +424,6 @@ fn records_sealed_inheritors() {
 
 #[test]
 fn records_type_aliases() {
-    use mago_oracle::world::World;
-
     let sources = [(
         Origin::Project,
         "<?php
@@ -460,7 +443,6 @@ fn records_type_aliases() {
 #[test]
 fn synthesizes_virtual_members() {
     use mago_oracle::symbol::class_like::ClassLikeSymbol;
-    use mago_oracle::world::World;
 
     let sources = [(
         Origin::Project,
@@ -488,7 +470,7 @@ fn synthesizes_virtual_members() {
             .find(|method| method.name.id == SymbolId::method(b"Proxy", b"compute"))
             .expect("compute is synthesized");
         assert!(
-            compute.params.iter().any(|parameter| parameter.default_ty.effective().is_some()),
+            compute.params.iter().any(|parameter| parameter.default_ty.effective(true).is_some()),
             "the @method's `int $scale = 2` default value is inferred, not skipped",
         );
     });
@@ -496,8 +478,6 @@ fn synthesizes_virtual_members() {
 
 #[test]
 fn applies_trait_alias_adaptation() {
-    use mago_oracle::world::World;
-
     let sources = [(
         Origin::Project,
         "<?php
@@ -628,7 +608,7 @@ fn lowers_signature_detail_channels() {
             "the assertion is conditional on true"
         );
         assert!(
-            function.params.iter().any(|parameter| parameter.out_ty.effective().is_some()),
+            function.params.iter().any(|parameter| parameter.out_ty.effective(true).is_some()),
             "@param-out int lowered into a parameter's out type",
         );
 
@@ -688,7 +668,7 @@ fn lowers_inferred_and_effect_channels() {
 
     with_link(&sources, |table| {
         let answer = table.get_constant(SymbolId::constant(b"ANSWER")).expect("ANSWER is linked");
-        assert!(answer.ty.effective().is_some(), "the global const value 41 + 1 is inferred");
+        assert!(answer.ty.effective(true).is_some(), "the global const value 41 + 1 is inferred");
 
         let FunctionLikeSymbol::Function(apply) =
             table.get_function_like(SymbolId::function_like(b"apply")).expect("apply is linked")
@@ -697,7 +677,7 @@ fn lowers_inferred_and_effect_channels() {
         };
         assert_eq!(apply.pure_unless_impure_params, &[0], "the $fn parameter (index 0) is pure-unless-callable-impure");
         assert!(
-            apply.params.iter().any(|parameter| parameter.default_ty.effective().is_some()),
+            apply.params.iter().any(|parameter| parameter.default_ty.effective(true).is_some()),
             "the int default value is inferred into the parameter's default type",
         );
 
@@ -714,7 +694,7 @@ fn lowers_inferred_and_effect_channels() {
             .expect("value property is present");
         assert!(!value.hooks.is_empty(), "the value property has a hook");
         assert!(
-            value.hooks.iter().all(|hook| hook.ty.effective().is_some()),
+            value.hooks.iter().all(|hook| hook.ty.effective(true).is_some()),
             "the property hook carries the property type as its return type",
         );
 

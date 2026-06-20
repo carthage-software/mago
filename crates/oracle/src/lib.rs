@@ -9,4 +9,3 @@ pub mod reference;
 pub mod symbol;
 pub mod ty;
 pub mod var;
-pub mod world;

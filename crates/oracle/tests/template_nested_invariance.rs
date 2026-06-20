@@ -3,7 +3,6 @@ mod common;
 use common::*;
 
 use mago_oracle::path::Path;
-use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::template;
 use mago_oracle::ty::template::StandinOptions;
 use mago_oracle::ty::template::TemplateState;
@@ -30,9 +29,8 @@ fn marker_for<'arena>(
 #[test]
 fn invariance_propagates_through_nested_covariant_position() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("Cell", &[("V", Variance::Invariant)]);
-        world.with_templates("Box", &[("T", Variance::Covariant)]);
+        let symbols =
+            symbol_table(f.arena, "<?php /** @template V */ class Cell {} /** @template-covariant T */ class Box {}");
 
         let template = f.t_template("Box", "T");
         let template_type = f.u(template);
@@ -48,7 +46,7 @@ fn invariance_propagates_through_nested_covariant_position() {
 
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
 
         let marked = marker_for(f, &state, "Box", "T");
         let expected = f.name("Cell");
@@ -63,9 +61,10 @@ fn invariance_propagates_through_nested_covariant_position() {
 #[test]
 fn pure_covariant_nesting_records_no_marker() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("Bag", &[("E", Variance::Covariant)]);
-        world.with_templates("Box", &[("T", Variance::Covariant)]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php /** @template-covariant E */ class Bag {} /** @template-covariant T */ class Box {}",
+        );
 
         let template = f.t_template("Box", "T");
         let template_type = f.u(template);
@@ -81,7 +80,7 @@ fn pure_covariant_nesting_records_no_marker() {
 
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
 
         let marked = marker_for(f, &state, "Box", "T");
         assert_eq!(marked, None, "no invariant position is crossed, so the bound must carry no invariant marker");
@@ -91,8 +90,7 @@ fn pure_covariant_nesting_records_no_marker() {
 #[test]
 fn invariance_at_outer_position_marks_direct_template() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("Cell", &[("V", Variance::Invariant)]);
+        let symbols = symbol_table(f.arena, "<?php /** @template V */ class Cell {}");
 
         let template = f.t_template("Cell", "V");
         let template_type = f.u(template);
@@ -103,7 +101,7 @@ fn invariance_at_outer_position_marks_direct_template() {
 
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
 
         let marked = marker_for(f, &state, "Cell", "V");
         let expected = f.name("Cell");

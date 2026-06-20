@@ -83,7 +83,7 @@ impl<'arena, St, Ex> ClassLikeRef<'_, 'arena, St, Ex> {
 /// it picks a winner for every duplicated symbol by [`Origin`] priority, lowers
 /// each winning declaration into its resolved symbol, flattens inheritance onto
 /// each class-like (members, inherited-type lists, generic forwarding), and
-/// precomputes the descendant and namespace indices the [`World`](crate::world::World)
+/// precomputes the descendant and namespace indices the [`SymbolTable`](crate::symbol::SymbolTable)
 /// read API relies on.
 pub fn link<'arena, A, S, St, Ex>(
     arena: &'arena A,

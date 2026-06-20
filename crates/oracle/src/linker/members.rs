@@ -647,7 +647,7 @@ fn annotation_visibility(visibility: Option<HirVisibility>) -> Visibility {
 }
 
 /// The `@var` type annotation declared in a property's docblock, if any.
-fn var_annotation<'arena, I, St, Ex>(
+pub(crate) fn var_annotation<'arena, I, St, Ex>(
     annotation: Option<&ItemAnnotation<'arena, I, St, Ex>>,
 ) -> Option<&'arena TypeAnnotation<'arena>> {
     annotation.and_then(|annotation| annotation.var.first()).map(|variable| variable.type_annotation)

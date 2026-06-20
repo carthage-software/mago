@@ -5,6 +5,7 @@ use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
+use crate::symbol::SymbolTable;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::array::KnownElement;
 use crate::ty::atom::payload::array::ListAtom;
@@ -13,7 +14,6 @@ use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::well_known::TYPE_NEVER;
-use crate::world::World;
 
 /// `list{A0, …, An} \ list{B0, …, Bn}` for two identically-shaped fixed
 /// sealed lists (no tail, all positions required, matching indices and
@@ -32,10 +32,10 @@ use crate::world::World;
 /// together with `meet` to reconstruct the input, so subtract still
 /// partitions. Returns `None` when the two lists are not the identical fixed
 /// shape; the caller then keeps the input unchanged.
-pub(in crate::ty::subtract) fn sealed_list_residue<'scratch, 'arena, S, A, W>(
+pub(in crate::ty::subtract) fn sealed_list_residue<'scratch, 'arena, S, A>(
     input: Atom<'arena>,
     removed: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -44,7 +44,6 @@ pub(in crate::ty::subtract) fn sealed_list_residue<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (Atom::List(input_payload), Atom::List(removed_payload)) = (input, removed) else {
         return false;
@@ -77,7 +76,7 @@ where
                 crate::ty::meet::compute(
                     element.value,
                     removed_elements[position].value,
-                    world,
+                    symbols,
                     options,
                     report,
                     builder,
@@ -86,7 +85,7 @@ where
                 crate::ty::subtract::compute(
                     element.value,
                     removed_elements[position].value,
-                    world,
+                    symbols,
                     options,
                     report,
                     builder,

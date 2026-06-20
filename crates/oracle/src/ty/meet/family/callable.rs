@@ -18,6 +18,7 @@ use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
+use crate::symbol::SymbolTable;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::callable::CallableAtom;
 use crate::ty::atom::payload::callable::Parameter;
@@ -26,12 +27,11 @@ use crate::ty::atom::payload::callable::SignatureFlag;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
-use crate::world::World;
 
-pub(in crate::ty::meet) fn callable_meet<'scratch, 'arena, S, A, W>(
+pub(in crate::ty::meet) fn callable_meet<'scratch, 'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -39,7 +39,6 @@ pub(in crate::ty::meet) fn callable_meet<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (Atom::Callable(CallableAtom::Signature(a_signature)), Atom::Callable(CallableAtom::Signature(b_signature))) =
         (a, b)
@@ -66,11 +65,11 @@ where
     }
 
     let return_type =
-        crate::ty::meet::compute(a_signature.return_type, b_signature.return_type, world, options, report, builder);
+        crate::ty::meet::compute(a_signature.return_type, b_signature.return_type, symbols, options, report, builder);
 
     let throws = match (a_signature.throws, b_signature.throws) {
         (Some(a_throws), Some(b_throws)) => {
-            Some(crate::ty::meet::compute(a_throws, b_throws, world, options, report, builder))
+            Some(crate::ty::meet::compute(a_throws, b_throws, symbols, options, report, builder))
         }
         (Some(throws), None) | (None, Some(throws)) => Some(throws),
         (None, None) => None,

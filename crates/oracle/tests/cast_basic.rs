@@ -12,7 +12,7 @@ use mago_oracle::ty::well_known;
 #[test]
 fn cast_int_literal_to_int_is_lossless_and_preserves() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let input = f.ui(42);
         let r = cast::cast(input, CastTarget::Int, &cb, &mut f.builder);
         assert!(!r.flags.contains(CastFlag::Lossy));
@@ -25,7 +25,7 @@ fn cast_int_literal_to_int_is_lossless_and_preserves() {
 #[test]
 fn cast_float_to_int_is_lossy() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let lit = f.t_lit_float(3.7);
         let input = f.u(lit);
         let r = cast::cast(input, CastTarget::Int, &cb, &mut f.builder);
@@ -39,7 +39,7 @@ fn cast_float_to_int_is_lossy() {
 #[test]
 fn cast_numeric_string_literal_to_int_preserves() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let input = f.us("42");
         let r = cast::cast(input, CastTarget::Int, &cb, &mut f.builder);
         assert!(!r.flags.contains(CastFlag::Lossy));
@@ -51,7 +51,7 @@ fn cast_numeric_string_literal_to_int_preserves() {
 #[test]
 fn cast_non_numeric_string_to_int_is_lossy_zero() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let input = f.us("hello");
         let r = cast::cast(input, CastTarget::Int, &cb, &mut f.builder);
         assert!(r.flags.contains(CastFlag::Lossy));
@@ -63,7 +63,7 @@ fn cast_non_numeric_string_to_int_is_lossy_zero() {
 #[test]
 fn cast_true_to_int_is_one() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let true_atom = f.t_true();
         let input = f.u(true_atom);
         let r = cast::cast(input, CastTarget::Int, &cb, &mut f.builder);
@@ -76,7 +76,7 @@ fn cast_true_to_int_is_one() {
 #[test]
 fn cast_null_to_int_is_zero() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let null = f.null();
         let input = f.u(null);
         let r = cast::cast(input, CastTarget::Int, &cb, &mut f.builder);
@@ -89,7 +89,7 @@ fn cast_null_to_int_is_zero() {
 #[test]
 fn cast_object_to_int_may_throw() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let object = f.t_object_any();
         let input = f.u(object);
         let r = cast::cast(input, CastTarget::Int, &cb, &mut f.builder);
@@ -100,7 +100,7 @@ fn cast_object_to_int_may_throw() {
 #[test]
 fn cast_int_literal_to_string_preserves() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let input = f.ui(42);
         let r = cast::cast(input, CastTarget::String, &cb, &mut f.builder);
         assert!(!r.flags.contains(CastFlag::Lossy));
@@ -112,7 +112,7 @@ fn cast_int_literal_to_string_preserves() {
 #[test]
 fn cast_true_to_string_is_one_literal() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let true_atom = f.t_true();
         let input = f.u(true_atom);
         let r = cast::cast(input, CastTarget::String, &cb, &mut f.builder);
@@ -125,7 +125,7 @@ fn cast_true_to_string_is_one_literal() {
 #[test]
 fn cast_false_to_string_is_empty_literal() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let false_atom = f.t_false();
         let input = f.u(false_atom);
         let r = cast::cast(input, CastTarget::String, &cb, &mut f.builder);
@@ -138,7 +138,7 @@ fn cast_false_to_string_is_empty_literal() {
 #[test]
 fn cast_array_to_string_may_throw() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let empty_array = f.t_empty_array();
         let input = f.u(empty_array);
         let r = cast::cast(input, CastTarget::String, &cb, &mut f.builder);
@@ -149,7 +149,7 @@ fn cast_array_to_string_may_throw() {
 #[test]
 fn cast_falsy_literals_to_bool_collapse_to_false() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let zero = f.t_lit_int(0);
         let empty_string = f.t_lit_string("");
         let zero_string = f.t_lit_string("0");
@@ -167,7 +167,7 @@ fn cast_falsy_literals_to_bool_collapse_to_false() {
 #[test]
 fn cast_truthy_literals_to_bool_collapse_to_true() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let one = f.t_lit_int(1);
         let minus_one = f.t_lit_int(-1);
         let hello = f.t_lit_string("hello");
@@ -184,7 +184,7 @@ fn cast_truthy_literals_to_bool_collapse_to_true() {
 #[test]
 fn cast_object_to_bool_is_always_true() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let object = f.t_object_any();
         let input = f.u(object);
         let r = cast::cast(input, CastTarget::Bool, &cb, &mut f.builder);
@@ -198,7 +198,7 @@ fn cast_object_to_bool_is_always_true() {
 #[test]
 fn cast_general_int_to_bool_widens_to_bool() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let int = f.t_int();
         let input = f.u(int);
         let r = cast::cast(input, CastTarget::Bool, &cb, &mut f.builder);
@@ -209,7 +209,7 @@ fn cast_general_int_to_bool_widens_to_bool() {
 #[test]
 fn cast_int_to_float_is_lossless() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let input = f.ui(42);
         let r = cast::cast(input, CastTarget::Float, &cb, &mut f.builder);
         assert!(!r.flags.contains(CastFlag::Lossy));
@@ -222,7 +222,7 @@ fn cast_int_to_float_is_lossless() {
 #[test]
 fn cast_null_to_array_is_empty_array() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let null = f.null();
         let input = f.u(null);
         let r = cast::cast(input, CastTarget::Array, &cb, &mut f.builder);
@@ -236,7 +236,7 @@ fn cast_null_to_array_is_empty_array() {
 #[test]
 fn cast_int_to_array_is_single_element_list() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let input = f.ui(1);
         let r = cast::cast(input, CastTarget::Array, &cb, &mut f.builder);
         assert!(!r.flags.contains(CastFlag::Lossy), "(array) 1 == [1] loses nothing");
@@ -253,7 +253,7 @@ fn cast_int_to_array_is_single_element_list() {
 #[test]
 fn cast_string_to_array_is_single_element_list() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let input = f.us("hi");
         let r = cast::cast(input, CastTarget::Array, &cb, &mut f.builder);
         assert!(!r.flags.contains(CastFlag::Lossy));
@@ -268,11 +268,10 @@ fn cast_string_to_array_is_single_element_list() {
 #[test]
 fn cast_object_with_tostring_to_string_is_lossless() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_method("Stringy", "__toString");
+        let symbols = symbol_table(f.arena, "<?php class Stringy { public function __toString() {} }");
         let object = f.t_named("Stringy");
         let input = f.u(object);
-        let r = cast::cast(input, CastTarget::String, &world, &mut f.builder);
+        let r = cast::cast(input, CastTarget::String, &symbols, &mut f.builder);
         assert!(!r.flags.contains(CastFlag::MayThrow), "a class with __toString casts cleanly");
         assert!(!r.flags.contains(CastFlag::Lossy));
         assert_eq!(r.ty, well_known::TYPE_STRING);
@@ -282,11 +281,10 @@ fn cast_object_with_tostring_to_string_is_lossless() {
 #[test]
 fn cast_object_without_tostring_to_string_may_throw() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.declare("Plain");
+        let symbols = symbol_table(f.arena, "<?php class Plain {}");
         let object = f.t_named("Plain");
         let input = f.u(object);
-        let r = cast::cast(input, CastTarget::String, &world, &mut f.builder);
+        let r = cast::cast(input, CastTarget::String, &symbols, &mut f.builder);
         assert!(r.flags.contains(CastFlag::MayThrow), "no __toString means the cast may throw");
     });
 }
@@ -294,7 +292,7 @@ fn cast_object_without_tostring_to_string_may_throw() {
 #[test]
 fn cast_has_method_tostring_to_string_is_lossless() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let has_to_string = f.t_has_method("__toString");
         let input = f.u(has_to_string);
         let r = cast::cast(input, CastTarget::String, &cb, &mut f.builder);
@@ -306,7 +304,7 @@ fn cast_has_method_tostring_to_string_is_lossless() {
 #[test]
 fn cast_object_to_object_is_lossless_passthrough() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let foo_atom = f.t_named("Foo");
         let foo = f.u(foo_atom);
         let r = cast::cast(foo, CastTarget::Object, &cb, &mut f.builder);
@@ -318,7 +316,7 @@ fn cast_object_to_object_is_lossless_passthrough() {
 #[test]
 fn cast_int_to_object_is_lossy_stdclass() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let input = f.ui(1);
         let r = cast::cast(input, CastTarget::Object, &cb, &mut f.builder);
         assert!(r.flags.contains(CastFlag::Lossy));
@@ -331,7 +329,7 @@ fn cast_int_to_object_is_lossy_stdclass() {
 #[test]
 fn cast_distributes_over_union_with_worst_classification() {
     fixture(|f| {
-        let cb = empty_world();
+        let cb = empty_symbol_table(f.arena);
         let lit = f.t_lit_int(42);
         let object = f.t_object_any();
         let input = f.u_many(vec![lit, object]);

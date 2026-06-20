@@ -13,18 +13,18 @@
 
 use mago_allocator::Arena;
 
+use crate::symbol::SymbolTable;
 use crate::ty::atom::Atom;
 use crate::ty::atom::payload::generic_parameter::DefiningEntity;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
-use crate::world::World;
 
-pub(in crate::ty::meet) fn generic_parameter_meet<'arena, S, A, W>(
+pub(in crate::ty::meet) fn generic_parameter_meet<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -32,7 +32,6 @@ pub(in crate::ty::meet) fn generic_parameter_meet<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (template, other_constraint) = match (a, b) {
         (Atom::GenericParameter(a_payload), Atom::GenericParameter(b_payload)) => {
@@ -40,10 +39,10 @@ where
                 // Distinct parameters: when one is the same variable as the
                 // other through inheritance forwarding, that one is the
                 // subtype and so the meet. Otherwise they are disjoint.
-                if parameter_forwards(a_payload, b_payload, world) {
+                if parameter_forwards(a_payload, b_payload, symbols) {
                     return Some(a);
                 }
-                if parameter_forwards(b_payload, a_payload, world) {
+                if parameter_forwards(b_payload, a_payload, symbols) {
                     return Some(b);
                 }
 
@@ -58,7 +57,7 @@ where
     };
 
     let new_constraint =
-        crate::ty::meet::compute(template.constraint, other_constraint, world, options, report, builder);
+        crate::ty::meet::compute(template.constraint, other_constraint, symbols, options, report, builder);
     if new_constraint.is_never() {
         return None;
     }
@@ -69,13 +68,13 @@ where
 /// `true` iff `from` is the same variable as `to` through inheritance
 /// forwarding - then `from <: to`, so `from` is their meet.
 #[inline]
-fn parameter_forwards<'arena, W>(
+fn parameter_forwards<'arena, A>(
     from: &GenericParameterAtom<'arena>,
     to: &GenericParameterAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
 ) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     let (DefiningEntity::ClassLike(from_class), DefiningEntity::ClassLike(to_class)) =
         (from.defining_entity, to.defining_entity)
@@ -83,5 +82,5 @@ where
         return false;
     };
 
-    world.template_parameter_forwards_to(from_class.id, from.name, to_class.id, to.name)
+    symbols.template_parameter_forwards_to(from_class.id, from.name, to_class.id, to.name)
 }
