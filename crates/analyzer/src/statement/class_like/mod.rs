@@ -2122,6 +2122,9 @@ fn check_abstract_method_signatures<'ctx, A>(
             continue;
         };
 
+        let overridden_declaring_classes: Vec<Word> =
+            overridden_method_ids.values().map(|id| id.get_class_name()).collect();
+
         for (parent_fqcn, parent_declaring_method_id) in overridden_method_ids {
             let parent_fqcn_str = parent_fqcn.as_ref();
 
@@ -2129,6 +2132,13 @@ fn check_abstract_method_signatures<'ctx, A>(
             let declaring_class_name_str = declaring_class_name.as_ref();
 
             if should_skip_same_method(method_fqcn.as_bytes(), parent_fqcn_str) {
+                continue;
+            }
+
+            if overridden_declaring_classes.iter().any(|other| {
+                *other != declaring_class_name
+                    && context.codebase.is_instance_of(other.as_bytes(), declaring_class_name_str)
+            }) {
                 continue;
             }
 

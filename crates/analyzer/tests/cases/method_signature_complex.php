@@ -43,7 +43,6 @@ class C2 implements I2
 
 // Test 3: Interface + trait with conflicting requirements
 // PHP: No error - mixed type is compatible with both int and string
-// Analyzer: Reports incompatible-method-signature (stricter than PHP)
 interface I3
 {
     public function conflict(int $x): string;
@@ -58,8 +57,7 @@ class C3 implements I3
 {
     use T2;
 
-    // @mago-expect analysis:incompatible-parameter-type
-    // PHP accepts mixed as satisfying both, but analyzer is stricter
+    // OK: `mixed` is contravariantly compatible with both `int` and `string`
     public function conflict(mixed $x): string
     {
         return '';
@@ -82,9 +80,7 @@ abstract class Base2 extends Base1
 
 class Concrete extends Base2
 {
-    public function chain(User $x): void
-    {
-    }
+    public function chain(User $x): void {}
 }
 
 // Test 5: Diamond problem with interfaces
@@ -107,9 +103,7 @@ interface IC extends IA
 class Diamond implements IB, IC
 {
     // OK: All require same signature
-    public function diamond(string $x)
-    {
-    }
+    public function diamond(string $x) {}
 }
 
 // Test 6: Mixed static and instance methods
@@ -124,13 +118,9 @@ interface I4
 class C4 implements I4
 {
     // @mago-expect analysis:incompatible-static-modifier
-    public function staticMethod(): void
-    {
-    } // ERROR: Should be static
+    public function staticMethod(): void {} // ERROR: Should be static
 
-    public function instanceMethod(): void
-    {
-    } // OK
+    public function instanceMethod(): void {} // OK
 }
 
 // Test 7: Optional parameters with type changes
@@ -144,9 +134,7 @@ class C5 implements I5
 {
     // ERROR: Parameter type incompatible even though optional
     // @mago-expect analysis:incompatible-parameter-type
-    public function optional(int $x = 0): void
-    {
-    }
+    public function optional(int $x = 0): void {}
 }
 
 // Test 8: Variadic parameters
@@ -159,18 +147,14 @@ interface I6
 class C6 implements I6
 {
     // OK: Same variadic signature
-    public function variadic(string ...$args): void
-    {
-    }
+    public function variadic(string ...$args): void {}
 }
 
 class C7 implements I6
 {
     // ERROR: Different type for variadic
     // @mago-expect analysis:incompatible-parameter-type
-    public function variadic(int ...$args): void
-    {
-    }
+    public function variadic(int ...$args): void {}
 }
 
 // Test 9: By-reference parameters
@@ -183,9 +167,7 @@ interface I7
 class C8 implements I7
 {
     // OK: Both by-reference
-    public function byRef(array &$data): void
-    {
-    }
+    public function byRef(array &$data): void {}
 }
 
 // Test 10: Method exists in class before trait use
@@ -198,13 +180,9 @@ trait T3
 // @mago-expect analysis:incompatible-parameter-type
 class C9
 {
-    public function preexisting(string $x): void
-    {
-    } // Defined first
+    public function preexisting(string $x): void {} // Defined first
 
     use T3;
 }
 
-class User
-{
-}
+class User {}
