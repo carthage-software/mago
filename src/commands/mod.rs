@@ -31,6 +31,7 @@
 //! - **`analyze`** ([`AnalyzeCommand`]): Perform static analysis
 //! - **`format`** ([`FormatCommand`]): Format PHP code
 //! - **`guard`** ([`GuardCommand`]): Enforce architectural rules
+//! - **`inspect-baseline`** ([`InspectBaselineCommand`]): Visualize a baseline file
 //! - **`cst`** ([`CstCommand`]): Display the abstract syntax tree
 //! - **`self-update`** ([`SelfUpdateCommand`]): Update Mago to the latest version
 //! - **`generate-completions`** ([`GenerateCompletionsCommand`]): Generate shell completions
@@ -63,6 +64,7 @@ use crate::commands::format::FormatCommand;
 use crate::commands::generate_completions::GenerateCompletionsCommand;
 use crate::commands::guard::GuardCommand;
 use crate::commands::init::InitCommand;
+use crate::commands::inspect_baseline::InspectBaselineCommand;
 use crate::commands::lint::LintCommand;
 use crate::commands::list_files::ListFilesCommand;
 use crate::commands::self_update::SelfUpdateCommand;
@@ -77,6 +79,7 @@ pub mod format;
 pub mod generate_completions;
 pub mod guard;
 pub mod init;
+pub mod inspect_baseline;
 pub mod lint;
 pub mod list_files;
 pub mod self_update;
@@ -200,6 +203,15 @@ pub enum MagoCommand {
     /// **Usage**: `mago guard [OPTIONS]`
     #[command(name = "guard")]
     Guard(GuardCommand),
+
+    /// Inspect and visualize a baseline file.
+    ///
+    /// Summarizes the issues recorded in a baseline - by code, by file, or drilling into a
+    /// single code or file - so large baselines are easy to navigate and prioritize.
+    ///
+    /// **Usage**: `mago inspect-baseline [BASELINE] [CODE_OR_FILE] [OPTIONS]`
+    #[command(name = "inspect-baseline")]
+    InspectBaseline(InspectBaselineCommand),
 
     /// Format PHP code according to style settings.
     ///

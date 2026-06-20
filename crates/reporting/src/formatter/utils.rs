@@ -170,6 +170,7 @@ pub fn long_message(issue: &Issue, include_annotations: bool) -> String {
 ///
 /// The URL is constructed by replacing `%file%`, `%line%`, and `%column%` placeholders
 /// in `template` with the provided values.
+#[must_use]
 pub fn osc8_hyperlink(template: &str, abs_path: &str, line: u32, column: u32, display_text: &str) -> String {
     let url = template
         .replace("%file%", &strip_windows_verbatim_prefix(abs_path))

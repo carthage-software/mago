@@ -120,6 +120,51 @@ mago analyze --ignore-baseline
 
 Useful when you want to see issues currently suppressed by the baseline, for example to clean some of them up.
 
+## Inspecting a baseline
+
+A large baseline is thousands of entries across thousands of lines - tedious to read by hand. `mago inspect-baseline` summarises one so you can see, at a glance, which issue codes and which files dominate it.
+
+```sh
+mago inspect-baseline lint-baseline.toml
+```
+
+With no flags it prints a ranked bar chart of issue codes, most frequent first - the quickest way to see what dominates the baseline:
+
+```
+359670 issues across 221 codes
+
+  49543  ██████████████████████████████  mixed-return-statement
+  32167  ███████████████████             mixed-argument
+  31707  ███████████████████             non-existent-property
+  …
+```
+
+The baseline path is optional: when omitted, the one configured in `mago.toml` is used. If several sections configure different baselines, pass the path explicitly.
+
+### Grouping
+
+Use `--group` to expand the summary into per-group charts. Group by `code` to list the files under each code, or by `file` to list the codes under each file:
+
+```sh
+mago inspect-baseline lint-baseline.toml --group code
+mago inspect-baseline lint-baseline.toml --group file
+```
+
+### Drilling into a single code or file
+
+Pass a code or file as a second argument to drill into it. When the argument matches an issue code, the files containing it are listed; otherwise it is treated as a file path (matched as a suffix) and the codes recorded for that file are listed:
+
+```sh
+mago inspect-baseline lint-baseline.toml mixed-argument
+mago inspect-baseline lint-baseline.toml src/Service/PaymentProcessor.php
+```
+
+### Other options
+
+- `--limit N` caps how many entries are shown, both top-level groups and members within each group.
+
+In an interactive terminal, file names are rendered as clickable hyperlinks. The link target follows the [`editor-url`](/guide/configuration/#editor-integration) setting in `mago.toml`, falling back to `file://` so paths open in most editors and terminals.
+
 ## Keeping the baseline tidy
 
 When you fix an issue that was part of the baseline, its entry becomes dead. Mago detects this and warns about stale entries.

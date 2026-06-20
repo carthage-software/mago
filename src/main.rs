@@ -253,6 +253,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         MagoCommand::Cst(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::Analyze(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::Guard(cmd) => cmd.execute(configuration, arguments.colors),
+        MagoCommand::InspectBaseline(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")

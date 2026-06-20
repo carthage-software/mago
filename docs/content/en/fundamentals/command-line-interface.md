@@ -56,6 +56,7 @@ Utility commands:
 | :--- | :--- |
 | [`mago config`](/guide/configuration/) | Print the merged configuration or its JSON Schema. |
 | [`mago init`](/guide/initialization/) | Scaffold a starter `mago.toml`. |
+| [`mago inspect-baseline`](/fundamentals/baseline/#inspecting-a-baseline) | Summarise and visualise a baseline file. |
 | [`mago list-files`](/guide/list-files/) | List the files Mago will process. |
 | [`mago generate-completions`](/guide/generate-completions/) | Print shell completion scripts. |
 | [`mago self-update`](/guide/upgrading/) | Replace the installed binary with a newer release. |
