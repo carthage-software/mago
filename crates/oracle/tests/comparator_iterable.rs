@@ -82,8 +82,8 @@ fn iterable_value_covariance() {
         let literal_type = f.ui(5);
         let literal_iterable = f.t_iterable(int_type, literal_type);
         let general_iterable = f.t_iterable(int_type, int_type);
-        assert!(atomic_is_contained(f, literal_iterable, general_iterable, &empty_world()));
-        assert!(!atomic_is_contained(f, general_iterable, literal_iterable, &empty_world()));
+        assert!(atomic_is_contained(f, literal_iterable, general_iterable, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, general_iterable, literal_iterable, &empty_symbol_table(f.arena)));
     });
 }
 

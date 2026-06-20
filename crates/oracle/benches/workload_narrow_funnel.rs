@@ -22,13 +22,13 @@ use criterion::criterion_group;
 use criterion::criterion_main;
 
 use mago_allocator::LocalArena;
+use mago_oracle::symbol::SymbolTable;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
 use mago_oracle::ty::lattice::LatticeOptions;
 use mago_oracle::ty::lattice::LatticeReport;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::subtract;
-use mago_oracle::world::NullWorld;
 
 mod common;
 
@@ -45,7 +45,7 @@ fn workload(c: &mut Criterion) {
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
     let pool = TypePool::new(SEED, &mut builder);
-    let world = NullWorld;
+    let symbols = SymbolTable::new_in(&arena);
     let options = LatticeOptions::default();
 
     let mut rng = Rng::new(SEED);
@@ -77,7 +77,7 @@ fn workload(c: &mut Criterion) {
                 let outcome = meet::narrow(
                     black_box(inputs[input_index]),
                     black_box(narrowings[narrowing_index]),
-                    &world,
+                    &symbols,
                     options,
                     &mut report,
                     &mut builder,
@@ -98,7 +98,7 @@ fn workload(c: &mut Criterion) {
                 let outcome = subtract::narrow(
                     black_box(inputs[input_index]),
                     black_box(narrowings[narrowing_index]),
-                    &world,
+                    &symbols,
                     options,
                     &mut report,
                     &mut builder,

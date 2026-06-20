@@ -8,12 +8,12 @@
 //! payloads so that, within one arena, structural equality coincides with
 //! pointer equality.
 //!
-//! Lifetimes encode ownership layering: a long-lived "world" arena holds
+//! Lifetimes encode ownership layering: a long-lived shared arena holds
 //! signature types, shorter-lived per-file arenas hold inference results, and
-//! covariance lets file-local types embed `&'world` atoms while the borrow
+//! covariance lets file-local types embed `&'shared` atoms while the borrow
 //! checker rejects the reverse direction.
 //!
-//! The forward direction - world atoms embedding into file types - is plain
+//! The forward direction - shared atoms embedding into file types - is plain
 //! covariance:
 //!
 //! ```
@@ -21,10 +21,10 @@
 //! use mago_oracle::ty::TypeBuilder;
 //! use mago_oracle::ty::well_known;
 //!
-//! let world_arena = LocalArena::new();
-//! let world_scratch = LocalArena::new();
-//! let mut world_builder = TypeBuilder::new(&world_arena, &world_scratch);
-//! let collection = world_builder.object_named(b"Collection");
+//! let shared_arena = LocalArena::new();
+//! let shared_scratch = LocalArena::new();
+//! let mut shared_builder = TypeBuilder::new(&shared_arena, &shared_scratch);
+//! let collection = shared_builder.object_named(b"Collection");
 //!
 //! let file_arena = LocalArena::new();
 //! let file_scratch = LocalArena::new();
@@ -33,7 +33,7 @@
 //! assert_eq!(nullable.to_string(), "Collection|null");
 //! ```
 //!
-//! The reverse - a world type capturing file-arena data that then outlives
+//! The reverse - a shared type capturing file-arena data that then outlives
 //! the file - is a compile error, not a runtime hazard:
 //!
 //! ```compile_fail
@@ -41,9 +41,9 @@
 //! use mago_oracle::ty::Type;
 //! use mago_oracle::ty::TypeBuilder;
 //!
-//! let world_arena = LocalArena::new();
-//! let world_scratch = LocalArena::new();
-//! let mut world_builder = TypeBuilder::new(&world_arena, &world_scratch);
+//! let shared_arena = LocalArena::new();
+//! let shared_scratch = LocalArena::new();
+//! let mut shared_builder = TypeBuilder::new(&shared_arena, &shared_scratch);
 //!
 //! let escaped: Type<'_> = {
 //!     let file_arena = LocalArena::new();
@@ -52,10 +52,10 @@
 //!     let file_local = file_builder.object_named(b"FileLocal");
 //!     let file_type = file_builder.union_of(&[file_local]);
 //!
-//!     world_builder.union_of(file_type.atoms)
+//!     shared_builder.union_of(file_type.atoms)
 //! };
 //!
-//! let still_alive = world_builder.union_of(&[]);
+//! let still_alive = shared_builder.union_of(&[]);
 //! assert_eq!(escaped.atoms.len(), 1);
 //! ```
 
@@ -77,7 +77,6 @@ pub use crate::ty::atom::set::AtomKindSet;
 pub use crate::ty::builder::TypeBuilder;
 pub use crate::ty::builder::union_buffer::UnionBuffer;
 pub use crate::ty::flags::FlowFlag;
-pub use crate::world::World;
 
 pub mod atom;
 pub mod builder;

@@ -20,21 +20,21 @@
 
 use mago_allocator::Arena;
 
+use crate::symbol::SymbolTable;
 use crate::ty::atom::Atom;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::well_known;
-use crate::world::World;
 
 /// `X <: !T` iff `meet(X, T) ≡ ⊥`. The check is by structural
 /// disjointness: if `X` has no value in common with `T`, every
 /// value of `X` lies outside `T`, satisfying the negation.
 #[inline]
-pub fn refines_container_negated<'arena, S, A, W>(
+pub fn refines_container_negated<'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -42,7 +42,6 @@ pub fn refines_container_negated<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Negated(inner) = container else {
         return false;
@@ -50,7 +49,7 @@ where
 
     let input_type = builder.union_of(&[input]);
 
-    crate::ty::meet::compute(input_type, *inner, world, options, report, builder).is_never()
+    crate::ty::meet::compute(input_type, *inner, symbols, options, report, builder).is_never()
 }
 
 /// `!T <: X` iff `mixed \ T <: X` iff `T ∪ X ≡ mixed`.
@@ -59,10 +58,10 @@ where
 /// contravariance to `U <: T`; otherwise we ask `refines(MIXED, T ∪ X)`
 /// and let the recognized partitions drive the answer.
 #[inline]
-pub fn refines_input_negated<'arena, S, A, W>(
+pub fn refines_input_negated<'arena, S, A>(
     input: Atom<'arena>,
     container: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -70,7 +69,6 @@ pub fn refines_input_negated<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if container == well_known::MIXED {
         return true;
@@ -81,12 +79,12 @@ where
     };
 
     if let Atom::Negated(container_inner) = container {
-        return crate::ty::lattice::refines(*container_inner, *input_inner, world, options, report, builder);
+        return crate::ty::lattice::refines(*container_inner, *input_inner, symbols, options, report, builder);
     }
 
     let mut union_atoms = builder.scratch_vec_from_slice(input_inner.atoms);
     union_atoms.push(container);
     let union_type = builder.union_of(&union_atoms);
 
-    crate::ty::lattice::refines(well_known::TYPE_MIXED, union_type, world, options, report, builder)
+    crate::ty::lattice::refines(well_known::TYPE_MIXED, union_type, symbols, options, report, builder)
 }

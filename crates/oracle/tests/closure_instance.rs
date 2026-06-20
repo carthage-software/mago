@@ -1,7 +1,7 @@
 mod common;
 
 use common::assert_subtype;
-use common::empty_world;
+use common::empty_symbol_table;
 use common::fixture;
 use common::is_contained;
 use common::overlaps;
@@ -44,9 +44,9 @@ fn anonymous_callable_signature_is_not_a_closure_instance() {
         let closure_class_atom = f.t_named("Closure");
         let closure_class = f.u(closure_class_atom);
 
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         assert!(
-            !is_contained(f, signature, closure_class, &world),
+            !is_contained(f, signature, closure_class, &symbols),
             "a bare callable(...) signature is not necessarily a \\Closure (could be a string or array)"
         );
     });
@@ -60,8 +60,8 @@ fn bare_callable_is_not_a_closure_instance() {
         let closure_class_atom = f.t_named("Closure");
         let closure_class = f.u(closure_class_atom);
 
-        let world = empty_world();
-        assert!(!is_contained(f, callable, closure_class, &world), "bare `callable` is not a \\Closure instance");
+        let symbols = empty_symbol_table(f.arena);
+        assert!(!is_contained(f, callable, closure_class, &symbols), "bare `callable` is not a \\Closure instance");
     });
 }
 
@@ -73,8 +73,8 @@ fn closure_does_not_refine_unrelated_class() {
         let other_atom = f.t_named("Foo");
         let other = f.u(other_atom);
 
-        let world = empty_world();
-        assert!(!is_contained(f, closure, other, &world), "a closure is not an instance of an unrelated class");
+        let symbols = empty_symbol_table(f.arena);
+        assert!(!is_contained(f, closure, other, &symbols), "a closure is not an instance of an unrelated class");
     });
 }
 
@@ -86,9 +86,9 @@ fn closure_overlaps_closure_class() {
         let closure_class_atom = f.t_named("Closure");
         let closure_class = f.u(closure_class_atom);
 
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         assert!(
-            overlaps(f, closure, closure_class, &world),
+            overlaps(f, closure, closure_class, &symbols),
             "a closure value inhabits both the signature and \\Closure"
         );
     });
@@ -102,12 +102,12 @@ fn meet_of_closure_and_closure_class_keeps_the_signature() {
         let closure_class_atom = f.t_named("Closure");
         let closure_class = f.u(closure_class_atom);
 
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut report = LatticeReport::new();
         let result =
-            meet::compute(closure, closure_class, &world, LatticeOptions::default(), &mut report, &mut f.builder);
+            meet::compute(closure, closure_class, &symbols, LatticeOptions::default(), &mut report, &mut f.builder);
 
-        assert!(is_contained(f, result, closure, &world), "meet should refine the closure signature");
+        assert!(is_contained(f, result, closure, &symbols), "meet should refine the closure signature");
         assert!(!result.is_never(), "a closure and \\Closure are not disjoint");
     });
 }

@@ -4,7 +4,7 @@
 //!   single intersection-bearing object (`Foo & Bar`), choosing the
 //!   canonical-smallest participant as the head.
 //! - Same class, different generic arguments: merge args pointwise
-//!   under the world-declared variance. Invariant args meet (must
+//!   under the declared variance. Invariant args meet (must
 //!   agree); covariant args meet; contravariant args join. If any
 //!   invariant slot meets to `never`, the whole intersection is
 //!   uninhabitable and we return `None`.
@@ -13,6 +13,9 @@ use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 
 use crate::path::Path;
+use crate::symbol::SymbolTable;
+use crate::symbol::class_like::ClassLikeKind;
+use crate::symbol::part::generic::GenericParameter;
 use crate::symbol::part::generic::Variance;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
@@ -20,44 +23,40 @@ use crate::ty::atom::kind::AtomKind;
 use crate::ty::atom::payload::generic_parameter::DefiningEntity;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use crate::ty::atom::payload::object::named::ObjectAtom;
-use crate::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 use crate::ty::builder::TypeBuilder;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::well_known;
-use crate::world::TemplateParameter;
-use crate::world::World;
 
-pub(in crate::ty::meet) fn compose_object_intersection<'scratch, 'arena, S, A, W>(
+pub(in crate::ty::meet) fn compose_object_intersection<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
-    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    let same_class_merged = merge_same_class_participants(&[a, b], world, options, report, builder)?;
-    let reconciled = reconcile_descendant_participants(same_class_merged, world, options, report, builder)?;
+    let same_class_merged = merge_same_class_participants(&[a, b], symbols, options, report, builder)?;
+    let reconciled = reconcile_descendant_participants(same_class_merged, symbols, options, report, builder)?;
 
-    finalize_object_composition(&reconciled, world, builder)
+    finalize_object_composition(&reconciled, symbols, builder)
 }
 
 /// Reconcile pairs of object participants where one nominally
 /// descends the other. The descendant's view of the ancestor (via
-/// `World::inherited_template_argument`) must be compatible with the
+/// `SymbolTable::inherited_template_argument`) must be compatible with the
 /// ancestor's args under the ancestor's variance; if not, the
 /// intersection is uninhabited (`None`). When compatible, the
 /// ancestor is redundant (the descendant is strictly more specific)
 /// and we drop it from the merged list.
 #[inline]
-fn reconcile_descendant_participants<'scratch, 'arena, S, A, W>(
+fn reconcile_descendant_participants<'scratch, 'arena, S, A>(
     mut merged: ScratchVec<'scratch, Atom<'arena>, S>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -65,7 +64,6 @@ fn reconcile_descendant_participants<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let mut keep: ScratchVec<'scratch, bool, S> = builder.scratch_vec_with(merged.len());
     keep.resize(merged.len(), true);
@@ -92,14 +90,14 @@ where
                 continue;
             }
 
-            if !world.descends_from(descendant_payload.name.id, ancestor_payload.name.id) {
+            if !symbols.descends_from(descendant_payload.name.id, ancestor_payload.name.id) {
                 continue;
             }
 
             if !descendant_args_satisfy_ancestor(
                 *descendant_payload,
                 *ancestor_payload,
-                world,
+                symbols,
                 options,
                 report,
                 builder,
@@ -122,9 +120,13 @@ where
 /// ancestor of `class_name`: every instance of `class_name` is also an
 /// instance of the ancestor, so the negation rules them all out.
 #[inline]
-fn negation_excludes_class<'arena, W>(negated_atom: Atom<'arena>, class_name: Path<'_>, world: &W) -> bool
+fn negation_excludes_class<'arena, A>(
+    negated_atom: Atom<'arena>,
+    class_name: Path<'_>,
+    symbols: &SymbolTable<'arena, A>,
+) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     let Atom::Negated(inner) = negated_atom else {
         return false;
@@ -139,19 +141,19 @@ where
             return false;
         };
 
-        world.descends_from(class_name.id, inner_payload.name.id)
+        symbols.descends_from(class_name.id, inner_payload.name.id)
     })
 }
 
-/// Project `descendant`'s view of `ancestor` through the world's
+/// Project `descendant`'s view of `ancestor` through the symbol table's
 /// inherited-template-argument rule and substitute `descendant`'s
 /// actual args, then check each position against `ancestor`'s args
 /// under `ancestor`'s variance.
 #[inline]
-fn descendant_args_satisfy_ancestor<'arena, S, A, W>(
+fn descendant_args_satisfy_ancestor<'arena, S, A>(
     descendant: ObjectAtom<'arena>,
     ancestor: ObjectAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -159,9 +161,8 @@ fn descendant_args_satisfy_ancestor<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    let arity = world.template_parameter_arity(ancestor.name.id);
+    let arity = symbols.template_parameter_arity(ancestor.name.id);
     if arity == 0 {
         return true;
     }
@@ -177,7 +178,14 @@ where
     let descendant_actuals: &[Type<'arena>] = descendant.type_arguments.unwrap_or(&[]);
 
     for (position, &ancestor_arg) in ancestor_args.iter().enumerate() {
-        let Some(inherited) = world.inherited_template_argument(descendant.name.id, ancestor.name.id, position) else {
+        let Some(inherited) = crate::ty::lattice::family::object::resolve_inherited_argument(
+            descendant.name,
+            ancestor.name,
+            position,
+            symbols,
+            builder,
+            16,
+        ) else {
             return true;
         };
 
@@ -186,26 +194,26 @@ where
                 return None;
             }
 
-            let parameter_position = world.template_parameter_index(descendant.name.id, payload.name)?;
+            let parameter_position = symbols.template_parameter_index(descendant.name.id, payload.name)?;
             descendant_actuals.get(parameter_position).copied()
         };
         let substituted = crate::ty::template::substitute(inherited, &resolver, builder);
 
-        let variance = world
+        let variance = symbols
             .template_parameter_at(ancestor.name.id, position)
-            .map(|parameter: TemplateParameter<'arena>| parameter.variance)
+            .map(|parameter: &'arena GenericParameter<'arena>| parameter.variance)
             .unwrap_or_default();
 
         let compatible = match variance {
             Variance::Invariant => {
-                crate::ty::lattice::refines(substituted, ancestor_arg, world, options, report, builder)
-                    && crate::ty::lattice::refines(ancestor_arg, substituted, world, options, report, builder)
+                crate::ty::lattice::refines(substituted, ancestor_arg, symbols, options, report, builder)
+                    && crate::ty::lattice::refines(ancestor_arg, substituted, symbols, options, report, builder)
             }
             Variance::Covariant => {
-                crate::ty::lattice::refines(substituted, ancestor_arg, world, options, report, builder)
+                crate::ty::lattice::refines(substituted, ancestor_arg, symbols, options, report, builder)
             }
             Variance::Contravariant => {
-                crate::ty::lattice::refines(ancestor_arg, substituted, world, options, report, builder)
+                crate::ty::lattice::refines(ancestor_arg, substituted, symbols, options, report, builder)
             }
         };
         if !compatible {
@@ -238,62 +246,65 @@ where
 /// (`HasMethod`, `HasProperty`, `ObjectShape`). An unknown class
 /// might gain the structural feature via a subclass, so the
 /// intersection stays alive. A final class that doesn't satisfy
-/// the structural collapses to `None`. When the world already
+/// the structural collapses to `None`. When the symbol table already
 /// records that a positive class in the intersection has the
 /// method/property, the redundant conjunct is dropped.
-pub(in crate::ty::meet) fn compose_object_with_structural<'scratch, 'arena, S, A, W>(
+pub(in crate::ty::meet) fn compose_object_with_structural<'arena, S, A>(
     object: Atom<'arena>,
     structural: Atom<'arena>,
-    world: &W,
-    builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
+    symbols: &SymbolTable<'arena, A>,
+    builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Object(object_payload) = object else {
         return None;
     };
 
-    if structural_uninhabited_under_finality(&[object_payload.name], structural, world) {
+    if structural_uninhabited_under_finality(&[object_payload.name], structural, symbols) {
         return None;
     }
 
     let drop_as_redundant = matches!(structural.kind(), AtomKind::HasMethod | AtomKind::HasProperty)
-        && class_satisfies_structural(object_payload.name, structural, world);
+        && class_satisfies_structural(object_payload.name, structural, symbols);
     if drop_as_redundant {
         return Some(object);
     }
 
-    finalize_object_composition(&[object, structural], world, builder)
+    finalize_object_composition(&[object, structural], symbols, builder)
 }
 
 /// `final C & HasMethod(m)` is uninhabited when `C` is final and the
-/// world says it lacks `m`: a final class admits no subclass that
+/// the symbol table says it lacks `m`: a final class admits no subclass that
 /// could add the member. The check fires only for nominal classes
-/// the world declares final; open-world classes always keep the
+/// the symbol table declares final; open (non-final) classes always keep the
 /// structural intersection.
 #[inline]
-fn structural_uninhabited_under_finality<'arena, W>(
+fn structural_uninhabited_under_finality<'arena, A>(
     classes: &[Path<'arena>],
     structural: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
 ) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
-    classes.iter().any(|&class| world.is_final(class.id) && !class_satisfies_structural(class, structural, world))
+    classes.iter().any(|&class| symbols.is_final(class.id) && !class_satisfies_structural(class, structural, symbols))
 }
 
 #[inline]
-fn class_satisfies_structural<'arena, W>(class: Path<'_>, structural: Atom<'arena>, world: &W) -> bool
+fn class_satisfies_structural<'arena, A>(
+    class: Path<'_>,
+    structural: Atom<'arena>,
+    symbols: &SymbolTable<'arena, A>,
+) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     match structural {
-        Atom::HasMethod(payload) => world.class_has_method(class.id, payload.method_name),
-        Atom::HasProperty(payload) => world.class_has_property(class.id, payload.property_name),
+        Atom::HasMethod(payload) => symbols.class_has_method(class.id, payload.method_name),
+        Atom::HasProperty(payload) => symbols.class_has_property(class.id, payload.property_name),
         _ => true,
     }
 }
@@ -304,15 +315,14 @@ where
 /// same intersection (the `X & !X` shape), makes the composition
 /// uninhabited.
 #[inline]
-fn finalize_object_composition<'scratch, 'arena, S, A, W>(
+fn finalize_object_composition<'scratch, 'arena, S, A>(
     merged: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let mut object_parts: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
     let mut other_parts: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
@@ -324,7 +334,7 @@ where
         }
     }
 
-    if !single_inheritance_consistent(&object_parts, world, builder) {
+    if !single_inheritance_consistent(&object_parts, symbols, builder) {
         return None;
     }
 
@@ -336,7 +346,7 @@ where
                     continue;
                 };
 
-                if negation_excludes_class(negated, object_payload.name, world) {
+                if negation_excludes_class(negated, object_payload.name, symbols) {
                     return None;
                 }
             }
@@ -353,7 +363,7 @@ where
                 if crate::ty::lattice::refines(
                     positive_type,
                     *negated_inner,
-                    world,
+                    symbols,
                     LatticeOptions::default(),
                     &mut LatticeReport::new(),
                     builder,
@@ -383,18 +393,17 @@ where
 /// possible witness, so it must descend every other class in the
 /// intersection. When that fails, the type is uninhabited and
 /// compose collapses to `None`. Without a final witness we
-/// optimistically allow the composition (PHP's open world might
+/// optimistically allow the composition (PHP's open class set might
 /// supply a common subclass via interfaces / traits).
 #[inline]
-fn single_inheritance_consistent<'scratch, 'arena, S, A, W>(
+fn single_inheritance_consistent<'scratch, 'arena, S, A>(
     objects: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let mut names: ScratchVec<'scratch, Path<'arena>, S> = builder.scratch_vec_with(objects.len());
     names.extend(objects.iter().filter_map(|atom| match atom {
@@ -402,7 +411,7 @@ where
         _ => None,
     }));
     for &final_candidate in &names {
-        if !world.is_final(final_candidate.id) {
+        if !symbols.is_final(final_candidate.id) {
             continue;
         }
 
@@ -411,7 +420,7 @@ where
                 continue;
             }
 
-            if !world.descends_from(final_candidate.id, other.id) && !world.descends_from(other.id, final_candidate.id)
+            if !symbols.descends_from(final_candidate.id, other.id) && !symbols.descends_from(other.id, final_candidate.id)
             {
                 return false;
             }
@@ -419,16 +428,16 @@ where
     }
 
     for (index, &left) in names.iter().enumerate() {
-        if world.class_like_kind(left.id) != Some(ClassLikeKind::Class) {
+        if symbols.class_like_kind(left.id) != Some(ClassLikeKind::Class) {
             continue;
         }
 
         for &right in &names[index + 1..] {
-            if world.class_like_kind(right.id) != Some(ClassLikeKind::Class) {
+            if symbols.class_like_kind(right.id) != Some(ClassLikeKind::Class) {
                 continue;
             }
 
-            if left != right && !world.descends_from(left.id, right.id) && !world.descends_from(right.id, left.id) {
+            if left != right && !symbols.descends_from(left.id, right.id) && !symbols.descends_from(right.id, left.id) {
                 return false;
             }
         }
@@ -438,9 +447,9 @@ where
 }
 
 #[inline]
-fn merge_same_class_participants<'scratch, 'arena, S, A, W>(
+fn merge_same_class_participants<'scratch, 'arena, S, A>(
     participants: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -448,7 +457,6 @@ fn merge_same_class_participants<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let mut out: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(participants.len());
 
@@ -468,7 +476,7 @@ where
                 continue;
             }
 
-            let merged_args = merge_args(*existing, *payload, world, options, report, builder)?;
+            let merged_args = merge_args(*existing, *payload, symbols, options, report, builder)?;
             *slot =
                 builder.object(ObjectAtom { name: payload.name, type_arguments: merged_args, flags: payload.flags });
             absorbed = true;
@@ -493,10 +501,10 @@ where
 /// Both sides are first normalized to exactly `arity` positions
 /// (over-supply truncated, under-supply default-filled).
 #[inline]
-fn merge_args<'scratch, 'arena, S, A, W>(
+fn merge_args<'scratch, 'arena, S, A>(
     a: ObjectAtom<'arena>,
     b: ObjectAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -504,9 +512,8 @@ fn merge_args<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    let arity = world.template_parameter_arity(a.name.id);
+    let arity = symbols.template_parameter_arity(a.name.id);
 
     if arity == 0 {
         return Some(None);
@@ -519,7 +526,7 @@ where
     if a.type_arguments.is_none() || b.type_arguments.is_none() {
         let all_contravariant = (0..arity).all(|index| {
             matches!(
-                world.template_parameter_at(a.name.id, index).map(|parameter| parameter.variance),
+                symbols.template_parameter_at(a.name.id, index).map(|parameter| parameter.variance),
                 Some(Variance::Contravariant)
             )
         });
@@ -542,9 +549,9 @@ where
     let a_supplied: &[Type<'arena>] = a.type_arguments.unwrap_or_default();
     let b_supplied: &[Type<'arena>] = b.type_arguments.unwrap_or_default();
     let fill = |index: usize| -> Type<'arena> {
-        world
+        symbols
             .template_parameter_at(a.name.id, index)
-            .and_then(|parameter| parameter.upper_bound)
+            .map(|parameter| parameter.constraint)
             .unwrap_or(well_known::TYPE_MIXED)
     };
     let mut a_args: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(arity);
@@ -555,12 +562,12 @@ where
     let mut merged: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(arity);
     for (index, (&a_arg, &b_arg)) in a_args.iter().zip(b_args.iter()).enumerate() {
         let variance =
-            world.template_parameter_at(a.name.id, index).map_or(Variance::Invariant, |parameter| parameter.variance);
+            symbols.template_parameter_at(a.name.id, index).map_or(Variance::Invariant, |parameter| parameter.variance);
         let arg = match variance {
-            Variance::Covariant => crate::ty::meet::compute(a_arg, b_arg, world, options, report, builder),
+            Variance::Covariant => crate::ty::meet::compute(a_arg, b_arg, symbols, options, report, builder),
             Variance::Invariant => {
-                let a_refines_b = crate::ty::lattice::refines(a_arg, b_arg, world, options, report, builder);
-                let b_refines_a = crate::ty::lattice::refines(b_arg, a_arg, world, options, report, builder);
+                let a_refines_b = crate::ty::lattice::refines(a_arg, b_arg, symbols, options, report, builder);
+                let b_refines_a = crate::ty::lattice::refines(b_arg, a_arg, symbols, options, report, builder);
                 if !a_refines_b || !b_refines_a {
                     return None;
                 }

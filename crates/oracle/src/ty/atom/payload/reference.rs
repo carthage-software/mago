@@ -13,7 +13,7 @@ use crate::path::Path;
 use crate::ty::Type;
 
 /// `Foo`, `Foo<int>`: an unresolved symbol reference. Expansion resolves it
-/// against the [`World`](crate::world) into a structural type.
+/// against the [`SymbolTable`](crate::symbol) into a structural type.
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SymbolReferenceAtom<'arena> {

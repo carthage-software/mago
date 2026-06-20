@@ -14,7 +14,7 @@
 //! ```ignore
 //! let mut state = TemplateState::new();
 //! let options = StandinOptions::default();
-//! let refined = standin(parameter, argument, &world, &mut state, &options, &mut builder);
+//! let refined = standin(parameter, argument, &symbols, &mut state, &options, &mut builder);
 //! ```
 //!
 //! Repeat for each call-site argument, then run reconciliation on
@@ -25,10 +25,10 @@
 //! - `GenericParameter T` (anywhere in the parameter tree): record a
 //!   bound and emit `T`'s constraint.
 //! - Same-class generic objects: walk type arguments by position, with
-//!   the world-declared variance for each parameter (covariant ⇒
+//!   the declared variance for each parameter (covariant ⇒
 //!   lower bound, contravariant ⇒ upper, invariant ⇒ equality).
 //!   Descendant arguments project through
-//!   [`World::inherited_template_argument`].
+//!   [`SymbolTable::inherited_template_argument`].
 //! - `Reference(C, [τ_i])` (an un-expanded `C<…>` symbol): co-traversed
 //!   identically to a generic object, so a template hidden behind a
 //!   not-yet-resolved symbol is still bound.
@@ -62,6 +62,7 @@ use mago_allocator::Arena;
 use mago_span::Span;
 
 use crate::path::Path;
+use crate::symbol::SymbolTable;
 use crate::symbol::part::generic::Variance;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
@@ -87,7 +88,6 @@ use crate::ty::template::BoundKind;
 use crate::ty::template::StandinOptions;
 use crate::ty::template::TemplateKey;
 use crate::ty::well_known;
-use crate::world::World;
 
 impl StandinOptions {
     #[must_use]
@@ -413,10 +413,10 @@ impl<'arena> TemplateResult<'arena> {
 /// `state` accumulates bounds; reuse one across every parameter of a
 /// call site so reconciliation sees the full set.
 #[inline]
-pub fn standin<'arena, S, A, W>(
+pub fn standin<'arena, S, A>(
     parameter: Type<'arena>,
     argument: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -424,19 +424,18 @@ pub fn standin<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    walk_type(parameter, argument, options.default_variance, 0, None, world, state, options, builder)
+    walk_type(parameter, argument, options.default_variance, 0, None, symbols, state, options, builder)
 }
 
 #[inline]
-fn walk_type<'arena, S, A, W>(
+fn walk_type<'arena, S, A>(
     parameter: Type<'arena>,
     argument: Type<'arena>,
     variance: Variance,
     depth: u32,
     introducing_class: Option<Path<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -444,7 +443,6 @@ fn walk_type<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if parameter == argument {
         return parameter;
@@ -458,7 +456,7 @@ where
 
     for &parameter_atom in parameter.atoms {
         let projected = project_argument(parameter_atom, argument);
-        match walk_atom(parameter_atom, projected, variance, depth, introducing_class, world, state, options, builder) {
+        match walk_atom(parameter_atom, projected, variance, depth, introducing_class, symbols, state, options, builder) {
             Walk::Unchanged => new_atoms.push(parameter_atom),
             Walk::Single(atom) => {
                 changed = true;
@@ -514,13 +512,13 @@ enum Walk<'arena> {
 }
 
 #[inline]
-fn walk_atom<'arena, S, A, W>(
+fn walk_atom<'arena, S, A>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     variance: Variance,
     depth: u32,
     introducing_class: Option<Path<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -528,31 +526,30 @@ fn walk_atom<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match parameter.kind() {
         AtomKind::GenericParameter => {
             walk_generic_parameter(parameter, argument, variance, depth, introducing_class, state, options)
         }
-        AtomKind::Object => walk_object(parameter, argument, introducing_class, depth, world, state, options, builder),
+        AtomKind::Object => walk_object(parameter, argument, introducing_class, depth, symbols, state, options, builder),
         AtomKind::Reference => {
-            walk_reference(parameter, argument, introducing_class, depth, world, state, options, builder)
+            walk_reference(parameter, argument, introducing_class, depth, symbols, state, options, builder)
         }
         AtomKind::ClassLikeString => {
-            walk_class_like_string(parameter, argument, depth, introducing_class, world, state, options, builder)
+            walk_class_like_string(parameter, argument, depth, introducing_class, symbols, state, options, builder)
         }
         AtomKind::ObjectShape => {
-            walk_object_shape(parameter, argument, depth, introducing_class, world, state, options, builder)
+            walk_object_shape(parameter, argument, depth, introducing_class, symbols, state, options, builder)
         }
-        AtomKind::List => walk_list(parameter, argument, depth, introducing_class, world, state, options, builder),
+        AtomKind::List => walk_list(parameter, argument, depth, introducing_class, symbols, state, options, builder),
         AtomKind::Array => {
-            walk_keyed_array(parameter, argument, depth, introducing_class, world, state, options, builder)
+            walk_keyed_array(parameter, argument, depth, introducing_class, symbols, state, options, builder)
         }
         AtomKind::Iterable => {
-            walk_iterable(parameter, argument, depth, introducing_class, world, state, options, builder)
+            walk_iterable(parameter, argument, depth, introducing_class, symbols, state, options, builder)
         }
         AtomKind::Callable => {
-            walk_callable(parameter, argument, depth, introducing_class, world, state, options, builder)
+            walk_callable(parameter, argument, depth, introducing_class, symbols, state, options, builder)
         }
         _ => Walk::Unchanged,
     }
@@ -606,16 +603,16 @@ fn walk_generic_parameter<'arena>(
 /// `Object(C, [τ_i])` against an argument that resolves to a class in
 /// `C`'s closure. Same-class arguments walk by position; descendant
 /// arguments (`D <: C`) project through
-/// [`World::inherited_template_argument`] and then substitute `D`'s
+/// [`SymbolTable::inherited_template_argument`] and then substitute `D`'s
 /// actual type arguments to recover the type `D` passes for `C`'s
 /// `i`-th slot. The variance comes from `C`'s declaration, not `D`'s.
 #[inline]
-fn walk_object<'arena, S, A, W>(
+fn walk_object<'arena, S, A>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     introducing_class: Option<Path<'arena>>,
     depth: u32,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -623,7 +620,6 @@ fn walk_object<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Object(parameter_object) = parameter else {
         return Walk::Unchanged;
@@ -638,7 +634,7 @@ where
         argument,
         introducing_class,
         depth,
-        world,
+        symbols,
         state,
         options,
         builder,
@@ -657,12 +653,12 @@ where
 /// structural object. Rebuilds a `Reference` so the un-expanded form is
 /// preserved.
 #[inline]
-fn walk_reference<'arena, S, A, W>(
+fn walk_reference<'arena, S, A>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     introducing_class: Option<Path<'arena>>,
     depth: u32,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -670,7 +666,6 @@ fn walk_reference<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Reference(parameter_reference) = parameter else {
         return Walk::Unchanged;
@@ -685,7 +680,7 @@ where
         argument,
         introducing_class,
         depth,
-        world,
+        symbols,
         state,
         options,
         builder,
@@ -725,13 +720,13 @@ fn named_generic_view(atom: Atom<'_>) -> Option<NamedGenericView<'_>> {
 /// [`walk_reference`]. Returns the refined argument list, or `None` when no
 /// argument atom names `container_name` (or a descendant) or nothing changed.
 #[inline]
-fn refine_named_generic_arguments<'arena, S, A, W>(
+fn refine_named_generic_arguments<'arena, S, A>(
     container_name: Path<'arena>,
     parameter_arguments: &'arena [Type<'arena>],
     argument: Type<'arena>,
     introducing_class: Option<Path<'arena>>,
     depth: u32,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -739,18 +734,17 @@ fn refine_named_generic_arguments<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let argument_view = argument.atoms.iter().copied().find_map(|atom| {
         named_generic_view(atom)
-            .filter(|view| view.name == container_name || world.descends_from(view.name.id, container_name.id))
+            .filter(|view| view.name == container_name || symbols.descends_from(view.name.id, container_name.id))
     })?;
 
     let mut new_arguments: Vec<Type<'arena>> = Vec::with_capacity(parameter_arguments.len());
     let mut changed = false;
     for (position, &parameter_argument) in parameter_arguments.iter().enumerate() {
-        let projected = projected_named_argument(container_name, argument_view, position, world, builder);
-        let position_variance = world
+        let projected = projected_named_argument(container_name, argument_view, position, symbols, builder);
+        let position_variance = symbols
             .template_parameter_at(container_name.id, position)
             .map_or(Variance::Invariant, |template_parameter| template_parameter.variance);
         let nested_introducing_class = match position_variance {
@@ -764,7 +758,7 @@ where
                 position_variance,
                 depth + 1,
                 nested_introducing_class,
-                world,
+                symbols,
                 state,
                 options,
                 builder,
@@ -783,27 +777,26 @@ where
 /// Pick the type the argument passes to `container_class`'s
 /// `position`-th type parameter. For same-class arguments that's just
 /// `argument.type_arguments[position]`. For descendant arguments it
-/// goes through [`World::inherited_template_argument`] and substitutes
+/// goes through [`SymbolTable::inherited_template_argument`] and substitutes
 /// the argument's own template arguments into the inherited expression.
 #[inline]
-fn projected_named_argument<'arena, S, A, W>(
+fn projected_named_argument<'arena, S, A>(
     container_class: Path<'arena>,
     argument_view: NamedGenericView<'arena>,
     position: usize,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Option<Type<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if argument_view.name == container_class {
         let type_arguments = argument_view.type_arguments?;
         return type_arguments.get(position).copied();
     }
 
-    let inherited = world.inherited_template_argument(argument_view.name.id, container_class.id, position)?;
+    let inherited = symbols.inherited_template_argument(argument_view.name.id, container_class.id, position)?;
 
     let actual_arguments: &[Type<'arena>] = argument_view.type_arguments.unwrap_or_default();
     let argument_entity = DefiningEntity::ClassLike(argument_view.name);
@@ -814,7 +807,7 @@ where
             if payload.defining_entity != argument_entity {
                 return None;
             }
-            let parameter_position = world.template_parameter_index(argument_view.name.id, payload.name)?;
+            let parameter_position = symbols.template_parameter_index(argument_view.name.id, payload.name)?;
             actual_arguments.get(parameter_position).copied()
         },
         builder,
@@ -827,12 +820,12 @@ where
 /// `Foo::class` binds `T` to `Foo`. The match is covariant
 /// (`class-string<X> <: class-string<Y>` when `X <: Y`).
 #[inline]
-fn walk_class_like_string<'arena, S, A, W>(
+fn walk_class_like_string<'arena, S, A>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
     introducing_class: Option<Path<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -840,7 +833,6 @@ fn walk_class_like_string<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::ClassLikeString(parameter_class_string) = parameter else {
         return Walk::Unchanged;
@@ -866,7 +858,7 @@ where
         Variance::Covariant,
         depth + 1,
         introducing_class,
-        world,
+        symbols,
         state,
         options,
         builder,
@@ -913,12 +905,12 @@ where
 /// against the argument property of the same name, covariantly - mirroring
 /// keyed-array known-item co-traversal.
 #[inline]
-fn walk_object_shape<'arena, S, A, W>(
+fn walk_object_shape<'arena, S, A>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
     introducing_class: Option<Path<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -926,7 +918,6 @@ fn walk_object_shape<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::ObjectShape(parameter_shape) = parameter else {
         return Walk::Unchanged;
@@ -955,7 +946,7 @@ where
                 Variance::Covariant,
                 depth + 1,
                 introducing_class,
-                world,
+                symbols,
                 state,
                 options,
                 builder,
@@ -980,12 +971,12 @@ where
 /// covariantly. The element type's variance is treated as covariant
 /// for inference: covariant positions accumulate lower bounds.
 #[inline]
-fn walk_list<'arena, S, A, W>(
+fn walk_list<'arena, S, A>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
     introducing_class: Option<Path<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -993,7 +984,6 @@ fn walk_list<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::List(parameter_list) = parameter else {
         return Walk::Unchanged;
@@ -1015,7 +1005,7 @@ where
         Variance::Covariant,
         depth + 1,
         introducing_class,
-        world,
+        symbols,
         state,
         options,
         builder,
@@ -1030,12 +1020,12 @@ where
 /// `Iterable(τ_K, τ_V)` against `Iterable(σ_K, σ_V)` or `List(σ)`
 /// (which exposes `int` keys and `σ` values).
 #[inline]
-fn walk_iterable<'arena, S, A, W>(
+fn walk_iterable<'arena, S, A>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
     introducing_class: Option<Path<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -1043,7 +1033,6 @@ fn walk_iterable<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Iterable(parameter_iterable) = parameter else {
         return Walk::Unchanged;
@@ -1065,7 +1054,7 @@ where
         Variance::Covariant,
         depth + 1,
         introducing_class,
-        world,
+        symbols,
         state,
         options,
         builder,
@@ -1076,7 +1065,7 @@ where
         Variance::Covariant,
         depth + 1,
         introducing_class,
-        world,
+        symbols,
         state,
         options,
         builder,
@@ -1095,12 +1084,12 @@ where
 /// key/value to `τ_K` / `τ_V` only - known-item entries don't have a
 /// corresponding projection.
 #[inline]
-fn walk_keyed_array<'arena, S, A, W>(
+fn walk_keyed_array<'arena, S, A>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
     introducing_class: Option<Path<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -1108,7 +1097,6 @@ fn walk_keyed_array<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Array(parameter_array) = parameter else {
         return Walk::Unchanged;
@@ -1138,7 +1126,7 @@ where
             Variance::Covariant,
             depth + 1,
             introducing_class,
-            world,
+            symbols,
             state,
             options,
             builder,
@@ -1152,7 +1140,7 @@ where
             Variance::Covariant,
             depth + 1,
             introducing_class,
-            world,
+            symbols,
             state,
             options,
             builder,
@@ -1176,7 +1164,7 @@ where
                     Variance::Covariant,
                     depth + 1,
                     introducing_class,
-                    world,
+                    symbols,
                     state,
                     options,
                     builder,
@@ -1216,12 +1204,12 @@ struct KeyedProjection<'arena> {
 /// types pointwise contravariantly and the return type covariantly.
 /// Aliases and `Any` callables pass through.
 #[inline]
-fn walk_callable<'arena, S, A, W>(
+fn walk_callable<'arena, S, A>(
     parameter: Atom<'arena>,
     argument: Type<'arena>,
     depth: u32,
     introducing_class: Option<Path<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     state: &mut TemplateState<'arena>,
     options: &StandinOptions,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -1229,7 +1217,6 @@ fn walk_callable<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Callable(parameter_callable) = parameter else {
         return Walk::Unchanged;
@@ -1254,7 +1241,7 @@ where
         Variance::Covariant,
         depth + 1,
         introducing_class,
-        world,
+        symbols,
         state,
         options,
         builder,
@@ -1273,7 +1260,7 @@ where
                     Variance::Contravariant,
                     depth + 1,
                     introducing_class,
-                    world,
+                    symbols,
                     state,
                     options,
                     builder,

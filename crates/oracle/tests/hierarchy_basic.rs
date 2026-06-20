@@ -2,28 +2,30 @@ mod common;
 
 use common::*;
 
+use std::fmt::Write as _;
+
 use mago_oracle::path::Path;
-use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::hierarchy::Hierarchy;
 use mago_oracle::ty::hierarchy::HierarchyBuilder;
 
-fn build_with_template_world<'arena>(
+fn build_with_template_symbols<'arena>(
     f: &mut Fixture<'_, 'arena>,
     edges: &[(&'static str, &'static str, Vec<Type<'arena>>)],
     templates: &[(&'static str, &'static str)],
 ) -> Hierarchy<'arena> {
-    let mut world = MockWorld::new();
+    let mut source = String::from("<?php");
     for (class, template) in templates {
-        world.with_templates(class, &[(*template, Variance::Invariant)]);
+        let _ = write!(source, " /** @template {template} */ class {class} {{}}");
     }
+    let symbols = symbol_table(f.arena, &source);
     let mut hierarchy_builder = HierarchyBuilder::new();
     for (child, parent, arguments) in edges {
         let child = f.name(child);
         let parent = f.name(parent);
         hierarchy_builder.add_edge(child, parent, arguments.clone());
     }
-    hierarchy_builder.build(&world, &mut f.builder)
+    hierarchy_builder.build(&symbols, &mut f.builder)
 }
 
 #[test]
@@ -31,7 +33,7 @@ fn direct_edge_returns_registered_args() {
     fixture(|f| {
         let string = f.t_string();
         let string_type = f.u(string);
-        let hierarchy = build_with_template_world(f, &[("B", "A", vec![string_type])], &[("A", "T")]);
+        let hierarchy = build_with_template_symbols(f, &[("B", "A", vec![string_type])], &[("A", "T")]);
         let child = f.name("B");
         let ancestor = f.name("A");
         assert_eq!(hierarchy.arg(child, ancestor, 0), Some(string_type));
@@ -43,7 +45,7 @@ fn missing_pair_returns_none() {
     fixture(|f| {
         let string = f.t_string();
         let string_type = f.u(string);
-        let hierarchy = build_with_template_world(f, &[("B", "A", vec![string_type])], &[("A", "T")]);
+        let hierarchy = build_with_template_symbols(f, &[("B", "A", vec![string_type])], &[("A", "T")]);
         let child = f.name("B");
         let other = f.name("Other");
         let foo = f.name("Foo");
@@ -56,8 +58,7 @@ fn missing_pair_returns_none() {
 #[test]
 fn transitive_two_step_concrete_args_compose() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("A", &[("T", Variance::Invariant)]);
+        let symbols = symbol_table(f.arena, "<?php /** @template T */ class A {}");
 
         let string = f.t_string();
         let string_type = f.u(string);
@@ -68,7 +69,7 @@ fn transitive_two_step_concrete_args_compose() {
         let mut hierarchy_builder = HierarchyBuilder::new();
         hierarchy_builder.add_edge(child_b, ancestor, vec![string_type]);
         hierarchy_builder.add_edge(child_c, child_b, vec![]);
-        let hierarchy = hierarchy_builder.build(&world, &mut f.builder);
+        let hierarchy = hierarchy_builder.build(&symbols, &mut f.builder);
 
         assert_eq!(hierarchy.arg(child_c, ancestor, 0), Some(string_type));
     });
@@ -77,10 +78,10 @@ fn transitive_two_step_concrete_args_compose() {
 #[test]
 fn transitive_two_step_template_threading() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("A", &[("T", Variance::Invariant)]);
-        world.with_templates("B", &[("U", Variance::Invariant)]);
-        world.with_templates("C", &[("V", Variance::Invariant)]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php /** @template T */ class A {} /** @template U */ class B {} /** @template V */ class C {}",
+        );
 
         let b_u = f.t_template("B", "U");
         let b_template = f.u(b_u);
@@ -94,7 +95,7 @@ fn transitive_two_step_template_threading() {
         let mut hierarchy_builder = HierarchyBuilder::new();
         hierarchy_builder.add_edge(child_b, ancestor, vec![b_template]);
         hierarchy_builder.add_edge(child_c, child_b, vec![c_template]);
-        let hierarchy = hierarchy_builder.build(&world, &mut f.builder);
+        let hierarchy = hierarchy_builder.build(&symbols, &mut f.builder);
 
         assert_eq!(hierarchy.arg(child_c, ancestor, 0), Some(c_template), "C passes its own V through to A");
     });
@@ -103,10 +104,10 @@ fn transitive_two_step_template_threading() {
 #[test]
 fn transitive_three_step_chain() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("A", &[("T", Variance::Invariant)]);
-        world.with_templates("B", &[("U", Variance::Invariant)]);
-        world.with_templates("C", &[("V", Variance::Invariant)]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php /** @template T */ class A {} /** @template U */ class B {} /** @template V */ class C {}",
+        );
 
         let b_u = f.t_template("B", "U");
         let b_template = f.u(b_u);
@@ -124,7 +125,7 @@ fn transitive_three_step_chain() {
         hierarchy_builder.add_edge(child_b, ancestor, vec![b_template]);
         hierarchy_builder.add_edge(child_c, child_b, vec![c_template]);
         hierarchy_builder.add_edge(child_d, child_c, vec![int_type]);
-        let hierarchy = hierarchy_builder.build(&world, &mut f.builder);
+        let hierarchy = hierarchy_builder.build(&symbols, &mut f.builder);
 
         assert_eq!(hierarchy.arg(child_d, ancestor, 0), Some(int_type));
         assert_eq!(hierarchy.arg(child_d, child_b, 0), Some(int_type));
@@ -135,10 +136,10 @@ fn transitive_three_step_chain() {
 #[test]
 fn nested_template_in_parent_args_substitutes() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("A", &[("T", Variance::Invariant)]);
-        world.with_templates("B", &[("U", Variance::Invariant)]);
-        world.with_templates("C", &[("V", Variance::Invariant)]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php /** @template T */ class A {} /** @template U */ class B {} /** @template V */ class C {}",
+        );
 
         let b_u = f.t_template("B", "U");
         let b_u_type = f.u(b_u);
@@ -156,7 +157,7 @@ fn nested_template_in_parent_args_substitutes() {
         let mut hierarchy_builder = HierarchyBuilder::new();
         hierarchy_builder.add_edge(child_b, ancestor, vec![list_of_b_u]);
         hierarchy_builder.add_edge(child_c, child_b, vec![c_v_type]);
-        let hierarchy = hierarchy_builder.build(&world, &mut f.builder);
+        let hierarchy = hierarchy_builder.build(&symbols, &mut f.builder);
 
         assert_eq!(hierarchy.arg(child_c, ancestor, 0), Some(list_of_c_v), "C composes to passing list<V> to A");
     });
@@ -165,8 +166,15 @@ fn nested_template_in_parent_args_substitutes() {
 #[test]
 fn args_returns_full_slice() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("A", &[("T", Variance::Invariant), ("U", Variance::Invariant)]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php
+/**
+ * @template T
+ * @template U
+ */
+class A {}",
+        );
 
         let string = f.t_string();
         let string_type = f.u(string);
@@ -178,7 +186,7 @@ fn args_returns_full_slice() {
 
         let mut hierarchy_builder = HierarchyBuilder::new();
         hierarchy_builder.add_edge(child, ancestor, vec![string_type, int_type]);
-        let hierarchy = hierarchy_builder.build(&world, &mut f.builder);
+        let hierarchy = hierarchy_builder.build(&symbols, &mut f.builder);
 
         let Some(arguments) = hierarchy.args(child, ancestor) else { panic!("B must record arguments for A") };
         assert_eq!(arguments, &[string_type, int_type]);
@@ -188,8 +196,7 @@ fn args_returns_full_slice() {
 #[test]
 fn iter_yields_every_pair() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("A", &[("T", Variance::Invariant)]);
+        let symbols = symbol_table(f.arena, "<?php /** @template T */ class A {}");
 
         let int = f.t_int();
         let int_type = f.u(int);
@@ -201,7 +208,7 @@ fn iter_yields_every_pair() {
         let mut hierarchy_builder = HierarchyBuilder::new();
         hierarchy_builder.add_edge(child_b, ancestor, vec![int_type]);
         hierarchy_builder.add_edge(child_c, child_b, vec![]);
-        let hierarchy = hierarchy_builder.build(&world, &mut f.builder);
+        let hierarchy = hierarchy_builder.build(&symbols, &mut f.builder);
 
         let pairs: Vec<(Path<'_>, Path<'_>)> = hierarchy.iter().map(|(pair, _)| pair).collect();
         assert!(pairs.contains(&(child_b, ancestor)));
@@ -213,8 +220,7 @@ fn iter_yields_every_pair() {
 #[test]
 fn last_added_edge_wins_on_duplicate() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("A", &[("T", Variance::Invariant)]);
+        let symbols = symbol_table(f.arena, "<?php /** @template T */ class A {}");
 
         let int = f.t_int();
         let int_type = f.u(int);
@@ -227,7 +233,7 @@ fn last_added_edge_wins_on_duplicate() {
         let mut hierarchy_builder = HierarchyBuilder::new();
         hierarchy_builder.add_edge(child, ancestor, vec![int_type]);
         hierarchy_builder.add_edge(child, ancestor, vec![string_type]);
-        let hierarchy = hierarchy_builder.build(&world, &mut f.builder);
+        let hierarchy = hierarchy_builder.build(&symbols, &mut f.builder);
 
         assert_eq!(hierarchy.arg(child, ancestor, 0), Some(string_type));
     });

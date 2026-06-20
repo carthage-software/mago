@@ -28,6 +28,8 @@ use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
 use crate::path::Path;
+use crate::symbol::SymbolTable;
+use crate::symbol::class_like::ClassLikeKind;
 use crate::symbol::part::generic::Variance;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
@@ -40,7 +42,6 @@ use crate::ty::atom::payload::callable::CallableAtom;
 use crate::ty::atom::payload::generic_parameter::DefiningEntity;
 use crate::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use crate::ty::atom::payload::object::named::ObjectAtom;
-use crate::ty::atom::payload::scalar::class_like_string::ClassLikeKind;
 use crate::ty::atom::payload::scalar::int::IntAtom;
 use crate::ty::atom::payload::scalar::mixed::MixedAtom;
 use crate::ty::atom::payload::scalar::mixed::Truthiness;
@@ -63,13 +64,12 @@ use crate::ty::well_known::STRING;
 use crate::ty::well_known::TYPE_ARRAY_KEY;
 use crate::ty::well_known::TYPE_INT;
 use crate::ty::well_known::TYPE_MIXED;
-use crate::world::World;
 
 #[inline]
-pub fn overlaps<'arena, S, A, W>(
+pub fn overlaps<'arena, S, A>(
     a: Type<'arena>,
     b: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -77,11 +77,10 @@ pub fn overlaps<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     a.atoms
         .iter()
-        .any(|a_atom| b.atoms.iter().any(|b_atom| atom_overlaps(*a_atom, *b_atom, world, options, report, builder)))
+        .any(|a_atom| b.atoms.iter().any(|b_atom| atom_overlaps(*a_atom, *b_atom, symbols, options, report, builder)))
 }
 
 /// Pairwise overlap over single atoms, applying the module-level rule
@@ -96,10 +95,10 @@ where
 /// `iterable` pairs always overlap: the empty iterator (`[]`, the empty
 /// generator, …) inhabits `iterable<K, V>` for every `K`, `V`.
 #[inline]
-fn atom_overlaps<'arena, S, A, W>(
+fn atom_overlaps<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -107,13 +106,12 @@ fn atom_overlaps<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if a == NEVER || b == NEVER {
         return false;
     }
 
-    if is_uninhabited(a, world, builder) || is_uninhabited(b, world, builder) {
+    if is_uninhabited(a, symbols, builder) || is_uninhabited(b, symbols, builder) {
         return false;
     }
 
@@ -127,8 +125,8 @@ where
 
     if let (Atom::GenericParameter(a_payload), Atom::GenericParameter(b_payload)) = (a, b) {
         let same = a_payload.name == b_payload.name && a_payload.defining_entity == b_payload.defining_entity;
-        if same || generic_parameters_forward(a_payload, b_payload, world) {
-            return overlaps(a_payload.constraint, b_payload.constraint, world, options, report, builder);
+        if same || generic_parameters_forward(a_payload, b_payload, symbols) {
+            return overlaps(a_payload.constraint, b_payload.constraint, symbols, options, report, builder);
         }
 
         return false;
@@ -136,31 +134,31 @@ where
 
     if let Atom::GenericParameter(payload) = a {
         let other = builder.union_of(&[b]);
-        return overlaps(payload.constraint, other, world, options, report, builder);
+        return overlaps(payload.constraint, other, symbols, options, report, builder);
     }
 
     if let Atom::GenericParameter(payload) = b {
         let other = builder.union_of(&[a]);
-        return overlaps(payload.constraint, other, world, options, report, builder);
+        return overlaps(payload.constraint, other, symbols, options, report, builder);
     }
 
     match (a, b) {
         (Atom::Negated(_), Atom::Negated(_)) => return true,
         (Atom::Negated(inner), other) | (other, Atom::Negated(inner)) => {
             let other_type = builder.union_of(&[other]);
-            let surviving = crate::ty::subtract::compute(other_type, *inner, world, options, report, builder);
+            let surviving = crate::ty::subtract::compute(other_type, *inner, symbols, options, report, builder);
             return !surviving.is_never();
         }
         _ => {}
     }
 
     if let Atom::Intersected(payload) = a {
-        if !atom_overlaps(*payload.head, b, world, options, report, builder) {
+        if !atom_overlaps(*payload.head, b, symbols, options, report, builder) {
             return false;
         }
 
         for &conjunct in payload.conjuncts {
-            if !atom_overlaps(conjunct, b, world, options, report, builder) {
+            if !atom_overlaps(conjunct, b, symbols, options, report, builder) {
                 return false;
             }
         }
@@ -169,12 +167,12 @@ where
     }
 
     if let Atom::Intersected(payload) = b {
-        if !atom_overlaps(a, *payload.head, world, options, report, builder) {
+        if !atom_overlaps(a, *payload.head, symbols, options, report, builder) {
             return false;
         }
 
         for &conjunct in payload.conjuncts {
-            if !atom_overlaps(a, conjunct, world, options, report, builder) {
+            if !atom_overlaps(a, conjunct, symbols, options, report, builder) {
                 return false;
             }
         }
@@ -182,32 +180,32 @@ where
         return true;
     }
 
-    if (atom_is_empty_container(a, world, builder) && atom_admits_empty_container(b))
-        || (atom_is_empty_container(b, world, builder) && atom_admits_empty_container(a))
+    if (atom_is_empty_container(a, symbols, builder) && atom_admits_empty_container(b))
+        || (atom_is_empty_container(b, symbols, builder) && atom_admits_empty_container(a))
     {
         return true;
     }
 
     if a.kind() == AtomKind::Object && b.kind() == AtomKind::Object {
-        return object_overlap(a, b, world, options, report, builder);
+        return object_overlap(a, b, symbols, options, report, builder);
     }
 
     if a.kind() == AtomKind::String && b.kind() == AtomKind::String {
-        return string_overlap(a, b, world, options, report, builder);
+        return string_overlap(a, b, symbols, options, report, builder);
     }
 
     if a.kind() == AtomKind::List && b.kind() == AtomKind::List {
-        return list_overlap(a, b, world, options, report, builder);
+        return list_overlap(a, b, symbols, options, report, builder);
     }
 
     if a.kind() == AtomKind::Array && b.kind() == AtomKind::Array {
-        return array_overlap(a, b, world, options, report, builder);
+        return array_overlap(a, b, symbols, options, report, builder);
     }
 
     if (a.kind() == AtomKind::List && b.kind() == AtomKind::Array)
         || (a.kind() == AtomKind::Array && b.kind() == AtomKind::List)
     {
-        return list_array_overlap(a, b, world, options, report, builder);
+        return list_array_overlap(a, b, symbols, options, report, builder);
     }
 
     if a.kind() == AtomKind::Callable && b.kind() == AtomKind::Callable {
@@ -221,13 +219,13 @@ where
     if (a.kind() == AtomKind::Iterable && b.kind() == AtomKind::Array)
         || (a.kind() == AtomKind::Array && b.kind() == AtomKind::Iterable)
     {
-        return iterable_array_overlap(a, b, world, options, report, builder);
+        return iterable_array_overlap(a, b, symbols, options, report, builder);
     }
 
     if (a.kind() == AtomKind::Iterable && b.kind() == AtomKind::List)
         || (a.kind() == AtomKind::List && b.kind() == AtomKind::Iterable)
     {
-        return iterable_list_overlap(a, b, world, options, report, builder);
+        return iterable_list_overlap(a, b, symbols, options, report, builder);
     }
 
     if matches!(
@@ -251,10 +249,10 @@ where
     };
 
     if let (Some(object), Some(structural)) = (object_atom, structural_atom) {
-        return object_structural_overlap(object, structural, world);
+        return object_structural_overlap(object, structural, symbols);
     }
 
-    if atom_refines(a, b, world, options, report, builder) || atom_refines(b, a, world, options, report, builder) {
+    if atom_refines(a, b, symbols, options, report, builder) || atom_refines(b, a, symbols, options, report, builder) {
         return true;
     }
 
@@ -265,13 +263,13 @@ where
 /// inheritance forwarding in *either* direction - then one is a subtype of
 /// the other, so they share the subtype's values and overlap.
 #[inline]
-fn generic_parameters_forward<'arena, W>(
+fn generic_parameters_forward<'arena, A>(
     a: &GenericParameterAtom<'arena>,
     b: &GenericParameterAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
 ) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     let (DefiningEntity::ClassLike(a_class), DefiningEntity::ClassLike(b_class)) =
         (a.defining_entity, b.defining_entity)
@@ -279,31 +277,39 @@ where
         return false;
     };
 
-    world.template_parameter_forwards_to(a_class.id, a.name, b_class.id, b.name)
-        || world.template_parameter_forwards_to(b_class.id, b.name, a_class.id, a.name)
+    symbols.template_parameter_forwards_to(a_class.id, a.name, b_class.id, b.name)
+        || symbols.template_parameter_forwards_to(b_class.id, b.name, a_class.id, a.name)
 }
 
 #[inline]
-fn object_structural_overlap<'arena, W>(object: Atom<'arena>, structural: Atom<'arena>, world: &W) -> bool
+fn object_structural_overlap<'arena, A>(
+    object: Atom<'arena>,
+    structural: Atom<'arena>,
+    symbols: &SymbolTable<'arena, A>,
+) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     let Atom::Object(payload) = object else {
         return false;
     };
 
     let class = payload.name;
-    !world.is_final(class.id) || class_satisfies_structural(class, structural, world)
+    !symbols.is_final(class.id) || class_satisfies_structural(class, structural, symbols)
 }
 
 #[inline]
-fn class_satisfies_structural<'arena, W>(class: Path<'arena>, structural: Atom<'arena>, world: &W) -> bool
+fn class_satisfies_structural<'arena, A>(
+    class: Path<'arena>,
+    structural: Atom<'arena>,
+    symbols: &SymbolTable<'arena, A>,
+) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     match structural {
-        Atom::HasMethod(has_method) => world.class_has_method(class.id, has_method.method_name),
-        Atom::HasProperty(has_property) => world.class_has_property(class.id, has_property.property_name),
+        Atom::HasMethod(has_method) => symbols.class_has_method(class.id, has_method.method_name),
+        Atom::HasProperty(has_property) => symbols.class_has_property(class.id, has_property.property_name),
         _ => true,
     }
 }
@@ -325,13 +331,13 @@ where
 ///
 /// Otherwise, in PHP's single-inheritance model, two unrelated nominal
 /// classes cannot share a runtime instance, so we return `false`. This
-/// is conservative: a future world surface for shared interfaces /
+/// is conservative: a future symbol-table surface for shared interfaces /
 /// traits can lift the answer to `true`.
 #[inline]
-fn object_overlap<'scratch, 'arena, S, A, W>(
+fn object_overlap<'scratch, 'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -339,61 +345,60 @@ fn object_overlap<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (Atom::Object(a_payload), Atom::Object(b_payload)) = (a, b) else {
         return false;
     };
 
     let combined = [a_payload.name, b_payload.name];
-    if intersection_uninhabited_under_finality(&combined, world) {
+    if intersection_uninhabited_under_finality(&combined, symbols) {
         return false;
     }
 
-    if intersection_has_unrelated_concrete_classes(&combined, world) {
+    if intersection_has_unrelated_concrete_classes(&combined, symbols) {
         return false;
     }
 
     if a_payload.name != b_payload.name
         && let (Some(a_parent), Some(b_parent)) =
-            (world.sealed_parent_of(a_payload.name.id), world.sealed_parent_of(b_payload.name.id))
+            (symbols.sealed_parent_of(a_payload.name.id), symbols.sealed_parent_of(b_payload.name.id))
         && a_parent == b_parent
-        && !world.descends_from(a_payload.name.id, b_payload.name.id)
-        && !world.descends_from(b_payload.name.id, a_payload.name.id)
+        && !symbols.descends_from(a_payload.name.id, b_payload.name.id)
+        && !symbols.descends_from(b_payload.name.id, a_payload.name.id)
     {
         return false;
     }
 
     if a_payload.name == b_payload.name {
-        let arity = world.template_parameter_arity(a_payload.name.id);
+        let arity = symbols.template_parameter_arity(a_payload.name.id);
         let one_side_bare = a_payload.type_arguments.is_none() || b_payload.type_arguments.is_none();
         let skip_for_coercion = options.template_default_coercion && one_side_bare;
         if arity > 0 && !skip_for_coercion {
             let a_supplied: &[Type<'arena>] = a_payload.type_arguments.unwrap_or_default();
             let b_supplied: &[Type<'arena>] = b_payload.type_arguments.unwrap_or_default();
             let fill = |index: usize| -> Type<'arena> {
-                world
+                symbols
                     .template_parameter_at(a_payload.name.id, index)
-                    .and_then(|parameter| parameter.upper_bound)
+                    .map(|parameter| parameter.constraint)
                     .unwrap_or(TYPE_MIXED)
             };
 
             for index in 0..arity {
                 let a_argument = a_supplied.get(index).copied().unwrap_or_else(|| fill(index));
                 let b_argument = b_supplied.get(index).copied().unwrap_or_else(|| fill(index));
-                let variance = world
+                let variance = symbols
                     .template_parameter_at(a_payload.name.id, index)
                     .map_or(Variance::Invariant, |parameter| parameter.variance);
                 match variance {
                     Variance::Invariant => {
-                        let a_refines_b = lattice::refines(a_argument, b_argument, world, options, report, builder);
-                        let b_refines_a = lattice::refines(b_argument, a_argument, world, options, report, builder);
+                        let a_refines_b = lattice::refines(a_argument, b_argument, symbols, options, report, builder);
+                        let b_refines_a = lattice::refines(b_argument, a_argument, symbols, options, report, builder);
                         if !a_refines_b || !b_refines_a {
                             return false;
                         }
                     }
                     Variance::Covariant => {
-                        if !overlaps(a_argument, b_argument, world, options, report, builder) {
+                        if !overlaps(a_argument, b_argument, symbols, options, report, builder) {
                             return false;
                         }
                     }
@@ -404,15 +409,15 @@ where
     }
 
     if a_payload.name != b_payload.name {
-        let (descendant, ancestor) = if world.descends_from(a_payload.name.id, b_payload.name.id) {
+        let (descendant, ancestor) = if symbols.descends_from(a_payload.name.id, b_payload.name.id) {
             (a_payload, b_payload)
-        } else if world.descends_from(b_payload.name.id, a_payload.name.id) {
+        } else if symbols.descends_from(b_payload.name.id, a_payload.name.id) {
             (b_payload, a_payload)
         } else {
             return true;
         };
 
-        if !descendant_args_satisfy_ancestor(descendant, ancestor, world, options, report, builder) {
+        if !descendant_args_satisfy_ancestor(descendant, ancestor, symbols, options, report, builder) {
             return false;
         }
     }
@@ -421,10 +426,10 @@ where
 }
 
 #[inline]
-fn descendant_args_satisfy_ancestor<'arena, S, A, W>(
+fn descendant_args_satisfy_ancestor<'arena, S, A>(
     descendant: &ObjectAtom<'arena>,
     ancestor: &ObjectAtom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -432,9 +437,8 @@ fn descendant_args_satisfy_ancestor<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    let arity = world.template_parameter_arity(ancestor.name.id);
+    let arity = symbols.template_parameter_arity(ancestor.name.id);
     if arity == 0 {
         return true;
     }
@@ -450,7 +454,14 @@ where
     let descendant_actuals: &[Type<'arena>] = descendant.type_arguments.unwrap_or_default();
 
     for (position, &ancestor_argument) in ancestor_arguments.iter().enumerate() {
-        let Some(inherited) = world.inherited_template_argument(descendant.name.id, ancestor.name.id, position) else {
+        let Some(inherited) = crate::ty::lattice::family::object::resolve_inherited_argument(
+            descendant.name,
+            ancestor.name,
+            position,
+            symbols,
+            builder,
+            16,
+        ) else {
             return true;
         };
 
@@ -461,22 +472,22 @@ where
                     return None;
                 }
 
-                let actual_position = world.template_parameter_index(descendant.name.id, parameter.name)?;
+                let actual_position = symbols.template_parameter_index(descendant.name.id, parameter.name)?;
                 descendant_actuals.get(actual_position).copied()
             },
             builder,
         );
-        let variance = world
+        let variance = symbols
             .template_parameter_at(ancestor.name.id, position)
             .map(|parameter| parameter.variance)
             .unwrap_or_default();
         let compatible = match variance {
             Variance::Invariant => {
-                lattice::refines(resolved, ancestor_argument, world, options, report, builder)
-                    && lattice::refines(ancestor_argument, resolved, world, options, report, builder)
+                lattice::refines(resolved, ancestor_argument, symbols, options, report, builder)
+                    && lattice::refines(ancestor_argument, resolved, symbols, options, report, builder)
             }
-            Variance::Covariant => lattice::refines(resolved, ancestor_argument, world, options, report, builder),
-            Variance::Contravariant => lattice::refines(ancestor_argument, resolved, world, options, report, builder),
+            Variance::Covariant => lattice::refines(resolved, ancestor_argument, symbols, options, report, builder),
+            Variance::Contravariant => lattice::refines(ancestor_argument, resolved, symbols, options, report, builder),
         };
         if !compatible {
             return false;
@@ -487,25 +498,25 @@ where
 }
 
 /// `true` iff `Foo & Bar & …` is provably uninhabited via the
-/// world's finality surface. A `final` class admits no subclass,
+/// symbol table's finality surface. A `final` class admits no subclass,
 /// so for `F & O` to be inhabited `F` and `O` must be ancestor-
 /// related; an unrelated `O` alongside a final `F` collapses the
-/// intersection. Without a final witness we stay open-world
+/// intersection. Without a final witness we stay permissive
 /// (return `false`).
 #[inline]
-fn intersection_uninhabited_under_finality<'arena, W>(classes: &[Path<'arena>], world: &W) -> bool
+fn intersection_uninhabited_under_finality<'arena, A>(classes: &[Path<'arena>], symbols: &SymbolTable<'arena, A>) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     classes.iter().any(|&final_candidate| {
-        if !world.is_final(final_candidate.id) {
+        if !symbols.is_final(final_candidate.id) {
             return false;
         }
 
         classes.iter().any(|&other| {
             other != final_candidate
-                && !world.descends_from(final_candidate.id, other.id)
-                && !world.descends_from(other.id, final_candidate.id)
+                && !symbols.descends_from(final_candidate.id, other.id)
+                && !symbols.descends_from(other.id, final_candidate.id)
         })
     })
 }
@@ -518,29 +529,32 @@ where
 /// from two unrelated classes - their intersection is therefore empty.
 /// Interfaces and traits are deliberately excluded (a class may implement /
 /// use many, so an unrelated interface can still be bridged by a common
-/// implementor), as is any name whose kind the world does not know. Shared by
+/// implementor), as is any name whose kind the symbol table does not know. Shared by
 /// `object_overlap`, `object_uninhabited`, and meet's intersection
 /// composition so overlap and meet always agree.
 ///
-/// Soundness rests on the [`World`] single-inheritance contract: for two
+/// Soundness rests on the [`SymbolTable`] single-inheritance contract: for two
 /// `Class`-kind names, `descends_from` forms a forest (no class has two
 /// unrelated class ancestors).
 #[inline]
-fn intersection_has_unrelated_concrete_classes<'arena, W>(classes: &[Path<'arena>], world: &W) -> bool
+fn intersection_has_unrelated_concrete_classes<'arena, A>(
+    classes: &[Path<'arena>],
+    symbols: &SymbolTable<'arena, A>,
+) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     for (index, &left) in classes.iter().enumerate() {
-        if world.class_like_kind(left.id) != Some(ClassLikeKind::Class) {
+        if symbols.class_like_kind(left.id) != Some(ClassLikeKind::Class) {
             continue;
         }
 
         for &right in &classes[index + 1..] {
-            if world.class_like_kind(right.id) != Some(ClassLikeKind::Class) {
+            if symbols.class_like_kind(right.id) != Some(ClassLikeKind::Class) {
                 continue;
             }
 
-            if left != right && !world.descends_from(left.id, right.id) && !world.descends_from(right.id, left.id) {
+            if left != right && !symbols.descends_from(left.id, right.id) && !symbols.descends_from(right.id, left.id) {
                 return true;
             }
         }
@@ -556,59 +570,57 @@ where
 /// The lattice can construct these but no runtime value inhabits
 /// them, so `overlap` treats them as bottom.
 #[inline]
-fn list_uninhabited<'arena, S, A, W>(
+fn list_uninhabited<'arena, S, A>(
     payload: &ListAtom<'arena>,
     intersections: Option<&[Atom<'arena>]>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if payload.flags.contains(ListFlag::NonEmpty)
         && payload.known_elements.is_none()
-        && type_is_value_never(payload.element_type, world, builder)
+        && type_is_value_never(payload.element_type, symbols, builder)
     {
         return true;
     }
 
     if let Some(entries) = payload.known_elements {
         for entry in entries {
-            if !entry.optional && type_is_value_never(entry.value, world, builder) {
+            if !entry.optional && type_is_value_never(entry.value, symbols, builder) {
                 return true;
             }
         }
     }
 
     let stripped = builder.list(*payload);
-    list_array_intersections_uninhabited_components(stripped, intersections, world, builder)
+    list_array_intersections_uninhabited_components(stripped, intersections, symbols, builder)
 }
 
 #[inline]
-fn array_uninhabited<'arena, S, A, W>(
+fn array_uninhabited<'arena, S, A>(
     payload: &ArrayAtom<'arena>,
     intersections: Option<&[Atom<'arena>]>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if payload.flags.contains(ArrayFlag::NonEmpty) {
         if let Some(key_type) = payload.key_param {
             let int_or_string = builder.union_of(&[INT, STRING]);
-            if !overlaps(key_type, int_or_string, world, LatticeOptions::default(), &mut LatticeReport::new(), builder)
+            if !overlaps(key_type, int_or_string, symbols, LatticeOptions::default(), &mut LatticeReport::new(), builder)
             {
                 return true;
             }
         }
 
-        let key_empty = payload.key_param.is_some_and(|ty| type_is_value_never(ty, world, builder));
-        let value_empty = payload.value_param.is_some_and(|ty| type_is_value_never(ty, world, builder));
+        let key_empty = payload.key_param.is_some_and(|ty| type_is_value_never(ty, symbols, builder));
+        let value_empty = payload.value_param.is_some_and(|ty| type_is_value_never(ty, symbols, builder));
         if key_empty || value_empty {
             return true;
         }
@@ -616,27 +628,26 @@ where
 
     if let Some(entries) = payload.known_items {
         for entry in entries {
-            if !entry.optional && type_is_value_never(entry.value, world, builder) {
+            if !entry.optional && type_is_value_never(entry.value, symbols, builder) {
                 return true;
             }
         }
     }
 
     let stripped = builder.array(*payload);
-    list_array_intersections_uninhabited_components(stripped, intersections, world, builder)
+    list_array_intersections_uninhabited_components(stripped, intersections, symbols, builder)
 }
 
 #[inline]
-fn object_uninhabited<'scratch, 'arena, S, A, W>(
+fn object_uninhabited<'scratch, 'arena, S, A>(
     payload: &ObjectAtom<'arena>,
     intersections: Option<&[Atom<'arena>]>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if let Some(conjunct_list) = intersections {
         let mut classes: ScratchVec<'scratch, Path<'arena>, S> = builder.scratch_vec_from_slice(&[payload.name]);
@@ -651,15 +662,15 @@ where
             }
         }
 
-        if intersection_uninhabited_under_finality(&classes, world) {
+        if intersection_uninhabited_under_finality(&classes, symbols) {
             return true;
         }
 
-        if intersection_has_unrelated_concrete_classes(&classes, world) {
+        if intersection_has_unrelated_concrete_classes(&classes, symbols) {
             return true;
         }
 
-        if sealed_siblings_disjoint(&classes, world) {
+        if sealed_siblings_disjoint(&classes, symbols) {
             return true;
         }
 
@@ -674,7 +685,7 @@ where
                 if lattice::refines(
                     bare_type,
                     *inner,
-                    world,
+                    symbols,
                     LatticeOptions::default(),
                     &mut LatticeReport::new(),
                     builder,
@@ -685,14 +696,14 @@ where
         }
 
         for &class in &classes {
-            if !world.is_final(class.id) {
+            if !symbols.is_final(class.id) {
                 continue;
             }
 
             for &structural in &structurals {
                 let satisfied = match structural {
-                    Atom::HasMethod(has_method) => world.class_has_method(class.id, has_method.method_name),
-                    Atom::HasProperty(has_property) => world.class_has_property(class.id, has_property.property_name),
+                    Atom::HasMethod(has_method) => symbols.class_has_method(class.id, has_method.method_name),
+                    Atom::HasProperty(has_property) => symbols.class_has_property(class.id, has_property.property_name),
                     _ => true,
                 };
 
@@ -707,7 +718,7 @@ where
         return false;
     };
 
-    if world.sealed_direct_inheritors(payload.name.id).is_some() {
+    if symbols.sealed_direct_inheritors(payload.name.id).is_some() {
         let head = builder.object(ObjectAtom {
             name: payload.name,
             type_arguments: Some(type_arguments),
@@ -716,7 +727,7 @@ where
         let residual = lattice::sealed::compute_residual(
             head,
             &[],
-            world,
+            symbols,
             LatticeOptions::default(),
             &mut LatticeReport::new(),
             builder,
@@ -727,11 +738,11 @@ where
     }
 
     type_arguments.iter().enumerate().any(|(index, &argument)| {
-        if !type_is_value_never(argument, world, builder) {
+        if !type_is_value_never(argument, symbols, builder) {
             return false;
         }
 
-        let variance = world
+        let variance = symbols
             .template_parameter_at(payload.name.id, index)
             .map_or(Variance::Contravariant, |parameter| parameter.variance);
         !matches!(variance, Variance::Contravariant)
@@ -739,50 +750,49 @@ where
 }
 
 #[inline]
-pub fn is_uninhabited<'arena, S, A, W>(
+pub fn is_uninhabited<'arena, S, A>(
     atom: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match atom {
-        Atom::List(payload) => list_uninhabited(payload, None, world, builder),
-        Atom::Array(payload) => array_uninhabited(payload, None, world, builder),
-        Atom::Object(payload) => object_uninhabited(payload, None, world, builder),
+        Atom::List(payload) => list_uninhabited(payload, None, symbols, builder),
+        Atom::Array(payload) => array_uninhabited(payload, None, symbols, builder),
+        Atom::Object(payload) => object_uninhabited(payload, None, symbols, builder),
         Atom::Intersected(payload) => {
             if matches!(*payload.head, Atom::Object(_))
-                && sealed_cover_fully_excluded(*payload.head, payload.conjuncts, world, builder)
+                && sealed_cover_fully_excluded(*payload.head, payload.conjuncts, symbols, builder)
             {
                 return true;
             }
 
-            if intersected_negated_contradiction(*payload.head, payload.conjuncts, world, builder) {
+            if intersected_negated_contradiction(*payload.head, payload.conjuncts, symbols, builder) {
                 return true;
             }
 
             match *payload.head {
                 Atom::Object(head_payload) => {
-                    return object_uninhabited(head_payload, Some(payload.conjuncts), world, builder);
+                    return object_uninhabited(head_payload, Some(payload.conjuncts), symbols, builder);
                 }
                 Atom::List(head_payload) => {
-                    return list_uninhabited(head_payload, Some(payload.conjuncts), world, builder);
+                    return list_uninhabited(head_payload, Some(payload.conjuncts), symbols, builder);
                 }
                 Atom::Array(head_payload) => {
-                    return array_uninhabited(head_payload, Some(payload.conjuncts), world, builder);
+                    return array_uninhabited(head_payload, Some(payload.conjuncts), symbols, builder);
                 }
                 _ => {}
             }
 
-            if is_uninhabited(*payload.head, world, builder) {
+            if is_uninhabited(*payload.head, symbols, builder) {
                 return true;
             }
 
             for &conjunct in payload.conjuncts {
-                if is_uninhabited(conjunct, world, builder) {
+                if is_uninhabited(conjunct, symbols, builder) {
                     return true;
                 }
             }
@@ -797,37 +807,35 @@ where
 /// canonical `never`. Used by [`is_uninhabited`] to recurse into
 /// container element types.
 #[inline]
-pub(crate) fn type_is_value_never<'arena, S, A, W>(
+pub(crate) fn type_is_value_never<'arena, S, A>(
     ty: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if ty.is_never() {
         return true;
     }
 
-    ty.atoms.iter().all(|atom| *atom == NEVER || is_uninhabited(*atom, world, builder))
+    ty.atoms.iter().all(|atom| *atom == NEVER || is_uninhabited(*atom, symbols, builder))
 }
 
 /// `true` iff the intersection of `head` with `conjuncts` refines the
 /// inner of any Negated conjunct, making `Intersected(H, C1, …, !T)`
 /// uninhabited.
 #[inline]
-fn intersected_negated_contradiction<'scratch, 'arena, S, A, W>(
+fn intersected_negated_contradiction<'scratch, 'arena, S, A>(
     head: Atom<'arena>,
     conjuncts: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let mut non_negated: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(conjuncts.len());
     for &conjunct in conjuncts {
@@ -844,7 +852,7 @@ where
             continue;
         };
 
-        if lattice::refines(positive_type, *inner, world, LatticeOptions::default(), &mut LatticeReport::new(), builder)
+        if lattice::refines(positive_type, *inner, symbols, LatticeOptions::default(), &mut LatticeReport::new(), builder)
         {
             return true;
         }
@@ -857,16 +865,15 @@ where
 /// and every direct inheritor of `H` is covered by some Negated
 /// conjunct, making the Intersected uninhabited.
 #[inline]
-fn sealed_cover_fully_excluded<'scratch, 'arena, S, A, W>(
+fn sealed_cover_fully_excluded<'scratch, 'arena, S, A>(
     head: Atom<'arena>,
     conjuncts: &[Atom<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let mut negated_inners: ScratchVec<'scratch, Type<'arena>, S> = builder.scratch_vec_with(conjuncts.len());
     for &conjunct in conjuncts {
@@ -883,7 +890,7 @@ where
         crate::ty::lattice::sealed::compute_residual(
             head,
             &negated_inners,
-            world,
+            symbols,
             LatticeOptions::default(),
             &mut LatticeReport::new(),
             builder,
@@ -915,10 +922,10 @@ fn callable_overlap(a: Atom<'_>, b: Atom<'_>) -> bool {
 /// non-empty intersection unless their literal/casing/flags are
 /// jointly unsatisfiable, which `string_meet` already decides.
 #[inline]
-fn string_overlap<'arena, S, A, W>(
+fn string_overlap<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -926,9 +933,8 @@ fn string_overlap<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    let _ = (world, options, report);
+    let _ = (symbols, options, report);
     crate::ty::meet::family::string::string_meet(a, b, builder).is_some()
 }
 
@@ -938,16 +944,15 @@ where
 /// empty. Mirrors the negated-class arm of [`is_uninhabited`] for
 /// objects.
 #[inline]
-fn list_array_intersections_uninhabited_components<'arena, S, A, W>(
+fn list_array_intersections_uninhabited_components<'arena, S, A>(
     stripped: Atom<'arena>,
     intersections: Option<&[Atom<'arena>]>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Some(conjuncts) = intersections else {
         return false;
@@ -958,7 +963,7 @@ where
     for &conjunct in conjuncts {
         if let Atom::Negated(inner) = conjunct {
             let mut report = LatticeReport::new();
-            if lattice::refines(stripped_type, *inner, world, options, &mut report, builder) {
+            if lattice::refines(stripped_type, *inner, symbols, options, &mut report, builder) {
                 return true;
             }
         }
@@ -972,10 +977,10 @@ where
 /// the element types must overlap for any concrete value to inhabit
 /// both sets.
 #[inline]
-fn list_overlap<'arena, S, A, W>(
+fn list_overlap<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -983,7 +988,6 @@ fn list_overlap<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (Atom::List(a_payload), Atom::List(b_payload)) = (a, b) else {
         return false;
@@ -993,17 +997,17 @@ where
         return true;
     }
 
-    overlaps(a_payload.element_type, b_payload.element_type, world, options, report, builder)
+    overlaps(a_payload.element_type, b_payload.element_type, symbols, options, report, builder)
 }
 
 /// `iterable<K,V> ∩ array<K',V'>` shares the empty array unless the
 /// array is non-empty; otherwise the iterable's K must admit some
 /// of the array's keys and V must admit some of the array's values.
 #[inline]
-fn iterable_array_overlap<'arena, S, A, W>(
+fn iterable_array_overlap<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -1011,7 +1015,6 @@ fn iterable_array_overlap<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (iterable_atom, array_atom) = if a.kind() == AtomKind::Iterable { (a, b) } else { (b, a) };
     let Atom::Iterable(iterable_payload) = iterable_atom else {
@@ -1027,8 +1030,8 @@ where
 
     let array_key = array_payload.key_param.unwrap_or(TYPE_ARRAY_KEY);
     let array_value = array_payload.value_param.unwrap_or(TYPE_MIXED);
-    overlaps(iterable_payload.key_type, array_key, world, options, report, builder)
-        && overlaps(iterable_payload.value_type, array_value, world, options, report, builder)
+    overlaps(iterable_payload.key_type, array_key, symbols, options, report, builder)
+        && overlaps(iterable_payload.value_type, array_value, symbols, options, report, builder)
 }
 
 /// `iterable<K,V> ∩ list<E>`. The empty list `[]` is an empty iterator and
@@ -1036,10 +1039,10 @@ where
 /// A non-empty list shares a value only when `int` fits `K` (the list's keys
 /// are `int`) and `V` overlaps the list element type.
 #[inline]
-fn iterable_list_overlap<'arena, S, A, W>(
+fn iterable_list_overlap<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -1047,7 +1050,6 @@ fn iterable_list_overlap<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (iterable_atom, list_atom) = if a.kind() == AtomKind::Iterable { (a, b) } else { (b, a) };
     let Atom::Iterable(iterable_payload) = iterable_atom else {
@@ -1061,11 +1063,11 @@ where
         return true;
     }
 
-    if !lattice::refines(TYPE_INT, iterable_payload.key_type, world, options, report, builder) {
+    if !lattice::refines(TYPE_INT, iterable_payload.key_type, symbols, options, report, builder) {
         return false;
     }
 
-    overlaps(iterable_payload.value_type, list_payload.element_type, world, options, report, builder)
+    overlaps(iterable_payload.value_type, list_payload.element_type, symbols, options, report, builder)
 }
 
 /// `list<E> ∩ array<K, V>` shares the empty list `[]` (which is also
@@ -1073,10 +1075,10 @@ where
 /// least one non-empty side, the array's key constraint must accept
 /// `int` (lists are int-keyed) and `E ∩ V` must overlap.
 #[inline]
-fn list_array_overlap<'arena, S, A, W>(
+fn list_array_overlap<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -1084,7 +1086,6 @@ fn list_array_overlap<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (list_atom, array_atom) = if a.kind() == AtomKind::List { (a, b) } else { (b, a) };
     let Atom::List(list_payload) = list_atom else {
@@ -1099,22 +1100,22 @@ where
     }
 
     if let Some(array_key_param) = array_payload.key_param
-        && !lattice::refines(TYPE_INT, array_key_param, world, options, report, builder)
+        && !lattice::refines(TYPE_INT, array_key_param, symbols, options, report, builder)
     {
         return false;
     }
 
     let array_value = array_payload.value_param.unwrap_or(TYPE_MIXED);
-    overlaps(list_payload.element_type, array_value, world, options, report, builder)
+    overlaps(list_payload.element_type, array_value, symbols, options, report, builder)
 }
 
 /// `array<K,V> ∩ array<K',V'>` mirrors `list_overlap`: the empty
 /// array `[]` is shared only when neither side demands non-empty.
 #[inline]
-fn array_overlap<'arena, S, A, W>(
+fn array_overlap<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -1122,7 +1123,6 @@ fn array_overlap<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (Atom::Array(a_payload), Atom::Array(b_payload)) = (a, b) else {
         return false;
@@ -1134,8 +1134,8 @@ where
 
     match (a_payload.key_param, b_payload.key_param, a_payload.value_param, b_payload.value_param) {
         (Some(a_key), Some(b_key), Some(a_value), Some(b_value)) => {
-            overlaps(a_key, b_key, world, options, report, builder)
-                && overlaps(a_value, b_value, world, options, report, builder)
+            overlaps(a_key, b_key, symbols, options, report, builder)
+                && overlaps(a_value, b_value, symbols, options, report, builder)
         }
         _ => true,
     }
@@ -1286,9 +1286,9 @@ fn mixed_overlap(a: Atom<'_>, b: Atom<'_>) -> bool {
 /// `true` iff two distinct names in `names` share the same sealed
 /// parent: distinct direct inheritors of one sealed class are disjoint.
 #[inline]
-fn sealed_siblings_disjoint<'arena, W>(names: &[Path<'arena>], world: &W) -> bool
+fn sealed_siblings_disjoint<'arena, A>(names: &[Path<'arena>], symbols: &SymbolTable<'arena, A>) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     if names.len() < 2 {
         return false;
@@ -1301,7 +1301,7 @@ where
             }
 
             if let (Some(first_parent), Some(second_parent)) =
-                (world.sealed_parent_of(names[first_index].id), world.sealed_parent_of(names[second_index].id))
+                (symbols.sealed_parent_of(names[first_index].id), symbols.sealed_parent_of(names[second_index].id))
                 && first_parent == second_parent
             {
                 return true;

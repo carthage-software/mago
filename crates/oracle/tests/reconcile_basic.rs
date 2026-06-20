@@ -170,12 +170,12 @@ fn witness_falls_back_when_no_bound_collected() {
 #[test]
 fn witness_uses_recorded_bounds_when_present() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default().with_default_variance(Variance::Covariant);
         let template = f.t_template("Box", "T");
         let ty = f.u(template);
-        template::standin(ty, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
+        template::standin(ty, well_known::TYPE_INT, &symbols, &mut state, &options, &mut f.builder);
         let result = state.witness(key_for(f.arena, "Box", "T"), well_known::TYPE_MIXED, &mut f.builder);
         assert_eq!(result, well_known::TYPE_INT);
     });
@@ -184,15 +184,15 @@ fn witness_uses_recorded_bounds_when_present() {
 #[test]
 fn witness_after_two_arguments_unions_bounds() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let template = f.t_template("F", "T");
         let ty = f.u(template);
 
         let options0 = StandinOptions::default().with_argument_offset(0).with_default_variance(Variance::Covariant);
-        template::standin(ty, well_known::TYPE_INT, &world, &mut state, &options0, &mut f.builder);
+        template::standin(ty, well_known::TYPE_INT, &symbols, &mut state, &options0, &mut f.builder);
         let options1 = StandinOptions::default().with_argument_offset(1).with_default_variance(Variance::Covariant);
-        template::standin(ty, well_known::TYPE_STRING, &world, &mut state, &options1, &mut f.builder);
+        template::standin(ty, well_known::TYPE_STRING, &symbols, &mut state, &options1, &mut f.builder);
 
         let result = state.witness(key_for(f.arena, "F", "T"), well_known::TYPE_MIXED, &mut f.builder);
         assert_eq!(result, well_known::TYPE_INT_OR_STRING);
@@ -202,8 +202,7 @@ fn witness_after_two_arguments_unions_bounds() {
 #[test]
 fn witness_after_invariant_then_nested_arg_keeps_deep_bound() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("Cell", &[("T", Variance::Invariant)]);
+        let symbols = symbol_table(f.arena, "<?php /** @template T */ class Cell {}");
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
         let template = f.t_template("F", "T");
@@ -212,7 +211,7 @@ fn witness_after_invariant_then_nested_arg_keeps_deep_bound() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_generic_named("Cell", vec![well_known::TYPE_INT]);
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         let result = state.witness(key_for(f.arena, "F", "T"), well_known::TYPE_MIXED, &mut f.builder);
         assert_eq!(result, well_known::TYPE_INT);
     });

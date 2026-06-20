@@ -1,7 +1,7 @@
 //! Workload: alias / reference expansion.
 //!
 //! Models the unresolved-type-resolution phase of an analyzer: a forest
-//! of types is expanded under a [`World`](mago_oracle::world::World)
+//! of types is expanded under a [`SymbolTable`](mago_oracle::symbol::SymbolTable)
 //! via [`expand::expand_with`]. Stresses the structural flat-map walk in
 //! `expand` and the per-atom resolution dispatch.
 //!
@@ -20,11 +20,11 @@ use criterion::criterion_group;
 use criterion::criterion_main;
 
 use mago_allocator::LocalArena;
+use mago_oracle::symbol::SymbolTable;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
 use mago_oracle::ty::expand;
 use mago_oracle::ty::expand::ExpansionContext;
-use mago_oracle::world::NullWorld;
 
 mod common;
 
@@ -40,7 +40,7 @@ fn workload(c: &mut Criterion) {
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
     let pool = TypePool::new(SEED, &mut builder);
-    let world = NullWorld;
+    let symbols = SymbolTable::new_in(&arena);
     let context_default = ExpansionContext::default();
     let context_full = ExpansionContext::default()
         .with_evaluate_conditional(true)
@@ -58,7 +58,7 @@ fn workload(c: &mut Criterion) {
         b.iter(|| {
             let mut accumulated: usize = 0;
             for ty in &targets {
-                let result = expand::expand_with(black_box(*ty), &world, &context_default, &mut builder);
+                let result = expand::expand_with(black_box(*ty), &symbols, &context_default, &mut builder);
                 accumulated = accumulated.wrapping_add(result.atoms.len());
             }
             black_box(accumulated)
@@ -69,7 +69,7 @@ fn workload(c: &mut Criterion) {
         b.iter(|| {
             let mut accumulated: usize = 0;
             for ty in &targets {
-                let result = expand::expand_with(black_box(*ty), &world, &context_full, &mut builder);
+                let result = expand::expand_with(black_box(*ty), &symbols, &context_full, &mut builder);
                 accumulated = accumulated.wrapping_add(result.atoms.len());
             }
             black_box(accumulated)

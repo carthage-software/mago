@@ -193,6 +193,13 @@ where
         builder
     }
 
+    /// The output arena this builder allocates into.
+    #[inline]
+    #[must_use]
+    pub(crate) const fn arena(&self) -> &'arena A {
+        self.arena
+    }
+
     fn seed(&mut self) {
         self.names.insert(b"");
         for atom in well_known::ATOMS {
@@ -554,7 +561,7 @@ where
     }
 
     /// Deep-copy a type from any other arena into this builder, re-consing
-    /// every payload, name, and slice. This is the world-promotion path: the
+    /// every payload, name, and slice. This is the cross-arena promotion path: the
     /// consing equivalent of [`CopyInto`](mago_allocator::copy::CopyInto).
     #[must_use]
     pub fn import(&mut self, ty: Type<'_>) -> Type<'arena> {

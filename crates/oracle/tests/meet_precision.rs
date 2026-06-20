@@ -4,32 +4,31 @@ use std::collections::BTreeMap;
 
 use common::*;
 
-use mago_oracle::symbol::part::generic::Variance;
+use mago_allocator::LocalArena;
+use mago_oracle::symbol::SymbolTable;
+
 use mago_oracle::ty::Type;
 use mago_oracle::ty::lattice::LatticeOptions;
 use mago_oracle::ty::lattice::LatticeReport;
 use mago_oracle::ty::meet;
 use mago_oracle::ty::well_known;
-use mago_oracle::world::World;
 
 fn meet_eq<'arena>(f: &mut Fixture<'_, 'arena>, a: Type<'arena>, b: Type<'arena>, expected: Type<'arena>) {
-    let w = empty_world();
+    let w = empty_symbol_table(f.arena);
     let mut report = LatticeReport::new();
     let result = meet::compute(a, b, &w, LatticeOptions::default(), &mut report, &mut f.builder);
     assert_eq!(result, expected, "meet({a}, {b}) = {result}, expected {expected}");
 }
 
-fn meet_eq_with<'arena, W>(
+fn meet_eq_with<'arena>(
     f: &mut Fixture<'_, 'arena>,
     a: Type<'arena>,
     b: Type<'arena>,
     expected: Type<'arena>,
-    world: &W,
-) where
-    W: World<'arena>,
-{
+    symbols: &SymbolTable<'arena, LocalArena>,
+) {
     let mut report = LatticeReport::new();
-    let result = meet::compute(a, b, world, LatticeOptions::default(), &mut report, &mut f.builder);
+    let result = meet::compute(a, b, symbols, LatticeOptions::default(), &mut report, &mut f.builder);
     assert_eq!(result, expected, "meet({a}, {b}) = {result}, expected {expected}");
 }
 
@@ -155,8 +154,7 @@ fn class_string_unrelated_meet_is_never() {
 #[test]
 fn class_string_descendant_meet_is_descendant() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.add_edge("Bar", "Foo");
+        let w = symbol_table(f.arena, "<?php class Foo {} class Bar extends Foo {}");
         let foo_named = f.t_named("Foo");
         let foo_ty = f.u(foo_named);
         let parent_atom = f.t_class_string_of(foo_ty);
@@ -242,7 +240,7 @@ fn callable_meet_with_compatible_signatures_intersects_return_unions_params() {
 #[test]
 fn class_string_unrelated_constraints_meet_is_never() {
     fixture(|f| {
-        let w = MockWorld::new();
+        let w = empty_symbol_table(f.arena);
         let foo_named = f.t_named("Foo");
         let foo_ty = f.u(foo_named);
         let lhs_atom = f.t_class_string_of(foo_ty);
@@ -258,7 +256,7 @@ fn class_string_unrelated_constraints_meet_is_never() {
 #[test]
 fn class_string_kinds_disjoint_meet_is_never() {
     fixture(|f| {
-        let w = MockWorld::new();
+        let w = empty_symbol_table(f.arena);
         let foo_named = f.t_named("Foo");
         let foo_ty = f.u(foo_named);
         let class_atom = f.t_class_string_of(foo_ty);
@@ -272,7 +270,7 @@ fn class_string_kinds_disjoint_meet_is_never() {
 #[test]
 fn enum_meet_enum_case_is_case() {
     fixture(|f| {
-        let w = MockWorld::new();
+        let w = empty_symbol_table(f.arena);
         let any_atom = f.t_enum("E");
         let any = f.u(any_atom);
         let case_atom = f.t_enum_case("E", "A");
@@ -284,7 +282,7 @@ fn enum_meet_enum_case_is_case() {
 #[test]
 fn distinct_enum_cases_meet_is_never() {
     fixture(|f| {
-        let w = MockWorld::new();
+        let w = empty_symbol_table(f.arena);
         let a_atom = f.t_enum_case("E", "A");
         let a = f.u(a_atom);
         let b_atom = f.t_enum_case("E", "B");
@@ -296,7 +294,7 @@ fn distinct_enum_cases_meet_is_never() {
 #[test]
 fn distinct_enums_meet_is_never() {
     fixture(|f| {
-        let w = MockWorld::new();
+        let w = empty_symbol_table(f.arena);
         let e_atom = f.t_enum("E");
         let e = f.u(e_atom);
         let f_atom = f.t_enum("F");
@@ -312,7 +310,7 @@ fn has_method_meet_has_method_composes() {
         let lhs = f.u(lhs_atom);
         let rhs_atom = f.t_has_method("bar");
         let rhs = f.u(rhs_atom);
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let mut report = LatticeReport::new();
         let result = meet::compute(lhs, rhs, &w, LatticeOptions::default(), &mut report, &mut f.builder);
         assert_ne!(result, well_known::TYPE_NEVER, "has-method ∧ has-method should compose, got NEVER");
@@ -320,10 +318,9 @@ fn has_method_meet_has_method_composes() {
 }
 
 #[test]
-fn named_object_with_method_meet_has_method_passes_when_world_confirms() {
+fn named_object_with_method_meet_has_method_passes_when_symbols_confirm() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.with_method("Foo", "doFoo");
+        let w = symbol_table(f.arena, "<?php class Foo { public function doFoo() {} }");
         let named_atom = f.t_named("Foo");
         let named = f.u(named_atom);
         let constraint_atom = f.t_has_method("doFoo");
@@ -381,7 +378,7 @@ fn nonnull_mixed_meet_null_is_never() {
 #[test]
 fn truthy_mixed_meet_int_is_truthy_int_set() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let truthy = f.mixed_truthy();
         let lhs = f.u(truthy);
         let int = f.t_int();
@@ -484,8 +481,7 @@ fn distinct_templates_have_no_meet_rule_and_collapse_to_never() {
 #[test]
 fn contravariant_a_object_meet_a_int_under_contravariant_t_subsumes_to_more_specific() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.with_templates("A", &[("T", Variance::Contravariant)]);
+        let w = symbol_table(f.arena, "<?php /** @template-contravariant T */ class A {}");
         let object_named = f.t_named("Object");
         let object_ty = f.u(object_named);
         let a_object_atom = f.t_generic_named("A", vec![object_ty]);
@@ -507,7 +503,7 @@ fn contravariant_a_object_meet_a_int_under_contravariant_t_subsumes_to_more_spec
 #[test]
 fn associativity_array_bool_int_meet_via_arb_failing_case() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
 
         let a_atom = f.t_keyed_unsealed(well_known::TYPE_INT, well_known::TYPE_INT, false);
         let a = f.u(a_atom);
@@ -530,9 +526,7 @@ fn associativity_array_bool_int_meet_via_arb_failing_case() {
 #[test]
 fn final_class_intersected_with_unrelated_is_uninhabited_in_meet() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.with_final("Foo");
-        w.declare("Bar");
+        let w = symbol_table(f.arena, "<?php final class Foo {} class Bar {}");
         let foo_atom = f.t_named("Foo");
         let foo = f.u(foo_atom);
         let bar_atom = f.t_named("Bar");
@@ -544,9 +538,7 @@ fn final_class_intersected_with_unrelated_is_uninhabited_in_meet() {
 #[test]
 fn enum_intersected_with_unrelated_class_is_uninhabited() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.with_pure_enum("Color");
-        w.declare("Bar");
+        let w = symbol_table(f.arena, "<?php enum Color {} class Bar {}");
         let color_atom = f.t_enum("Color");
         let color = f.u(color_atom);
         let bar_atom = f.t_named("Bar");
@@ -558,12 +550,17 @@ fn enum_intersected_with_unrelated_class_is_uninhabited() {
 #[test]
 fn unrelated_objects_no_finality_overlap_is_open() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.with_templates("A", &[("T", Variance::Invariant)]);
-        w.with_templates("B", &[("T", Variance::Contravariant)]);
-        w.declare("E");
-        w.with_extended("A", "B", vec![well_known::TYPE_MIXED]);
-        w.with_final("B");
+        let w = symbol_table(
+            f.arena,
+            "<?php
+/** @template-contravariant T */ final class B {}
+/**
+ * @template T
+ * @extends B<mixed>
+ */
+class A extends B {}
+class E {}",
+        );
 
         let object_ty = f.u(well_known::OBJECT);
         let a_atom = f.t_generic_named("A", vec![object_ty]);
@@ -582,7 +579,7 @@ fn unrelated_objects_no_finality_overlap_is_open() {
 #[test]
 fn empty_array_meet_array_int_int_collapses_to_empty() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
         let array_int_int_atom = f.t_keyed_unsealed(well_known::TYPE_INT, well_known::TYPE_INT, false);
         let array_int_int = f.u(array_int_int_atom);
         let empty_array = f.u(well_known::EMPTY_ARRAY);
@@ -596,7 +593,7 @@ fn empty_array_meet_array_int_int_collapses_to_empty() {
 #[test]
 fn associativity_array_int_int_meet_via_arb_failing_case() {
     fixture(|f| {
-        let w = empty_world();
+        let w = empty_symbol_table(f.arena);
 
         let array_int_int_atom = f.t_keyed_unsealed(well_known::TYPE_INT, well_known::TYPE_INT, false);
         let array_int_int = f.u(array_int_int_atom);
@@ -618,12 +615,21 @@ fn associativity_array_int_int_meet_via_arb_failing_case() {
 #[test]
 fn refines_a_descending_c_int_under_contravariant_t() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.with_templates("A", &[("T", Variance::Invariant)]);
-        w.with_templates("B", &[("T", Variance::Contravariant)]);
-        w.with_templates("C", &[("T", Variance::Contravariant)]);
-        w.with_extended("A", "B", vec![well_known::TYPE_MIXED]);
-        w.with_extended("B", "C", vec![well_known::TYPE_MIXED]);
+        let w = symbol_table(
+            f.arena,
+            "<?php
+/** @template-contravariant T */ class C {}
+/**
+ * @template-contravariant T
+ * @extends C<mixed>
+ */
+class B extends C {}
+/**
+ * @template T
+ * @extends B<mixed>
+ */
+class A extends B {}",
+        );
 
         let a_atom = f.t_named("A");
         let a = f.u(a_atom);
@@ -643,8 +649,7 @@ fn refines_a_descending_c_int_under_contravariant_t() {
 #[test]
 fn associativity_a_numeric_meet_a_intersected_has_method_meet_a_a() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.with_templates("A", &[("T", Variance::Invariant)]);
+        let w = symbol_table(f.arena, "<?php /** @template T */ class A {}");
 
         let numeric = f.t_numeric();
         let numeric_ty = f.u(numeric);
@@ -676,10 +681,10 @@ fn associativity_a_numeric_meet_a_intersected_has_method_meet_a_a() {
 #[test]
 fn list_intersection_overlap_consistency_arb_case() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.with_templates("A", &[("T", Variance::Invariant)]);
-        w.with_templates("B", &[("T", Variance::Invariant)]);
-        w.with_templates("E", &[("T", Variance::Invariant)]);
+        let w = symbol_table(
+            f.arena,
+            "<?php /** @template T */ class A {} /** @template T */ class B {} /** @template T */ class E {}",
+        );
 
         let e_named = f.t_named("E");
         let b_and_e_atom = f.t_named_intersected("B", &[e_named]);
@@ -714,13 +719,22 @@ fn list_intersection_overlap_consistency_arb_case() {
 #[test]
 fn invariant_a_associativity_arb_failing_case() {
     fixture(|f| {
-        let mut w = MockWorld::new();
-        w.with_templates("A", &[("T", Variance::Invariant)]);
-        w.with_templates("B", &[("T", Variance::Contravariant)]);
-        w.with_templates("C", &[("T", Variance::Contravariant)]);
-        w.with_templates("D", &[("T", Variance::Invariant)]);
-        w.with_extended("B", "C", vec![well_known::TYPE_MIXED]);
-        w.with_extended("A", "B", vec![well_known::TYPE_MIXED]);
+        let w = symbol_table(
+            f.arena,
+            "<?php
+/** @template-contravariant T */ class C {}
+/**
+ * @template-contravariant T
+ * @extends C<mixed>
+ */
+class B extends C {}
+/**
+ * @template T
+ * @extends B<mixed>
+ */
+class A extends B {}
+/** @template T */ class D {}",
+        );
 
         let object = f.u(well_known::OBJECT);
         let a_object_atom = f.t_generic_named("A", vec![object]);

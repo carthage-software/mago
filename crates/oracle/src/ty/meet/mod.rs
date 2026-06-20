@@ -46,6 +46,7 @@ use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
+use crate::symbol::SymbolTable;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
@@ -69,7 +70,6 @@ use crate::ty::lattice::sealed::SealedResidual;
 use crate::ty::lattice::sealed::compute_residual;
 use crate::ty::meet::family::generic;
 use crate::ty::well_known;
-use crate::world::World;
 
 pub(crate) mod family;
 
@@ -109,10 +109,10 @@ impl<'arena> MeetOutcome<'arena> {
 /// `Narrowed` and `Redundant` variants; `Impossible` corresponds to
 /// `result ≡ ⊥`.
 #[inline]
-pub fn narrow<'scratch, 'arena, S, A, W>(
+pub fn narrow<'scratch, 'arena, S, A>(
     input: Type<'arena>,
     narrowing: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -120,7 +120,6 @@ pub fn narrow<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if input == narrowing {
         return MeetOutcome::Redundant(input);
@@ -135,7 +134,7 @@ where
     for &input_atom in input.atoms {
         for &narrowing_atom in narrowing.atoms {
             if any_negated && (input_atom.kind() == AtomKind::Negated || narrowing_atom.kind() == AtomKind::Negated) {
-                negated_atom_meet_multi(input_atom, narrowing_atom, world, options, report, builder, &mut atoms);
+                negated_atom_meet_multi(input_atom, narrowing_atom, symbols, options, report, builder, &mut atoms);
                 continue;
             }
 
@@ -143,11 +142,11 @@ where
                 continue;
             }
 
-            if any_mixed && narrowed_mixed_meet_multi(input_atom, narrowing_atom, world, builder, &mut atoms) {
+            if any_mixed && narrowed_mixed_meet_multi(input_atom, narrowing_atom, symbols, builder, &mut atoms) {
                 continue;
             }
 
-            if let Some(met) = atom_meet(input_atom, narrowing_atom, world, options, report, builder) {
+            if let Some(met) = atom_meet(input_atom, narrowing_atom, symbols, options, report, builder) {
                 atoms.push(met);
             }
         }
@@ -169,10 +168,10 @@ where
 /// This is a thin wrapper over [`narrow`] for callers that don't need
 /// the assertion classification.
 #[inline]
-pub fn compute<'arena, S, A, W>(
+pub fn compute<'arena, S, A>(
     a: Type<'arena>,
     b: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -180,9 +179,8 @@ pub fn compute<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    narrow(a, b, world, options, report, builder).into_type()
+    narrow(a, b, symbols, options, report, builder).into_type()
 }
 
 /// Pairwise atom meet. `int ∧ float` is treated as disjoint even though
@@ -191,10 +189,10 @@ where
 /// value-level intersection must never be re-introduced through the
 /// coercion-aware `refines` subsumption short-circuit.
 #[inline]
-fn atom_meet<'arena, S, A, W>(
+fn atom_meet<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -202,9 +200,8 @@ fn atom_meet<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    if is_uninhabited(a, world, builder) || is_uninhabited(b, world, builder) {
+    if is_uninhabited(a, symbols, builder) || is_uninhabited(b, symbols, builder) {
         return None;
     }
 
@@ -217,7 +214,7 @@ where
     }
 
     if a == well_known::MIXED || a == well_known::PLACEHOLDER {
-        if is_uninhabited(b, world, builder) {
+        if is_uninhabited(b, symbols, builder) {
             return None;
         }
 
@@ -225,7 +222,7 @@ where
     }
 
     if b == well_known::MIXED || b == well_known::PLACEHOLDER {
-        if is_uninhabited(a, world, builder) {
+        if is_uninhabited(a, symbols, builder) {
             return None;
         }
 
@@ -237,54 +234,53 @@ where
     }
 
     if a.kind() == AtomKind::Negated || b.kind() == AtomKind::Negated {
-        return negated_atom_meet(a, b, world, options, report, builder);
+        return negated_atom_meet(a, b, symbols, options, report, builder);
     }
 
     if a.kind() == AtomKind::Intersected || b.kind() == AtomKind::Intersected {
-        return intersected_atom_meet(a, b, world, options, report, builder);
+        return intersected_atom_meet(a, b, symbols, options, report, builder);
     }
 
     if a.kind() == AtomKind::Mixed || b.kind() == AtomKind::Mixed {
-        let met = narrowed_mixed_meet(a, b, world, builder);
-        return normalise_meet_result(met, world, builder);
+        let met = narrowed_mixed_meet(a, b, symbols, builder);
+        return normalise_meet_result(met, symbols, builder);
     }
 
     let a_type = builder.union_of(&[a]);
     let b_type = builder.union_of(&[b]);
 
-    if refines(a_type, b_type, world, options, report, builder) {
-        return normalise_meet_result(Some(a), world, builder);
+    if refines(a_type, b_type, symbols, options, report, builder) {
+        return normalise_meet_result(Some(a), symbols, builder);
     }
 
-    if refines(b_type, a_type, world, options, report, builder) {
-        return normalise_meet_result(Some(b), world, builder);
+    if refines(b_type, a_type, symbols, options, report, builder) {
+        return normalise_meet_result(Some(b), symbols, builder);
     }
 
     if a.kind() == AtomKind::GenericParameter || b.kind() == AtomKind::GenericParameter {
-        let met = generic::generic_parameter_meet(a, b, world, options, report, builder);
-        return normalise_meet_result(met, world, builder);
+        let met = generic::generic_parameter_meet(a, b, symbols, options, report, builder);
+        return normalise_meet_result(met, symbols, builder);
     }
 
-    let met = family_atom_meet(a, b, world, options, report, builder);
-    normalise_meet_result(met, world, builder)
+    let met = family_atom_meet(a, b, symbols, options, report, builder);
+    normalise_meet_result(met, symbols, builder)
 }
 
 /// If the synthesised atom is uninhabited (e.g. sealed-class
 /// intersection with all inheritors negated), collapse to `None`
 /// so the caller treats it as the empty meet.
 #[inline]
-fn normalise_meet_result<'arena, S, A, W>(
+fn normalise_meet_result<'arena, S, A>(
     result: Option<Atom<'arena>>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match result {
-        Some(atom) if is_uninhabited(atom, world, builder) => None,
+        Some(atom) if is_uninhabited(atom, symbols, builder) => None,
         other => other,
     }
 }
@@ -313,10 +309,10 @@ where
 /// pushes every surviving atom into `out` (e.g.
 /// `meet(non-negative-int, !int(1))` yields `[int(0), int<2,∞>]`).
 #[inline]
-fn negated_atom_meet_multi<'scratch, 'arena, S, A, W>(
+fn negated_atom_meet_multi<'scratch, 'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -324,10 +320,9 @@ fn negated_atom_meet_multi<'scratch, 'arena, S, A, W>(
 ) where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if a.kind() == AtomKind::Negated && b.kind() == AtomKind::Negated {
-        let met = negated_pair_meet(a, b, world, options, report, builder);
+        let met = negated_pair_meet(a, b, symbols, options, report, builder);
         out.push(met);
         return;
     }
@@ -338,7 +333,7 @@ fn negated_atom_meet_multi<'scratch, 'arena, S, A, W>(
     };
 
     let positive_type = builder.union_of(&[positive]);
-    let surviving = crate::ty::subtract::compute(positive_type, negated_inner, world, options, report, builder);
+    let surviving = crate::ty::subtract::compute(positive_type, negated_inner, symbols, options, report, builder);
     if surviving.is_never() {
         return;
     }
@@ -349,10 +344,10 @@ fn negated_atom_meet_multi<'scratch, 'arena, S, A, W>(
 /// `meet(!T, !U) ≡ !(T ∪ U)`. When `T <: U` the union collapses
 /// to `U` and the result is `!U`; symmetric for `U <: T`.
 #[inline]
-fn negated_pair_meet<'scratch, 'arena, S, A, W>(
+fn negated_pair_meet<'scratch, 'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -360,17 +355,16 @@ fn negated_pair_meet<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let (Atom::Negated(a_inner), Atom::Negated(b_inner)) = (a, b) else {
         return well_known::NEVER;
     };
 
-    if refines(*a_inner, *b_inner, world, options, report, builder) {
+    if refines(*a_inner, *b_inner, symbols, options, report, builder) {
         return b;
     }
 
-    if refines(*b_inner, *a_inner, world, options, report, builder) {
+    if refines(*b_inner, *a_inner, symbols, options, report, builder) {
         return a;
     }
 
@@ -391,10 +385,10 @@ where
 /// fall back through other meet pairs. A future refactor of
 /// `atom_meet` to return `Vec<Atom>` would make this exact.
 #[inline]
-fn negated_atom_meet<'arena, S, A, W>(
+fn negated_atom_meet<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -402,10 +396,9 @@ fn negated_atom_meet<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if a.kind() == AtomKind::Negated && b.kind() == AtomKind::Negated {
-        return Some(negated_pair_meet(a, b, world, options, report, builder));
+        return Some(negated_pair_meet(a, b, symbols, options, report, builder));
     }
 
     let (positive, negated_inner) = match (a, b) {
@@ -414,7 +407,7 @@ where
     };
 
     let positive_type = builder.union_of(&[positive]);
-    let surviving = crate::ty::subtract::compute(positive_type, negated_inner, world, options, report, builder);
+    let surviving = crate::ty::subtract::compute(positive_type, negated_inner, symbols, options, report, builder);
     if surviving.is_never() {
         return None;
     }
@@ -427,10 +420,10 @@ where
 }
 
 #[inline]
-fn intersected_atom_meet<'scratch, 'arena, S, A, W>(
+fn intersected_atom_meet<'scratch, 'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -438,11 +431,10 @@ fn intersected_atom_meet<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let result = match (a, b) {
         (Atom::Intersected(a_payload), Atom::Intersected(b_payload)) => {
-            let head = atom_meet(*a_payload.head, *b_payload.head, world, options, report, builder)?;
+            let head = atom_meet(*a_payload.head, *b_payload.head, symbols, options, report, builder)?;
             let mut all_conjuncts: ScratchVec<'scratch, Atom<'arena>, S> =
                 builder.scratch_vec_from_slice(a_payload.conjuncts);
             all_conjuncts.extend_from_slice(b_payload.conjuncts);
@@ -450,18 +442,18 @@ where
             builder.intersected(head, &all_conjuncts)
         }
         (Atom::Intersected(payload), other) | (other, Atom::Intersected(payload)) => {
-            let head = atom_meet(*payload.head, other, world, options, report, builder)?;
+            let head = atom_meet(*payload.head, other, symbols, options, report, builder)?;
 
             builder.intersected(head, payload.conjuncts)
         }
         _ => return None,
     };
 
-    if let Some(canonical) = canonicalise_intersected(result, world, options, report, builder) {
+    if let Some(canonical) = canonicalise_intersected(result, symbols, options, report, builder) {
         return Some(canonical);
     }
 
-    if is_uninhabited(result, world, builder) {
+    if is_uninhabited(result, symbols, builder) {
         return None;
     }
 
@@ -474,9 +466,9 @@ where
 /// After dropping redundancies, a sealed-cover single-survivor residual
 /// replaces the Intersected with the bare inheritor.
 #[inline]
-fn canonicalise_intersected<'scratch, 'arena, S, A, W>(
+fn canonicalise_intersected<'scratch, 'arena, S, A>(
     atom: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -484,7 +476,6 @@ fn canonicalise_intersected<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Intersected(payload) = atom else {
         return None;
@@ -498,7 +489,7 @@ where
     for &conjunct in payload.conjuncts {
         if let Atom::Negated(inner) = conjunct {
             if let Some(head) = head_type
-                && !overlaps(head, *inner, world, options, report, builder)
+                && !overlaps(head, *inner, symbols, options, report, builder)
             {
                 continue;
             }
@@ -514,7 +505,7 @@ where
     }
 
     if payload.head.kind() == AtomKind::Object && !negated_inners.is_empty() {
-        let residual = compute_residual(*payload.head, &negated_inners, world, options, report, builder);
+        let residual = compute_residual(*payload.head, &negated_inners, symbols, options, report, builder);
         match residual {
             SealedResidual::Surviving(survivors) if survivors.len() == 1 => {
                 let survivor = survivors.first().copied()?;
@@ -523,7 +514,7 @@ where
                     builder.scratch_vec_with(kept.len());
                 for &conjunct in &kept {
                     let still_applies = match conjunct {
-                        Atom::Negated(inner) => overlaps(survivor_type, *inner, world, options, report, builder),
+                        Atom::Negated(inner) => overlaps(survivor_type, *inner, symbols, options, report, builder),
                         _ => true,
                     };
 
@@ -557,19 +548,18 @@ where
 /// flag, expressed via the universal `Intersected` / `Negated`
 /// machinery and PHP truthiness semantics for each atom kind.
 #[inline]
-fn narrowed_mixed_meet<'scratch, 'arena, S, A, W>(
+fn narrowed_mixed_meet<'scratch, 'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
 ) -> Option<Atom<'arena>>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let mut pieces: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec();
-    if !narrowed_mixed_meet_multi(a, b, world, builder, &mut pieces) {
+    if !narrowed_mixed_meet_multi(a, b, symbols, builder, &mut pieces) {
         return None;
     }
 
@@ -585,17 +575,16 @@ where
 /// the caller falls through. A `true` with no pushed atoms is the empty
 /// meet.
 #[inline]
-fn narrowed_mixed_meet_multi<'scratch, 'arena, S, A, W>(
+fn narrowed_mixed_meet_multi<'scratch, 'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
     out: &mut ScratchVec<'scratch, Atom<'arena>, S>,
 ) -> bool
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if let (Atom::Mixed(a_payload), Atom::Mixed(b_payload)) = (a, b) {
         let merged_truthiness = match (a_payload.truthiness(), b_payload.truthiness()) {
@@ -622,7 +611,7 @@ where
     };
 
     if mixed_payload == MixedAtom::EMPTY {
-        if !is_uninhabited(other, world, builder) {
+        if !is_uninhabited(other, symbols, builder) {
             out.push(other);
         }
 
@@ -887,10 +876,10 @@ where
 }
 
 #[inline]
-fn family_atom_meet<'arena, S, A, W>(
+fn family_atom_meet<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -898,7 +887,6 @@ fn family_atom_meet<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     match (a.kind(), b.kind()) {
         (AtomKind::Int, AtomKind::Int) => family::int::int_meet(a, b, builder),
@@ -906,16 +894,16 @@ where
         (AtomKind::Numeric, AtomKind::String) | (AtomKind::String, AtomKind::Numeric) => {
             family::string::numeric_string_meet(a, b, builder)
         }
-        (AtomKind::List, AtomKind::List) => family::array::list_meet(a, b, world, options, report, builder),
-        (AtomKind::Array, AtomKind::Array) => family::array::keyed_array_meet(a, b, world, options, report, builder),
+        (AtomKind::List, AtomKind::List) => family::array::list_meet(a, b, symbols, options, report, builder),
+        (AtomKind::Array, AtomKind::Array) => family::array::keyed_array_meet(a, b, symbols, options, report, builder),
         (AtomKind::List, AtomKind::Array) | (AtomKind::Array, AtomKind::List) => {
-            family::array::list_array_meet(a, b, world, options, report, builder)
+            family::array::list_array_meet(a, b, symbols, options, report, builder)
         }
         (AtomKind::Iterable, AtomKind::Iterable) => {
-            family::iterable::iterable_meet(a, b, world, options, report, builder)
+            family::iterable::iterable_meet(a, b, symbols, options, report, builder)
         }
         (AtomKind::Callable, AtomKind::Callable) => {
-            family::callable::callable_meet(a, b, world, options, report, builder)
+            family::callable::callable_meet(a, b, symbols, options, report, builder)
         }
         (AtomKind::HasMethod, AtomKind::HasMethod) => family::has_member::has_method_meet(a, b, builder),
         (AtomKind::HasProperty, AtomKind::HasProperty) => family::has_member::has_property_meet(a, b, builder),
@@ -923,17 +911,17 @@ where
             family::has_member::has_method_property_meet(a, b, builder)
         }
         (AtomKind::Object, AtomKind::Object) => {
-            family::object::compose_object_intersection(a, b, world, options, report, builder)
+            family::object::compose_object_intersection(a, b, symbols, options, report, builder)
         }
         (AtomKind::Object, AtomKind::HasMethod)
         | (AtomKind::Object, AtomKind::HasProperty)
         | (AtomKind::Object, AtomKind::ObjectShape) => {
-            family::object::compose_object_with_structural(a, b, world, builder)
+            family::object::compose_object_with_structural(a, b, symbols, builder)
         }
         (AtomKind::HasMethod, AtomKind::Object)
         | (AtomKind::HasProperty, AtomKind::Object)
         | (AtomKind::ObjectShape, AtomKind::Object) => {
-            family::object::compose_object_with_structural(b, a, world, builder)
+            family::object::compose_object_with_structural(b, a, symbols, builder)
         }
         (AtomKind::ObjectShape, AtomKind::HasMethod | AtomKind::HasProperty) => {
             family::object::compose_shape_with_structural(a, b, builder)
@@ -942,16 +930,16 @@ where
             family::object::compose_shape_with_structural(b, a, builder)
         }
         (AtomKind::Iterable, AtomKind::Array) => {
-            family::array::iterable_array_meet(a, b, world, options, report, builder)
+            family::array::iterable_array_meet(a, b, symbols, options, report, builder)
         }
         (AtomKind::Array, AtomKind::Iterable) => {
-            family::array::iterable_array_meet(b, a, world, options, report, builder)
+            family::array::iterable_array_meet(b, a, symbols, options, report, builder)
         }
         (AtomKind::Iterable, AtomKind::List) => {
-            family::array::iterable_list_meet(a, b, world, options, report, builder)
+            family::array::iterable_list_meet(a, b, symbols, options, report, builder)
         }
         (AtomKind::List, AtomKind::Iterable) => {
-            family::array::iterable_list_meet(b, a, world, options, report, builder)
+            family::array::iterable_list_meet(b, a, symbols, options, report, builder)
         }
         _ => None,
     }

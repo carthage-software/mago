@@ -28,6 +28,7 @@
 use mago_allocator::Arena;
 
 use crate::path::Path;
+use crate::symbol::SymbolTable;
 use crate::ty::Type;
 use crate::ty::atom::Atom;
 use crate::ty::atom::kind::AtomKind;
@@ -36,15 +37,14 @@ use crate::ty::lattice;
 use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::well_known;
-use crate::world::World;
 
 /// Static compatibility: a value the type system admits in `a` is also
 /// admitted in `b`. Equivalent to [`lattice::overlaps`].
 #[inline]
-pub fn statically_compatible<'arena, S, A, W>(
+pub fn statically_compatible<'arena, S, A>(
     a: Type<'arena>,
     b: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -52,9 +52,8 @@ pub fn statically_compatible<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    lattice::overlaps(a, b, world, options, report, builder)
+    lattice::overlaps(a, b, symbols, options, report, builder)
 }
 
 /// Runtime compatibility: a single PHP runtime value could inhabit both
@@ -65,10 +64,10 @@ where
 /// disjoint generic arguments are compatible, and intersection conjuncts
 /// beyond the head class are ignored.
 #[inline]
-pub fn runtime_compatible<'arena, S, A, W>(
+pub fn runtime_compatible<'arena, S, A>(
     a: Type<'arena>,
     b: Type<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -76,18 +75,17 @@ pub fn runtime_compatible<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     a.atoms
         .iter()
-        .any(|left| b.atoms.iter().any(|right| atom_runtime_compatible(*left, *right, world, options, report, builder)))
+        .any(|left| b.atoms.iter().any(|right| atom_runtime_compatible(*left, *right, symbols, options, report, builder)))
 }
 
 #[inline]
-fn atom_runtime_compatible<'arena, S, A, W>(
+fn atom_runtime_compatible<'arena, S, A>(
     a: Atom<'arena>,
     b: Atom<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -95,7 +93,6 @@ fn atom_runtime_compatible<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if a == well_known::NEVER || b == well_known::NEVER {
         return false;
@@ -113,7 +110,7 @@ where
     let a_object = is_object_family_atom(a);
     let b_object = is_object_family_atom(b);
     if a_object && b_object {
-        return objects_runtime_compatible(a, b, world);
+        return objects_runtime_compatible(a, b, symbols);
     }
 
     if a_object != b_object {
@@ -123,7 +120,7 @@ where
     let a_type = builder.union_of(&[a]);
     let b_type = builder.union_of(&[b]);
 
-    lattice::overlaps(a_type, b_type, world, options, report, builder)
+    lattice::overlaps(a_type, b_type, symbols, options, report, builder)
 }
 
 /// `true` iff some nominal class on one side is related (either direction
@@ -131,9 +128,9 @@ where
 /// nominal set on a side means "any class", which is compatible with
 /// anything in the family.
 #[inline]
-fn objects_runtime_compatible<'arena, W>(a: Atom<'arena>, b: Atom<'arena>, world: &W) -> bool
+fn objects_runtime_compatible<'arena, A>(a: Atom<'arena>, b: Atom<'arena>, symbols: &SymbolTable<'arena, A>) -> bool
 where
-    W: World<'arena>,
+    A: Arena,
 {
     let a_classes = nominal_classes(a);
     let b_classes = nominal_classes(b);
@@ -145,7 +142,7 @@ where
     a_classes.iter().any(|a_class| {
         b_classes
             .iter()
-            .any(|b_class| world.descends_from(a_class.id, b_class.id) || world.descends_from(b_class.id, a_class.id))
+            .any(|b_class| symbols.descends_from(a_class.id, b_class.id) || symbols.descends_from(b_class.id, a_class.id))
     })
 }
 

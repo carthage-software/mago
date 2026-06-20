@@ -4,7 +4,6 @@ use std::collections::BTreeMap;
 
 use common::*;
 
-use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::atom::payload::generic_parameter::DefiningEntity;
 use mago_oracle::ty::template;
 use mago_oracle::ty::template::BoundKind;
@@ -23,7 +22,7 @@ fn key_for<'arena>(f: &mut Fixture<'_, 'arena>, class: &'static str, name: &'sta
 #[test]
 fn keyed_array_value_param_records_lower_bound() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
         let template = f.t_template("F", "T");
@@ -32,7 +31,7 @@ fn keyed_array_value_param_records_lower_bound() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_keyed_unsealed(well_known::TYPE_STRING, well_known::TYPE_INT, false);
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds.len(), 1);
         assert_eq!(bounds[0].kind, BoundKind::Lower);
@@ -43,7 +42,7 @@ fn keyed_array_value_param_records_lower_bound() {
 #[test]
 fn keyed_array_known_item_walked_when_arg_has_matching_key() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
         let template = f.t_template("F", "T");
@@ -53,7 +52,7 @@ fn keyed_array_known_item_walked_when_arg_has_matching_key() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_keyed_sealed(BTreeMap::from([(name_key, (false, well_known::TYPE_STRING))]), false);
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds[0].ty, well_known::TYPE_STRING);
     });
@@ -62,7 +61,7 @@ fn keyed_array_known_item_walked_when_arg_has_matching_key() {
 #[test]
 fn keyed_array_against_iterable_walks_key_and_value_params() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
         let key_template = f.t_template("F", "K");
@@ -73,7 +72,7 @@ fn keyed_array_against_iterable_walks_key_and_value_params() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_iterable(well_known::TYPE_STRING, well_known::TYPE_INT);
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         assert_eq!(state.bounds_for(key_for(f, "F", "K"))[0].ty, well_known::TYPE_STRING);
         assert_eq!(state.bounds_for(key_for(f, "F", "V"))[0].ty, well_known::TYPE_INT);
     });
@@ -82,7 +81,7 @@ fn keyed_array_against_iterable_walks_key_and_value_params() {
 #[test]
 fn callable_return_walked_covariantly() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
         let template = f.t_template("F", "T");
@@ -91,7 +90,7 @@ fn callable_return_walked_covariantly() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_callable(&[], well_known::TYPE_INT);
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds.len(), 1);
         assert_eq!(bounds[0].kind, BoundKind::Lower);
@@ -102,7 +101,7 @@ fn callable_return_walked_covariantly() {
 #[test]
 fn callable_parameter_walked_contravariantly() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
         let template = f.t_template("F", "T");
@@ -111,7 +110,7 @@ fn callable_parameter_walked_contravariantly() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_callable(&[well_known::TYPE_INT], well_known::TYPE_VOID);
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds.len(), 1);
         assert_eq!(bounds[0].kind, BoundKind::Upper);
@@ -122,7 +121,7 @@ fn callable_parameter_walked_contravariantly() {
 #[test]
 fn callable_records_both_param_and_return_bounds() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
         let parameter_template = f.t_template("F", "P");
@@ -133,7 +132,7 @@ fn callable_records_both_param_and_return_bounds() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_callable(&[well_known::TYPE_INT], well_known::TYPE_STRING);
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         assert_eq!(state.bounds_for(key_for(f, "F", "P"))[0].kind, BoundKind::Upper);
         assert_eq!(state.bounds_for(key_for(f, "F", "P"))[0].ty, well_known::TYPE_INT);
         assert_eq!(state.bounds_for(key_for(f, "F", "R"))[0].kind, BoundKind::Lower);
@@ -144,10 +143,10 @@ fn callable_records_both_param_and_return_bounds() {
 #[test]
 fn descendant_class_arg_threads_through_extension_binding() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("A", &[("T", Variance::Covariant)]);
-        world.declare("B");
-        world.with_extended("B", "A", vec![well_known::TYPE_INT]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php /** @template-covariant T */ class A {} /** @extends A<int> */ class B extends A {}",
+        );
 
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
@@ -157,7 +156,7 @@ fn descendant_class_arg_threads_through_extension_binding() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_named("B");
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds.len(), 1);
         assert_eq!(bounds[0].ty, well_known::TYPE_INT);
@@ -167,12 +166,17 @@ fn descendant_class_arg_threads_through_extension_binding() {
 #[test]
 fn descendant_class_arg_substitutes_own_template_args() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("A", &[("T", Variance::Covariant)]);
-        world.with_templates("B", &[("U", Variance::Covariant)]);
-        let b_u = f.t_template("B", "U");
-        let b_u_type = f.u(b_u);
-        world.with_extended("B", "A", vec![b_u_type]);
+        let symbols = symbol_table(
+            f.arena,
+            "<?php
+/** @template-covariant T */
+class A {}
+/**
+ * @template-covariant U
+ * @extends A<U>
+ */
+class B extends A {}",
+        );
 
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
@@ -182,7 +186,7 @@ fn descendant_class_arg_substitutes_own_template_args() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_generic_named("B", vec![well_known::TYPE_STRING]);
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         let bounds = state.bounds_for(key_for(f, "F", "T"));
         assert_eq!(bounds[0].ty, well_known::TYPE_STRING);
     });
@@ -191,7 +195,7 @@ fn descendant_class_arg_substitutes_own_template_args() {
 #[test]
 fn iteration_depth_cutoff_replaces_template_with_constraint() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default().with_max_depth(0);
         let template = f.t_template("F", "T");
@@ -200,7 +204,7 @@ fn iteration_depth_cutoff_replaces_template_with_constraint() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_list(well_known::TYPE_INT, false);
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         assert_eq!(state.iter().count(), 0, "walking past depth 0 collapses to the constraint without recording");
     });
 }
@@ -208,12 +212,12 @@ fn iteration_depth_cutoff_replaces_template_with_constraint() {
 #[test]
 fn iteration_depth_zero_records_top_level_binding() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default().with_max_depth(0);
         let template = f.t_template("F", "T");
         let parameter = f.u(template);
-        template::standin(parameter, well_known::TYPE_INT, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, well_known::TYPE_INT, &symbols, &mut state, &options, &mut f.builder);
         assert_eq!(state.bounds_for(key_for(f, "F", "T")).len(), 1, "the depth 0 walk fires before the cutoff check");
     });
 }
@@ -221,14 +225,14 @@ fn iteration_depth_zero_records_top_level_binding() {
 #[test]
 fn keyed_array_unchanged_when_no_template() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
         let parameter_atom = f.t_keyed_unsealed(well_known::TYPE_STRING, well_known::TYPE_INT, false);
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_keyed_unsealed(well_known::TYPE_STRING, well_known::TYPE_INT, false);
         let argument = f.u(argument_atom);
-        let result = template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        let result = template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         assert_eq!(result, parameter);
         assert_eq!(state.iter().count(), 0);
     });
@@ -237,12 +241,12 @@ fn keyed_array_unchanged_when_no_template() {
 #[test]
 fn callable_unchanged_when_no_template() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
         let parameter_atom = f.t_callable(&[well_known::TYPE_INT], well_known::TYPE_STRING);
         let parameter = f.u(parameter_atom);
-        let result = template::standin(parameter, parameter, &world, &mut state, &options, &mut f.builder);
+        let result = template::standin(parameter, parameter, &symbols, &mut state, &options, &mut f.builder);
         assert_eq!(result, parameter);
         assert_eq!(state.iter().count(), 0);
     });
@@ -251,10 +255,7 @@ fn callable_unchanged_when_no_template() {
 #[test]
 fn descendant_with_no_extension_binding_passes_through() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("A", &[("T", Variance::Covariant)]);
-        world.declare("B");
-        world.add_edge("B", "A");
+        let symbols = symbol_table(f.arena, "<?php /** @template-covariant T */ class A {} class B extends A {}");
 
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
@@ -264,8 +265,8 @@ fn descendant_with_no_extension_binding_passes_through() {
         let parameter = f.u(parameter_atom);
         let argument_atom = f.t_named("B");
         let argument = f.u(argument_atom);
-        let result = template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
-        assert_eq!(result, parameter, "the world has no inherited binding for B extends A");
+        let result = template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
+        assert_eq!(result, parameter, "the symbol table has no inherited binding for B extends A");
         assert_eq!(state.iter().count(), 0);
     });
 }
@@ -273,7 +274,7 @@ fn descendant_with_no_extension_binding_passes_through() {
 #[test]
 fn keyed_array_known_value_against_lit_walks_to_lit_bound() {
     fixture(|f| {
-        let world = empty_world();
+        let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
         let template = f.t_template("F", "T");
@@ -284,7 +285,7 @@ fn keyed_array_known_value_against_lit_walks_to_lit_bound() {
         let forty_two = f.ui(42);
         let argument_atom = f.t_keyed_sealed(BTreeMap::from([(value_key, (false, forty_two))]), false);
         let argument = f.u(argument_atom);
-        template::standin(parameter, argument, &world, &mut state, &options, &mut f.builder);
+        template::standin(parameter, argument, &symbols, &mut state, &options, &mut f.builder);
         assert_eq!(state.bounds_for(key_for(f, "F", "T"))[0].ty, forty_two);
     });
 }

@@ -1,12 +1,13 @@
 //! Sealed-class lattice rules: when a named class is declared sealed
 //! (its set of direct inheritors is closed by the language engine), the
-//! lattice can prove identities that open-world reasoning cannot reach.
+//! lattice can prove identities that open-hierarchy reasoning cannot reach.
 
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec as ScratchVec;
 use mago_flags::U8Flags;
 
 use crate::path::Path;
+use crate::symbol::SymbolTable;
 use crate::symbol::class_like::part::inheritance::InheritedType;
 use crate::symbol::part::generic::Variance;
 use crate::ty::Type;
@@ -18,7 +19,6 @@ use crate::ty::lattice::LatticeOptions;
 use crate::ty::lattice::LatticeReport;
 use crate::ty::predicates::contains_template_anywhere;
 use crate::ty::well_known;
-use crate::world::World;
 
 /// The result of asking "what survives of `H`'s sealed cover after
 /// these negation conjuncts filter out some inheritors?". The surviving
@@ -35,10 +35,10 @@ where
 
 const DEPTH_CAP: usize = 16;
 
-pub(crate) fn compute_residual<'scratch, 'arena, S, A, W>(
+pub(crate) fn compute_residual<'scratch, 'arena, S, A>(
     head: Atom<'arena>,
     negated_inners: &[Type<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -46,7 +46,6 @@ pub(crate) fn compute_residual<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Atom::Object(head_payload) = head else {
         return SealedResidual::NotSealed;
@@ -54,14 +53,14 @@ where
 
     let class_name = head_payload.name;
 
-    let Some(inheritors) = world.sealed_direct_inheritors(class_name.id) else {
+    let Some(inheritors) = symbols.sealed_direct_inheritors(class_name.id) else {
         return SealedResidual::NotSealed;
     };
 
     let mut visited: ScratchVec<'scratch, Path<'arena>, S> = builder.scratch_vec_with(8);
     visited.push(class_name);
 
-    compute_residual_impl(head, negated_inners, inheritors, world, options, report, builder, &mut visited, 0)
+    compute_residual_impl(head, negated_inners, inheritors, symbols, options, report, builder, &mut visited, 0)
 }
 
 /// One level of the sealed cover: each inheritor is either covered by a
@@ -75,11 +74,11 @@ where
 /// refines / overlaps consumers would loop forever asking the same
 /// question. Callers fall back to non-sealed reasoning.
 #[inline]
-fn compute_residual_impl<'scratch, 'arena, S, A, W>(
+fn compute_residual_impl<'scratch, 'arena, S, A>(
     head: Atom<'arena>,
     negated_inners: &[Type<'arena>],
     inheritors: &[InheritedType<'arena>],
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'scratch, 'arena, S, A>,
@@ -89,7 +88,6 @@ fn compute_residual_impl<'scratch, 'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     if depth > DEPTH_CAP {
         return SealedResidual::NotSealed;
@@ -103,22 +101,22 @@ where
 
     for inheritor in inheritors {
         let inheritor = inheritor.target;
-        if !inheritor_admits_head_arguments(*head_payload, inheritor, world, options, report, builder) {
+        if !inheritor_admits_head_arguments(*head_payload, inheritor, symbols, options, report, builder) {
             continue;
         }
 
-        let inheritor_atom = build_inheritor_atom(*head_payload, inheritor, world, builder);
+        let inheritor_atom = build_inheritor_atom(*head_payload, inheritor, symbols, builder);
 
         let covered = negated_inners.iter().any(|negated| {
             let inheritor_type = builder.union_of(&[inheritor_atom]);
-            lattice::refines(inheritor_type, *negated, world, options, report, builder)
+            lattice::refines(inheritor_type, *negated, symbols, options, report, builder)
         });
 
         if covered {
             continue;
         }
 
-        if let Some(grandchildren) = world.sealed_direct_inheritors(inheritor.id) {
+        if let Some(grandchildren) = symbols.sealed_direct_inheritors(inheritor.id) {
             if visited.contains(&inheritor) {
                 return SealedResidual::NotSealed;
             }
@@ -129,7 +127,7 @@ where
                 inheritor_atom,
                 negated_inners,
                 grandchildren,
-                world,
+                symbols,
                 options,
                 report,
                 builder,
@@ -161,10 +159,10 @@ where
 /// the parameter (its inherited argument still mentions a template) can take
 /// any value, so it is always compatible.
 #[inline]
-fn inheritor_admits_head_arguments<'arena, S, A, W>(
+fn inheritor_admits_head_arguments<'arena, S, A>(
     head_payload: ObjectAtom<'arena>,
     inheritor: Path<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     options: LatticeOptions,
     report: &mut LatticeReport<'arena>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
@@ -172,19 +170,18 @@ fn inheritor_admits_head_arguments<'arena, S, A, W>(
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
     let Some(head_arguments) = head_payload.type_arguments else {
         return true;
     };
 
-    let arity = world.template_parameter_arity(head_payload.name.id);
+    let arity = symbols.template_parameter_arity(head_payload.name.id);
     if arity == 0 || head_arguments.len() != arity {
         return true;
     }
 
     for (position, &head_argument) in head_arguments.iter().enumerate() {
-        let Some(inherited) = world.inherited_template_argument(inheritor.id, head_payload.name.id, position) else {
+        let Some(inherited) = symbols.inherited_template_argument(inheritor.id, head_payload.name.id, position) else {
             continue;
         };
 
@@ -192,17 +189,17 @@ where
             continue;
         }
 
-        let variance = world
+        let variance = symbols
             .template_parameter_at(head_payload.name.id, position)
             .map(|parameter| parameter.variance)
             .unwrap_or_default();
 
         let compatible = match variance {
-            Variance::Covariant => lattice::refines(inherited, head_argument, world, options, report, builder),
-            Variance::Contravariant => lattice::refines(head_argument, inherited, world, options, report, builder),
+            Variance::Covariant => lattice::refines(inherited, head_argument, symbols, options, report, builder),
+            Variance::Contravariant => lattice::refines(head_argument, inherited, symbols, options, report, builder),
             Variance::Invariant => {
-                lattice::refines(inherited, head_argument, world, options, report, builder)
-                    && lattice::refines(head_argument, inherited, world, options, report, builder)
+                lattice::refines(inherited, head_argument, symbols, options, report, builder)
+                    && lattice::refines(head_argument, inherited, symbols, options, report, builder)
             }
         };
 
@@ -215,25 +212,24 @@ where
 }
 
 #[inline]
-fn build_inheritor_atom<'arena, S, A, W>(
+fn build_inheritor_atom<'arena, S, A>(
     head_payload: ObjectAtom<'arena>,
     inheritor: Path<'arena>,
-    world: &W,
+    symbols: &SymbolTable<'arena, A>,
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
 ) -> Atom<'arena>
 where
     S: Arena,
     A: Arena,
-    W: World<'arena>,
 {
-    let arity = world.template_parameter_arity(inheritor.id);
+    let arity = symbols.template_parameter_arity(inheritor.id);
 
     let type_arguments = if let Some(head_arguments) = head_payload.type_arguments
         && arity != 0
     {
         let mut projected = builder.scratch_vec_with(arity);
         for position in 0..arity {
-            let argument = world
+            let argument = symbols
                 .inherited_template_argument(inheritor.id, head_payload.name.id, position)
                 .unwrap_or_else(|| head_arguments.get(position).copied().unwrap_or(well_known::TYPE_MIXED));
             projected.push(argument);

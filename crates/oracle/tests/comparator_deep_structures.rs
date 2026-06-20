@@ -4,7 +4,6 @@ use std::collections::BTreeMap;
 
 use common::*;
 
-use mago_oracle::symbol::part::generic::Variance;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::array::KnownElement;
@@ -279,22 +278,20 @@ fn shape_in_unsealed_keyed_array() {
 #[test]
 fn deep_object_with_generic_param() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("Box", &[("T", Variance::Covariant)]);
+        let symbols = symbol_table(f.arena, "<?php /** @template-covariant T */ class Box {}");
         let forty_two = f.ui(42);
         let literal = f.t_generic_named("Box", vec![forty_two]);
         let int = f.t_int();
         let int_type = f.u(int);
         let general = f.t_generic_named("Box", vec![int_type]);
-        assert!(atomic_is_contained(f, literal, general, &world));
+        assert!(atomic_is_contained(f, literal, general, &symbols));
     });
 }
 
 #[test]
 fn deep_nested_object_in_box() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("Box", &[("T", Variance::Covariant)]);
+        let symbols = symbol_table(f.arena, "<?php /** @template-covariant T */ class Box {}");
         let one = f.ui(1);
         let inner = f.t_generic_named("Box", vec![one]);
         let inner_type = f.u(inner);
@@ -304,7 +301,7 @@ fn deep_nested_object_in_box() {
         let inner_general = f.t_generic_named("Box", vec![int_type]);
         let inner_general_type = f.u(inner_general);
         let outer_general = f.t_generic_named("Box", vec![inner_general_type]);
-        assert!(atomic_is_contained(f, outer, outer_general, &world));
+        assert!(atomic_is_contained(f, outer, outer_general, &symbols));
     });
 }
 
@@ -374,8 +371,7 @@ fn shape_with_string_in_string_lit() {
 #[test]
 fn list_of_generic_objects() {
     fixture(|f| {
-        let mut world = MockWorld::new();
-        world.with_templates("Box", &[("T", Variance::Covariant)]);
+        let symbols = symbol_table(f.arena, "<?php /** @template-covariant T */ class Box {}");
         let one = f.ui(1);
         let inner_lit = f.t_generic_named("Box", vec![one]);
         let int = f.t_int();
@@ -385,14 +381,14 @@ fn list_of_generic_objects() {
         let inner_int_type = f.u(inner_int);
         let outer_lit = f.t_list(inner_lit_type, false);
         let outer_int = f.t_list(inner_int_type, false);
-        assert!(atomic_is_contained(f, outer_lit, outer_int, &world));
+        assert!(atomic_is_contained(f, outer_lit, outer_int, &symbols));
     });
 }
 
 #[test]
 fn keyed_with_object_values() {
     fixture(|f| {
-        let world = MockWorld::from_edges(&[("Admin", "User")]);
+        let symbols = symbol_table(f.arena, "<?php class User {} class Admin extends User {}");
         let string = f.t_string();
         let string_type = f.u(string);
         let admin = f.t_named("Admin");
@@ -401,22 +397,22 @@ fn keyed_with_object_values() {
         let user_type = f.u(user);
         let admin_keyed = f.t_keyed_unsealed(string_type, admin_type, false);
         let user_keyed = f.t_keyed_unsealed(string_type, user_type, false);
-        assert!(atomic_is_contained(f, admin_keyed, user_keyed, &world));
-        assert!(!atomic_is_contained(f, user_keyed, admin_keyed, &world));
+        assert!(atomic_is_contained(f, admin_keyed, user_keyed, &symbols));
+        assert!(!atomic_is_contained(f, user_keyed, admin_keyed, &symbols));
     });
 }
 
 #[test]
 fn list_with_class_hierarchy() {
     fixture(|f| {
-        let world = MockWorld::from_edges(&[("B", "A")]);
+        let symbols = symbol_table(f.arena, "<?php class A {} class B extends A {}");
         let b = f.t_named("B");
         let b_type = f.u(b);
         let a = f.t_named("A");
         let a_type = f.u(a);
         let list_b = f.t_list(b_type, false);
         let list_a = f.t_list(a_type, false);
-        assert!(atomic_is_contained(f, list_b, list_a, &world));
-        assert!(!atomic_is_contained(f, list_a, list_b, &world));
+        assert!(atomic_is_contained(f, list_b, list_a, &symbols));
+        assert!(!atomic_is_contained(f, list_a, list_b, &symbols));
     });
 }

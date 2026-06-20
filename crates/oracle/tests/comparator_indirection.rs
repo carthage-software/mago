@@ -60,7 +60,7 @@ fn t_key_of<'arena>(f: &mut Fixture<'_, 'arena>, target: Type<'arena>) -> Atom<'
 fn variable_reflexive() {
     fixture(|f| {
         let variable = t_variable(f, "T");
-        assert!(atomic_is_contained(f, variable, variable, &empty_world()));
+        assert!(atomic_is_contained(f, variable, variable, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -69,8 +69,8 @@ fn distinct_variables_dont_refine() {
     fixture(|f| {
         let t = t_variable(f, "T");
         let u = t_variable(f, "U");
-        assert!(!atomic_is_contained(f, t, u, &empty_world()));
-        assert!(!atomic_is_contained(f, u, t, &empty_world()));
+        assert!(!atomic_is_contained(f, t, u, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, u, t, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -79,7 +79,7 @@ fn reference_handle_equal_refines_via_interning() {
     fixture(|f| {
         let first = t_reference(f, "Foo");
         let second = t_reference(f, "Foo");
-        assert!(atomic_is_contained(f, first, second, &empty_world()));
+        assert!(atomic_is_contained(f, first, second, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -88,7 +88,7 @@ fn distinct_references_dont_refine_without_resolution() {
     fixture(|f| {
         let foo = t_reference(f, "Foo");
         let bar = t_reference(f, "Bar");
-        assert!(!atomic_is_contained(f, foo, bar, &empty_world()));
+        assert!(!atomic_is_contained(f, foo, bar, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -98,8 +98,8 @@ fn concrete_input_does_not_refine_unresolved_reference() {
         let foo_reference = t_reference(f, "Foo");
         let int = f.t_int();
         let foo_named = f.t_named("Foo");
-        assert!(!atomic_is_contained(f, int, foo_reference, &empty_world()));
-        assert!(!atomic_is_contained(f, foo_named, foo_reference, &empty_world()));
+        assert!(!atomic_is_contained(f, int, foo_reference, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, foo_named, foo_reference, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -109,8 +109,8 @@ fn reference_input_does_not_refine_concrete_container() {
         let foo_reference = t_reference(f, "Foo");
         let int = f.t_int();
         let foo_named = f.t_named("Foo");
-        assert!(!atomic_is_contained(f, foo_reference, int, &empty_world()));
-        assert!(!atomic_is_contained(f, foo_reference, foo_named, &empty_world()));
+        assert!(!atomic_is_contained(f, foo_reference, int, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, foo_reference, foo_named, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -119,7 +119,7 @@ fn reference_refines_mixed_via_top() {
     fixture(|f| {
         let foo_reference = t_reference(f, "Foo");
         let mixed = f.mixed();
-        assert!(atomic_is_contained(f, foo_reference, mixed, &empty_world()));
+        assert!(atomic_is_contained(f, foo_reference, mixed, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -128,7 +128,7 @@ fn never_refines_reference_via_bot() {
     fixture(|f| {
         let foo_reference = t_reference(f, "Foo");
         let never = f.never();
-        assert!(atomic_is_contained(f, never, foo_reference, &empty_world()));
+        assert!(atomic_is_contained(f, never, foo_reference, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -138,8 +138,8 @@ fn member_reference_handle_equality() {
         let first = t_member_reference(f, "Foo", "BAR");
         let second = t_member_reference(f, "Foo", "BAR");
         let third = t_member_reference(f, "Foo", "BAZ");
-        assert!(atomic_is_contained(f, first, second, &empty_world()));
-        assert!(!atomic_is_contained(f, first, third, &empty_world()));
+        assert!(atomic_is_contained(f, first, second, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, first, third, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -149,8 +149,8 @@ fn global_reference_handle_equality() {
         let first = t_global_reference(f, "PHP_INT_MAX");
         let second = t_global_reference(f, "PHP_INT_MAX");
         let third = t_global_reference(f, "PHP_INT_MIN");
-        assert!(atomic_is_contained(f, first, second, &empty_world()));
-        assert!(!atomic_is_contained(f, first, third, &empty_world()));
+        assert!(atomic_is_contained(f, first, second, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, first, third, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -160,8 +160,8 @@ fn alias_handle_equality() {
         let first = t_alias(f, "Foo", "MyAlias");
         let second = t_alias(f, "Foo", "MyAlias");
         let third = t_alias(f, "Foo", "OtherAlias");
-        assert!(atomic_is_contained(f, first, second, &empty_world()));
-        assert!(!atomic_is_contained(f, first, third, &empty_world()));
+        assert!(atomic_is_contained(f, first, second, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, first, third, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -189,8 +189,8 @@ fn conditional_handle_equality() {
             well_known::TYPE_STRING,
             well_known::TYPE_FLOAT,
         );
-        assert!(atomic_is_contained(f, first, second, &empty_world()));
-        assert!(!atomic_is_contained(f, first, third, &empty_world()));
+        assert!(atomic_is_contained(f, first, second, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, first, third, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -200,8 +200,8 @@ fn derived_handle_equality() {
         let first = t_key_of(f, well_known::TYPE_INT);
         let second = t_key_of(f, well_known::TYPE_INT);
         let third = t_key_of(f, well_known::TYPE_STRING);
-        assert!(atomic_is_contained(f, first, second, &empty_world()));
-        assert!(!atomic_is_contained(f, first, third, &empty_world()));
+        assert!(atomic_is_contained(f, first, second, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, first, third, &empty_symbol_table(f.arena)));
     });
 }
 
@@ -210,7 +210,7 @@ fn distinct_indirection_kinds_dont_cross() {
     fixture(|f| {
         let variable = t_variable(f, "T");
         let reference = t_reference(f, "T");
-        assert!(!atomic_is_contained(f, variable, reference, &empty_world()));
-        assert!(!atomic_is_contained(f, reference, variable, &empty_world()));
+        assert!(!atomic_is_contained(f, variable, reference, &empty_symbol_table(f.arena)));
+        assert!(!atomic_is_contained(f, reference, variable, &empty_symbol_table(f.arena)));
     });
 }
