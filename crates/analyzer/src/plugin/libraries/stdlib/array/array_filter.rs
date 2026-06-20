@@ -15,6 +15,8 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
+use mago_codex::ttype::atomic::mixed::truthiness::TMixedTruthiness;
+use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
@@ -175,7 +177,7 @@ where
     Some(get_keyed_array(key_type, filtered_values))
 }
 
-fn filter_falsy_atomics(mut value_type: TUnion) -> FilterOutcome {
+fn filter_falsy_atomics(value_type: TUnion) -> FilterOutcome {
     if value_type.is_always_truthy() {
         return FilterOutcome::KeptAsRequired(value_type);
     }
@@ -184,9 +186,40 @@ fn filter_falsy_atomics(mut value_type: TUnion) -> FilterOutcome {
         return FilterOutcome::Removed;
     }
 
-    value_type.types.to_mut().retain(|atomic| !atomic.is_falsy());
+    let mut narrowed = Vec::new();
+    for atomic in value_type.types.as_ref() {
+        if atomic.is_falsy() {
+            continue;
+        }
 
-    if value_type.types.is_empty() { FilterOutcome::Removed } else { FilterOutcome::KeptAsOptional(value_type) }
+        narrowed.push(if atomic.is_truthy() { atomic.clone() } else { narrow_atomic_to_truthy(atomic.clone()) });
+    }
+
+    if narrowed.is_empty() { FilterOutcome::Removed } else { FilterOutcome::KeptAsOptional(TUnion::from_vec(narrowed)) }
+}
+
+fn narrow_atomic_to_truthy(atomic: TAtomic) -> TAtomic {
+    match atomic {
+        TAtomic::Scalar(TScalar::Bool(b)) if b.is_general() => TAtomic::Scalar(TScalar::r#true()),
+        TAtomic::Scalar(TScalar::String(mut string)) if !string.is_known_literal() => {
+            string.is_truthy = true;
+            string.is_non_empty = true;
+
+            TAtomic::Scalar(TScalar::String(string))
+        }
+        TAtomic::Array(TArray::List(mut list)) => {
+            list.non_empty = true;
+
+            TAtomic::Array(TArray::List(list))
+        }
+        TAtomic::Array(TArray::Keyed(mut keyed)) => {
+            keyed.non_empty = true;
+
+            TAtomic::Array(TArray::Keyed(keyed))
+        }
+        TAtomic::Mixed(mixed) => TAtomic::Mixed(mixed.with_truthiness(TMixedTruthiness::Truthy)),
+        other => other,
+    }
 }
 
 pub(super) fn apply_assertion_to_narrow_type(

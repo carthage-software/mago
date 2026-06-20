@@ -2334,6 +2334,7 @@ test_case!(issue_1966);
 test_case!(issue_1968);
 test_case!(issue_1993);
 test_case!(issue_1993_assert);
+test_case!(issue_1990);
 test_case!(issue_1994);
 test_case!(issue_1996);
 test_case!(issue_1467);
