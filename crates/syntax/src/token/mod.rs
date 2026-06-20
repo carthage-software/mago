@@ -29,12 +29,12 @@ pub enum Associativity {
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum Precedence {
     Lowest,
-    Print,
-    YieldFrom,
-    Yield,
     KeyOr,
     KeyXor,
     KeyAnd,
+    Print,
+    Yield,
+    YieldFrom,
     Assignment,
     ElvisOrConditional,
     NullCoalesce,

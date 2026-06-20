@@ -1336,6 +1336,19 @@ mod parser {
     smoke_test!(clone_paren_property_smoke, "<?php clone (new Bar())->prop;");
     smoke_test!(clone_paren_array_access_smoke, "<?php clone ($a)[0];");
     smoke_test!(clone_paren_static_const_smoke, "<?php clone ($a)::CONST;");
+
+    test_expression!(equality_below_comparison_eq, "$a == $b > $c", "($a == ($b > $c))");
+    test_expression!(equality_below_comparison_neq, "$a != $b < $c", "($a != ($b < $c))");
+    test_expression!(equality_below_comparison_identical, "$a === $b <= $c", "($a === ($b <= $c))");
+    test_expression!(equality_below_comparison_not_identical, "$a !== $b >= $c", "($a !== ($b >= $c))");
+    test_expression!(spaceship_is_equality_tier, "$a <=> $b > $c", "($a <=> ($b > $c))");
+    test_expression!(yield_binds_tighter_than_or, "yield \"a\" or $b", "((yield \"a\") or $b)");
+    test_expression!(yield_binds_tighter_than_and, "yield \"a\" and $b", "((yield \"a\") and $b)");
+    test_expression!(yield_binds_tighter_than_xor, "yield \"a\" xor $b", "((yield \"a\") xor $b)");
+    test_expression!(yield_from_binds_tighter_than_or, "yield from $a or $b", "((yield from $a) or $b)");
+    test_expression!(print_binds_tighter_than_or, "print \"a\" or $b", "((print \"a\") or $b)");
+    test_expression!(print_binds_tighter_than_and, "print \"a\" and $b", "((print \"a\") and $b)");
+    test_expression!(assign_yield_below_and, "$x = yield \"a\" and $b", "(($x = (yield \"a\")) and $b)");
 }
 
 mod semantics {
