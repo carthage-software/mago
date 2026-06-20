@@ -661,7 +661,7 @@ baseline-variant = "loose"
 mago analyze --ignore-baseline
 </code></pre>
 <p>当你想看到当前被 baseline 抑制的所有问题(例如打算清理其中一部分时)很有用。</p>
-<h2 id="keeping-the-baseline-tidy">保持 baseline 整洁</h2>
+<h2 id="inspecting-a-baseline">保持 baseline 整洁</h2>
 <p>当你修复了 baseline 中的某个问题后,对应条目就成了死条目。Mago 会检测到并就过期条目发出警告。</p>
 <p>若只想清除这些过期条目,运行:</p>
 <pre><code class="language-sh">mago lint --remove-outdated-baseline-entries --baseline lint-baseline.toml
@@ -671,7 +671,7 @@ mago analyze --ignore-baseline
 <pre><code class="language-sh">mago lint --generate-baseline --baseline lint-baseline.toml
 </code></pre>
 <p>对上述任一命令传入 <code>--backup-baseline</code>,即可在覆盖前把旧文件保留为 <code>lint-baseline.toml.bkp</code>。</p>
-<h2 id="json-schema">JSON Schema</h2>
+<h2 id="grouping">JSON Schema</h2>
 <p>如果你正在构建需要解析或生成 baseline 文件的工具或 IDE 集成,可以获取 schema:</p>
 <pre><code class="language-sh">mago config --schema --show baseline
 </code></pre>
@@ -724,11 +724,11 @@ mago analyze --ignore-baseline
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#keeping-the-baseline-tidy">保持 baseline 整洁</a>
+      <a class="doc-toc__link" href="#inspecting-a-baseline">保持 baseline 整洁</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
-      <a class="doc-toc__link" href="#json-schema">JSON Schema</a>
+      <a class="doc-toc__link" href="#grouping">JSON Schema</a>
     </li>
     
   </ol>

@@ -632,6 +632,34 @@ baseline-variant = "loose"
 mago analyze --ignore-baseline
 </code></pre>
 <p>Useful when you want to see issues currently suppressed by the baseline, for example to clean some of them up.</p>
+<h2 id="inspecting-a-baseline">Inspecting a baseline</h2>
+<p>A large baseline is thousands of entries across thousands of lines - tedious to read by hand. <code>mago inspect-baseline</code> summarises one so you can see, at a glance, which issue codes and which files dominate it.</p>
+<pre><code class="language-sh">mago inspect-baseline lint-baseline.toml
+</code></pre>
+<p>With no flags it prints a ranked bar chart of issue codes, most frequent first - the quickest way to see what dominates the baseline:</p>
+<pre><code>359670 issues across 221 codes
+
+  49543  ██████████████████████████████  mixed-return-statement
+  32167  ███████████████████             mixed-argument
+  31707  ███████████████████             non-existent-property
+  …
+</code></pre>
+<p>The baseline path is optional: when omitted, the one configured in <code>mago.toml</code> is used. If several sections configure different baselines, pass the path explicitly.</p>
+<h3 id="grouping">Grouping</h3>
+<p>Use <code>--group</code> to expand the summary into per-group charts. Group by <code>code</code> to list the files under each code, or by <code>file</code> to list the codes under each file:</p>
+<pre><code class="language-sh">mago inspect-baseline lint-baseline.toml --group code
+mago inspect-baseline lint-baseline.toml --group file
+</code></pre>
+<h3 id="drilling-into-a-single-code-or-file">Drilling into a single code or file</h3>
+<p>Pass a code or file as a second argument to drill into it. When the argument matches an issue code, the files containing it are listed; otherwise it is treated as a file path (matched as a suffix) and the codes recorded for that file are listed:</p>
+<pre><code class="language-sh">mago inspect-baseline lint-baseline.toml mixed-argument
+mago inspect-baseline lint-baseline.toml src/Service/PaymentProcessor.php
+</code></pre>
+<h3 id="other-options">Other options</h3>
+<ul>
+<li><code>--limit N</code> caps how many entries are shown, both top-level groups and members within each group.</li>
+</ul>
+<p>In an interactive terminal, file names are rendered as clickable hyperlinks. The link target follows the <a href="../../../../main/en/guide/configuration#editor-integration"><code>editor-url</code></a> setting in <code>mago.toml</code>, falling back to <code>file://</code> so paths open in most editors and terminals.</p>
 <h2 id="keeping-the-baseline-tidy">Keeping the baseline tidy</h2>
 <p>When you fix an issue that was part of the baseline, its entry becomes dead. Mago detects this and warns about stale entries.</p>
 <p>To prune just the dead entries, run:</p>
@@ -692,6 +720,22 @@ mago analyze --ignore-baseline
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#skipping-the-baseline-temporarily">Skipping the baseline temporarily</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#inspecting-a-baseline">Inspecting a baseline</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#grouping">Grouping</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#drilling-into-a-single-code-or-file">Drilling into a single code or file</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#other-options">Other options</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
