@@ -14,11 +14,16 @@ use crate::cst::cst::DocumentIndentation;
 use crate::cst::cst::DocumentKind as AstDocumentKind;
 use crate::cst::cst::DocumentString;
 use crate::cst::cst::Expression;
+use crate::cst::cst::Identifier;
 use crate::cst::cst::InterpolatedString;
 use crate::cst::cst::Keyword;
+use crate::cst::cst::Literal;
 use crate::cst::cst::LiteralStringPart;
+use crate::cst::cst::LocalIdentifier;
 use crate::cst::cst::ShellExecuteString;
 use crate::cst::cst::StringPart;
+use crate::cst::cst::UnaryPrefix;
+use crate::cst::cst::UnaryPrefixOperator;
 use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
@@ -220,15 +225,91 @@ where
             return Ok(expression);
         };
 
-        let Expression::ConstantAccess(ConstantAccess { name }) = index else {
+        let Some(index) = self.normalize_interpolated_offset(index) else {
             return Ok(expression);
         };
 
         Ok(self.arena.alloc(Expression::ArrayAccess(ArrayAccess {
             array,
             left_bracket: *left_bracket,
-            index: self.arena.alloc(Expression::Identifier(*name)),
+            index,
             right_bracket: *right_bracket,
         })))
     }
+
+    /// Rewrites the offset of a simple-syntax interpolated array access (`"$a[offset]"`) to match
+    /// PHP's special offset rules, returning `None` when the offset is already correct.
+    ///
+    /// In this position PHP treats the offset as a string key unless it is a canonical decimal
+    /// integer. The only offsets that stay numeric are `"$a[1]"` and `"$a[-1]"`; everything else
+    /// scalar becomes the string key of its raw lexeme:
+    ///
+    /// * A bareword (`"$a[key]"`) is the key `"key"`, so the `ConstantAccess` the expression
+    ///   parser produced is turned back into a plain `Identifier`. `true`, `false`, and `null`
+    ///   are barewords here too, so `"$a[true]"` is the key `"true"`.
+    /// * A non-canonical numeric offset keeps its raw lexeme: `"$a[01]"`, `"$a[0x1]"`, and
+    ///   `"$a[-0]"` are the keys `"01"`, `"0x1"`, and `"-0"`.
+    /// * A float (`"$a[1.5]"`) is rejected by PHP, but Mago's interpolation lexer is lenient and
+    ///   produces a float literal here; it is treated as the string key of its raw lexeme rather
+    ///   than a (truncating) numeric key.
+    fn normalize_interpolated_offset(&self, index: &'arena Expression<'arena>) -> Option<&'arena Expression<'arena>> {
+        match index {
+            Expression::ConstantAccess(ConstantAccess { name }) => {
+                Some(self.arena.alloc(Expression::Identifier(*name)))
+            }
+            Expression::Literal(literal) => {
+                let (raw, span) = match literal {
+                    Literal::Integer(integer) if integer_offset_is_canonical(integer.raw) => return None,
+                    Literal::Integer(integer) => (integer.raw, integer.span),
+                    Literal::Float(float) => (float.raw, float.span),
+                    Literal::True(keyword) | Literal::False(keyword) | Literal::Null(keyword) => {
+                        (keyword.value, keyword.span)
+                    }
+                    Literal::String(_) => return None,
+                };
+
+                Some(self.string_key_offset(raw, span))
+            }
+            Expression::UnaryPrefix(UnaryPrefix {
+                operator: UnaryPrefixOperator::Negation(minus),
+                operand: Expression::Literal(Literal::Integer(integer)),
+            }) => {
+                let mut raw = self.new_vec();
+                raw.push(b'-');
+                raw.extend_from_slice(integer.raw);
+
+                if integer_offset_is_canonical(&raw) {
+                    return None;
+                }
+
+                Some(self.string_key_offset(self.bytes(&raw), minus.join(integer.span)))
+            }
+            _ => None,
+        }
+    }
+
+    fn string_key_offset(&self, value: &'arena [u8], span: Span) -> &'arena Expression<'arena> {
+        self.arena.alloc(Expression::Identifier(Identifier::Local(LocalIdentifier { span, value })))
+    }
+}
+
+/// Returns `true` when `raw` is the canonical decimal spelling of an integer that fits in a
+/// 64-bit PHP `int`, mirroring PHP's array-key normalization. Leading zeros (`"01"`), a negative
+/// zero (`"-0"`), non-decimal bases (`"0x1"`), and out-of-range values are all non-canonical, so
+/// PHP keeps them as string keys.
+fn integer_offset_is_canonical(raw: &[u8]) -> bool {
+    let digits = match raw {
+        [b'-', rest @ ..] => rest,
+        _ => raw,
+    };
+
+    if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
+        return false;
+    }
+
+    if digits[0] == b'0' {
+        return raw == b"0";
+    }
+
+    std::str::from_utf8(raw).ok().and_then(|text| text.parse::<i64>().ok()).is_some()
 }

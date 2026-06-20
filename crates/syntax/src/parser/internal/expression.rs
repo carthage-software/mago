@@ -136,10 +136,21 @@ where
         &mut self,
         precedence: Precedence,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
-        let mut left = self.parse_lhs_expression(precedence)?;
+        let left = self.parse_lhs_expression(precedence)?;
 
+        self.parse_expression_continuation(left, precedence)
+    }
+
+    pub(crate) fn parse_expression_continuation(
+        &mut self,
+        mut left: &'arena Expression<'arena>,
+        precedence: Precedence,
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         while let Some(next) = self.stream.lookahead(0)? {
-            if !self.state.within_indirect_variable
+            let bareword_names_a_variable =
+                self.state.within_indirect_variable && self.state.within_string_interpolation;
+
+            if !bareword_names_a_variable
                 && !matches!(precedence, Precedence::Instanceof | Precedence::New)
                 && !matches!(next.kind, T!["(" | "::"])
                 && let Expression::Identifier(identifier) = left

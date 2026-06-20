@@ -109,17 +109,15 @@ where
             ) => return Err(self.stream.unexpected(None, &[])),
         };
 
+        let parenthesized = self.arena.alloc(Expression::Parenthesized(Parenthesized {
+            left_parenthesis: partial_args.left_parenthesis,
+            expression: self.arena.alloc(cloned_expression),
+            right_parenthesis: partial_args.right_parenthesis,
+        }));
+
         Ok(Expression::Clone(Clone {
             clone,
-            object: {
-                let object = Expression::Parenthesized(Parenthesized {
-                    left_parenthesis: partial_args.left_parenthesis,
-                    expression: self.arena.alloc(cloned_expression),
-                    right_parenthesis: partial_args.right_parenthesis,
-                });
-
-                self.arena.alloc(object)
-            },
+            object: self.parse_expression_continuation(parenthesized, Precedence::Clone)?,
         }))
     }
 }
