@@ -31,11 +31,15 @@ use crate::symbol::class_like::part::visibility::Visibility;
 
 type Members<'arena, St, Ex> = [MemberItem<'arena, SymbolId, St, Ex>];
 
-/// Flattens inherited members onto every class-like, parents first. After this
-/// each symbol's method/property/constant lists hold its own members plus every
-/// non-private member reachable through its parents, each carrying the
-/// `defining_symbol` of the ancestor that declares it, plus override edges.
-/// Trait-use adaptations (`as` / `insteadof`) are read straight from the IR.
+/// Flattens inherited members onto every class-like in `class_likes`, parents
+/// first. After this each symbol's method/property/constant lists hold its own
+/// members plus every non-private member reachable through its parents, each
+/// carrying the `defining_symbol` of the ancestor that declares it, plus override
+/// edges. Trait-use adaptations (`as` / `insteadof`) are read straight from the IR.
+///
+/// Class-likes already in the table but absent from `class_likes` - the symbols
+/// seeded from a base table - are skipped: they are already flattened, and their
+/// own members do not live in this slice's IR.
 ///
 /// Every working buffer lives on `scratch`; only the flattened slices reach the
 /// output arena.
@@ -51,6 +55,10 @@ pub(crate) fn resolve<'arena, S, A, St, Ex>(
     Ex: Copy,
 {
     for id in topological_order(scratch, table) {
+        if !class_likes.contains_key(&id) {
+            continue;
+        }
+
         let Some(symbol) = table.get_class_like(id) else {
             continue;
         };

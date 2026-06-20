@@ -12,7 +12,6 @@ mod types;
 
 use mago_allocator::Arena;
 use mago_allocator::collections::HashMap;
-
 use mago_hir::ir::item::expression::anonymous_class::AnonymousClass;
 use mago_hir::ir::item::statement::class::Class;
 use mago_hir::ir::item::statement::r#enum::Enum;
@@ -85,6 +84,9 @@ impl<'arena, St, Ex> ClassLikeRef<'_, 'arena, St, Ex> {
 /// each class-like (members, inherited-type lists, generic forwarding), and
 /// precomputes the descendant and namespace indices the [`SymbolTable`](crate::symbol::SymbolTable)
 /// read API relies on.
+///
+/// Use [`link_with`] to link a slice on top of an existing table instead of
+/// starting from scratch.
 pub fn link<'arena, A, S, St, Ex>(
     arena: &'arena A,
     scratch: &S,
@@ -96,11 +98,45 @@ where
     St: Copy,
     Ex: Copy,
 {
+    link_with(arena, scratch, &SymbolTable::new_in(arena), definitions)
+}
+
+/// Links a new slice of per-file [`DefinitionTable`]s on top of an already-linked
+/// `base` [`SymbolTable`], returning the merged table.
+///
+/// The new symbols are added to a copy of `base`: every symbol the slice declares
+/// is lowered, has its inheritance flattened against both the slice and the base
+/// (so `class Foo extends \Exception` resolves the builtin's members), and the
+/// descendant index is recomputed over the union. `base` itself is never mutated;
+/// because both tables live in the same `'arena`, seeding copies map entries -
+/// arena pointers - not symbol payloads. This is the path for linking user code
+/// on top of a prebuilt table of PHP builtins and extensions.
+///
+/// A slice declaration only replaces a base symbol of the same id when it wins
+/// [`Origin`] priority (Project > Override > Runtime > Dependency); otherwise the
+/// base symbol is kept untouched.
+pub fn link_with<'arena, A, S, St, Ex>(
+    arena: &'arena A,
+    scratch: &S,
+    base: &SymbolTable<'arena, A>,
+    definitions: &[DefinitionTable<'arena, A, St, Ex>],
+) -> SymbolTable<'arena, A>
+where
+    A: Arena,
+    S: Arena,
+    St: Copy,
+    Ex: Copy,
+{
     let mut table = SymbolTable::new_in(arena);
+    seed_from_base(&mut table, base);
+
     let mut builder = TypeBuilder::new(arena, scratch);
     let mut lowerer = Lowerer { arena, builder: &mut builder };
 
-    let class_likes = collect_class_likes(scratch, definitions);
+    let mut class_likes = collect_class_likes(scratch, definitions);
+    class_likes
+        .retain(|&id, reference| wins(table.get_class_like(id).map(|existing| existing.origin()), reference.origin()));
+
     lower_function_likes(&mut lowerer, definitions, &mut table);
     lower_constants(&mut lowerer, definitions, &mut table);
 
@@ -126,6 +162,29 @@ where
     descendants::build_descendants(arena, scratch, &mut table);
 
     table
+}
+
+/// Copies every already-linked symbol from `base` into `table`. Keys and values
+/// are [`Copy`] - the values are arena pointers into the shared `'arena` - so
+/// this clones map entries, never symbol payloads. The descendant indices are
+/// left empty on purpose: [`descendants::build_descendants`] recomputes them over
+/// the merged class-like set once the new slice is in.
+fn seed_from_base<'arena, A>(table: &mut SymbolTable<'arena, A>, base: &SymbolTable<'arena, A>)
+where
+    A: Arena,
+{
+    for (&id, &constant) in &base.constants {
+        table.constants.insert(id, constant);
+    }
+    for (&id, &function_like) in &base.function_likes {
+        table.function_likes.insert(id, function_like);
+    }
+    for (&id, &class_like) in &base.class_likes {
+        table.class_likes.insert(id, class_like);
+    }
+    for &namespace in &base.namespaces {
+        table.namespaces.insert(namespace);
+    }
 }
 
 /// Records every namespace prefix of a fully-qualified `name` as containing a
