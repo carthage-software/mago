@@ -48,7 +48,7 @@ test_parsing!(error_handling_lexer_errors, 1);
 test_parsing!(error_handling_recovery, 3);
 test_parsing!(expr_alternative_array_syntax, 22);
 test_parsing!(expr_fetch_and_call_args, 5);
-test_parsing!(expr_first_class_callables, 6);
+test_parsing!(expr_first_class_callables, 4);
 test_parsing!(expr_new_without_class, 2);
 test_parsing!(expr_uvs_global_non_simple_var_error, 3);
 test_parsing!(scalar_encapsed_neg_var_offset, 6);
