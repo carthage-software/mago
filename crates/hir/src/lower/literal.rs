@@ -3,6 +3,7 @@ use ordered_float::OrderedFloat;
 use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_syntax::cst;
+use mago_syntax_core::utils::parse_literal_integer_as_float;
 
 use crate::ir::literal::Literal;
 use crate::ir::literal::LiteralFloat;
@@ -25,7 +26,7 @@ where
                     LiteralKind::Float(LiteralFloat {
                         span: integer.span(),
                         raw: self.interner.intern(integer.raw),
-                        value: OrderedFloat(integer.value.unwrap_or_default() as f64),
+                        value: OrderedFloat(parse_literal_integer_as_float(integer.raw).unwrap_or_default()),
                     })
                 }
                 cst::Literal::Integer(integer) => LiteralKind::Integer(LiteralInteger {

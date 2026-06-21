@@ -103,3 +103,38 @@ fn integer_literal_at_i64_max_stays_an_integer() {
     assert!(!assignment_rhs_is_float("<?php $x = 9223372036854775807;"), "i64::MAX fits, so it stays an integer");
     assert!(!assignment_rhs_is_float("<?php $x = 5;"), "a small integer stays an integer");
 }
+
+fn assignment_rhs_float_value(code: &str) -> f64 {
+    let mut value = None;
+    with_ir(code, |ir| {
+        for statement in ir.statements {
+            if let StatementKind::Expression(expression) = &statement.kind
+                && let ExpressionKind::Assignment(assignment) = &expression.kind
+                && let ExpressionKind::Literal(literal) = &assignment.right.kind
+                && let LiteralKind::Float(float) = literal.kind
+            {
+                value = Some(float.value.into_inner());
+                return;
+            }
+        }
+
+        panic!("no assignment with a float literal right-hand side found");
+    });
+
+    value.unwrap_or(f64::NAN)
+}
+
+#[test]
+fn integer_literal_past_u64_uses_the_real_magnitude_not_the_saturated_value() {
+    let decimal = assignment_rhs_float_value("<?php $x = 111111111111111111111;");
+    assert!((1.0e20..1.2e20).contains(&decimal), "expected ~1.11e20, got {decimal}");
+
+    let hex = assignment_rhs_float_value("<?php $x = 0xFFFFFFFFFFFFFFFF0;");
+    assert!((2.9e20..3.0e20).contains(&hex), "expected ~2.95e20, got {hex}");
+}
+
+#[test]
+fn enormous_integer_literal_lowers_to_infinity() {
+    let value = assignment_rhs_float_value(&format!("<?php $x = {};", "9".repeat(400)));
+    assert!(value.is_infinite(), "an enormous literal overflows to infinity, got {value}");
+}
