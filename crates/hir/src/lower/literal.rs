@@ -1,3 +1,5 @@
+use ordered_float::OrderedFloat;
+
 use mago_allocator::Arena;
 use mago_span::HasSpan;
 use mago_syntax::cst;
@@ -19,6 +21,16 @@ where
         self.arena.alloc(Literal {
             span: literal.span(),
             kind: match literal {
+                cst::Literal::Integer(integer)
+                    if integer.raw.first() != Some(&b'-')
+                        && integer.value.is_some_and(|value| value > i64::MAX as u64) =>
+                {
+                    LiteralKind::Float(LiteralFloat {
+                        span: integer.span(),
+                        raw: self.interner.intern(integer.raw),
+                        value: OrderedFloat(integer.value.unwrap_or_default() as f64),
+                    })
+                }
                 cst::Literal::Integer(integer) => LiteralKind::Integer(LiteralInteger {
                     span: integer.span(),
                     raw: self.interner.intern(integer.raw),
