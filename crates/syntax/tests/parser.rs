@@ -1458,6 +1458,61 @@ mod semantics {
         });
     }
 
+    fn with_interpolated_indirect_variable(code: &str, check: impl FnOnce(&Expression<'_>)) {
+        with_expression(code, |expression| {
+            let Expression::CompositeString(CompositeString::Interpolated(string)) = expression else {
+                panic!("`{code}` is not an interpolated string: {expression:?}");
+            };
+
+            let indirect = string.parts.iter().find_map(|part| match part {
+                StringPart::Expression(Expression::Variable(Variable::Indirect(indirect))) => Some(indirect),
+                _ => None,
+            });
+
+            let Some(indirect) = indirect else {
+                panic!("`{code}` has no `${{...}}` indirect variable");
+            };
+
+            check(indirect.expression);
+        });
+    }
+
+    #[test]
+    fn dollar_brace_with_surrounding_whitespace_is_constant_access() {
+        with_interpolated_indirect_variable(r#""${ foo }""#, |inner| {
+            assert!(matches!(inner, Expression::ConstantAccess(_)), "expected ConstantAccess, got {inner:?}");
+        });
+    }
+
+    #[test]
+    fn dollar_brace_with_leading_whitespace_is_constant_access() {
+        with_interpolated_indirect_variable(r#""${ foo}""#, |inner| {
+            assert!(matches!(inner, Expression::ConstantAccess(_)), "expected ConstantAccess, got {inner:?}");
+        });
+    }
+
+    #[test]
+    fn dollar_brace_with_trailing_whitespace_is_constant_access() {
+        with_interpolated_indirect_variable(r#""${foo }""#, |inner| {
+            assert!(matches!(inner, Expression::ConstantAccess(_)), "expected ConstantAccess, got {inner:?}");
+        });
+    }
+
+    #[test]
+    fn dollar_brace_immediate_offset_form_is_identifier() {
+        with_interpolated_indirect_variable(r#""${foo[0]}""#, |inner| {
+            let Expression::ArrayAccess(access) = inner else {
+                panic!("expected an array access, got {inner:?}");
+            };
+
+            assert!(
+                matches!(access.array, Expression::Identifier(_)),
+                "expected Identifier label, got {:?}",
+                access.array
+            );
+        });
+    }
+
     #[test]
     fn interpolated_offset_hex_is_string_key() {
         with_interpolated_offset(r#""$a[0x0]""#, |index| assert_string_key(index, b"0x0"));
@@ -1508,9 +1563,23 @@ mod semantics {
         with_interpolated_offset(r#""$a[null]""#, |index| assert_string_key(index, b"null"));
     }
 
+    fn assert_parse_error(code: &str) {
+        let arena = LocalArena::new();
+        let source = format!("<?php {code};");
+        let file = File::ephemeral(Cow::Borrowed(b"semantics".as_slice()), Cow::Owned(source.into_bytes()));
+        let program = parse_file(&arena, &file);
+
+        assert!(!program.errors.is_empty(), "`{code}` was expected to fail to parse but parsed cleanly");
+    }
+
     #[test]
-    fn interpolated_offset_float_is_string_key() {
-        with_interpolated_offset(r#""$a[1.5]""#, |index| assert_string_key(index, b"1.5"));
+    fn interpolated_float_offset_is_a_parse_error() {
+        assert_parse_error(r#""$a[1.5]""#);
+    }
+
+    #[test]
+    fn interpolated_arithmetic_offset_is_a_parse_error() {
+        assert_parse_error(r#""$a[1+2]""#);
     }
 
     #[test]

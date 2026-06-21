@@ -417,10 +417,24 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, IndirectVariable, {
-            Document::Group(Group::new(
-                vec_in![f.arena; Document::String(b"${"), self.expression.format(f), Document::String(b"}")],
-            ))
+            if indirect_variable_needs_spacing(self.expression) {
+                Document::Group(Group::new(
+                    vec_in![f.arena; Document::String(b"${ "), self.expression.format(f), Document::String(b" }")],
+                ))
+            } else {
+                Document::Group(Group::new(
+                    vec_in![f.arena; Document::String(b"${"), self.expression.format(f), Document::String(b"}")],
+                ))
+            }
         })
+    }
+}
+
+fn indirect_variable_needs_spacing(expression: &Expression<'_>) -> bool {
+    match expression {
+        Expression::ConstantAccess(_) => true,
+        Expression::ArrayAccess(access) => indirect_variable_needs_spacing(access.array),
+        _ => false,
     }
 }
 

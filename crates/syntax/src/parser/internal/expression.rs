@@ -147,11 +147,7 @@ where
         precedence: Precedence,
     ) -> Result<&'arena Expression<'arena>, ParseError> {
         while let Some(next) = self.stream.lookahead(0)? {
-            let bareword_names_a_variable =
-                self.state.within_indirect_variable && self.state.within_string_interpolation;
-
-            if !bareword_names_a_variable
-                && !matches!(precedence, Precedence::Instanceof | Precedence::New)
+            if !matches!(precedence, Precedence::Instanceof | Precedence::New)
                 && !matches!(next.kind, T!["(" | "::"])
                 && let Expression::Identifier(identifier) = left
             {
@@ -370,10 +366,22 @@ where
                         right_bracket: self.stream.consume_span()?,
                     })
                 } else {
+                    let is_numeric_offset = matches!(next.kind, T![OffsetNumber])
+                        || (matches!(next.kind, T!["-"])
+                            && matches!(self.stream.peek_kind(1)?, Some(T![OffsetNumber])));
+
+                    let index = if is_numeric_offset {
+                        self.parse_interpolated_numeric_offset()?
+                    } else if matches!(next.kind, T![OffsetString]) {
+                        self.parse_interpolated_string_offset()?
+                    } else {
+                        self.parse_expression_with_precedence(Precedence::Lowest)?
+                    };
+
                     Expression::ArrayAccess(ArrayAccess {
                         array: lhs,
                         left_bracket,
-                        index: self.parse_expression_with_precedence(Precedence::Lowest)?,
+                        index,
                         right_bracket: self.stream.eat_span(T!["]"])?,
                     })
                 }

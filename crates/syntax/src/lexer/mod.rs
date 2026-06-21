@@ -85,6 +85,8 @@ pub struct Lexer<'input> {
     mode: LexerMode<'input>,
     interpolating: bool,
     brace_interpolating: bool,
+    var_offset_depth: u32,
+    expect_string_varname: bool,
     /// Buffer for tokens during string interpolation.
     buffer: VecDeque<Token<'input>>,
 }
@@ -112,6 +114,8 @@ impl<'input> Lexer<'input> {
             mode: LexerMode::Inline,
             interpolating: false,
             brace_interpolating: false,
+            var_offset_depth: 0,
+            expect_string_varname: false,
             buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
         }
     }
@@ -134,6 +138,8 @@ impl<'input> Lexer<'input> {
             mode: LexerMode::Script,
             interpolating: false,
             brace_interpolating: false,
+            var_offset_depth: 0,
+            expect_string_varname: false,
             buffer: VecDeque::with_capacity(Self::BUFFER_INITIAL_CAPACITY),
         }
     }
@@ -322,6 +328,16 @@ impl<'input> Lexer<'input> {
             }
             LexerMode::Script => {
                 let start = self.input.current_position();
+
+                if self.expect_string_varname {
+                    self.expect_string_varname = false;
+                    let (length, _) = self.input.scan_identifier(0);
+                    let buffer = self.input.consume(length);
+                    let end = self.input.current_position();
+
+                    return Some(Ok(self.token(TokenKind::StringVariableName, buffer, start, end)));
+                }
+
                 let whitespaces = self.input.consume_whitespaces();
                 if !whitespaces.is_empty() {
                     return Some(Ok(self.token(
@@ -341,6 +357,13 @@ impl<'input> Lexer<'input> {
                     let buffer = self.input.consume(1);
                     let end = self.input.current_position();
                     return Some(Ok(self.token(kind, buffer, start, end)));
+                }
+
+                if self.var_offset_depth > 0 && IDENT_START_TABLE[first_byte as usize] {
+                    let (length, _) = self.input.scan_identifier(0);
+                    let buffer = self.input.consume(length);
+                    let end = self.input.current_position();
+                    return Some(Ok(self.token(TokenKind::OffsetString, buffer, start, end)));
                 }
 
                 if IDENT_START_TABLE[first_byte as usize] {
@@ -564,7 +587,27 @@ impl<'input> Lexer<'input> {
                         (TokenKind::HashComment, 1 + comment_len)
                     }
                     [b'\\', ..] => (TokenKind::NamespaceSeparator, 1),
-                    [b'.', start_of_number!(), ..] => {
+                    [start_of_number!(), ..] if self.var_offset_depth > 0 => {
+                        let mut length = 1;
+                        let base = match self.input.read(2) {
+                            [b'0', b'x' | b'X'] => {
+                                length = 2;
+                                16
+                            }
+                            [b'0', b'b' | b'B'] => {
+                                length = 2;
+                                2
+                            }
+                            [b'0', b'o' | b'O'] => {
+                                length = 2;
+                                8
+                            }
+                            _ => 10,
+                        };
+
+                        (TokenKind::OffsetNumber, read_digits_of_base(&self.input, length, base))
+                    }
+                    [b'.', start_of_number!(), ..] if self.var_offset_depth == 0 => {
                         let mut length = read_digits_of_base(&self.input, 2, 10);
                         if let float_exponent!() = self.input.peek(length, 1) {
                             let mut exp_length = length + 1;
@@ -1191,6 +1234,20 @@ impl<'input> Lexer<'input> {
         Some(Ok(self.token(TokenKind::StringPart, content, start, content_end)))
     }
 
+    fn peek_string_varname_label(&self) -> bool {
+        let Some(&first) = self.input.read(1).first() else {
+            return false;
+        };
+
+        if !IDENT_START_TABLE[first as usize] {
+            return false;
+        }
+
+        let (label_length, _) = self.input.scan_identifier(0);
+
+        matches!(self.input.read(label_length + 1).get(label_length), Some(b'[' | b'}'))
+    }
+
     #[inline]
     fn interpolation(
         &mut self,
@@ -1205,6 +1262,10 @@ impl<'input> Lexer<'input> {
         let was_brace_interpolating = self.brace_interpolating;
         // For brace interpolation ({$...}), allow qualified identifiers with backslashes.
         self.brace_interpolating = brace;
+        let was_var_offset_depth = self.var_offset_depth;
+        self.var_offset_depth = 0;
+        let was_expect_string_varname = self.expect_string_varname;
+        self.expect_string_varname = false;
 
         let pending_error = loop {
             match self.advance() {
@@ -1212,6 +1273,20 @@ impl<'input> Lexer<'input> {
                     let token_start = token.start.offset;
                     let token_end = token_start + token.value.len() as u32;
                     let is_final_token = token_start <= end_offset && end_offset <= token_end;
+
+                    if brace {
+                        if token.kind == TokenKind::DollarLeftBrace && self.peek_string_varname_label() {
+                            self.expect_string_varname = true;
+                        }
+                    } else {
+                        match token.kind {
+                            TokenKind::LeftBracket => self.var_offset_depth += 1,
+                            TokenKind::RightBracket => {
+                                self.var_offset_depth = self.var_offset_depth.saturating_sub(1);
+                            }
+                            _ => {}
+                        }
+                    }
 
                     self.buffer.push_back(token);
 
@@ -1227,6 +1302,8 @@ impl<'input> Lexer<'input> {
         self.mode = post_interpolation_mode;
         self.interpolating = was_interpolating;
         self.brace_interpolating = was_brace_interpolating;
+        self.var_offset_depth = was_var_offset_depth;
+        self.expect_string_varname = was_expect_string_varname;
 
         if let Some(error) = pending_error {
             return Some(Err(error));

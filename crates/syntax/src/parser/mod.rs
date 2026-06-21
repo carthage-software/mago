@@ -22,7 +22,6 @@ const MAX_RECURSION_DEPTH: u16 = 512;
 
 #[derive(Debug, Default)]
 pub struct State {
-    pub within_indirect_variable: bool,
     pub within_string_interpolation: bool,
     pub recursion_depth: u16,
 }

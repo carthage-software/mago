@@ -3,13 +3,12 @@ use std::vec::Vec;
 use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
 use mago_span::Span;
+use mago_syntax_core::utils::parse_literal_integer;
 use mago_syntax_core::utils::parse_literal_string_in;
 
 use crate::T;
-use crate::cst::cst::ArrayAccess;
 use crate::cst::cst::BracedExpressionStringPart;
 use crate::cst::cst::CompositeString;
-use crate::cst::cst::ConstantAccess;
 use crate::cst::cst::DocumentIndentation;
 use crate::cst::cst::DocumentKind as AstDocumentKind;
 use crate::cst::cst::DocumentString;
@@ -18,6 +17,7 @@ use crate::cst::cst::Identifier;
 use crate::cst::cst::InterpolatedString;
 use crate::cst::cst::Keyword;
 use crate::cst::cst::Literal;
+use crate::cst::cst::LiteralInteger;
 use crate::cst::cst::LiteralStringPart;
 use crate::cst::cst::LocalIdentifier;
 use crate::cst::cst::ShellExecuteString;
@@ -216,76 +216,57 @@ where
     fn parse_string_part_expression(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {
         let previous_state = self.state.within_string_interpolation;
         self.state.within_string_interpolation = true;
-        let expression_result = self.parse_expression();
+        let expression = self.parse_expression();
         self.state.within_string_interpolation = previous_state;
 
-        let expression = expression_result?;
-
-        let Expression::ArrayAccess(ArrayAccess { array, left_bracket, index, right_bracket }) = expression else {
-            return Ok(expression);
-        };
-
-        let Some(index) = self.normalize_interpolated_offset(index) else {
-            return Ok(expression);
-        };
-
-        Ok(self.arena.alloc(Expression::ArrayAccess(ArrayAccess {
-            array,
-            left_bracket: *left_bracket,
-            index,
-            right_bracket: *right_bracket,
-        })))
+        expression
     }
 
-    /// Rewrites the offset of a simple-syntax interpolated array access (`"$a[offset]"`) to match
-    /// PHP's special offset rules, returning `None` when the offset is already correct.
-    ///
-    /// In this position PHP treats the offset as a string key unless it is a canonical decimal
-    /// integer. The only offsets that stay numeric are `"$a[1]"` and `"$a[-1]"`; everything else
-    /// scalar becomes the string key of its raw lexeme:
-    ///
-    /// * A bareword (`"$a[key]"`) is the key `"key"`, so the `ConstantAccess` the expression
-    ///   parser produced is turned back into a plain `Identifier`. `true`, `false`, and `null`
-    ///   are barewords here too, so `"$a[true]"` is the key `"true"`.
-    /// * A non-canonical numeric offset keeps its raw lexeme: `"$a[01]"`, `"$a[0x1]"`, and
-    ///   `"$a[-0]"` are the keys `"01"`, `"0x1"`, and `"-0"`.
-    /// * A float (`"$a[1.5]"`) is rejected by PHP, but Mago's interpolation lexer is lenient and
-    ///   produces a float literal here; it is treated as the string key of its raw lexeme rather
-    ///   than a (truncating) numeric key.
-    fn normalize_interpolated_offset(&self, index: &'arena Expression<'arena>) -> Option<&'arena Expression<'arena>> {
-        match index {
-            Expression::ConstantAccess(ConstantAccess { name }) => {
-                Some(self.arena.alloc(Expression::Identifier(*name)))
-            }
-            Expression::Literal(literal) => {
-                let (raw, span) = match literal {
-                    Literal::Integer(integer) if integer_offset_is_canonical(integer.raw) => return None,
-                    Literal::Integer(integer) => (integer.raw, integer.span),
-                    Literal::Float(float) => (float.raw, float.span),
-                    Literal::True(keyword) | Literal::False(keyword) | Literal::Null(keyword) => {
-                        (keyword.value, keyword.span)
-                    }
-                    Literal::String(_) => return None,
-                };
+    pub(crate) fn parse_interpolated_numeric_offset(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {
+        let minus = if matches!(self.stream.peek_kind(0)?, Some(T!["-"])) {
+            Some(self.stream.eat_span(T!["-"])?)
+        } else {
+            None
+        };
 
-                Some(self.string_key_offset(raw, span))
-            }
-            Expression::UnaryPrefix(UnaryPrefix {
-                operator: UnaryPrefixOperator::Negation(minus),
-                operand: Expression::Literal(Literal::Integer(integer)),
-            }) => {
-                let mut raw = self.new_vec();
-                raw.push(b'-');
-                raw.extend_from_slice(integer.raw);
+        let number = self.stream.eat(T![OffsetNumber])?;
+        let number_span = number.span_for(self.stream.file_id());
 
-                if integer_offset_is_canonical(&raw) {
-                    return None;
-                }
+        let Some(minus_span) = minus else {
+            return Ok(if integer_offset_is_canonical(number.value) {
+                self.arena.alloc(Expression::Literal(Literal::Integer(LiteralInteger {
+                    span: number_span,
+                    raw: number.value,
+                    value: parse_literal_integer(number.value),
+                })))
+            } else {
+                self.string_key_offset(number.value, number_span)
+            });
+        };
 
-                Some(self.string_key_offset(self.bytes(&raw), minus.join(integer.span)))
-            }
-            _ => None,
-        }
+        let mut raw = self.new_vec();
+        raw.push(b'-');
+        raw.extend_from_slice(number.value);
+        let raw = self.bytes(&raw);
+
+        Ok(if integer_offset_is_canonical(raw) {
+            self.arena.alloc(Expression::UnaryPrefix(UnaryPrefix {
+                operator: UnaryPrefixOperator::Negation(minus_span),
+                operand: self.arena.alloc(Expression::Literal(Literal::Integer(LiteralInteger {
+                    span: number_span,
+                    raw: number.value,
+                    value: parse_literal_integer(number.value),
+                }))),
+            }))
+        } else {
+            self.string_key_offset(raw, minus_span.join(number_span))
+        })
+    }
+
+    pub(crate) fn parse_interpolated_string_offset(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {
+        let label = self.stream.eat(T![OffsetString])?;
+
+        Ok(self.string_key_offset(label.value, label.span_for(self.stream.file_id())))
     }
 
     fn string_key_offset(&self, value: &'arena [u8], span: Span) -> &'arena Expression<'arena> {

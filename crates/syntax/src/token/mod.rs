@@ -200,6 +200,8 @@ pub enum TokenKind {
     Isset,                       // `isset`
     List,                        // `list`
     LiteralInteger,              // `1`
+    OffsetNumber,                // `5`/`0x0` offset in `$a[...]` (PHP `T_NUM_STRING`)
+    OffsetString,                // `bar`/`true` offset in `$a[...]` (PHP `T_STRING`)
     IntCast,                     // `(int)`
     IntegerCast,                 // `(integer)`
     Interface,                   // `interface`
@@ -254,6 +256,7 @@ pub enum TokenKind {
     BinaryCast,                  // `(binary)`
     VoidCast,                    // `(void)`
     StringPart,                  // `string` inside a double-quoted string, or a document string
+    StringVariableName,          // `foo` in the immediate `${foo}` interpolation form (PHP `T_STRING_VARNAME`)
     Switch,                      // `switch`
     Throw,                       // `throw`
     Trait,                       // `trait`
