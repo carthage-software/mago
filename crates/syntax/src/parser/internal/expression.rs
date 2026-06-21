@@ -185,7 +185,18 @@ where
                     break;
                 }
 
-                left = self.parse_infix_expression(left)?;
+                if let Expression::Binary(binary) = left
+                    && matches!(binary.rhs, Expression::Assignment(_))
+                    && infix_precedence > binary.operator.precedence()
+                {
+                    left = self.arena.alloc(Expression::Binary(Binary {
+                        lhs: binary.lhs,
+                        operator: binary.operator,
+                        rhs: self.parse_infix_expression(binary.rhs)?,
+                    }));
+                } else {
+                    left = self.parse_infix_expression(left)?;
+                }
             } else {
                 break;
             }

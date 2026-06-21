@@ -1349,6 +1349,13 @@ mod parser {
     test_expression!(print_binds_tighter_than_or, "print \"a\" or $b", "((print \"a\") or $b)");
     test_expression!(print_binds_tighter_than_and, "print \"a\" and $b", "((print \"a\") and $b)");
     test_expression!(assign_yield_below_and, "$x = yield \"a\" and $b", "(($x = (yield \"a\")) and $b)");
+
+    test_expression!(
+        reference_assignment_operand_keeps_relational_precedence,
+        "$a == $b =& $c > $d",
+        "($a == (($b = (& $c)) > $d))"
+    );
+    smoke_test!(reference_assignment_comparison_chain, "<?php $a[] =& $a == $a =& $b > gc_collect_cycles();");
 }
 
 mod semantics {
