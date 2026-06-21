@@ -58,7 +58,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Literal<'arena> {
                 },
                 Literal::Integer(literal_integer) => match literal_integer.value {
                     Some(value) => {
-                        if value > i64::MAX as u64 {
+                        if literal_integer.raw.first() == Some(&b'-') {
+                            get_literal_int(value as i64)
+                        } else if value > i64::MAX as u64 {
                             get_literal_float(value as f64)
                         } else {
                             get_literal_int(value as i64)

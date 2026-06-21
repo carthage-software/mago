@@ -717,7 +717,8 @@ impl<'input> Lexer<'input> {
                     TokenKind::HaltCompiler => LexerMode::Halt(HaltStage::LookingForLeftParenthesis),
                     TokenKind::DocumentStart(document_kind) => {
                         let body_offset = self.input.current_offset() + len;
-                        let indent = read_document_indentation(&self.input, body_offset, document_label);
+                        let interpolated = matches!(document_kind, DocumentKind::Heredoc);
+                        let indent = read_document_indentation(&self.input, body_offset, document_label, interpolated);
 
                         LexerMode::DocumentString(document_kind, document_label, indent, Interpolation::None)
                     }
@@ -1493,8 +1494,9 @@ fn matches_literal_double_quote_string(input: &Input, prefix_len: usize) -> bool
 /// leading whitespace is followed by the closing `label`. The returned width is
 /// the number of leading space/tab bytes on that line; PHP 7.3 flexible
 /// heredoc/nowdoc strips up to that many columns from every body line.
-fn read_document_indentation(input: &Input, body_offset: usize, label: &[u8]) -> usize {
+fn read_document_indentation(input: &Input, body_offset: usize, label: &[u8], interpolated: bool) -> usize {
     let total = input.len();
+    let base = input.current_offset();
     let mut position = body_offset;
     loop {
         let mut width = 0;
@@ -1507,7 +1509,28 @@ fn read_document_indentation(input: &Input, body_offset: usize, label: &[u8]) ->
             return width;
         }
 
+        let mut last_was_slash = false;
         while position < total && !matches!(*input.read_at(position), b'\n' | b'\r') {
+            let byte = *input.read_at(position);
+            let next = (position + 1 < total).then(|| *input.read_at(position + 1));
+
+            if interpolated && !last_was_slash {
+                if (byte == b'$' && next == Some(b'{')) || (byte == b'{' && next == Some(b'$')) {
+                    let from = (position - base) + 2;
+                    position = base + read_until_end_of_brace_interpolation(input, from) as usize;
+
+                    continue;
+                }
+
+                if byte == b'$' && next.is_some_and(|c| is_start_of_identifier(&c)) {
+                    let from = (position - base) + 2;
+                    position = base + read_until_end_of_variable_interpolation(input, from) as usize;
+
+                    continue;
+                }
+            }
+
+            last_was_slash = byte == b'\\' && !last_was_slash;
             position += 1;
         }
 

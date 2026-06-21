@@ -1631,4 +1631,72 @@ mod semantics {
             assert!(matches!(index, Expression::Variable(_)), "expected a variable, got {index:?}");
         });
     }
+
+    #[test]
+    fn interpolated_offset_i64_min_is_a_single_integer_literal() {
+        with_interpolated_offset(r#""$a[-9223372036854775808]""#, |index| {
+            let Expression::Literal(Literal::Integer(integer)) = index else {
+                panic!("expected a single integer literal, got {index:?}");
+            };
+
+            assert_eq!(integer.raw, b"-9223372036854775808");
+            assert_eq!(integer.value.map(|value| value as i64), Some(i64::MIN));
+        });
+    }
+
+    #[test]
+    fn interpolated_offset_below_i64_min_is_a_string_key() {
+        with_interpolated_offset(r#""$a[-9223372036854775809]""#, |index| {
+            assert_string_key(index, b"-9223372036854775809");
+        });
+    }
+
+    fn with_document_string(code: &str, check: impl FnOnce(&DocumentString<'_>)) {
+        let arena = LocalArena::new();
+        let file = File::ephemeral(Cow::Borrowed(b"semantics".as_slice()), Cow::Owned(code.as_bytes().to_vec()));
+        let program = parse_file(&arena, &file);
+
+        assert!(program.errors.is_empty(), "`{code}` failed to parse: {:?}", program.errors);
+
+        let document = program.statements.iter().find_map(|statement| match statement {
+            Statement::Expression(statement) => match statement.expression {
+                Expression::Assignment(assignment) => match assignment.rhs {
+                    Expression::CompositeString(CompositeString::Document(document)) => Some(document),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        });
+
+        let Some(document) = document else {
+            panic!("`{code}` has no heredoc/nowdoc assignment");
+        };
+
+        check(document);
+    }
+
+    #[test]
+    fn nested_same_name_heredoc_measures_outer_indentation() {
+        let code = "<?php\n$y = <<<DOC\n        b\n        ${<<<DOC\n            a\n            DOC}\n         d\n        DOC;\n";
+
+        with_document_string(code, |document| {
+            assert!(
+                matches!(document.indentation, DocumentIndentation::Whitespace(8)),
+                "expected 8-space indentation, got {:?}",
+                document.indentation
+            );
+
+            let last_literal = document.parts.iter().rev().find_map(|part| match part {
+                StringPart::Literal(literal) => Some(literal),
+                _ => None,
+            });
+
+            assert_eq!(
+                last_literal.and_then(|literal| literal.value),
+                Some(b" d".as_slice()),
+                "the ` d` line should keep one leading space"
+            );
+        });
+    }
 }
