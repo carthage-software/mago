@@ -451,6 +451,50 @@ where
         arguments.map(|arguments| self.lower_argument_list(arguments))
     }
 
+    fn lower_simple_interpolation_part(
+        &mut self,
+        expression: &'scratch cst::Expression<'scratch>,
+    ) -> Expression<'arena, (), (), ()> {
+        if let cst::Expression::ArrayAccess(access) = expression
+            && let cst::Expression::UnaryPrefix(unary) = access.index
+            && matches!(unary.operator, cst::UnaryPrefixOperator::Negation(_))
+            && let cst::Expression::Literal(cst::Literal::Integer(integer)) = unary.operand
+            && let Some(magnitude) = integer.value
+            && magnitude > i64::MAX as u64
+        {
+            let span = access.index.span();
+
+            let mut raw = mago_allocator::vec::Vec::new_in(self.arena);
+            raw.push(b'-');
+            raw.extend_from_slice(integer.raw);
+
+            let index = self.arena.alloc(Expression {
+                span,
+                meta: (),
+                kind: ExpressionKind::Literal(self.arena.alloc(Literal {
+                    span,
+                    kind: LiteralKind::Integer(LiteralInteger {
+                        span,
+                        raw: self.interner.intern(raw.as_slice()),
+                        value: Some(magnitude),
+                    }),
+                })),
+            });
+
+            let array = self.arena.alloc(self.lower_expression(access.array));
+
+            return Expression {
+                span: expression.span(),
+                meta: (),
+                kind: ExpressionKind::Access(
+                    self.arena.alloc(Access { span: access.span(), kind: AccessKind::Array(array, index) }),
+                ),
+            };
+        }
+
+        self.lower_expression(expression)
+    }
+
     fn lower_composite_string(
         &mut self,
         string: &'scratch cst::CompositeString<'scratch>,
@@ -468,7 +512,7 @@ where
                     CompositeStringPart::Literal(self.interner.intern(literal.value.unwrap_or(literal.raw)))
                 }
                 cst::StringPart::Expression(expression) => {
-                    CompositeStringPart::Expression(arena.alloc(self.lower_expression(expression)))
+                    CompositeStringPart::Expression(arena.alloc(self.lower_simple_interpolation_part(expression)))
                 }
                 cst::StringPart::BracedExpression(braced) => {
                     CompositeStringPart::Expression(arena.alloc(self.lower_expression(braced.expression)))

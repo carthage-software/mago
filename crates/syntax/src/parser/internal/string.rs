@@ -249,27 +249,18 @@ where
         raw.extend_from_slice(number.value);
         let raw = self.bytes(&raw);
 
-        if !integer_offset_is_canonical(raw) {
-            return Ok(self.string_key_offset(raw, minus_span.join(number_span)));
-        }
-
-        let magnitude = parse_literal_integer(number.value);
-        if magnitude == Some(1u64 << 63) {
-            return Ok(self.arena.alloc(Expression::Literal(Literal::Integer(LiteralInteger {
-                span: minus_span.join(number_span),
-                raw,
-                value: magnitude,
-            }))));
-        }
-
-        Ok(self.arena.alloc(Expression::UnaryPrefix(UnaryPrefix {
-            operator: UnaryPrefixOperator::Negation(minus_span),
-            operand: self.arena.alloc(Expression::Literal(Literal::Integer(LiteralInteger {
-                span: number_span,
-                raw: number.value,
-                value: magnitude,
-            }))),
-        })))
+        Ok(if integer_offset_is_canonical(raw) {
+            self.arena.alloc(Expression::UnaryPrefix(UnaryPrefix {
+                operator: UnaryPrefixOperator::Negation(minus_span),
+                operand: self.arena.alloc(Expression::Literal(Literal::Integer(LiteralInteger {
+                    span: number_span,
+                    raw: number.value,
+                    value: parse_literal_integer(number.value),
+                }))),
+            }))
+        } else {
+            self.string_key_offset(raw, minus_span.join(number_span))
+        })
     }
 
     pub(crate) fn parse_interpolated_string_offset(&mut self) -> Result<&'arena Expression<'arena>, ParseError> {

@@ -21,10 +21,7 @@ where
         self.arena.alloc(Literal {
             span: literal.span(),
             kind: match literal {
-                cst::Literal::Integer(integer)
-                    if integer.raw.first() != Some(&b'-')
-                        && integer.value.is_some_and(|value| value > i64::MAX as u64) =>
-                {
+                cst::Literal::Integer(integer) if integer.value.is_some_and(|value| value > i64::MAX as u64) => {
                     LiteralKind::Float(LiteralFloat {
                         span: integer.span(),
                         raw: self.interner.intern(integer.raw),

@@ -1640,14 +1640,18 @@ mod semantics {
     }
 
     #[test]
-    fn interpolated_offset_i64_min_is_a_single_integer_literal() {
+    fn interpolated_offset_i64_min_stays_a_uniform_negation() {
         with_interpolated_offset(r#""$a[-9223372036854775808]""#, |index| {
-            let Expression::Literal(Literal::Integer(integer)) = index else {
-                panic!("expected a single integer literal, got {index:?}");
+            let Expression::UnaryPrefix(unary) = index else {
+                panic!("expected a unary prefix, got {index:?}");
             };
 
-            assert_eq!(integer.raw, b"-9223372036854775808");
-            assert_eq!(integer.value.map(|value| value as i64), Some(i64::MIN));
+            assert!(matches!(unary.operator, UnaryPrefixOperator::Negation(_)), "expected negation");
+            assert!(
+                matches!(unary.operand, Expression::Literal(Literal::Integer(integer)) if integer.value == Some(1u64 << 63)),
+                "expected the magnitude 2^63, got {:?}",
+                unary.operand
+            );
         });
     }
 
