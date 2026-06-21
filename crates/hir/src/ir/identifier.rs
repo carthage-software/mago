@@ -12,6 +12,7 @@ use mago_allocator::copy::CopyInto;
 pub struct Identifier<'arena> {
     pub span: Span,
     pub value: &'arena [u8],
+    pub imported: bool,
     pub kind: IdentifierKind,
 }
 
@@ -31,7 +32,12 @@ impl CopyInto for Identifier<'_> {
     where
         A: Arena,
     {
-        Identifier { span: self.span, value: arena.alloc_slice_copy(self.value), kind: self.kind }
+        Identifier {
+            span: self.span,
+            imported: self.imported,
+            value: arena.alloc_slice_copy(self.value),
+            kind: self.kind,
+        }
     }
 }
 

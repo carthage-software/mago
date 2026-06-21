@@ -25,6 +25,7 @@ where
     fn enclosing_class_or_static(&self, span: Span) -> Identifier<'arena> {
         self.type_resolution.enclosing_class().unwrap_or(Identifier {
             span,
+            imported: false,
             value: b"static",
             kind: IdentifierKind::Local,
         })
@@ -56,9 +57,12 @@ where
             cst::Hint::Callable(_) => TypeKind::Callable,
             cst::Hint::Static(keyword) => TypeKind::Static(self.enclosing_class_or_static(keyword.span())),
             cst::Hint::Self_(keyword) => TypeKind::Self_(self.enclosing_class_or_static(keyword.span())),
-            cst::Hint::Parent(keyword) => {
-                TypeKind::Parent(Identifier { span: keyword.span(), value: b"parent", kind: IdentifierKind::Local })
-            }
+            cst::Hint::Parent(keyword) => TypeKind::Parent(Identifier {
+                span: keyword.span(),
+                imported: false,
+                value: b"parent",
+                kind: IdentifierKind::Local,
+            }),
             cst::Hint::Void(_) => TypeKind::Void,
             cst::Hint::Never(_) => TypeKind::Never,
             cst::Hint::Float(_) => TypeKind::Float,

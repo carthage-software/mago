@@ -23,7 +23,8 @@ where
         }
 
         for attribute in attribute_lists.iter().flat_map(|list| list.attributes.iter()) {
-            let resolved = self.namespace_resolution.resolve_name(NameResolutionKind::Default, attribute.name.value());
+            let (resolved, _) =
+                self.namespace_resolution.resolve_name(NameResolutionKind::Default, attribute.name.value());
             if !is_attribute_name(resolved) {
                 continue;
             }
@@ -63,7 +64,7 @@ where
             return None;
         };
 
-        let class_name = self.namespace_resolution.resolve_name(NameResolutionKind::Default, class.value());
+        let (class_name, _) = self.namespace_resolution.resolve_name(NameResolutionKind::Default, class.value());
         if !is_attribute_name(class_name) {
             return None;
         }

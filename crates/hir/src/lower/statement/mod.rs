@@ -163,6 +163,7 @@ where
             annotation,
             name: Identifier {
                 span: name_string.span(),
+                imported: false,
                 value: self.interner.intern(name_value),
                 kind: IdentifierKind::Local,
             },
@@ -628,7 +629,7 @@ where
         UseItem {
             span: item.span(),
             kind,
-            item: Identifier { span: item.name.span(), value, kind: identifier_kind },
+            item: Identifier { span: item.name.span(), imported: false, value, kind: identifier_kind },
             r#as: item.alias.as_ref().map(|alias| alias.identifier.value).unwrap_or_else(|| {
                 match memchr::memrchr(b'\\', value) {
                     Some(position) => &value[position + 1..],

@@ -30,7 +30,7 @@ where
         let mut ranges = Vec::new_in(self.arena);
         for attribute_list in attribute_lists.iter() {
             for attribute in attribute_list.attributes.iter() {
-                let resolved =
+                let (resolved, _) =
                     self.namespace_resolution.resolve_name(NameResolutionKind::Default, attribute.name.value());
                 let Some(claim) = recognize_availability_claim(resolved) else {
                     continue;

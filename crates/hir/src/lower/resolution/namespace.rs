@@ -66,9 +66,11 @@ where
         }
     }
 
-    pub(crate) fn resolve_name(&self, kind: NameResolutionKind, name: &'scratch [u8]) -> &'scratch [u8] {
+    /// Resolves `name` to its fully-qualified form and reports whether it was resolved through a
+    /// `use` import (an alias matched).
+    pub(crate) fn resolve_name(&self, kind: NameResolutionKind, name: &'scratch [u8]) -> (&'scratch [u8], bool) {
         if let [b'\\', rest @ ..] = name {
-            return rest;
+            return (rest, false);
         }
 
         match memchr::memchr(b'\\', name) {
@@ -77,16 +79,16 @@ where
                 let suffix = &name[separator + 1..];
 
                 if first.eq_ignore_ascii_case(b"namespace") {
-                    self.qualify(suffix)
+                    (self.qualify(suffix), false)
                 } else if let Some(resolved) = self.lookup_alias(NameResolutionKind::Default, first) {
-                    self.concat(resolved, suffix)
+                    (self.concat(resolved, suffix), true)
                 } else {
-                    self.qualify(name)
+                    (self.qualify(name), false)
                 }
             }
             None => match self.lookup_alias(kind, name) {
-                Some(resolved) => resolved,
-                None => self.qualify(name),
+                Some(resolved) => (resolved, true),
+                None => (self.qualify(name), false),
             },
         }
     }

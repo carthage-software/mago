@@ -23,12 +23,12 @@ where
             cst::Identifier::FullyQualified(_) => IdentifierKind::FullyQualified,
         };
 
-        let value = match resolve {
+        let (value, imported) = match resolve {
             Some(name_kind) => self.namespace_resolution.resolve_name(name_kind, identifier.value()),
-            None => identifier.value(),
+            None => (identifier.value(), false),
         };
 
-        Identifier { span: identifier.span(), value: self.interner.intern(value), kind }
+        Identifier { span: identifier.span(), imported, value: self.interner.intern(value), kind }
     }
 
     pub(crate) fn lower_declaration_name(
@@ -37,6 +37,7 @@ where
     ) -> Identifier<'arena> {
         Identifier {
             span: name.span,
+            imported: false,
             value: self.interner.intern(self.namespace_resolution.qualify(name.value)),
             kind: IdentifierKind::Local,
         }

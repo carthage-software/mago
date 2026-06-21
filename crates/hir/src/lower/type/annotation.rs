@@ -369,9 +369,12 @@ where
             }
             PHPDocReferenceKind::Self_(keyword) => ReferenceKind::Self_(self.enclosing_class_or_static(keyword.span)),
             PHPDocReferenceKind::Static(keyword) => ReferenceKind::Static(self.enclosing_class_or_static(keyword.span)),
-            PHPDocReferenceKind::Parent(keyword) => {
-                ReferenceKind::Parent(Identifier { span: keyword.span, value: b"parent", kind: IdentifierKind::Local })
-            }
+            PHPDocReferenceKind::Parent(keyword) => ReferenceKind::Parent(Identifier {
+                span: keyword.span,
+                imported: false,
+                value: b"parent",
+                kind: IdentifierKind::Local,
+            }),
         }
     }
 
@@ -403,12 +406,13 @@ where
     fn resolve_member_reference_class(&mut self, kind: PHPDocReferenceKind<'scratch>) -> Identifier<'arena> {
         match kind {
             PHPDocReferenceKind::Parent(keyword) => {
-                Identifier { span: keyword.span, value: b"parent", kind: IdentifierKind::Local }
+                Identifier { span: keyword.span, imported: false, value: b"parent", kind: IdentifierKind::Local }
             }
             PHPDocReferenceKind::Self_(keyword) | PHPDocReferenceKind::Static(keyword) => {
                 match self.type_resolution.enclosing_class() {
                     Some(class) => Identifier {
                         span: class.span,
+                        imported: false,
                         value: {
                             let mut lowercased = Vec::new_in(self.scratch);
                             lowercased.extend(class.value.iter().map(u8::to_ascii_lowercase));
@@ -419,6 +423,7 @@ where
                     },
                     None => Identifier {
                         span: keyword.span,
+                        imported: false,
                         value: self.interner.intern(keyword.value),
                         kind: IdentifierKind::Local,
                     },
@@ -446,11 +451,9 @@ where
             IdentifierKind::Local
         };
 
-        Identifier {
-            span: identifier.span,
-            value: self.interner.intern(self.namespace_resolution.resolve_name(resolution, value)),
-            kind,
-        }
+        let (resolved, imported) = self.namespace_resolution.resolve_name(resolution, value);
+
+        Identifier { span: identifier.span, imported, value: self.interner.intern(resolved), kind }
     }
 
     fn array(

@@ -28,7 +28,7 @@ where
         let span = anonymous_class.span();
         let modifiers = self.lower_modifiers(&anonymous_class.modifiers);
         let name = self.build_synthetic_name(b"anonymous-class", span);
-        let owner = Identifier { span, value: name, kind: IdentifierKind::Local };
+        let owner = Identifier { span, imported: false, value: name, kind: IdentifierKind::Local };
         let document = self.phpdoc_resolution.get(anonymous_class.span());
         self.type_resolution.enter_scope(TypeParameterDefiningEntity::ClassLike(owner));
         let annotation = self.lower_item_annotation(document.as_ref(), Some(owner));
