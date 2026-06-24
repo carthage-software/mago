@@ -751,7 +751,7 @@ fn add_nested_assertions(
 
                     let entry = new_types.entry(base_key_atom).or_default();
 
-                    let new_key = if array_key.starts_with(b"'") {
+                    let new_key = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
                         Some(ArrayKey::String(word(&array_key[1..(array_key.len() - 1)])))
                     } else if array_key.starts_with(b"$") {
                         None
@@ -1020,9 +1020,10 @@ where
 
             let array_key_type = if let Some(array_key_offset) = array_key_offset {
                 ArrayKey::Integer(array_key_offset as i64)
+            } else if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
+                ArrayKey::String(word(&array_key[1..(array_key.len() - 1)]))
             } else {
-                let unquoted: Vec<u8> = array_key.iter().copied().filter(|&b| b != b'\'').collect();
-                ArrayKey::String(word(&unquoted))
+                ArrayKey::String(word(&array_key))
             };
 
             let mut new_base_key = base_key.clone();
