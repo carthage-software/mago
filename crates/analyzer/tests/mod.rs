@@ -2501,6 +2501,11 @@ test_case!(issue_1770, {
     s.check_property_initialization = false;
     s
 });
+test_case!(issue_2008, {
+    let mut s = crate::framework::default_test_settings();
+    s.strict_array_index_existence = true;
+    s
+});
 test_case!(issue_1772);
 test_case!(issue_1775);
 test_case!(issue_1786);

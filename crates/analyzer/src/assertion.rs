@@ -33,12 +33,14 @@ use mago_syntax::cst::UnaryPrefixOperator;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::ascii_lowercase_word;
+use mago_word::concat_word;
 use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::assertion::AssertionContext;
 use crate::resolver::class_name::get_class_name_from_atomic;
 use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_index_id;
 use crate::utils::misc::unwrap_expression;
 
 #[derive(Debug, Clone, Copy)]
@@ -292,6 +294,35 @@ where
     let function_name = ascii_lowercase_word(function_identifier.value());
     let resolved_function_name = ascii_lowercase_word(assertion_context.resolved_names.get(function_identifier));
     let should_check_against_unresolved = { function_identifier.is_local() };
+
+    let is_array_key_exists = |name: &[u8]| matches!(name, b"array_key_exists" | b"key_exists");
+    if (should_check_against_unresolved && is_array_key_exists(function_name.as_bytes()))
+        || is_array_key_exists(resolved_function_name.as_bytes())
+    {
+        let key_argument = function_call.argument_list.arguments.first().map(mago_syntax::cst::Argument::value);
+        let array_argument = function_call.argument_list.arguments.get(1).map(mago_syntax::cst::Argument::value);
+
+        if let (Some(key_argument), Some(array_argument)) = (key_argument, array_argument)
+            && get_expression_array_key(artifacts, key_argument).is_none()
+            && let Some(array_id) = get_expression_id(
+                array_argument,
+                assertion_context.this_class_name,
+                assertion_context.resolved_names,
+                Some(assertion_context.codebase),
+            )
+            && let Some(index_id) = get_index_id(
+                key_argument,
+                assertion_context.this_class_name,
+                assertion_context.resolved_names,
+                Some(assertion_context.codebase),
+            )
+        {
+            let access_id = concat_word!(array_id.as_bytes(), b"[", index_id.as_bytes(), b"]");
+            if_types.insert(access_id, vec![vec![Assertion::ArrayKeyExists]]);
+
+            return if_types;
+        }
+    }
 
     let (argument_variable_id_position, function_assertions) = if resolved_function_name
         .as_bytes()

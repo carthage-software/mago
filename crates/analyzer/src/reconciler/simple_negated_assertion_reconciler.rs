@@ -239,7 +239,7 @@ where
             Some(reconcile_falsy_or_empty(context, assertion, existing_var_type, key, negated, span))
         }
         Assertion::IsNotIsset => Some(reconcile_not_isset(context, existing_var_type, key, span)),
-        Assertion::ArrayKeyDoesNotExist => Some(get_never()),
+        Assertion::ArrayKeyDoesNotExist => Some(reconcile_not_isset(context, existing_var_type, key, span)),
         Assertion::DoesNotHaveArrayKey(key_name) => {
             Some(reconcile_no_array_key(context, assertion, existing_var_type, key, span, key_name, negated))
         }
