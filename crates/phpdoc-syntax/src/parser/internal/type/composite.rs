@@ -77,7 +77,7 @@ where
                     if !is_inner_nullable
                         && min_precedence <= TypePrecedence::Conditional
                         && is_keyword(&token, TypeKeyword::Is)
-                        && self.is_conditional_type_ahead() =>
+                        && (self.parenthesis_depth > 0 || self.is_conditional_type_ahead()) =>
                 {
                     let subject = self.alloc(inner);
 
@@ -226,7 +226,10 @@ where
 
     pub(crate) fn parse_parenthesized_type(&mut self) -> Result<Type<'arena>, ParseError> {
         let left_parenthesis = self.stream.consume_span()?;
-        let inner = self.parse_type()?;
+        self.parenthesis_depth += 1;
+        let inner = self.parse_type();
+        self.parenthesis_depth -= 1;
+        let inner = inner?;
         let inner = self.alloc(inner);
         let right_parenthesis = self.stream.eat_span(TokenKind::RightParenthesis)?;
 

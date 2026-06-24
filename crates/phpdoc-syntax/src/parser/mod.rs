@@ -24,6 +24,7 @@ where
     pub(crate) arena: &'arena A,
     pub(crate) stream: PHPDocTokenStream<'arena, A>,
     pub(crate) errors: Vec<'arena, ParseError, A>,
+    pub(crate) parenthesis_depth: usize,
 }
 
 impl<'arena, A> PHPDocParser<'arena, A>
@@ -36,7 +37,7 @@ where
         let lexer = DocblockLexer::new(input);
         let stream = PHPDocTokenStream::new(arena, lexer, content, span.start);
 
-        Self { arena, stream, errors: Vec::new_in(arena) }
+        Self { arena, stream, errors: Vec::new_in(arena), parenthesis_depth: 0 }
     }
 
     #[must_use]

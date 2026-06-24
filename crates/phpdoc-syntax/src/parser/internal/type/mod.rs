@@ -367,6 +367,21 @@ mod tests {
     }
 
     #[test]
+    fn parses_parenthesized_conditional_unconditionally() {
+        let arena = LocalArena::new();
+
+        let Type::Parenthesized(wildcard) = parse(&arena, b"($field is IntlCalendar::FIELD_* ? int : false)") else {
+            panic!("expected a parenthesized type");
+        };
+        assert!(matches!(wildcard.inner, Type::Conditional(_)));
+
+        let Type::Parenthesized(simple) = parse(&arena, b"($x is positive-int ? non-empty-array : array)") else {
+            panic!("expected a parenthesized type");
+        };
+        assert!(matches!(simple.inner, Type::Conditional(_)));
+    }
+
+    #[test]
     fn does_not_treat_description_starting_with_is_as_conditional() {
         let arena = LocalArena::new();
         assert!(!matches!(parse(&arena, b"boolean is true when foofy"), Type::Conditional(_)));
