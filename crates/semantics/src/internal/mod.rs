@@ -29,6 +29,7 @@ use mago_syntax::cst::Program;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::Switch;
 use mago_syntax::cst::Trait;
+use mago_syntax::cst::TraitUseAliasAdaptation;
 use mago_syntax::cst::Try;
 use mago_syntax::cst::UnaryPrefixOperator;
 use mago_syntax::walker::Walker;
@@ -118,6 +119,15 @@ impl<'ast, 'arena> Walker<'ast, 'arena, Context<'_, 'ast, 'arena>> for CheckingW
     #[inline]
     fn walk_in_trait(&self, r#trait: &'ast Trait<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
         checker::class_like::check_trait(r#trait, context);
+    }
+
+    #[inline]
+    fn walk_in_trait_use_alias_adaptation(
+        &self,
+        trait_use_alias_adaptation: &'ast TraitUseAliasAdaptation<'arena>,
+        context: &mut Context<'_, 'ast, 'arena>,
+    ) {
+        checker::class_like::check_trait_use_alias_adaptation(trait_use_alias_adaptation, context);
     }
 
     #[inline]

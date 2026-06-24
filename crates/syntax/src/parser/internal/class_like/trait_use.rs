@@ -119,7 +119,7 @@ where
                 TraitUseAdaptation::Alias(TraitUseAliasAdaptation {
                     method_reference,
                     r#as: self.expect_keyword(T!["as"])?,
-                    modifier: self.parse_optional_read_visibility_modifier()?,
+                    modifier: self.parse_optional_modifier()?,
                     alias: match self.stream.peek_kind(0)? {
                         Some(T![";" | "?>"]) => None,
                         _ => Some(self.parse_local_identifier()?),

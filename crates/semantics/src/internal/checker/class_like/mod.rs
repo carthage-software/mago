@@ -20,6 +20,7 @@ use mago_syntax::cst::PropertyHookBody;
 use mago_syntax::cst::PropertyItem;
 use mago_syntax::cst::Sequence;
 use mago_syntax::cst::Trait;
+use mago_syntax::cst::TraitUseAliasAdaptation;
 
 use crate::internal::checker::partial_application;
 use crate::internal::consts::ANONYMOUS_CLASS_NAME;
@@ -38,6 +39,37 @@ mod constant;
 mod inheritance;
 mod method;
 mod property;
+
+#[inline]
+pub fn check_trait_use_alias_adaptation<'ast, 'arena>(
+    adaptation: &'ast TraitUseAliasAdaptation<'arena>,
+    context: &mut Context<'_, 'ast, 'arena>,
+) {
+    let Some(modifier) = &adaptation.modifier else {
+        return;
+    };
+
+    if modifier.is_read_visibility() {
+        return;
+    }
+
+    let modifier_name = BytesDisplay(modifier.get_keyword().value);
+
+    context.report(
+        Issue::error(format!("The `{modifier_name}` modifier is not allowed in a trait `as` adaptation."))
+            .with_annotation(
+                Annotation::primary(modifier.span()).with_message(format!("`{modifier_name}` cannot be used here")),
+            )
+            .with_annotation(
+                Annotation::secondary(adaptation.r#as.span())
+                    .with_message("This `as` adaptation only accepts a visibility modifier."),
+            )
+            .with_note(
+                "Trait `as` adaptations may only change a method's visibility (`public`, `protected`, or `private`) and/or assign an alias.",
+            )
+            .with_help(format!("Remove the `{modifier_name}` modifier.")),
+    );
+}
 
 #[inline]
 pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
