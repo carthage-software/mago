@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use mago_bytes::BytesDisplay;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -13,6 +14,9 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::cst::Access;
+use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Unset;
 
@@ -23,6 +27,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::utils::expression::get_expression_id;
+use mago_word::concat_word;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
     fn analyze<'ctx, A>(
@@ -54,6 +59,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                 block_context.remove_variable(value_id.as_bytes(), true, context);
                 block_context.references_possibly_from_confusing_scope.remove(value_id);
             }
+
+            check_property_unset(context, artifacts, self.unset.span, value);
 
             'array_access: {
                 let Expression::ArrayAccess(array_access) = value else {
@@ -319,5 +326,78 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
         block_context.flags.set_inside_unset(was_inside_unset);
 
         Ok(())
+    }
+}
+
+fn check_property_unset<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
+    artifacts: &AnalysisArtifacts,
+    unset_keyword_span: Span,
+    value: &Expression<'arena>,
+) where
+    A: Arena,
+{
+    let Expression::Access(Access::Property(property_access)) = value else {
+        return;
+    };
+
+    let ClassLikeMemberSelector::Identifier(property_name) = &property_access.property else {
+        return;
+    };
+
+    let Some(object_type) = artifacts.get_expression_type(property_access.object) else {
+        return;
+    };
+
+    for atomic in object_type.types.as_ref() {
+        let TAtomic::Object(object) = atomic else {
+            continue;
+        };
+
+        let Some(class_name) = object.get_name() else {
+            continue;
+        };
+
+        let qualified_property_name = concat_word!(b"$", property_name.value);
+        let Some(property_metadata) =
+            context.codebase.get_declaring_property(class_name.as_bytes(), qualified_property_name.as_bytes())
+        else {
+            continue;
+        };
+
+        let class_is_readonly =
+            context.codebase.get_class_like(class_name.as_bytes()).is_some_and(|class| class.flags.is_readonly());
+
+        let qualified = format!("{}::${}", BytesDisplay(class_name.as_bytes()), BytesDisplay(property_name.value));
+
+        if property_metadata.flags.is_readonly() || class_is_readonly {
+            context.collector.report_with_code(
+                IssueCode::InvalidUnset,
+                Issue::error(format!("Cannot unset readonly property `{qualified}`."))
+                    .with_annotation(
+                        Annotation::primary(value.span()).with_message("This readonly property cannot be unset."),
+                    )
+                    .with_annotation(Annotation::secondary(unset_keyword_span).with_message("`unset` used here."))
+                    .with_note("Unsetting a readonly property throws an `Error` at runtime.")
+                    .with_help("Remove this property from the `unset` statement."),
+            );
+
+            return;
+        }
+
+        if !property_metadata.hooks.is_empty() || property_metadata.flags.is_virtual_property() {
+            context.collector.report_with_code(
+                IssueCode::InvalidUnset,
+                Issue::error(format!("Cannot unset hooked property `{qualified}`."))
+                    .with_annotation(
+                        Annotation::primary(value.span()).with_message("This hooked property cannot be unset."),
+                    )
+                    .with_annotation(Annotation::secondary(unset_keyword_span).with_message("`unset` used here."))
+                    .with_note("Unsetting a property that declares hooks throws an `Error` at runtime.")
+                    .with_help("Remove this property from the `unset` statement."),
+            );
+
+            return;
+        }
     }
 }
