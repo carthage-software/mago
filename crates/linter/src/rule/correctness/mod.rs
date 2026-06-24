@@ -15,6 +15,7 @@ pub mod no_unused_static;
 pub mod strict_assertions;
 pub mod strict_behavior;
 pub mod strict_types;
+pub mod suspicious_explode_arguments;
 pub mod switch_continue_to_break;
 pub mod use_specific_assertions;
 
@@ -35,5 +36,6 @@ pub use no_unused_static::*;
 pub use strict_assertions::*;
 pub use strict_behavior::*;
 pub use strict_types::*;
+pub use suspicious_explode_arguments::*;
 pub use switch_continue_to_break::*;
 pub use use_specific_assertions::*;

@@ -308,6 +308,7 @@ define_rules! {
     NoAliasFunction(no_alias_function @ NoAliasFunctionRule),
     LowercaseTypeHint(lowercase_type_hint @ LowercaseTypeHintRule),
     IdentityComparison(identity_comparison @ IdentityComparisonRule),
+    SuspiciousExplodeArguments(suspicious_explode_arguments @ SuspiciousExplodeArgumentsRule),
     IneffectiveFormatIgnoreNext(ineffective_format_ignore_next @ IneffectiveFormatIgnoreNextRule),
     InlineVariableReturn(inline_variable_return @ InlineVariableReturnRule),
     IneffectiveFormatIgnoreRegion(ineffective_format_ignore_region @ IneffectiveFormatIgnoreRegionRule),

@@ -171,6 +171,7 @@ use crate::rule::StrictAssertionsConfig;
 use crate::rule::StrictBehaviorConfig;
 use crate::rule::StrictTypesConfig;
 use crate::rule::StringStyleConfig;
+use crate::rule::SuspiciousExplodeArgumentsConfig;
 use crate::rule::SwitchContinueToBreakConfig;
 use crate::rule::TaggedFixmeConfig;
 use crate::rule::TaggedTodoConfig;
@@ -328,6 +329,7 @@ pub struct RulesSettings {
     pub no_alias_function: RuleSettings<NoAliasFunctionConfig>,
     pub lowercase_type_hint: RuleSettings<LowercaseTypeHintConfig>,
     pub identity_comparison: RuleSettings<IdentityComparisonConfig>,
+    pub suspicious_explode_arguments: RuleSettings<SuspiciousExplodeArgumentsConfig>,
     pub ineffective_format_ignore_next: RuleSettings<IneffectiveFormatIgnoreNextConfig>,
     pub ineffective_format_ignore_region: RuleSettings<IneffectiveFormatIgnoreRegionConfig>,
     pub inline_variable_return: RuleSettings<InlineVariableReturnConfig>,
