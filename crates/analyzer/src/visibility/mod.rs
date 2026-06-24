@@ -263,7 +263,24 @@ where
         block_context.scope.get_class_like_name(),
     );
 
-    if !is_visible {
+    let is_readonly_violation = property_metadata.flags.is_readonly()
+        && !can_initialize_readonly_property(
+            context,
+            declaring_class_name.as_bytes(),
+            block_context.scope.get_class_like_name(),
+            block_context.scope.get_function_like(),
+        );
+
+    if is_readonly_violation {
+        report_readonly_issue(
+            context,
+            block_context,
+            IssueCode::InvalidPropertyWrite,
+            access_span,
+            member_span,
+            property_metadata.span.or(property_metadata.name_span),
+        );
+    } else if !is_visible {
         let issue_title = format!(
             "Cannot write to {} property `{}` on class `{}`.",
             visibility, property_name, declaring_class_metadata.original_name
@@ -284,24 +301,6 @@ where
             property_metadata.span.or(property_metadata.name_span),
             help_text,
         );
-    } else if property_metadata.flags.is_readonly()
-        && !can_initialize_readonly_property(
-            context,
-            declaring_class_name.as_bytes(),
-            block_context.scope.get_class_like_name(),
-            block_context.scope.get_function_like(),
-        )
-    {
-        report_readonly_issue(
-            context,
-            block_context,
-            IssueCode::InvalidPropertyWrite,
-            access_span,
-            member_span,
-            property_metadata.span.or(property_metadata.name_span),
-        );
-    } else {
-        // write target is visible and either not readonly or being initialized in an allowed context
     }
 
     is_visible

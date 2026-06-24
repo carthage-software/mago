@@ -2342,6 +2342,7 @@ test_case!(issue_2005);
 test_case!(issue_2014);
 test_case!(issue_2015);
 test_case!(issue_2018);
+test_case!(readonly_property_write);
 test_case!(issue_1467);
 test_case!(issue_1464);
 test_case!(issue_1484);
