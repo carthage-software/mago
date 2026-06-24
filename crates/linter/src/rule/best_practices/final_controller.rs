@@ -9,6 +9,7 @@ use mago_span::HasSpan;
 use mago_syntax::cst::ModifierSequenceExt;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -130,6 +131,95 @@ impl LintRule for FinalControllerRule {
             .with_note("For shared logic, prefer composition (injecting services) over inheritance.")
             .with_help("Add the `final` keyword to the class declaration.");
 
-        ctx.collector.report(issue);
+        let insert_offset = class.modifiers.first_span().unwrap_or_else(|| class.class.span()).start_offset();
+
+        ctx.collector.propose(issue, |edits| {
+            edits.push(TextEdit::insert(insert_offset, "final "));
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use indoc::indoc;
+
+    use crate::test_lint_fix;
+    use crate::test_lint_success;
+
+    test_lint_fix! {
+        name = adds_final_to_plain_controller,
+        rule = FinalControllerRule,
+        settings = |s: &mut crate::settings::Settings| s.integrations.insert(Integration::Laravel),
+        code = indoc! {r"
+            <?php
+
+            class UserController
+            {
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            final class UserController
+            {
+            }
+        "},
+    }
+
+    test_lint_fix! {
+        name = adds_final_before_existing_modifier,
+        rule = FinalControllerRule,
+        settings = |s: &mut crate::settings::Settings| s.integrations.insert(Integration::Laravel),
+        code = indoc! {r"
+            <?php
+
+            readonly class CachedController
+            {
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            final readonly class CachedController
+            {
+            }
+        "},
+    }
+
+    test_lint_fix! {
+        name = adds_final_after_attributes,
+        rule = FinalControllerRule,
+        settings = |s: &mut crate::settings::Settings| s.integrations.insert(Integration::Laravel),
+        code = indoc! {r"
+            <?php
+
+            #[Route]
+            class OrderController
+            {
+            }
+        "},
+        fixed = indoc! {r"
+            <?php
+
+            #[Route]
+            final class OrderController
+            {
+            }
+        "},
+    }
+
+    test_lint_success! {
+        name = skips_abstract_controller,
+        rule = FinalControllerRule,
+        settings = |s: &mut crate::settings::Settings| s.integrations.insert(Integration::Laravel),
+        code = indoc! {r"
+            <?php
+
+            abstract class BaseController
+            {
+            }
+        "},
     }
 }
