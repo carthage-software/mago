@@ -361,6 +361,18 @@ mod tests {
     fn parses_conditional() {
         let arena = LocalArena::new();
         assert!(matches!(parse(&arena, b"T is int ? string : float"), Type::Conditional(_)));
+        assert!(matches!(parse(&arena, b"T is ?int ? string : float"), Type::Conditional(_)));
+        assert!(matches!(parse(&arena, b"T is int|string ? array : bool"), Type::Conditional(_)));
+        assert!(matches!(parse(&arena, b"T is array<int, string> ? A : B"), Type::Conditional(_)));
+    }
+
+    #[test]
+    fn does_not_treat_description_starting_with_is_as_conditional() {
+        let arena = LocalArena::new();
+        assert!(!matches!(parse(&arena, b"boolean is true when foofy"), Type::Conditional(_)));
+        assert!(!matches!(parse(&arena, b"bool is null on failure"), Type::Conditional(_)));
+        assert!(!matches!(parse(&arena, b"int is the result"), Type::Conditional(_)));
+        assert!(!matches!(parse(&arena, b"string is it"), Type::Conditional(_)));
     }
 
     #[test]

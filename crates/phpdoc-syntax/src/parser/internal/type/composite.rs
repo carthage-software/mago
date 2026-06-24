@@ -76,7 +76,8 @@ where
                 TokenKind::Identifier
                     if !is_inner_nullable
                         && min_precedence <= TypePrecedence::Conditional
-                        && is_keyword(&token, TypeKeyword::Is) =>
+                        && is_keyword(&token, TypeKeyword::Is)
+                        && self.is_conditional_type_ahead() =>
                 {
                     let subject = self.alloc(inner);
 
@@ -100,6 +101,100 @@ where
                 _ => return Ok(inner),
             };
         }
+    }
+
+    /// Looks ahead to decide whether an `is` keyword opens a conditional type
+    /// (`subject is target ? then : else`) or is merely free-text description that
+    /// happens to begin with `is`, e.g. `@return bool is true when something`.
+    ///
+    /// It scans the tokens that would make up `[not] <target>` and only reports a
+    /// conditional when that single target type is immediately followed by a `?`.
+    fn is_conditional_type_ahead(&mut self) -> bool {
+        let mut index = 1;
+
+        if self.stream.lookahead(index).is_some_and(|token| is_keyword(&token, TypeKeyword::Not)) {
+            index += 1;
+        }
+
+        let mut depth: usize = 0;
+        let mut seen_atom = false;
+        let mut after_operator = false;
+
+        const SCAN_LIMIT: usize = 48;
+        while index < SCAN_LIMIT {
+            let Some(token) = self.stream.lookahead(index) else {
+                return false;
+            };
+
+            if depth > 0 {
+                match token.kind {
+                    TokenKind::LeftParenthesis
+                    | TokenKind::LeftAngleBracket
+                    | TokenKind::LeftBracket
+                    | TokenKind::LeftBrace => depth += 1,
+                    TokenKind::RightParenthesis
+                    | TokenKind::RightAngleBracket
+                    | TokenKind::RightBracket
+                    | TokenKind::RightBrace => {
+                        depth -= 1;
+                        if depth == 0 {
+                            seen_atom = true;
+                            after_operator = false;
+                        }
+                    }
+                    _ => {}
+                }
+
+                index += 1;
+                continue;
+            }
+
+            match token.kind {
+                TokenKind::Question => {
+                    if seen_atom && !after_operator {
+                        return true;
+                    }
+
+                    seen_atom = false;
+                    after_operator = true;
+                }
+                TokenKind::Pipe | TokenKind::Ampersand | TokenKind::ColonColon => {
+                    if !seen_atom {
+                        return false;
+                    }
+
+                    seen_atom = false;
+                    after_operator = true;
+                }
+                TokenKind::LeftParenthesis
+                | TokenKind::LeftAngleBracket
+                | TokenKind::LeftBracket
+                | TokenKind::LeftBrace => depth += 1,
+                TokenKind::Identifier
+                | TokenKind::Variable
+                | TokenKind::ThisVariable
+                | TokenKind::LiteralInteger
+                | TokenKind::LiteralFloat
+                | TokenKind::SingleQuotedString
+                | TokenKind::DoubleQuotedString
+                | TokenKind::Asterisk
+                | TokenKind::Bang
+                | TokenKind::Minus
+                | TokenKind::Plus => {
+                    if seen_atom && !after_operator {
+                        return false;
+                    }
+
+                    seen_atom = true;
+                    after_operator = false;
+                }
+                _ => return false,
+            }
+
+            index += 1;
+        }
+
+        false
     }
 
     #[inline]
