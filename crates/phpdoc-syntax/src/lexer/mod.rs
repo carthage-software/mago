@@ -28,13 +28,14 @@ const fn is_identifier_start(byte: u8) -> bool {
 #[derive(Debug)]
 pub struct DocblockLexer<'arena> {
     input: Input<'arena>,
+    inline_code: Option<usize>,
 }
 
 impl<'arena> DocblockLexer<'arena> {
     #[inline]
     #[must_use]
     pub fn new(input: Input<'arena>) -> DocblockLexer<'arena> {
-        DocblockLexer { input }
+        DocblockLexer { input, inline_code: None }
     }
 
     #[inline]
@@ -58,6 +59,10 @@ impl<'arena> DocblockLexer<'arena> {
         let start = self.input.current_position();
         let whitespaces = self.input.consume_whitespaces();
         if !whitespaces.is_empty() {
+            if memchr::memchr2(b'\n', b'\r', whitespaces).is_some() {
+                self.inline_code = None;
+            }
+
             return Some(Token::new(TokenKind::Whitespace, whitespaces, start));
         }
 
@@ -91,8 +96,8 @@ impl<'arena> DocblockLexer<'arena> {
             b'-' => (TokenKind::Minus, 1),
             b'+' => (TokenKind::Plus, 1),
             b'`' => (TokenKind::Backtick, remaining.iter().take_while(|&&byte| byte == b'`').count()),
-            b'/' => self.read_slash(remaining),
-            b'\'' | b'"' => self.read_string(first),
+            b'/' if self.inline_code.is_none() => self.read_slash(remaining),
+            b'\'' | b'"' if self.inline_code.is_none() => self.read_string(first),
             b'$' => self.read_variable().unwrap_or_else(|| self.read_other()),
             b'@' => self.read_tag().unwrap_or_else(|| self.read_other()),
             b'0'..=b'9' => self.read_number(),
@@ -100,6 +105,14 @@ impl<'arena> DocblockLexer<'arena> {
             b if is_identifier_start(b) => (TokenKind::Identifier, self.read_identifier()),
             _ => self.read_other(),
         };
+
+        if kind == TokenKind::Backtick {
+            match self.inline_code {
+                None => self.inline_code = Some(length),
+                Some(open) if open == length => self.inline_code = None,
+                Some(_) => {}
+            }
+        }
 
         let value = self.input.consume(length);
 

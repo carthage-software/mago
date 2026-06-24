@@ -254,6 +254,36 @@ fn block_code_inline_code_and_inline_tags_are_separated() {
 }
 
 #[test]
+fn inline_code_keeps_slashes_and_quotes_as_literal_content() {
+    let arena = LocalArena::new();
+    let source = b"/**\n * `foo('val'); // return 'val'`\n */";
+    let document = parse(&arena, source);
+
+    assert!(document.errors.is_empty(), "expected no errors, got {:?}", document.errors);
+
+    let texts = texts(&document);
+    let [TextSegment::InlineCode(inline)] = texts[0].segments else {
+        panic!("expected a single inline-code segment, got {:?}", texts[0].segments);
+    };
+    assert_eq!(inline.value, b"foo('val'); // return 'val'");
+}
+
+#[test]
+fn inline_code_with_unbalanced_apostrophe_is_closed() {
+    let arena = LocalArena::new();
+    let source = b"/**\n * `it's fine`\n */";
+    let document = parse(&arena, source);
+
+    assert!(document.errors.is_empty(), "expected no errors, got {:?}", document.errors);
+
+    let texts = texts(&document);
+    let [TextSegment::InlineCode(inline)] = texts[0].segments else {
+        panic!("expected a single inline-code segment, got {:?}", texts[0].segments);
+    };
+    assert_eq!(inline.value, b"it's fine");
+}
+
+#[test]
 fn utf8_paragraph_text_is_kept_verbatim() {
     let arena = LocalArena::new();
     let source = "/**\n * 中文段落\n */".as_bytes();
