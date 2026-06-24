@@ -235,6 +235,7 @@ define_rules! {
     NoRequestVariable(no_request_variable @ NoRequestVariableRule),
     NoShellExecuteString(no_shell_execute_string @ NoShellExecuteStringRule),
     NoShortOpeningTag(no_short_opening_tag @ NoShortOpeningTagRule),
+    NoShorthandArrayType(no_shorthand_array_type @ NoShorthandArrayTypeRule),
     NoShorthandTernary(no_shorthand_ternary @ NoShorthandTernaryRule),
     NoSprintfConcat(no_sprintf_concat @ NoSprintfConcatRule),
     OptionalParamOrder(optional_param_order @ OptionalParamOrderRule),

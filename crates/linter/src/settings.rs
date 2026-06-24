@@ -117,6 +117,7 @@ use crate::rule::NoServiceStateMutationConfig;
 use crate::rule::NoShellExecuteStringConfig;
 use crate::rule::NoShortBoolCastConfig;
 use crate::rule::NoShortOpeningTagConfig;
+use crate::rule::NoShorthandArrayTypeConfig;
 use crate::rule::NoShorthandTernaryConfig;
 use crate::rule::NoSideEffectsWithDeclarationsConfig;
 use crate::rule::NoSprintfConcatConfig;
@@ -253,6 +254,7 @@ pub struct RulesSettings {
     pub no_request_variable: RuleSettings<NoRequestVariableConfig>,
     pub no_shell_execute_string: RuleSettings<NoShellExecuteStringConfig>,
     pub no_short_opening_tag: RuleSettings<NoShortOpeningTagConfig>,
+    pub no_shorthand_array_type: RuleSettings<NoShorthandArrayTypeConfig>,
     pub no_shorthand_ternary: RuleSettings<NoShorthandTernaryConfig>,
     pub no_sprintf_concat: RuleSettings<NoSprintfConcatConfig>,
     pub optional_param_order: RuleSettings<OptionalParamOrderConfig>,
