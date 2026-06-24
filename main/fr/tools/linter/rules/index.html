@@ -5122,9 +5122,13 @@ while ($i &lt; 10) {
 <details class="rule" name="rule" id="no-boolean-flag-parameter">
 <summary><code class="rule__code">no-boolean-flag-parameter</code><a class="rule__anchor" href="#no-boolean-flag-parameter" aria-label="Lien permanent vers no-boolean-flag-parameter">¶</a><span class="rule__level rule__level--help">help</span></summary>
 <div class="rule__body">
-<p>Flags function-like parameters that use a boolean type.</p>
-<p>Boolean flag parameters can indicate a violation of the Single Responsibility Principle (SRP).
-Refactor by extracting the flag logic into its own class or method.</p>
+<p>Flags function-like parameters that use a boolean type and drive the function's behaviour.</p>
+<p>A boolean parameter is only reported when it is used as a flag, that is, referenced in
+the condition of an <code>if</code>/<code>elseif</code> statement or a ternary (<code>?:</code>) expression. Such flag
+parameters can indicate a violation of the Single Responsibility Principle (SRP);
+refactor by extracting the flag logic into its own class or method.</p>
+<p>A boolean parameter that is merely stored (e.g. <code>$this-&gt;enabled = $enabled;</code>), passed on,
+or returned does not branch the function's behaviour and is not reported.</p>
 <hr class="rule__separator">
 <div class="rule-examples">
 <div class="rule-example rule-example--bad">
@@ -5132,7 +5136,11 @@ Refactor by extracting the flag logic into its own class or method.</p>
 <pre><code class="language-php">&lt;?php
 
 function get_difference(string $a, string $b, bool $ignore_case): string {
-    // ...
+    if ($ignore_case) {
+        return strtolower($a) === strtolower($b) ? '' : $a;
+    }
+
+    return $a === $b ? '' : $a;
 }
 </code></pre>
 </div>
@@ -5146,6 +5154,17 @@ function get_difference(string $a, string $b): string {
 
 function get_difference_case_insensitive(string $a, string $b): string {
     // ...
+}
+
+final class Connection
+{
+    private bool $secure;
+
+    // The boolean is only stored, never used to branch behaviour.
+    public function configure(bool $secure): void
+    {
+        $this-&gt;secure = $secure;
+    }
 }
 </code></pre>
 </div>
