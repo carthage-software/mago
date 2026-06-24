@@ -1,5 +1,6 @@
 use indoc::indoc;
 use mago_allocator::Arena;
+use mago_syntax::cst::LiteralString;
 use schemars::JsonSchema;
 
 use mago_reporting::Annotation;
@@ -94,39 +95,156 @@ impl LintRule for NoRedundantStringConcatRule {
             return;
         };
 
-        let Binary { lhs, operator, rhs } = binary;
-
-        if !operator.is_concatenation() {
+        if !binary.operator.is_concatenation() {
             return;
         }
 
-        let (Expression::Literal(Literal::String(left)), Expression::Literal(Literal::String(right))) = (lhs, rhs)
-        else {
-            return;
+        let enclosing = match ctx.get_parent() {
+            Some(Node::Expression(_)) => ctx.get_nth_parent(1),
+            other => other,
         };
 
-        if left.kind == right.kind {
-            if ctx.source_file.line_number(left.offset()) != ctx.source_file.line_number(right.offset()) {
-                return;
+        if let Some(Node::Binary(parent)) = enclosing
+            && parent.operator.is_concatenation()
+        {
+            return;
+        }
+
+        let mut operands = Vec::new();
+        collect_concatenation_operands(binary, &mut operands);
+
+        let mut index = 0;
+        while index < operands.len() {
+            let operand = operands[index];
+            let Expression::Literal(Literal::String(first)) = operand else {
+                index += 1;
+                continue;
+            };
+
+            let mut run = vec![first];
+            let mut last = first;
+            let mut next_index = index + 1;
+            while next_index < operands.len()
+                && let Expression::Literal(Literal::String(next)) = operands[next_index]
+                && pair_can_be_merged(ctx, last, next)
+            {
+                run.push(next);
+                last = next;
+                next_index += 1;
             }
 
-            let dangerous = matches!(&right.raw[1..], [b'{', ..]);
-            if dangerous {
-                return;
+            index = next_index;
+
+            if run.len() < 2 {
+                continue;
             }
 
             let issue = Issue::new(self.cfg.level(), "String concatenation can be simplified.")
                 .with_code(self.meta.code)
-                .with_annotations(vec![
-                    Annotation::primary(operator.span()).with_message("Redundant string concatenation"),
-                    Annotation::secondary(left.span()).with_message("Left string"),
-                    Annotation::secondary(right.span()).with_message("Right string"),
-                ])
+                .with_annotation(
+                    Annotation::primary(first.span().join(last.span())).with_message("Redundant string concatenation"),
+                )
                 .with_help("Consider combining these strings into a single string.");
 
+            let ranges: Vec<TextRange> = run
+                .iter()
+                .zip(run.iter().skip(1))
+                .map(|(left, right)| TextRange::new(left.end_offset() - 1, right.start_offset() + 1))
+                .collect();
+
             ctx.collector.propose(issue, |edits| {
-                edits.push(TextEdit::delete(TextRange::new(left.end_offset() - 1, right.start_offset() + 1)));
+                for range in ranges {
+                    edits.push(TextEdit::delete(range));
+                }
             });
         }
+    }
+}
+
+fn collect_concatenation_operands<'arena>(binary: &Binary<'arena>, operands: &mut Vec<&'arena Expression<'arena>>) {
+    match binary.lhs {
+        Expression::Binary(inner) if inner.operator.is_concatenation() => {
+            collect_concatenation_operands(inner, operands);
+        }
+        other => operands.push(other),
+    }
+
+    operands.push(binary.rhs);
+}
+
+fn pair_can_be_merged<A>(ctx: &LintContext<'_, '_, A>, left: &LiteralString<'_>, right: &LiteralString<'_>) -> bool
+where
+    A: Arena,
+{
+    if left.kind != right.kind {
+        return false;
+    }
+
+    if ctx.source_file.line_number(left.offset()) != ctx.source_file.line_number(right.offset()) {
+        return false;
+    }
+
+    !matches!(&right.raw[1..], [b'{', ..])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use indoc::indoc;
+
+    use crate::test_lint_failure;
+    use crate::test_lint_fix;
+
+    test_lint_failure! {
+        name = chained_concatenation_reports_a_single_issue,
+        rule = NoRedundantStringConcatRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            $foo = 'a' . 'b' . 'c' . 'd' . 'e' . 'f' . 'g' . 'h' . 'i' . 'j' . 'k';
+        "#},
+    }
+
+    test_lint_failure! {
+        name = each_mergeable_run_reports_its_own_issue,
+        rule = NoRedundantStringConcatRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            $foo = 'a' . 'b' . $middle . 'c' . 'd';
+        "#},
+    }
+
+    test_lint_fix! {
+        name = single_concatenation_is_merged,
+        rule = NoRedundantStringConcatRule,
+        code = indoc! {r#"
+            <?php
+
+            $foo = 'Hello' . ' World';
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $foo = 'Hello World';
+        "#},
+    }
+
+    test_lint_fix! {
+        name = chained_concatenation_is_merged_in_one_pass,
+        rule = NoRedundantStringConcatRule,
+        code = indoc! {r#"
+            <?php
+
+            $foo = 'mything' . 'myotherthing' . 'somethingelse';
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $foo = 'mythingmyotherthingsomethingelse';
+        "#},
     }
 }
