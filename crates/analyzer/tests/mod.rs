@@ -2339,6 +2339,7 @@ test_case!(issue_1994);
 test_case!(issue_1996);
 test_case!(issue_2004);
 test_case!(issue_2005);
+test_case!(issue_2014);
 test_case!(issue_1467);
 test_case!(issue_1464);
 test_case!(issue_1484);

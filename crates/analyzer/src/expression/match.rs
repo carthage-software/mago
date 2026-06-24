@@ -1,4 +1,4 @@
-use mago_allocator::Arena;
+use std::convert::AsRef;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -6,6 +6,7 @@ use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::saturate_clauses;
+use mago_allocator::Arena;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
@@ -477,10 +478,12 @@ where
         }
 
         for var_id in all_redefined_vars {
+            let base_type = self.block_context.locals.get(&var_id).map(AsRef::as_ref);
+
             let mut final_type: Option<TUnion> = None;
 
             for arm_context in &reachable_contexts {
-                let arm_type = arm_context.locals.get(&var_id).map(std::convert::AsRef::as_ref);
+                let arm_type = arm_context.locals.get(&var_id).map(AsRef::as_ref).or(base_type);
                 final_type = Some(combine_optional_union_types(final_type.as_ref(), arm_type, self.context.codebase));
             }
 
