@@ -591,6 +591,8 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     }
 
     let mut this_escapes = matches!(receiver_variable, Some(v) if v == b"$this");
+    let mut escaped_roots: Vec<Word> = Vec::new();
+    let mut container_escapes = false;
     let mut has_object_argument = false;
     for argument in invocation.arguments_source.iter_arguments() {
         let Some(expression) = argument.value() else {
@@ -606,17 +608,32 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
             continue;
         };
 
+        let is_object = block_context.locals.get(&argument_id).is_some_and(|t| t.has_object_type());
+
         if argument_id.as_bytes() == b"$this" {
             this_escapes = true;
+            has_object_argument = has_object_argument || is_object;
+
+            continue;
         }
 
-        if block_context.locals.get(&argument_id).is_some_and(|t| t.has_object_type()) {
+        if is_object {
             has_object_argument = true;
+
+            if is_plain_variable(argument_id) {
+                container_escapes = true;
+            } else {
+                escaped_roots.push(argument_id);
+            }
         }
     }
 
     if !has_object_argument {
         return;
+    }
+
+    if this_escapes {
+        escaped_roots.push(Word::new(b"$this"));
     }
 
     let preserved: WordSet = block_context
@@ -633,15 +650,19 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
             return false;
         }
 
-        if !this_escapes && var_id.as_bytes().starts_with(b"$this->") {
-            return false;
-        }
-
         if preserved.contains(&var_id) {
             return false;
         }
 
-        true
+        if container_escapes {
+            if !this_escapes && var_id.as_bytes().starts_with(b"$this->") {
+                return false;
+            }
+
+            return true;
+        }
+
+        is_descendant_of_any(var_id, &escaped_roots)
     };
 
     block_context.locals.retain(|var_id, _| !should_wipe(*var_id));
@@ -655,6 +676,23 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
 fn is_property_or_index_key(var_id: Word) -> bool {
     let s = var_id.as_bytes();
     memchr::memmem::find(s, b"->").is_some() || (s.starts_with(b"$") && s.contains(&b'['))
+}
+
+fn is_plain_variable(var_id: Word) -> bool {
+    let s = var_id.as_bytes();
+    s.starts_with(b"$") && !s.contains(&b'[') && memchr::memmem::find(s, b"->").is_none()
+}
+
+fn is_descendant_of_any(var_id: Word, roots: &[Word]) -> bool {
+    let key = var_id.as_bytes();
+    roots.iter().any(|root| {
+        let root = root.as_bytes();
+        let Some(rest) = key.strip_prefix(root) else {
+            return false;
+        };
+
+        rest.starts_with(b"->") || rest.first() == Some(&b'[')
+    })
 }
 
 fn property_root_is_immutable<A>(context: &Context<'_, '_, A>, block_context: &BlockContext<'_>, var_id: Word) -> bool
