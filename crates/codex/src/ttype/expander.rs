@@ -541,6 +541,15 @@ fn expand_global_reference(
 fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
     resolve_special_class_names(object, codebase, options);
 
+    if let TObject::Named(named) = object
+        && named.intersection_types.is_none()
+        && let Some(class_metadata) = codebase.get_class_like(named.name.as_bytes())
+        && class_metadata.kind.is_enum()
+    {
+        *object = TObject::new_enum(class_metadata.original_name);
+        return;
+    }
+
     let TObject::Named(named) = object else {
         return;
     };

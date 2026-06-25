@@ -178,6 +178,19 @@ pub fn are_definitely_not_identical(
         return true;
     }
 
+    if lhs.is_enum() && rhs.is_enum() {
+        let left_cases = lhs.get_enum_cases();
+        let right_cases = rhs.get_enum_cases();
+
+        if left_cases.len() == 1
+            && right_cases.len() == 1
+            && let (left_enum, Some(left_case)) = left_cases[0]
+            && let (right_enum, Some(right_case)) = right_cases[0]
+        {
+            return !left_enum.as_bytes().eq_ignore_ascii_case(right_enum.as_bytes()) || left_case != right_case;
+        }
+    }
+
     if (lhs.is_null() && (!rhs.is_null() && !rhs.can_be_null()))
         || (rhs.is_null() && (!lhs.is_null() && !lhs.can_be_null()))
     {
