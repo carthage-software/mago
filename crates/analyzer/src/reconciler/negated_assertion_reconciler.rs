@@ -220,32 +220,33 @@ fn subtract_complex_type<A>(
                 acceptable_types.push(existing_atomic);
             }
             (
+                TAtomic::Object(TObject::Named(existing_named_object)),
+                TAtomic::Object(TObject::Enum(TEnum { name: assertion_enum_name, case: Some(assertion_case) })),
+            ) if context
+                .codebase
+                .is_instance_of(assertion_enum_name.as_bytes(), existing_named_object.get_name().as_bytes()) =>
+            {
+                subtract_enum_case(
+                    context,
+                    existing_named_object.get_name(),
+                    assertion_case,
+                    &existing_atomic,
+                    &mut acceptable_types,
+                    can_be_disjunct,
+                );
+            }
+            (
                 TAtomic::Object(TObject::Enum(TEnum { name: existing_enum_name, case: None })),
                 TAtomic::Object(TObject::Enum(TEnum { name: assertion_enum_name, case: Some(assertion_case) })),
             ) if context.codebase.is_instance_of(assertion_enum_name.as_bytes(), existing_enum_name.as_bytes()) => {
-                *can_be_disjunct = true;
-
-                let Some(enum_metadata) = context.codebase.get_enum(existing_enum_name.as_bytes()) else {
-                    acceptable_types.push(existing_atomic);
-                    continue;
-                };
-
-                // Enum is too large, do not subtract anything
-                if enum_metadata.enum_cases.len() > MAX_ENUM_CASES_FOR_ANALYSIS {
-                    acceptable_types.push(existing_atomic);
-                    continue;
-                }
-
-                for enum_case in enum_metadata.enum_cases.keys() {
-                    if enum_case == assertion_case {
-                        continue;
-                    }
-
-                    acceptable_types.push(TAtomic::Object(TObject::Enum(TEnum {
-                        name: *existing_enum_name,
-                        case: Some(*enum_case),
-                    })));
-                }
+                subtract_enum_case(
+                    context,
+                    *existing_enum_name,
+                    assertion_case,
+                    &existing_atomic,
+                    &mut acceptable_types,
+                    can_be_disjunct,
+                );
             }
             (TAtomic::Object(TObject::Enum(_)), TAtomic::Object(TObject::Enum(_))) => {
                 *can_be_disjunct = true;
@@ -282,6 +283,38 @@ fn subtract_complex_type<A>(
     }
 
     existing_var_type.types = Cow::Owned(acceptable_types);
+}
+
+fn subtract_enum_case<A>(
+    context: &mut Context<'_, '_, A>,
+    existing_enum_name: Word,
+    assertion_case: &Word,
+    existing_atomic: &TAtomic,
+    acceptable_types: &mut Vec<TAtomic>,
+    can_be_disjunct: &mut bool,
+) where
+    A: Arena,
+{
+    *can_be_disjunct = true;
+
+    let Some(enum_metadata) = context.codebase.get_enum(existing_enum_name.as_bytes()) else {
+        acceptable_types.push(existing_atomic.clone());
+        return;
+    };
+
+    if enum_metadata.enum_cases.len() > MAX_ENUM_CASES_FOR_ANALYSIS {
+        acceptable_types.push(existing_atomic.clone());
+        return;
+    }
+
+    for enum_case in enum_metadata.enum_cases.keys() {
+        if enum_case == assertion_case {
+            continue;
+        }
+
+        acceptable_types
+            .push(TAtomic::Object(TObject::Enum(TEnum { name: existing_enum_name, case: Some(*enum_case) })));
+    }
 }
 
 fn handle_negated_class<A>(

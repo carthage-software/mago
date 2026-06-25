@@ -2510,6 +2510,7 @@ test_case!(issue_2008, {
     s.strict_array_index_existence = true;
     s
 });
+test_case!(issue_2019);
 test_case!(issue_1772);
 test_case!(issue_1775);
 test_case!(issue_1786);
