@@ -1503,13 +1503,6 @@ where
         }
     }
 
-    if !class_like_metadata.kind.is_trait() {
-        let to_string_method = word("__tostring");
-        if class_like_metadata.methods.contains(&to_string_method) {
-            class_like_metadata.add_direct_parent_interface(word("stringable"));
-        }
-    }
-
     if class_like_metadata.attributes.iter().any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"Deprecated")) {
         class_like_metadata.flags |= MetadataFlags::DEPRECATED;
     }

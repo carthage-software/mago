@@ -2,6 +2,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_word::Word;
 use mago_word::WordSet;
+use mago_word::word;
 
 use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
@@ -223,6 +224,13 @@ pub fn populate_class_like_metadata_iterative(
                 method_metadata.type_resolution_context = Some(updated_context);
             }
         }
+    }
+
+    if (metadata.kind.is_class() || metadata.kind.is_enum())
+        && metadata.appearing_method_ids.contains_key(&word(b"__tostring"))
+        && !metadata.all_parent_interfaces.contains(&word(b"stringable"))
+    {
+        metadata.add_direct_parent_interface(word(b"stringable"));
     }
 
     metadata.mark_as_populated();
