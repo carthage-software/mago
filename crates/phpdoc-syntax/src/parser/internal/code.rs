@@ -46,7 +46,11 @@ where
         let content_start = self.stream.current_position();
 
         loop {
-            if !block && self.stream.starts_line(0) && self.stream.current_position() != content_start {
+            if !block
+                && self.stream.starts_line(0)
+                && self.stream.current_position() != content_start
+                && self.stream.is_at(TokenKind::Tag)
+            {
                 break;
             }
 
@@ -98,7 +102,25 @@ where
     fn extract_code_value(&self, start: Position, end: Position, block: bool) -> &'arena [u8] {
         let raw = self.stream.raw_between(start, end);
         if !block {
-            return raw;
+            if !raw.contains(&b'\n') {
+                return raw;
+            }
+
+            let mut buffer = self.new_vec::<u8>();
+            let mut first = true;
+            for line in raw.split(|&byte| byte == b'\n') {
+                let line = line.strip_suffix(b"\r").unwrap_or(line);
+                if first {
+                    buffer.extend_from_slice(line);
+                } else {
+                    buffer.push(b' ');
+                    buffer.extend_from_slice(strip_docblock_prefix(line).trim_ascii_start());
+                }
+
+                first = false;
+            }
+
+            return buffer.leak();
         }
 
         let mut buffer = self.new_vec::<u8>();

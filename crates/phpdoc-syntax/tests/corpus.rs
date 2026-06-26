@@ -269,6 +269,21 @@ fn inline_code_keeps_slashes_and_quotes_as_literal_content() {
 }
 
 #[test]
+fn inline_code_spans_continuation_lines() {
+    let arena = LocalArena::new();
+    let source = b"/**\n * `USING gist (side, account_id,\n *    open_during)` is the stab.\n */";
+    let document = parse(&arena, source);
+
+    assert!(document.errors.is_empty(), "expected no errors, got {:?}", document.errors);
+
+    let texts = texts(&document);
+    let [TextSegment::InlineCode(inline), TextSegment::PlainText(_)] = texts[0].segments else {
+        panic!("expected inline-code then plain-text, got {:?}", texts[0].segments);
+    };
+    assert_eq!(inline.value, b"USING gist (side, account_id, open_during)");
+}
+
+#[test]
 fn inline_code_with_unbalanced_apostrophe_is_closed() {
     let arena = LocalArena::new();
     let source = b"/**\n * `it's fine`\n */";
