@@ -166,7 +166,9 @@ impl LintRule for PreferEarlyReturnRule {
                 Annotation::secondary(function_span)
                     .with_message("The function can benefit from early return to improve readability"),
             )
-            .with_help("Invert the condition and use `return` to exit early, then place the main logic outside the if block.")
+            .with_help(
+                "Invert the condition and use `return` to exit early, then place the main logic outside the if block.",
+            )
             .with_note("This pattern improves readability by reducing nesting levels.");
 
         ctx.collector.propose(issue, |edits| {
