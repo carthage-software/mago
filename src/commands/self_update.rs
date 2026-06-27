@@ -166,7 +166,7 @@ fn perform_update(release: &Release, target_asset: &ReleaseAsset) -> Result<(), 
 
     debug!("Downloaded archive to: {:?}", tmp_archive_path);
 
-    let binary_path = format!("{BIN}-{}-{TARGET}/{BIN}", release.version);
+    let binary_path = format!("{BIN}-{}-{TARGET}/{BIN}{}", release.version, std::env::consts::EXE_SUFFIX);
 
     info!("Extracting archive...");
     crate::updater::archive::extract_file(&tmp_archive_path, &binary_path, tmp_dir.path())?;
