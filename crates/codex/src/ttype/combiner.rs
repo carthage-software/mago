@@ -1317,36 +1317,33 @@ fn widen_known_items_with_params(
     let mut items = known_items?;
 
     if let Some((key_param, value_param)) = params {
-        let key_param_accepts_int;
-        let key_param_accepts_string;
-        if key_param.has_mixed() || key_param.has_mixed_template() {
-            key_param_accepts_int = true;
-            key_param_accepts_string = true;
-        } else {
-            let mut accepts_int = false;
-            let mut accepts_string = false;
-            for part in key_param.types.as_ref() {
-                if accepts_int && accepts_string {
-                    break;
+        let (key_param_accepts_int, key_param_accepts_string) =
+            if key_param.has_mixed() || key_param.has_mixed_template() {
+                (true, true)
+            } else {
+                let mut accepts_int = false;
+                let mut accepts_string = false;
+                for part in key_param.types.as_ref() {
+                    if accepts_int && accepts_string {
+                        break;
+                    }
+
+                    match part {
+                        TAtomic::Scalar(TScalar::ArrayKey) => {
+                            accepts_int = true;
+                            accepts_string = true;
+                        }
+                        TAtomic::Scalar(TScalar::Integer(_)) => accepts_int = true,
+                        TAtomic::Scalar(TScalar::String(_)) => accepts_string = true,
+                        _ => {
+                            accepts_int = true;
+                            accepts_string = true;
+                        }
+                    }
                 }
 
-                match part {
-                    TAtomic::Scalar(TScalar::ArrayKey) => {
-                        accepts_int = true;
-                        accepts_string = true;
-                    }
-                    TAtomic::Scalar(TScalar::Integer(_)) => accepts_int = true,
-                    TAtomic::Scalar(TScalar::String(_)) => accepts_string = true,
-                    _ => {
-                        accepts_int = true;
-                        accepts_string = true;
-                    }
-                }
-            }
-
-            key_param_accepts_int = accepts_int;
-            key_param_accepts_string = accepts_string;
-        }
+                (accepts_int, accepts_string)
+            };
 
         if !key_param_accepts_int && !key_param_accepts_string {
             return Some(items);
