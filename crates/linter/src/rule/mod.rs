@@ -324,6 +324,7 @@ define_rules! {
     PreferArrowFunction(prefer_arrow_function @ PreferArrowFunctionRule),
     PreparedSql(prepared_sql @ PreparedSqlRule),
     PreferEarlyContinue(prefer_early_continue @ PreferEarlyContinueRule),
+    PreferEarlyReturn(prefer_early_return @ PreferEarlyReturnRule),
     PreferStaticClosure(prefer_static_closure @ PreferStaticClosureRule),
     PreferTestAttribute(prefer_test_attribute @ PreferTestAttributeRule),
     PreferViewArray(prefer_view_array @ PreferViewArrayRule),

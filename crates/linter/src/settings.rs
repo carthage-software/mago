@@ -139,6 +139,7 @@ use crate::rule::PreferArrowFunctionConfig;
 use crate::rule::PreferCastsMethodConfig;
 use crate::rule::PreferDedicatedStatusAssertionConfig;
 use crate::rule::PreferEarlyContinueConfig;
+use crate::rule::PreferEarlyReturnConfig;
 use crate::rule::PreferExplodeOverPregSplitConfig;
 use crate::rule::PreferFakeHelperConfig;
 use crate::rule::PreferFirstClassCallableConfig;
@@ -344,6 +345,7 @@ pub struct RulesSettings {
     pub explicit_octal: RuleSettings<ExplicitOctalConfig>,
     pub prefer_arrow_function: RuleSettings<PreferArrowFunctionConfig>,
     pub prefer_early_continue: RuleSettings<PreferEarlyContinueConfig>,
+    pub prefer_early_return: RuleSettings<PreferEarlyReturnConfig>,
     pub prefer_interface: RuleSettings<PreferInterfaceConfig>,
     pub prefer_static_closure: RuleSettings<PreferStaticClosureConfig>,
     pub prefer_test_attribute: RuleSettings<PreferTestAttributeConfig>,
