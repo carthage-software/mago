@@ -27,6 +27,7 @@ mago-php-version = { workspace = true }
 mago-collector = { workspace = true }
 foldhash = { workspace = true }
 memchr = { workspace = true }
+ordered-float = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 regex = { workspace = true }

@@ -1742,6 +1742,7 @@ dependencies = [
  "mago-text-edit",
  "mago-word",
  "memchr",
+ "ordered-float",
  "regex",
  "schemars",
  "serde",
