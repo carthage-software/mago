@@ -305,6 +305,30 @@ mod tests {
     }
 
     #[test]
+    fn parses_call_site_variance() {
+        use crate::cst::r#type::GenericParameterVariance;
+
+        let arena = LocalArena::new();
+
+        let Type::Reference(reference) = parse(&arena, b"ReflectionClass<covariant T>") else { panic!() };
+        let Some(parameters) = &reference.parameters else { panic!("expected generic parameters") };
+        let Some(entry) = parameters.entries.iter().next() else { panic!("expected one entry") };
+        assert!(matches!(entry.variance, Some(GenericParameterVariance::Covariant(_))));
+
+        let Type::Array(array) = parse(&arena, b"array<covariant K, contravariant V>") else { panic!() };
+        let Some(parameters) = &array.parameters else { panic!("expected generic parameters") };
+        let entries: Vec<_> = parameters.entries.iter().collect();
+        assert!(matches!(entries[0].variance, Some(GenericParameterVariance::Covariant(_))));
+        assert!(matches!(entries[1].variance, Some(GenericParameterVariance::Contravariant(_))));
+
+        let Type::Reference(reference) = parse(&arena, b"Foo<covariant>") else { panic!() };
+        let Some(parameters) = &reference.parameters else { panic!("expected generic parameters") };
+        let Some(entry) = parameters.entries.iter().next() else { panic!("expected one entry") };
+        assert!(entry.variance.is_none());
+        assert!(matches!(entry.inner, Type::Reference(_)));
+    }
+
+    #[test]
     fn parses_shape() {
         let arena = LocalArena::new();
         let Type::Shape(shape) = parse(&arena, b"array{a: int, b?: string}") else { panic!() };

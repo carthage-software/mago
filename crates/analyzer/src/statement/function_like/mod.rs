@@ -741,6 +741,7 @@ where
     TObject::Named(TNamedObject {
         name: class_like_metadata.original_name,
         type_parameters: if type_parameters.is_empty() { None } else { Some(type_parameters) },
+        variances: None,
         is_static: true,
         is_this: true,
         intersection_types: if intersections.is_empty() { None } else { Some(intersections) },

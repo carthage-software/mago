@@ -40,6 +40,7 @@ use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::error::TypeError;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::template::GenericTemplate;
+use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 use crate::ttype::*;
@@ -898,8 +899,10 @@ fn get_reference_from_kind(
     };
 
     let mut type_parameters = None;
+    let mut type_parameter_variances = None;
     if let Some(generics) = generics {
         let mut parameters = vec![];
+        let mut variances = vec![];
         for generic in &generics.entries {
             let mut generic_type = get_union_from_type(&generic.inner, scope, type_context, classname)?;
 
@@ -913,9 +916,20 @@ fn get_reference_from_kind(
             }
 
             parameters.push(generic_type);
+
+            let variance = match generic.variance {
+                Some(variance) => Variance::from(variance),
+                None if matches!(generic.inner, Type::Wildcard(_)) => Variance::Bivariant,
+                None => Variance::Invariant,
+            };
+
+            variances.push(variance);
         }
 
         type_parameters = Some(parameters);
+        if variances.iter().any(|variance| !variance.is_invariant()) {
+            type_parameter_variances = Some(variances);
+        }
     }
 
     let is_generator = fq_reference_name_id.as_bytes().eq_ignore_ascii_case(b"Generator");
@@ -962,6 +976,7 @@ fn get_reference_from_kind(
         Ok(TAtomic::Object(TObject::Named(TNamedObject {
             name: fq_reference_name_id,
             type_parameters,
+            variances: type_parameter_variances,
             intersection_types: None,
             is_static,
             is_this,
@@ -971,6 +986,7 @@ fn get_reference_from_kind(
         Ok(TAtomic::Reference(TReference::Symbol {
             name: fq_reference_name_id,
             parameters: type_parameters,
+            variances: type_parameter_variances,
             intersection_types: None,
         }))
     }

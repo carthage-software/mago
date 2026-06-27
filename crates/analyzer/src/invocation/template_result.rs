@@ -163,6 +163,12 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
                 GenericParent::ClassLike(method_context.class_like_metadata.name),
                 template_type.clone(),
             );
+
+            if let Some(variance) = instance_type.get_variance(template_index)
+                && !variance.is_invariant()
+            {
+                template_result.projections.insert(template_name, variance);
+            }
         }
     }
 

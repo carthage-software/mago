@@ -4,6 +4,7 @@ use mago_word::concat_word;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -75,6 +76,7 @@ pub enum TReference {
         /// Generic arguments provided at the reference site, e.g., the `<int>` in `Foo<int>`.
         /// Kept original name `type_params` as requested for fields.
         parameters: Option<Vec<TUnion>>,
+        variances: Option<Vec<Variance>>,
         /// Represents additional types in an intersection type (`&B&S` part of `A&B&S`).
         /// Contains other *atomic* types (boxed due to potential recursion).
         intersection_types: Option<Vec<TAtomic>>,
@@ -101,14 +103,14 @@ impl TReference {
     #[inline]
     #[must_use]
     pub fn new_symbol(name: Word) -> Self {
-        TReference::Symbol { name, parameters: None, intersection_types: None }
+        TReference::Symbol { name, parameters: None, variances: None, intersection_types: None }
     }
 
     /// Creates a symbol reference with generic parameters.
     #[inline]
     #[must_use]
     pub fn new_symbol_with_parameters(name: Word, parameters: Vec<TUnion>) -> Self {
-        TReference::Symbol { name, parameters: Some(parameters), intersection_types: None }
+        TReference::Symbol { name, parameters: Some(parameters), variances: None, intersection_types: None }
     }
 
     /// Creates a class-like member reference.
@@ -145,7 +147,7 @@ impl TReference {
     #[must_use]
     pub const fn get_symbol_data(&self) -> Option<(Word, &Option<Vec<TUnion>>, &Option<Vec<TAtomic>>)> {
         match self {
-            TReference::Symbol { name, parameters, intersection_types } => {
+            TReference::Symbol { name, parameters, intersection_types, .. } => {
                 Some((*name, parameters, intersection_types))
             }
             _ => None,

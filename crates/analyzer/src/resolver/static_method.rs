@@ -540,6 +540,7 @@ where
                     .collect::<Vec<_>>(),
             )
         },
+        variances: None,
         is_static: true,
         is_this: true,
         intersection_types: if intersections.is_empty() { None } else { Some(intersections) },

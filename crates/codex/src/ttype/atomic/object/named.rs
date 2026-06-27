@@ -5,6 +5,7 @@ use mago_word::word;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 
 /// Represents an instance of a specific named class, interface, or trait.
@@ -18,6 +19,7 @@ pub struct TNamedObject {
     pub name: Word,
     /// Concrete types provided for generic type parameters, if any.
     pub type_parameters: Option<Vec<TUnion>>,
+    pub variances: Option<Vec<Variance>>,
     /// `true` if this represents the `static` type (same class, possibly different instance).
     /// Set for `new static()`, `: static` return type, and `$this`.
     pub is_static: bool,
@@ -39,6 +41,7 @@ impl TNamedObject {
         Self {
             name,
             type_parameters: None,
+            variances: None,
             is_static: false,
             is_this: false,
             remapped_parameters: false,
@@ -53,6 +56,7 @@ impl TNamedObject {
         Self {
             name,
             type_parameters,
+            variances: None,
             is_static: false,
             is_this: false,
             remapped_parameters: false,
@@ -67,6 +71,7 @@ impl TNamedObject {
         Self {
             name,
             type_parameters: None,
+            variances: None,
             is_static: true,
             is_this: false,
             remapped_parameters: false,
@@ -81,6 +86,7 @@ impl TNamedObject {
         Self {
             name,
             type_parameters: None,
+            variances: None,
             is_static: true,
             is_this: true,
             remapped_parameters: false,
@@ -135,6 +141,19 @@ impl TNamedObject {
     pub fn with_type_parameters(mut self, type_parameters: Option<Vec<TUnion>>) -> Self {
         self.type_parameters = type_parameters;
         self
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn with_variances(mut self, variances: Option<Vec<Variance>>) -> Self {
+        self.variances = variances;
+        self
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn get_variance(&self, offset: usize) -> Option<Variance> {
+        self.variances.as_ref().and_then(|variances| variances.get(offset).copied())
     }
 
     /// Returns a new instance with the `is_static` flag set.

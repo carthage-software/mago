@@ -1275,7 +1275,7 @@ pub fn populate_atomic_type(
             }
         }
         TAtomic::Reference(reference) => match reference {
-            TReference::Symbol { name, parameters, intersection_types } => {
+            TReference::Symbol { name, parameters, variances, intersection_types } => {
                 if let Some(parameters) = parameters {
                     for parameter in parameters {
                         populate_union_type(parameter, codebase_symbols, reference_source, symbol_references, force);
@@ -1314,7 +1314,9 @@ pub fn populate_atomic_type(
                                 .collect::<Vec<_>>()
                         });
 
-                        let mut named_object = TNamedObject::new(*name).with_type_parameters(parameters.clone());
+                        let mut named_object = TNamedObject::new(*name)
+                            .with_type_parameters(parameters.clone())
+                            .with_variances(variances.clone());
                         if let Some(intersection_types) = intersection_types {
                             for intersection_type in intersection_types {
                                 named_object.add_intersection_type(intersection_type);

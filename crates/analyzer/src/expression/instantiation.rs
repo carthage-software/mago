@@ -507,6 +507,7 @@ where
     let constraint_object = TAtomic::Object(TObject::Named(TNamedObject {
         name: metadata.original_name,
         type_parameters,
+        variances: None,
         is_static: classname.is_static() || (classname.is_self() && metadata.flags.is_final()),
         is_this: false,
         intersection_types: None,

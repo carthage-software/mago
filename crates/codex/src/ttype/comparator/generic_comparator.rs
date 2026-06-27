@@ -67,8 +67,17 @@ pub(crate) fn is_contained_by(
 
         let mut parameter_comparison_result = ComparisonResult::new();
 
-        let variance =
+        let declared_variance =
             container_metadata.template_variance.get(parameter_offset).copied().unwrap_or(Variance::Invariant);
+
+        let variance = container_object
+            .get_variance(parameter_offset)
+            .filter(|call_site_variance| !call_site_variance.is_invariant())
+            .unwrap_or(declared_variance);
+
+        if variance.is_bivariant() {
+            continue;
+        }
 
         let forward_ok = union_comparator::is_contained_by(
             codebase,

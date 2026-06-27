@@ -233,8 +233,12 @@ where
                 parameter_type_had_template_types = true;
                 // Store the original type before replacement for inference
                 base_parameter_type_for_inference = Some(base_parameter_type.clone());
-                let mut replaced_type =
-                    inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase);
+                let mut replaced_type = inferred_type_replacer::replace_with_polarity(
+                    &base_parameter_type,
+                    template_result,
+                    context.codebase,
+                    mago_codex::ttype::template::variance::Variance::Contravariant,
+                );
                 if replaced_type.is_expandable() {
                     expander::expand_union(
                         context.codebase,
@@ -423,8 +427,12 @@ where
 
             let final_parameter_type =
                 if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
-                    let mut final_parameter_type =
-                        inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase);
+                    let mut final_parameter_type = inferred_type_replacer::replace_with_polarity(
+                        &base_parameter_type,
+                        template_result,
+                        context.codebase,
+                        mago_codex::ttype::template::variance::Variance::Contravariant,
+                    );
 
                     expander::expand_union(
                         context.codebase,

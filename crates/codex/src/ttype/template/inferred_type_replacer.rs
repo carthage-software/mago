@@ -17,22 +17,34 @@ use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::combiner;
+use crate::ttype::get_mixed;
 use crate::ttype::get_never;
 use crate::ttype::intersect_union_types;
 use crate::ttype::template::TemplateBound;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::bounds::get_most_specific_type_from_bounds;
 use crate::ttype::template::bounds::get_root_template_type;
+use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 
 #[must_use]
 pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &CodebaseMetadata) -> TUnion {
+    replace_with_polarity(union, template_result, codebase, Variance::Covariant)
+}
+
+#[must_use]
+pub fn replace_with_polarity(
+    union: &TUnion,
+    template_result: &TemplateResult,
+    codebase: &CodebaseMetadata,
+    polarity: Variance,
+) -> TUnion {
     let mut new_types = Vec::new();
 
     for atomic_type in union.types.as_ref() {
         let mut atomic_type = atomic_type.clone();
-        atomic_type = replace_atomic(atomic_type, template_result, codebase);
+        atomic_type = replace_atomic(atomic_type, template_result, codebase, polarity);
 
         match &atomic_type {
             TAtomic::GenericParameter(TGenericParameter {
@@ -41,6 +53,20 @@ pub fn replace(union: &TUnion, template_result: &TemplateResult, codebase: &Code
                 constraint,
                 intersection_types,
             }) => {
+                if let Some(projection) = template_result.projections.get(parameter_name).copied() {
+                    match projection.project(polarity) {
+                        Some(true) => {}
+                        Some(false) => {
+                            new_types.extend(get_mixed().types.into_owned());
+                            continue;
+                        }
+                        None => {
+                            new_types.extend(get_never().types.into_owned());
+                            continue;
+                        }
+                    }
+                }
+
                 let key = parameter_name;
 
                 let template_type = replace_template_parameter(
@@ -153,7 +179,7 @@ fn replace_template_parameter(
                 let replaced_intersection_parts: Vec<TAtomic> = intersection_types
                     .iter()
                     .cloned()
-                    .map(|part| replace_atomic(part, template_result, codebase))
+                    .map(|part| replace_atomic(part, template_result, codebase, Variance::Covariant))
                     .collect();
 
                 for atomic_template_type in template_type_inner.types.to_mut() {
@@ -216,73 +242,90 @@ fn replace_template_parameter(
     template_type
 }
 
-fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebase: &CodebaseMetadata) -> TAtomic {
+fn replace_atomic(
+    mut atomic: TAtomic,
+    template_result: &TemplateResult,
+    codebase: &CodebaseMetadata,
+    polarity: Variance,
+) -> TAtomic {
     match &mut atomic {
         TAtomic::Conditional(conditional) => {
-            *Arc::make_mut(&mut conditional.subject) = replace(&conditional.subject, template_result, codebase);
-            *Arc::make_mut(&mut conditional.target) = replace(&conditional.target, template_result, codebase);
-            *Arc::make_mut(&mut conditional.then) = replace(&conditional.then, template_result, codebase);
-            *Arc::make_mut(&mut conditional.otherwise) = replace(&conditional.otherwise, template_result, codebase);
+            *Arc::make_mut(&mut conditional.subject) =
+                replace_with_polarity(&conditional.subject, template_result, codebase, polarity);
+            *Arc::make_mut(&mut conditional.target) =
+                replace_with_polarity(&conditional.target, template_result, codebase, polarity);
+            *Arc::make_mut(&mut conditional.then) =
+                replace_with_polarity(&conditional.then, template_result, codebase, polarity);
+            *Arc::make_mut(&mut conditional.otherwise) =
+                replace_with_polarity(&conditional.otherwise, template_result, codebase, polarity);
         }
         TAtomic::Array(array_type) => match array_type {
             TArray::List(list_data) => {
                 *Arc::make_mut(&mut list_data.element_type) =
-                    replace(&list_data.element_type, template_result, codebase);
+                    replace_with_polarity(&list_data.element_type, template_result, codebase, polarity);
 
                 if let Some(known_elements) = &mut list_data.known_elements {
                     for (_, element_type) in known_elements.values_mut() {
-                        *element_type = replace(element_type, template_result, codebase);
+                        *element_type = replace_with_polarity(element_type, template_result, codebase, polarity);
                     }
                 }
             }
             TArray::Keyed(keyed_data) => {
                 if let Some((key_parameter, value_parameter)) = &mut keyed_data.parameters {
-                    *Arc::make_mut(key_parameter) = replace(key_parameter, template_result, codebase);
-                    *Arc::make_mut(value_parameter) = replace(value_parameter, template_result, codebase);
+                    *Arc::make_mut(key_parameter) =
+                        replace_with_polarity(key_parameter, template_result, codebase, polarity);
+                    *Arc::make_mut(value_parameter) =
+                        replace_with_polarity(value_parameter, template_result, codebase, polarity);
                 }
 
                 if let Some(known_items) = &mut keyed_data.known_items {
                     for (_, item_type) in known_items.values_mut() {
-                        *item_type = replace(item_type, template_result, codebase);
+                        *item_type = replace_with_polarity(item_type, template_result, codebase, polarity);
                     }
                 }
             }
         },
         TAtomic::Iterable(iterable) => {
             let key_type = iterable.get_key_type_mut();
-            *key_type = replace(key_type, template_result, codebase);
+            *key_type = replace_with_polarity(key_type, template_result, codebase, polarity);
 
             let value_type = iterable.get_value_type_mut();
-            *value_type = replace(value_type, template_result, codebase);
+            *value_type = replace_with_polarity(value_type, template_result, codebase, polarity);
 
             if let Some(intersection_types) = iterable.get_intersection_types_mut() {
                 let old_intersection_types = TUnion::from_vec(intersection_types.clone());
 
-                *intersection_types = replace(&old_intersection_types, template_result, codebase).types.into_owned();
+                *intersection_types =
+                    replace_with_polarity(&old_intersection_types, template_result, codebase, polarity)
+                        .types
+                        .into_owned();
             }
         }
         TAtomic::Object(TObject::Named(named_object)) => {
             if let Some(type_parameters) = named_object.get_type_parameters_mut() {
                 for parameter in type_parameters {
-                    *parameter = replace(parameter, template_result, codebase);
+                    *parameter = replace_with_polarity(parameter, template_result, codebase, polarity);
                 }
             }
 
             if let Some(intersection_types) = named_object.get_intersection_types_mut() {
                 let old_intersection_types = TUnion::from_vec(intersection_types.clone());
 
-                *intersection_types = replace(&old_intersection_types, template_result, codebase).types.into_owned();
+                *intersection_types =
+                    replace_with_polarity(&old_intersection_types, template_result, codebase, polarity)
+                        .types
+                        .into_owned();
             }
         }
         TAtomic::Callable(TCallable::Signature(signature)) => {
             for parameter in signature.get_parameters_mut() {
                 if let Some(t) = parameter.get_type_signature_mut() {
-                    *t = replace(t, template_result, codebase);
+                    *t = replace_with_polarity(t, template_result, codebase, polarity.flip());
                 }
             }
 
             if let Some(return_type) = signature.get_return_type_mut() {
-                *return_type = replace(return_type, template_result, codebase);
+                *return_type = replace_with_polarity(return_type, template_result, codebase, polarity);
             }
         }
         TAtomic::Derived(derived) => match derived {
@@ -333,7 +376,7 @@ fn replace_atomic(mut atomic: TAtomic, template_result: &TemplateResult, codebas
             }
         },
         TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
-            *Arc::make_mut(constraint) = replace_atomic((**constraint).clone(), template_result, codebase);
+            *Arc::make_mut(constraint) = replace_atomic((**constraint).clone(), template_result, codebase, polarity);
         }
         _ => (),
     }

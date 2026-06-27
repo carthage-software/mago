@@ -214,7 +214,12 @@ where
         return wrap_atomic(TAtomic::Callable(TCallable::Signature(TCallableSignature::mixed(true))));
     }
 
-    wrap_atomic(TAtomic::Reference(TReference::Symbol { name: word(name), parameters: None, intersection_types: None }))
+    wrap_atomic(TAtomic::Reference(TReference::Symbol {
+        name: word(name),
+        parameters: None,
+        variances: None,
+        intersection_types: None,
+    }))
 }
 
 /// Merges a docblock type with a real type, preserving nullability from the real type.

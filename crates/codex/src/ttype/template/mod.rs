@@ -36,6 +36,7 @@ pub struct TemplateResult {
     pub upper_bounds: HashMap<Word, HashMap<GenericParent, TemplateBound>>,
     pub readonly: bool,
     pub upper_bounds_unintersectable_types: Vec<TUnion>,
+    pub projections: HashMap<Word, crate::ttype::template::variance::Variance>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -86,6 +87,7 @@ impl TemplateResult {
             upper_bounds: HashMap::default(),
             readonly: false,
             upper_bounds_unintersectable_types: Vec::new(),
+            projections: HashMap::default(),
         }
     }
 

@@ -686,6 +686,7 @@ where
                 name: parent_name,
                 parameters: parent_parameters,
                 intersection_types: None,
+                ..
             }) = extended_union.get_single_owned()
             else {
                 class_like_metadata.issues.push(
@@ -776,7 +777,7 @@ where
             }
 
             let (parent_name, parent_parameters) = match implemented_union.get_single_owned() {
-                TAtomic::Reference(TReference::Symbol { name, parameters, intersection_types: None }) => {
+                TAtomic::Reference(TReference::Symbol { name, parameters, intersection_types: None, .. }) => {
                     (name, parameters)
                 }
                 atomic => {
@@ -863,6 +864,7 @@ where
                 name,
                 parameters,
                 intersection_types,
+                ..
             }) = required_union.get_single_owned()
             {
                 if intersection_types.is_some() {
@@ -948,6 +950,7 @@ where
                 name,
                 parameters,
                 intersection_types,
+                ..
             }) = required_union.get_single_owned()
             {
                 if intersection_types.is_some() {
@@ -1387,6 +1390,7 @@ where
                         name: trait_name,
                         parameters: trait_parameters,
                         intersection_types: None,
+                        ..
                     }) = template_use_type.get_single_owned()
                     else {
                         class_like_metadata.issues.push(
