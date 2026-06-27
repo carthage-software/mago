@@ -38,7 +38,11 @@ where
         let r#type = self.alloc(r#type);
         let ampersand = if self.stream.is_at(TokenKind::Ampersand) { Some(self.stream.consume_span()?) } else { None };
         let ellipsis = if self.stream.is_at(TokenKind::Ellipsis) { Some(self.stream.consume_span()?) } else { None };
-        let parameter = self.parse_variable()?;
+        let parameter = if self.stream.is_at(TokenKind::Variable) || self.stream.is_at(TokenKind::ThisVariable) {
+            Some(self.parse_variable()?)
+        } else {
+            None
+        };
         let description = self.parse_optional_description(false)?;
 
         Ok(TagValue::Param(ParamTagValue { r#type, ampersand, ellipsis, parameter, description }))

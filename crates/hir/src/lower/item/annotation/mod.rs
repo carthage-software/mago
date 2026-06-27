@@ -206,7 +206,7 @@ where
                             r#type: Some(self.lower_type_annotation(value.r#type)),
                             is_by_reference: value.ampersand.is_some(),
                             is_variadic: value.ellipsis.is_some(),
-                            variable: self.phpdoc_variable(&value.parameter),
+                            variable: value.parameter.as_ref().map(|parameter| self.phpdoc_variable(parameter)),
                             default_value: None,
                         },
                     ));

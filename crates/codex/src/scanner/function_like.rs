@@ -523,17 +523,21 @@ fn scan_function_like_docblock<A>(
             return;
         };
 
-        let parameter_name = word(parameter_tag.parameter.value);
+        let Some(parameter_variable) = parameter_tag.parameter else {
+            return;
+        };
+
+        let parameter_name = word(parameter_variable.value);
         let is_variadic = parameter_tag.is_variadic();
 
         let Some(parameter_metadata) = metadata.get_parameter_mut(parameter_name) else {
             metadata.issues.push(
                 Issue::error("The @param tag references an unknown parameter.")
                     .with_code(ScanningIssueKind::InvalidParamTag)
-                    .with_annotation(Annotation::primary(parameter_tag.span()).with_message(format!(
-                        "Parameter `{}` is not defined in this function",
-                        parameter_tag.parameter
-                    )))
+                    .with_annotation(
+                        Annotation::primary(parameter_tag.span())
+                            .with_message(format!("Parameter `{parameter_variable}` is not defined in this function")),
+                    )
                     .with_note(
                         "Each `@param` tag in a docblock must correspond to a parameter in the function's signature.",
                     )

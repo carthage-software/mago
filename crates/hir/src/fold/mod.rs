@@ -1110,7 +1110,7 @@ generate_fold! {
             r#type: parameter_annotation.r#type.map(|r#type| copy_ref_into(r#type, folder.arena())),
             is_by_reference: parameter_annotation.is_by_reference,
             is_variadic: parameter_annotation.is_variadic,
-            variable: parameter_annotation.variable.copy_into(folder.arena()),
+            variable: parameter_annotation.variable.map(|variable| variable.copy_into(folder.arena())),
             default_value: parameter_annotation
                 .default_value
                 .map(|value| &*folder.arena().alloc(folder.fold_expression(value))),

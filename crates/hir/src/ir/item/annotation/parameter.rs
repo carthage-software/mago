@@ -18,7 +18,7 @@ pub struct ParameterAnnotation<'arena, I, S, E> {
     pub r#type: Option<&'arena TypeAnnotation<'arena>>,
     pub is_by_reference: bool,
     pub is_variadic: bool,
-    pub variable: DirectVariable<'arena>,
+    pub variable: Option<DirectVariable<'arena>>,
     pub default_value: Option<&'arena Expression<'arena, I, S, E>>,
 }
 
@@ -47,7 +47,7 @@ where
             r#type: self.r#type.map(|node| copy_ref_into(node, arena)),
             is_by_reference: self.is_by_reference,
             is_variadic: self.is_variadic,
-            variable: self.variable.copy_into(arena),
+            variable: self.variable.map(|variable| variable.copy_into(arena)),
             default_value: self.default_value.map(|node| copy_ref_into(node, arena)),
         }
     }

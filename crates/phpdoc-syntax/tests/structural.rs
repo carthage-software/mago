@@ -51,8 +51,35 @@ fn parses_param_with_type_and_variable() {
     assert!(matches!(param.r#type, Type::String(_)));
     assert!(param.ampersand.is_none());
     assert!(param.ellipsis.is_none());
-    assert_eq!(param.parameter.value, b"$bar");
+    assert_eq!(param.parameter.map(|parameter| parameter.value), Some(&b"$bar"[..]));
     assert!(param.description.is_none());
+}
+
+#[test]
+fn parses_param_with_type_and_no_variable() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @param list<string> */");
+    let tag = first_tag(&document);
+
+    assert_eq!(tag.name.value, b"param");
+
+    let TagValue::Param(param) = &tag.value else { panic!("expected param, got {:?}", tag.value) };
+    assert!(matches!(param.r#type, Type::List(_)));
+    assert!(param.parameter.is_none());
+    assert!(param.description.is_none());
+}
+
+#[test]
+fn parses_param_with_type_and_no_variable_but_description() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @param list<string> the items */");
+    let tag = first_tag(&document);
+
+    let TagValue::Param(param) = &tag.value else { panic!("expected param, got {:?}", tag.value) };
+    assert!(matches!(param.r#type, Type::List(_)));
+    assert!(param.parameter.is_none());
+    let Some(description) = &param.description else { panic!("expected a description") };
+    assert_eq!(plain(description), b"the items");
 }
 
 #[test]
@@ -64,7 +91,7 @@ fn parses_param_by_reference_variadic_with_description() {
     let TagValue::Param(param) = &tag.value else { panic!() };
     assert!(param.ampersand.is_some());
     assert!(param.ellipsis.is_some());
-    assert_eq!(param.parameter.value, b"$values");
+    assert_eq!(param.parameter.map(|parameter| parameter.value), Some(&b"$values"[..]));
     let Some(description) = &param.description else { panic!() };
     assert_eq!(plain(description), b"the values");
 }
@@ -357,14 +384,14 @@ fn parses_multiline_docblock_with_multiple_tags() {
     let Element::Tag(a) = elements[1] else { panic!("expected tag, got {:?}", elements[1]) };
     let TagValue::Param(a) = &a.value else { panic!("expected param, got {:?}", a.value) };
     assert!(matches!(a.r#type, Type::Int(_)));
-    assert_eq!(a.parameter.value, b"$a");
+    assert_eq!(a.parameter.map(|parameter| parameter.value), Some(&b"$a"[..]));
     let Some(a_description) = a.description else { panic!("expected description") };
     assert_eq!(plain(&a_description), b"first");
 
     let Element::Tag(b) = elements[2] else { panic!("expected tag, got {:?}", elements[2]) };
     let TagValue::Param(b) = &b.value else { panic!("expected param, got {:?}", b.value) };
     assert!(matches!(b.r#type, Type::String(_)));
-    assert_eq!(b.parameter.value, b"$b");
+    assert_eq!(b.parameter.map(|parameter| parameter.value), Some(&b"$b"[..]));
     let Some(b_description) = b.description else { panic!("expected description") };
     assert_eq!(plain(&b_description), b"second");
 
@@ -434,7 +461,7 @@ fn parses_bare_int_mask_as_int() {
     assert!(!document.has_errors());
     let TagValue::Param(param) = &tag.value else { panic!("got {:?}", tag.value) };
     assert!(matches!(param.r#type, Type::Int(_)));
-    assert_eq!(param.parameter.value, b"$flags");
+    assert_eq!(param.parameter.map(|parameter| parameter.value), Some(&b"$flags"[..]));
 }
 
 #[test]

@@ -11,7 +11,7 @@ pub struct ParamTagValue<'arena> {
     pub r#type: &'arena Type<'arena>,
     pub ampersand: Option<Span>,
     pub ellipsis: Option<Span>,
-    pub parameter: Variable<'arena>,
+    pub parameter: Option<Variable<'arena>>,
     pub description: Option<Text<'arena>>,
 }
 
@@ -84,7 +84,14 @@ impl TypelessParamTagValue<'_> {
 
 impl HasSpan for ParamTagValue<'_> {
     fn span(&self) -> Span {
-        let end = self.description.as_ref().map_or_else(|| self.parameter.span(), HasSpan::span);
+        let end = self
+            .description
+            .as_ref()
+            .map(HasSpan::span)
+            .or_else(|| self.parameter.as_ref().map(HasSpan::span))
+            .or(self.ellipsis)
+            .or(self.ampersand)
+            .unwrap_or_else(|| self.r#type.span());
 
         self.r#type.span().join(end)
     }

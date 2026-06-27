@@ -137,6 +137,7 @@ where
             type_context,
             scope,
             class_like_metadata,
+            true,
         );
 
         if let Some(type_metadata) = property_metadata.type_metadata.as_ref()
@@ -247,6 +248,7 @@ where
                             type_context,
                             scope,
                             class_like_metadata,
+                            false,
                         );
                     }
 
@@ -310,6 +312,7 @@ where
                     type_context,
                     scope,
                     class_like_metadata,
+                    false,
                 );
             }
 
@@ -546,6 +549,7 @@ fn update_property_metadata_from_docblock(
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
     class_like_metadata: &mut ClassLikeMetadata,
+    allow_param_tag: bool,
 ) {
     for tag in document.tags() {
         match &tag.value {
@@ -568,13 +572,24 @@ fn update_property_metadata_from_docblock(
         }
     }
 
-    let var = find_most_trusted_tag(document, |tag| match &tag.value {
-        TagValue::Var(var) => Some(*var),
+    let var_type = find_most_trusted_tag(document, |tag| match &tag.value {
+        TagValue::Var(var) => Some(var.r#type),
         _ => None,
     });
 
-    if let Some(var) = &var {
-        match get_type_metadata_from_type(var.r#type, Some(classname), type_context, scope) {
+    let docblock_type = var_type.or_else(|| {
+        if !allow_param_tag {
+            return None;
+        }
+
+        find_most_trusted_tag(document, |tag| match &tag.value {
+            TagValue::Param(param) => Some(param.r#type),
+            _ => None,
+        })
+    });
+
+    if let Some(docblock_type) = docblock_type {
+        match get_type_metadata_from_type(docblock_type, Some(classname), type_context, scope) {
             Ok(property_type_metadata) => {
                 let real_type = property_metadata.type_declaration_metadata.as_ref();
                 let property_type_metadata = merge_type_preserving_nullability(property_type_metadata, real_type);
@@ -582,7 +597,7 @@ fn update_property_metadata_from_docblock(
                 property_metadata.set_type_metadata(Some(property_type_metadata));
             }
             Err(typing_error) => class_like_metadata.issues.push(
-                Issue::error("Could not resolve the type for the @var tag.")
+                Issue::error("Could not resolve the property type from its docblock.")
                     .with_code(ScanningIssueKind::InvalidVarTag)
                     .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
                     .with_note(typing_error.note())

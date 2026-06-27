@@ -56,7 +56,7 @@ fn parses_description_text_and_typed_tags() {
     assert_eq!(foo.name.value, b"param");
     let TagValue::Param(foo) = &foo.value else { panic!("expected param, got {:?}", foo.value) };
     assert!(matches!(foo.r#type, Type::String(_)));
-    assert_eq!(foo.parameter.value, b"$foo");
+    assert_eq!(foo.parameter.map(|parameter| parameter.value), Some(&b"$foo"[..]));
     assert!(foo.description.is_none());
 
     let Element::Tag(ret) = elements[2] else { panic!("expected tag, got {:?}", elements[2]) };
@@ -89,7 +89,7 @@ fn utf8_variable_name_and_ascii_description() {
     assert_eq!(tags.len(), 1);
     let TagValue::Param(param) = &tags[0].value else { panic!("expected param, got {:?}", tags[0].value) };
     assert!(matches!(param.r#type, Type::String(_)));
-    assert_eq!(param.parameter.value, "$مثال".as_bytes());
+    assert_eq!(param.parameter.map(|parameter| parameter.value), Some("$مثال".as_bytes()));
     let Some(description) = param.description else { panic!("expected a description") };
     assert_eq!(plain(&description), b"A parameter with an Arabic variable name.");
 }
@@ -122,7 +122,7 @@ fn ideographic_space_is_part_of_identifiers() {
         panic!("expected identifier, got {:?}", reference.kind)
     };
     assert_eq!(identifier.value, "\u{3000}string".as_bytes());
-    assert_eq!(param.parameter.value, b"$foo");
+    assert_eq!(param.parameter.map(|parameter| parameter.value), Some(&b"$foo"[..]));
     let Some(description) = param.description else { panic!("expected a description") };
     assert_eq!(plain(&description), "中文描述".as_bytes());
 }

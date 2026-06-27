@@ -19,7 +19,7 @@ where
             r#type: parameter.r#type.map(|r#type| self.lower_type_annotation(r#type)),
             is_by_reference: parameter.ampersand.is_some(),
             is_variadic: parameter.ellipsis.is_some(),
-            variable: self.phpdoc_variable(&parameter.parameter),
+            variable: Some(self.phpdoc_variable(&parameter.parameter)),
             default_value: match parameter.default.as_ref() {
                 Some(default) => {
                     let default = self.lower_constant_expression(default.value);

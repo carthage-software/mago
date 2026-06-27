@@ -944,7 +944,9 @@ generate_walker! {
             walker.walk_type_annotation(type_annotation, context);
         }
 
-        walker.walk_direct_variable(&parameter_annotation.variable, context);
+        if let Some(variable) = &parameter_annotation.variable {
+            walker.walk_direct_variable(variable, context);
+        }
         if let Some(default_value) = parameter_annotation.default_value {
             walker.walk_expression(default_value, context);
         }
