@@ -458,6 +458,20 @@ where
                     .and_then(|argument| artifacts.get_expression_type(argument.value()))
                     .map_or(is_subclass_of_call, |t| !t.is_false());
 
+                let subject_is_string_only = function_call
+                    .argument_list
+                    .arguments
+                    .first()
+                    .map(mago_syntax::cst::Argument::value)
+                    .and_then(|expr| artifacts.get_expression_type(expr))
+                    .is_some_and(|subject| {
+                        !subject.types.is_empty()
+                            && subject
+                                .types
+                                .iter()
+                                .all(|atomic| matches!(atomic, TAtomic::Scalar(scalar) if scalar.is_any_string()))
+                    });
+
                 let mut assertions = vec![];
                 for atomic in class_name_type.types.as_ref() {
                     let Some(resolved) = get_class_name_from_atomic(assertion_context.codebase, atomic) else {
@@ -472,7 +486,9 @@ where
                         ))));
                     }
 
-                    assertions.push(Assertion::IsType(object_type));
+                    if !(allow_string && subject_is_string_only) {
+                        assertions.push(Assertion::IsType(object_type));
+                    }
                 }
 
                 if assertions.is_empty() {
