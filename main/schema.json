@@ -594,6 +594,11 @@
             "level": "Help",
             "max_allowed_statements": 0
           },
+          "prefer-early-return": {
+            "enabled": false,
+            "level": "Help",
+            "max_allowed_statements": 0
+          },
           "prefer-interface": {
             "enabled": true,
             "level": "Note"
@@ -1660,6 +1665,11 @@
             },
             "prefer-early-continue": {
               "enabled": true,
+              "level": "Help",
+              "max_allowed_statements": 0
+            },
+            "prefer-early-return": {
+              "enabled": false,
               "level": "Help",
               "max_allowed_statements": 0
             },
@@ -2877,120 +2887,128 @@
             "max_allowed_statements": 0
           }
         },
-        "prefer-interface": {
+        "prefer-early-return": {
           "$ref": "#/$defs/RuleSettings121",
+          "default": {
+            "enabled": false,
+            "level": "Help",
+            "max_allowed_statements": 0
+          }
+        },
+        "prefer-interface": {
+          "$ref": "#/$defs/RuleSettings122",
           "default": {
             "enabled": true,
             "level": "Note"
           }
         },
         "prefer-static-closure": {
-          "$ref": "#/$defs/RuleSettings122",
+          "$ref": "#/$defs/RuleSettings123",
           "default": {
             "enabled": true,
             "level": "Help"
           }
         },
         "prefer-test-attribute": {
-          "$ref": "#/$defs/RuleSettings123",
+          "$ref": "#/$defs/RuleSettings124",
           "default": {
             "enabled": false,
             "level": "Warning"
           }
         },
         "prefer-view-array": {
-          "$ref": "#/$defs/RuleSettings124",
+          "$ref": "#/$defs/RuleSettings125",
           "default": {
             "enabled": true,
             "level": "Help"
           }
         },
         "prefer-while-loop": {
-          "$ref": "#/$defs/RuleSettings125",
+          "$ref": "#/$defs/RuleSettings126",
           "default": {
             "enabled": true,
             "level": "Note"
           }
         },
         "psl-array-functions": {
-          "$ref": "#/$defs/RuleSettings126",
-          "default": {
-            "enabled": true,
-            "level": "Warning"
-          }
-        },
-        "psl-data-structures": {
           "$ref": "#/$defs/RuleSettings127",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "psl-datetime": {
+        "psl-data-structures": {
           "$ref": "#/$defs/RuleSettings128",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "psl-math-functions": {
+        "psl-datetime": {
           "$ref": "#/$defs/RuleSettings129",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "psl-output": {
+        "psl-math-functions": {
           "$ref": "#/$defs/RuleSettings130",
+          "default": {
+            "enabled": true,
+            "level": "Warning"
+          }
+        },
+        "psl-output": {
+          "$ref": "#/$defs/RuleSettings131",
           "default": {
             "enabled": true,
             "level": "Error"
           }
         },
         "psl-randomness-functions": {
-          "$ref": "#/$defs/RuleSettings131",
-          "default": {
-            "enabled": true,
-            "level": "Warning"
-          }
-        },
-        "psl-regex-functions": {
           "$ref": "#/$defs/RuleSettings132",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "psl-sleep-functions": {
+        "psl-regex-functions": {
           "$ref": "#/$defs/RuleSettings133",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "psl-string-functions": {
+        "psl-sleep-functions": {
           "$ref": "#/$defs/RuleSettings134",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "str-contains": {
+        "psl-string-functions": {
           "$ref": "#/$defs/RuleSettings135",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "str-starts-with": {
+        "str-contains": {
           "$ref": "#/$defs/RuleSettings136",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "strict-behavior": {
+        "str-starts-with": {
           "$ref": "#/$defs/RuleSettings137",
+          "default": {
+            "enabled": true,
+            "level": "Warning"
+          }
+        },
+        "strict-behavior": {
+          "$ref": "#/$defs/RuleSettings138",
           "default": {
             "enabled": true,
             "level": "Warning",
@@ -2998,7 +3016,7 @@
           }
         },
         "strict-types": {
-          "$ref": "#/$defs/RuleSettings138",
+          "$ref": "#/$defs/RuleSettings139",
           "default": {
             "enabled": true,
             "level": "Warning",
@@ -3006,21 +3024,21 @@
           }
         },
         "tagged-fixme": {
-          "$ref": "#/$defs/RuleSettings139",
-          "default": {
-            "enabled": true,
-            "level": "Warning"
-          }
-        },
-        "tagged-todo": {
           "$ref": "#/$defs/RuleSettings140",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "too-many-enum-cases": {
+        "tagged-todo": {
           "$ref": "#/$defs/RuleSettings141",
+          "default": {
+            "enabled": true,
+            "level": "Warning"
+          }
+        },
+        "too-many-enum-cases": {
+          "$ref": "#/$defs/RuleSettings142",
           "default": {
             "enabled": true,
             "level": "Error",
@@ -3028,7 +3046,7 @@
           }
         },
         "too-many-methods": {
-          "$ref": "#/$defs/RuleSettings142",
+          "$ref": "#/$defs/RuleSettings143",
           "default": {
             "enabled": true,
             "level": "Error",
@@ -3038,7 +3056,7 @@
           }
         },
         "too-many-properties": {
-          "$ref": "#/$defs/RuleSettings143",
+          "$ref": "#/$defs/RuleSettings144",
           "default": {
             "enabled": true,
             "level": "Error",
@@ -3046,7 +3064,7 @@
           }
         },
         "trait-name": {
-          "$ref": "#/$defs/RuleSettings144",
+          "$ref": "#/$defs/RuleSettings145",
           "default": {
             "enabled": true,
             "level": "Help",
@@ -3054,7 +3072,7 @@
           }
         },
         "validated-sanitized-input": {
-          "$ref": "#/$defs/RuleSettings145",
+          "$ref": "#/$defs/RuleSettings146",
           "default": {
             "enabled": false,
             "level": "Error",
@@ -3063,14 +3081,14 @@
           }
         },
         "valid-docblock": {
-          "$ref": "#/$defs/RuleSettings146",
+          "$ref": "#/$defs/RuleSettings147",
           "default": {
             "enabled": true,
             "level": "Note"
           }
         },
         "variable-name": {
-          "$ref": "#/$defs/RuleSettings147",
+          "$ref": "#/$defs/RuleSettings148",
           "default": {
             "enabled": false,
             "level": "Help",
@@ -3080,42 +3098,42 @@
           }
         },
         "constant-condition": {
-          "$ref": "#/$defs/RuleSettings148",
+          "$ref": "#/$defs/RuleSettings149",
           "default": {
             "enabled": true,
             "level": "Help"
           }
         },
         "no-array-accumulation-in-loop": {
-          "$ref": "#/$defs/RuleSettings149",
+          "$ref": "#/$defs/RuleSettings150",
           "default": {
             "enabled": false,
             "level": "Warning"
           }
         },
         "no-ini-set": {
-          "$ref": "#/$defs/RuleSettings150",
+          "$ref": "#/$defs/RuleSettings151",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
         "no-parameter-shadowing": {
-          "$ref": "#/$defs/RuleSettings151",
+          "$ref": "#/$defs/RuleSettings152",
           "default": {
             "enabled": false,
             "level": "Warning"
           }
         },
         "no-inline": {
-          "$ref": "#/$defs/RuleSettings152",
+          "$ref": "#/$defs/RuleSettings153",
           "default": {
             "enabled": false,
             "level": "Error"
           }
         },
         "no-side-effects-with-declarations": {
-          "$ref": "#/$defs/RuleSettings153",
+          "$ref": "#/$defs/RuleSettings154",
           "default": {
             "enabled": false,
             "level": "Warning",
@@ -3125,21 +3143,21 @@
           }
         },
         "no-insecure-comparison": {
-          "$ref": "#/$defs/RuleSettings154",
-          "default": {
-            "enabled": true,
-            "level": "Error"
-          }
-        },
-        "no-literal-password": {
           "$ref": "#/$defs/RuleSettings155",
           "default": {
             "enabled": true,
             "level": "Error"
           }
         },
-        "tainted-data-to-sink": {
+        "no-literal-password": {
           "$ref": "#/$defs/RuleSettings156",
+          "default": {
+            "enabled": true,
+            "level": "Error"
+          }
+        },
+        "tainted-data-to-sink": {
+          "$ref": "#/$defs/RuleSettings157",
           "default": {
             "enabled": true,
             "level": "Error",
@@ -3149,14 +3167,14 @@
           }
         },
         "sensitive-parameter": {
-          "$ref": "#/$defs/RuleSettings157",
+          "$ref": "#/$defs/RuleSettings158",
           "default": {
             "enabled": true,
             "level": "Error"
           }
         },
         "property-name": {
-          "$ref": "#/$defs/RuleSettings158",
+          "$ref": "#/$defs/RuleSettings159",
           "default": {
             "enabled": false,
             "level": "Help",
@@ -3165,35 +3183,35 @@
           }
         },
         "no-unsafe-finally": {
-          "$ref": "#/$defs/RuleSettings159",
+          "$ref": "#/$defs/RuleSettings160",
           "default": {
             "enabled": true,
             "level": "Error"
           }
         },
         "strict-assertions": {
-          "$ref": "#/$defs/RuleSettings160",
-          "default": {
-            "enabled": true,
-            "level": "Warning"
-          }
-        },
-        "use-specific-assertions": {
           "$ref": "#/$defs/RuleSettings161",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "no-request-all": {
+        "use-specific-assertions": {
           "$ref": "#/$defs/RuleSettings162",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "no-service-state-mutation": {
+        "no-request-all": {
           "$ref": "#/$defs/RuleSettings163",
+          "default": {
+            "enabled": true,
+            "level": "Warning"
+          }
+        },
+        "no-service-state-mutation": {
+          "$ref": "#/$defs/RuleSettings164",
           "default": {
             "enabled": false,
             "level": "Warning",
@@ -3215,42 +3233,42 @@
           }
         },
         "middleware-in-routes": {
-          "$ref": "#/$defs/RuleSettings164",
+          "$ref": "#/$defs/RuleSettings165",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
         "use-compound-assignment": {
-          "$ref": "#/$defs/RuleSettings165",
+          "$ref": "#/$defs/RuleSettings166",
           "default": {
             "enabled": true,
             "level": "Help"
           }
         },
         "require-preg-quote-delimiter": {
-          "$ref": "#/$defs/RuleSettings166",
+          "$ref": "#/$defs/RuleSettings167",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
         "require-namespace": {
-          "$ref": "#/$defs/RuleSettings167",
+          "$ref": "#/$defs/RuleSettings168",
           "default": {
             "enabled": false,
             "level": "Warning"
           }
         },
         "sorted-integer-keys": {
-          "$ref": "#/$defs/RuleSettings168",
+          "$ref": "#/$defs/RuleSettings169",
           "default": {
             "enabled": false,
             "level": "Help"
           }
         },
         "string-style": {
-          "$ref": "#/$defs/RuleSettings169",
+          "$ref": "#/$defs/RuleSettings170",
           "default": {
             "enabled": false,
             "level": "Note",
@@ -3258,14 +3276,14 @@
           }
         },
         "single-class-per-file": {
-          "$ref": "#/$defs/RuleSettings170",
+          "$ref": "#/$defs/RuleSettings171",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
         "readable-literal": {
-          "$ref": "#/$defs/RuleSettings171",
+          "$ref": "#/$defs/RuleSettings172",
           "default": {
             "enabled": true,
             "level": "Warning",
@@ -3273,7 +3291,7 @@
           }
         },
         "yoda-conditions": {
-          "$ref": "#/$defs/RuleSettings172",
+          "$ref": "#/$defs/RuleSettings173",
           "default": {
             "enabled": false,
             "level": "Help",
@@ -3281,91 +3299,91 @@
           }
         },
         "no-short-bool-cast": {
-          "$ref": "#/$defs/RuleSettings173",
+          "$ref": "#/$defs/RuleSettings174",
           "default": {
             "enabled": false,
             "level": "Help"
           }
         },
         "no-alternative-syntax": {
-          "$ref": "#/$defs/RuleSettings174",
+          "$ref": "#/$defs/RuleSettings175",
           "default": {
             "enabled": false,
             "level": "Warning"
           }
         },
         "prefer-pre-increment": {
-          "$ref": "#/$defs/RuleSettings175",
-          "default": {
-            "enabled": false,
-            "level": "Help"
-          }
-        },
-        "prefer-self-return-type": {
           "$ref": "#/$defs/RuleSettings176",
           "default": {
             "enabled": false,
             "level": "Help"
           }
         },
-        "switch-continue-to-break": {
+        "prefer-self-return-type": {
           "$ref": "#/$defs/RuleSettings177",
+          "default": {
+            "enabled": false,
+            "level": "Help"
+          }
+        },
+        "switch-continue-to-break": {
+          "$ref": "#/$defs/RuleSettings178",
           "default": {
             "enabled": false,
             "level": "Warning"
           }
         },
         "no-null-property-init": {
-          "$ref": "#/$defs/RuleSettings178",
+          "$ref": "#/$defs/RuleSettings179",
           "default": {
             "enabled": false,
             "level": "Help"
           }
         },
         "use-wp-functions": {
-          "$ref": "#/$defs/RuleSettings179",
-          "default": {
-            "enabled": true,
-            "level": "Warning"
-          }
-        },
-        "no-direct-db-query": {
           "$ref": "#/$defs/RuleSettings180",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
-        "no-implicit-model-query": {
+        "no-direct-db-query": {
           "$ref": "#/$defs/RuleSettings181",
+          "default": {
+            "enabled": true,
+            "level": "Warning"
+          }
+        },
+        "no-implicit-model-query": {
+          "$ref": "#/$defs/RuleSettings182",
           "default": {
             "enabled": true,
             "level": "Note"
           }
         },
         "no-db-schema-change": {
-          "$ref": "#/$defs/RuleSettings182",
-          "default": {
-            "enabled": true,
-            "level": "Error"
-          }
-        },
-        "no-unescaped-output": {
           "$ref": "#/$defs/RuleSettings183",
           "default": {
             "enabled": true,
             "level": "Error"
           }
         },
-        "no-roles-as-capabilities": {
+        "no-unescaped-output": {
           "$ref": "#/$defs/RuleSettings184",
+          "default": {
+            "enabled": true,
+            "level": "Error"
+          }
+        },
+        "no-roles-as-capabilities": {
+          "$ref": "#/$defs/RuleSettings185",
           "default": {
             "enabled": true,
             "level": "Warning"
           }
         },
         "missing-docs": {
-          "$ref": "#/$defs/RuleSettings185",
+          "$ref": "#/$defs/RuleSettings186",
           "default": {
             "enabled": false,
             "level": "Help",
@@ -3382,7 +3400,7 @@
           }
         },
         "no-literal-namespace-string": {
-          "$ref": "#/$defs/RuleSettings186",
+          "$ref": "#/$defs/RuleSettings187",
           "default": {
             "enabled": false,
             "level": "Warning"
@@ -6084,7 +6102,7 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "default": true
+          "default": false
         },
         "exclude": {
           "type": "array",
@@ -6094,7 +6112,13 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Note"
+          "default": "Help"
+        },
+        "max_allowed_statements": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 0
         }
       },
       "additionalProperties": false
@@ -6114,12 +6138,32 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Help"
+          "default": "Note"
         }
       },
       "additionalProperties": false
     },
     "RuleSettings123": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "level": {
+          "$ref": "#/$defs/Level",
+          "default": "Help"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuleSettings124": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6139,7 +6183,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings124": {
+    "RuleSettings125": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6159,26 +6203,6 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings125": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": true
-        },
-        "exclude": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "level": {
-          "$ref": "#/$defs/Level",
-          "default": "Note"
-        }
-      },
-      "additionalProperties": false
-    },
     "RuleSettings126": {
       "type": "object",
       "properties": {
@@ -6194,7 +6218,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Warning"
+          "default": "Note"
         }
       },
       "additionalProperties": false
@@ -6274,7 +6298,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Error"
+          "default": "Warning"
         }
       },
       "additionalProperties": false
@@ -6294,7 +6318,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Warning"
+          "default": "Error"
         }
       },
       "additionalProperties": false
@@ -6415,10 +6439,6 @@
         "level": {
           "$ref": "#/$defs/Level",
           "default": "Warning"
-        },
-        "allow-loose-behavior": {
-          "type": "boolean",
-          "default": false
         }
       },
       "additionalProperties": false
@@ -6440,7 +6460,7 @@
           "$ref": "#/$defs/Level",
           "default": "Warning"
         },
-        "allow-disabling": {
+        "allow-loose-behavior": {
           "type": "boolean",
           "default": false
         }
@@ -6463,6 +6483,10 @@
         "level": {
           "$ref": "#/$defs/Level",
           "default": "Warning"
+        },
+        "allow-disabling": {
+          "type": "boolean",
+          "default": false
         }
       },
       "additionalProperties": false
@@ -6502,6 +6526,26 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
+          "default": "Warning"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuleSettings142": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "level": {
+          "$ref": "#/$defs/Level",
           "default": "Error"
         },
         "threshold": {
@@ -6514,7 +6558,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings142": {
+    "RuleSettings143": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6549,7 +6593,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings143": {
+    "RuleSettings144": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6576,7 +6620,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings144": {
+    "RuleSettings145": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6600,7 +6644,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings145": {
+    "RuleSettings146": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6634,7 +6678,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings146": {
+    "RuleSettings147": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6654,7 +6698,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings147": {
+    "RuleSettings148": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6686,7 +6730,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings148": {
+    "RuleSettings149": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6706,32 +6750,12 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings149": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": false
-        },
-        "exclude": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "level": {
-          "$ref": "#/$defs/Level",
-          "default": "Warning"
-        }
-      },
-      "additionalProperties": false
-    },
     "RuleSettings150": {
       "type": "object",
       "properties": {
         "enabled": {
           "type": "boolean",
-          "default": true
+          "default": false
         },
         "exclude": {
           "type": "array",
@@ -6751,7 +6775,7 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "default": false
+          "default": true
         },
         "exclude": {
           "type": "array",
@@ -6781,12 +6805,32 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Error"
+          "default": "Warning"
         }
       },
       "additionalProperties": false
     },
     "RuleSettings153": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "level": {
+          "$ref": "#/$defs/Level",
+          "default": "Error"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuleSettings154": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6817,26 +6861,6 @@
           "description": "When true, top-level `class_exists(...)` calls are allowed alongside\ndeclarations. This is commonly used to trigger autoloading/preloading.",
           "type": "boolean",
           "default": true
-        }
-      },
-      "additionalProperties": false
-    },
-    "RuleSettings154": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": true
-        },
-        "exclude": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "level": {
-          "$ref": "#/$defs/Level",
-          "default": "Error"
         }
       },
       "additionalProperties": false
@@ -6877,16 +6901,6 @@
         "level": {
           "$ref": "#/$defs/Level",
           "default": "Error"
-        },
-        "known-sink-functions": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "type": "string"
-          },
-          "default": [
-            "printf"
-          ]
         }
       },
       "additionalProperties": false
@@ -6907,11 +6921,41 @@
         "level": {
           "$ref": "#/$defs/Level",
           "default": "Error"
+        },
+        "known-sink-functions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "printf"
+          ]
         }
       },
       "additionalProperties": false
     },
     "RuleSettings158": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "level": {
+          "$ref": "#/$defs/Level",
+          "default": "Error"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuleSettings159": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -6939,26 +6983,6 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings159": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": true
-        },
-        "exclude": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "level": {
-          "$ref": "#/$defs/Level",
-          "default": "Error"
-        }
-      },
-      "additionalProperties": false
-    },
     "RuleSettings160": {
       "type": "object",
       "properties": {
@@ -6974,7 +6998,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Warning"
+          "default": "Error"
         }
       },
       "additionalProperties": false
@@ -7020,6 +7044,26 @@
       "additionalProperties": false
     },
     "RuleSettings163": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "level": {
+          "$ref": "#/$defs/Level",
+          "default": "Warning"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuleSettings164": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -7078,26 +7122,6 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings164": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": true
-        },
-        "exclude": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "level": {
-          "$ref": "#/$defs/Level",
-          "default": "Warning"
-        }
-      },
-      "additionalProperties": false
-    },
     "RuleSettings165": {
       "type": "object",
       "properties": {
@@ -7113,7 +7137,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Help"
+          "default": "Warning"
         }
       },
       "additionalProperties": false
@@ -7133,7 +7157,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Warning"
+          "default": "Help"
         }
       },
       "additionalProperties": false
@@ -7143,7 +7167,7 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "default": false
+          "default": true
         },
         "exclude": {
           "type": "array",
@@ -7173,12 +7197,32 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Help"
+          "default": "Warning"
         }
       },
       "additionalProperties": false
     },
     "RuleSettings169": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "level": {
+          "$ref": "#/$defs/Level",
+          "default": "Help"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuleSettings170": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -7209,7 +7253,7 @@
         "concatenation"
       ]
     },
-    "RuleSettings170": {
+    "RuleSettings171": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -7229,7 +7273,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings171": {
+    "RuleSettings172": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -7256,7 +7300,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings172": {
+    "RuleSettings173": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -7294,26 +7338,6 @@
         }
       ]
     },
-    "RuleSettings173": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": false
-        },
-        "exclude": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "level": {
-          "$ref": "#/$defs/Level",
-          "default": "Help"
-        }
-      },
-      "additionalProperties": false
-    },
     "RuleSettings174": {
       "type": "object",
       "properties": {
@@ -7329,7 +7353,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Warning"
+          "default": "Help"
         }
       },
       "additionalProperties": false
@@ -7349,7 +7373,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Help"
+          "default": "Warning"
         }
       },
       "additionalProperties": false
@@ -7389,7 +7413,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Warning"
+          "default": "Help"
         }
       },
       "additionalProperties": false
@@ -7409,7 +7433,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Help"
+          "default": "Warning"
         }
       },
       "additionalProperties": false
@@ -7419,7 +7443,7 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "default": true
+          "default": false
         },
         "exclude": {
           "type": "array",
@@ -7429,7 +7453,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Warning"
+          "default": "Help"
         }
       },
       "additionalProperties": false
@@ -7469,7 +7493,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Note"
+          "default": "Warning"
         }
       },
       "additionalProperties": false
@@ -7489,7 +7513,7 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Error"
+          "default": "Note"
         }
       },
       "additionalProperties": false
@@ -7529,12 +7553,32 @@
         },
         "level": {
           "$ref": "#/$defs/Level",
-          "default": "Warning"
+          "default": "Error"
         }
       },
       "additionalProperties": false
     },
     "RuleSettings185": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "level": {
+          "$ref": "#/$defs/Level",
+          "default": "Warning"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuleSettings186": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -7594,7 +7638,7 @@
       },
       "additionalProperties": false
     },
-    "RuleSettings186": {
+    "RuleSettings187": {
       "type": "object",
       "properties": {
         "enabled": {
