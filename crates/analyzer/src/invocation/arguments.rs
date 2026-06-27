@@ -318,21 +318,24 @@ pub fn verify_argument_type<'arena, A>(
 
     let is_empty_container = input_type.is_empty_array() || is_empty_container_construction(input_expression);
     if union_comparison_result.type_coerced.unwrap_or(false) && !input_type.is_mixed() && !is_empty_container {
-        let issue_kind;
-        let annotation_msg;
-        let note_msg;
-
-        if union_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false) {
-            issue_kind = IssueCode::LessSpecificNestedArgumentType;
-            annotation_msg = format!("Provided type `{input_type_str}` is too general due to nested `mixed`.");
-            note_msg = "The structure contains `mixed`, making it incompatible.".to_string();
+        let (issue_kind, annotation_msg, note_msg) = if union_comparison_result
+            .type_coerced_from_nested_mixed
+            .unwrap_or(false)
+        {
+            (
+                IssueCode::LessSpecificNestedArgumentType,
+                format!("Provided type `{input_type_str}` is too general due to nested `mixed`."),
+                "The structure contains `mixed`, making it incompatible.".to_string(),
+            )
         } else {
-            issue_kind = IssueCode::LessSpecificArgument;
-            annotation_msg = format!("Provided type `{input_type_str}` is too general.");
-            note_msg = format!(
-                "The provided type `{input_type_str}` can be assigned to `{parameter_type_str}`, but is wider (less specific)."
-            );
-        }
+            (
+                IssueCode::LessSpecificArgument,
+                format!("Provided type `{input_type_str}` is too general."),
+                format!(
+                    "The provided type `{input_type_str}` can be assigned to `{parameter_type_str}`, but is wider (less specific)."
+                ),
+            )
+        };
 
         let mut issue = Issue::error(format!(
             "Argument type mismatch for argument #{} of `{}`: expected `{}`, but provided type `{}` is less specific.",

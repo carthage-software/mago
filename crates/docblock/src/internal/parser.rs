@@ -116,17 +116,13 @@ where
         }
     }
 
-    let description_part;
-    let description_start;
     let trimmed = after_metadata.trim_ascii_start();
-    if trimmed.is_empty() {
-        description_part = b"" as &[u8];
-        description_start = span.start.forward(content.len() as u32);
+    let (description_part, description_start) = if trimmed.is_empty() {
+        (b"" as &[u8], span.start.forward(content.len() as u32))
     } else {
         let offset = content.len() - trimmed.len();
-        description_part = trimmed;
-        description_start = span.start.forward(offset as u32);
-    }
+        (trimmed, span.start.forward(offset as u32))
+    };
 
     let mut description: std::vec::Vec<u8> = description_part.to_vec();
     let mut end_span = *span;

@@ -1887,48 +1887,40 @@ where
 {
     let mut if_types = WordMap::default();
 
-    let var_name;
-    let other_value_var_name;
-    let var_type;
-    let other_value_type;
-
-    match typed_value_position {
-        OtherValuePosition::Right => {
-            var_name = get_expression_id(
+    let (var_name, other_value_var_name, var_type, other_value_type) = match typed_value_position {
+        OtherValuePosition::Right => (
+            get_expression_id(
                 left,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 Some(assertion_context.codebase),
-            );
-
-            other_value_var_name = get_expression_id(
+            ),
+            get_expression_id(
                 right,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 Some(assertion_context.codebase),
-            );
-
-            var_type = artifacts.get_expression_type(&left.span());
-            other_value_type = artifacts.get_expression_type(&right.span());
-        }
-        OtherValuePosition::Left => {
-            var_name = get_expression_id(
+            ),
+            artifacts.get_expression_type(&left.span()),
+            artifacts.get_expression_type(&right.span()),
+        ),
+        OtherValuePosition::Left => (
+            get_expression_id(
                 right,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 Some(assertion_context.codebase),
-            );
-            other_value_var_name = get_expression_id(
+            ),
+            get_expression_id(
                 left,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 Some(assertion_context.codebase),
-            );
-
-            var_type = artifacts.get_expression_type(&right.span());
-            other_value_type = artifacts.get_expression_type(&left.span());
-        }
-    }
+            ),
+            artifacts.get_expression_type(&right.span()),
+            artifacts.get_expression_type(&left.span()),
+        ),
+    };
 
     let Some(var_name) = var_name else {
         return vec![];
@@ -1980,47 +1972,40 @@ where
 {
     let mut if_types = WordMap::default();
 
-    let var_name;
-    let other_value_var_name;
-    let other_value_type;
-    let var_type;
-
-    match typed_value_position {
-        OtherValuePosition::Right => {
-            var_name = get_expression_id(
+    let (var_name, other_value_var_name, var_type, other_value_type) = match typed_value_position {
+        OtherValuePosition::Right => (
+            get_expression_id(
                 left,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 Some(assertion_context.codebase),
-            );
-            other_value_var_name = get_expression_id(
+            ),
+            get_expression_id(
                 right,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 Some(assertion_context.codebase),
-            );
-
-            var_type = artifacts.get_expression_type(&left.span());
-            other_value_type = artifacts.get_expression_type(&right.span());
-        }
-        OtherValuePosition::Left => {
-            var_name = get_expression_id(
+            ),
+            artifacts.get_expression_type(&left.span()),
+            artifacts.get_expression_type(&right.span()),
+        ),
+        OtherValuePosition::Left => (
+            get_expression_id(
                 right,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 Some(assertion_context.codebase),
-            );
-            other_value_var_name = get_expression_id(
+            ),
+            get_expression_id(
                 left,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 Some(assertion_context.codebase),
-            );
-
-            var_type = artifacts.get_expression_type(&right.span());
-            other_value_type = artifacts.get_expression_type(&left.span());
-        }
-    }
+            ),
+            artifacts.get_expression_type(&right.span()),
+            artifacts.get_expression_type(&left.span()),
+        ),
+    };
 
     if let Some(var_name) = var_name
         && let Some(other_value_type) = other_value_type

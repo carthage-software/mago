@@ -131,7 +131,7 @@ fn subtract_complex_type<A>(
 {
     let mut acceptable_types = vec![];
 
-    let existing_atomic_types = existing_var_type.types.to_mut().drain(..).collect::<Vec<_>>();
+    let existing_atomic_types = std::mem::take(existing_var_type.types.to_mut());
 
     for existing_atomic in existing_atomic_types {
         if &existing_atomic == assertion_type {
