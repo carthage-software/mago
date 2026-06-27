@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_reporting::IssueCollection;
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -457,6 +458,8 @@ where
 
         (loop_scope, continue_context) = result?;
 
+        let first_iteration_issues = if is_do { recorded_issues.clone() } else { IssueCollection::new() };
+
         if !pre_conditions.is_empty() && loop_scope.truthy_pre_conditions {
             always_enters_loop.set(true);
         }
@@ -643,26 +646,24 @@ where
             continue_context.by_reference_constraints.clone_from(&pre_loop_context.by_reference_constraints);
 
             let (result, new_recorded_issues) = context.record(|context| -> Result<LoopScope, AnalysisError> {
-                if !is_do {
-                    for (condition_offset, pre_condition) in pre_conditions.iter().enumerate() {
-                        apply_pre_condition_to_loop_context(
-                            context,
-                            pre_condition,
-                            unsafe {
-                                // SAFETY: we know the pre_condition_clauses will contain
-                                // the clauses for the pre_condition at condition_offset.
-                                pre_condition_clauses.get_unchecked(condition_offset)
-                            },
-                            &mut continue_context,
-                            loop_parent_context,
-                            artifacts,
-                            is_do,
-                            !pre_conditions_applied,
-                        )?;
-                    }
-
-                    pre_conditions_applied = true;
+                for (condition_offset, pre_condition) in pre_conditions.iter().enumerate() {
+                    apply_pre_condition_to_loop_context(
+                        context,
+                        pre_condition,
+                        unsafe {
+                            // SAFETY: we know the pre_condition_clauses will contain
+                            // the clauses for the pre_condition at condition_offset.
+                            pre_condition_clauses.get_unchecked(condition_offset)
+                        },
+                        &mut continue_context,
+                        loop_parent_context,
+                        artifacts,
+                        is_do,
+                        !pre_conditions_applied,
+                    )?;
                 }
+
+                pre_conditions_applied = true;
 
                 for variable_id in &always_assigned_before_loop_body_variables {
                     let pre_loop_context_type = pre_loop_context.locals.get(variable_id);
@@ -740,6 +741,12 @@ where
             recorded_issues = new_recorded_issues;
 
             i += 1;
+        }
+
+        for issue in first_iteration_issues {
+            if !recorded_issues.iter().any(|existing| existing == &issue) {
+                recorded_issues.push(issue);
+            }
         }
 
         if !recorded_issues.is_empty() {
