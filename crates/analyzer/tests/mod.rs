@@ -2349,6 +2349,7 @@ test_case!(call_site_variance_projection);
 test_case!(issue_2026);
 test_case!(issue_2029);
 test_case!(issue_2020);
+test_case!(possibly_null_destructuring);
 test_case!(readonly_property_write);
 test_case!(issue_1467);
 test_case!(issue_1464);

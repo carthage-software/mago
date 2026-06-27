@@ -232,6 +232,8 @@ final class AnalyzerCodeModuleGenerator
         'docblock-parameter-narrowing',
         'overly-wide-return-type',
         'invalid-destructuring-source',
+        'null-destructuring-source',
+        'possibly-null-destructuring-source',
         'mixed-destructuring-shape',
         'skip-in-keyed-destructuring',
         'spread-in-destructuring',

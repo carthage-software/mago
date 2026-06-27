@@ -18,6 +18,7 @@ use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_literal_int;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_null;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -663,13 +664,40 @@ where
     A: Arena,
 {
     let mut non_array = false;
+    let mut add_null = false;
+    let mut null_source = false;
 
-    let can_be_destructured = array_type
+    let source_has_null = array_type.has_null();
+    let non_nullable_type = if source_has_null { Some(array_type.to_non_nullable()) } else { None };
+    let destructure_type: &TUnion = non_nullable_type.as_ref().unwrap_or(array_type);
+
+    let can_be_destructured = destructure_type
         .types
         .iter()
         .all(|atomic| atomic.is_array() || atomic.extends_or_implements(context.codebase, b"ArrayAccess"));
 
-    if !can_be_destructured {
+    if array_type.is_null() {
+        let mut issue = Issue::error("Destructuring a `null` value.".to_string());
+
+        if let Some(source_expression) = source_expression {
+            issue = issue.with_annotation(
+                Annotation::primary(source_expression.span()).with_message("This expression is always `null`"),
+            );
+        } else {
+            issue = issue.with_annotation(
+                Annotation::primary(target_span).with_message("The value being destructured is always `null`"),
+            );
+        }
+
+        issue = issue
+            .with_note("PHP assigns `null` to every target and emits a warning when destructuring `null`.")
+            .with_help("Ensure the value is an array before destructuring it.");
+
+        context.collector.report_with_code(IssueCode::NullDestructuringSource, issue);
+
+        non_array = true;
+        null_source = true;
+    } else if !can_be_destructured {
         let assigned_type_str = array_type.get_id();
 
         let mut issue = Issue::error(format!(
@@ -704,6 +732,29 @@ where
         context.collector.report_with_code(IssueCode::InvalidDestructuringSource, issue);
 
         non_array = true;
+    } else if source_has_null {
+        let assigned_type_str = array_type.get_id();
+
+        let mut issue = Issue::warning(format!("Destructuring a possibly null value of type `{assigned_type_str}`."));
+
+        if let Some(source_expression) = source_expression {
+            issue = issue.with_annotation(
+                Annotation::primary(source_expression.span())
+                    .with_message(format!("This expression has type `{assigned_type_str}` and may be null here")),
+            );
+        } else {
+            issue = issue.with_annotation(Annotation::primary(target_span).with_message(format!(
+                "The value being destructured has type `{assigned_type_str}` and may be null here"
+            )));
+        }
+
+        issue = issue
+            .with_note("If the value is null at runtime, every target receives `null` and PHP emits a warning.")
+            .with_help("Ensure the value is not null before destructuring, for example with a prior null check.");
+
+        context.collector.report_with_code(IssueCode::PossiblyNullDestructuringSource, issue);
+
+        add_null = true;
     }
 
     let mut last_index: usize = 0;
@@ -788,7 +839,7 @@ where
     }
 
     if !has_keyed_elements && has_non_keyed_elements && !impossible {
-        check_list_destructure_keys(context, target_span, source_expression, array_type);
+        check_list_destructure_keys(context, target_span, source_expression, destructure_type);
     }
 
     for target_element in target_elements {
@@ -799,10 +850,12 @@ where
                 let index_type =
                     artifacts.get_expression_type(key_value_element.key).cloned().unwrap_or_else(get_mixed);
 
-                let access_type = if impossible {
+                let access_type = if null_source {
+                    get_null()
+                } else if impossible {
                     get_mixed()
                 } else {
-                    get_array_target_type_given_index(
+                    let access_type = get_array_target_type_given_index(
                         context,
                         block_context,
                         key_value_element.key.span(),
@@ -812,13 +865,15 @@ where
                             target_span
                         },
                         None,
-                        array_type,
+                        destructure_type,
                         &index_type,
                         false,
                         None,
                         None,
                         false,
-                    )
+                    );
+
+                    if add_null { access_type.as_nullable() } else { access_type }
                 };
 
                 analyze_assignment(
@@ -835,10 +890,12 @@ where
             ArrayElement::Value(value_element) => {
                 let index_type = get_literal_int(last_index as i64);
 
-                let access_type = if impossible {
+                let access_type = if null_source {
+                    get_null()
+                } else if impossible {
                     get_mixed()
                 } else {
-                    get_array_target_type_given_index(
+                    let access_type = get_array_target_type_given_index(
                         context,
                         block_context,
                         target_span,
@@ -848,13 +905,15 @@ where
                             target_span
                         },
                         Some(value_element.value.span()),
-                        array_type,
+                        destructure_type,
                         &index_type,
                         false,
                         None,
                         None,
                         false,
-                    )
+                    );
+
+                    if add_null { access_type.as_nullable() } else { access_type }
                 };
 
                 analyze_assignment(
