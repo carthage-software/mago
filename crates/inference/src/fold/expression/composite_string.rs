@@ -1,0 +1,115 @@
+use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
+use mago_hir::ir::expression::CompositeStringPart;
+use mago_hir::ir::expression::Expression;
+use mago_hir::ir::expression::ExpressionKind;
+use mago_oracle::id::SymbolId;
+use mago_oracle::ty::Type;
+use mago_oracle::ty::well_known::FALSE;
+use mago_oracle::ty::well_known::NON_EMPTY_STRING;
+use mago_oracle::ty::well_known::NULL;
+use mago_oracle::ty::well_known::STRING;
+use mago_oracle::ty::well_known::TYPE_NEVER;
+use mago_oracle::ty::well_known::TYPE_STRING;
+use mago_span::Span;
+
+use crate::flow::Flow;
+use crate::fold::InferenceFolder;
+use crate::semantics::append_string;
+
+type TypedPart<'arena> = CompositeStringPart<'arena, SymbolId, Flow, Type<'arena>>;
+
+impl<'source, 'arena, A, S, E> InferenceFolder<'source, '_, 'arena, A, S, E>
+where
+    A: Arena,
+{
+    pub fn infer_composite_string(
+        &mut self,
+        span: Span,
+        parts: &'source [CompositeStringPart<'source, SymbolId, S, E>],
+    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+        let mut rebuilt = Vec::new_in(self.arena);
+        let mut bytes = Vec::new_in(self.source);
+        let mut foldable = true;
+        let mut non_empty = false;
+        let mut has_never = false;
+
+        for part in parts {
+            let rebuilt_part = match part {
+                CompositeStringPart::Literal(literal) => {
+                    if !literal.is_empty() {
+                        non_empty = true;
+                    }
+                    if foldable {
+                        bytes.extend_from_slice(literal);
+                    }
+
+                    CompositeStringPart::Literal(self.arena.alloc_slice_copy(literal))
+                }
+                CompositeStringPart::Expression(expression) => {
+                    let expression = self.infer_expression(expression);
+                    has_never |= expression.meta.is_never();
+                    if foldable && !append_string(&mut bytes, expression.meta) {
+                        foldable = false;
+                    }
+
+                    CompositeStringPart::Expression(self.arena.alloc(expression))
+                }
+            };
+
+            rebuilt.push(rebuilt_part);
+        }
+
+        let meta = if has_never {
+            TYPE_NEVER
+        } else if foldable {
+            self.literal_string(&bytes)
+        } else if non_empty {
+            self.ty.union_of(&[NON_EMPTY_STRING])
+        } else {
+            TYPE_STRING
+        };
+
+        Expression { meta, span, kind: ExpressionKind::CompositeString(rebuilt.leak()) }
+    }
+
+    pub fn infer_shell_execute(
+        &mut self,
+        span: Span,
+        parts: &'source [CompositeStringPart<'source, SymbolId, S, E>],
+    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+        let (rebuilt, has_never) = self.rebuild_string_parts(parts);
+
+        // The backtick operator is `shell_exec`: the command's output, `null`
+        // when there is no output or an error, or `false` on a pipe failure.
+        let meta = if has_never { TYPE_NEVER } else { self.ty.union_of(&[STRING, FALSE, NULL]) };
+
+        Expression { meta, span, kind: ExpressionKind::ShellExecute(rebuilt) }
+    }
+
+    fn rebuild_string_parts(
+        &mut self,
+        parts: &'source [CompositeStringPart<'source, SymbolId, S, E>],
+    ) -> (&'arena [TypedPart<'arena>], bool) {
+        let mut rebuilt = Vec::new_in(self.arena);
+        let mut has_never = false;
+
+        for part in parts {
+            let rebuilt_part = match part {
+                CompositeStringPart::Literal(literal) => {
+                    CompositeStringPart::Literal(self.arena.alloc_slice_copy(literal))
+                }
+                CompositeStringPart::Expression(expression) => {
+                    let expression = self.infer_expression(expression);
+                    has_never |= expression.meta.is_never();
+
+                    CompositeStringPart::Expression(self.arena.alloc(expression))
+                }
+            };
+
+            rebuilt.push(rebuilt_part);
+        }
+
+        (rebuilt.leak(), has_never)
+    }
+}

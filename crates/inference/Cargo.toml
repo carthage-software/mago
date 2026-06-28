@@ -1,0 +1,26 @@
+[package]
+name = "mago-inference"
+description = "Type inference for Mago: folds bound HIR into typed HIR by computing expression types and control flow."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-allocator = { workspace = true }
+mago-database = { workspace = true }
+mago-flags = { workspace = true }
+mago-hir = { workspace = true }
+mago-oracle = { workspace = true }
+mago-span = { workspace = true }
+itoa = { workspace = true }
+ordered-float =  { workspace = true }
+
+[dev-dependencies]
+mago-syntax = { workspace = true }

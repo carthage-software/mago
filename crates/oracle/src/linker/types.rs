@@ -87,7 +87,7 @@ where
 
 /// Bridges a phpdoc type annotation into an oracle [`Type`], interning every
 /// atom through the builder on its scratch arena.
-pub(crate) fn lower_type_annotation<'arena, S, A>(
+pub fn lower_type_annotation<'arena, S, A>(
     builder: &mut TypeBuilder<'_, 'arena, S, A>,
     annotation: &TypeAnnotation<'arena>,
 ) -> Option<Type<'arena>>
