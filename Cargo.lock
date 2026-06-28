@@ -1732,10 +1732,10 @@ dependencies = [
 
 [[package]]
 name = "mago-oracle"
-version = "1.30.0"
+version = "1.42.0"
 dependencies = [
  "codspeed-criterion-compat",
- "foldhash 0.2.0",
+ "foldhash",
  "mago-allocator",
  "mago-database",
  "mago-flags",
