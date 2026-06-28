@@ -381,7 +381,8 @@ where
         return None;
     };
 
-    if !crate::ty::lattice::refines(well_known::TYPE_INT, iterable_payload.key_type, symbols, options, report, builder) {
+    if !crate::ty::lattice::refines(well_known::TYPE_INT, iterable_payload.key_type, symbols, options, report, builder)
+    {
         if list_payload.flags.contains(ListFlag::NonEmpty) {
             return None;
         }

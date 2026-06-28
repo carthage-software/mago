@@ -504,7 +504,10 @@ where
 /// intersection. Without a final witness we stay permissive
 /// (return `false`).
 #[inline]
-fn intersection_uninhabited_under_finality<'arena, A>(classes: &[Path<'arena>], symbols: &SymbolTable<'arena, A>) -> bool
+fn intersection_uninhabited_under_finality<'arena, A>(
+    classes: &[Path<'arena>],
+    symbols: &SymbolTable<'arena, A>,
+) -> bool
 where
     A: Arena,
 {
@@ -613,8 +616,14 @@ where
     if payload.flags.contains(ArrayFlag::NonEmpty) {
         if let Some(key_type) = payload.key_param {
             let int_or_string = builder.union_of(&[INT, STRING]);
-            if !overlaps(key_type, int_or_string, symbols, LatticeOptions::default(), &mut LatticeReport::new(), builder)
-            {
+            if !overlaps(
+                key_type,
+                int_or_string,
+                symbols,
+                LatticeOptions::default(),
+                &mut LatticeReport::new(),
+                builder,
+            ) {
                 return true;
             }
         }
@@ -852,8 +861,14 @@ where
             continue;
         };
 
-        if lattice::refines(positive_type, *inner, symbols, LatticeOptions::default(), &mut LatticeReport::new(), builder)
-        {
+        if lattice::refines(
+            positive_type,
+            *inner,
+            symbols,
+            LatticeOptions::default(),
+            &mut LatticeReport::new(),
+            builder,
+        ) {
             return true;
         }
     }

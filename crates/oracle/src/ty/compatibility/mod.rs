@@ -76,9 +76,9 @@ where
     S: Arena,
     A: Arena,
 {
-    a.atoms
-        .iter()
-        .any(|left| b.atoms.iter().any(|right| atom_runtime_compatible(*left, *right, symbols, options, report, builder)))
+    a.atoms.iter().any(|left| {
+        b.atoms.iter().any(|right| atom_runtime_compatible(*left, *right, symbols, options, report, builder))
+    })
 }
 
 #[inline]
@@ -140,9 +140,9 @@ where
     }
 
     a_classes.iter().any(|a_class| {
-        b_classes
-            .iter()
-            .any(|b_class| symbols.descends_from(a_class.id, b_class.id) || symbols.descends_from(b_class.id, a_class.id))
+        b_classes.iter().any(|b_class| {
+            symbols.descends_from(a_class.id, b_class.id) || symbols.descends_from(b_class.id, a_class.id)
+        })
     })
 }
 

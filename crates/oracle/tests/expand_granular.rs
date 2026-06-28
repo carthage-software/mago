@@ -34,7 +34,10 @@ fn alias_resolves_when_eval_aliases_on() {
         let symbols = symbol_table(f.arena, "<?php /** @type Body = int */ class Foo {}");
         let alias = alias_atom(f, "Foo", "Body");
         let ty = f.u(alias);
-        assert_eq!(expand::expand_with(ty, &symbols, &ExpansionContext::default(), &mut f.builder), well_known::TYPE_INT);
+        assert_eq!(
+            expand::expand_with(ty, &symbols, &ExpansionContext::default(), &mut f.builder),
+            well_known::TYPE_INT
+        );
     });
 }
 
@@ -55,7 +58,10 @@ fn class_constant_resolves_when_flag_on() {
         let symbols = symbol_table(f.arena, "<?php class Foo { const int BAR = 0; }");
         let constant = class_const_atom(f, "Foo", "BAR");
         let ty = f.u(constant);
-        assert_eq!(expand::expand_with(ty, &symbols, &ExpansionContext::default(), &mut f.builder), well_known::TYPE_INT);
+        assert_eq!(
+            expand::expand_with(ty, &symbols, &ExpansionContext::default(), &mut f.builder),
+            well_known::TYPE_INT
+        );
     });
 }
 

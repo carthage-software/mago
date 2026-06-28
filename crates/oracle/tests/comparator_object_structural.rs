@@ -44,7 +44,8 @@ fn named_class_without_method_does_not_refine_has_method() {
 #[test]
 fn inherited_method_satisfies_has_method() {
     fixture(|f| {
-        let symbols = symbol_table(f.arena, "<?php class Animal { public function name() {} } class Dog extends Animal {}");
+        let symbols =
+            symbol_table(f.arena, "<?php class Animal { public function name() {} } class Dog extends Animal {}");
         let dog = f.t_named("Dog");
         let has_name = f.t_has_method("name");
         assert!(atomic_is_contained(f, dog, has_name, &symbols));
