@@ -75,7 +75,10 @@ where
                 return true;
             }
 
-            if container.atoms.iter().any(|candidate| atom_refines(*atom, *candidate, symbols, options, report, builder))
+            if container
+                .atoms
+                .iter()
+                .any(|candidate| atom_refines(*atom, *candidate, symbols, options, report, builder))
             {
                 return true;
             }
@@ -260,7 +263,8 @@ where
             };
 
             let positive_type = builder.union_of(&[positive_atom]);
-            let positive_meet_inner = crate::ty::meet::compute(positive_type, *inner, symbols, options, report, builder);
+            let positive_meet_inner =
+                crate::ty::meet::compute(positive_type, *inner, symbols, options, report, builder);
 
             let has_matching = containers.iter().enumerate().any(|(other_index, &other)| {
                 if other_index == index {

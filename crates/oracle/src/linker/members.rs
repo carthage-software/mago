@@ -429,7 +429,9 @@ where
 
         let owner_method = SymbolId::method(class_name, name);
         let arena = self.arena;
-        let parameters = arena.alloc_slice_fill_iter(method.parameters.as_slice().iter().map(|parameter| {
+        let parameters = arena.alloc_slice_fill_iter(method.parameters.as_slice().iter().filter_map(|parameter| {
+            let variable = parameter.variable?;
+
             let mut parameter_flags = U8Flags::<SignatureParameterFlag>::empty();
             if parameter.is_by_reference {
                 parameter_flags = parameter_flags.with(SignatureParameterFlag::ByReference);
@@ -445,10 +447,10 @@ where
             ty.annotation = parameter.r#type.and_then(|r#type| self.lower_type_annotation(r#type));
             let default_ty = self.default_type_slot(parameter.default_value);
 
-            SignatureParameter {
+            Some(SignatureParameter {
                 span: parameter.span,
                 defining_symbol: owner_method,
-                path: Path::method_parameter(arena, class_name, name, parameter.variable.name),
+                path: Path::method_parameter(arena, class_name, name, variable.name),
                 attributes: &[],
                 flags: parameter_flags,
                 constraint: crate::symbol::part::constraint::SymbolConstraint::unconstrained(),
@@ -456,7 +458,7 @@ where
                 out_ty: TypeSlot::new(),
                 default_ty,
                 origin,
-            }
+            })
         }));
 
         let mut ret = TypeSlot::new();

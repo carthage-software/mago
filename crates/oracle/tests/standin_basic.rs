@@ -262,8 +262,14 @@ fn equal_param_and_argument_short_circuits_no_changes() {
         let symbols = empty_symbol_table(f.arena);
         let mut state = TemplateState::new();
         let options = StandinOptions::default();
-        let result =
-            template::standin(well_known::TYPE_INT, well_known::TYPE_INT, &symbols, &mut state, &options, &mut f.builder);
+        let result = template::standin(
+            well_known::TYPE_INT,
+            well_known::TYPE_INT,
+            &symbols,
+            &mut state,
+            &options,
+            &mut f.builder,
+        );
         assert_eq!(result, well_known::TYPE_INT);
         assert_eq!(state.iter().count(), 0, "no template parameter mentioned means no bounds recorded");
     });
