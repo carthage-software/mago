@@ -456,7 +456,8 @@ where
 
     for &parameter_atom in parameter.atoms {
         let projected = project_argument(parameter_atom, argument);
-        match walk_atom(parameter_atom, projected, variance, depth, introducing_class, symbols, state, options, builder) {
+        match walk_atom(parameter_atom, projected, variance, depth, introducing_class, symbols, state, options, builder)
+        {
             Walk::Unchanged => new_atoms.push(parameter_atom),
             Walk::Single(atom) => {
                 changed = true;
@@ -531,7 +532,9 @@ where
         AtomKind::GenericParameter => {
             walk_generic_parameter(parameter, argument, variance, depth, introducing_class, state, options)
         }
-        AtomKind::Object => walk_object(parameter, argument, introducing_class, depth, symbols, state, options, builder),
+        AtomKind::Object => {
+            walk_object(parameter, argument, introducing_class, depth, symbols, state, options, builder)
+        }
         AtomKind::Reference => {
             walk_reference(parameter, argument, introducing_class, depth, symbols, state, options, builder)
         }

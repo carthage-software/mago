@@ -172,7 +172,10 @@ class C extends D {}",
         let e_param = f.t_template("E", "TE");
         assert!(atomic_is_contained(f, c_param, d_param, &symbols), "TC <: TD (C extends D<TC>)");
         assert!(atomic_is_contained(f, d_param, e_param, &symbols), "TD <: TE (D extends E<TD>)");
-        assert!(atomic_is_contained(f, c_param, e_param, &symbols), "transitivity: TC <: TD and TD <: TE imply TC <: TE");
+        assert!(
+            atomic_is_contained(f, c_param, e_param, &symbols),
+            "transitivity: TC <: TD and TD <: TE imply TC <: TE"
+        );
     });
 }
 

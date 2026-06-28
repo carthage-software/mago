@@ -112,8 +112,10 @@ fn properties_of_with_public_filter_drops_private() {
 #[test]
 fn properties_of_walks_inheritance() {
     fixture(|f| {
-        let symbols =
-            symbol_table(f.arena, "<?php class Base { public int $id; } class Sub extends Base { public string $name; }");
+        let symbols = symbol_table(
+            f.arena,
+            "<?php class Base { public int $id; } class Sub extends Base { public string $name; }",
+        );
         let sub = f.t_named("Sub");
         let sub_type = f.u(sub);
         let derived_atom = t_properties_of(f, sub_type, None);

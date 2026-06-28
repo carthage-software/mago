@@ -138,7 +138,11 @@ where
 }
 
 #[inline]
-fn refines_has_property<'arena, A>(input: Atom<'arena>, property: &'arena [u8], symbols: &SymbolTable<'arena, A>) -> bool
+fn refines_has_property<'arena, A>(
+    input: Atom<'arena>,
+    property: &'arena [u8],
+    symbols: &SymbolTable<'arena, A>,
+) -> bool
 where
     A: Arena,
 {

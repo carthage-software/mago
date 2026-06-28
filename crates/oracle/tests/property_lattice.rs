@@ -1,8 +1,8 @@
 mod common;
 
 use common::symbol_table;
-use std::fmt::Write as _;
 use mago_oracle::symbol::SymbolTable;
+use std::fmt::Write as _;
 
 use proptest::prelude::*;
 

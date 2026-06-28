@@ -364,7 +364,9 @@ where
         DerivedAtom::TemplateType { object, class_name, template_name } => {
             evaluate_template_type(object, class_name, template_name, symbols, context, builder)
         }
-        DerivedAtom::PropertiesOf { target, visibility } => evaluate_properties_of(target, visibility, symbols, builder),
+        DerivedAtom::PropertiesOf { target, visibility } => {
+            evaluate_properties_of(target, visibility, symbols, builder)
+        }
         DerivedAtom::New(target) => evaluate_new(target, symbols, context, builder),
     };
 

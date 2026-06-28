@@ -420,7 +420,8 @@ where
                 continue;
             }
 
-            if !symbols.descends_from(final_candidate.id, other.id) && !symbols.descends_from(other.id, final_candidate.id)
+            if !symbols.descends_from(final_candidate.id, other.id)
+                && !symbols.descends_from(other.id, final_candidate.id)
             {
                 return false;
             }

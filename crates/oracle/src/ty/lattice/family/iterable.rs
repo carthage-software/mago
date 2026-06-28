@@ -48,7 +48,14 @@ where
     match input {
         Atom::Iterable(input_payload) => {
             type_refines(input_payload.key_type, container_payload.key_type, symbols, options, report, builder)
-                && type_refines(input_payload.value_type, container_payload.value_type, symbols, options, report, builder)
+                && type_refines(
+                    input_payload.value_type,
+                    container_payload.value_type,
+                    symbols,
+                    options,
+                    report,
+                    builder,
+                )
         }
         Atom::List(input_payload) => {
             type_refines(well_known::TYPE_INT, container_payload.key_type, symbols, options, report, builder)

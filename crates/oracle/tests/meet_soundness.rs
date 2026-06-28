@@ -590,7 +590,10 @@ fn callable_refines_truthy_mixed() {
         let c = f.u(callable);
         let truthy_atom = f.mixed_truthy();
         let truthy = f.u(truthy_atom);
-        assert!(does_refine(f, c, truthy, &empty_symbol_table(f.arena)), "callables are objects/closures, always truthy");
+        assert!(
+            does_refine(f, c, truthy, &empty_symbol_table(f.arena)),
+            "callables are objects/closures, always truthy"
+        );
     });
 }
 

@@ -365,6 +365,49 @@ fn bridges_phpdoc_member_types() {
 }
 
 #[test]
+fn bridges_phpdoc_parameter_types() {
+    use mago_oracle::symbol::function_like::FunctionLikeSymbol;
+    use mago_oracle::ty::well_known;
+
+    let sources = [(
+        Origin::Project,
+        "<?php
+        function via_param(
+            /** @param int */
+            $value,
+        ): void {}
+
+        function via_var(
+            /** @var int */
+            $value,
+        ): void {}
+        ",
+    )];
+
+    with_link(&sources, |table| {
+        let parameter_type = |name: &[u8]| {
+            let Some(FunctionLikeSymbol::Function(function)) = table.get_function_like(SymbolId::function_like(name))
+            else {
+                panic!("expected a linked function");
+            };
+
+            function.params.first().and_then(|parameter| parameter.ty.effective(true))
+        };
+
+        assert_eq!(
+            parameter_type(b"via_param"),
+            Some(well_known::TYPE_INT),
+            "@param on a parameter bridges into its type slot, like @var",
+        );
+        assert_eq!(
+            parameter_type(b"via_var"),
+            Some(well_known::TYPE_INT),
+            "@var on a parameter bridges into its type slot",
+        );
+    });
+}
+
+#[test]
 fn bridges_structured_phpdoc_types_faithfully() {
     use mago_oracle::ty::AtomKind;
 
