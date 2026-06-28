@@ -4,7 +4,7 @@ description = "The mago cst command for poking at the parser output. A debugging
 nav_order = 75
 nav_section = "Guide"
 +++
-# Inspecting the AST
+# Inspecting the CST
 
 `mago cst` prints either the concrete syntax tree or the token stream for a single PHP file. Useful for debugging a tricky parse, understanding how Mago sees a piece of syntax, or feeding the output to another tool that wants Mago's parser. It is not part of the regular formatter / linter / analyzer / guard workflow; treat it as a debug command, alongside `list-files` and friends.
 
