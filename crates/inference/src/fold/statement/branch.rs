@@ -29,11 +29,14 @@ where
         span: Span,
         conditional: &'source If<'source, SymbolId, S, E>,
     ) -> Statement<'arena, SymbolId, Flow, Type<'arena>> {
+        let entry_reachable = self.reachable;
         let (condition, when_true, when_false) = self.analyze_condition(conditional.condition);
         let entry = self.environment.clone();
 
+        self.reachable = entry_reachable;
         let then = self.infer_branch(&entry, when_true, conditional.then);
 
+        self.reachable = entry_reachable;
         let (otherwise, else_fallthrough, else_exit) = match conditional.r#else {
             Some(statement) => {
                 let branch = self.infer_branch(&entry, when_false, statement);
@@ -77,8 +80,8 @@ where
             }
             None => {
                 self.environment.clone_from(entry);
-                let mut statement = self.infer_statement(statement);
-                statement.meta.reachable = false;
+                self.reachable = false;
+                let statement = self.infer_statement(statement);
 
                 Branch { statement, fallthrough: None, exit: None }
             }

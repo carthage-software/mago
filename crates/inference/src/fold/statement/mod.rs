@@ -23,49 +23,52 @@ where
         &mut self,
         statement: &'source Statement<'source, SymbolId, S, E>,
     ) -> Statement<'arena, SymbolId, Flow, Type<'arena>> {
-        match statement.kind {
+        let reachable = self.reachable;
+
+        let mut typed = match statement.kind {
             StatementKind::Expression(expression) => self.infer_expression_statement(statement.span, expression),
             StatementKind::Namespace(namespace) => self.infer_namespace(statement.span, namespace),
             StatementKind::Sequence(statements) => self.infer_sequence(statement.span, statements),
             StatementKind::Return(value) => self.infer_return(statement.span, value),
             StatementKind::If(conditional) => self.infer_if(statement.span, conditional),
             StatementKind::Noop => Statement {
-                meta: Flow { reachable: true, exit: ControlFlow::Fallthrough },
+                meta: Flow { reachable, exit: ControlFlow::Fallthrough },
                 span: statement.span,
                 kind: StatementKind::Noop,
             },
             _ => todo!(),
-        }
+        };
+
+        typed.meta.reachable = reachable;
+        self.reachable = reachable && matches!(typed.meta.exit, ControlFlow::Fallthrough);
+
+        typed
     }
 
-    /// Folds a run of statements, threading reachability: once a statement exits
-    /// non-locally (`return`, `break`, `continue`, or a diverging expression),
-    /// every following statement is marked unreachable. The returned [`Flow`] is
-    /// the block's own: `reachable` is whether control falls off the end, and
-    /// `exit` is how it left when it did not.
+    /// Folds a run of statements, returning the typed statements and the block's
+    /// own `exit` (how the block leaves: `Fallthrough` if control can fall off the
+    /// end, otherwise the divergence of the first statement that left non-locally).
+    /// Per-statement reachability is threaded through [`Self::reachable`] in
+    /// [`Self::infer_statement`], so divergence here also propagates into the
+    /// statements that follow and into any nested bodies.
     pub fn infer_block(
         &mut self,
         statements: &'source [Statement<'source, SymbolId, S, E>],
-    ) -> (&'arena [Statement<'arena, SymbolId, Flow, Type<'arena>>], Flow) {
+    ) -> (&'arena [Statement<'arena, SymbolId, Flow, Type<'arena>>], ControlFlow) {
         let mut items = Vec::new_in(self.arena);
-        let mut reachable = true;
         let mut exit = ControlFlow::Fallthrough;
 
         for statement in statements {
-            let mut typed = self.infer_statement(statement);
-            if reachable {
-                if !matches!(typed.meta.exit, ControlFlow::Fallthrough) {
-                    exit = typed.meta.exit;
-                    reachable = false;
-                }
-            } else {
-                typed.meta.reachable = false;
+            let was_reachable = self.reachable;
+            let typed = self.infer_statement(statement);
+            if was_reachable && !matches!(typed.meta.exit, ControlFlow::Fallthrough) {
+                exit = typed.meta.exit;
             }
 
             items.push(typed);
         }
 
-        (items.leak(), Flow { reachable, exit })
+        (items.leak(), exit)
     }
 
     pub fn infer_namespace(
@@ -82,7 +85,7 @@ where
         let body = self.infer_statement(namespace.statement);
         self.namespace = previous;
 
-        let meta = body.meta;
+        let meta = Flow { reachable: true, exit: body.meta.exit };
         let statement = self.arena.alloc(body);
         let name = match namespace.name {
             Some(name) => {
@@ -102,9 +105,9 @@ where
         span: Span,
         statements: &'source [Statement<'source, SymbolId, S, E>],
     ) -> Statement<'arena, SymbolId, Flow, Type<'arena>> {
-        let (items, meta) = self.infer_block(statements);
+        let (items, exit) = self.infer_block(statements);
 
-        Statement { meta, span, kind: StatementKind::Sequence(items) }
+        Statement { meta: Flow { reachable: true, exit }, span, kind: StatementKind::Sequence(items) }
     }
 
     pub fn infer_return(
@@ -121,11 +124,12 @@ where
             None => None,
         };
 
-        Statement {
-            meta: Flow { reachable: true, exit: ControlFlow::Return },
-            span,
-            kind: StatementKind::Return(value),
-        }
+        let exit = match value {
+            Some(value) if value.meta.is_never() => ControlFlow::Diverge,
+            _ => ControlFlow::Return,
+        };
+
+        Statement { meta: Flow { reachable: true, exit }, span, kind: StatementKind::Return(value) }
     }
 
     pub fn infer_expression_statement(

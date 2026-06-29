@@ -45,6 +45,7 @@ where
     environment: Environment<'source, 'arena, A>,
     line_starts: &'source [u32],
     namespace: &'source [u8],
+    reachable: bool,
     _phantom: std::marker::PhantomData<(S, E)>,
 }
 
@@ -64,12 +65,13 @@ where
             environment: HashMap::new_in(source),
             line_starts,
             namespace: b"",
+            reachable: true,
             _phantom: std::marker::PhantomData,
         }
     }
 
     pub fn infer_ir(&mut self, ir: IR<'source, SymbolId, S, E>) -> IR<'arena, SymbolId, Flow, Type<'arena>> {
-        let (statements, _flow) = self.infer_block(ir.statements);
+        let (statements, _exit) = self.infer_block(ir.statements);
 
         IR { span: ir.span, statements, errors: self.arena.alloc_slice_copy(ir.errors) }
     }
