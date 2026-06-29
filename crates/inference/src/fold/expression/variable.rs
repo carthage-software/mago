@@ -44,7 +44,7 @@ where
         Ok(Expression { meta, span, kind })
     }
 
-    fn infer_variable_node(
+    pub(crate) fn infer_variable_node(
         &mut self,
         variable: &Variable<'source, SymbolId, S, E>,
     ) -> InferenceResult<Variable<'arena, SymbolId, Flow, Type<'arena>>> {

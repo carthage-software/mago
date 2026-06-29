@@ -2,6 +2,7 @@ use mago_hir::ir::statement::StatementKind;
 
 use crate::harness::*;
 
+mod annotation;
 mod branch;
 mod namespace;
 
@@ -127,5 +128,37 @@ test_inference! {
     expect = |ir| {
         let flows: Vec<_> = ir.statements.iter().map(|statement| (statement.meta.reachable, statement.meta.exit)).collect();
         assert_eq!(flows, vec![(true, ControlFlow::Fallthrough), (true, ControlFlow::Fallthrough), (true, ControlFlow::Fallthrough)]);
+    }
+}
+
+test_inference! {
+    name = echo_infers_its_operands,
+    code = "<?php echo 1 + 2;",
+    expect = |ir| {
+        let StatementKind::Echo(expressions) = get_last_statement(ir).kind else { panic!("expected an echo") };
+        assert_eq!(expressions[0].meta.to_string(), "int(3)", "the echo operand is inferred");
+    }
+}
+
+test_inference! {
+    name = static_variable_binds_its_initializer,
+    cases = { "<?php static $x = 5; $x;" => "int(5)" }
+}
+
+test_inference! {
+    name = global_variable_is_mixed_without_annotation,
+    cases = { "<?php global $y; $y;" => "mixed" }
+}
+
+test_inference! {
+    name = unset_forgets_the_variable,
+    cases = { "<?php $x = 5; unset($x); $x;" => "mixed" }
+}
+
+test_inference! {
+    name = halt_compiler_diverges,
+    code = "<?php $a = 1; __halt_compiler();",
+    expect = |ir| {
+        assert_eq!(get_last_statement(ir).meta.exit, ControlFlow::Diverge, "code after __halt_compiler() does not run");
     }
 }

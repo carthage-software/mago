@@ -40,6 +40,11 @@ impl<'source, 'arena, A: Arena> Environment<'source, 'arena, A> {
         self.variables.insert(variable, ty);
     }
 
+    /// Forgets `variable`, so a later read sees it as undefined (`mixed`).
+    pub(crate) fn unset(&mut self, variable: Var<'arena>) {
+        self.variables.remove(&variable);
+    }
+
     /// Merges a conditionally-taken path back in: keeps only the variables that
     /// existed in `before` (so a variable introduced only on the conditional path,
     /// or by scoped narrowing, does not leak as definite), unioning each with its
