@@ -13,11 +13,6 @@ impl<'source, 'arena, A, S, E> InferenceFolder<'source, '_, 'arena, A, S, E>
 where
     A: Arena,
 {
-    /// Infers an arrow-function node and its callable type. Arrow functions
-    /// capture the enclosing scope by value, so the body is inferred against the
-    /// current environment with the parameters bound on top, then restored. Its
-    /// return type is the declared one, or the inferred type of the body
-    /// expression when none is declared.
     pub(crate) fn infer_arrow_function(
         &mut self,
         arrow: &'source ArrowFunction<'source, SymbolId, S, E>,

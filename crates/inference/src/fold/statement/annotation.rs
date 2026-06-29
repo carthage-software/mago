@@ -18,8 +18,6 @@ impl<'source, 'arena, A, S, E> InferenceFolder<'source, '_, 'arena, A, S, E>
 where
     A: Arena,
 {
-    /// `/** @var T $x */` as a statement: binds `$x` to the annotated type in the
-    /// environment.
     pub(crate) fn infer_variable_binding_annotation(
         &mut self,
         span: Span,
@@ -33,7 +31,7 @@ where
         let node = annotation.copy_into(self.arena);
 
         Ok(Statement {
-            meta: Flow { reachable: true, exit: ControlFlow::Fallthrough },
+            meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
             span,
             kind: StatementKind::VariableBindingAnnotation(self.arena.alloc(node)),
         })

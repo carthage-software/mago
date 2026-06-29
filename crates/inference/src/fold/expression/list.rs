@@ -18,9 +18,6 @@ impl<'source, 'arena, A, S, E> InferenceFolder<'source, '_, 'arena, A, S, E>
 where
     A: Arena,
 {
-    /// `list(...)` is only valid as an assignment target. As a value expression
-    /// it is an error, so it evaluates to `never`; the operands are still folded
-    /// to keep the typed tree complete.
     pub fn infer_list(
         &mut self,
         span: Span,

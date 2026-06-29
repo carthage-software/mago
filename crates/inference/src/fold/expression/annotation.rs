@@ -16,9 +16,6 @@ impl<'source, 'arena, A, S, E> InferenceFolder<'source, '_, 'arena, A, S, E>
 where
     A: Arena,
 {
-    /// `/** @var T */ <expr>` in a value position (an assignment's right-hand
-    /// side or a returned expression): the annotated type `T` overrides the
-    /// expression's own inferred type.
     pub fn infer_annotation(
         &mut self,
         span: Span,

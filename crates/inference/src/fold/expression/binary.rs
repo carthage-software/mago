@@ -92,9 +92,6 @@ where
         Ok(Expression { meta, span, kind: ExpressionKind::Binary(self.arena.alloc(binary)) })
     }
 
-    /// Infers `right` after narrowing the environment by what `left` being
-    /// `polarity` (true for `&&`, false for `||`) tells us about its variables.
-    /// The narrowing is scoped: each touched variable is restored afterwards.
     fn infer_narrowed(
         &mut self,
         right: &'source Expression<'source, SymbolId, S, E>,

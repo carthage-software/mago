@@ -35,12 +35,6 @@ impl<'source, 'arena, A, S, E> InferenceFolder<'source, '_, 'arena, A, S, E>
 where
     A: Arena,
 {
-    /// Folds a closure / arrow-function / anonymous-class literal expression. A
-    /// closure/arrow's type is the callable signature of its linked symbol, and
-    /// every expression it carries — its body, parameter defaults, attribute
-    /// arguments, and annotation default values — is inferred for real. A literal
-    /// whose symbol is missing is an unbound/unlinked IR; an anonymous class is
-    /// not yet supported.
     pub fn infer_expression_item(
         &mut self,
         span: Span,
@@ -75,9 +69,6 @@ where
         Ok(Expression { meta, span, kind: ExpressionKind::Item(self.arena.alloc(typed_item)) })
     }
 
-    /// The type a function-like body yields: the union of every `return`'s value
-    /// type, plus `null` when control can fall off the end or `return;` with no
-    /// value. A body that never returns nor falls through is `never`.
     pub(crate) fn infer_returned_type(
         &mut self,
         body: &Statement<'arena, SymbolId, Flow, Type<'arena>>,

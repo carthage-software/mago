@@ -55,6 +55,7 @@ where
     line_starts: &'source [u32],
     namespace: &'source [u8],
     reachable: bool,
+    is_first_statement: bool,
     extensions: Extensions<'arena, A>,
     _phantom: std::marker::PhantomData<(S, E)>,
 }
@@ -82,6 +83,7 @@ where
             line_starts,
             namespace: b"",
             reachable: true,
+            is_first_statement: true,
             extensions,
             _phantom: std::marker::PhantomData,
         }

@@ -33,8 +33,6 @@ where
         }
     }
 
-    /// Infers each parameter node: its attributes and default value are inferred,
-    /// the remaining (type-only) fields are carried through.
     pub(crate) fn infer_parameters(
         &mut self,
         parameters: &Delimited<'source, Parameter<'source, SymbolId, S, E>>,

@@ -16,9 +16,6 @@ impl<'source, 'arena, A, S, E> InferenceFolder<'source, '_, 'arena, A, S, E>
 where
     A: Arena,
 {
-    /// Infers a docblock annotation: the `@method`/`@param` default-value
-    /// expressions are inferred, every other tag (which carries only types,
-    /// names, or flags) is carried through.
     pub(crate) fn infer_item_annotation(
         &mut self,
         annotation: &ItemAnnotation<'source, SymbolId, S, E>,

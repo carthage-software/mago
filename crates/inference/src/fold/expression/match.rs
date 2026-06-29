@@ -25,13 +25,6 @@ impl<'source, 'arena, A, S, E> InferenceFolder<'source, '_, 'arena, A, S, E>
 where
     A: Arena,
 {
-    /// Infers a `match`, threading the still-unmatched subject type through the
-    /// arms in order: each arm sees the subject narrowed to the values that can
-    /// reach it (`meet` with the arm's conditions), and the fall-through to later
-    /// arms is the subject with those values removed (`subtract`). An arm whose
-    /// narrowed subject is `never` is unreachable and contributes neither a result
-    /// type nor a branch environment; the result is the union of the reachable
-    /// arms' results, and the environment afterwards is their join.
     pub fn infer_match(
         &mut self,
         span: Span,
@@ -103,9 +96,6 @@ where
         Ok(Expression { meta, span, kind: ExpressionKind::Match(self.arena.alloc(match_expression)) })
     }
 
-    /// Infers one arm's result with the subject narrowed to `matched`. When the
-    /// arm is reachable (`matched` has inhabitants) its result joins the union
-    /// and, unless it diverges, its environment joins `joined`.
     fn infer_arm_result(
         &mut self,
         entry: &Environment<'source, 'arena, A>,

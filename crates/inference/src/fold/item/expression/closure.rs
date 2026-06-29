@@ -17,11 +17,6 @@ impl<'source, 'arena, A, S, E> InferenceFolder<'source, '_, 'arena, A, S, E>
 where
     A: Arena,
 {
-    /// Infers a closure node and its callable type. The attributes and annotation
-    /// are inferred in the enclosing scope; the body is inferred in a fresh scope
-    /// with the `use` captures and the parameters bound (closures do not see other
-    /// locals). The return type is the declared one, or the type inferred from the
-    /// body when none is declared.
     pub(crate) fn infer_closure(
         &mut self,
         closure: &'source Closure<'source, SymbolId, S, E>,

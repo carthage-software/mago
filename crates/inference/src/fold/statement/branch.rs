@@ -60,7 +60,7 @@ where
         };
 
         Ok(Statement {
-            meta: Flow { reachable: true, exit },
+            meta: Flow { reachable: entry_reachable, exit },
             span,
             kind: StatementKind::If(self.arena.alloc(conditional)),
         })
