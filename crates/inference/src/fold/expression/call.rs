@@ -11,10 +11,12 @@ use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::identifier::Identifier;
 use mago_oracle::id::SymbolId;
 use mago_oracle::symbol::function_like::FunctionLikeSymbol;
+use mago_oracle::symbol::function_like::function::FunctionSymbol;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::callable::CallableAtom;
 use mago_oracle::ty::atom::payload::generic_parameter::GenericParameterAtom;
+use mago_oracle::ty::atom::payload::scalar::string::StringLiteral;
 use mago_oracle::ty::template::substitute;
 use mago_oracle::ty::well_known::TYPE_MIXED;
 use mago_span::Span;
@@ -101,6 +103,10 @@ where
             return TYPE_MIXED;
         };
 
+        self.function_return(function, argument_types)
+    }
+
+    fn function_return(&mut self, function: &FunctionSymbol<'arena>, argument_types: &[Type<'arena>]) -> Type<'arena> {
         let Some(ret) = function.ret.effective(true) else {
             return TYPE_MIXED;
         };
@@ -117,7 +123,20 @@ where
         self.instantiate_return(&parameter_types, ret, argument_types)
     }
 
-    fn resolve_callable_call(&mut self, callee: Type<'arena>, argument_types: &[Type<'arena>]) -> Type<'arena> {
+    pub(crate) fn resolve_callable_call(
+        &mut self,
+        callee: Type<'arena>,
+        argument_types: &[Type<'arena>],
+    ) -> Type<'arena> {
+        if let [Atom::String(string)] = callee.atoms
+            && let StringLiteral::Value(name) = string.literal
+            && !name.contains(&b':')
+            && let Some(FunctionLikeSymbol::Function(function)) =
+                self.symbols.get_function_like(SymbolId::function_like(name))
+        {
+            return self.function_return(function, argument_types);
+        }
+
         let [Atom::Callable(CallableAtom::Closure(signature) | CallableAtom::Signature(signature))] = callee.atoms
         else {
             return TYPE_MIXED;

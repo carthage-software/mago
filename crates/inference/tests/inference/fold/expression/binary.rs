@@ -134,3 +134,12 @@ test_inference! {
         assert_eq!(get_last_binary(ir).right.meta.to_string(), "false");
     }
 }
+
+test_inference! {
+    name = pipe_operator_applies_the_right_operand,
+    def = "<?php function shout(string $s): string { return $s; }",
+    cases = {
+        "<?php $f = fn(int $x): string => ''; $r = 5 |> $f; $r;" => "string",
+        "<?php $r = 'x' |> 'shout'; $r;" => "string",
+    }
+}

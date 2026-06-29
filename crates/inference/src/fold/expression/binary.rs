@@ -181,7 +181,7 @@ where
             BinaryOperator::And | BinaryOperator::Or | BinaryOperator::Xor => logical(operator, left, right),
             BinaryOperator::NullCoalesce => self.null_coalesce(left, right),
             BinaryOperator::Instanceof => TYPE_BOOL,
-            BinaryOperator::Pipe => TYPE_MIXED,
+            BinaryOperator::Pipe => self.resolve_callable_call(right, &[left]),
         }
     }
 

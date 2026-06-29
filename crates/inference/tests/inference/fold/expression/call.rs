@@ -12,6 +12,15 @@ test_inference! {
 }
 
 test_inference! {
+    name = string_naming_a_function_is_callable,
+    def = "<?php function takes_int(int $x): string { return ''; }",
+    cases = {
+        "<?php 'takes_int'(1);" => "string",
+        "<?php $f = 'takes_int'; $f(1);" => "string",
+    }
+}
+
+test_inference! {
     name = instantiates_template_return_from_arguments,
     def = indoc! {"
         <?php
