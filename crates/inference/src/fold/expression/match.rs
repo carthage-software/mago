@@ -116,7 +116,7 @@ where
     ) -> &'arena Expression<'arena, SymbolId, Flow, Type<'arena>> {
         let reachable = !matched.is_never();
 
-        self.environment = entry.clone();
+        self.environment.clone_from(entry);
         if reachable && let Some(variable) = subject_variable {
             self.environment.insert(variable, matched);
         }

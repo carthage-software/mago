@@ -46,11 +46,6 @@ fn operations_are_canonical() {
 
 #[test]
 fn elseif_chain_else_is_contradiction() {
-    // $a is null|string.
-    //   if    ($a === null) ...        -> L1
-    //   elseif ($a === false) ...      -> L2  (reached under !L1)
-    //   elseif ($a !== null) ...       -> !L1 (reached under !L1 && !L2)
-    //   else ...                       -> reached under !L1 && !L2 && !(!L1) == FALSE
     let arena = LocalArena::new();
     let mut diagram = DecisionDiagram::new_in(&arena);
 
