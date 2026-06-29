@@ -9,6 +9,7 @@ use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_span::Span;
 
 use crate::flow::Flow;
+use crate::fold::Environment;
 use crate::fold::InferenceFolder;
 use crate::reconciler::reconcile;
 
@@ -73,7 +74,7 @@ where
             (None, None) => TYPE_NEVER,
         };
 
-        if let Some(environment) = self.merge_condition_environments(then_environment, else_environment) {
+        if let Some(environment) = Environment::merge_options(then_environment, else_environment, &mut self.ty) {
             self.environment = environment;
         }
 

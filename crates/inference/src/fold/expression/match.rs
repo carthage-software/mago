@@ -118,7 +118,7 @@ where
 
         self.environment.clone_from(entry);
         if reachable && let Some(variable) = subject_variable {
-            self.environment.insert(variable, matched);
+            self.environment.set(variable, matched);
         }
 
         let typed = self.infer_expression(result);
@@ -127,7 +127,7 @@ where
             if !typed.meta.is_never() {
                 let contribution = self.environment.clone();
                 *joined = Some(match joined.take() {
-                    Some(existing) => self.union_environments(existing, contribution),
+                    Some(existing) => existing.union(contribution, &mut self.ty),
                     None => contribution,
                 });
             }

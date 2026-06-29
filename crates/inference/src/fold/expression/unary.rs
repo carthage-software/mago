@@ -226,7 +226,7 @@ where
     fn write_back(&mut self, operand: &'source Expression<'source, SymbolId, S, E>, ty: Type<'arena>) {
         if let ExpressionKind::Variable(Variable::Direct(direct)) = &operand.kind {
             let name = self.arena.alloc_slice_copy(direct.name);
-            self.environment.insert(Var::new(name), ty);
+            self.environment.set(Var::new(name), ty);
         }
     }
 }

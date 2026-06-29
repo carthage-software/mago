@@ -47,7 +47,7 @@ where
         };
 
         let exit = merge_exits(then.exit, else_exit);
-        if let Some(environment) = self.merge_condition_environments(then.fallthrough, else_fallthrough) {
+        if let Some(environment) = Environment::merge_options(then.fallthrough, else_fallthrough, &mut self.ty) {
             self.environment = environment;
         }
 

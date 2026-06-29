@@ -53,7 +53,7 @@ where
                 let variable = match variable {
                     Variable::Direct(direct) => {
                         let direct = direct.copy_into(self.arena);
-                        self.environment.insert(Var::new(direct.name), ty);
+                        self.environment.set(Var::new(direct.name), ty);
 
                         Variable::Direct(direct)
                     }

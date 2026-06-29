@@ -106,15 +106,15 @@ where
         let before = self.environment.clone();
 
         for (variable, assertion) in &assertions {
-            let base = self.environment.get(variable).copied().unwrap_or(TYPE_MIXED);
+            let base = self.environment.get(*variable);
             let narrowed = reconcile(&mut self.ty, self.symbols, *assertion, base);
 
-            self.environment.insert(*variable, narrowed);
+            self.environment.set(*variable, narrowed);
         }
 
         let right = self.infer_expression(right);
 
-        self.merge_environment_with(before);
+        self.environment.merge_with(before, &mut self.ty);
 
         right
     }

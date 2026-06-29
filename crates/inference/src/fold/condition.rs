@@ -10,7 +10,6 @@ use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known::TYPE_BOOL;
 use mago_oracle::ty::well_known::TYPE_FALSE;
-use mago_oracle::ty::well_known::TYPE_MIXED;
 use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_oracle::ty::well_known::TYPE_TRUE;
 use mago_span::Span;
@@ -98,7 +97,7 @@ where
             Some(left_true) => {
                 self.environment = left_true;
                 let (right, right_true, right_false) = self.analyze_condition(binary.right);
-                let when_false = self.merge_condition_environments(left_false, right_false);
+                let when_false = Environment::merge_options(left_false, right_false, &mut self.ty);
 
                 (right, right_true, when_false)
             }
@@ -131,7 +130,7 @@ where
             Some(left_false) => {
                 self.environment = left_false;
                 let (right, right_true, right_false) = self.analyze_condition(binary.right);
-                let when_true = self.merge_condition_environments(left_true, right_true);
+                let when_true = Environment::merge_options(left_true, right_true, &mut self.ty);
 
                 (right, when_true, right_false)
             }
@@ -165,28 +164,16 @@ where
         let mut assertions = Vec::new_in(self.source);
         narrowing_assertions(condition, polarity, &mut assertions);
         for (variable, assertion) in &assertions {
-            let base = environment.get(variable).copied().unwrap_or(TYPE_MIXED);
+            let base = environment.get(*variable);
             let narrowed = reconcile(&mut self.ty, self.symbols, *assertion, base);
             if narrowed.is_never() {
                 return None;
             }
 
-            environment.insert(*variable, narrowed);
+            environment.set(*variable, narrowed);
         }
 
         Some(environment)
-    }
-
-    pub(crate) fn merge_condition_environments(
-        &mut self,
-        left: Option<Environment<'source, 'arena, A>>,
-        right: Option<Environment<'source, 'arena, A>>,
-    ) -> Option<Environment<'source, 'arena, A>> {
-        match (left, right) {
-            (None, None) => None,
-            (Some(environment), None) | (None, Some(environment)) => Some(environment),
-            (Some(left), Some(right)) => Some(self.union_environments(left, right)),
-        }
     }
 }
 

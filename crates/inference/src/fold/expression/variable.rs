@@ -24,7 +24,7 @@ where
         let (meta, kind) = match variable {
             Variable::Direct(direct) => {
                 let direct = direct.copy_into(self.arena);
-                let meta = self.environment.get(&Var::new(direct.name)).copied().unwrap_or(TYPE_MIXED);
+                let meta = self.environment.get(Var::new(direct.name));
 
                 (meta, ExpressionKind::Variable(Variable::Direct(direct)))
             }
