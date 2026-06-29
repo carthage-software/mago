@@ -37,7 +37,7 @@ where
         &mut self,
         expression: &'source Expression<'source, SymbolId, S, E>,
     ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        match &expression.kind {
+        let mut typed = match &expression.kind {
             ExpressionKind::Parenthesized(inner) => self.infer_parenthesized_expression(expression.span, inner),
             ExpressionKind::Literal(literal) => self.infer_literal(expression.span, literal),
             ExpressionKind::Assignment(assignment) => self.infer_assignment(expression.span, assignment),
@@ -87,7 +87,13 @@ where
                 self.diverging(expression.span, ExpressionKind::Identifier(identifier.copy_into(self.arena)))
             }
             ExpressionKind::Error(error_span) => self.diverging(expression.span, ExpressionKind::Error(*error_span)),
+        };
+
+        if !self.extensions.is_empty() {
+            self.apply_extensions(&mut typed);
         }
+
+        typed
     }
 
     pub fn infer_parenthesized_expression(

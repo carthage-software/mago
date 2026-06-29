@@ -11,6 +11,7 @@ use mago_hir::ir::statement::StatementKind;
 use mago_hir::lower::LowerSettings;
 use mago_hir::lower::Lowering;
 use mago_inference::Inference;
+use mago_inference::extension::Extensions;
 use mago_inference::flow::Flow;
 use mago_oracle::definition::binder::bind;
 use mago_oracle::id::SymbolId;
@@ -51,6 +52,16 @@ impl Test {
     /// returning the typed IR. `definitions` is plain PHP whose declarations
     /// (constants, functions, classes) populate the symbol table.
     pub fn infer<'arena>(&'arena self, definitions: &str, code: &str) -> TypedIr<'arena> {
+        self.infer_with(definitions, code, Extensions::default())
+    }
+
+    /// As [`Self::infer`], inferring against the given extensions.
+    pub fn infer_with<'arena>(
+        &'arena self,
+        definitions: &str,
+        code: &str,
+        extensions: Extensions<'arena, LocalArena>,
+    ) -> TypedIr<'arena> {
         let definitions_file =
             File::ephemeral(Cow::Borrowed(b"definitions.php"), Cow::Owned(definitions.as_bytes().to_vec()));
         let definitions_program = parse_file(&self.scratch, &definitions_file);
@@ -68,7 +79,7 @@ impl Test {
         let ir = self.source.alloc(ir);
         let (bound, _definitions) = bind(&self.source, Origin::Project, ir);
 
-        Inference::new(&self.source, &self.dest).infer(&symbols, &file, bound)
+        Inference::new(&self.source, &self.dest).infer(&symbols, &file, bound, extensions)
     }
 }
 

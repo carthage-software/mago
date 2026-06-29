@@ -5,9 +5,11 @@ use mago_oracle::id::SymbolId;
 use mago_oracle::symbol::SymbolTable;
 use mago_oracle::ty::Type;
 
+use crate::extension::Extensions;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 
+pub mod extension;
 pub mod flow;
 pub mod reconciler;
 pub mod tdd;
@@ -37,7 +39,8 @@ where
         symbols: &'symbols SymbolTable<'arena, A>,
         file: &File,
         ir: IR<'source, SymbolId, S, E>,
+        extensions: Extensions<'arena, A>,
     ) -> IR<'arena, SymbolId, Flow, Type<'arena>> {
-        InferenceFolder::new(self.source, self.arena, symbols, file).infer_ir(ir)
+        InferenceFolder::new(self.source, self.arena, symbols, file, extensions).infer_ir(ir)
     }
 }

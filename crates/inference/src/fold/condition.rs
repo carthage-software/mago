@@ -14,6 +14,7 @@ use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_oracle::ty::well_known::TYPE_TRUE;
 use mago_span::Span;
 
+use crate::extension::AssertionTiming;
 use crate::flow::Flow;
 use crate::fold::Environment;
 use crate::fold::InferenceFolder;
@@ -171,6 +172,28 @@ where
             }
 
             environment.set(*variable, narrowed);
+        }
+
+        if !self.extensions.assertion.is_empty() {
+            for (variable, assertion, timing) in &self.extension_assertions(condition) {
+                let applies = match timing {
+                    AssertionTiming::Always => true,
+                    AssertionTiming::WhenTrue => polarity,
+                    AssertionTiming::WhenFalse => !polarity,
+                };
+
+                if !applies {
+                    continue;
+                }
+
+                let base = environment.get(*variable);
+                let narrowed = reconcile(&mut self.ty, self.symbols, *assertion, base);
+                if narrowed.is_never() {
+                    return None;
+                }
+
+                environment.set(*variable, narrowed);
+            }
         }
 
         Some(environment)

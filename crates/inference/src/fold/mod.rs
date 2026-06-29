@@ -3,6 +3,8 @@ use mago_allocator::vec::Vec;
 use mago_database::file::File;
 use mago_flags::U8Flags;
 use mago_hir::ir::IR;
+use mago_hir::ir::expression::Expression;
+use mago_oracle::assertion::Assertion;
 use mago_oracle::id::SymbolId;
 use mago_oracle::symbol::SymbolTable;
 use mago_oracle::ty::Atom;
@@ -20,9 +22,15 @@ use mago_oracle::ty::atom::payload::scalar::string::StringLiteral;
 use mago_oracle::ty::atom::payload::scalar::string::StringRefinementFlag;
 use mago_oracle::ty::well_known::EMPTY_ARRAY;
 use mago_oracle::ty::well_known::TYPE_FLOAT;
+use mago_oracle::var::Var;
 use ordered_float::OrderedFloat;
 
+use crate::extension::AssertionSink;
+use crate::extension::AssertionTiming;
+use crate::extension::ExtensionContext;
+use crate::extension::Extensions;
 use crate::flow::Flow;
+use crate::reconciler::reconcile;
 
 mod condition;
 mod environment;
@@ -44,6 +52,7 @@ where
     line_starts: &'source [u32],
     namespace: &'source [u8],
     reachable: bool,
+    extensions: Extensions<'arena, A>,
     _phantom: std::marker::PhantomData<(S, E)>,
 }
 
@@ -51,7 +60,13 @@ impl<'source, 'symbol, 'arena, A, S, E> InferenceFolder<'source, 'symbol, 'arena
 where
     A: Arena,
 {
-    pub fn new(source: &'source A, arena: &'arena A, symbols: &'symbol SymbolTable<'arena, A>, file: &File) -> Self {
+    pub fn new(
+        source: &'source A,
+        arena: &'arena A,
+        symbols: &'symbol SymbolTable<'arena, A>,
+        file: &File,
+        extensions: Extensions<'arena, A>,
+    ) -> Self {
         let ty = TypeBuilder::new(arena, source);
         let line_starts = source.alloc_slice_copy(file.lines.as_slice());
 
@@ -64,8 +79,57 @@ where
             line_starts,
             namespace: b"",
             reachable: true,
+            extensions,
             _phantom: std::marker::PhantomData,
         }
+    }
+
+    /// Lets the enabled [`ExtensionInference`] extensions override the type of an
+    /// already-inferred expression, and applies any unconditional
+    /// ([`AssertionTiming::Always`]) assertions the [`ExtensionAssertion`]
+    /// extensions extract from it to the environment. Skipped entirely when no
+    /// extensions are enabled.
+    pub(crate) fn apply_extensions(&mut self, typed: &mut Expression<'arena, SymbolId, Flow, Type<'arena>>) {
+        let inference = self.extensions.inference;
+        if !inference.is_empty() {
+            let mut context = ExtensionContext::new(&mut self.ty, self.symbols, self.namespace);
+            for extension in inference {
+                if let Some(ty) = extension.infer(&mut context, typed) {
+                    typed.meta = ty;
+                    break;
+                }
+            }
+        }
+
+        if !self.extensions.assertion.is_empty() {
+            let assertions = self.extension_assertions(typed);
+            for (variable, assertion, timing) in &assertions {
+                if matches!(timing, AssertionTiming::Always) {
+                    let base = self.environment.get(*variable);
+                    let narrowed = reconcile(&mut self.ty, self.symbols, *assertion, base);
+                    self.environment.set(*variable, narrowed);
+                }
+            }
+        }
+    }
+
+    /// Collects the assertions every enabled [`ExtensionAssertion`] extracts from
+    /// `expression`, each tagged with the timing under which it holds.
+    pub(crate) fn extension_assertions(
+        &mut self,
+        expression: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
+    ) -> Vec<'source, (Var<'arena>, Assertion<'arena>, AssertionTiming), A> {
+        let extensions = self.extensions.assertion;
+        let mut entries = Vec::new_in(self.source);
+        if !extensions.is_empty() {
+            let mut context = ExtensionContext::new(&mut self.ty, self.symbols, self.namespace);
+            let mut sink = AssertionSink::new(&mut entries);
+            for extension in extensions {
+                extension.assertions(&mut context, expression, &mut sink);
+            }
+        }
+
+        entries
     }
 
     pub fn infer_ir(&mut self, ir: IR<'source, SymbolId, S, E>) -> IR<'arena, SymbolId, Flow, Type<'arena>> {
