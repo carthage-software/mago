@@ -106,7 +106,7 @@ where
     /// become integers, `null` becomes `""`, and integer-like strings (canonical
     /// decimal, no leading zeros) become integers. Returns `None` for any key
     /// that is not statically known.
-    fn array_key_of(&mut self, key: Type<'arena>) -> Option<ArrayKey<'arena>> {
+    pub(crate) fn array_key_of(&mut self, key: Type<'arena>) -> Option<ArrayKey<'arena>> {
         let [atom] = key.atoms else {
             return None;
         };

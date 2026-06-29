@@ -1,6 +1,7 @@
 mod annotation;
 mod array;
 mod binary;
+mod call;
 mod clone;
 mod composite_string;
 mod conditional;

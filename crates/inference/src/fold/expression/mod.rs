@@ -15,6 +15,7 @@ pub mod annotation;
 pub mod array;
 pub mod assignment;
 pub mod binary;
+pub mod call;
 pub mod clone;
 pub mod composite_string;
 pub mod conditional;
@@ -58,7 +59,7 @@ where
                 self.diverging(expression.span, ExpressionKind::ArrayAppend(self.arena.alloc(array)))
             }
             ExpressionKind::Item(_item_expression) => todo!(),
-            ExpressionKind::Call(_call) => todo!(),
+            ExpressionKind::Call(call) => self.infer_call(expression.span, call),
             ExpressionKind::PartialApplication(_partial_application) => todo!(),
             ExpressionKind::Access(_access) => todo!(),
             ExpressionKind::Clone(operand) => self.infer_clone(expression.span, operand),

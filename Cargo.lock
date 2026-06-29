@@ -1692,6 +1692,7 @@ dependencies = [
 name = "mago-inference"
 version = "1.42.0"
 dependencies = [
+ "indoc",
  "itoa",
  "mago-allocator",
  "mago-database",

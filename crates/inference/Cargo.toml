@@ -23,4 +23,5 @@ itoa = { workspace = true }
 ordered-float =  { workspace = true }
 
 [dev-dependencies]
+indoc = { workspace = true }
 mago-syntax = { workspace = true }
