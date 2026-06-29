@@ -3,6 +3,7 @@ use mago_allocator::CopyInto;
 use mago_allocator::copy::copy_ref_into;
 use mago_allocator::vec::Vec;
 use mago_hir::ir::delimited::Delimited;
+use mago_hir::ir::expression::AccessKind;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::statement::GlobalItem;
@@ -290,8 +291,20 @@ where
         let mut items = Vec::new_in(self.arena);
         for operand in operands {
             let typed = self.infer_expression(operand)?;
-            if let ExpressionKind::Variable(Variable::Direct(direct)) = typed.kind {
-                self.environment.unset(Var::new(direct.name));
+            match typed.kind {
+                ExpressionKind::Variable(Variable::Direct(direct)) => {
+                    self.environment.unset(Var::new(direct.name));
+                }
+                ExpressionKind::Access(access) => {
+                    if let AccessKind::Array(base, index) = access.kind
+                        && let ExpressionKind::Variable(Variable::Direct(direct)) = base.kind
+                        && let Some(key) = self.array_key_of(index.meta)
+                    {
+                        let updated = self.remove_array_key(base.meta, key);
+                        self.environment.set(Var::new(direct.name), updated);
+                    }
+                }
+                _ => {}
             }
 
             items.push(typed);

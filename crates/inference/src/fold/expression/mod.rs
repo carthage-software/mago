@@ -13,6 +13,7 @@ use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 use crate::fold::expression::construct::RequireKind;
 
+pub mod access;
 pub mod annotation;
 pub mod array;
 pub mod assignment;
@@ -65,9 +66,7 @@ where
             ExpressionKind::PartialApplication(_) => {
                 return Err(InferenceError::Unsupported { span: expression.span, construct: "partial application" });
             }
-            ExpressionKind::Access(_) => {
-                return Err(InferenceError::Unsupported { span: expression.span, construct: "member access" });
-            }
+            ExpressionKind::Access(access) => self.infer_access(expression.span, access)?,
             ExpressionKind::Clone(operand) => self.infer_clone(expression.span, operand)?,
             ExpressionKind::Empty(operand) => self.infer_empty(expression.span, operand)?,
             ExpressionKind::Eval(operand) => self.infer_eval(expression.span, operand)?,
