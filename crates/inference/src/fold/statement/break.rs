@@ -29,7 +29,13 @@ where
         let reachable = self.reachable;
         let (depth, level) = self.infer_loop_level(level)?;
         let exit = match depth {
-            Some(depth) => ControlFlow::Break(depth),
+            Some(depth) => {
+                if reachable {
+                    self.record_loop_exit(depth, true);
+                }
+
+                ControlFlow::Break(depth)
+            }
             None => ControlFlow::Diverge,
         };
 

@@ -12,6 +12,7 @@ mod global;
 mod goto;
 mod inline;
 mod label;
+mod r#loop;
 mod namespace;
 mod r#static;
 mod switch;

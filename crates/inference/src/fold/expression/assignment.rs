@@ -53,7 +53,7 @@ where
         Ok(Expression { meta, span, kind: ExpressionKind::Assignment(self.arena.alloc(assignment)) })
     }
 
-    fn bind_target(
+    pub(crate) fn bind_target(
         &mut self,
         target: &'source Expression<'source, SymbolId, S, E>,
         ty: Type<'arena>,

@@ -26,6 +26,7 @@ mod global;
 mod goto;
 mod inline;
 mod label;
+pub(crate) mod r#loop;
 mod namespace;
 mod r#return;
 mod sequence;
@@ -85,11 +86,11 @@ where
                 span: statement.span,
                 kind: StatementKind::HaltCompiler,
             },
-            StatementKind::Item(_)
-            | StatementKind::Foreach(_)
-            | StatementKind::For(_)
-            | StatementKind::While(_)
-            | StatementKind::DoWhile(_) => {
+            StatementKind::While(while_loop) => self.infer_while(statement.span, while_loop)?,
+            StatementKind::DoWhile(do_while) => self.infer_do_while(statement.span, do_while)?,
+            StatementKind::For(for_loop) => self.infer_for(statement.span, for_loop)?,
+            StatementKind::Foreach(foreach) => self.infer_foreach(statement.span, foreach)?,
+            StatementKind::Item(_) => {
                 return Err(InferenceError::Unsupported { span: statement.span, construct: "this statement" });
             }
         };

@@ -67,6 +67,26 @@ impl<'source, 'arena, A: Arena> Environment<'source, 'arena, A> {
         self.variables.remove(&variable);
     }
 
+    /// Whether two environments bind exactly the same places to the same types.
+    /// Types are hash-consed, so the per-entry comparison is cheap; this is the
+    /// fixed-point test a loop uses to decide its head has stabilized.
+    pub(crate) fn equals(&self, other: &Self) -> bool {
+        self.variables.len() == other.variables.len()
+            && self.variables.iter().all(|(place, ty)| other.variables.get(place) == Some(ty))
+    }
+
+    /// Every recorded place and its type, for callers that fold over the whole
+    /// environment (loop widening).
+    pub(crate) fn entries(&self) -> impl Iterator<Item = (Var<'arena>, Type<'arena>)> + '_ {
+        self.variables.iter().map(|(place, ty)| (*place, *ty))
+    }
+
+    /// Each place paired with a mutable handle to its type, for rewriting types in
+    /// place without reallocating the map (loop widening / definite-key marking).
+    pub(crate) fn entries_mut(&mut self) -> impl Iterator<Item = (Var<'arena>, &mut Type<'arena>)> {
+        self.variables.iter_mut().map(|(place, ty)| (*place, ty))
+    }
+
     /// Merges a conditionally-taken path back in: keeps only the variables that
     /// existed in `before` (so a variable introduced only on the conditional path,
     /// or by scoped narrowing, does not leak as definite), unioning each with its

@@ -58,8 +58,25 @@ where
     namespace: &'source [u8],
     reachable: bool,
     is_first_statement: bool,
+    loops: std::vec::Vec<LoopFrame<'source, 'arena, A>>,
     extensions: Extensions<'arena, A>,
     _phantom: std::marker::PhantomData<(S, E)>,
+}
+
+/// The break/continue environments collected for one enclosing loop while its
+/// body is folded. `break` paths feed the environment after the loop; `continue`
+/// paths feed the next iteration's head. The stack is indexed by level, so
+/// `break 2`/`continue 2` reach the second loop out.
+#[derive(Debug)]
+pub(crate) struct LoopFrame<'source, 'arena, A: Arena> {
+    pub(crate) break_environment: Option<Environment<'source, 'arena, A>>,
+    pub(crate) continue_environment: Option<Environment<'source, 'arena, A>>,
+}
+
+impl<A: Arena> Default for LoopFrame<'_, '_, A> {
+    fn default() -> Self {
+        Self { break_environment: None, continue_environment: None }
+    }
 }
 
 impl<'source, 'symbol, 'arena, A, S, E> InferenceFolder<'source, 'symbol, 'arena, A, S, E>
@@ -86,9 +103,28 @@ where
             namespace: b"",
             reachable: true,
             is_first_statement: true,
+            loops: std::vec::Vec::new(),
             extensions,
             _phantom: std::marker::PhantomData,
         }
+    }
+
+    /// Records the current environment as a `break`/`continue` target at `level`
+    /// loops out (1 = the innermost). The collected environments are merged when
+    /// the loop finishes: `break` paths into the post-loop environment, `continue`
+    /// paths into the next iteration's head. No-op when no loop is that deep
+    /// (the level is then a fatal error handled by the diverging exit).
+    pub(crate) fn record_loop_exit(&mut self, level: u64, is_break: bool) {
+        let depth = self.loops.len();
+        let level = level as usize;
+        if level == 0 || level > depth {
+            return;
+        }
+
+        let environment = self.environment.clone();
+        let frame = &mut self.loops[depth - level];
+        let slot = if is_break { &mut frame.break_environment } else { &mut frame.continue_environment };
+        *slot = Environment::merge_options(slot.take(), Some(environment), &mut self.ty);
     }
 
     /// Lets the enabled [`ExtensionInference`] extensions override the type of an
