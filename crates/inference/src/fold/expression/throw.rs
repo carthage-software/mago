@@ -6,6 +6,7 @@ use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 
@@ -17,9 +18,9 @@ where
         &mut self,
         span: Span,
         operand: &'source Expression<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let operand = self.infer_expression(operand);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let operand = self.infer_expression(operand)?;
 
-        Expression { meta: TYPE_NEVER, span, kind: ExpressionKind::Throw(self.arena.alloc(operand)) }
+        Ok(Expression { meta: TYPE_NEVER, span, kind: ExpressionKind::Throw(self.arena.alloc(operand)) })
     }
 }

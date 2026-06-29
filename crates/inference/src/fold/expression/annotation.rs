@@ -8,6 +8,7 @@ use mago_oracle::linker::lower_type_annotation;
 use mago_oracle::ty::Type;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 
@@ -22,17 +23,17 @@ where
         &mut self,
         span: Span,
         annotation: &'source Annotation<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let type_annotation = annotation.annotation.type_annotation.copy_into(self.arena);
         let annotated = lower_type_annotation(&mut self.ty, &type_annotation);
 
-        let inner = self.infer_expression(annotation.expression);
+        let inner = self.infer_expression(annotation.expression)?;
         let meta = annotated.unwrap_or(inner.meta);
 
         let variable_annotation = annotation.annotation.copy_into(self.arena);
         let node =
             Annotation { annotation: self.arena.alloc(variable_annotation), expression: self.arena.alloc(inner) };
 
-        Expression { meta, span, kind: ExpressionKind::Annotation(self.arena.alloc(node)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Annotation(self.arena.alloc(node)) })
     }
 }

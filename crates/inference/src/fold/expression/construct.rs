@@ -15,6 +15,7 @@ use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_oracle::ty::well_known::TYPE_TRUE;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 use crate::semantics::truthiness;
@@ -35,8 +36,8 @@ where
         &mut self,
         span: Span,
         operand: &'source Expression<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let operand = self.infer_expression(operand);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let operand = self.infer_expression(operand)?;
 
         let meta = if operand.meta.is_never() {
             TYPE_NEVER
@@ -48,29 +49,29 @@ where
             }
         };
 
-        Expression { meta, span, kind: ExpressionKind::Empty(self.arena.alloc(operand)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Empty(self.arena.alloc(operand)) })
     }
 
     pub fn infer_eval(
         &mut self,
         span: Span,
         operand: &'source Expression<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let operand = self.infer_expression(operand);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let operand = self.infer_expression(operand)?;
         let meta = if operand.meta.is_never() { TYPE_NEVER } else { TYPE_MIXED };
 
-        Expression { meta, span, kind: ExpressionKind::Eval(self.arena.alloc(operand)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Eval(self.arena.alloc(operand)) })
     }
 
     pub fn infer_print(
         &mut self,
         span: Span,
         operand: &'source Expression<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let operand = self.infer_expression(operand);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let operand = self.infer_expression(operand)?;
         let meta = if operand.meta.is_never() { TYPE_NEVER } else { self.int_literal(1) };
 
-        Expression { meta, span, kind: ExpressionKind::Print(self.arena.alloc(operand)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Print(self.arena.alloc(operand)) })
     }
 
     pub fn infer_require_like(
@@ -78,8 +79,8 @@ where
         span: Span,
         operand: &'source Expression<'source, SymbolId, S, E>,
         kind: RequireKind,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let operand = self.infer_expression(operand);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let operand = self.infer_expression(operand)?;
         let meta = if operand.meta.is_never() { TYPE_NEVER } else { TYPE_MIXED };
         let operand = self.arena.alloc(operand);
 
@@ -90,21 +91,21 @@ where
             RequireKind::RequireOnce => ExpressionKind::RequireOnce(operand),
         };
 
-        Expression { meta, span, kind }
+        Ok(Expression { meta, span, kind })
     }
 
     pub fn infer_isset(
         &mut self,
         span: Span,
-        delimited: &'source Delimited<'source, Expression<'source, SymbolId, S, E>>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+        delimited: &Delimited<'source, Expression<'source, SymbolId, S, E>>,
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut items = Vec::new_in(self.arena);
         let mut any_unset = false;
         let mut all_set = true;
         let mut has_never = false;
 
         for operand in delimited.items {
-            let operand = self.infer_expression(operand);
+            let operand = self.infer_expression(operand)?;
             let operand_type = operand.meta;
             if operand_type.is_never() {
                 has_never = true;
@@ -127,19 +128,23 @@ where
             TYPE_BOOL
         };
 
-        Expression { meta, span, kind: ExpressionKind::Isset(Delimited { span: delimited.span, items: items.leak() }) }
+        Ok(Expression {
+            meta,
+            span,
+            kind: ExpressionKind::Isset(Delimited { span: delimited.span, items: items.leak() }),
+        })
     }
 
     pub fn infer_exit(
         &mut self,
         span: Span,
-        arguments: Option<&'source Delimited<'source, Argument<'source, SymbolId, S, E>>>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+        arguments: Option<&Delimited<'source, Argument<'source, SymbolId, S, E>>>,
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let arguments = match arguments {
             Some(delimited) => {
                 let mut items = Vec::new_in(self.arena);
                 for argument in delimited.items {
-                    items.push(self.infer_argument(argument));
+                    items.push(self.infer_argument(argument)?);
                 }
 
                 Some(Delimited { span: delimited.span, items: items.leak() })
@@ -147,29 +152,29 @@ where
             None => None,
         };
 
-        Expression { meta: TYPE_NEVER, span, kind: ExpressionKind::Exit(arguments) }
+        Ok(Expression { meta: TYPE_NEVER, span, kind: ExpressionKind::Exit(arguments) })
     }
 
     fn infer_argument(
         &mut self,
         argument: &'source Argument<'source, SymbolId, S, E>,
-    ) -> Argument<'arena, SymbolId, Flow, Type<'arena>> {
-        match argument {
+    ) -> InferenceResult<Argument<'arena, SymbolId, Flow, Type<'arena>>> {
+        Ok(match argument {
             Argument::Value(expression) => {
-                let expression = self.infer_expression(expression);
+                let expression = self.infer_expression(expression)?;
 
                 Argument::Value(self.arena.alloc(expression))
             }
             Argument::Variadic(expression) => {
-                let expression = self.infer_expression(expression);
+                let expression = self.infer_expression(expression)?;
 
                 Argument::Variadic(self.arena.alloc(expression))
             }
             Argument::Named(name, expression) => {
-                let expression = self.infer_expression(expression);
+                let expression = self.infer_expression(expression)?;
 
                 Argument::Named(name.copy_into(self.arena), self.arena.alloc(expression))
             }
-        }
+        })
     }
 }

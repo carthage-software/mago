@@ -6,6 +6,7 @@ use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::ControlFlow;
 use crate::flow::Flow;
 use crate::fold::Environment;
@@ -28,18 +29,18 @@ where
         &mut self,
         span: Span,
         conditional: &'source If<'source, SymbolId, S, E>,
-    ) -> Statement<'arena, SymbolId, Flow, Type<'arena>> {
+    ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let entry_reachable = self.reachable;
-        let (condition, when_true, when_false) = self.analyze_condition(conditional.condition);
+        let (condition, when_true, when_false) = self.analyze_condition(conditional.condition)?;
         let entry = self.environment.clone();
 
         self.reachable = entry_reachable;
-        let then = self.infer_branch(&entry, when_true, conditional.then);
+        let then = self.infer_branch(&entry, when_true, conditional.then)?;
 
         self.reachable = entry_reachable;
         let (otherwise, else_fallthrough, else_exit) = match conditional.r#else {
             Some(statement) => {
-                let branch = self.infer_branch(&entry, when_false, statement);
+                let branch = self.infer_branch(&entry, when_false, statement)?;
 
                 (Some(&*self.arena.alloc(branch.statement)), branch.fallthrough, branch.exit)
             }
@@ -58,7 +59,11 @@ where
             r#else: otherwise,
         };
 
-        Statement { meta: Flow { reachable: true, exit }, span, kind: StatementKind::If(self.arena.alloc(conditional)) }
+        Ok(Statement {
+            meta: Flow { reachable: true, exit },
+            span,
+            kind: StatementKind::If(self.arena.alloc(conditional)),
+        })
     }
 
     fn infer_branch(
@@ -66,24 +71,24 @@ where
         entry: &Environment<'source, 'arena, A>,
         environment: Option<Environment<'source, 'arena, A>>,
         statement: &'source Statement<'source, SymbolId, S, E>,
-    ) -> Branch<'source, 'arena, A> {
+    ) -> InferenceResult<Branch<'source, 'arena, A>> {
         match environment {
             Some(environment) => {
                 self.environment = environment;
-                let statement = self.infer_statement(statement);
+                let statement = self.infer_statement(statement)?;
                 let fallthrough = match statement.meta.exit {
                     ControlFlow::Fallthrough => Some(self.environment.clone()),
                     _ => None,
                 };
 
-                Branch { exit: Some(statement.meta.exit), fallthrough, statement }
+                Ok(Branch { exit: Some(statement.meta.exit), fallthrough, statement })
             }
             None => {
                 self.environment.clone_from(entry);
                 self.reachable = false;
-                let statement = self.infer_statement(statement);
+                let statement = self.infer_statement(statement)?;
 
-                Branch { statement, fallthrough: None, exit: None }
+                Ok(Branch { statement, fallthrough: None, exit: None })
             }
         }
     }

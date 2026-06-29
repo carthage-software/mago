@@ -29,6 +29,7 @@ use mago_oracle::ty::well_known::TYPE_STRING;
 use mago_oracle::ty::well_known::TYPE_TRUE;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 use crate::reconciler::condition_diagram;
@@ -65,13 +66,13 @@ where
         &mut self,
         span: Span,
         binary: &'source Binary<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let left = self.infer_expression(binary.left);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let left = self.infer_expression(binary.left)?;
 
         let right = match binary.operator {
-            BinaryOperator::And => self.infer_narrowed(binary.right, &left, true),
-            BinaryOperator::Or => self.infer_narrowed(binary.right, &left, false),
-            _ => self.infer_expression(binary.right),
+            BinaryOperator::And => self.infer_narrowed(binary.right, &left, true)?,
+            BinaryOperator::Or => self.infer_narrowed(binary.right, &left, false)?,
+            _ => self.infer_expression(binary.right)?,
         };
 
         let meta = match binary.operator {
@@ -88,7 +89,7 @@ where
             right: self.arena.alloc(right),
         };
 
-        Expression { meta, span, kind: ExpressionKind::Binary(self.arena.alloc(binary)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Binary(self.arena.alloc(binary)) })
     }
 
     /// Infers `right` after narrowing the environment by what `left` being
@@ -99,7 +100,7 @@ where
         right: &'source Expression<'source, SymbolId, S, E>,
         left: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
         polarity: bool,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut assertions = Vec::new_in(self.source);
         narrowing_assertions(left, polarity, &mut assertions);
 
@@ -112,11 +113,11 @@ where
             self.environment.set(*variable, narrowed);
         }
 
-        let right = self.infer_expression(right);
+        let right = self.infer_expression(right)?;
 
         self.environment.merge_with(before, &mut self.ty);
 
-        right
+        Ok(right)
     }
 
     /// Folds `&&`/`||` whose boolean structure is decided regardless of runtime

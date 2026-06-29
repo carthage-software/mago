@@ -10,6 +10,7 @@ use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 
@@ -23,24 +24,24 @@ where
     pub fn infer_list(
         &mut self,
         span: Span,
-        elements: &'source Delimited<'source, ArrayElement<'source, SymbolId, S, E>>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+        elements: &Delimited<'source, ArrayElement<'source, SymbolId, S, E>>,
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut items = Vec::new_in(self.arena);
         for element in elements.items {
             let kind = match element.kind {
                 ArrayElementKind::Value(value) => {
-                    let value = self.infer_expression(value);
+                    let value = self.infer_expression(value)?;
 
                     ArrayElementKind::Value(self.arena.alloc(value))
                 }
                 ArrayElementKind::KeyValue(key, value) => {
-                    let key = self.infer_expression(key);
-                    let value = self.infer_expression(value);
+                    let key = self.infer_expression(key)?;
+                    let value = self.infer_expression(value)?;
 
                     ArrayElementKind::KeyValue(self.arena.alloc(key), self.arena.alloc(value))
                 }
                 ArrayElementKind::Variadic(value) => {
-                    let value = self.infer_expression(value);
+                    let value = self.infer_expression(value)?;
 
                     ArrayElementKind::Variadic(self.arena.alloc(value))
                 }
@@ -50,10 +51,10 @@ where
             items.push(ArrayElement { span: element.span, kind });
         }
 
-        Expression {
+        Ok(Expression {
             meta: TYPE_NEVER,
             span,
             kind: ExpressionKind::List(Delimited { span: elements.span, items: items.leak() }),
-        }
+        })
     }
 }

@@ -29,6 +29,7 @@ use mago_oracle::ty::well_known::TYPE_TRUE;
 use mago_oracle::var::Var;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 use crate::semantics::Number;
@@ -47,8 +48,8 @@ where
         &mut self,
         span: Span,
         unary: &'source UnaryPrefix<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let operand = self.infer_expression(unary.operand);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let operand = self.infer_expression(unary.operand)?;
 
         let meta = if operand.meta.is_never() {
             TYPE_NEVER
@@ -72,15 +73,15 @@ where
 
         let unary = UnaryPrefix { span: unary.span, operator: unary.operator, operand: self.arena.alloc(operand) };
 
-        Expression { meta, span, kind: ExpressionKind::UnaryPrefix(self.arena.alloc(unary)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::UnaryPrefix(self.arena.alloc(unary)) })
     }
 
     pub fn infer_unary_postfix(
         &mut self,
         span: Span,
         unary: &'source UnaryPostfix<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let operand = self.infer_expression(unary.operand);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let operand = self.infer_expression(unary.operand)?;
 
         let meta = if operand.meta.is_never() {
             TYPE_NEVER
@@ -96,7 +97,7 @@ where
 
         let unary = UnaryPostfix { span: unary.span, operand: self.arena.alloc(operand), operator: unary.operator };
 
-        Expression { meta, span, kind: ExpressionKind::UnaryPostfix(self.arena.alloc(unary)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::UnaryPostfix(self.arena.alloc(unary)) })
     }
 
     fn unary_prefix_type(&mut self, operator: UnaryPrefixOperator, operand: Type<'arena>) -> Type<'arena> {

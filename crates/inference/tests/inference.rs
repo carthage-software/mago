@@ -2,6 +2,9 @@
 #[macro_use]
 mod harness;
 
+#[path = "inference/error.rs"]
+mod error;
+
 #[path = "inference/extension.rs"]
 mod extension;
 

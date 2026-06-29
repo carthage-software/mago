@@ -14,6 +14,7 @@ use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_oracle::var::Var;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::Environment;
 use crate::fold::InferenceFolder;
@@ -35,8 +36,8 @@ where
         &mut self,
         span: Span,
         match_expression: &'source Match<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let subject = self.infer_expression(match_expression.subject);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let subject = self.infer_expression(match_expression.subject)?;
         let subject_variable = direct_variable(&subject);
         let entry = self.environment.clone();
 
@@ -52,7 +53,7 @@ where
                     let mut typed_conditions = Vec::new_in(self.arena);
                     let mut condition_atoms = Vec::new_in(self.source);
                     for condition in conditions {
-                        let typed = self.infer_expression(condition);
+                        let typed = self.infer_expression(condition)?;
                         condition_atoms.extend_from_slice(typed.meta.atoms);
                         typed_conditions.push(typed);
                     }
@@ -66,7 +67,7 @@ where
                         result,
                         &mut result_atoms,
                         &mut joined,
-                    );
+                    )?;
 
                     remaining = subtract_with(&mut self.ty, self.symbols, remaining, conditions_type);
                     MatchArmKind::Expression(typed_conditions.leak(), result)
@@ -79,7 +80,7 @@ where
                         result,
                         &mut result_atoms,
                         &mut joined,
-                    );
+                    )?;
 
                     remaining = TYPE_NEVER;
                     MatchArmKind::Default(result)
@@ -99,7 +100,7 @@ where
             arms: Delimited { span: match_expression.arms.span, items: arms },
         };
 
-        Expression { meta, span, kind: ExpressionKind::Match(self.arena.alloc(match_expression)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Match(self.arena.alloc(match_expression)) })
     }
 
     /// Infers one arm's result with the subject narrowed to `matched`. When the
@@ -113,7 +114,7 @@ where
         result: &'source Expression<'source, SymbolId, S, E>,
         result_atoms: &mut Vec<'source, Atom<'arena>, A>,
         joined: &mut Option<Environment<'source, 'arena, A>>,
-    ) -> &'arena Expression<'arena, SymbolId, Flow, Type<'arena>> {
+    ) -> InferenceResult<&'arena Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let reachable = !matched.is_never();
 
         self.environment.clone_from(entry);
@@ -121,7 +122,7 @@ where
             self.environment.set(variable, matched);
         }
 
-        let typed = self.infer_expression(result);
+        let typed = self.infer_expression(result)?;
         if reachable {
             result_atoms.extend_from_slice(typed.meta.atoms);
             if !typed.meta.is_never() {
@@ -133,7 +134,7 @@ where
             }
         }
 
-        self.arena.alloc(typed)
+        Ok(self.arena.alloc(typed))
     }
 }
 

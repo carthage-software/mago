@@ -18,6 +18,7 @@ use mago_oracle::ty::well_known::TYPE_MIXED;
 use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 
@@ -28,8 +29,8 @@ where
     pub fn infer_array(
         &mut self,
         span: Span,
-        elements: &'source Delimited<'source, ArrayElement<'source, SymbolId, S, E>>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+        elements: &Delimited<'source, ArrayElement<'source, SymbolId, S, E>>,
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut items = Vec::new_in(self.arena);
         let mut entries = Vec::new_in(self.source);
         let mut value_atoms = Vec::new_in(self.source);
@@ -40,7 +41,7 @@ where
         for element in elements.items {
             let kind = match element.kind {
                 ArrayElementKind::Value(value) => {
-                    let value = self.infer_expression(value);
+                    let value = self.infer_expression(value)?;
                     has_never |= value.meta.is_never();
                     value_atoms.extend_from_slice(value.meta.atoms);
                     if shapeable {
@@ -51,8 +52,8 @@ where
                     ArrayElementKind::Value(self.arena.alloc(value))
                 }
                 ArrayElementKind::KeyValue(key, value) => {
-                    let key = self.infer_expression(key);
-                    let value = self.infer_expression(value);
+                    let key = self.infer_expression(key)?;
+                    let value = self.infer_expression(value)?;
                     has_never |= key.meta.is_never() || value.meta.is_never();
                     value_atoms.extend_from_slice(value.meta.atoms);
                     if shapeable {
@@ -73,7 +74,7 @@ where
                 }
                 ArrayElementKind::Variadic(value) => {
                     shapeable = false;
-                    let value = self.infer_expression(value);
+                    let value = self.infer_expression(value)?;
                     has_never |= value.meta.is_never();
 
                     ArrayElementKind::Variadic(self.arena.alloc(value))
@@ -99,7 +100,11 @@ where
             self.ty.union_of(&[atom])
         };
 
-        Expression { meta, span, kind: ExpressionKind::Array(Delimited { span: elements.span, items: items.leak() }) }
+        Ok(Expression {
+            meta,
+            span,
+            kind: ExpressionKind::Array(Delimited { span: elements.span, items: items.leak() }),
+        })
     }
 
     /// Resolves a literal array key the way PHP coerces it: `true`/`false`/floats

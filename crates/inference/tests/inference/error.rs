@@ -1,0 +1,41 @@
+use mago_inference::InferenceError;
+
+use crate::harness::Test;
+
+#[test]
+fn object_instantiation_is_reported_unsupported() {
+    let test = Test::new();
+    let result = test.try_infer("<?php", "<?php new DateTime();");
+
+    assert!(
+        matches!(result, Err(InferenceError::Unsupported { construct: "object instantiation", .. })),
+        "expected an unsupported error, got {result:?}",
+    );
+}
+
+#[test]
+fn method_calls_are_reported_unsupported() {
+    let test = Test::new();
+    let result = test.try_infer("<?php", "<?php $service->handle();");
+
+    assert!(
+        matches!(result, Err(InferenceError::Unsupported { construct: "method and static-method calls", .. })),
+        "expected an unsupported error, got {result:?}",
+    );
+}
+
+#[test]
+fn an_unsupported_construct_aborts_inference_rather_than_typing_as_mixed() {
+    let test = Test::new();
+    let result = test.try_infer("<?php", "<?php $a = new DateTime(); $a;");
+
+    assert!(result.is_err(), "inference must not fabricate a type for an unsupported construct");
+}
+
+#[test]
+fn supported_code_infers_without_error() {
+    let test = Test::new();
+    let result = test.try_infer("<?php", "<?php $a = 1; $a;");
+
+    assert!(result.is_ok(), "expected inference to succeed, got {result:?}");
+}

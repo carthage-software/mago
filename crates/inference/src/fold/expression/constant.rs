@@ -8,6 +8,7 @@ use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known::TYPE_MIXED;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 
@@ -19,10 +20,10 @@ where
         &self,
         span: Span,
         identifier: &Identifier<'source>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let meta = self.resolve_constant_type(identifier).unwrap_or(TYPE_MIXED);
 
-        Expression { meta, span, kind: ExpressionKind::Constant(identifier.copy_into(self.arena)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Constant(identifier.copy_into(self.arena)) })
     }
 
     /// The constant name arrives already qualified to the current namespace. An

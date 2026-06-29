@@ -1,4 +1,5 @@
 mod expression;
+mod item;
 mod statement;
 
 test_inference! {

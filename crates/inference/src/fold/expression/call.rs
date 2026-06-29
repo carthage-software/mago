@@ -19,6 +19,8 @@ use mago_oracle::ty::template::substitute;
 use mago_oracle::ty::well_known::TYPE_MIXED;
 use mago_span::Span;
 
+use crate::error::InferenceError;
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 
@@ -30,20 +32,20 @@ where
         &mut self,
         span: Span,
         call: &'source Call<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut arguments = Vec::new_in(self.arena);
         let mut argument_types = Vec::new_in(self.source);
         for argument in call.arguments.items {
             let typed = match argument {
                 Argument::Value(expression) => {
-                    Argument::Value(self.infer_call_argument(expression, &mut argument_types))
+                    Argument::Value(self.infer_call_argument(expression, &mut argument_types)?)
                 }
                 Argument::Variadic(expression) => {
-                    Argument::Variadic(self.infer_call_argument(expression, &mut argument_types))
+                    Argument::Variadic(self.infer_call_argument(expression, &mut argument_types)?)
                 }
                 Argument::Named(name, expression) => Argument::Named(
                     name.copy_into(self.arena),
-                    self.infer_call_argument(expression, &mut argument_types),
+                    self.infer_call_argument(expression, &mut argument_types)?,
                 ),
             };
 
@@ -64,30 +66,30 @@ where
                     (CalleeKind::Function(self.arena.alloc(callee)), meta)
                 }
                 _ => {
-                    let callee = self.infer_expression(callee);
+                    let callee = self.infer_expression(callee)?;
                     let meta = self.resolve_callable_call(callee.meta, &argument_types);
 
                     (CalleeKind::Function(self.arena.alloc(callee)), meta)
                 }
             },
-            _ => todo!(),
+            _ => return Err(InferenceError::Unsupported { span, construct: "method and static-method calls" }),
         };
 
         let callee = Callee { span: call.callee.span, kind };
         let call = Call { span: call.span, callee, arguments };
 
-        Expression { meta, span, kind: ExpressionKind::Call(self.arena.alloc(call)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Call(self.arena.alloc(call)) })
     }
 
     fn infer_call_argument(
         &mut self,
         expression: &'source Expression<'source, SymbolId, S, E>,
         argument_types: &mut Vec<'source, Type<'arena>, A>,
-    ) -> &'arena Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let typed = self.infer_expression(expression);
+    ) -> InferenceResult<&'arena Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let typed = self.infer_expression(expression)?;
         argument_types.push(typed.meta);
 
-        self.arena.alloc(typed)
+        Ok(self.arena.alloc(typed))
     }
 
     fn resolve_function_call(

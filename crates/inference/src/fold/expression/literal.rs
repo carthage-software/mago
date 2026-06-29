@@ -23,6 +23,7 @@ use mago_oracle::ty::well_known::TYPE_TRUE;
 use mago_span::Span;
 use ordered_float::OrderedFloat;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 
@@ -34,7 +35,7 @@ where
         &mut self,
         span: Span,
         literal: &'source Literal<'source>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let meta = match literal.kind {
             LiteralKind::String(literal_string) => match literal_string.value {
                 Some(value) => {
@@ -71,6 +72,6 @@ where
             LiteralKind::Null => TYPE_NULL,
         };
 
-        Expression { meta, span, kind: ExpressionKind::Literal(self.arena.alloc(literal.copy_into(self.arena))) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Literal(self.arena.alloc(literal.copy_into(self.arena))) })
     }
 }

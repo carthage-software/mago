@@ -18,6 +18,8 @@ use mago_oracle::ty::well_known::TYPE_MIXED;
 use mago_oracle::var::Var;
 use mago_span::Span;
 
+use crate::error::InferenceError;
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 use crate::semantics::collect_closed_array;
@@ -30,15 +32,15 @@ where
         &mut self,
         span: Span,
         assignment: &'source Assignment<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let value = self.infer_expression(assignment.right);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let value = self.infer_expression(assignment.right)?;
 
         let value_meta = match assignment.operator {
             None => value.meta,
-            Some(_) => todo!(),
+            Some(_) => return Err(InferenceError::Unsupported { span, construct: "compound assignment" }),
         };
 
-        let target = self.bind_target(assignment.left, value_meta);
+        let target = self.bind_target(assignment.left, value_meta)?;
         let meta = target.meta;
 
         let assignment = Assignment {
@@ -48,15 +50,15 @@ where
             right: self.arena.alloc(value),
         };
 
-        Expression { meta, span, kind: ExpressionKind::Assignment(self.arena.alloc(assignment)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Assignment(self.arena.alloc(assignment)) })
     }
 
     fn bind_target(
         &mut self,
         target: &'source Expression<'source, SymbolId, S, E>,
         ty: Type<'arena>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        match &target.kind {
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let node = match &target.kind {
             ExpressionKind::Variable(variable) => {
                 let variable = match variable {
                     Variable::Direct(direct) => {
@@ -66,22 +68,25 @@ where
                         Variable::Direct(direct)
                     }
                     Variable::Indirect(expression) => {
-                        let expression = self.infer_expression(expression);
+                        let expression = self.infer_expression(expression)?;
 
                         Variable::Indirect(self.arena.alloc(expression))
                     }
-                    Variable::Nested(_) => todo!(),
+                    Variable::Nested(_) => {
+                        return Err(InferenceError::Unsupported {
+                            span: target.span,
+                            construct: "a variable-variable assignment target",
+                        });
+                    }
                 };
 
                 Expression { meta: ty, span: target.span, kind: ExpressionKind::Variable(variable) }
             }
             ExpressionKind::Annotation(annotation) => {
-                // `/** @var T $x */` on an assignment target: bind the inner
-                // target with the annotated type instead of the assigned value.
                 let type_annotation = annotation.annotation.type_annotation.copy_into(self.arena);
                 let annotated = lower_type_annotation(&mut self.ty, &type_annotation).unwrap_or(ty);
 
-                let inner = self.bind_target(annotation.expression, annotated);
+                let inner = self.bind_target(annotation.expression, annotated)?;
 
                 let variable_annotation = annotation.annotation.copy_into(self.arena);
                 let node = Annotation {
@@ -96,17 +101,19 @@ where
                 }
             }
             ExpressionKind::Array(elements) => {
-                let elements = self.bind_destructure(elements, ty);
+                let elements = self.bind_destructure(elements, ty)?;
 
                 Expression { meta: ty, span: target.span, kind: ExpressionKind::Array(elements) }
             }
             ExpressionKind::List(elements) => {
-                let elements = self.bind_destructure(elements, ty);
+                let elements = self.bind_destructure(elements, ty)?;
 
                 Expression { meta: ty, span: target.span, kind: ExpressionKind::List(elements) }
             }
-            _ => todo!(),
-        }
+            _ => return Err(InferenceError::Unsupported { span: target.span, construct: "this assignment target" }),
+        };
+
+        Ok(node)
     }
 
     /// Destructures `ty` into a list/array assignment target, binding each
@@ -117,7 +124,7 @@ where
         &mut self,
         elements: &'source Delimited<'source, ArrayElement<'source, SymbolId, S, E>>,
         ty: Type<'arena>,
-    ) -> Delimited<'arena, ArrayElement<'arena, SymbolId, Flow, Type<'arena>>> {
+    ) -> InferenceResult<Delimited<'arena, ArrayElement<'arena, SymbolId, Flow, Type<'arena>>>> {
         let mut items = Vec::new_in(self.source);
         collect_closed_array(ty, &mut items);
 
@@ -129,16 +136,16 @@ where
                     let element_type = element_type_for(&items, ArrayKey::Int(index));
                     index += 1;
 
-                    ArrayElementKind::Value(self.arena.alloc(self.bind_target(target, element_type)))
+                    ArrayElementKind::Value(self.arena.alloc(self.bind_target(target, element_type)?))
                 }
                 ArrayElementKind::KeyValue(key, target) => {
-                    let key = self.infer_expression(key);
+                    let key = self.infer_expression(key)?;
                     let element_type =
                         self.array_key_of(key.meta).map_or(TYPE_MIXED, |key| element_type_for(&items, key));
 
                     ArrayElementKind::KeyValue(
                         self.arena.alloc(key),
-                        self.arena.alloc(self.bind_target(target, element_type)),
+                        self.arena.alloc(self.bind_target(target, element_type)?),
                     )
                 }
                 ArrayElementKind::Missing => {
@@ -147,14 +154,14 @@ where
                     ArrayElementKind::Missing
                 }
                 ArrayElementKind::Variadic(target) => {
-                    ArrayElementKind::Variadic(self.arena.alloc(self.bind_target(target, TYPE_MIXED)))
+                    ArrayElementKind::Variadic(self.arena.alloc(self.bind_target(target, TYPE_MIXED)?))
                 }
             };
 
             typed.push(ArrayElement { span: element.span, kind });
         }
 
-        Delimited { span: elements.span, items: typed.leak() }
+        Ok(Delimited { span: elements.span, items: typed.leak() })
     }
 }
 

@@ -23,9 +23,10 @@ use crate::extension::ExtensionAssertion;
 use crate::extension::ExtensionContext;
 use crate::flow::Flow;
 
-/// Yields the assertions PHP's `is_*` type-predicate functions establish about a
-/// variable argument: `is_string($x)` narrows `$x` to `string` when true and
-/// removes `string` when false. Opt-in, so the core inference carries no
+/// Yields the assertions PHP's `is_*` type-predicate functions establish.
+///
+/// For a variable argument, `is_string($x)` narrows `$x` to `string` when true
+/// and removes `string` when false. Opt-in, so the core inference carries no
 /// built-in stdlib knowledge.
 ///
 /// This activates once call inference lands; until then no `is_*` call reaches

@@ -25,6 +25,7 @@ use mago_oracle::ty::well_known::TYPE_FLOAT;
 use mago_oracle::var::Var;
 use ordered_float::OrderedFloat;
 
+use crate::error::InferenceResult;
 use crate::extension::AssertionSink;
 use crate::extension::AssertionTiming;
 use crate::extension::ExtensionContext;
@@ -32,9 +33,11 @@ use crate::extension::Extensions;
 use crate::flow::Flow;
 use crate::reconciler::reconcile;
 
+mod argument;
 mod condition;
 mod environment;
 mod expression;
+mod item;
 mod statement;
 
 pub(crate) use environment::Environment;
@@ -132,10 +135,13 @@ where
         entries
     }
 
-    pub fn infer_ir(&mut self, ir: IR<'source, SymbolId, S, E>) -> IR<'arena, SymbolId, Flow, Type<'arena>> {
-        let (statements, _exit) = self.infer_block(ir.statements);
+    pub fn infer_ir(
+        &mut self,
+        ir: IR<'source, SymbolId, S, E>,
+    ) -> InferenceResult<IR<'arena, SymbolId, Flow, Type<'arena>>> {
+        let (statements, _exit) = self.infer_block(ir.statements)?;
 
-        IR { span: ir.span, statements, errors: self.arena.alloc_slice_copy(ir.errors) }
+        Ok(IR { span: ir.span, statements, errors: self.arena.alloc_slice_copy(ir.errors) })
     }
 
     pub(crate) fn int_literal(&mut self, value: i64) -> Type<'arena> {

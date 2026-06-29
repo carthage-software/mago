@@ -11,6 +11,7 @@ use mago_hir::ir::statement::StatementKind;
 use mago_hir::lower::LowerSettings;
 use mago_hir::lower::Lowering;
 use mago_inference::Inference;
+use mago_inference::InferenceResult;
 use mago_inference::extension::Extensions;
 use mago_inference::flow::Flow;
 use mago_oracle::definition::binder::bind;
@@ -61,6 +62,24 @@ impl Test {
         code: &str,
         extensions: Extensions<'arena, LocalArena>,
     ) -> TypedIr<'arena> {
+        match self.try_infer_with(definitions, code, extensions) {
+            Ok(ir) => ir,
+            Err(error) => panic!("inference failed: {error}"),
+        }
+    }
+
+    /// Links `definitions` then infers `code`, returning the inference result so a
+    /// test can assert on the error a construct produces.
+    pub fn try_infer<'arena>(&'arena self, definitions: &str, code: &str) -> InferenceResult<TypedIr<'arena>> {
+        self.try_infer_with(definitions, code, Extensions::default())
+    }
+
+    fn try_infer_with<'arena>(
+        &'arena self,
+        definitions: &str,
+        code: &str,
+        extensions: Extensions<'arena, LocalArena>,
+    ) -> InferenceResult<TypedIr<'arena>> {
         let definitions_file =
             File::ephemeral(Cow::Borrowed(b"definitions.php"), Cow::Owned(definitions.as_bytes().to_vec()));
         let definitions_program = parse_file(&self.scratch, &definitions_file);

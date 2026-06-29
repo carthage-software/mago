@@ -14,6 +14,7 @@ use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_oracle::ty::well_known::TYPE_TRUE;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::extension::AssertionTiming;
 use crate::flow::Flow;
 use crate::fold::Environment;
@@ -38,10 +39,10 @@ where
     pub fn analyze_condition(
         &mut self,
         expr: &'source Expression<'source, SymbolId, S, E>,
-    ) -> Continuations<'arena, Environment<'source, 'arena, A>> {
-        match &expr.kind {
+    ) -> InferenceResult<Continuations<'arena, Environment<'source, 'arena, A>>> {
+        let result = match &expr.kind {
             ExpressionKind::Parenthesized(inner) => {
-                let (inner, when_true, when_false) = self.analyze_condition(inner);
+                let (inner, when_true, when_false) = self.analyze_condition(inner)?;
                 let meta = inner.meta;
 
                 let node =
@@ -50,7 +51,7 @@ where
                 (node, when_true, when_false)
             }
             ExpressionKind::UnaryPrefix(unary) if matches!(unary.operator, UnaryPrefixOperator::Not) => {
-                let (operand, operand_true, operand_false) = self.analyze_condition(unary.operand);
+                let (operand, operand_true, operand_false) = self.analyze_condition(unary.operand)?;
 
                 let when_true = operand_false;
                 let when_false = operand_true;
@@ -66,13 +67,13 @@ where
                 )
             }
             ExpressionKind::Binary(binary) if matches!(binary.operator, BinaryOperator::And) => {
-                self.analyze_and(expr.span, binary)
+                self.analyze_and(expr.span, binary)?
             }
             ExpressionKind::Binary(binary) if matches!(binary.operator, BinaryOperator::Or) => {
-                self.analyze_or(expr.span, binary)
+                self.analyze_or(expr.span, binary)?
             }
             _ => {
-                let typed = self.infer_expression(expr);
+                let typed = self.infer_expression(expr)?;
                 let when_true = match truthiness(typed.meta) {
                     Some(false) => None,
                     _ => self.narrowed_environment(&typed, true),
@@ -84,26 +85,28 @@ where
 
                 (typed, when_true, when_false)
             }
-        }
+        };
+
+        Ok(result)
     }
 
     fn analyze_and(
         &mut self,
         span: Span,
         binary: &'source Binary<'source, SymbolId, S, E>,
-    ) -> Continuations<'arena, Environment<'source, 'arena, A>> {
-        let (left, left_true, left_false) = self.analyze_condition(binary.left);
+    ) -> InferenceResult<Continuations<'arena, Environment<'source, 'arena, A>>> {
+        let (left, left_true, left_false) = self.analyze_condition(binary.left)?;
 
         let (right, when_true, when_false) = match left_true {
             Some(left_true) => {
                 self.environment = left_true;
-                let (right, right_true, right_false) = self.analyze_condition(binary.right);
+                let (right, right_true, right_false) = self.analyze_condition(binary.right)?;
                 let when_false = Environment::merge_options(left_false, right_false, &mut self.ty);
 
                 (right, right_true, when_false)
             }
             None => {
-                let (right, _, _) = self.analyze_condition(binary.right);
+                let (right, _, _) = self.analyze_condition(binary.right)?;
 
                 (right, None, left_false)
             }
@@ -117,26 +120,26 @@ where
             right: self.arena.alloc(right),
         };
 
-        (Expression { meta, span, kind: ExpressionKind::Binary(self.arena.alloc(node)) }, when_true, when_false)
+        Ok((Expression { meta, span, kind: ExpressionKind::Binary(self.arena.alloc(node)) }, when_true, when_false))
     }
 
     fn analyze_or(
         &mut self,
         span: Span,
         binary: &'source Binary<'source, SymbolId, S, E>,
-    ) -> Continuations<'arena, Environment<'source, 'arena, A>> {
-        let (left, left_true, left_false) = self.analyze_condition(binary.left);
+    ) -> InferenceResult<Continuations<'arena, Environment<'source, 'arena, A>>> {
+        let (left, left_true, left_false) = self.analyze_condition(binary.left)?;
 
         let (right, when_true, when_false) = match left_false {
             Some(left_false) => {
                 self.environment = left_false;
-                let (right, right_true, right_false) = self.analyze_condition(binary.right);
+                let (right, right_true, right_false) = self.analyze_condition(binary.right)?;
                 let when_true = Environment::merge_options(left_true, right_true, &mut self.ty);
 
                 (right, when_true, right_false)
             }
             None => {
-                let (right, _, _) = self.analyze_condition(binary.right);
+                let (right, _, _) = self.analyze_condition(binary.right)?;
 
                 (right, left_true, None)
             }
@@ -150,7 +153,7 @@ where
             right: self.arena.alloc(right),
         };
 
-        (Expression { meta, span, kind: ExpressionKind::Binary(self.arena.alloc(node)) }, when_true, when_false)
+        Ok((Expression { meta, span, kind: ExpressionKind::Binary(self.arena.alloc(node)) }, when_true, when_false))
     }
 
     /// A clone of the current environment narrowed by the condition's `polarity`

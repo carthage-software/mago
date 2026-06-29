@@ -111,7 +111,7 @@ impl<A: Arena> std::fmt::Debug for Extensions<'_, A> {
 
 impl<A: Arena> Clone for Extensions<'_, A> {
     fn clone(&self) -> Self {
-        Self { inference: self.inference, assertion: self.assertion }
+        *self
     }
 }
 

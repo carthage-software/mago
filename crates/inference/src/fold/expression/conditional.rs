@@ -8,6 +8,7 @@ use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::Environment;
 use crate::fold::InferenceFolder;
@@ -21,22 +22,22 @@ where
         &mut self,
         span: Span,
         conditional: &'source Conditional<'source, SymbolId, S, E>,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let (condition, when_true, when_false) = self.analyze_condition(conditional.condition);
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let (condition, when_true, when_false) = self.analyze_condition(conditional.condition)?;
         let condition_meta = condition.meta;
 
         let (then_node, then_result, then_environment) = match conditional.then {
             Some(then) => match when_true {
                 Some(environment) => {
                     self.environment = environment;
-                    let typed = self.infer_expression(then);
+                    let typed = self.infer_expression(then)?;
                     let result = typed.meta;
                     let post = self.environment.clone();
 
                     (Some(&*self.arena.alloc(typed)), Some(result), Some(post))
                 }
                 None => {
-                    let typed = self.infer_expression(then);
+                    let typed = self.infer_expression(then)?;
 
                     (Some(&*self.arena.alloc(typed)), None, None)
                 }
@@ -54,14 +55,14 @@ where
         let (else_node, else_result, else_environment) = match when_false {
             Some(environment) => {
                 self.environment = environment;
-                let typed = self.infer_expression(conditional.r#else);
+                let typed = self.infer_expression(conditional.r#else)?;
                 let result = typed.meta;
                 let post = self.environment.clone();
 
                 (&*self.arena.alloc(typed), Some(result), Some(post))
             }
             None => {
-                let typed = self.infer_expression(conditional.r#else);
+                let typed = self.infer_expression(conditional.r#else)?;
 
                 (&*self.arena.alloc(typed), None, None)
             }
@@ -85,6 +86,6 @@ where
             r#else: else_node,
         };
 
-        Expression { meta, span, kind: ExpressionKind::Conditional(self.arena.alloc(conditional)) }
+        Ok(Expression { meta, span, kind: ExpressionKind::Conditional(self.arena.alloc(conditional)) })
     }
 }

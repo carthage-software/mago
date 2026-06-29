@@ -9,6 +9,7 @@ use mago_oracle::ty::well_known::EMPTY_STRING;
 use mago_oracle::ty::well_known::NON_EMPTY_LITERAL_STRING;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 
@@ -20,7 +21,7 @@ where
         &mut self,
         span: Span,
         magic_constant: &MagicConstant,
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let meta = match magic_constant.kind {
             MagicConstantKind::Line => {
                 let line = line_number(self.line_starts, span.start.offset) + 1;
@@ -40,7 +41,7 @@ where
             | MagicConstantKind::Class => self.ty.union_of(&[EMPTY_STRING]),
         };
 
-        Expression { meta, span, kind: ExpressionKind::MagicConstant(*magic_constant) }
+        Ok(Expression { meta, span, kind: ExpressionKind::MagicConstant(*magic_constant) })
     }
 }
 

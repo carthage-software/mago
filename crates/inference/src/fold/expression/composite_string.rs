@@ -13,6 +13,7 @@ use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_oracle::ty::well_known::TYPE_STRING;
 use mago_span::Span;
 
+use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
 use crate::semantics::append_string;
@@ -26,8 +27,8 @@ where
     pub fn infer_composite_string(
         &mut self,
         span: Span,
-        parts: &'source [CompositeStringPart<'source, SymbolId, S, E>],
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
+        parts: &[CompositeStringPart<'source, SymbolId, S, E>],
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut rebuilt = Vec::new_in(self.arena);
         let mut bytes = Vec::new_in(self.source);
         let mut foldable = true;
@@ -47,7 +48,7 @@ where
                     CompositeStringPart::Literal(self.arena.alloc_slice_copy(literal))
                 }
                 CompositeStringPart::Expression(expression) => {
-                    let expression = self.infer_expression(expression);
+                    let expression = self.infer_expression(expression)?;
                     has_never |= expression.meta.is_never();
                     if foldable && !append_string(&mut bytes, expression.meta) {
                         foldable = false;
@@ -70,27 +71,25 @@ where
             TYPE_STRING
         };
 
-        Expression { meta, span, kind: ExpressionKind::CompositeString(rebuilt.leak()) }
+        Ok(Expression { meta, span, kind: ExpressionKind::CompositeString(rebuilt.leak()) })
     }
 
     pub fn infer_shell_execute(
         &mut self,
         span: Span,
-        parts: &'source [CompositeStringPart<'source, SymbolId, S, E>],
-    ) -> Expression<'arena, SymbolId, Flow, Type<'arena>> {
-        let (rebuilt, has_never) = self.rebuild_string_parts(parts);
+        parts: &[CompositeStringPart<'source, SymbolId, S, E>],
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let (rebuilt, has_never) = self.rebuild_string_parts(parts)?;
 
-        // The backtick operator is `shell_exec`: the command's output, `null`
-        // when there is no output or an error, or `false` on a pipe failure.
         let meta = if has_never { TYPE_NEVER } else { self.ty.union_of(&[STRING, FALSE, NULL]) };
 
-        Expression { meta, span, kind: ExpressionKind::ShellExecute(rebuilt) }
+        Ok(Expression { meta, span, kind: ExpressionKind::ShellExecute(rebuilt) })
     }
 
     fn rebuild_string_parts(
         &mut self,
-        parts: &'source [CompositeStringPart<'source, SymbolId, S, E>],
-    ) -> (&'arena [TypedPart<'arena>], bool) {
+        parts: &[CompositeStringPart<'source, SymbolId, S, E>],
+    ) -> InferenceResult<(&'arena [TypedPart<'arena>], bool)> {
         let mut rebuilt = Vec::new_in(self.arena);
         let mut has_never = false;
 
@@ -100,7 +99,7 @@ where
                     CompositeStringPart::Literal(self.arena.alloc_slice_copy(literal))
                 }
                 CompositeStringPart::Expression(expression) => {
-                    let expression = self.infer_expression(expression);
+                    let expression = self.infer_expression(expression)?;
                     has_never |= expression.meta.is_never();
 
                     CompositeStringPart::Expression(self.arena.alloc(expression))
@@ -110,6 +109,6 @@ where
             rebuilt.push(rebuilt_part);
         }
 
-        (rebuilt.leak(), has_never)
+        Ok((rebuilt.leak(), has_never))
     }
 }
