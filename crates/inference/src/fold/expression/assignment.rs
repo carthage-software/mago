@@ -64,6 +64,7 @@ where
                     Variable::Direct(direct) => {
                         let direct = direct.copy_into(self.arena);
                         self.environment.set(Var::new(direct.name), ty);
+                        self.environment.invalidate_rooted_in(Var::new(direct.name));
 
                         Variable::Direct(direct)
                     }

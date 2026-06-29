@@ -6,7 +6,6 @@ use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::expression::Match;
 use mago_hir::ir::expression::MatchArm;
 use mago_hir::ir::expression::MatchArmKind;
-use mago_hir::ir::variable::Variable;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
@@ -31,7 +30,7 @@ where
         match_expression: &'source Match<'source, SymbolId, S, E>,
     ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let subject = self.infer_expression(match_expression.subject)?;
-        let subject_variable = direct_variable(&subject);
+        let subject_place = self.place_id(&subject);
         let entry = self.environment.clone();
 
         let mut remaining = subject.meta;
@@ -53,14 +52,8 @@ where
 
                     let conditions_type = self.ty.union_of(&condition_atoms);
                     let matched = meet_with(&mut self.ty, self.symbols, remaining, conditions_type);
-                    let result = self.infer_arm_result(
-                        &entry,
-                        subject_variable,
-                        matched,
-                        result,
-                        &mut result_atoms,
-                        &mut joined,
-                    )?;
+                    let result =
+                        self.infer_arm_result(&entry, subject_place, matched, result, &mut result_atoms, &mut joined)?;
 
                     remaining = subtract_with(&mut self.ty, self.symbols, remaining, conditions_type);
                     MatchArmKind::Expression(typed_conditions.leak(), result)
@@ -68,7 +61,7 @@ where
                 MatchArmKind::Default(result) => {
                     let result = self.infer_arm_result(
                         &entry,
-                        subject_variable,
+                        subject_place,
                         remaining,
                         result,
                         &mut result_atoms,
@@ -99,7 +92,7 @@ where
     fn infer_arm_result(
         &mut self,
         entry: &Environment<'source, 'arena, A>,
-        subject_variable: Option<Var<'arena>>,
+        subject_place: Option<Var<'arena>>,
         matched: Type<'arena>,
         result: &'source Expression<'source, SymbolId, S, E>,
         result_atoms: &mut Vec<'source, Atom<'arena>, A>,
@@ -108,8 +101,8 @@ where
         let reachable = !matched.is_never();
 
         self.environment.clone_from(entry);
-        if reachable && let Some(variable) = subject_variable {
-            self.environment.set(variable, matched);
+        if reachable && let Some(place) = subject_place {
+            self.environment.set(place, matched);
         }
 
         let typed = self.infer_expression(result)?;
@@ -125,13 +118,5 @@ where
         }
 
         Ok(self.arena.alloc(typed))
-    }
-}
-
-fn direct_variable<'arena>(expression: &Expression<'arena, SymbolId, Flow, Type<'arena>>) -> Option<Var<'arena>> {
-    match &expression.kind {
-        ExpressionKind::Parenthesized(inner) => direct_variable(inner),
-        ExpressionKind::Variable(Variable::Direct(direct)) => Some(Var::new(direct.name)),
-        _ => None,
     }
 }

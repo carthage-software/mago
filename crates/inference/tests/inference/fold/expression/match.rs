@@ -23,6 +23,13 @@ test_inference! {
 }
 
 test_inference! {
+    name = narrows_array_element_subject_inside_arm,
+    cases = {
+        "<?php /** @var array{0: 1|2} */ $a = []; match ($a[0]) { 1 => $a[0], 2 => $a[0] + 1 };" => "int(1)|int(3)",
+    }
+}
+
+test_inference! {
     name = unreachable_arm_is_excluded_from_union,
     cases = {
         "<?php /** @var 1|2 */ $a = 1; match ($a) { 1 => 'one', 2 => 'two', 3 => 'never' };"

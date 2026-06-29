@@ -40,6 +40,28 @@ impl<'source, 'arena, A: Arena> Environment<'source, 'arena, A> {
         self.variables.insert(variable, ty);
     }
 
+    /// The narrowed type recorded for a place, or `None` when it has not been
+    /// narrowed. Unlike [`Self::get`], absence is reported rather than defaulted
+    /// to `mixed`, so a derived place (an array element) can fall back to the
+    /// type computed from its container's shape.
+    pub(crate) fn lookup(&self, place: Var<'arena>) -> Option<Type<'arena>> {
+        self.variables.get(&place).copied()
+    }
+
+    /// Drops every derived place rooted at `root` (e.g. `$a[0]`, `$a['k']`), whose
+    /// narrowing a write to `root` invalidates. The root's own entry is left as is,
+    /// since the write replaces it directly. A variable name never contains `[` or
+    /// `-`, so the byte after the root is an unambiguous boundary.
+    pub(crate) fn invalidate_rooted_in(&mut self, root: Var<'arena>) {
+        let root_bytes = root.as_bytes();
+        self.variables.retain(|place, _| {
+            let bytes = place.as_bytes();
+            !(bytes.len() > root_bytes.len()
+                && bytes.starts_with(root_bytes)
+                && matches!(bytes[root_bytes.len()], b'[' | b'-'))
+        });
+    }
+
     /// Forgets `variable`, so a later read sees it as undefined (`mixed`).
     pub(crate) fn unset(&mut self, variable: Var<'arena>) {
         self.variables.remove(&variable);
@@ -67,13 +89,23 @@ impl<'source, 'arena, A: Arena> Environment<'source, 'arena, A> {
     /// in only one keeps its type). Used to join the two truth-paths of a
     /// short-circuit operand and the reachable branches of an `if`/`match`.
     pub(crate) fn union(mut self, other: Self, builder: &mut TypeBuilder<'source, 'arena, A, A>) -> Self {
-        for (variable, right_type) in &other.variables {
-            let value = match self.variables.get(variable).copied() {
-                Some(left_type) => union_types(builder, left_type, *right_type),
-                None => *right_type,
-            };
+        // A derived place (an array element, later a property) is narrowed only where
+        // it is explicitly recorded; absent on a path it stands for the wider
+        // container-shaped type. So a derived place survives the join only when both
+        // paths carry it — otherwise it is dropped and reads fall back to the shape.
+        // Plain variables are always tracked, so they keep the one-sided behavior.
+        self.variables.retain(|place, _| is_variable_place(*place) || other.variables.contains_key(place));
 
-            self.variables.insert(*variable, value);
+        for (place, right_type) in &other.variables {
+            match self.variables.get(place).copied() {
+                Some(left_type) => {
+                    self.variables.insert(*place, union_types(builder, left_type, *right_type));
+                }
+                None if is_variable_place(*place) => {
+                    self.variables.insert(*place, *right_type);
+                }
+                None => {}
+            }
         }
 
         self
@@ -93,6 +125,13 @@ impl<'source, 'arena, A: Arena> Environment<'source, 'arena, A> {
             (Some(left), Some(right)) => Some(left.union(right, builder)),
         }
     }
+}
+
+/// A place key is a plain variable when it names nothing derived: variable names
+/// contain neither `[` (an array element) nor `-` (a property arrow), so either
+/// byte marks a derived place that is only valid where it has been narrowed.
+fn is_variable_place(place: Var<'_>) -> bool {
+    !place.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-'))
 }
 
 /// The union of two types, deduplicated on the builder's scratch arena.

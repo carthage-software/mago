@@ -32,8 +32,6 @@ use mago_span::Span;
 use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
-use crate::reconciler::condition_diagram;
-use crate::reconciler::narrowing_assertions;
 use crate::reconciler::reconcile;
 use crate::semantics::Number;
 use crate::semantics::append_string;
@@ -76,9 +74,10 @@ where
         };
 
         let meta = match binary.operator {
-            BinaryOperator::And | BinaryOperator::Or => self
-                .boolean_fold(binary.operator, &left, &right)
-                .unwrap_or_else(|| self.binary_type(binary.operator, left.meta, right.meta)),
+            BinaryOperator::And | BinaryOperator::Or => match self.boolean_fold(binary.operator, &left, &right) {
+                Some(folded) => folded,
+                None => self.binary_type(binary.operator, left.meta, right.meta),
+            },
             _ => self.binary_type(binary.operator, left.meta, right.meta),
         };
 
@@ -99,15 +98,15 @@ where
         polarity: bool,
     ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut assertions = Vec::new_in(self.source);
-        narrowing_assertions(left, polarity, &mut assertions);
+        self.narrowing_assertions(left, polarity, &mut assertions);
 
         let before = self.environment.clone();
 
-        for (variable, assertion) in &assertions {
-            let base = self.environment.get(*variable);
-            let narrowed = reconcile(&mut self.ty, self.symbols, *assertion, base);
+        for (place, base, assertion) in &assertions {
+            let current = self.environment.lookup(*place).unwrap_or(*base);
+            let narrowed = reconcile(&mut self.ty, self.symbols, *assertion, current);
 
-            self.environment.set(*variable, narrowed);
+            self.environment.set(*place, narrowed);
         }
 
         let right = self.infer_expression(right)?;
@@ -122,14 +121,14 @@ where
     /// `false` and tautologies to `true`, catching multi-variable cases the
     /// per-variable narrowing cannot (e.g. `($a || $b) && (!$a && !$b)`).
     fn boolean_fold(
-        &self,
+        &mut self,
         operator: BinaryOperator,
         left: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
         right: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
     ) -> Option<Type<'arena>> {
         let mut diagram = DecisionDiagram::new_in(self.source);
-        let left_node = condition_diagram(&mut diagram, left)?;
-        let right_node = condition_diagram(&mut diagram, right)?;
+        let left_node = self.condition_diagram(&mut diagram, left)?;
+        let right_node = self.condition_diagram(&mut diagram, right)?;
 
         let combined = match operator {
             BinaryOperator::And => diagram.and(left_node, right_node),

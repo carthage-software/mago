@@ -4,6 +4,8 @@ use crate::harness::*;
 
 mod annotation;
 mod branch;
+mod r#break;
+mod r#continue;
 mod declare;
 mod echo;
 mod global;
@@ -12,6 +14,7 @@ mod inline;
 mod label;
 mod namespace;
 mod r#static;
+mod switch;
 mod r#try;
 mod unset;
 mod r#use;

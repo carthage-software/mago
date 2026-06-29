@@ -19,7 +19,6 @@ use crate::extension::AssertionTiming;
 use crate::flow::Flow;
 use crate::fold::Environment;
 use crate::fold::InferenceFolder;
-use crate::reconciler::narrowing_assertions;
 use crate::reconciler::reconcile;
 use crate::semantics::truthiness;
 
@@ -166,15 +165,15 @@ where
         let mut environment = self.environment.clone();
 
         let mut assertions = Vec::new_in(self.source);
-        narrowing_assertions(condition, polarity, &mut assertions);
-        for (variable, assertion) in &assertions {
-            let base = environment.get(*variable);
-            let narrowed = reconcile(&mut self.ty, self.symbols, *assertion, base);
+        self.narrowing_assertions(condition, polarity, &mut assertions);
+        for (place, base, assertion) in &assertions {
+            let current = environment.lookup(*place).unwrap_or(*base);
+            let narrowed = reconcile(&mut self.ty, self.symbols, *assertion, current);
             if narrowed.is_never() {
                 return None;
             }
 
-            environment.set(*variable, narrowed);
+            environment.set(*place, narrowed);
         }
 
         if !self.extensions.assertion.is_empty() {

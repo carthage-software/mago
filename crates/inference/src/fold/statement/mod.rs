@@ -17,6 +17,8 @@ use crate::fold::InferenceFolder;
 
 mod annotation;
 mod branch;
+mod r#break;
+mod r#continue;
 mod declare;
 mod echo;
 mod expression;
@@ -28,6 +30,7 @@ mod namespace;
 mod r#return;
 mod sequence;
 mod r#static;
+mod switch;
 mod r#try;
 mod unset;
 mod r#use;
@@ -69,6 +72,9 @@ where
             StatementKind::Goto(label) => self.infer_goto(statement.span, label)?,
             StatementKind::Label(label) => self.infer_label(statement.span, label)?,
             StatementKind::Try(try_statement) => self.infer_try(statement.span, try_statement)?,
+            StatementKind::Switch(switch) => self.infer_switch(statement.span, switch)?,
+            StatementKind::Break(level) => self.infer_break(statement.span, level)?,
+            StatementKind::Continue(level) => self.infer_continue(statement.span, level)?,
             StatementKind::Noop => Statement {
                 meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
                 span: statement.span,
@@ -83,10 +89,7 @@ where
             | StatementKind::Foreach(_)
             | StatementKind::For(_)
             | StatementKind::While(_)
-            | StatementKind::DoWhile(_)
-            | StatementKind::Continue(_)
-            | StatementKind::Break(_)
-            | StatementKind::Switch(_) => {
+            | StatementKind::DoWhile(_) => {
                 return Err(InferenceError::Unsupported { span: statement.span, construct: "this statement" });
             }
         };

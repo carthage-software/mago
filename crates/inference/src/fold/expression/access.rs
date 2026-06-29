@@ -33,7 +33,11 @@ where
             AccessKind::Array(array, index) => {
                 let array = self.infer_expression(array)?;
                 let index = self.infer_expression(index)?;
-                let meta = self.array_element_type(array.meta, index.meta);
+                let shape = self.array_element_type(array.meta, index.meta);
+                let meta = match self.array_place_id(&array, index.meta) {
+                    Some(place) => self.environment.lookup(place).unwrap_or(shape),
+                    None => shape,
+                };
 
                 let node = Access {
                     span: access.span,
