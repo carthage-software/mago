@@ -13,6 +13,7 @@ use mago_oracle::id::SymbolId;
 use mago_oracle::symbol::function_like::FunctionLikeSymbol;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
+use mago_oracle::ty::atom::payload::callable::CallableAtom;
 use mago_oracle::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use mago_oracle::ty::template::substitute;
 use mago_oracle::ty::well_known::TYPE_MIXED;
@@ -64,8 +65,9 @@ where
                 }
                 _ => {
                     let callee = self.infer_expression(callee);
+                    let meta = self.resolve_callable_call(callee.meta, &argument_types);
 
-                    (CalleeKind::Function(self.arena.alloc(callee)), TYPE_MIXED)
+                    (CalleeKind::Function(self.arena.alloc(callee)), meta)
                 }
             },
             _ => todo!(),
@@ -105,14 +107,49 @@ where
             return ret;
         }
 
+        let mut parameter_types = Vec::new_in(self.source);
+        for parameter in function.params {
+            parameter_types.push(parameter.ty.effective(true).unwrap_or(TYPE_MIXED));
+        }
+
+        self.instantiate_return(&parameter_types, ret, argument_types)
+    }
+
+    fn resolve_callable_call(&mut self, callee: Type<'arena>, argument_types: &[Type<'arena>]) -> Type<'arena> {
+        let [Atom::Callable(CallableAtom::Closure(signature) | CallableAtom::Signature(signature))] = callee.atoms
+        else {
+            return TYPE_MIXED;
+        };
+
+        let Some(parameters) = signature.parameters else {
+            return signature.return_type;
+        };
+
+        let mut parameter_types = Vec::new_in(self.source);
+        for parameter in parameters {
+            parameter_types.push(parameter.r#type);
+        }
+
+        self.instantiate_return(&parameter_types, signature.return_type, argument_types)
+    }
+
+    fn instantiate_return(
+        &mut self,
+        parameter_types: &[Type<'arena>],
+        ret: Type<'arena>,
+        argument_types: &[Type<'arena>],
+    ) -> Type<'arena> {
         let mut bindings = Vec::new_in(self.source);
-        for (index, parameter) in function.params.iter().enumerate() {
-            if let Some(parameter_type) = parameter.ty.effective(true)
-                && let [Atom::GenericParameter(generic)] = parameter_type.atoms
+        for (index, parameter_type) in parameter_types.iter().enumerate() {
+            if let [Atom::GenericParameter(generic)] = parameter_type.atoms
                 && let Some(argument_type) = argument_types.get(index)
             {
                 bindings.push((generic.name, *argument_type));
             }
+        }
+
+        if bindings.is_empty() {
+            return ret;
         }
 
         let resolver = |parameter: &GenericParameterAtom<'arena>| -> Option<Type<'arena>> {

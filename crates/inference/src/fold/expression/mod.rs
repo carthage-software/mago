@@ -21,6 +21,7 @@ pub mod composite_string;
 pub mod conditional;
 pub mod constant;
 pub mod construct;
+pub mod item;
 pub mod list;
 pub mod literal;
 pub mod magic_constant;
@@ -58,7 +59,7 @@ where
 
                 self.diverging(expression.span, ExpressionKind::ArrayAppend(self.arena.alloc(array)))
             }
-            ExpressionKind::Item(_item_expression) => todo!(),
+            ExpressionKind::Item(item_expression) => self.infer_expression_item(expression.span, item_expression),
             ExpressionKind::Call(call) => self.infer_call(expression.span, call),
             ExpressionKind::PartialApplication(_partial_application) => todo!(),
             ExpressionKind::Access(_access) => todo!(),

@@ -47,11 +47,13 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
     }
 
     /// The symbol table for the program under inference.
+    #[must_use]
     pub fn symbols(&self) -> &SymbolTable<'arena, A> {
         self.symbols
     }
 
     /// The namespace the current expression is in (empty for the global namespace).
+    #[must_use]
     pub fn namespace(&self) -> &[u8] {
         self.namespace
     }

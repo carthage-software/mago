@@ -28,12 +28,11 @@ pub type TypedStatement<'arena> = Statement<'arena, SymbolId, Flow, Type<'arena>
 pub type TypedExpression<'arena> = Expression<'arena, SymbolId, Flow, Type<'arena>>;
 pub type TypedBinary<'arena> = Binary<'arena, SymbolId, Flow, Type<'arena>>;
 
-/// Owns the three arenas a single inference run needs so that the returned typed
-/// `IR` (which borrows the destination arena) can outlive the call. Only the
-/// `test_inference!` macro constructs and drives it.
+/// Owns the arenas a single inference run needs so that the returned typed `IR`
+/// (which borrows the arena) can outlive the call. Only the `test_inference!`
+/// macro constructs and drives it.
 pub struct Test {
-    source: LocalArena,
-    dest: LocalArena,
+    arena: LocalArena,
     scratch: LocalArena,
 }
 
@@ -45,7 +44,7 @@ impl Default for Test {
 
 impl Test {
     pub fn new() -> Self {
-        Self { source: LocalArena::new(), dest: LocalArena::new(), scratch: LocalArena::new() }
+        Self { arena: LocalArena::new(), scratch: LocalArena::new() }
     }
 
     /// Links `definitions` into a symbol table, then infers `code` against it,
@@ -66,20 +65,21 @@ impl Test {
             File::ephemeral(Cow::Borrowed(b"definitions.php"), Cow::Owned(definitions.as_bytes().to_vec()));
         let definitions_program = parse_file(&self.scratch, &definitions_file);
         let definitions_ir: IR<'_, (), (), ()> =
-            Lowering::new(&self.dest, &self.scratch, &definitions_file, definitions_program, LowerSettings::default())
+            Lowering::new(&self.arena, &self.scratch, &definitions_file, definitions_program, LowerSettings::default())
                 .lower();
-        let definitions_ir = self.dest.alloc(definitions_ir);
-        let (_definitions, table) = bind(&self.dest, Origin::Project, definitions_ir);
-        let symbols = link(&self.dest, &self.scratch, &[table]);
+        let definitions_ir = self.arena.alloc(definitions_ir);
+        let (_definitions, definitions_table) = bind(&self.arena, Origin::Project, definitions_ir);
 
         let file = File::ephemeral(Cow::Borrowed(b"code.php"), Cow::Owned(code.as_bytes().to_vec()));
         let program = parse_file(&self.scratch, &file);
         let ir: IR<'_, (), (), ()> =
-            Lowering::new(&self.source, &self.scratch, &file, program, LowerSettings::default()).lower();
-        let ir = self.source.alloc(ir);
-        let (bound, _definitions) = bind(&self.source, Origin::Project, ir);
+            Lowering::new(&self.arena, &self.scratch, &file, program, LowerSettings::default()).lower();
+        let ir = self.arena.alloc(ir);
+        let (bound, code_table) = bind(&self.arena, Origin::Project, ir);
 
-        Inference::new(&self.source, &self.dest).infer(&symbols, &file, bound, extensions)
+        let symbols = link(&self.arena, &self.scratch, &[definitions_table, code_table]);
+
+        Inference::new(&self.arena, &self.arena).infer(&symbols, &file, bound, extensions)
     }
 }
 

@@ -17,9 +17,9 @@ use crate::flow::Flow;
 pub struct Bits32Extension;
 
 impl<A: Arena> ExtensionInference<A> for Bits32Extension {
-    fn infer<'ctx, 'source, 'arena>(
+    fn infer<'arena>(
         &self,
-        context: &mut ExtensionContext<'ctx, 'source, 'arena, A>,
+        context: &mut ExtensionContext<'_, '_, 'arena, A>,
         expression: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
     ) -> Option<Type<'arena>> {
         if let [Atom::Int(IntAtom::Literal(value))] = expression.meta.atoms {

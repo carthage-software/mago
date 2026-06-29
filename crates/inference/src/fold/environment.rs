@@ -14,7 +14,7 @@ pub(crate) struct Environment<'source, 'arena, A: Arena> {
     variables: HashMap<'source, Var<'arena>, Type<'arena>, A>,
 }
 
-impl<'source, 'arena, A: Arena> Clone for Environment<'source, 'arena, A> {
+impl<A: Arena> Clone for Environment<'_, '_, A> {
     fn clone(&self) -> Self {
         Self { arena: self.arena, variables: self.variables.clone() }
     }
@@ -91,11 +91,14 @@ impl<'source, 'arena, A: Arena> Environment<'source, 'arena, A> {
 }
 
 /// The union of two types, deduplicated on the builder's scratch arena.
-pub(crate) fn union_types<'source, 'arena, A: Arena>(
+pub(crate) fn union_types<'source, 'arena, A>(
     builder: &mut TypeBuilder<'source, 'arena, A, A>,
     left: Type<'arena>,
     right: Type<'arena>,
-) -> Type<'arena> {
+) -> Type<'arena>
+where
+    A: Arena,
+{
     let mut atoms = builder.scratch_vec::<Atom<'arena>>();
     atoms.extend_from_slice(left.atoms);
     atoms.extend_from_slice(right.atoms);

@@ -56,9 +56,9 @@ impl<'sink, 'source, 'arena, A: Arena> AssertionSink<'sink, 'source, 'arena, A> 
 /// Runs once per expression with the children already typed; returning
 /// `Some(type)` replaces the expression's inferred type, `None` leaves it.
 pub trait ExtensionInference<A: Arena>: Send + Sync {
-    fn infer<'ctx, 'source, 'arena>(
+    fn infer<'arena>(
         &self,
-        context: &mut ExtensionContext<'ctx, 'source, 'arena, A>,
+        context: &mut ExtensionContext<'_, '_, 'arena, A>,
         expression: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
     ) -> Option<Type<'arena>>;
 }
