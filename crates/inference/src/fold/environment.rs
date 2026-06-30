@@ -3,6 +3,8 @@ use mago_allocator::collections::HashMap;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
+use mago_oracle::ty::join;
+use mago_oracle::ty::join::JoinOptions;
 use mago_oracle::ty::well_known::TYPE_MIXED;
 use mago_oracle::var::Var;
 
@@ -148,7 +150,6 @@ fn is_variable_place(place: Var<'_>) -> bool {
     !place.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-'))
 }
 
-/// The union of two types, deduplicated on the builder's scratch arena.
 pub(crate) fn union_types<'source, 'arena, A>(
     builder: &mut TypeBuilder<'source, 'arena, A, A>,
     left: Type<'arena>,
@@ -161,5 +162,16 @@ where
     atoms.extend_from_slice(left.atoms);
     atoms.extend_from_slice(right.atoms);
 
-    builder.union_of(&atoms)
+    let options = JoinOptions {
+        merge_int_ranges: false,
+        int_literal_collapse_threshold: None,
+        string_literal_collapse_threshold: None,
+        float_literal_collapse_threshold: None,
+        array_shape_collapse_threshold: None,
+        ..JoinOptions::default()
+    };
+
+    let canonical = join::compute_with(&atoms, &options, builder);
+
+    builder.union_of(&canonical)
 }

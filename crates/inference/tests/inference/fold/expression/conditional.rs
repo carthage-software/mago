@@ -49,7 +49,6 @@ test_inference! {
 test_inference! {
     name = elvis_drops_falsy_from_condition,
     cases = {
-        "<?php /** @var string|null */ $a = null; $a ?: 'default';"
-            => "(string&!string('')&!string('0'))|string('default')",
+        "<?php /** @var string|null */ $a = null; $a ?: 'default';" => "string&!string('')&!string('0')",
     }
 }

@@ -9,6 +9,7 @@ use mago_inference::extension::ExtensionAssertion;
 use mago_inference::extension::ExtensionContext;
 use mago_inference::extension::ExtensionInference;
 use mago_inference::extension::Extensions;
+use mago_inference::extension::StdlibInference;
 use mago_inference::extension::semantics::Bits32Extension;
 use mago_inference::flow::Flow;
 use mago_oracle::assertion::Assertion;
@@ -136,4 +137,16 @@ fn conditional_assertions_narrow_each_branch() {
         Extensions { inference: &[], assertion: &assertion },
     );
     assert_eq!(get_last_expression(ir).meta.to_string(), "int|string");
+}
+
+#[test]
+fn stdlib_strlen_and_count_refine_to_non_negative_int() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    for code in ["<?php strlen('hello');", "<?php count([1, 2, 3]);", "<?php mb_strlen('x');"] {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), "non-negative-int", "for code: {code}");
+    }
 }
