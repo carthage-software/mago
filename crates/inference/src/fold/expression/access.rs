@@ -175,7 +175,10 @@ where
     /// Resolves the class operand of a static access to its symbol, trying the
     /// written name then its short form (mirroring function resolution). `None`
     /// for `self`/`static`/`parent` (no class context here) or an unknown class.
-    fn resolve_class(&self, class: &'source Expression<'source, SymbolId, S, E>) -> Option<ClassLikeSymbol<'arena>> {
+    pub(crate) fn resolve_class(
+        &self,
+        class: &'source Expression<'source, SymbolId, S, E>,
+    ) -> Option<ClassLikeSymbol<'arena>> {
         let (ExpressionKind::Identifier(identifier) | ExpressionKind::Constant(identifier)) = &class.kind else {
             return None;
         };

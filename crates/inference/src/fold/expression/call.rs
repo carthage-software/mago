@@ -8,10 +8,16 @@ use mago_hir::ir::expression::Callee;
 use mago_hir::ir::expression::CalleeKind;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
+use mago_hir::ir::expression::selector::MemberSelector;
+use mago_hir::ir::expression::selector::MemberSelectorKind;
 use mago_hir::ir::identifier::Identifier;
 use mago_oracle::id::SymbolId;
+use mago_oracle::symbol::Symbol;
+use mago_oracle::symbol::class_like::ClassLikeSymbol;
 use mago_oracle::symbol::function_like::FunctionLikeSymbol;
 use mago_oracle::symbol::function_like::function::FunctionSymbol;
+use mago_oracle::symbol::function_like::part::parameter::SignatureParameter;
+use mago_oracle::symbol::part::ty::TypeSlot;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::callable::CallableAtom;
@@ -19,9 +25,9 @@ use mago_oracle::ty::atom::payload::generic_parameter::GenericParameterAtom;
 use mago_oracle::ty::atom::payload::scalar::string::StringLiteral;
 use mago_oracle::ty::template::substitute;
 use mago_oracle::ty::well_known::TYPE_MIXED;
+use mago_oracle::ty::well_known::TYPE_NULL;
 use mago_span::Span;
 
-use crate::error::InferenceError;
 use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
@@ -55,7 +61,7 @@ where
         }
 
         let arguments = Delimited { span: call.arguments.span, items: arguments.leak() };
-        let (kind, meta) = match call.callee.kind {
+        let (kind, meta) = match &call.callee.kind {
             CalleeKind::Function(callee) => match &callee.kind {
                 ExpressionKind::Identifier(identifier) => {
                     let meta = self.resolve_function_call(identifier, &argument_types);
@@ -74,7 +80,30 @@ where
                     (CalleeKind::Function(self.arena.alloc(callee)), meta)
                 }
             },
-            _ => return Err(InferenceError::Unsupported { span, construct: "method and static-method calls" }),
+            CalleeKind::Method(object, selector) => {
+                let object = self.infer_expression(object)?;
+                let meta = self.method_return(object.meta, selector, &argument_types);
+                let selector = self.infer_member_selector(selector)?;
+
+                (CalleeKind::Method(self.arena.alloc(object), selector), meta)
+            }
+            CalleeKind::NullsafeMethod(object, selector) => {
+                let object = self.infer_expression(object)?;
+                let mut meta = self.method_return(object.meta, selector, &argument_types);
+                if object.meta.atoms.iter().any(|atom| matches!(atom, Atom::Null)) {
+                    meta = self.union(meta, TYPE_NULL);
+                }
+                let selector = self.infer_member_selector(selector)?;
+
+                (CalleeKind::NullsafeMethod(self.arena.alloc(object), selector), meta)
+            }
+            CalleeKind::StaticMethod(class, selector) => {
+                let meta = self.static_method_return(class, selector, &argument_types);
+                let class = self.infer_expression(class)?;
+                let selector = self.infer_member_selector(selector)?;
+
+                (CalleeKind::StaticMethod(self.arena.alloc(class), selector), meta)
+            }
         };
 
         let callee = Callee { span: call.callee.span, kind };
@@ -107,20 +136,104 @@ where
     }
 
     fn function_return(&mut self, function: &FunctionSymbol<'arena>, argument_types: &[Type<'arena>]) -> Type<'arena> {
-        let Some(ret) = function.ret.effective(true) else {
+        self.signature_return(function.ret, function.generics.is_empty(), function.params, argument_types)
+    }
+
+    fn signature_return(
+        &mut self,
+        ret: TypeSlot<'arena>,
+        monomorphic: bool,
+        params: &[SignatureParameter<'arena>],
+        argument_types: &[Type<'arena>],
+    ) -> Type<'arena> {
+        let Some(ret) = ret.effective(true) else {
             return TYPE_MIXED;
         };
 
-        if function.generics.is_empty() {
+        if monomorphic {
             return ret;
         }
 
         let mut parameter_types = Vec::new_in(self.source);
-        for parameter in function.params {
+        for parameter in params {
             parameter_types.push(parameter.ty.effective(true).unwrap_or(TYPE_MIXED));
         }
 
         self.instantiate_return(&parameter_types, ret, argument_types)
+    }
+
+    fn method_return(
+        &mut self,
+        receiver: Type<'arena>,
+        selector: &MemberSelector<'source, SymbolId, S, E>,
+        argument_types: &[Type<'arena>],
+    ) -> Type<'arena> {
+        let MemberSelectorKind::Name(name) = &selector.kind else {
+            return TYPE_MIXED;
+        };
+
+        let mut classes = receiver.atoms.iter().filter_map(object_class);
+        let Some(class_name) = classes.next() else {
+            return TYPE_MIXED;
+        };
+        if classes.next().is_some() {
+            return TYPE_MIXED;
+        }
+
+        let Some(symbol) = self.symbols.get_class_like(SymbolId::class_like(class_name)) else {
+            return TYPE_MIXED;
+        };
+
+        self.method_return_type(&symbol, name.value, argument_types)
+    }
+
+    fn static_method_return(
+        &mut self,
+        class: &'source Expression<'source, SymbolId, S, E>,
+        selector: &MemberSelector<'source, SymbolId, S, E>,
+        argument_types: &[Type<'arena>],
+    ) -> Type<'arena> {
+        let MemberSelectorKind::Name(name) = &selector.kind else {
+            return TYPE_MIXED;
+        };
+
+        let Some(symbol) = self.resolve_class(class) else {
+            return TYPE_MIXED;
+        };
+
+        self.method_return_type(&symbol, name.value, argument_types)
+    }
+
+    fn method_return_type(
+        &mut self,
+        class: &ClassLikeSymbol<'arena>,
+        method: &[u8],
+        argument_types: &[Type<'arena>],
+    ) -> Type<'arena> {
+        let target = SymbolId::method(class.path().as_bytes(), method);
+        let Some(method) = class.methods().members.iter().find(|member| member.name.id == target) else {
+            return TYPE_MIXED;
+        };
+
+        self.signature_return(method.ret, method.generics.is_empty(), method.params, argument_types)
+    }
+
+    fn infer_member_selector(
+        &mut self,
+        selector: &MemberSelector<'source, SymbolId, S, E>,
+    ) -> InferenceResult<MemberSelector<'arena, SymbolId, Flow, Type<'arena>>> {
+        let kind = match &selector.kind {
+            MemberSelectorKind::Missing => MemberSelectorKind::Missing,
+            MemberSelectorKind::Name(name) => MemberSelectorKind::Name(name.copy_into(self.arena)),
+            MemberSelectorKind::Variable(variable) => MemberSelectorKind::Variable(variable.copy_into(self.arena)),
+            MemberSelectorKind::Expression(expression) => {
+                let expression = self.infer_expression(expression)?;
+
+                MemberSelectorKind::Expression(self.arena.alloc(expression))
+            }
+        };
+
+        Ok(MemberSelector { span: selector.span, kind })
     }
 
     pub(crate) fn resolve_callable_call(
@@ -193,5 +306,13 @@ where
         }
 
         None
+    }
+}
+
+fn object_class<'arena>(atom: &Atom<'arena>) -> Option<&'arena [u8]> {
+    match atom {
+        Atom::Object(object) => Some(object.name.as_bytes()),
+        Atom::Enum(enumeration) => Some(enumeration.name.as_bytes()),
+        _ => None,
     }
 }

@@ -7,6 +7,42 @@ test_inference! {
 }
 
 test_inference! {
+    name = resolves_method_call_return_type,
+    def = "<?php class C { public function size(): int { return 0; } }",
+    cases = { "<?php /** @var C */ $c = null; $c->size();" => "int" }
+}
+
+test_inference! {
+    name = resolves_static_method_call_return_type,
+    def = "<?php class C { public static function make(): string { return ''; } }",
+    cases = { "<?php C::make();" => "string" }
+}
+
+test_inference! {
+    name = nullsafe_method_call_on_nullable_unions_null,
+    def = "<?php class C { public function size(): int { return 0; } }",
+    cases = {
+        "<?php /** @var C|null */ $c = null; $c?->size();" => "int|null",
+        "<?php /** @var C */ $c = null; $c?->size();" => "int",
+    }
+}
+
+test_inference! {
+    name = resolves_enum_instance_method_call,
+    def = "<?php enum E { case A; public function label(): string { return ''; } }",
+    cases = { "<?php /** @var E */ $e = E::A; $e->label();" => "string" }
+}
+
+test_inference! {
+    name = unknown_method_or_non_object_receiver_is_mixed,
+    def = "<?php class C { public function size(): int { return 0; } }",
+    cases = {
+        "<?php /** @var C */ $c = null; $c->missing();" => "mixed",
+        "<?php /** @var int */ $x = 0; $x->size();" => "mixed",
+    }
+}
+
+test_inference! {
     name = unknown_function_is_mixed,
     cases = { "<?php undefined_function();" => "mixed" }
 }

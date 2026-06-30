@@ -14,13 +14,13 @@ fn object_instantiation_is_reported_unsupported() {
 }
 
 #[test]
-fn method_calls_are_reported_unsupported() {
+fn method_calls_on_an_unknown_receiver_are_mixed_not_an_error() {
     let test = Test::new();
     let result = test.try_infer("<?php", "<?php $service->handle();");
 
     assert!(
-        matches!(result, Err(InferenceError::Unsupported { construct: "method and static-method calls", .. })),
-        "expected an unsupported error, got {result:?}",
+        result.is_ok(),
+        "method calls are supported; an unknown receiver infers as mixed, not an error: {result:?}"
     );
 }
 
