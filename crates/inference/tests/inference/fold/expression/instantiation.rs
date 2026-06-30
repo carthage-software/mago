@@ -1,7 +1,5 @@
 use indoc::indoc;
 
-use crate::harness::*;
-
 /// `Dog extends Animal`, `use`s a trait, and adds its own members — so a `new Dog`
 /// instance must resolve own, inherited, and trait members.
 const HIERARCHY: &str = indoc! {"

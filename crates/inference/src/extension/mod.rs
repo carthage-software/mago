@@ -19,11 +19,10 @@ use crate::flow::Flow;
 
 pub mod assertion;
 pub mod context;
-pub mod library;
+pub mod inference;
 pub mod semantics;
 
 pub use context::ExtensionContext;
-pub use library::StdlibInference;
 
 /// When an assertion holds relative to the truth value of the expression it was
 /// extracted from — mirroring `@assert` / `@assert-if-true` / `@assert-if-false`.
