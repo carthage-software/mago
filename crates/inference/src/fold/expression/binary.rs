@@ -144,7 +144,12 @@ where
         }
     }
 
-    fn binary_type(&mut self, operator: BinaryOperator, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
+    pub(crate) fn binary_type(
+        &mut self,
+        operator: BinaryOperator,
+        left: Type<'arena>,
+        right: Type<'arena>,
+    ) -> Type<'arena> {
         if left.is_never() {
             return TYPE_NEVER;
         }

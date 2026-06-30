@@ -1,6 +1,7 @@
 mod access;
 mod annotation;
 mod array;
+mod assignment;
 mod binary;
 mod call;
 mod clone;

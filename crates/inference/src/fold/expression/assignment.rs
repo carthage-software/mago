@@ -10,6 +10,8 @@ use mago_hir::ir::expression::Assignment;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::expression::annotation::Annotation;
+use mago_hir::ir::expression::operator::AssignmentOperator;
+use mago_hir::ir::expression::operator::BinaryOperator;
 use mago_hir::ir::expression::selector::MemberSelectorKind;
 use mago_hir::ir::variable::Variable;
 use mago_oracle::id::SymbolId;
@@ -38,12 +40,18 @@ where
     ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let value = self.infer_expression(assignment.right)?;
 
-        let value_meta = match assignment.operator {
+        // `$target OP= $value` is `$target = $target OP $value`: the new value is the
+        // binary operation against the target's current type, then bound back.
+        let assigned = match assignment.operator {
             None => value.meta,
-            Some(_) => return Err(InferenceError::Unsupported { span, construct: "compound assignment" }),
+            Some(operator) => {
+                let current = self.infer_expression(assignment.left)?.meta;
+
+                self.binary_type(compound_operator(operator), current, value.meta)
+            }
         };
 
-        let target = self.bind_target(assignment.left, value_meta)?;
+        let target = self.bind_target(assignment.left, assigned)?;
         let meta = target.meta;
 
         let assignment = Assignment {
@@ -203,4 +211,24 @@ where
 /// `mixed` when the key is absent (an open or unknown source shape).
 fn element_type_for<'arena>(items: &[KnownItem<'arena>], key: ArrayKey<'arena>) -> Type<'arena> {
     items.iter().find(|item| item.key == key).map_or(TYPE_MIXED, |item| item.value)
+}
+
+/// The binary operator a compound assignment desugars to (`+=` is `+`, `.=` is
+/// `.`, `??=` is `??`).
+fn compound_operator(operator: AssignmentOperator) -> BinaryOperator {
+    match operator {
+        AssignmentOperator::Addition => BinaryOperator::Addition,
+        AssignmentOperator::Subtraction => BinaryOperator::Subtraction,
+        AssignmentOperator::Multiplication => BinaryOperator::Multiplication,
+        AssignmentOperator::Division => BinaryOperator::Division,
+        AssignmentOperator::Modulo => BinaryOperator::Modulo,
+        AssignmentOperator::Exponentiation => BinaryOperator::Exponentiation,
+        AssignmentOperator::Concat => BinaryOperator::StringConcat,
+        AssignmentOperator::BitwiseAnd => BinaryOperator::BitwiseAnd,
+        AssignmentOperator::BitwiseOr => BinaryOperator::BitwiseOr,
+        AssignmentOperator::BitwiseXor => BinaryOperator::BitwiseXor,
+        AssignmentOperator::LeftShift => BinaryOperator::LeftShift,
+        AssignmentOperator::RightShift => BinaryOperator::RightShift,
+        AssignmentOperator::Coalesce => BinaryOperator::NullCoalesce,
+    }
 }

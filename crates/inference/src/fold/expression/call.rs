@@ -293,7 +293,10 @@ where
         substitute(ret, &resolver, &mut self.ty)
     }
 
-    fn resolve_function_symbol(&self, identifier: &Identifier<'source>) -> Option<FunctionLikeSymbol<'arena>> {
+    pub(crate) fn resolve_function_symbol(
+        &self,
+        identifier: &Identifier<'source>,
+    ) -> Option<FunctionLikeSymbol<'arena>> {
         if let Some(symbol) = self.symbols.get_function_like(SymbolId::function_like(identifier.value)) {
             return Some(symbol);
         }
@@ -309,7 +312,7 @@ where
     }
 }
 
-fn object_class<'arena>(atom: &Atom<'arena>) -> Option<&'arena [u8]> {
+pub(crate) fn object_class<'arena>(atom: &Atom<'arena>) -> Option<&'arena [u8]> {
     match atom {
         Atom::Object(object) => Some(object.name.as_bytes()),
         Atom::Enum(enumeration) => Some(enumeration.name.as_bytes()),

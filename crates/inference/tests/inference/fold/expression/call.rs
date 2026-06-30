@@ -145,3 +145,26 @@ test_inference! {
     "},
     cases = { "<?php Factory::of(true);" => "true" }
 }
+
+test_inference! {
+    name = first_class_callables_are_closures_with_the_callee_signature,
+    def = indoc! {"
+        <?php
+        function greet(string $name): string { return $name; }
+
+        class C {
+            public function size(int $n): int { return $n; }
+            public static function make(): C { return new C(); }
+        }
+    "},
+    cases = {
+        "<?php greet(...);" => "(closure(string): string)",
+        "<?php /** @var C */ $c = null; $c->size(...);" => "(closure(int): int)",
+        "<?php C::make(...);" => "(closure(): C)",
+    }
+}
+
+test_inference! {
+    name = a_first_class_callable_from_an_unknown_callee_is_mixed,
+    cases = { "<?php unknown(...);" => "mixed" }
+}

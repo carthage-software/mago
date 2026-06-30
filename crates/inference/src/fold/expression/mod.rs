@@ -7,7 +7,6 @@ use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_span::Span;
 
-use crate::error::InferenceError;
 use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
@@ -29,6 +28,7 @@ pub mod list;
 pub mod literal;
 pub mod magic_constant;
 pub mod r#match;
+pub mod partial_application;
 pub mod throw;
 pub mod unary;
 pub mod variable;
@@ -64,9 +64,7 @@ where
             }
             ExpressionKind::Item(item_expression) => self.infer_expression_item(expression.span, item_expression)?,
             ExpressionKind::Call(call) => self.infer_call(expression.span, call)?,
-            ExpressionKind::PartialApplication(_) => {
-                return Err(InferenceError::Unsupported { span: expression.span, construct: "partial application" });
-            }
+            ExpressionKind::PartialApplication(partial) => self.infer_partial_application(expression.span, partial)?,
             ExpressionKind::Access(access) => self.infer_access(expression.span, access)?,
             ExpressionKind::Clone(operand) => self.infer_clone(expression.span, operand)?,
             ExpressionKind::Empty(operand) => self.infer_empty(expression.span, operand)?,
