@@ -91,14 +91,15 @@ where
                     }
                     Variable::Indirect(expression) => {
                         let expression = self.infer_expression(expression)?;
+                        self.bind_dynamic_variable(expression.meta, ty, target.span)?;
 
                         Variable::Indirect(self.arena.alloc(expression))
                     }
-                    Variable::Nested(_) => {
-                        return Err(InferenceError::Unsupported {
-                            span: target.span,
-                            construct: "a variable-variable assignment target",
-                        });
+                    Variable::Nested(inner) => {
+                        let (name, inner) = self.fold_variable(inner)?;
+                        self.bind_dynamic_variable(name, ty, target.span)?;
+
+                        Variable::Nested(self.arena.alloc(inner))
                     }
                 };
 
@@ -193,6 +194,17 @@ where
         };
 
         Ok(node)
+    }
+
+    fn bind_dynamic_variable(&mut self, name_type: Type<'arena>, ty: Type<'arena>, span: Span) -> InferenceResult<()> {
+        let Some(name) = self.resolved_variable_name(name_type) else {
+            return Err(InferenceError::Unsupported { span, construct: "a variable-variable assignment target" });
+        };
+
+        self.environment.set(Var::new(name), ty);
+        self.environment.invalidate_rooted_in(Var::new(name));
+
+        Ok(())
     }
 
     /// Destructures `ty` into a list/array assignment target, binding each

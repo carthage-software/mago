@@ -3,9 +3,9 @@ use mago_inference::InferenceError;
 use crate::harness::Test;
 
 #[test]
-fn variable_variable_assignment_target_is_reported_unsupported() {
+fn a_dynamically_named_variable_variable_write_is_reported_unsupported() {
     let test = Test::new();
-    let result = test.try_infer("<?php", "<?php $x = 'a'; $$x = 1;");
+    let result = test.try_infer("<?php", "<?php /** @var string */ $x = ''; $$x = 1;");
 
     assert!(
         matches!(result, Err(InferenceError::Unsupported { construct: "a variable-variable assignment target", .. })),
@@ -27,7 +27,7 @@ fn method_calls_on_an_unknown_receiver_are_mixed_not_an_error() {
 #[test]
 fn an_unsupported_construct_aborts_inference_rather_than_typing_as_mixed() {
     let test = Test::new();
-    let result = test.try_infer("<?php", "<?php $x = 'a'; $$x = 1; $y = 1; $y;");
+    let result = test.try_infer("<?php", "<?php /** @var string */ $x = ''; $$x = 1; $y = 1; $y;");
 
     assert!(result.is_err(), "inference must not fabricate a type for an unsupported construct");
 }

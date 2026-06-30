@@ -109,3 +109,17 @@ test_inference! {
         "} => "array{'a': int(1), 'b': int(2), ...<int, list{0: int(1)}|string('hello')>}",
     }
 }
+
+test_inference! {
+    name = a_variable_variable_write_targets_the_named_place,
+    cases = {
+        "<?php $x = 'a'; $$x = 1; $a;" => "int(1)",
+        "<?php $x = 'a'; $$x = 1; $$x;" => "int(1)",
+        "<?php $x = 'a'; $$x = 1; $s = $a + $$x; $s;" => "int(2)",
+    }
+}
+
+test_inference! {
+    name = a_braced_variable_variable_resolves_a_literal_name,
+    cases = { "<?php ${'a'} = 5; $a;" => "int(5)" }
+}
