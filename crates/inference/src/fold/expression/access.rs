@@ -256,6 +256,7 @@ where
             ExpressionKind::Self_ | ExpressionKind::Static => {
                 return self.self_class.and_then(|name| self.symbols.get_class_like(SymbolId::class_like(name)));
             }
+            ExpressionKind::Parent => return self.resolve_parent(),
             _ => return None,
         };
 
@@ -271,6 +272,16 @@ where
         }
 
         None
+    }
+
+    /// The direct superclass of the current `self::` context, for `parent::`.
+    /// `None` outside a class or when the class has no parent.
+    fn resolve_parent(&self) -> Option<ClassLikeSymbol<'arena>> {
+        let class = self.self_class?;
+        let symbol = self.symbols.get_class_like(SymbolId::class_like(class))?;
+        let (parent, _) = symbol.inheritance_edges();
+
+        self.symbols.get_class_like(SymbolId::class_like(parent?.target.as_bytes()))
     }
 
     pub(crate) fn array_element_type(&mut self, array: Type<'arena>, key: Type<'arena>) -> Type<'arena> {

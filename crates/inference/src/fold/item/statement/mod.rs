@@ -7,13 +7,20 @@ use mago_allocator::Arena;
 use mago_allocator::CopyInto;
 use mago_allocator::copy::copy_ref_into;
 use mago_allocator::copy::copy_slice_into;
+use mago_allocator::vec::Vec;
 use mago_flags::U8Flags;
+use mago_hir::ir::delimited::Delimited;
 use mago_hir::ir::item::member::MemberItem;
 use mago_hir::ir::item::member::MemberItemKind;
 use mago_hir::ir::item::member::constant::ClassLikeConstant;
 use mago_hir::ir::item::member::enum_case::EnumCase;
+use mago_hir::ir::item::member::hook::Hook;
+use mago_hir::ir::item::member::hook::HookBody;
+use mago_hir::ir::item::member::hook::HookBodyKind;
 use mago_hir::ir::item::member::method::Method;
+use mago_hir::ir::item::member::property::HookedProperty;
 use mago_hir::ir::item::member::property::Property;
+use mago_hir::ir::item::member::trait_use::TraitUse;
 use mago_hir::ir::item::modifier::Modifier;
 use mago_hir::ir::item::modifier::ModifierKind;
 use mago_hir::ir::item::statement::ItemStatement;
@@ -99,11 +106,11 @@ where
             MemberItemKind::Property(property) => {
                 MemberItemKind::Property(self.arena.alloc(self.infer_property_member(property)?))
             }
-            MemberItemKind::TraitUse(_) => {
-                return Err(InferenceError::Unsupported { span: member.span, construct: "a trait use" });
+            MemberItemKind::HookedProperty(property) => {
+                MemberItemKind::HookedProperty(self.arena.alloc(self.infer_hooked_property(this_type, property)?))
             }
-            MemberItemKind::HookedProperty(_) => {
-                return Err(InferenceError::Unsupported { span: member.span, construct: "a hooked property" });
+            MemberItemKind::TraitUse(trait_use) => {
+                MemberItemKind::TraitUse(self.arena.alloc(self.infer_trait_use(trait_use)?))
             }
         };
 
@@ -204,6 +211,119 @@ where
             variable: property.variable.copy_into(self.arena),
             default_value,
             flattened: property.flattened,
+        })
+    }
+
+    fn infer_hooked_property(
+        &mut self,
+        this_type: Type<'arena>,
+        property: &'source HookedProperty<'source, SymbolId, S, E>,
+    ) -> InferenceResult<HookedProperty<'arena, SymbolId, Flow, Type<'arena>>> {
+        let attributes = self.infer_attributes(property.attributes)?;
+        let annotation = match property.annotation {
+            Some(annotation) => Some(&*self.arena.alloc(self.infer_item_annotation(annotation)?)),
+            None => None,
+        };
+        let default_value = match property.default_value {
+            Some(default_value) => Some(&*self.arena.alloc(self.infer_expression(default_value)?)),
+            None => None,
+        };
+
+        let mut hooks = Vec::new_in(self.arena);
+        for hook in property.hooks.items {
+            hooks.push(self.infer_hook(this_type, hook)?);
+        }
+
+        Ok(HookedProperty {
+            span: property.span,
+            annotation,
+            attributes,
+            version_constraint: self.arena.alloc_slice_copy(property.version_constraint),
+            modifiers: copy_slice_into(property.modifiers, self.arena),
+            r#type: property.r#type.map(|r#type| copy_ref_into(r#type, self.arena)),
+            variable: property.variable.copy_into(self.arena),
+            default_value,
+            hooks: Delimited { span: property.hooks.span, items: hooks.leak() },
+        })
+    }
+
+    fn infer_hook(
+        &mut self,
+        this_type: Type<'arena>,
+        hook: &'source Hook<'source, SymbolId, S, E>,
+    ) -> InferenceResult<Hook<'arena, SymbolId, Flow, Type<'arena>>> {
+        let attributes = self.infer_attributes(hook.attributes)?;
+        let annotation = match hook.annotation {
+            Some(annotation) => Some(&*self.arena.alloc(self.infer_item_annotation(annotation)?)),
+            None => None,
+        };
+
+        let outer_environment = std::mem::replace(&mut self.environment, Environment::new_in(self.source));
+        let outer_reachable = self.reachable;
+        self.reachable = true;
+        self.environment.set(Var::new(self.arena.alloc_slice_copy(b"$this")), this_type);
+
+        let parameters = match &hook.parameters {
+            Some(parameters) => {
+                self.bind_signature_parameters(parameters.items, &[]);
+
+                Some(self.infer_parameters(parameters)?)
+            }
+            None => None,
+        };
+        let body = match &hook.body {
+            Some(body) => Some(self.infer_hook_body(body)?),
+            None => None,
+        };
+
+        self.environment = outer_environment;
+        self.reachable = outer_reachable;
+
+        Ok(Hook {
+            span: hook.span,
+            annotation,
+            attributes,
+            version_constraint: self.arena.alloc_slice_copy(hook.version_constraint),
+            flags: hook.flags,
+            modifiers: copy_slice_into(hook.modifiers, self.arena),
+            name: hook.name.copy_into(self.arena),
+            parameters,
+            body,
+        })
+    }
+
+    fn infer_hook_body(
+        &mut self,
+        body: &'source HookBody<'source, SymbolId, S, E>,
+    ) -> InferenceResult<HookBody<'arena, SymbolId, Flow, Type<'arena>>> {
+        let kind = match &body.kind {
+            HookBodyKind::Expression(expression) => {
+                HookBodyKind::Expression(self.arena.alloc(self.infer_expression(expression)?))
+            }
+            HookBodyKind::Statements(statements) => {
+                let (statements, _exit) = self.infer_block(statements)?;
+
+                HookBodyKind::Statements(statements)
+            }
+        };
+
+        Ok(HookBody { span: body.span, kind })
+    }
+
+    fn infer_trait_use(
+        &mut self,
+        trait_use: &'source TraitUse<'source, SymbolId, S, E>,
+    ) -> InferenceResult<TraitUse<'arena, SymbolId, Flow, Type<'arena>>> {
+        let annotation = match trait_use.annotation {
+            Some(annotation) => Some(&*self.arena.alloc(self.infer_item_annotation(annotation)?)),
+            None => None,
+        };
+
+        Ok(TraitUse {
+            span: trait_use.span,
+            annotation,
+            traits: copy_slice_into(trait_use.traits, self.arena),
+            adaptations: trait_use.adaptations.map(|adaptations| adaptations.copy_into(self.arena)),
         })
     }
 
