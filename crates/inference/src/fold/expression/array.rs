@@ -136,8 +136,11 @@ where
 
 /// Appends an entry, applying PHP's last-write-wins on duplicate keys while
 /// keeping the key's first position.
-fn push_entry<'arena, A>(entries: &mut Vec<'_, KnownItem<'arena>, A>, key: ArrayKey<'arena>, value: Type<'arena>)
-where
+pub(crate) fn push_entry<'arena, A>(
+    entries: &mut Vec<'_, KnownItem<'arena>, A>,
+    key: ArrayKey<'arena>,
+    value: Type<'arena>,
+) where
     A: Arena,
 {
     if let Some(existing) = entries.iter_mut().find(|entry| entry.key == key) {
