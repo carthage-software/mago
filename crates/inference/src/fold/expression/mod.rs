@@ -24,6 +24,7 @@ pub mod composite_string;
 pub mod conditional;
 pub mod constant;
 pub mod construct;
+pub mod instantiation;
 pub mod list;
 pub mod literal;
 pub mod magic_constant;
@@ -89,9 +90,7 @@ where
                 self.infer_magic_constant(expression.span, magic_constant)?
             }
             ExpressionKind::Constant(identifier) => self.infer_constant(expression.span, identifier)?,
-            ExpressionKind::Instantiation(_) => {
-                return Err(InferenceError::Unsupported { span: expression.span, construct: "object instantiation" });
-            }
+            ExpressionKind::Instantiation(instantiation) => self.infer_instantiation(expression.span, instantiation)?,
             ExpressionKind::Yield(yield_expression) => self.infer_yield(expression.span, yield_expression)?,
             ExpressionKind::Throw(operand) => self.infer_throw(expression.span, operand)?,
             ExpressionKind::Parent => self.diverging(expression.span, ExpressionKind::Parent),
