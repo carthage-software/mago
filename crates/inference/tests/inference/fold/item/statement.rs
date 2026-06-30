@@ -344,6 +344,41 @@ test_inference! {
     }
 }
 
+test_inference! {
+    name = reads_a_promoted_constructor_property,
+    code = indoc! {"
+        <?php
+        class C {
+            public function __construct(public int $x, private string $y) {}
+            public function gx(): int { return $this->x; }
+            public function gy(): string { return $this->y; }
+        }
+    "},
+    expect = |ir| {
+        let Some(x) = method_return_value(ir, b"gx") else { panic!("expected a return value in gx()") };
+        assert_eq!(x.meta.to_string(), "int", "the public promoted property is readable as its native type");
+
+        let Some(y) = method_return_value(ir, b"gy") else { panic!("expected a return value in gy()") };
+        assert_eq!(y.meta.to_string(), "string", "the private promoted property is readable as its native type");
+    }
+}
+
+test_inference! {
+    name = a_promoted_property_takes_its_docblock_param_type,
+    code = indoc! {"
+        <?php
+        class C {
+            /** @param non-empty-string $name */
+            public function __construct(public string $name) {}
+            public function get(): string { return $this->name; }
+        }
+    "},
+    expect = |ir| {
+        let Some(value) = method_return_value(ir, b"get") else { panic!("expected a return value in get()") };
+        assert_eq!(value.meta.to_string(), "non-empty-string", "the @param type promotes onto the property");
+    }
+}
+
 fn constant_value(ir: TypedIr<'_>, name: &[u8]) -> Option<String> {
     constant_value_in(ir.statements, name)
 }

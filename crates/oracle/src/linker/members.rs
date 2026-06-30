@@ -94,6 +94,20 @@ where
         for member in members {
             match &member.kind {
                 MemberItemKind::Method(method) => {
+                    if method.name.value.eq_ignore_ascii_case(b"__construct") {
+                        for parameter in method.parameters.as_slice() {
+                            if !parameter.modifiers.is_empty() {
+                                properties.push(self.promoted_property(
+                                    class_name,
+                                    owner,
+                                    parameter,
+                                    method.annotation,
+                                    origin,
+                                ));
+                            }
+                        }
+                    }
+
                     methods.push(self.method(class_name, owner, method, origin));
                 }
                 MemberItemKind::Property(property) => {
@@ -248,6 +262,32 @@ where
             flags: property_flags(property.modifiers, property.default_value.is_some(), false)
                 .union(crate::linker::tags::property_flags(crate::linker::tags::tags_of(property.annotation))),
             constraint: self.constraint(property.version_constraint),
+            attributes,
+            ty,
+            hooks: &[],
+            origin,
+        }
+    }
+
+    fn promoted_property<I, St, Ex>(
+        &mut self,
+        class_name: &'arena [u8],
+        owner: SymbolId,
+        parameter: &Parameter<'arena, I, St, Ex>,
+        annotation: Option<&ItemAnnotation<'arena, I, St, Ex>>,
+        origin: Origin,
+    ) -> PropertyMember<'arena> {
+        let read = read_visibility(parameter.modifiers);
+        let attributes = self.attributes(parameter.attributes);
+        let ty = self.parameter_type_slot(parameter, annotation);
+
+        PropertyMember {
+            span: parameter.span,
+            visibility: ReadWriteVisibility::new(read, write_visibility(parameter.modifiers, read)),
+            name: Path::property(self.arena, class_name, parameter.variable.name),
+            defining_symbol: owner,
+            flags: property_flags(parameter.modifiers, parameter.default_value.is_some(), false),
+            constraint: self.constraint(parameter.version_constraint),
             attributes,
             ty,
             hooks: &[],

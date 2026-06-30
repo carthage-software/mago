@@ -13,6 +13,7 @@ use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::expression::annotation::Annotation;
 use mago_hir::ir::expression::operator::AssignmentOperator;
 use mago_hir::ir::expression::operator::BinaryOperator;
+use mago_hir::ir::expression::selector::MemberSelector;
 use mago_hir::ir::expression::selector::MemberSelectorKind;
 use mago_hir::ir::variable::Variable;
 use mago_oracle::id::SymbolId;
@@ -162,17 +163,18 @@ where
                     Expression { meta: ty, span: target.span, kind: ExpressionKind::Access(self.arena.alloc(node)) }
                 }
                 AccessKind::Property(object, selector) => {
-                    let object = self.infer_expression(object)?;
-                    // A write narrows the property place, so a later read sees it.
-                    if let MemberSelectorKind::Name(name) = &selector.kind
-                        && let Some(place) = self.property_place_id(&object, name.value)
-                    {
-                        self.environment.set(place, ty);
-                    }
-
-                    let selector = self.infer_member_selector(selector)?;
+                    let (object, selector) = self.bind_object_property(object, selector, ty)?;
                     let node =
                         Access { span: access.span, kind: AccessKind::Property(self.arena.alloc(object), selector) };
+
+                    Expression { meta: ty, span: target.span, kind: ExpressionKind::Access(self.arena.alloc(node)) }
+                }
+                AccessKind::NullsafeProperty(object, selector) => {
+                    let (object, selector) = self.bind_object_property(object, selector, ty)?;
+                    let node = Access {
+                        span: access.span,
+                        kind: AccessKind::NullsafeProperty(self.arena.alloc(object), selector),
+                    };
 
                     Expression { meta: ty, span: target.span, kind: ExpressionKind::Access(self.arena.alloc(node)) }
                 }
@@ -190,10 +192,40 @@ where
                     return Err(InferenceError::Unsupported { span: target.span, construct: "this assignment target" });
                 }
             },
+            ExpressionKind::Parenthesized(inner) => {
+                let inner = self.bind_target(inner, ty)?;
+
+                Expression {
+                    meta: inner.meta,
+                    span: target.span,
+                    kind: ExpressionKind::Parenthesized(self.arena.alloc(inner)),
+                }
+            }
             _ => return Err(InferenceError::Unsupported { span: target.span, construct: "this assignment target" }),
         };
 
         Ok(node)
+    }
+
+    fn bind_object_property(
+        &mut self,
+        object: &'source Expression<'source, SymbolId, S, E>,
+        selector: &MemberSelector<'source, SymbolId, S, E>,
+        ty: Type<'arena>,
+    ) -> InferenceResult<(
+        Expression<'arena, SymbolId, Flow, Type<'arena>>,
+        MemberSelector<'arena, SymbolId, Flow, Type<'arena>>,
+    )> {
+        let object = self.infer_expression(object)?;
+        if let MemberSelectorKind::Name(name) = &selector.kind
+            && let Some(place) = self.property_place_id(&object, name.value)
+        {
+            self.environment.set(place, ty);
+        }
+
+        let selector = self.infer_member_selector(selector)?;
+
+        Ok((object, selector))
     }
 
     fn bind_dynamic_variable(&mut self, name_type: Type<'arena>, ty: Type<'arena>, span: Span) -> InferenceResult<()> {

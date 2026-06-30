@@ -123,3 +123,24 @@ test_inference! {
     name = a_braced_variable_variable_resolves_a_literal_name,
     cases = { "<?php ${'a'} = 5; $a;" => "int(5)" }
 }
+
+test_inference! {
+    name = a_parenthesized_assignment_target_binds_the_inner_place,
+    cases = {
+        "<?php ($a) = 1; $a;" => "int(1)",
+        "<?php (($a)) = 'x'; $a;" => "string('x')",
+    }
+}
+
+test_inference! {
+    name = a_nullsafe_property_write_narrows_the_property_place,
+    cases = {
+        indoc! {"
+            <?php
+            class C { public ?int $p = null; }
+            $o = new C();
+            $o?->p = 5;
+            $o->p;
+        "} => "int(5)",
+    }
+}
