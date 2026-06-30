@@ -125,3 +125,11 @@ test_inference! {
         "<?php $a = ['a' => 1, 'b' => 2]; unset($a['a']); $a['b'];" => "int(2)",
     }
 }
+
+test_inference! {
+    name = reads_an_element_from_a_list,
+    cases = {
+        "<?php /** @var list<int> */ $a = []; $a[0];" => "int|null",
+        "<?php /** @var non-empty-list<string> */ $a = ['x']; $a[0];" => "string",
+    }
+}

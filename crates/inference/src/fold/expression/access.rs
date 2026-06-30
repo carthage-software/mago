@@ -18,6 +18,9 @@ use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::array::ArrayAtom;
 use mago_oracle::ty::atom::payload::array::ArrayKey;
+use mago_oracle::ty::atom::payload::array::ListAtom;
+use mago_oracle::ty::atom::payload::array::ListFlag;
+use mago_oracle::ty::well_known::TYPE_INT;
 use mago_oracle::ty::well_known::TYPE_MIXED;
 use mago_oracle::ty::well_known::TYPE_NULL;
 use mago_span::Span;
@@ -289,6 +292,10 @@ where
             return self.keyed_element_type(atom, key);
         }
 
+        if let [Atom::List(atom)] = array.atoms {
+            return self.list_element_type(atom, key);
+        }
+
         let mut items = Vec::new_in(self.source);
         if !collect_closed_array(array, &mut items) {
             return TYPE_MIXED;
@@ -335,6 +342,41 @@ where
             && !meet_with(&mut self.ty, self.symbols, key, rest_key).is_never()
         {
             atoms.extend_from_slice(rest_value.atoms);
+        }
+
+        if !definitely_present {
+            atoms.push(Atom::Null);
+        }
+
+        self.ty.union_of(&atoms)
+    }
+
+    fn list_element_type(&mut self, atom: &ListAtom<'arena>, key: Type<'arena>) -> Type<'arena> {
+        let literal_key = self.array_key_of(key);
+
+        let mut atoms = Vec::new_in(self.source);
+        let mut definitely_present = false;
+
+        if let Some(known_elements) = atom.known_elements {
+            for element in known_elements {
+                let element_key = ArrayKey::Int(i64::from(element.index));
+                let element_key_type = self.array_key_type(element_key);
+                if !meet_with(&mut self.ty, self.symbols, key, element_key_type).is_never() {
+                    atoms.extend_from_slice(element.value.atoms);
+                }
+
+                if !element.optional && literal_key == Some(element_key) {
+                    definitely_present = true;
+                }
+            }
+        }
+
+        if !atom.element_type.is_never() && !meet_with(&mut self.ty, self.symbols, key, TYPE_INT).is_never() {
+            atoms.extend_from_slice(atom.element_type.atoms);
+        }
+
+        if atom.flags.contains(ListFlag::NonEmpty) && literal_key == Some(ArrayKey::Int(0)) {
+            definitely_present = true;
         }
 
         if !definitely_present {

@@ -144,3 +144,28 @@ test_inference! {
         "} => "int(5)",
     }
 }
+
+test_inference! {
+    name = a_dynamic_variable_variable_write_yields_the_value_and_continues,
+    cases = {
+        "<?php $v = ($$$a = 1); $v;" => "int(1)",
+        "<?php $$$a = 1; $b = 2; $b;" => "int(2)",
+        "<?php /** @var string */ $x = ''; $$x = 5; $$x;" => "mixed",
+    }
+}
+
+test_inference! {
+    name = an_invalid_assignment_target_evaluates_to_never,
+    cases = { "<?php class C { const F = 1; } $v = (C::F = 2); $v;" => "never" }
+}
+
+test_inference! {
+    name = an_invalid_assignment_target_makes_following_code_unreachable,
+    code = "<?php class C { const F = 1; } C::F = 2; $after = 1; $after;",
+    expect = |ir| {
+        assert!(
+            !get_last_statement(ir).meta.reachable,
+            "code after an invalid (never-typed) assignment target is unreachable",
+        );
+    }
+}

@@ -30,10 +30,10 @@ use mago_oracle::ty::well_known::TYPE_ARRAY_KEY;
 use mago_oracle::ty::well_known::TYPE_INT;
 use mago_oracle::ty::well_known::TYPE_INT_OR_STRING;
 use mago_oracle::ty::well_known::TYPE_MIXED;
+use mago_oracle::ty::well_known::TYPE_NEVER;
 use mago_oracle::var::Var;
 use mago_span::Span;
 
-use crate::error::InferenceError;
 use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
@@ -92,13 +92,13 @@ where
                     }
                     Variable::Indirect(expression) => {
                         let expression = self.infer_expression(expression)?;
-                        self.bind_dynamic_variable(expression.meta, ty, target.span)?;
+                        self.bind_dynamic_variable(expression.meta, ty);
 
                         Variable::Indirect(self.arena.alloc(expression))
                     }
                     Variable::Nested(inner) => {
                         let (name, inner) = self.fold_variable(inner)?;
-                        self.bind_dynamic_variable(name, ty, target.span)?;
+                        self.bind_dynamic_variable(name, ty);
 
                         Variable::Nested(self.arena.alloc(inner))
                     }
@@ -188,9 +188,7 @@ where
 
                     Expression { meta: ty, span: target.span, kind: ExpressionKind::Access(self.arena.alloc(node)) }
                 }
-                _ => {
-                    return Err(InferenceError::Unsupported { span: target.span, construct: "this assignment target" });
-                }
+                _ => self.unreachable_target(target)?,
             },
             ExpressionKind::Parenthesized(inner) => {
                 let inner = self.bind_target(inner, ty)?;
@@ -201,8 +199,18 @@ where
                     kind: ExpressionKind::Parenthesized(self.arena.alloc(inner)),
                 }
             }
-            _ => return Err(InferenceError::Unsupported { span: target.span, construct: "this assignment target" }),
+            _ => self.unreachable_target(target)?,
         };
+
+        Ok(node)
+    }
+
+    fn unreachable_target(
+        &mut self,
+        target: &'source Expression<'source, SymbolId, S, E>,
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let mut node = self.infer_expression(target)?;
+        node.meta = TYPE_NEVER;
 
         Ok(node)
     }
@@ -228,15 +236,11 @@ where
         Ok((object, selector))
     }
 
-    fn bind_dynamic_variable(&mut self, name_type: Type<'arena>, ty: Type<'arena>, span: Span) -> InferenceResult<()> {
-        let Some(name) = self.resolved_variable_name(name_type) else {
-            return Err(InferenceError::Unsupported { span, construct: "a variable-variable assignment target" });
-        };
-
-        self.environment.set(Var::new(name), ty);
-        self.environment.invalidate_rooted_in(Var::new(name));
-
-        Ok(())
+    fn bind_dynamic_variable(&mut self, name_type: Type<'arena>, ty: Type<'arena>) {
+        if let Some(name) = self.resolved_variable_name(name_type) {
+            self.environment.set(Var::new(name), ty);
+            self.environment.invalidate_rooted_in(Var::new(name));
+        }
     }
 
     /// Destructures `ty` into a list/array assignment target, binding each
