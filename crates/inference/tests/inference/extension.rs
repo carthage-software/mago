@@ -156,6 +156,18 @@ fn stdlib_constant_folds_literal_arguments() {
         ("<?php ord('A');", "int(65)"),
         ("<?php chr(65);", "string('A')"),
         ("<?php abs(-7);", "int(7)"),
+        ("<?php abs(-7.5);", "float(7.5)"),
+        ("<?php strrev('abc');", "string('cba')"),
+        ("<?php str_repeat('ab', 3);", "string('ababab')"),
+        ("<?php str_contains('hello', 'ell');", "true"),
+        ("<?php str_contains('hello', 'xyz');", "false"),
+        ("<?php str_starts_with('hello', 'he');", "true"),
+        ("<?php str_ends_with('hello', 'lo');", "true"),
+        ("<?php dechex(255);", "string('ff')"),
+        ("<?php decbin(5);", "string('101')"),
+        ("<?php decoct(8);", "string('10')"),
+        ("<?php bin2hex('AB');", "string('4142')"),
+        ("<?php intdiv(7, 2);", "int(3)"),
     ];
 
     for (code, expected) in cases {
@@ -193,6 +205,25 @@ fn stdlib_count_keeps_lower_bound_for_non_empty_shapes() {
         ("<?php /** @var array{a: int, b?: string} */ $a = []; count($a);", "int<1, 2>"),
         ("<?php /** @var array{a: int} */ $a = []; count($a);", "int(1)"),
         ("<?php /** @var list<int> */ $a = []; count($a);", "non-negative-int"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
+#[test]
+fn stdlib_abs_refines_int_ranges_and_floats() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php /** @var int<-5, 3> */ $n = 0; abs($n);", "int<0, 5>"),
+        ("<?php /** @var int<2, 10> */ $n = 2; abs($n);", "int<2, 10>"),
+        ("<?php /** @var int */ $n = 0; abs($n);", "non-negative-int"),
+        ("<?php /** @var float */ $f = 0.0; abs($f);", "float"),
     ];
 
     for (code, expected) in cases {
