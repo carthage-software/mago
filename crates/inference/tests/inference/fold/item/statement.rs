@@ -326,6 +326,41 @@ test_inference! {
     }
 }
 
+test_inference! {
+    name = folds_a_constant_declaration,
+    code = "<?php const FOO = 1 + 2; $x = 1;",
+    expect = |ir| {
+        assert_eq!(constant_value(ir, b"FOO").as_deref(), Some("int(3)"), "the constant value is inferred");
+        assert!(get_last_statement(ir).meta.reachable, "code after a constant declaration is reachable");
+    }
+}
+
+test_inference! {
+    name = folds_each_constant_in_a_grouped_declaration,
+    code = "<?php const A = 1, B = 'x';",
+    expect = |ir| {
+        assert_eq!(constant_value(ir, b"A").as_deref(), Some("int(1)"), "the first constant value is inferred");
+        assert_eq!(constant_value(ir, b"B").as_deref(), Some("string('x')"), "the second constant value is inferred");
+    }
+}
+
+fn constant_value(ir: TypedIr<'_>, name: &[u8]) -> Option<String> {
+    constant_value_in(ir.statements, name)
+}
+
+fn constant_value_in(statements: &[TypedStatement<'_>], name: &[u8]) -> Option<String> {
+    statements.iter().find_map(|statement| match statement.kind {
+        StatementKind::Item(item) => match item.kind {
+            ItemStatementKind::Constant(constant) if constant.name.value == name => {
+                Some(constant.value.meta.to_string())
+            }
+            _ => None,
+        },
+        StatementKind::Sequence(inner) => constant_value_in(inner, name),
+        _ => None,
+    })
+}
+
 fn function_return_value<'arena>(ir: TypedIr<'arena>, name: &[u8]) -> Option<&'arena TypedExpression<'arena>> {
     for statement in ir.statements {
         let StatementKind::Item(item) = statement.kind else { continue };

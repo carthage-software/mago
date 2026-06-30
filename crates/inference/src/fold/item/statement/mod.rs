@@ -1,4 +1,5 @@
 mod class;
+mod constant;
 mod r#enum;
 mod function;
 mod interface;
@@ -41,7 +42,6 @@ use mago_oracle::ty::atom::payload::object::named::ObjectFlag;
 use mago_oracle::var::Var;
 use mago_span::Span;
 
-use crate::error::InferenceError;
 use crate::error::InferenceResult;
 use crate::flow::ControlFlow;
 use crate::flow::Flow;
@@ -70,8 +70,8 @@ where
             ItemStatementKind::Trait(node) => {
                 ItemStatementKind::Trait(self.arena.alloc(self.infer_trait(item.meta, node)?))
             }
-            ItemStatementKind::Constant(_) => {
-                return Err(InferenceError::Unsupported { span: item.span, construct: "constant declarations" });
+            ItemStatementKind::Constant(node) => {
+                ItemStatementKind::Constant(self.arena.alloc(self.infer_constant_declaration(node)?))
             }
             ItemStatementKind::Function(node) => {
                 ItemStatementKind::Function(self.arena.alloc(self.infer_function(node)?))
