@@ -1230,6 +1230,12 @@ impl<'input> Lexer<'input> {
         let terminator = self.input.consume(terminator_length);
         let terminator_end = self.input.current_position();
 
+        if self.interpolating {
+            self.buffer.push_back(self.token(TokenKind::StringPart, content, start, content_end));
+
+            return Some(Ok(self.token(TokenKind::Whitespace, terminator, content_end, terminator_end)));
+        }
+
         self.buffer.push_back(self.token(TokenKind::Whitespace, terminator, content_end, terminator_end));
 
         Some(Ok(self.token(TokenKind::StringPart, content, start, content_end)))

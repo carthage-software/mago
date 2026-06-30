@@ -879,6 +879,26 @@ fn test_heredoc() -> Result<(), SyntaxError> {
 }
 
 #[test]
+fn test_lossless_when_interpolation_runs_across_nested_heredoc_content() {
+    let code = b"<?php\n\ndeclare(strict_types1=);\n\n/** @param non-empty-string $s */\nfuncti\n    echo $s;\n}\n\nfunction probe(string $name): void\n{\n    $message = <<<EOT\nHello, {$void\n{\n    $message = <<<EOT\nHello, {$name}!\nEOT;\n\n    takes_non_empty($message);\n}\n";
+
+    let input = Input::new(FileId::zero(), code);
+    let mut lexer = Lexer::new(input, LexerSettings::default());
+    let mut reconstructed = Vec::with_capacity(code.len());
+
+    while let Some(result) = lexer.advance() {
+        let token = match result {
+            Ok(token) => token,
+            Err(err) => panic!("unexpected lexer error: {err}"),
+        };
+
+        reconstructed.extend_from_slice(token.value);
+    }
+
+    assert_eq!(code, reconstructed.as_slice());
+}
+
+#[test]
 fn test_double_quote_string() -> Result<(), SyntaxError> {
     let code = b"
             hello
