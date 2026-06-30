@@ -1,3 +1,4 @@
+mod class;
 mod r#enum;
 mod interface;
 mod r#trait;
@@ -12,6 +13,7 @@ use mago_hir::ir::item::member::MemberItemKind;
 use mago_hir::ir::item::member::constant::ClassLikeConstant;
 use mago_hir::ir::item::member::enum_case::EnumCase;
 use mago_hir::ir::item::member::method::Method;
+use mago_hir::ir::item::member::property::Property;
 use mago_hir::ir::item::modifier::Modifier;
 use mago_hir::ir::item::modifier::ModifierKind;
 use mago_hir::ir::item::statement::ItemStatement;
@@ -51,8 +53,8 @@ where
             ItemStatementKind::Enum(node) => {
                 ItemStatementKind::Enum(self.arena.alloc(self.infer_enum(item.meta, node)?))
             }
-            ItemStatementKind::Class(_) => {
-                return Err(InferenceError::Unsupported { span: item.span, construct: "class declarations" });
+            ItemStatementKind::Class(node) => {
+                ItemStatementKind::Class(self.arena.alloc(self.infer_class(item.meta, node)?))
             }
             ItemStatementKind::Interface(node) => {
                 ItemStatementKind::Interface(self.arena.alloc(self.infer_interface(item.meta, node)?))
@@ -94,11 +96,14 @@ where
                 MemberItemKind::Constant(self.arena.alloc(self.infer_constant_member(constant)?))
             }
             MemberItemKind::EnumCase(case) => MemberItemKind::EnumCase(self.arena.alloc(self.infer_enum_case(case)?)),
-            MemberItemKind::TraitUse(_) => {
-                return Err(InferenceError::Unsupported { span: member.span, construct: "trait use in an enum" });
+            MemberItemKind::Property(property) => {
+                MemberItemKind::Property(self.arena.alloc(self.infer_property_member(property)?))
             }
-            MemberItemKind::Property(_) | MemberItemKind::HookedProperty(_) => {
-                return Err(InferenceError::Unsupported { span: member.span, construct: "this member" });
+            MemberItemKind::TraitUse(_) => {
+                return Err(InferenceError::Unsupported { span: member.span, construct: "a trait use" });
+            }
+            MemberItemKind::HookedProperty(_) => {
+                return Err(InferenceError::Unsupported { span: member.span, construct: "a hooked property" });
             }
         };
 
@@ -172,6 +177,33 @@ where
             name: constant.name.copy_into(self.arena),
             value: self.arena.alloc(value),
             flattened: constant.flattened,
+        })
+    }
+
+    fn infer_property_member(
+        &mut self,
+        property: &'source Property<'source, SymbolId, S, E>,
+    ) -> InferenceResult<Property<'arena, SymbolId, Flow, Type<'arena>>> {
+        let attributes = self.infer_attributes(property.attributes)?;
+        let annotation = match property.annotation {
+            Some(annotation) => Some(&*self.arena.alloc(self.infer_item_annotation(annotation)?)),
+            None => None,
+        };
+        let default_value = match property.default_value {
+            Some(default_value) => Some(&*self.arena.alloc(self.infer_expression(default_value)?)),
+            None => None,
+        };
+
+        Ok(Property {
+            span: property.span,
+            annotation,
+            attributes,
+            version_constraint: self.arena.alloc_slice_copy(property.version_constraint),
+            modifiers: copy_slice_into(property.modifiers, self.arena),
+            r#type: property.r#type.map(|r#type| copy_ref_into(r#type, self.arena)),
+            variable: property.variable.copy_into(self.arena),
+            default_value,
+            flattened: property.flattened,
         })
     }
 

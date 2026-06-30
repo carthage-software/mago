@@ -3,6 +3,7 @@ use mago_allocator::vec::Vec;
 use mago_hir::ir::expression::AccessKind;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
+use mago_hir::ir::expression::selector::MemberSelectorKind;
 use mago_hir::ir::variable::Variable;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
@@ -23,12 +24,31 @@ where
         match &expression.kind {
             ExpressionKind::Parenthesized(inner) => self.place_id(inner),
             ExpressionKind::Variable(Variable::Direct(direct)) => Some(Var::new(direct.name)),
-            ExpressionKind::Access(access) => match access.kind {
+            ExpressionKind::Access(access) => match &access.kind {
                 AccessKind::Array(base, index) => self.array_place_id(base, index.meta),
+                AccessKind::Property(base, selector) => match &selector.kind {
+                    MemberSelectorKind::Name(name) => self.property_place_id(base, name.value),
+                    _ => None,
+                },
                 _ => None,
             },
             _ => None,
         }
+    }
+
+    pub(crate) fn property_place_id(
+        &mut self,
+        base: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
+        name: &[u8],
+    ) -> Option<Var<'arena>> {
+        let base_id = self.place_id(base)?;
+
+        let mut bytes = Vec::new_in(self.arena);
+        bytes.extend_from_slice(base_id.as_bytes());
+        bytes.extend_from_slice(b"->");
+        bytes.extend_from_slice(name);
+
+        Some(Var::new(bytes.leak()))
     }
 
     pub(crate) fn array_place_id(

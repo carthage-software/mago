@@ -2,12 +2,15 @@ use mago_allocator::Arena;
 use mago_allocator::CopyInto;
 use mago_allocator::vec::Vec;
 use mago_hir::ir::delimited::Delimited;
+use mago_hir::ir::expression::Access;
+use mago_hir::ir::expression::AccessKind;
 use mago_hir::ir::expression::ArrayElement;
 use mago_hir::ir::expression::ArrayElementKind;
 use mago_hir::ir::expression::Assignment;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::expression::annotation::Annotation;
+use mago_hir::ir::expression::selector::MemberSelectorKind;
 use mago_hir::ir::variable::Variable;
 use mago_oracle::id::SymbolId;
 use mago_oracle::linker::lower_type_annotation;
@@ -111,6 +114,36 @@ where
 
                 Expression { meta: ty, span: target.span, kind: ExpressionKind::List(elements) }
             }
+            ExpressionKind::Access(access) => match &access.kind {
+                AccessKind::Property(object, selector) => {
+                    let object = self.infer_expression(object)?;
+                    // A write narrows the property place, so a later read sees it.
+                    if let MemberSelectorKind::Name(name) = &selector.kind
+                        && let Some(place) = self.property_place_id(&object, name.value)
+                    {
+                        self.environment.set(place, ty);
+                    }
+
+                    let selector = self.infer_member_selector(selector)?;
+                    let node =
+                        Access { span: access.span, kind: AccessKind::Property(self.arena.alloc(object), selector) };
+
+                    Expression { meta: ty, span: target.span, kind: ExpressionKind::Access(self.arena.alloc(node)) }
+                }
+                AccessKind::StaticProperty(class, variable) => {
+                    let class = self.infer_expression(class)?;
+                    let variable = self.infer_variable_node(variable)?;
+                    let node = Access {
+                        span: access.span,
+                        kind: AccessKind::StaticProperty(self.arena.alloc(class), variable),
+                    };
+
+                    Expression { meta: ty, span: target.span, kind: ExpressionKind::Access(self.arena.alloc(node)) }
+                }
+                _ => {
+                    return Err(InferenceError::Unsupported { span: target.span, construct: "this assignment target" });
+                }
+            },
             _ => return Err(InferenceError::Unsupported { span: target.span, construct: "this assignment target" }),
         };
 

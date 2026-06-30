@@ -125,11 +125,46 @@ test_inference! {
     }
 }
 
+test_inference! {
+    name = folds_a_class_declaration_without_error,
+    code = "<?php class Box { public int $size = 0; public function size(): int { return $this->size; } } $x = 1;",
+    expect = |ir| {
+        assert!(
+            ir.statements.iter().any(|statement| matches!(statement.kind, StatementKind::Item(_))),
+            "the class declaration survives inference as an item",
+        );
+        assert!(get_last_statement(ir).meta.reachable, "code after a class declaration is reachable");
+    }
+}
+
+test_inference! {
+    name = infers_property_default_value,
+    code = "<?php class Box { public int $size = 7; }",
+    expect = |ir| {
+        let Some(members) = item_members(ir) else { panic!("expected a class") };
+        let default = members.iter().find_map(|member| match member.kind {
+            MemberItemKind::Property(property) => property.default_value.map(|value| value.meta.to_string()),
+            _ => None,
+        });
+        assert_eq!(default.as_deref(), Some("int(7)"), "the property default value is inferred");
+    }
+}
+
+test_inference! {
+    name = reads_this_property_inside_a_class_method,
+    code = "<?php class Box { public int $size = 0; public function size(): int { return $this->size; } }",
+    expect = |ir| {
+        let Some(value) = method_return_value(ir, b"size") else { panic!("expected a return value in size()") };
+        assert_eq!(value.meta.to_string(), "int", "$this->size resolves to the declared property type");
+    }
+}
+
 /// The members of the first class-like declaration in the program, whatever its
 /// kind, so a test can navigate enum/interface/trait members uniformly.
 fn item_members(ir: TypedIr<'_>) -> Option<&[mago_hir::ir::item::member::MemberItem<'_, SymbolId, Flow, Type<'_>>]> {
     ir.statements.iter().find_map(|statement| match statement.kind {
         StatementKind::Item(item) => match item.kind {
+            ItemStatementKind::Class(node) => Some(node.members.items),
             ItemStatementKind::Enum(node) => Some(node.members.items),
             ItemStatementKind::Interface(node) => Some(node.members.items),
             ItemStatementKind::Trait(node) => Some(node.members.items),

@@ -218,7 +218,7 @@ where
         self.signature_return(method.ret, method.generics.is_empty(), method.params, argument_types)
     }
 
-    fn infer_member_selector(
+    pub(crate) fn infer_member_selector(
         &mut self,
         selector: &MemberSelector<'source, SymbolId, S, E>,
     ) -> InferenceResult<MemberSelector<'arena, SymbolId, Flow, Type<'arena>>> {

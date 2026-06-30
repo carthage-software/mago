@@ -5,6 +5,48 @@ test_inference! {
 }
 
 test_inference! {
+    name = reads_instance_property_type,
+    def = "<?php class C { public int $count = 0; }",
+    cases = { "<?php /** @var C */ $c = null; $c->count;" => "int" }
+}
+
+test_inference! {
+    name = a_static_property_read_as_an_instance_is_mixed,
+    def = "<?php class C { public static int $count = 0; }",
+    cases = { "<?php /** @var C */ $c = null; $c->count;" => "mixed" }
+}
+
+test_inference! {
+    name = a_property_write_is_visible_to_a_later_read,
+    def = "<?php class C { public int $count = 0; }",
+    cases = { "<?php /** @var C */ $c = null; $c->count = 5; $c->count;" => "int(5)" }
+}
+
+test_inference! {
+    name = a_property_write_yields_the_assigned_value,
+    def = "<?php class C { public static int $total = 0; }",
+    cases = { "<?php C::$total = 7;" => "int(7)" }
+}
+
+test_inference! {
+    name = nullsafe_property_read_on_nullable_unions_null,
+    def = "<?php class C { public int $count = 0; }",
+    cases = {
+        "<?php /** @var C|null */ $c = null; $c?->count;" => "int|null",
+        "<?php /** @var C */ $c = null; $c?->count;" => "int",
+    }
+}
+
+test_inference! {
+    name = unknown_property_or_non_object_receiver_is_mixed,
+    def = "<?php class C { public int $count = 0; }",
+    cases = {
+        "<?php /** @var C */ $c = null; $c->missing;" => "mixed",
+        "<?php /** @var int */ $x = 0; $x->count;" => "mixed",
+    }
+}
+
+test_inference! {
     name = a_non_static_property_read_statically_is_mixed,
     def = "<?php class C { public int $x = 0; }",
     cases = { "<?php C::$x;" => "mixed" }

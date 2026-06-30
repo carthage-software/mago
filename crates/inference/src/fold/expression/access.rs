@@ -7,6 +7,8 @@ use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::expression::selector::ConstantSelector;
 use mago_hir::ir::expression::selector::ConstantSelectorKind;
+use mago_hir::ir::expression::selector::MemberSelector;
+use mago_hir::ir::expression::selector::MemberSelectorKind;
 use mago_hir::ir::variable::Variable;
 use mago_oracle::id::SymbolId;
 use mago_oracle::symbol::Symbol;
@@ -20,7 +22,6 @@ use mago_oracle::ty::well_known::TYPE_MIXED;
 use mago_oracle::ty::well_known::TYPE_NULL;
 use mago_span::Span;
 
-use crate::error::InferenceError;
 use crate::error::InferenceResult;
 use crate::flow::Flow;
 use crate::fold::InferenceFolder;
@@ -57,8 +58,48 @@ where
                 self.infer_static_property(span, access.span, class, property)
             }
             AccessKind::ClassConstant(class, selector) => self.infer_class_constant(span, access.span, class, selector),
-            _ => Err(InferenceError::Unsupported { span, construct: "member access" }),
+            AccessKind::Property(object, selector) => self.infer_property(span, access.span, object, selector, false),
+            AccessKind::NullsafeProperty(object, selector) => {
+                self.infer_property(span, access.span, object, selector, true)
+            }
         }
+    }
+
+    fn infer_property(
+        &mut self,
+        span: Span,
+        access_span: Span,
+        object: &'source Expression<'source, SymbolId, S, E>,
+        selector: &'source MemberSelector<'source, SymbolId, S, E>,
+        nullsafe: bool,
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let object = self.infer_expression(object)?;
+
+        let mut meta = match &selector.kind {
+            MemberSelectorKind::Name(name) => {
+                let declared = self.property_read_type(object.meta, name.value);
+                match self.property_place_id(&object, name.value) {
+                    Some(place) => self.environment.lookup(place).unwrap_or(declared),
+                    None => declared,
+                }
+            }
+            _ => TYPE_MIXED,
+        };
+
+        if nullsafe && object.meta.atoms.iter().any(|atom| matches!(atom, Atom::Null)) {
+            meta = self.union(meta, TYPE_NULL);
+        }
+
+        let object = self.arena.alloc(object);
+        let selector = self.infer_member_selector(selector)?;
+        let kind = if nullsafe {
+            AccessKind::NullsafeProperty(object, selector)
+        } else {
+            AccessKind::Property(object, selector)
+        };
+
+        let node = Access { span: access_span, kind };
+        Ok(Expression { meta, span, kind: ExpressionKind::Access(self.arena.alloc(node)) })
     }
 
     fn infer_static_property(
@@ -107,17 +148,48 @@ where
         let Variable::Direct(direct) = property else {
             return TYPE_MIXED;
         };
-        let Some(properties) = symbol.properties() else {
+
+        self.declared_property_type(&symbol, direct.name, true).unwrap_or(TYPE_MIXED)
+    }
+
+    fn property_read_type(&self, receiver: Type<'arena>, name: &[u8]) -> Type<'arena> {
+        let mut found = None;
+        for atom in receiver.atoms {
+            let candidate = match atom {
+                Atom::Object(object) => Some(object.name.as_bytes()),
+                Atom::Enum(_) => return TYPE_MIXED,
+                _ => continue,
+            };
+
+            if found.is_some() {
+                return TYPE_MIXED;
+            }
+            found = candidate;
+        }
+
+        let Some(class_name) = found else {
+            return TYPE_MIXED;
+        };
+        let Some(symbol) = self.symbols.get_class_like(SymbolId::class_like(class_name)) else {
             return TYPE_MIXED;
         };
 
-        let target = SymbolId::property(symbol.path().as_bytes(), direct.name);
-        properties
+        self.declared_property_type(&symbol, name, false).unwrap_or(TYPE_MIXED)
+    }
+
+    fn declared_property_type(
+        &self,
+        class: &ClassLikeSymbol<'arena>,
+        name: &[u8],
+        want_static: bool,
+    ) -> Option<Type<'arena>> {
+        let target = SymbolId::property(class.path().as_bytes(), name);
+        class
+            .properties()?
             .members
             .iter()
-            .find(|member| member.name.id == target && member.is_static())
+            .find(|member| member.name.id == target && member.is_static() == want_static)
             .and_then(|member| member.ty.effective(false))
-            .unwrap_or(TYPE_MIXED)
     }
 
     /// The type of a `Class::CONSTANT` read. Handles three forms: `Class::class`
