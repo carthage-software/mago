@@ -1,9 +1,12 @@
 mod r#enum;
+mod interface;
+mod r#trait;
 
 use mago_allocator::Arena;
 use mago_allocator::CopyInto;
 use mago_allocator::copy::copy_ref_into;
 use mago_allocator::copy::copy_slice_into;
+use mago_flags::U8Flags;
 use mago_hir::ir::item::member::MemberItem;
 use mago_hir::ir::item::member::MemberItemKind;
 use mago_hir::ir::item::member::constant::ClassLikeConstant;
@@ -16,8 +19,15 @@ use mago_hir::ir::item::statement::ItemStatementKind;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
 use mago_oracle::id::SymbolId;
+use mago_oracle::symbol::Symbol;
+use mago_oracle::symbol::class_like::ClassLikeKind;
+use mago_oracle::symbol::class_like::ClassLikeSymbol;
 use mago_oracle::symbol::function_like::part::parameter::SignatureParameter;
 use mago_oracle::ty::Type;
+use mago_oracle::ty::atom::payload::generic_parameter::DefiningEntity;
+use mago_oracle::ty::atom::payload::generic_parameter::GenericParameterAtom;
+use mago_oracle::ty::atom::payload::object::named::ObjectAtom;
+use mago_oracle::ty::atom::payload::object::named::ObjectFlag;
 use mago_oracle::var::Var;
 use mago_span::Span;
 
@@ -44,11 +54,11 @@ where
             ItemStatementKind::Class(_) => {
                 return Err(InferenceError::Unsupported { span: item.span, construct: "class declarations" });
             }
-            ItemStatementKind::Interface(_) => {
-                return Err(InferenceError::Unsupported { span: item.span, construct: "interface declarations" });
+            ItemStatementKind::Interface(node) => {
+                ItemStatementKind::Interface(self.arena.alloc(self.infer_interface(item.meta, node)?))
             }
-            ItemStatementKind::Trait(_) => {
-                return Err(InferenceError::Unsupported { span: item.span, construct: "trait declarations" });
+            ItemStatementKind::Trait(node) => {
+                ItemStatementKind::Trait(self.arena.alloc(self.infer_trait(item.meta, node)?))
             }
             ItemStatementKind::Constant(_) => {
                 return Err(InferenceError::Unsupported { span: item.span, construct: "constant declarations" });
@@ -197,6 +207,57 @@ where
             .get_class_like(SymbolId::class_like(class_name))
             .and_then(|symbol| symbol.methods().members.iter().find(|member| member.name.id == target))
             .map_or(&[], |member| member.params)
+    }
+
+    /// The class context for folding a class-like body: the canonical name its
+    /// symbol is keyed by (for `self::`/`static::`) and the type its `$this` takes.
+    /// Falls back to the written name and a bare named object when the symbol is
+    /// somehow absent.
+    pub(crate) fn class_context(&mut self, symbol: SymbolId, fallback_name: &[u8]) -> (&'arena [u8], Type<'arena>) {
+        match self.symbols.get_class_like(symbol) {
+            Some(symbol) => (symbol.path().as_bytes(), self.this_type(&symbol)),
+            None => {
+                let class_name = self.arena.alloc_slice_copy(fallback_name);
+                let atom = self.ty.object_named(class_name);
+
+                (class_name, self.ty.union_of(&[atom]))
+            }
+        }
+    }
+
+    /// The type a non-static method's `$this` takes: an enum atom for an enum, or
+    /// a `$this`/`static` named object for a class, interface, or trait that
+    /// carries the class's own template parameters so a generic self resolves.
+    fn this_type(&mut self, symbol: &ClassLikeSymbol<'arena>) -> Type<'arena> {
+        let class_name = symbol.path().as_bytes();
+        if matches!(symbol.kind(), ClassLikeKind::Enum) {
+            let atom = self.ty.enum_any(class_name);
+
+            return self.ty.union_of(&[atom]);
+        }
+
+        let name = self.ty.intern_class_like_path(class_name);
+        let generics = symbol.generics();
+        let type_arguments = if generics.is_empty() {
+            None
+        } else {
+            let mut arguments = self.ty.scratch_vec::<Type<'arena>>();
+            for generic in generics {
+                let atom = self.ty.generic_parameter(GenericParameterAtom {
+                    name: generic.name,
+                    defining_entity: DefiningEntity::ClassLike(name),
+                    constraint: generic.constraint,
+                });
+                arguments.push(self.ty.union_of(&[atom]));
+            }
+
+            Some(self.ty.types(&arguments))
+        };
+
+        let flags = U8Flags::<ObjectFlag>::empty().with(ObjectFlag::IsThis).with(ObjectFlag::IsStatic);
+        let atom = self.ty.object(ObjectAtom { name, type_arguments, flags });
+
+        self.ty.union_of(&[atom])
     }
 }
 
