@@ -140,13 +140,63 @@ fn conditional_assertions_narrow_each_branch() {
 }
 
 #[test]
-fn stdlib_strlen_and_count_refine_to_non_negative_int() {
+fn stdlib_constant_folds_literal_arguments() {
     let test = Test::new();
     let extension = StdlibInference;
     let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
 
-    for code in ["<?php strlen('hello');", "<?php count([1, 2, 3]);", "<?php mb_strlen('x');"] {
+    let cases = [
+        ("<?php strlen('hello');", "int(5)"),
+        ("<?php mb_strlen('héllo');", "int(5)"),
+        ("<?php count([1, 2, 3]);", "int(3)"),
+        ("<?php count([]);", "int(0)"),
+        ("<?php strtoupper('aBc');", "string('ABC')"),
+        ("<?php strtolower('aBc');", "string('abc')"),
+        ("<?php ucfirst('abc');", "string('Abc')"),
+        ("<?php ord('A');", "int(65)"),
+        ("<?php chr(65);", "string('A')"),
+        ("<?php abs(-7);", "int(7)"),
+    ];
+
+    for (code, expected) in cases {
         let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
-        assert_eq!(get_last_expression(ir).meta.to_string(), "non-negative-int", "for code: {code}");
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
+#[test]
+fn stdlib_refines_non_literal_arguments() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php /** @var string */ $s = ''; strlen($s);", "non-negative-int"),
+        ("<?php /** @var array<int> */ $a = []; count($a);", "non-negative-int"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
+#[test]
+fn stdlib_count_keeps_lower_bound_for_non_empty_shapes() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php /** @var non-empty-list<int> */ $a = [1]; count($a);", "positive-int"),
+        ("<?php /** @var non-empty-array<string, int> */ $a = []; count($a);", "positive-int"),
+        ("<?php /** @var array{a: int, b?: string} */ $a = []; count($a);", "int<1, 2>"),
+        ("<?php /** @var array{a: int} */ $a = []; count($a);", "int(1)"),
+        ("<?php /** @var list<int> */ $a = []; count($a);", "non-negative-int"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
     }
 }

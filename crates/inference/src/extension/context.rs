@@ -37,6 +37,21 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
         self.builder.union_of(&[Atom::Int(IntAtom::Literal(value))])
     }
 
+    /// A literal string type.
+    pub fn string(&mut self, value: &[u8]) -> Type<'arena> {
+        let atom = self.builder.string_literal(value);
+
+        self.builder.union_of(&[atom])
+    }
+
+    /// An integer range type; `None` bounds are open (`Some(0), None` is
+    /// `non-negative-int`, `Some(1), None` is `positive-int`).
+    pub fn int_range(&mut self, lower: Option<i64>, upper: Option<i64>) -> Type<'arena> {
+        let atom = self.builder.int_range(lower, upper);
+
+        self.builder.union_of(&[atom])
+    }
+
     /// A literal float type; non-finite values widen to `float`.
     pub fn float(&mut self, value: f64) -> Type<'arena> {
         if !value.is_finite() {
