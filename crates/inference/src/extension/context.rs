@@ -1,14 +1,24 @@
 use mago_allocator::Arena;
+use mago_flags::U8Flags;
+use mago_oracle::assertion::Assertion;
 use mago_oracle::symbol::SymbolTable;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
+use mago_oracle::ty::atom::payload::array::ArrayAtom;
 use mago_oracle::ty::atom::payload::array::KnownElement;
+use mago_oracle::ty::atom::payload::array::KnownItem;
+use mago_oracle::ty::atom::payload::array::ListAtom;
 use mago_oracle::ty::atom::payload::scalar::float::FloatAtom;
 use mago_oracle::ty::atom::payload::scalar::float::LiteralFloat;
 use mago_oracle::ty::atom::payload::scalar::int::IntAtom;
+use mago_oracle::ty::well_known::EMPTY_ARRAY;
+use mago_oracle::ty::well_known::NON_NEGATIVE_INT;
 use mago_oracle::ty::well_known::TYPE_FLOAT;
+use mago_oracle::ty::well_known::TYPE_NEVER;
 use ordered_float::OrderedFloat;
+
+use crate::reconciler::reconcile;
 
 /// What an extension may read and build while refining an expression. Holds the
 /// real [`TypeBuilder`] directly (no trait object), so the type-construction
@@ -71,6 +81,145 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
         let atom = self.builder.list_of(element, non_empty);
 
         self.builder.union_of(&[atom])
+    }
+
+    pub fn truthy(&mut self, ty: Type<'arena>) -> Type<'arena> {
+        reconcile(self.builder, self.symbols, Assertion::Truthy, ty)
+    }
+
+    pub fn keyed(&mut self, key: Type<'arena>, value: Type<'arena>, non_empty: bool) -> Type<'arena> {
+        let atom = self.builder.keyed_unsealed(key, value, non_empty);
+
+        self.builder.union_of(&[atom])
+    }
+
+    pub fn filter_array(&mut self, source: Type<'arena>, narrow: bool) -> Option<Type<'arena>> {
+        match source.atoms {
+            [Atom::Array(array)] => {
+                let mut items: Vec<KnownItem<'arena>> = Vec::new();
+                if let Some(known) = array.known_items {
+                    for item in known {
+                        let value = if narrow { self.truthy(item.value) } else { item.value };
+                        if !value.is_never() {
+                            items.push(KnownItem { key: item.key, value, optional: true });
+                        }
+                    }
+                }
+
+                let (key_param, value_param) = match (array.key_param, array.value_param) {
+                    (Some(key), Some(value)) => {
+                        let value = if narrow { self.truthy(value) } else { value };
+                        if value.is_never() { (None, None) } else { (Some(key), Some(value)) }
+                    }
+                    _ => (None, None),
+                };
+
+                if items.is_empty() && value_param.is_none() {
+                    return Some(self.builder.union_of(&[EMPTY_ARRAY]));
+                }
+
+                let known_items = (!items.is_empty()).then(|| self.builder.known_items(&items));
+                let atom =
+                    self.builder.array(ArrayAtom { key_param, value_param, known_items, flags: U8Flags::empty() });
+
+                Some(self.builder.union_of(&[atom]))
+            }
+            [Atom::List(list)] => {
+                let mut values: Vec<Atom<'arena>> = Vec::new();
+                if let Some(known) = list.known_elements {
+                    for element in known {
+                        values.extend_from_slice(element.value.atoms);
+                    }
+                }
+
+                if !list.element_type.is_never() {
+                    values.extend_from_slice(list.element_type.atoms);
+                }
+
+                if values.is_empty() {
+                    return Some(self.builder.union_of(&[EMPTY_ARRAY]));
+                }
+
+                let value = self.builder.union_of(&values);
+                let value = if narrow { self.truthy(value) } else { value };
+                if value.is_never() {
+                    return Some(self.builder.union_of(&[EMPTY_ARRAY]));
+                }
+
+                let key = self.builder.union_of(&[NON_NEGATIVE_INT]);
+                let atom = self.builder.keyed_unsealed(key, value, false);
+
+                Some(self.builder.union_of(&[atom]))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn reverse_list(&mut self, source: Type<'arena>) -> Option<Type<'arena>> {
+        match source.atoms {
+            [Atom::List(list)] if list.element_type.is_never() && list.known_elements.is_some() => {
+                let elements = list.known_elements.unwrap_or(&[]);
+                let reversed: Vec<KnownElement<'arena>> = elements
+                    .iter()
+                    .rev()
+                    .enumerate()
+                    .map(|(index, element)| KnownElement {
+                        index: index as u32,
+                        value: element.value,
+                        optional: element.optional,
+                    })
+                    .collect();
+                let known_elements = Some(self.builder.known_elements(&reversed));
+                let atom = self.builder.list(ListAtom {
+                    element_type: TYPE_NEVER,
+                    known_elements,
+                    known_count: list.known_count,
+                    flags: list.flags,
+                });
+
+                Some(self.builder.union_of(&[atom]))
+            }
+            [Atom::List(_)] | [Atom::Array(_)] => Some(source),
+            _ => None,
+        }
+    }
+
+    pub fn remap_array_values(&mut self, source: Type<'arena>, value: Type<'arena>) -> Option<Type<'arena>> {
+        let atom = match source.atoms {
+            [Atom::List(list)] => {
+                let known_elements = list.known_elements.map(|elements| {
+                    let remapped: Vec<KnownElement<'arena>> = elements
+                        .iter()
+                        .map(|element| KnownElement { index: element.index, value, optional: element.optional })
+                        .collect();
+
+                    self.builder.known_elements(&remapped)
+                });
+                let element_type = if list.element_type.is_never() { TYPE_NEVER } else { value };
+
+                self.builder.list(ListAtom {
+                    element_type,
+                    known_elements,
+                    known_count: list.known_count,
+                    flags: list.flags,
+                })
+            }
+            [Atom::Array(array)] => {
+                let known_items = array.known_items.map(|items| {
+                    let remapped: Vec<KnownItem<'arena>> =
+                        items.iter().map(|item| KnownItem { key: item.key, value, optional: item.optional }).collect();
+
+                    self.builder.known_items(&remapped)
+                });
+                let (key_param, value_param) =
+                    if array.is_sealed() { (None, None) } else { (array.key_param, Some(value)) };
+
+                self.builder.array(ArrayAtom { key_param, value_param, known_items, flags: array.flags })
+            }
+            _ => return None,
+        };
+
+        Some(self.builder.union_of(&[atom]))
     }
 
     /// A literal float type; non-finite values widen to `float`.

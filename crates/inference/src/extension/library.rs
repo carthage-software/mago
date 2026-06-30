@@ -10,6 +10,7 @@ use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::array::ArrayFlag;
 use mago_oracle::ty::atom::payload::array::ArrayKey;
 use mago_oracle::ty::atom::payload::array::ListFlag;
+use mago_oracle::ty::atom::payload::callable::CallableAtom;
 use mago_oracle::ty::atom::payload::scalar::float::FloatAtom;
 use mago_oracle::ty::atom::payload::scalar::int::IntAtom;
 use mago_oracle::ty::atom::payload::scalar::string::StringAtom;
@@ -18,7 +19,9 @@ use mago_oracle::ty::atom::payload::scalar::string::StringRefinementFlag;
 use mago_oracle::ty::well_known::ARRAY_KEY;
 use mago_oracle::ty::well_known::FALSE;
 use mago_oracle::ty::well_known::FLOAT;
+use mago_oracle::ty::well_known::INT;
 use mago_oracle::ty::well_known::NON_NEGATIVE_INT;
+use mago_oracle::ty::well_known::STRING;
 use mago_oracle::ty::well_known::TRUE;
 
 use crate::extension::ExtensionContext;
@@ -77,6 +80,12 @@ impl<A: Arena> ExtensionInference<A> for StdlibInference {
             b"strripos" => Some(string_position(context, call, true, true)),
             b"array_keys" => array_keys(context, argument),
             b"array_values" => array_values(context, argument),
+            b"array_map" => array_map(context, call),
+            b"array_filter" => array_filter(context, call),
+            b"array_reverse" => array_reverse(context, call),
+            b"array_flip" => array_flip(context, call),
+            b"array_merge" => array_merge(context, call),
+            b"array_column" => array_column(context, call),
             b"min" => fold_min_max(context, call, false),
             b"max" => fold_min_max(context, call, true),
             b"substr" => fold_substr(context, call),
@@ -349,6 +358,224 @@ fn array_values<'arena, A: Arena>(
     }
 
     None
+}
+
+fn array_map<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+) -> Option<Type<'arena>> {
+    let arguments = positional_arguments(call);
+    let [callback, array] = arguments.as_slice() else {
+        return None;
+    };
+
+    if matches!(callback.atoms, [Atom::Null]) {
+        return Some(*array);
+    }
+
+    let return_type = callable_return(*callback)?;
+    context.remap_array_values(*array, return_type)
+}
+
+fn array_filter<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+) -> Option<Type<'arena>> {
+    let array = nth_argument(call, 0)?;
+    let has_callback = nth_argument(call, 1).is_some_and(|callback| !matches!(callback.atoms, [Atom::Null]));
+
+    context.filter_array(array, !has_callback)
+}
+
+fn array_reverse<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+) -> Option<Type<'arena>> {
+    if nth_argument(call, 1).is_some() {
+        return None;
+    }
+
+    context.reverse_list(nth_argument(call, 0)?)
+}
+
+fn array_flip<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+) -> Option<Type<'arena>> {
+    match nth_argument(call, 0)?.atoms {
+        [Atom::Array(array)] if array.known_items.is_none() => {
+            let (key, value) = (array.key_param?, array.value_param?);
+            if !is_array_key_type(value) {
+                return None;
+            }
+
+            Some(context.keyed(value, key, array.flags.contains(ArrayFlag::NonEmpty)))
+        }
+        [Atom::List(list)] if list.known_elements.is_none() => {
+            if !is_array_key_type(list.element_type) {
+                return None;
+            }
+
+            let value = context.union(&[NON_NEGATIVE_INT]);
+            Some(context.keyed(list.element_type, value, list.flags.contains(ListFlag::NonEmpty)))
+        }
+        _ => None,
+    }
+}
+
+fn array_merge<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+) -> Option<Type<'arena>> {
+    let arguments = positional_arguments(call);
+    if arguments.is_empty() {
+        return None;
+    }
+
+    let mut all_lists = true;
+    let mut all_sealed = true;
+    let mut non_empty = false;
+    let mut ordered: Vec<Type<'arena>> = Vec::new();
+    let mut values: Vec<Atom<'arena>> = Vec::new();
+    let mut keys: Vec<Atom<'arena>> = Vec::new();
+
+    for argument in &arguments {
+        match argument.atoms {
+            [Atom::List(list)] => {
+                non_empty |= list.flags.contains(ListFlag::NonEmpty);
+                if !list.element_type.is_never() {
+                    all_sealed = false;
+                    values.extend_from_slice(list.element_type.atoms);
+                }
+                if let Some(known) = list.known_elements {
+                    for element in known {
+                        ordered.push(element.value);
+                        values.extend_from_slice(element.value.atoms);
+                        non_empty |= !element.optional;
+                    }
+                }
+                keys.push(INT);
+            }
+            [Atom::Array(array)] => {
+                if array.known_items.is_none() && array.is_sealed() {
+                    continue;
+                }
+
+                all_lists = false;
+                non_empty |= array.flags.contains(ArrayFlag::NonEmpty);
+                if let Some(items) = array.known_items {
+                    for item in items {
+                        values.extend_from_slice(item.value.atoms);
+                        keys.push(array_key_atom(item.key));
+                        non_empty |= !item.optional;
+                    }
+                }
+                if let (Some(key), Some(value)) = (array.key_param, array.value_param) {
+                    keys.extend_from_slice(key.atoms);
+                    values.extend_from_slice(value.atoms);
+                }
+            }
+            _ => return None,
+        }
+    }
+
+    if all_lists {
+        if all_sealed {
+            return Some(context.list(&ordered, non_empty || !ordered.is_empty()));
+        }
+        if values.is_empty() {
+            return None;
+        }
+
+        let value = context.union(&values);
+        return Some(context.list_of(value, non_empty));
+    }
+
+    if values.is_empty() {
+        return None;
+    }
+
+    let key = if keys.is_empty() { context.union(&[ARRAY_KEY]) } else { context.union(&keys) };
+    let value = context.union(&values);
+    Some(context.keyed(key, value, non_empty))
+}
+
+fn array_key_atom(key: ArrayKey<'_>) -> Atom<'static> {
+    match key {
+        ArrayKey::Int(_) => INT,
+        ArrayKey::String(_) => STRING,
+        ArrayKey::Const { .. } => ARRAY_KEY,
+    }
+}
+
+fn array_column<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+) -> Option<Type<'arena>> {
+    let row = outer_value_type(nth_argument(call, 0)?)?;
+    let [Atom::Array(keyed)] = row.atoms else {
+        return None;
+    };
+    let known = keyed.known_items?;
+
+    let column_key = nth_argument(call, 1)?;
+    let column_type = if matches!(column_key.atoms, [Atom::Null]) {
+        row
+    } else {
+        let key = literal_array_key(column_key)?;
+        known.iter().find(|item| item.key == key)?.value
+    };
+
+    let index_type = match nth_argument(call, 2) {
+        None => None,
+        Some(index) if matches!(index.atoms, [Atom::Null]) => None,
+        Some(index) => {
+            let key = literal_array_key(index)?;
+            let value = known.iter().find(|item| item.key == key)?.value;
+            if !is_array_key_type(value) {
+                return None;
+            }
+
+            Some(value)
+        }
+    };
+
+    match index_type {
+        Some(index) => Some(context.keyed(index, column_type, false)),
+        None => Some(context.list_of(column_type, false)),
+    }
+}
+
+fn outer_value_type<'arena>(ty: Type<'arena>) -> Option<Type<'arena>> {
+    match ty.atoms {
+        [Atom::List(list)] if !list.element_type.is_never() => Some(list.element_type),
+        [Atom::Array(array)] => array.value_param,
+        _ => None,
+    }
+}
+
+fn literal_array_key<'arena>(ty: Type<'arena>) -> Option<ArrayKey<'arena>> {
+    if let Some(value) = literal_string(ty) {
+        return Some(ArrayKey::String(value));
+    }
+    if let Some(value) = literal_int(ty) {
+        return Some(ArrayKey::Int(value));
+    }
+
+    None
+}
+
+fn is_array_key_type(ty: Type<'_>) -> bool {
+    !ty.atoms.is_empty() && ty.atoms.iter().all(|atom| matches!(atom, Atom::Int(_) | Atom::String(_) | Atom::ArrayKey))
+}
+
+fn callable_return<'arena>(ty: Type<'arena>) -> Option<Type<'arena>> {
+    match ty.atoms {
+        [Atom::Callable(CallableAtom::Closure(signature) | CallableAtom::Signature(signature))] => {
+            Some(signature.return_type)
+        }
+        _ => None,
+    }
 }
 
 fn array_key_type<'arena, A: Arena>(

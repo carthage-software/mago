@@ -317,3 +317,101 @@ fn stdlib_substr_and_implode_fold() {
         assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
     }
 }
+
+#[test]
+fn stdlib_array_map_preserves_shape_with_callback_return() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php array_map(fn(int $x): string => (string) $x, [1, 2, 3]);", "list{0: string, 1: string, 2: string}"),
+        ("<?php /** @var list<int> */ $a = []; array_map(fn(int $x): string => (string) $x, $a);", "list<string>"),
+        ("<?php /** @var array<string, int> */ $a = []; array_map(fn(int $x): float => 1.0, $a);", "array<string, float>"),
+        ("<?php /** @var non-empty-list<int> */ $a = [1]; array_map(fn(int $x): bool => true, $a);", "non-empty-list<bool>"),
+        ("<?php array_map(null, [1, 2, 3]);", "list{0: int(1), 1: int(2), 2: int(3)}"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
+#[test]
+fn stdlib_array_filter_narrows_and_preserves_keys() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php /** @var list<int> */ $a = []; array_filter($a);", "array<non-negative-int, negative-int|positive-int>"),
+        ("<?php /** @var list<string> */ $a = []; array_filter($a);", "array<non-negative-int, string&!string('')&!string('0')>"),
+        ("<?php /** @var array<string, int> */ $a = []; array_filter($a);", "array<string, negative-int|positive-int>"),
+        ("<?php /** @var array<string, int> */ $a = []; array_filter($a, fn($x) => true);", "array<string, int>"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
+#[test]
+fn stdlib_array_reverse_and_flip() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php array_reverse([1, 'b', 3.0]);", "list{0: float(3), 1: string('b'), 2: int(1)}"),
+        ("<?php /** @var list<int> */ $a = []; array_reverse($a);", "list<int>"),
+        ("<?php /** @var array<string, int> */ $a = []; array_reverse($a);", "array<string, int>"),
+        ("<?php /** @var array<string, int> */ $a = []; array_flip($a);", "array<int, string>"),
+        ("<?php /** @var list<string> */ $a = []; array_flip($a);", "array<string, non-negative-int>"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
+#[test]
+fn stdlib_array_merge_concats_and_unions() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php array_merge([1, 2], ['a', 'b']);", "list{0: int(1), 1: int(2), 2: string('a'), 3: string('b')}"),
+        ("<?php array_merge([], [1, 2]);", "list{0: int(1), 1: int(2)}"),
+        ("<?php /** @var list<int> */ $a = []; /** @var list<string> */ $b = []; array_merge($a, $b);", "list<int|string>"),
+        ("<?php /** @var non-empty-list<int> */ $a = [1]; /** @var list<string> */ $b = []; array_merge($a, $b);", "non-empty-list<int|string>"),
+        ("<?php /** @var array<string, int> */ $a = []; /** @var array<int, string> */ $b = []; array_merge($a, $b);", "array<int|string, int|string>"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
+#[test]
+fn stdlib_array_column_extracts_the_column() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php /** @var list<array{id: int, name: string}> */ $r = []; array_column($r, 'name');", "list<string>"),
+        ("<?php /** @var list<array{id: int, name: string}> */ $r = []; array_column($r, 'name', 'id');", "array<int, string>"),
+        ("<?php /** @var list<array{id: int, name: string}> */ $r = []; array_column($r, null);", "list<array{'id': int, 'name': string}>"),
+        ("<?php /** @var array<string, array{x: float}> */ $r = []; array_column($r, 'x');", "list<float>"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
