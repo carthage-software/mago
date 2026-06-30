@@ -36,10 +36,11 @@ where
     pub(crate) fn infer_parameters(
         &mut self,
         parameters: &Delimited<'source, Parameter<'source, SymbolId, S, E>>,
+        this_type: Option<Type<'arena>>,
     ) -> InferenceResult<Delimited<'arena, Parameter<'arena, SymbolId, Flow, Type<'arena>>>> {
         let mut items = Vec::new_in(self.arena);
         for parameter in parameters.items {
-            items.push(self.infer_parameter(parameter)?);
+            items.push(self.infer_parameter(parameter, this_type)?);
         }
 
         Ok(Delimited { span: parameters.span, items: items.leak() })
@@ -48,6 +49,7 @@ where
     fn infer_parameter(
         &mut self,
         parameter: &Parameter<'source, SymbolId, S, E>,
+        this_type: Option<Type<'arena>>,
     ) -> InferenceResult<Parameter<'arena, SymbolId, Flow, Type<'arena>>> {
         let attributes = self.infer_attributes(parameter.attributes)?;
         let default_value = match parameter.default_value {
@@ -55,13 +57,22 @@ where
             None => None,
         };
 
-        let hooks = match parameter.hooks {
+        let hooks = match &parameter.hooks {
             None => None,
-            Some(_) => {
-                return Err(InferenceError::Unsupported {
-                    span: parameter.span,
-                    construct: "parameter property hooks",
-                });
+            Some(hooks) => {
+                let Some(this_type) = this_type else {
+                    return Err(InferenceError::Unsupported {
+                        span: parameter.span,
+                        construct: "parameter property hooks",
+                    });
+                };
+
+                let mut items = Vec::new_in(self.arena);
+                for hook in hooks.items {
+                    items.push(self.infer_hook(this_type, hook)?);
+                }
+
+                Some(Delimited { span: hooks.span, items: items.leak() })
             }
         };
 

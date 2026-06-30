@@ -277,20 +277,31 @@ where
         annotation: Option<&ItemAnnotation<'arena, I, St, Ex>>,
         origin: Origin,
     ) -> PropertyMember<'arena> {
+        let property_name = parameter.variable.name;
+        let property_id = SymbolId::property(class_name, property_name);
+
         let read = read_visibility(parameter.modifiers);
         let attributes = self.attributes(parameter.attributes);
         let ty = self.parameter_type_slot(parameter, annotation);
 
+        let arena = self.arena;
+        let declared_hooks = parameter.hooks.as_ref().map_or(&[][..], |hooks| hooks.as_slice());
+        let hooks = arena.alloc_slice_fill_iter(
+            declared_hooks
+                .iter()
+                .map(|hook| self.property_hook(class_name, property_name, property_id, hook, ty, origin)),
+        );
+
         PropertyMember {
             span: parameter.span,
             visibility: ReadWriteVisibility::new(read, write_visibility(parameter.modifiers, read)),
-            name: Path::property(self.arena, class_name, parameter.variable.name),
+            name: Path::property(self.arena, class_name, property_name),
             defining_symbol: owner,
-            flags: property_flags(parameter.modifiers, parameter.default_value.is_some(), false),
+            flags: property_flags(parameter.modifiers, parameter.default_value.is_some(), !hooks.is_empty()),
             constraint: self.constraint(parameter.version_constraint),
             attributes,
             ty,
-            hooks: &[],
+            hooks,
             origin,
         }
     }

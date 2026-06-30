@@ -29,7 +29,7 @@ where
         let reachable = self.reachable;
         self.bind_signature_parameters(arrow.parameters.items, signature);
 
-        let parameters = self.infer_parameters(&arrow.parameters)?;
+        let parameters = self.infer_parameters(&arrow.parameters, None)?;
         let expression = self.infer_expression(arrow.expression)?;
 
         self.environment = outer;

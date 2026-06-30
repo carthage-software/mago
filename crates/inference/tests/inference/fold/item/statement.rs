@@ -379,6 +379,52 @@ test_inference! {
     }
 }
 
+test_inference! {
+    name = reads_a_hooked_promoted_property,
+    code = indoc! {"
+        <?php
+        class C {
+            public function __construct(public int $count { get => 0; }) {}
+            public function g(): int { return $this->count; }
+        }
+    "},
+    expect = |ir| {
+        let Some(value) = method_return_value(ir, b"g") else { panic!("expected a return value in g()") };
+        assert_eq!(value.meta.to_string(), "int", "the hooked promoted property is readable as its declared type");
+    }
+}
+
+test_inference! {
+    name = a_promoted_property_hook_is_folded_not_dropped,
+    code = indoc! {"
+        <?php
+        class C {
+            public function __construct(public int $count { get => $this->count; }) {}
+        }
+    "},
+    expect = |ir| {
+        let hooks = constructor_parameter_hooks(ir).expect("the constructor parameter keeps its hooks");
+        assert_eq!(hooks, 1, "the get hook is folded onto the promoted parameter");
+    }
+}
+
+fn constructor_parameter_hooks(ir: TypedIr<'_>) -> Option<usize> {
+    for statement in ir.statements {
+        let StatementKind::Item(item) = statement.kind else { continue };
+        let ItemStatementKind::Class(class) = item.kind else { continue };
+        for member in class.members.items {
+            if let MemberItemKind::Method(method) = member.kind
+                && method.name.value == b"__construct"
+                && let Some(parameter) = method.parameters.items.first()
+            {
+                return Some(parameter.hooks.as_ref().map_or(0, |hooks| hooks.items.len()));
+            }
+        }
+    }
+
+    None
+}
+
 fn constant_value(ir: TypedIr<'_>, name: &[u8]) -> Option<String> {
     constant_value_in(ir.statements, name)
 }

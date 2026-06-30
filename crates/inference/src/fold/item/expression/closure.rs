@@ -43,7 +43,7 @@ where
 
         self.bind_signature_parameters(closure.parameters.items, signature);
 
-        let parameters = self.infer_parameters(&closure.parameters)?;
+        let parameters = self.infer_parameters(&closure.parameters, None)?;
         let body = self.infer_statement(closure.body)?;
 
         self.environment = outer;

@@ -35,7 +35,7 @@ where
 
         self.bind_signature_parameters(function.parameters.items, signature);
 
-        let parameters = self.infer_parameters(&function.parameters)?;
+        let parameters = self.infer_parameters(&function.parameters, None)?;
         let body = self.infer_statement(function.body)?;
 
         self.environment = outer_environment;

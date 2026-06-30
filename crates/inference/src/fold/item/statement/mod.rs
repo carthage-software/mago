@@ -140,7 +140,7 @@ where
         }
         self.bind_signature_parameters(method.parameters.items, signature);
 
-        let parameters = self.infer_parameters(&method.parameters)?;
+        let parameters = self.infer_parameters(&method.parameters, Some(this_type))?;
         let body = match method.body {
             Some(body) => Some(&*self.arena.alloc(self.infer_statement(body)?)),
             None => None,
@@ -248,7 +248,7 @@ where
         })
     }
 
-    fn infer_hook(
+    pub(crate) fn infer_hook(
         &mut self,
         this_type: Type<'arena>,
         hook: &'source Hook<'source, SymbolId, S, E>,
@@ -268,7 +268,7 @@ where
             Some(parameters) => {
                 self.bind_signature_parameters(parameters.items, &[]);
 
-                Some(self.infer_parameters(parameters)?)
+                Some(self.infer_parameters(parameters, None)?)
             }
             None => None,
         };
