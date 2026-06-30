@@ -88,7 +88,7 @@ where
         Ok(Expression { meta, span, kind: ExpressionKind::PartialApplication(self.arena.alloc(node)) })
     }
 
-    fn infer_partial_arguments(
+    pub(crate) fn infer_partial_arguments(
         &mut self,
         arguments: &'source Delimited<'source, PartialArgument<'source, SymbolId, S, E>>,
     ) -> InferenceResult<Delimited<'arena, PartialArgument<'arena, SymbolId, Flow, Type<'arena>>>> {

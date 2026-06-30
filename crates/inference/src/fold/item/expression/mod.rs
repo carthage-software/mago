@@ -1,3 +1,4 @@
+mod anonymous_class;
 mod arrow_function;
 mod closure;
 
@@ -61,8 +62,11 @@ where
 
                 (meta, ItemExpression { meta: item.meta, span: item.span, kind })
             }
-            ItemExpressionKind::AnonymousClass(_) => {
-                return Err(InferenceError::Unsupported { span: item.span, construct: "anonymous classes" });
+            ItemExpressionKind::AnonymousClass(node) => {
+                let (meta, node) = self.infer_anonymous_class(item.meta, node)?;
+                let kind = ItemExpressionKind::AnonymousClass(self.arena.alloc(node));
+
+                (meta, ItemExpression { meta: item.meta, span: item.span, kind })
             }
         };
 
